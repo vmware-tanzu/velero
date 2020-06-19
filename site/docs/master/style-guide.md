@@ -5,6 +5,8 @@ _This style guide is adapted from the [Kubernetes style guide](https://kubernete
 
 This page outlines writing style guidelines for the Velero documentation and you should use this page as a reference you write or edit content. Note that these are guidelines, not rules. Use your best judgment as you write documentation, and feel free to propose changes to these guidelines. Changes to the style guide are made by the Velero maintainers as a group. To propose a change or addition create an issue/PR, or add a suggestion to the [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA) and attend the meeting to participate in the discussion.
 
+NOTE: This guide is based on kramdown style markdown.
+
 ## Content best practices
 
 
@@ -12,7 +14,7 @@ This page outlines writing style guidelines for the Velero documentation and you
 
 <table caption="Do and Don't - Use present tense">
   <tr><th>Do</th><th>Don't</th></tr>
-  <tr><td>This command starts a proxy.</td><td>This command will start a proxy.</td></tr>
+  <tr><td>This `command` starts a proxy.</td><td>This command will start a proxy.</td></tr>
 </table>
 
 Exception: Use future or past tense if it is required to convey the correct meaning.
@@ -143,25 +145,25 @@ Use angle brackets for placeholders. Tell the reader what a placeholder represen
 
 <table caption="Do and Don't - Bold interface elements" markdown="1">
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td markdown="1">Click **Fork**.</td><td>Click "Fork".</td></tr>
-<tr><td markdown="1">Select **Other**.</td><td>Select "Other".</td></tr>
+<tr><td markdown="span">Click **Fork**.</td><td>Click "Fork".</td></tr>
+<tr><td markdown="span">Select **Other**.</td><td>Select "Other".</td></tr>
 </table>
 
 ### Use italics to define or introduce new terms
 
 <table caption="Do and Don't - Use italics for new terms" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>A _cluster_ is a set of nodes ...</td><td>A "cluster" is a set of nodes ...</td></tr>
-<tr><td>These components form the _control plane_.</td><td>These components form the **control plane**.</td></tr>
+<tr><td markdown="span">A _cluster_ is a set of nodes ...</td><td>A "cluster" is a set of nodes ...</td></tr>
+<tr><td markdown="span">These components form the _control plane_.</td><td markdown="span">These components form the **control plane**.</td></tr>
 </table>
 
 ### Use code style for filenames, directories, paths, object field names and namespaces
 
 <table caption="Do and Don't - Use code style for filenames, directories, paths, object field names and namespaces" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>Open the `envars.yaml` file.</td><td>Open the envars.yaml file.</td></tr>
-<tr><td>Go to the `/docs/tutorials` directory.</td><td>Go to the /docs/tutorials directory.</td></tr>
-<tr><td>Open the `/_data/concepts.yaml` file.</td><td>Open the /\_data/concepts.yaml file.</td></tr>
+<tr><td markdown="span">Open the `envars.yaml` file.</td><td>Open the envars.yaml file.</td></tr>
+<tr><td markdown="span">Go to the `/docs/tutorials` directory.</td><td>Go to the /docs/tutorials directory.</td></tr>
+<tr><td markdown="span">Open the `/_data/concepts.yaml` file.</td><tdmarkdown="span">Open the /\_data/concepts.yaml file.</td></tr>
 </table>
 
 ### Use punctuation inside quotes
@@ -173,9 +175,10 @@ Use angle brackets for placeholders. Tell the reader what a placeholder represen
 </table>
 
 Exception: When the quoted word is a user input.
+
 Example:
-My user ID is “IM47g”.
-Did you try the password “mycatisawesome”?
+* My user ID is “IM47g”.
+* Did you try the password “mycatisawesome”?
 
 ## Inline code formatting
 
@@ -187,9 +190,9 @@ document, use the backtick (`` ` ``).
 
 <table caption="Do and Don't - Use code style for inline code and commands" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>The `kubectl run`command` creates a Deployment.</td><td>The "kubectl run" command creates a Deployment.</td></tr>
-<tr><td>For declarative management, use `kubectl apply`.</td><td>For declarative management, use "kubectl apply".</td></tr>
-<tr><td>Use single backticks to enclose inline code. For example, `var example = true`.</td><td>Use two asterisks (`**`) or an underscore (`_`) to enclose inline code. For example, **var example = true**.</td></tr>
+<tr><td markdown="span">The `kubectl run` command creates a Deployment.</td><td>The "kubectl run" command creates a Deployment.</td></tr>
+<tr><td markdown="span">For declarative management, use `kubectl apply`.</td><td>For declarative management, use "kubectl apply".</td></tr>
+<tr><td markdown="span">Use single backticks to enclose inline code. For example, `var example = true`.</td><td>Use two asterisks (`**`) or an underscore (`_`) to enclose inline code. For example, **var example = true**.</td></tr>
 <tr><td>Use triple backticks (\`\`\`) before and after a multi-line block of code for fenced code blocks.</td><td>Use multi-line blocks of code to create diagrams, flowcharts, or other illustrations.</td></tr>
 <tr><td>Use meaningful variable names that have a context.</td><td>Use variable names such as 'foo','bar', and 'baz' that are not meaningful and lack context.</td></tr>
 <tr><td>Remove trailing spaces in the code.</td><td>Add trailing spaces in the code, where these are important, because the screen reader will read out the spaces as well.</td></tr>
@@ -199,7 +202,7 @@ document, use the backtick (`` ` ``).
 
 <table caption="Do and Don't - Starting a sentence with a component tool or component name" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>The `kubeadm` tool bootstraps and provisions machines in a cluster.</td><td>`kubeadm` tool bootstraps and provisions machines in a cluster.</td></tr>
+<tr><td markdown="span">The `kubeadm` tool bootstraps and provisions machines in a cluster.</td><td markdown="span">`kubeadm` tool bootstraps and provisions machines in a cluster.</td></tr>
 <tr><td>The kube-scheduler is the default scheduler for Kubernetes.</td><td>kube-scheduler is the default scheduler for Kubernetes.</td></tr>
 </table>
 
@@ -209,9 +212,9 @@ For field values of type string or integer, use normal style without quotation m
 
 <table caption="Do and Don't - Use normal style for string and integer field values" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>Set the value of `imagePullPolicy` to `Always`.</td><td>Set the value of `imagePullPolicy` to "Always".</td></tr>
-<tr><td>Set the value of `image` to `nginx:1.16`.</td><td>Set the value of `image` to nginx:1.16.</td></tr>
-<tr><td>Set the value of the `replicas` field to `2`.</td><td>Set the value of the `replicas` field to 2.</td></tr>
+<tr><td markdown="span">Set the value of `imagePullPolicy` to `Always`.</td><td markdown="span">Set the value of `imagePullPolicy` to "Always".</td></tr>
+<tr><td markdown="span">Set the value of `image` to `nginx:1.16`.</td><td markdown="span">Set the value of `image` to nginx:1.16.</td></tr>
+<tr><td markdown="span">Set the value of the `replicas` field to `2`.</td><td markdown="span">Set the value of the `replicas` field to 2.</td></tr>
 </table>
 
 ## Code snippet formatting
@@ -268,7 +271,7 @@ People accessing this documentation may use a screen reader or other assistive t
 <tr><th>Do</th><th>Don't</th></tr>
 <tr><td>Include a title on each page or blog post.</td><td>Include more than one title headings (#) in a page.</td></tr>
 <tr><td>Use ordered headings to provide a meaningful high-level outline of your content.</td><td>Use headings level 4 through 6, unless it is absolutely necessary. If your content is that detailed, it may need to be broken into separate articles.</td></tr>
-<tr><td>Use sentence case for headings. For example, **Extend kubectl with plugins**</td><td>Use title case for headings. For example, **Extend Kubectl With Plugins**</td></tr>
+<tr><td markdown="span">Use sentence case for headings. For example, **Extend kubectl with plugins**</td><td markdown="span">Use title case for headings. For example, **Extend Kubectl With Plugins**</td></tr>
 </table>
 
 ### Paragraphs
@@ -276,15 +279,15 @@ People accessing this documentation may use a screen reader or other assistive t
 <table caption="Do and Don't - Paragraphs" >
 <tr><th>Do</th><th>Don't</th></tr>
 <tr><td>Try to keep paragraphs under 6 sentences.</td><td>Write long-winded paragraphs.</td></tr>
-<tr><td>Use three hyphens (`---`) to create a horizontal rule for breaks in paragraph content.</td><td>Use horizontal rules for decoration.</td></tr>
+<tr><td markdown="span">Use three hyphens (`---`) to create a horizontal rule for breaks in paragraph content.</td><td>Use horizontal rules for decoration.</td></tr>
 </table>
 
 ### Links
 
 <table caption="Do and Don't - Links" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>Write hyperlinks that give you context for the content they link to. For example: Certain ports are open on your machines. See [check required ports](#check-required-ports) for more details.</td><td>Use ambiguous terms such as “click here”. For example: Certain ports are open on your machines. See [here](#check-required-ports) for more details.</td></tr>
-<tr><td>Write Markdown-style links: `[link text](URL)`. For example: `[community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA)` and the output is  [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA).</td><td>Write HTML-style links: `<a href="/media/examples/link-element-example.css" target="_blank">Visit our tutorial!</a>`</td></tr>
+<tr><td markdown="span">Write hyperlinks that give you context for the content they link to. For example: Certain ports are open on your machines. See [check required ports](#check-required-ports) for more details.</td><td markdown="span">Use ambiguous terms such as “click here”. For example: Certain ports are open on your machines. See [here](#check-required-ports) for more details.</td></tr>
+<tr><td markdown="span">Write Markdown-style links: `[link text](URL)`. For example: `[community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA)` and the output is  [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA).</td><td markdown="span">Write HTML-style links: `<a href="/media/examples/link-element-example.css" target="_blank">Visit our tutorial!</a>`</td></tr>
 </table>
 
 
@@ -296,7 +299,6 @@ Website navigation links can also be marked up as list items; after all they are
  - End each item in a list with a period if one or more items in the list are complete sentences. For the sake of consistency, normally either all items or none should be complete sentences.
 
   - Ordered lists that are part of an incomplete introductory sentence can be in lowercase and punctuated as if each item was a part of the introductory sentence.
-
 
  - Use the number one (`1.`) for ordered lists.
 
@@ -310,4 +312,6 @@ Website navigation links can also be marked up as list items; after all they are
 
 ### Tables
 
-The semantic purpose of a data table is to present tabular data. Sighted users can quickly scan the table but a screen reader goes through line by line. A table caption is used to create a descriptive title for a data table. Assistive technologies (AT) use the HTML table caption element to identify the table contents to the user within the page structure. For example, `<table caption="Do and Don't - Use present tense">`.
+The semantic purpose of a data table is to present tabular data. Sighted users can quickly scan the table but a screen reader goes through line by line. A table caption is used to create a descriptive title for a data table. Assistive technologies (AT) use the HTML table caption element to identify the table contents to the user within the page structure. For example, `<table caption="Do and Don't - Use present tense">`. To make tables accessible, use HTML formatting to create tables.
+
+If you need to create a table and style table data with markdown, add `markdown="span"` to all `<td>` where the markdown interpreter should be applied.
