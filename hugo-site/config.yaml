@@ -2,6 +2,8 @@ baseURL: http://example.org/
 disablePathToLower: true
 languageCode: en-us
 title: Velero
+frontmatter:
+  date: [":filename", ":default"]
 params:
   author: Velero Authors
   vm_logo: vm-logo.png
