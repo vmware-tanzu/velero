@@ -23,8 +23,6 @@ import (
 	"testing"
 	"time"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +34,7 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
@@ -68,7 +66,7 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 	var expected []string
 
 	for i := 0; i < 3; i++ {
-		backup := builder.ForBackup(api.DefaultNamespace, fmt.Sprintf("backup-%d", i)).Result()
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, fmt.Sprintf("backup-%d", i)).Result()
 		sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup)
 		expected = append(expected, kube.NamespaceAndName(backup))
 	}
@@ -158,8 +156,8 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 
 	tests := []struct {
 		name                           string
-		backup                         *api.Backup
-		deleteBackupRequests           []*api.DeleteBackupRequest
+		backup                         *velerov1api.Backup
+		deleteBackupRequests           []*velerov1api.DeleteBackupRequest
 		backupLocation                 *velerov1api.BackupStorageLocation
 		expectDeletion                 bool
 		createDeleteBackupRequestError bool
@@ -196,14 +194,14 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			name:           "expired backup with a pending deletion request is not deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
 			backupLocation: defaultBackupLocation,
-			deleteBackupRequests: []*api.DeleteBackupRequest{
+			deleteBackupRequests: []*velerov1api.DeleteBackupRequest{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: velerov1api.DefaultNamespace,
 						Name:      "foo",
 						Labels: map[string]string{
-							api.BackupNameLabel: "backup-1",
-							api.BackupUIDLabel:  "",
+							velerov1api.BackupNameLabel: "backup-1",
+							velerov1api.BackupUIDLabel:  "",
 						},
 					},
 					Status: velerov1api.DeleteBackupRequestStatus{
@@ -217,14 +215,14 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			name:           "expired backup with only processed deletion requests is deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
 			backupLocation: defaultBackupLocation,
-			deleteBackupRequests: []*api.DeleteBackupRequest{
+			deleteBackupRequests: []*velerov1api.DeleteBackupRequest{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: velerov1api.DefaultNamespace,
 						Name:      "foo",
 						Labels: map[string]string{
-							api.BackupNameLabel: "backup-1",
-							api.BackupUIDLabel:  "",
+							velerov1api.BackupNameLabel: "backup-1",
+							velerov1api.BackupUIDLabel:  "",
 						},
 					},
 					Status: velerov1api.DeleteBackupRequestStatus{

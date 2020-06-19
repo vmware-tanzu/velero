@@ -222,8 +222,6 @@ func (s *resticServer) run() {
 	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
-
-	s.logger.Info("Waiting for all controllers to shut down gracefully")
 }
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a
