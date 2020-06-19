@@ -1,9 +1,9 @@
-# Velero Documentation Style Guide
+
+# Documentation Style Guide
 
 _This style guide is adapted from the [Kubernetes style guide](https://kubernetes.io/docs/contribute/style/style-guide/)._
 
-This page outlines writing style guidelines for the Velero documentation.
-These are guidelines, not rules. Use your best judgment as you write documentation, and feel free to propose changes to these guidelines. Changes to the style guide are made by the Velero maintainers as a group. To propose a change or addition, create an issue/PR, or add it to the [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA) and attend the meeting to participate in the discussion.
+This page outlines writing style guidelines for the Velero documentation and you should use this page as a reference you write or edit content. Note that these are guidelines, not rules. Use your best judgment as you write documentation, and feel free to propose changes to these guidelines. Changes to the style guide are made by the Velero maintainers as a group. To propose a change or addition create an issue/PR, or add a suggestion to the [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA) and attend the meeting to participate in the discussion.
 
 ## Content best practices
 
@@ -86,7 +86,7 @@ Many readers speak English as a second language. Avoid jargon and idioms to help
 ### Avoid statements about the future
 
 Avoid making promises or giving hints about the future. If you need to talk about
-an alpha feature, put the text under a heading that identifies it as alpha
+an beta feature, put the text under a heading that identifies it as beta
 information.
 
 ### Avoid statements that will soon be out of date
@@ -131,8 +131,7 @@ leads to an awkward sentence construction.
 
 ### Use angle brackets for placeholders
 
-Use angle brackets for placeholders. Tell the reader what a placeholder
-represents.
+Use angle brackets for placeholders. Tell the reader what a placeholder represents.
 
 1. Display information about a Pod:
 
@@ -210,9 +209,9 @@ For field values of type string or integer, use normal style without quotation m
 
 <table caption="Do and Don't - Use normal style for string and integer field values" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>Set the value of `imagePullPolicy` to Always.</td><td>Set the value of `imagePullPolicy` to "Always".</td></tr>
-<tr><td>Set the value of `image` to nginx:1.16.</td><td>Set the value of `image` to `nginx:1.16`.</td></tr>
-<tr><td>Set the value of the `replicas` field to 2.</td><td>Set the value of the `replicas` field to `2`.</td></tr>
+<tr><td>Set the value of `imagePullPolicy` to `Always`.</td><td>Set the value of `imagePullPolicy` to "Always".</td></tr>
+<tr><td>Set the value of `image` to `nginx:1.16`.</td><td>Set the value of `image` to nginx:1.16.</td></tr>
+<tr><td>Set the value of the `replicas` field to `2`.</td><td>Set the value of the `replicas` field to 2.</td></tr>
 </table>
 
 ## Code snippet formatting
@@ -267,7 +266,7 @@ People accessing this documentation may use a screen reader or other assistive t
 
 <table caption="Do and Don't - Headings" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>Include a title on each page the page or blog post.</td><td>Use include more than one title headings (#) in a page.</td></tr>
+<tr><td>Include a title on each page or blog post.</td><td>Include more than one title headings (#) in a page.</td></tr>
 <tr><td>Use ordered headings to provide a meaningful high-level outline of your content.</td><td>Use headings level 4 through 6, unless it is absolutely necessary. If your content is that detailed, it may need to be broken into separate articles.</td></tr>
 <tr><td>Use sentence case for headings. For example, **Extend kubectl with plugins**</td><td>Use title case for headings. For example, **Extend Kubectl With Plugins**</td></tr>
 </table>
@@ -284,9 +283,10 @@ People accessing this documentation may use a screen reader or other assistive t
 
 <table caption="Do and Don't - Links" >
 <tr><th>Do</th><th>Don't</th></tr>
-<tr><td>Write hyperlinks that give you context for the content they link to. For example: Certain ports are open on your machines. See <a href="#check-required-ports">Check required ports</a> for more details.</td><td>Use ambiguous terms such as “click here”. For example: Certain ports are open on your machines. See <a href="#check-required-ports">here</a> for more details.</td></tr>
-<tr><td>Write Markdown-style links: `[link text](URL)`. For example: `[community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA)` and the output is  [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA).</td><td>Write HTML-style links: `<a href="/media/examples/link-element-example.css" target="_blank">Visit our tutorial!</a>`, or create links that open in new tabs or windows. For example: `[example website](https://example.com){target="_blank"}`</td></tr>
+<tr><td>Write hyperlinks that give you context for the content they link to. For example: Certain ports are open on your machines. See [check required ports](#check-required-ports) for more details.</td><td>Use ambiguous terms such as “click here”. For example: Certain ports are open on your machines. See [here](#check-required-ports) for more details.</td></tr>
+<tr><td>Write Markdown-style links: `[link text](URL)`. For example: `[community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA)` and the output is  [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA).</td><td>Write HTML-style links: `<a href="/media/examples/link-element-example.css" target="_blank">Visit our tutorial!</a>`</td></tr>
 </table>
+
 
 ### Lists
 
