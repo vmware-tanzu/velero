@@ -897,6 +897,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
+	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
+	// by v2.0, the block from this line and including the `s.mgr.Start() will be
+	// deprecated, since the manager auto-starts all the caches. Until then, we need to start the
+	// cache for them manually.
 	for i := range controllers {
 		controllerRunInfo := controllers[i]
 		// Adding the controllers to the manager will register them as a (runtime-controller) runnable,

@@ -212,6 +212,11 @@ func (s *resticServer) run() {
 	go s.podInformer.Run(s.ctx.Done())
 	go s.secretInformer.Run(s.ctx.Done())
 
+	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
+	// by v2.0, the block from this line and including the `s.mgr.Start() will be
+	// deprecated, since the manager auto-starts all the caches. Until then, we need to start the
+	// cache for them manually.
+
 	// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
 	// so the manager will ensure the cache is started and ready before all controller are started
 	s.mgr.Add(managercontroller.Runnable(backupController, 1))
