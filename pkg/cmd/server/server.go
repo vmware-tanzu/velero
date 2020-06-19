@@ -363,6 +363,8 @@ func (s *server) run() error {
 		return err
 	}
 
+	// Fetching from the server directly since at this point
+	// the cache has not yet started
 	bsl := &velerov1api.BackupStorageLocation{}
 	if err := s.mgr.GetAPIReader().Get(context.Background(), kbclient.ObjectKey{
 		Namespace: s.namespace,
