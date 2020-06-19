@@ -14,6 +14,14 @@ Add that to the PR.
 
 If a PR does not warrant a changelog, the CI check for a changelog can be skipped by applying a `changelog-not-required` label on the PR.
 
+## Copyright header 
+
+Whenever a source code file is being modified, the copyright notice should be updated to our standard copyright notice. That is, it should read “Copyright [insert current year] the Velero contributors.” 
+
+For new files, the entire copyright and license header must be added.
+
+Please note that doc files do not need a copyright header.
+
 ## Code
 
 - Log messages are capitalized.
@@ -36,7 +44,7 @@ If a PR does not warrant a changelog, the CI check for a changelog can be skippe
 
 For imports, we use the following convention:
 
-<group><version><api | client | informer | ...>
+`<group><version><api | client | informer | ...>`
 
 Example:
 
