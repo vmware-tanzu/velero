@@ -1,0 +1,165 @@
+Volume Backup by Default when Restic Enabled
+
+Git issue to be created following internal review (to which the related issues will be linked)
+
+
+# **Change tracking**
+
+_This is a live document, you can reach me on the following channels for more information or for any questions:_
+
+
+
+*   _Email:  [bstephanie@vmware.com](mailto:bstephanie@vmware.com)_
+*   _Kubernetes slack:  _
+    *   _Channel:  #velero_
+    *   _@Stephanie Bauman_
+*   _VMware internal slack:_
+    *   _@bstephanie_
+
+Background
+
+Relates to these issues on github: 
+
+[https://github.com/vmware-tanzu/velero/issues/1871](https://github.com/vmware-tanzu/velero/issues/1871)
+
+[https://github.com/vmware-tanzu/velero/issues/605](https://github.com/vmware-tanzu/velero/issues/605)
+
+[https://github.com/vmware-tanzu/velero/issues/2375](https://github.com/vmware-tanzu/velero/issues/2375)
+
+Currently the Velero rustic plug-in requires users to provide annotations for each pod containing resources in a cluster. This process requires users to individually annotate the deployment spec and call out which volumes from each pod should be backed up by Velero, and this can be cumbersome for Velero users. And, in this current process, any volumes that are not annotated are not included as part of the velero backup.
+
+To get around this issue, users are currently writing scripts which support automation of backup functions for all volumes in a cluster and not just for those annotated manually in the deployment spec. Users are also using scripts to annotate which volumes should be excluded from back up.
+
+Strategic Fit
+
+As the Velero product continues to grow, the product should support data back-up operations using restic at a broader scale and then tailor-fit that operation for a specific backup need using exclusions. 
+
+Users are looking for a way to automate and decrease the amount of time it takes to backup all volume resources in the cluster with an option to call out exclusions of individual volumes that should not be backed up.
+
+Purpose / Goal
+
+Enable Velero to provide users with a way to automate backup of all volumes by default using the restic plug-in and also provide a way for users to exclude specific volumes from the backup. The ability to do this should be incorporated as part of the annotation for the pod spec when executing the backup. Users are currently using scripts to achieve this functionality and we also want to improve the experience for our users. 
+
+Feature Description
+
+A Velero capability is needed that provides automated annotation to the pod for including all volumes in a velero back up. This should treat the automated annotation as an “include all” function for backing up all volumes by default. And, the controller should also include the option to exclude some volumes from back to specify which volumes should not be backed up and include these in the annotation spec. 
+
+ 
+
+Assumptions
+
+Snapshotter and annotation conflicts will be addressed and will not cause breaking changes in the way the Velero restc plug-in functions.
+
+We may need to build a new inclusion patterns that do not exist in restic as a result of supporting this feature. *** 
+
+ 
+
+Use cases
+
+
+
+1. The Velero restic plug-in as it exists today requires individual annotation of volumes to be included in the pod spec before those volumes will be included in the back up, which means that these volumes are excluded by default unless they are included in the annotation. We need a way to do the inverse and allow users to include the volumes to be backed up by restic by default.
+2. Users may not always want to back up all volumes using the Velero restic plug-in so they also need a way to annotate exclusion of certain volume resources from being backup in the spec. 
+3. A potential use case could exist to include the option to select one of two options for handling backups via the Velero restic plug-in should exist:  Option 1 - user can select to include all volumes by default and be able to manually annotate exclusions in the pod spec; option 2 - user can select to exclude all volumes by default and be able to manually annotate exclusions in the pod spec. (_question - why did we build only the exclusion by default in - is there some history there that I should be aware of?)_
+
+Non-goals
+
+We will not be building _(are we using existing restic exclusion and inclusion patterns in our implementation - [https://restic.readthedocs.io/en/stable/040_backup.html#excluding-files](https://restic.readthedocs.io/en/stable/040_backup.html#excluding-files)) _new exclusion or inclusion patterns that cannot be leveraged from restic.
+
+Host-path volumes will continue to remain unsupported with this feature set. (_question: what is the difference between host-path volumes and new local volume types?_)
+
+Retic’s Current Include and Exclude Capabilities
+
+User Stories
+
+
+
+1. As a user, I want the ability to include all restic volumes by default in my backup.
+2. As a user, I want the ability to exclude certain volume resources from my restic backup. 
+3. As a user, prior to running a restic backup in Velero, I want the ability to choose to either a) include all volumes in the back up by default or, b) exclude all volumes in the back up default.  
+4. As a user, I still want the option to use the exclude all resources by default function when using Velero to perform a restic backup.
+5. As a user, I still want the option to use the include certain resources by default function when leveraging the exclude all resources by default capability in Velero. 
+
+Requirements 
+
+**_P0_** = must not ship without 
+
+
+    (absolute requirement for MVP, engineering requirements for long term viability usually fall in here for ex., and incompletion nearing or by deadline means delaying code freeze and GA date)
+
+**_P1_** = should not ship without 
+
+
+    (required for feature to achieve general adoption, should be scoped into feature but can be pushed back to later iterations if needed)
+
+**_P2_** = nice to have 
+
+
+    (opportunistic, should not be scoped into the overall feature if it has dependencies and could cause delay)
+
+P0. Specify include all volumes or exclude all volumes by default function
+
+When preparing to run a backup, allow users to specify whether to set **include** all volumes in the specified pod backup or **exclude** all volumes in the specified pod back up.
+
+N/A. Retain current function for excluding all volumes from a specified pod. 
+
+Retain the ability for users to essentially ‘exclude all’ volumes from being backed up by default and include only the specific volumes that are called out in the annotation. 
+
+_Note: this is not a change to the current functionality and only calls out that this functionality will not be deprecated but will continue to be supported for those users wishing to use this function._
+
+P0.Enable users to back up all volumes in a specified pod.
+
+P0. Specify include all volumes or exclude all volumes by default function
+
+
+    When preparing to run a backup, allow users to specify whether to set **include** all volumes in the specified pod backup or **exclude** all volumes in the specified pod back up.
+
+P0. Enable users to back up all volumes in a specified pod.
+
+	When a pod is specified for backup, enable Velero to pull all volumes contained in the pod for backup. 
+
+P0. Enable users to exclude specific volumes in a specified pod from being backed up.
+
+
+    When a pod is specified for backup, enable Velero to exclude only those volume names that are specified for exclusion.
+
+Out of scope for 2.1
+
+Questions 
+
+**Question: **Will this need to include a different inclusion pattern than what is currently supported by restic? ([https://restic.readthedocs.io/en/stable/040_backup.html#including-files](https://restic.readthedocs.io/en/stable/040_backup.html#including-files))
+
+**Question: **Will this create any breaking issues for the Velero restic integration? 
+
+
+
+*   No breaking change - retain default behavior should not cause breaking issues 
+
+**Question: **Will this be implemented at the client level or the server lever and what are the advantages/disadvantages of each?
+
+
+
+*   Could be a velero server level flag (do not want to maintain one flag for the binary) 
+    *   Server flag specify default value 
+*   Or API level back up so user specifies opt-in or opt-out 
+    *   Preferred 
+
+**Question: **What are the impacts of using a controller to manage the pod vs annotating the pod directly for the use cases and requirements documented? What are the impacts to users for controller vs non-controller use cases? 
+
+
+
+*   None - can put direct on pod or pod templated
+
+**Question: **Do we need to specify at least one volume to include in the backup for the exclude path to be valid? (assuming yes)
+
+**Question: **Restic backup PV and non-PV volument types - what kind should we be backing up?
+
+
+
+*   Backup all types that restic is capable of backing up
+*   Will not make this exclusive to just backing up PVs 
+*   Call out specific volume types that restic will include - and include in velero documentation  
+
+ 
+
+For questions, please contact michaelmi@vmware.com,  [bstephanie@vmware.com](mailto:bstephanie@vmware.com) 
