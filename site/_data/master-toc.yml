@@ -43,6 +43,8 @@ toc:
         url: /csi
       - page: Verifying Self-signed Certificates
         url: /self-signed-certificates
+      - page: Changing Velero's RBAC permissions
+        url: /rbac
   - title: Plugins
     subfolderitems:
       - page: Overview
