@@ -3,14 +3,29 @@
 {{ partial "head.html" . }}
 
 <body id="{{ .Page.Params.id }}">
-  <div class="container-fluid site-outer-container">
+<div class="container-fluid site-outer-container">
     <div class="site-container">
-      {{ partial "site-header.html" . }}
-      {{ block "main" . }}
-      {{ end }}
-      {{ partial "footer.html" . }}
+        {{ partial "site-header.html" . }}
+        {{ block "main" . }}
+            <div class="post-single-hero bg-color-{{ .Site.Params.hero.backgroundColor }}">
+                <div class="section">
+                    <div class="section-content">
+                        <h1>{{ .Title }}</h1>
+                    </div>
+                </div>
+            </div>
+            <div class="post-single-body">
+                <div class="section section-card">
+                    <div class="section-content pt-4 pb-0">
+                        {{ block "content" . }}
+                            {{ .Content }}
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+        {{ end }}
+        {{ partial "footer.html" . }}
     </div>
-  </div>
+</div>
 </body>
-
 </html>
