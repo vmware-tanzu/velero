@@ -44,6 +44,7 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "download NAME",
 		Short: "Download a backup",
+		Long:  "Download a backup. This downloads all of the Kubernetes manifests for the backup. Note that for persistant volumes, it does not download the content of the storage.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
