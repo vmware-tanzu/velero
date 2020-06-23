@@ -1,5 +1,5 @@
 {{ if ne .CurrentSection.Params.version .Site.Params.latest }}
-    {{ $latest_url := replace .Params.url .CurrentSection.Params.version .Site.Params.latest | relURL }}
+    {{ $latest_url := replace .Permalink .CurrentSection.Params.version .Site.Params.latest | relURL }}
     <div class="alert alert-primary" role="alert">
         {{ if eq .CurrentSection.Params.version "master" }}
             <p>
