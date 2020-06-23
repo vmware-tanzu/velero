@@ -2,7 +2,7 @@
 <html lang="en">
 {{ partial "head.html" . }}
 
-<body id="{{ .Page.Params.id }}">
+<body id="{{ .CurrentSection.Params.id }}">
 <div class="container-fluid site-outer-container">
     <div class="site-container">
         {{ partial "site-header.html" . }}
