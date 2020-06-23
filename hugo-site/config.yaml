@@ -81,3 +81,5 @@ minify:
     xml:
       keepWhitespace: false
 enableRobotsTXT: true
+permalinks:
+  posts: "/blog/:title/"

@@ -1,6 +1,6 @@
 <div class="row">
     {{ $limit := int (.Scratch.Get "limit") }}
-    {{ $pages := (.Site.GetPage "/blog").Pages }}
+    {{ $pages := (.Site.GetPage "/posts").Pages }}
 
     {{ if gt $limit 0 }}
         {{ $pages = first $limit $pages }}
