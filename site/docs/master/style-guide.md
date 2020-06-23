@@ -163,7 +163,7 @@ Use angle brackets for placeholders. Tell the reader what a placeholder represen
 <tr><th>Do</th><th>Don't</th></tr>
 <tr><td markdown="span">Open the `envars.yaml` file.</td><td>Open the envars.yaml file.</td></tr>
 <tr><td markdown="span">Go to the `/docs/tutorials` directory.</td><td>Go to the /docs/tutorials directory.</td></tr>
-<tr><td markdown="span">Open the `/_data/concepts.yaml` file.</td><tdmarkdown="span">Open the /\_data/concepts.yaml file.</td></tr>
+<tr><td markdown="span">Open the `/_data/concepts.yaml` file.</td><td markdown="span">Open the /\_data/concepts.yaml file.</td></tr>
 </table>
 
 ### Use punctuation inside quotes
