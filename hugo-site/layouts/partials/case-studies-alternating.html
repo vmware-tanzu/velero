@@ -4,9 +4,14 @@
     {{ $limit := .Scratch.Get "limit" }}
     {{ range $index, $page := sort (first $limit $caseStudies.Resources) "Name" "asc" }}
         <div class="row no-gutters align-items-center">
-            {{ $isEven := (modBool $index 2) }}
-            {{ $iconClassName := cond ($isEven) "order-md-first" "order-md-last" }}
-            {{ $bodyClassName := cond ($isEven) "order-md-last" "order-md-first" }}
+            {{ $iconClassName := "" }}
+            {{ $bodyClassName := "" }}
+
+            {{ if not (modBool $index 2) }}
+                {{ $iconClassName = "order-md-last" }}
+                {{ $bodyClassName = "order-md-first" }}
+            {{ end }}
+
             {{ if .Params.icon }}
                 <div class="order-xs-first col-md-3 match-height icon bg-color-{{ $caseStudyBackground }} {{ $iconClassName }}">
                     <img src="/img/case-study-icons/{{ .Params.icon }}" alt="{{ .Title }}"/>
