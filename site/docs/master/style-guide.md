@@ -5,7 +5,7 @@ _This style guide is adapted from the [Kubernetes style guide](https://kubernete
 
 This page outlines writing style guidelines for the Velero documentation and you should use this page as a reference you write or edit content. Note that these are guidelines, not rules. Use your best judgment as you write documentation, and feel free to propose changes to these guidelines. Changes to the style guide are made by the Velero maintainers as a group. To propose a change or addition create an issue/PR, or add a suggestion to the [community meeting agenda](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA) and attend the meeting to participate in the discussion.
 
-NOTE: This guide is based on kramdown style markdown.
+The Velero documentation uses the [kramdown](https://kramdown.gettalong.org/) Markdown renderer.
 
 ## Content best practices
 
@@ -88,7 +88,7 @@ Many readers speak English as a second language. Avoid jargon and idioms to help
 ### Avoid statements about the future
 
 Avoid making promises or giving hints about the future. If you need to talk about
-an beta feature, put the text under a heading that identifies it as beta
+a beta feature, put the text under a heading that identifies it as beta
 information.
 
 ### Avoid statements that will soon be out of date
@@ -139,7 +139,7 @@ Use angle brackets for placeholders. Tell the reader what a placeholder represen
 
         kubectl describe pod <pod-name> -n <namespace>
 
-    If the namespace of the pod is `default`, you can omit the '-n' parameter.
+    If the pod is in the default namespace, you can omit the '-n' parameter.
 
 ### Use bold for user interface elements
 
@@ -195,7 +195,7 @@ document, use the backtick (`` ` ``).
 <tr><td markdown="span">Use single backticks to enclose inline code. For example, `var example = true`.</td><td>Use two asterisks (`**`) or an underscore (`_`) to enclose inline code. For example, **var example = true**.</td></tr>
 <tr><td>Use triple backticks (\`\`\`) before and after a multi-line block of code for fenced code blocks.</td><td>Use multi-line blocks of code to create diagrams, flowcharts, or other illustrations.</td></tr>
 <tr><td>Use meaningful variable names that have a context.</td><td>Use variable names such as 'foo','bar', and 'baz' that are not meaningful and lack context.</td></tr>
-<tr><td>Remove trailing spaces in the code.</td><td>Add trailing spaces in the code, where these are important, because the screen reader will read out the spaces as well.</td></tr>
+<tr><td>Remove trailing spaces in the code.</td><td>Add trailing spaces in the code, where these are important, because a screen reader will read out the spaces as well.</td></tr>
 </table>
 
 ### Starting a sentence with a component tool or component name
