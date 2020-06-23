@@ -55,3 +55,29 @@ params:
     - title: GitHub
       fa_icon: fab fa-github
       url: https://github.com/vmware-tanzu/velero
+minify:
+  disableCSS: false
+  disableHTML: false
+  disableJS: false
+  disableJSON: false
+  disableSVG: false
+  disableXML: true
+  minifyOutput: false
+  tdewolff:
+    css:
+      decimals: -1
+      keepCSS2: true
+    html:
+      keepConditionalComments: true
+      keepDefaultAttrVals: true
+      keepDocumentTags: true
+      keepEndTags: true
+      keepQuotes: true
+      keepWhitespace: false
+    js: {}
+    json: {}
+    svg:
+      decimals: -1
+    xml:
+      keepWhitespace: false
+enableRobotsTXT: true
