@@ -8,7 +8,28 @@ params:
   vm_logo: vm-logo.png
   logo: Velero.svg
   backgroundColor: med-blue
+  versioning: true
   latest: v1.4
+  versions:
+    - master
+    - v1.4
+    - v1.3.2
+    - v1.3.1
+    - v1.3.0
+    - v1.2.0
+    - v1.1.0
+    - v1.0.0
+    - v0.11.0
+    - v0.10.0
+    - v0.9.0
+    - v0.8.1
+    - v0.8.0
+    - v0.7.1
+    - v0.7.0
+    - v0.6.0
+    - v0.5.0
+    - v0.4.0
+    - v0.3.0
   gh_repo: https://github.com/vmware-tanzu/velero
   footer:
     title: Getting Started

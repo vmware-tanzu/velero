@@ -1,0 +1,57 @@
+toc:
+  - title: Introduction
+    subfolderitems:
+      - page: Getting started
+        url: /index.html
+      - page: About Ark
+        url: /about
+  - title: Install
+    subfolderitems:
+      - page: Set up with cloud provider
+        url: /cloud-common
+      - page: Run on AWS
+        url: /aws-config
+      - page: Run on GCP
+        url: /gcp-config
+      - page: Run on Azure
+        url: /azure-config
+      - page: IBM Cloud Object Store
+        url: /ibm-config
+      - page: Configuration reference
+        url: /config-definition
+  - title: Troubleshooting
+    subfolderitems:
+      - page: Troubleshooting
+        url: /troubleshooting
+      - page: Troubleshoot an install or setup
+        url: /debugging-install
+      - page: Troubleshoot a backup delete
+        url: /debugging-deletes
+      - page: Troubleshoot a restore
+        url: /debugging-restores
+  - title: Customize Ark
+    subfolderitems:
+      - page: Build from source
+        url: /build-from-scratch
+      - page: Run in any namespace
+        url: /namespace
+      - page: Extend
+        url: /extend
+      - page: Extend with plugins
+        url: /plugins
+      - page: Extend with hooks
+        url: /hooks
+  - title: More information
+    subfolderitems:
+      - page: Backup file format
+        url: /output-file-format
+      - page: API types
+        url: /api-types
+      - page: FAQ
+        url: /faq
+  - title: Tutorials
+    subfolderitems:
+      - page: Disaster Recovery
+        url: /use-cases
+      - page: Cluster migration
+        url: /use-cases.html#cluster-migration
