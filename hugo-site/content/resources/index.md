@@ -1,5 +1,4 @@
 ---
-layout: page
 title: Resources
 description: Velero Resources
 id: resources

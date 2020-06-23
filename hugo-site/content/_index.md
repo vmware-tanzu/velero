@@ -1,5 +1,4 @@
 ---
-layout: default
 id: home
 description: Backup and migrate Kubernetes resources and persistent volumes
 backgrounds:

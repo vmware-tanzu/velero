@@ -1,5 +1,4 @@
 ---
-layout: page
 title: Community
 description: Velero Community
 id: community
