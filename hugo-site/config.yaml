@@ -82,4 +82,4 @@ minify:
       keepWhitespace: false
 enableRobotsTXT: true
 permalinks:
-  posts: "/blog/:title/"
+  posts: "/blog/:slug/"
