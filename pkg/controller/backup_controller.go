@@ -59,7 +59,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupController struct {
@@ -68,7 +68,7 @@ type backupController struct {
 	backupper                   pkgbackup.Backupper
 	lister                      velerov1listers.BackupLister
 	client                      velerov1client.BackupsGetter
-	kbClient                    client.Client
+	kbClient                    kbclient.Client
 	clock                       clock.Clock
 	backupLogLevel              logrus.Level
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
@@ -94,7 +94,7 @@ func NewBackupController(
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
-	kbClient client.Client,
+	kbClient kbclient.Client,
 	defaultBackupLocation string,
 	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
@@ -375,7 +375,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 
 	// validate the storage location, and store the BackupStorageLocation API obj on the request
 	storageLocation := &velerov1api.BackupStorageLocation{}
-	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+	if err := c.kbClient.Get(context.Background(), kbclient.ObjectKey{
 		Namespace: request.Namespace,
 		Name:      request.Spec.StorageLocation,
 	}, storageLocation); err != nil {

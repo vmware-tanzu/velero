@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"io"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"sort"
 	"strings"
 	"testing"
@@ -36,8 +34,8 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
-
 	"k8s.io/apimachinery/pkg/version"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -181,7 +179,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
 
-			var fakeClient client.Client
+			var fakeClient kbclient.Client
 			if test.backupLocation != nil {
 				fakeClient = newFakeClient(t, test.backupLocation)
 			} else {
@@ -782,7 +780,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper       = new(fakeBackupper)
 			)
 
-			var fakeClient client.Client
+			var fakeClient kbclient.Client
 			// add the test's backup storage location if it's different than the default
 			if test.backupLocation != nil && test.backupLocation != defaultBackupLocation {
 				fakeClient = newFakeClient(t, test.backupLocation)

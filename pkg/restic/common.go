@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
@@ -288,7 +287,7 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
-func GetCACert(client client.Client, namespace, backupLocation string) ([]byte, error) {
+func GetCACert(client kbclient.Client, namespace, backupLocation string) ([]byte, error) {
 	location := &velerov1api.BackupStorageLocation{}
 	if err := client.Get(context.Background(), kbclient.ObjectKey{
 		Namespace: namespace,
@@ -316,7 +315,7 @@ func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 // should be used when running a restic command for an Azure backend. This list is
 // the current environment, plus the Azure-specific variables restic needs, namely
 // a storage account name and key.
-func AzureCmdEnv(client client.Client, namespace, backupLocation string) ([]string, error) {
+func AzureCmdEnv(client kbclient.Client, namespace, backupLocation string) ([]string, error) {
 	loc := &velerov1api.BackupStorageLocation{}
 	if err := client.Get(context.Background(), kbclient.ObjectKey{
 		Namespace: namespace,
@@ -342,7 +341,7 @@ func AzureCmdEnv(client client.Client, namespace, backupLocation string) ([]stri
 // should be used when running a restic command for an S3 backend. This list is
 // the current environment, plus the AWS-specific variables restic needs, namely
 // a credential profile.
-func S3CmdEnv(client client.Client, namespace, backupLocation string) ([]string, error) {
+func S3CmdEnv(client kbclient.Client, namespace, backupLocation string) ([]string, error) {
 	loc := &velerov1api.BackupStorageLocation{}
 	if err := client.Get(context.Background(), kbclient.ObjectKey{
 		Namespace: namespace,
