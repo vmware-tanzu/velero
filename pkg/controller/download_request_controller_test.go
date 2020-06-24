@@ -27,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
@@ -48,7 +50,7 @@ type downloadRequestTestHarness struct {
 	controller *downloadRequestController
 }
 
-func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
+func newDownloadRequestTestHarness(t *testing.T, fakeClient client.Client) *downloadRequestTestHarness {
 	var (
 		client          = fake.NewSimpleClientset()
 		informerFactory = informers.NewSharedInformerFactory(client, 0)
@@ -58,7 +60,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 			client.VeleroV1(),
 			informerFactory.Velero().V1().DownloadRequests(),
 			informerFactory.Velero().V1().Restores().Lister(),
-			informerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			fakeClient,
 			informerFactory.Velero().V1().Backups().Lister(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			velerotest.NewLogger(),
@@ -69,7 +71,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 	require.NoError(t, err)
 	controller.clock = clock.NewFakeClock(clockTime)
 
-	controller.newBackupStore = func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	controller.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 		return backupStore, nil
 	}
 
@@ -84,34 +86,34 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 	}
 }
 
-func newDownloadRequest(phase v1.DownloadRequestPhase, targetKind v1.DownloadTargetKind, targetName string) *v1.DownloadRequest {
-	return &v1.DownloadRequest{
+func newDownloadRequest(phase velerov1api.DownloadRequestPhase, targetKind velerov1api.DownloadTargetKind, targetName string) *velerov1api.DownloadRequest {
+	return &velerov1api.DownloadRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "a-download-request",
-			Namespace: v1.DefaultNamespace,
+			Namespace: velerov1api.DefaultNamespace,
 		},
-		Spec: v1.DownloadRequestSpec{
-			Target: v1.DownloadTarget{
+		Spec: velerov1api.DownloadRequestSpec{
+			Target: velerov1api.DownloadTarget{
 				Kind: targetKind,
 				Name: targetName,
 			},
 		},
-		Status: v1.DownloadRequestStatus{
+		Status: velerov1api.DownloadRequestStatus{
 			Phase: phase,
 		},
 	}
 }
 
-func newBackupLocation(name, provider, bucket string) *v1.BackupStorageLocation {
-	return &v1.BackupStorageLocation{
+func newBackupLocation(name, provider, bucket string) *velerov1api.BackupStorageLocation {
+	return &velerov1api.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.DefaultNamespace,
+			Namespace: velerov1api.DefaultNamespace,
 		},
-		Spec: v1.BackupStorageLocationSpec{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: provider,
-			StorageType: v1.StorageType{
-				ObjectStorage: &v1.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: bucket,
 				},
 			},
@@ -120,17 +122,18 @@ func newBackupLocation(name, provider, bucket string) *v1.BackupStorageLocation 
 }
 
 func TestProcessDownloadRequest(t *testing.T) {
-	defaultBackup := func() *v1.Backup {
-		return builder.ForBackup(v1.DefaultNamespace, "a-backup").StorageLocation("a-location").Result()
+
+	defaultBackup := func() *velerov1api.Backup {
+		return builder.ForBackup(velerov1api.DefaultNamespace, "a-backup").StorageLocation("a-location").Result()
 	}
 
 	tests := []struct {
 		name            string
 		key             string
-		downloadRequest *v1.DownloadRequest
-		backup          *v1.Backup
-		restore         *v1.Restore
-		backupLocation  *v1.BackupStorageLocation
+		downloadRequest *velerov1api.DownloadRequest
+		backup          *velerov1api.Backup
+		restore         *velerov1api.Restore
+		backupLocation  *velerov1api.BackupStorageLocation
 		expired         bool
 		expectedErr     string
 		expectGetsURL   bool
@@ -149,94 +152,94 @@ func TestProcessDownloadRequest(t *testing.T) {
 		},
 		{
 			name:            "backup contents request for nonexistent backup returns an error",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindBackupContents, "a-backup"),
-			backup:          builder.ForBackup(v1.DefaultNamespace, "non-matching-backup").StorageLocation("a-location").Result(),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindBackupContents, "a-backup"),
+			backup:          builder.ForBackup(velerov1api.DefaultNamespace, "non-matching-backup").StorageLocation("a-location").Result(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectedErr:     "backup.velero.io \"a-backup\" not found",
 		},
 		{
 			name:            "restore log request for nonexistent restore returns an error",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
-			restore:         builder.ForRestore(v1.DefaultNamespace, "non-matching-restore").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
+			restore:         builder.ForRestore(velerov1api.DefaultNamespace, "non-matching-restore").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectedErr:     "error getting Restore: restore.velero.io \"a-backup-20170912150214\" not found",
 		},
 		{
 			name:            "backup contents request for backup with nonexistent location returns an error",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindBackupContents, "a-backup"),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindBackupContents, "a-backup"),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("non-matching-location", "a-provider", "a-bucket"),
-			expectedErr:     "backupstoragelocation.velero.io \"a-location\" not found",
+			expectedErr:     "backupstoragelocations.velero.io \"a-location\" not found",
 		},
 		{
 			name:            "backup contents request with phase '' gets a url",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindBackupContents, "a-backup"),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindBackupContents, "a-backup"),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "backup contents request with phase 'New' gets a url",
-			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseNew, v1.DownloadTargetKindBackupContents, "a-backup"),
+			downloadRequest: newDownloadRequest(velerov1api.DownloadRequestPhaseNew, velerov1api.DownloadTargetKindBackupContents, "a-backup"),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "backup log request with phase '' gets a url",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindBackupLog, "a-backup"),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindBackupLog, "a-backup"),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "backup log request with phase 'New' gets a url",
-			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseNew, v1.DownloadTargetKindBackupLog, "a-backup"),
+			downloadRequest: newDownloadRequest(velerov1api.DownloadRequestPhaseNew, velerov1api.DownloadTargetKindBackupLog, "a-backup"),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "restore log request with phase '' gets a url",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
-			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
+			restore:         builder.ForRestore(velerov1api.DefaultNamespace, "a-backup-20170912150214").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "restore log request with phase 'New' gets a url",
-			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseNew, v1.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
-			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
+			downloadRequest: newDownloadRequest(velerov1api.DownloadRequestPhaseNew, velerov1api.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
+			restore:         builder.ForRestore(velerov1api.DefaultNamespace, "a-backup-20170912150214").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "restore results request with phase '' gets a url",
-			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindRestoreResults, "a-backup-20170912150214"),
-			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
+			downloadRequest: newDownloadRequest("", velerov1api.DownloadTargetKindRestoreResults, "a-backup-20170912150214"),
+			restore:         builder.ForRestore(velerov1api.DefaultNamespace, "a-backup-20170912150214").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "restore results request with phase 'New' gets a url",
-			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseNew, v1.DownloadTargetKindRestoreResults, "a-backup-20170912150214"),
-			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
+			downloadRequest: newDownloadRequest(velerov1api.DownloadRequestPhaseNew, velerov1api.DownloadTargetKindRestoreResults, "a-backup-20170912150214"),
+			restore:         builder.ForRestore(velerov1api.DefaultNamespace, "a-backup-20170912150214").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
 		},
 		{
 			name:            "request with phase 'Processed' is not deleted if not expired",
-			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseProcessed, v1.DownloadTargetKindBackupLog, "a-backup-20170912150214"),
+			downloadRequest: newDownloadRequest(velerov1api.DownloadRequestPhaseProcessed, velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214"),
 			backup:          defaultBackup(),
 		},
 		{
 			name:            "request with phase 'Processed' is deleted if expired",
-			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseProcessed, v1.DownloadTargetKindBackupLog, "a-backup-20170912150214"),
+			downloadRequest: newDownloadRequest(velerov1api.DownloadRequestPhaseProcessed, velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214"),
 			backup:          defaultBackup(),
 			expired:         true,
 		},
@@ -244,13 +247,20 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			harness := newDownloadRequestTestHarness(t)
+			var fakeClient client.Client
+			if tc.backupLocation != nil {
+				fakeClient = newFakeClient(t, tc.backupLocation)
+			} else {
+				fakeClient = newFakeClient(t)
+			}
+
+			harness := newDownloadRequestTestHarness(t, fakeClient)
 
 			// set up test case data
 
 			// Set .status.expiration properly for processed requests. Since "expired" is relative to the controller's
 			// clock time, it's easier to do this here than as part of the test case definitions.
-			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == v1.DownloadRequestPhaseProcessed {
+			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
 				if tc.expired {
 					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(-1 * time.Minute)}
 				} else {
@@ -271,10 +281,6 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 			if tc.backup != nil {
 				require.NoError(t, harness.informerFactory.Velero().V1().Backups().Informer().GetStore().Add(tc.backup))
-			}
-
-			if tc.backupLocation != nil {
-				require.NoError(t, harness.informerFactory.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(tc.backupLocation))
 			}
 
 			if tc.expectGetsURL {
@@ -300,12 +306,12 @@ func TestProcessDownloadRequest(t *testing.T) {
 				output, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Get(tc.downloadRequest.Name, metav1.GetOptions{})
 				require.NoError(t, err)
 
-				assert.Equal(t, string(v1.DownloadRequestPhaseProcessed), string(output.Status.Phase))
+				assert.Equal(t, string(velerov1api.DownloadRequestPhaseProcessed), string(output.Status.Phase))
 				assert.Equal(t, "a-url", output.Status.DownloadURL)
 				assert.True(t, velerotest.TimesAreEqual(harness.controller.clock.Now().Add(signedURLTTL), output.Status.Expiration.Time), "expiration does not match")
 			}
 
-			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == v1.DownloadRequestPhaseProcessed {
+			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
 				res, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Get(tc.downloadRequest.Name, metav1.GetOptions{})
 
 				if tc.expired {

@@ -18,8 +18,10 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+
 	"sort"
 	"strings"
 	"testing"
@@ -32,8 +34,8 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
-
 	"k8s.io/apimachinery/pkg/version"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -154,7 +156,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:         "non-existent backup location fails validation",
 			backup:       defaultBackup().StorageLocation("nonexistent").Result(),
-			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.velero.io \"nonexistent\" not found"},
+			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
 		},
 		{
 			name:           "backup for read-only backup location fails validation",
@@ -177,12 +179,19 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
 
+			var fakeClient kbclient.Client
+			if test.backupLocation != nil {
+				fakeClient = newFakeClient(t, test.backupLocation)
+			} else {
+				fakeClient = newFakeClient(t)
+			}
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
 				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				kbClient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				clock:                  &clock.RealClock{},
@@ -191,13 +200,6 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			require.NotNil(t, test.backup)
 			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
-
-			if test.backupLocation != nil {
-				_, err := clientset.VeleroV1().BackupStorageLocations(test.backupLocation.Namespace).Create(test.backupLocation)
-				require.NoError(t, err)
-
-				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation))
-			}
 
 			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
 
@@ -244,6 +246,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				fakeClient      = newFakeClient(t)
 			)
 
 			apiServer := velerotest.NewAPIServer(t)
@@ -255,7 +258,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				kbClient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  test.backupLocation.Name,
 				clock:                  &clock.RealClock{},
@@ -303,6 +306,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 		formatFlag := logging.FormatText
 		var (
 			clientset       = fake.NewSimpleClientset(test.backup)
+			fakeClient      = newFakeClient(t)
 			logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 		)
@@ -316,7 +320,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
 				discoveryHelper:        discoveryHelper,
-				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				kbClient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupTTL:       defaultBackupTTL.Duration,
 				clock:                  clock.NewFakeClock(now),
@@ -776,6 +780,14 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper       = new(fakeBackupper)
 			)
 
+			var fakeClient kbclient.Client
+			// add the test's backup storage location if it's different than the default
+			if test.backupLocation != nil && test.backupLocation != defaultBackupLocation {
+				fakeClient = newFakeClient(t, test.backupLocation)
+			} else {
+				fakeClient = newFakeClient(t)
+			}
+
 			apiServer := velerotest.NewAPIServer(t)
 
 			apiServer.DiscoveryClient.FakedServerVersion = &version.Info{
@@ -798,7 +810,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				kbClient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				defaultVolumesToRestic: test.defaultVolumesToRestic,
@@ -833,19 +845,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
 
 			// add the default backup storage location to the clientset and the informer/lister store
-			_, err = clientset.VeleroV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
-			require.NoError(t, err)
-
-			require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(defaultBackupLocation))
-
-			// add the test's backup storage location to the clientset and the informer/lister store
-			// if it's different than the default
-			if test.backupLocation != nil && test.backupLocation != defaultBackupLocation {
-				_, err := clientset.VeleroV1().BackupStorageLocations(test.backupLocation.Namespace).Create(test.backupLocation)
-				require.NoError(t, err)
-
-				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation))
-			}
+			require.NoError(t, fakeClient.Create(context.Background(), defaultBackupLocation))
 
 			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
 

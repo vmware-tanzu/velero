@@ -17,6 +17,7 @@ limitations under the License.
 package backuplocation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -146,12 +149,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	client, err := f.Client()
+	client, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
 
-	if _, err := client.VeleroV1().BackupStorageLocations(backupStorageLocation.Namespace).Create(backupStorageLocation); err != nil {
+	if err := client.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
 

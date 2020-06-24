@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This code embeds the CRD manifests in pkg/generated/crds/manifests in
-// pkg/generated/crds/crds.go.
+// This code embeds the CRD manifests in config/crd/bases in
+// config/crd/crds/crds.go.
 
 package main
 
@@ -30,7 +30,7 @@ import (
 	"text/template"
 )
 
-// This is relative to pkg/generated/crds
+// This is relative to config/crd/crds
 const goHeaderFile = "../../../hack/boilerplate.go.txt"
 
 const tpl = `{{.GoHeader}}
@@ -96,14 +96,14 @@ func main() {
 		GoHeader: string(headerBytes),
 	}
 
-	// This is relative to pkg/generated/crds
-	manifests, err := ioutil.ReadDir("manifests")
+	// This is relative to config/crd/crds
+	manifests, err := ioutil.ReadDir("../bases")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	for _, crd := range manifests {
-		file, err := os.Open("manifests/" + crd.Name())
+		file, err := os.Open("../bases/" + crd.Name())
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -120,7 +120,7 @@ func main() {
 		data.RawCRDs = append(data.RawCRDs, fmt.Sprintf("%q", buf.Bytes()))
 	}
 
-	t, err := template.New("crds").Parse(tpl)
+	t, err := template.New("crd").Parse(tpl)
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -17,10 +17,13 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
@@ -284,17 +287,20 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
-func GetCACert(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, bsl string) ([]byte, error) {
-	location, err := backupLocationLister.BackupStorageLocations(namespace).Get(bsl)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting backup storage location")
+func GetCACert(client kbclient.Client, namespace, backupLocation string) ([]byte, error) {
+	location := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: namespace,
+		Name:      backupLocation,
+	}, location); err != nil {
+		return nil, err
 	}
 
-	if location.Spec.ObjectStorage != nil {
-		return location.Spec.ObjectStorage.CACert, nil
+	if location.Spec.ObjectStorage == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	return location.Spec.ObjectStorage.CACert, nil
 }
 
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
@@ -309,10 +315,13 @@ func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 // should be used when running a restic command for an Azure backend. This list is
 // the current environment, plus the Azure-specific variables restic needs, namely
 // a storage account name and key.
-func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
-	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting backup storage location")
+func AzureCmdEnv(client kbclient.Client, namespace, backupLocation string) ([]string, error) {
+	loc := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: namespace,
+		Name:      backupLocation,
+	}, loc); err != nil {
+		return nil, err
 	}
 
 	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
@@ -332,10 +341,13 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 // should be used when running a restic command for an S3 backend. This list is
 // the current environment, plus the AWS-specific variables restic needs, namely
 // a credential profile.
-func S3CmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
-	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting backup storage location")
+func S3CmdEnv(client kbclient.Client, namespace, backupLocation string) ([]string, error) {
+	loc := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: namespace,
+		Name:      backupLocation,
+	}, loc); err != nil {
+		return nil, err
 	}
 
 	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)

@@ -17,8 +17,11 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"time"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -146,13 +149,22 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
+	client, err := f.KubebuilderClient()
+	if err != nil {
+		return err
+	}
+
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
 		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
 	}
 
 	if o.StorageLocation != "" {
-		if _, err := o.client.VeleroV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
+		location := &velerov1api.BackupStorageLocation{}
+		if err := client.Get(context.Background(), kbclient.ObjectKey{
+			Namespace: f.Namespace(),
+			Name:      o.StorageLocation,
+		}, location); err != nil {
 			return err
 		}
 	}

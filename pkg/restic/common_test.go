@@ -17,18 +17,22 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"os"
 	"sort"
 	"testing"
 
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -381,10 +385,8 @@ func TestTempCredentialsFile(t *testing.T) {
 
 func TestTempCACertFile(t *testing.T) {
 	var (
-		bslInformer = cache.NewSharedIndexInformer(nil, new(velerov1api.BackupStorageLocation), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		bslLister   = velerov1listers.NewBackupStorageLocationLister(bslInformer.GetIndexer())
-		fs          = velerotest.NewFakeFileSystem()
-		bsl         = &velerov1api.BackupStorageLocation{
+		fs  = velerotest.NewFakeFileSystem()
+		bsl = &velerov1api.BackupStorageLocation{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "velero",
@@ -398,15 +400,11 @@ func TestTempCACertFile(t *testing.T) {
 		}
 	)
 
-	// bsl not in lister: expect an error
-	caCert, err := GetCACert(bslLister, "velero", "default")
-	assert.Error(t, err)
+	fakeClient := newFakeClient(t)
+	fakeClient.Create(context.Background(), bsl)
 
-	// now add bsl to lister
-	require.NoError(t, bslInformer.GetStore().Add(bsl))
-
-	// bsl in lister: expect temp file to be created with cacert value
-	caCert, err = GetCACert(bslLister, "velero", "default")
+	// expect temp file to be created with cacert value
+	caCert, err := GetCACert(fakeClient, bsl.Namespace, bsl.Name)
 	require.NoError(t, err)
 
 	fileName, err := TempCACertFile(caCert, "default", fs)
@@ -520,4 +518,10 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
+}
+
+func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
+	err := velerov1api.AddToScheme(scheme.Scheme)
+	require.NoError(t, err)
+	return k8sfake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }

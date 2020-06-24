@@ -30,7 +30,7 @@ var (
 		{Name: "Name", Type: "string", Format: "name"},
 		{Name: "Provider"},
 		{Name: "Bucket/Prefix"},
-		{Name: "Status"},
+		{Name: "Phase"},
 		{Name: "Access Mode"},
 	}
 )

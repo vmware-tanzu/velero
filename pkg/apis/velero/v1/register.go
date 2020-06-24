@@ -22,20 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var (
-	// SchemeBuilder collects the scheme builder functions for the Velero API
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-
-	// AddToScheme applies the SchemeBuilder functions to a specified scheme
-	AddToScheme = SchemeBuilder.AddToScheme
-)
-
-// GroupName is the group name for the Velero API
-const GroupName = "velero.io"
-
-// SchemeGroupVersion is the GroupVersion for the Velero API
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
-
 // Resource gets a Velero GroupResource for a specified resource
 func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()

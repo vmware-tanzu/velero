@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -29,8 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -46,10 +48,10 @@ type downloadRequestController struct {
 	downloadRequestLister velerov1listers.DownloadRequestLister
 	restoreLister         velerov1listers.RestoreLister
 	clock                 clock.Clock
-	backupLocationLister  velerov1listers.BackupStorageLocationLister
+	kbClient              client.Client
 	backupLister          velerov1listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore        func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore        func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -57,7 +59,7 @@ func NewDownloadRequestController(
 	downloadRequestClient velerov1client.DownloadRequestsGetter,
 	downloadRequestInformer velerov1informers.DownloadRequestInformer,
 	restoreLister velerov1listers.RestoreLister,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbClient client.Client,
 	backupLister velerov1listers.BackupLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
@@ -67,7 +69,7 @@ func NewDownloadRequestController(
 		downloadRequestClient: downloadRequestClient,
 		downloadRequestLister: downloadRequestInformer.Lister(),
 		restoreLister:         restoreLister,
-		backupLocationLister:  backupLocationLister,
+		kbClient:              kbClient,
 		backupLister:          backupLister,
 
 		// use variables to refer to these functions so they can be
@@ -85,7 +87,7 @@ func NewDownloadRequestController(
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err != nil {
-					downloadRequest := obj.(*v1.DownloadRequest)
+					downloadRequest := obj.(*velerov1api.DownloadRequest)
 					c.logger.WithError(errors.WithStack(err)).
 						WithField("downloadRequest", downloadRequest.Name).
 						Error("Error creating queue key, item not added to queue")
@@ -121,9 +123,9 @@ func (c *downloadRequestController) processDownloadRequest(key string) error {
 	}
 
 	switch downloadRequest.Status.Phase {
-	case "", v1.DownloadRequestPhaseNew:
+	case "", velerov1api.DownloadRequestPhaseNew:
 		return c.generatePreSignedURL(downloadRequest, log)
-	case v1.DownloadRequestPhaseProcessed:
+	case velerov1api.DownloadRequestPhaseProcessed:
 		return c.deleteIfExpired(downloadRequest)
 	}
 
@@ -134,7 +136,7 @@ const signedURLTTL = 10 * time.Minute
 
 // generatePreSignedURL generates a pre-signed URL for downloadRequest, changes the phase to
 // Processed, and persists the changes to storage.
-func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest, log logrus.FieldLogger) error {
+func (c *downloadRequestController) generatePreSignedURL(downloadRequest *velerov1api.DownloadRequest, log logrus.FieldLogger) error {
 	update := downloadRequest.DeepCopy()
 
 	var (
@@ -143,7 +145,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	)
 
 	switch downloadRequest.Spec.Target.Kind {
-	case v1.DownloadTargetKindRestoreLog, v1.DownloadTargetKindRestoreResults:
+	case velerov1api.DownloadTargetKindRestoreLog, velerov1api.DownloadTargetKindRestoreResults:
 		restore, err := c.restoreLister.Restores(downloadRequest.Namespace).Get(downloadRequest.Spec.Target.Name)
 		if err != nil {
 			return errors.Wrap(err, "error getting Restore")
@@ -159,8 +161,11 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		return errors.WithStack(err)
 	}
 
-	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
-	if err != nil {
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Spec.StorageLocation,
+	}, backupLocation); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -176,7 +181,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		return err
 	}
 
-	update.Status.Phase = v1.DownloadRequestPhaseProcessed
+	update.Status.Phase = velerov1api.DownloadRequestPhaseProcessed
 	update.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(persistence.DownloadURLTTL)}
 
 	_, err = patchDownloadRequest(downloadRequest, update, c.downloadRequestClient)
@@ -184,7 +189,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 }
 
 // deleteIfExpired deletes downloadRequest if it has expired.
-func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.DownloadRequest) error {
+func (c *downloadRequestController) deleteIfExpired(downloadRequest *velerov1api.DownloadRequest) error {
 	log := c.logger.WithField("key", kube.NamespaceAndName(downloadRequest))
 	log.Info("checking for expiration of DownloadRequest")
 	if downloadRequest.Status.Expiration.Time.After(c.clock.Now()) {
@@ -216,7 +221,7 @@ func (c *downloadRequestController) resync() {
 	}
 }
 
-func patchDownloadRequest(original, updated *v1.DownloadRequest, client velerov1client.DownloadRequestsGetter) (*v1.DownloadRequest, error) {
+func patchDownloadRequest(original, updated *velerov1api.DownloadRequest, client velerov1client.DownloadRequestsGetter) (*velerov1api.DownloadRequest, error) {
 	origBytes, err := json.Marshal(original)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling original download request")
