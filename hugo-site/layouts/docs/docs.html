@@ -56,7 +56,7 @@
         apiKey: '3d80f66bb5ecf85f8e2760caef383f24',
         indexName: 'velero',
         inputSelector: '.docsearch-input',
-        algoliaOptions: {'facetFilters': ["version:{{ .Params.version }}"]},
+        algoliaOptions: {'facetFilters': ["version:{{ .CurrentSection.Params.version }}"]},
         debug: false // Set debug to true if you want to inspect the dropdown
     });
 </script>
