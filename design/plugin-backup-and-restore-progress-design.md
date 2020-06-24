@@ -40,11 +40,11 @@ Progress will be updated by volume snapshotter in VolumePluginRestore CR which i
 
 Existing `Snapshot` Go struct from `volume` package have most of the details related to backup operation performed by volumesnapshotters.
 This struct also gets backed up to backup location. But, this struct doesn't get synced on other clusters at regular intervals.
-It will be synced only during restore operation, and velero CLI shows few of its contents.
+It is currently synced only during restore operation, and velero CLI shows few of its contents.
 
 At a high level, in this approach, this struct will be converted to a CR by adding new fields (related to Progress tracking) to it, and gets rid of `volume.Snapshot` struct.
 
-Instead of backing up of Go struct, CRs will be backed up to backup location, and it gets synced into other cluster by backupSyncController running in that cluster.
+Instead of backing up of Go struct, proposal is: to backup CRs to backup location, and sync them into other cluster by backupSyncController running in that cluster.
 
 #### VolumePluginBackup CR
 
