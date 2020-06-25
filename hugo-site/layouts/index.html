@@ -114,7 +114,7 @@
                     <h2>Blog Highlights</h2>
                 </div>
             </div>
-            {{ .Scratch.Set "limit" "3" }}
+            {{ .Scratch.Set "posts" (first 3 (.Site.GetPage "/posts").Pages) }}
             {{ partial "blog-posts.html" . }}
             <div class="row pt-5">
                 <div class="col text-center">

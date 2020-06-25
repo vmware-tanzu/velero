@@ -1,17 +1,12 @@
 <div class="row">
-    {{ $limit := int (.Scratch.Get "limit") }}
-    {{ $pages := (.Site.GetPage "/posts").Pages }}
+    {{ $posts := (.Scratch.Get "posts") }}
 
-    {{ if gt $limit 0 }}
-        {{ $pages = first $limit $pages }}
-    {{ end }}
-
-    {{ range $index, $page := $pages }}
+    {{ range $index, $post := $posts }}
         {{ partial "blog-post-card.html" . }}
 
         {{ $currentIndex := add $index 1 }}
         {{ $row := mod $currentIndex 3 }}
-        {{ if (and (eq $row 0) (ne $currentIndex $limit)) }}
+        {{ if (eq $row 0) }}
             </div>
             <div class="row mt-4">
         {{ end }}
