@@ -141,7 +141,7 @@ Loop:
 	// Manually set this header so the net/http library does not automatically try to decompress. We
 	// need to handle this manually because it's not currently possible to set the MIME type for the
 	// pre-signed URLs for GCP or Azure.
-	httpReq.Header.Set("Accept-Encoding", "gzip")
+	//httpReq.Header.Set("Accept-Encoding", "gzip")
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
