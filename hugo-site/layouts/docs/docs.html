@@ -6,7 +6,9 @@
     <!-- Block google from indexing versioned docs -->
     <meta name="robots" content="noindex">
 {{ end }}
-{{ if eq .File.LogicalName "_index.md" }}
+{{ $fileName := "" }}
+{{ with .File }}{{ $fileName = .LogicalName }}{{ end }}
+{{ if eq $fileName "_index.md" }}
     <title>{{ .Site.Title }} Docs - Overview</title>
 {{ else }}
     <title>{{ .Site.Title }} Docs - {{ .Title }}</title>
