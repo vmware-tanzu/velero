@@ -1,0 +1,14 @@
+FROM quay.io/konveyor/builder:latest AS builder
+ENV GOPATH=$APP_ROOT
+COPY . $APP_ROOT/src/github.com/vmware-tanzu/velero
+WORKDIR $APP_ROOT/src/github.com/vmware-tanzu/velero
+RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static"' -o $APP_ROOT/src/velero-restore-helper github.com/vmware-tanzu/velero/cmd/velero-restore-helper
+
+FROM registry.access.redhat.com/ubi8-minimal
+RUN microdnf -y update && microdnf clean all
+
+COPY --from=builder /opt/app-root/src/velero-restore-helper velero-restore-helper
+
+USER 65534:65534
+
+ENTRYPOINT [ "/velero-restore-helper" ]
