@@ -62,6 +62,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		}
 
 		ready := r.StorageLocation.IsReadyToValidate(&location)
+		log.Debug("--->>> bsl validation frequency: ", location.Spec.ValidationFrequency)
 		if !ready {
 			continue
 		}

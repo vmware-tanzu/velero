@@ -37,17 +37,20 @@ type StorageLocation struct {
 // A backup storage location's validation frequency overrites the server's default value.
 // To skip validation all together, the frequency must be set to zero.
 func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageLocation) bool {
+	log := p.Log.WithField("controller", "backupstoragelocation")
+	log = log.WithField("backupstoragelocation", location.Name)
+
 	storeValidationFrequency := p.DefaultStoreValidationFrequency
 	// If the bsl validation frequency is not specifically set, skip this block and use the server's default
 	if location.Spec.ValidationFrequency != nil {
 		storeValidationFrequency = location.Spec.ValidationFrequency.Duration
 		if storeValidationFrequency == 0 {
-			p.Log.Debug("Validation period for this backup location is set to 0, skipping validation")
+			log.Debug("Validation period for this backup location is set to 0, skipping validation")
 			return false
 		}
 
 		if storeValidationFrequency < 0 {
-			p.Log.Debug("Validation period must be non-negative, changing from %d to %d", storeValidationFrequency, p.DefaultStoreValidationFrequency)
+			log.Debug("Validation period must be non-negative, changing from %d to %d", storeValidationFrequency, p.DefaultStoreValidationFrequency)
 			storeValidationFrequency = p.DefaultStoreValidationFrequency
 		}
 	}

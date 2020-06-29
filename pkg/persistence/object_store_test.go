@@ -50,7 +50,7 @@ type objectBackupStoreTestHarness struct {
 }
 
 func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTestHarness {
-	objectStore := NewInMemoryObjectStore(bucket)
+	objectStore := newInMemoryObjectStore(bucket)
 
 	return &objectBackupStoreTestHarness{
 		objectBackupStore: &objectBackupStore{
@@ -635,7 +635,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Bucket has a leading and trailing slash, they are both stripped",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("/bucket/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 		},
@@ -643,7 +643,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("/prefix/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",
@@ -652,7 +652,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has no leading or trailing slash, a trailing slash is added",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("prefix").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",

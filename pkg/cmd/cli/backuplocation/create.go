@@ -84,7 +84,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync")
-	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync")
+	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "how often to verify if the storage is valid. Optional. Set this to `0s` to disable sync")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup storage location")
 	flags.Var(

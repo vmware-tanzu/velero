@@ -13,6 +13,11 @@ spec:
     description: Backup Storage Location status such as Available/Unavailable
     name: Phase
     type: string
+  - JSONPath: .status.lastValidationTime
+    description: LastValidationTime is the last time the backup store location was
+      validated
+    name: Last Validated
+    type: date
   - JSONPath: .metadata.creationTimestamp
     name: Age
     type: date

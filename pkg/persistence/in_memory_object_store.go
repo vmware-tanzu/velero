@@ -34,7 +34,7 @@ type inMemoryObjectStore struct {
 	Data map[string]BucketData
 }
 
-func NewInMemoryObjectStore(buckets ...string) *inMemoryObjectStore {
+func newInMemoryObjectStore(buckets ...string) *inMemoryObjectStore {
 	o := &inMemoryObjectStore{
 		Data: make(map[string]BucketData),
 	}
