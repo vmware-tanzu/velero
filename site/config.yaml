@@ -1,5 +1,7 @@
+#baseURL: "https://velero.io/"
 disablePathToLower: true
 languageCode: en-us
+DefaultContentLanguage: "en"
 title: Velero
 frontmatter:
   date: [":filename", ":default"]
@@ -81,5 +83,6 @@ minify:
     xml:
       keepWhitespace: false
 enableRobotsTXT: true
+enableGitInfo: true
 permalinks:
   posts: "/blog/:slug/"
