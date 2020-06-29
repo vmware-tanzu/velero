@@ -21,7 +21,10 @@ You can run `make verify` to ensure that all generated files (clientset, listers
 
 ## Linting
 
-You can run `make lint` which executes golangci-lint inside the build image, or `make local-lint` which executes outside of the build image. 
+You can run `make lint` which executes golangci-lint inside the build image, or `make local-lint` which executes outside of the build image.
+Both `make lint` and `make local-lint` will only run the linter against changes.
+
+Use `lint-all` to run the linter against the entire code base.
 
 The default linters are defined in the `Makefile` via the `LINTERS` variable. 
 
