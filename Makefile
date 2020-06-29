@@ -233,6 +233,16 @@ ifneq ($(SKIP_TESTS), 1)
 	@hack/lint.sh $(LINTERS)
 endif
 
+lint-all:
+ifneq ($(SKIP_TESTS), 1)
+	@$(MAKE) shell CMD="-c 'hack/lint.sh $(LINTERS) true'"
+endif
+
+local-lint-all:
+ifneq ($(SKIP_TESTS), 1)
+	@hack/lint.sh $(LINTERS) true
+endif
+
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
