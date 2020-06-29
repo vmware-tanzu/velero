@@ -15,7 +15,7 @@ If you are running a build on Ubuntu you will need the following packages:
 
 # Local Development
 1. Clone down your own fork, or clone the main repo `git clone https://github.com/vmware-tanzu/velero` and add your own remote.
-1. `cd velero/hugo-site`
+1. `cd velero/site`
 1. Serve the site and watch for markup/sass changes `hugo serve`.
 1. View your website at http://127.0.0.1:1313/
 1. Commit any changes and push everything to your fork.
@@ -27,10 +27,10 @@ If you are running a build on Ubuntu you will need the following packages:
 1. Create a new configuration:
     - Click `Edit Configurations...`
     - Click the `+` button to create a new configuration and select `Hugo`
-    - Select `hugo serve` and make sure it is running under the `hugo-site` directory
+    - Select `hugo serve` and make sure it is running under the `site` directory
     - Save and run the new Configuration
     - View your website at http://127.0.0.1:1313/
-    - Any changes in `hugo-site` will reload the website automatically
+    - Any changes in `site` will reload the website automatically
 
 # [TODO]Adding a New Docs Version
 

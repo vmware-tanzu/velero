@@ -292,7 +292,7 @@ push-build-image:
 	docker push $(BUILDER_IMAGE)
 
 build-image-hugo:
-	cd hugo-site && docker build --pull -t $(HUGO_IMAGE) .
+	cd site && docker build --pull -t $(HUGO_IMAGE) .
 
 clean:
 # if we have a cached image then use it to run go clean --modcache
@@ -346,18 +346,10 @@ release:
 		PUBLISH=$(PUBLISH) \
 		./hack/goreleaser.sh'"
 
-serve-docs:
+serve-docs: build-image-hugo
 	docker run \
 	--rm \
-	-v "$$(pwd)/site:/srv/jekyll" \
-	-it -p 4000:4000 \
-	jekyll/jekyll \
-	jekyll serve --livereload --incremental
-
-serve-docs-hugo: build-image-hugo
-	docker run \
-	--rm \
-	-v "$$(pwd)/hugo-site:/srv/hugo" \
+	-v "$$(pwd)/site:/srv/hugo" \
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
 	hugo server --bind=0.0.0.0
