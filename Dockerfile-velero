@@ -22,14 +22,9 @@ RUN apt-get update && \
     bunzip2 restic_0.9.6_linux_amd64.bz2 && \
     mv restic_0.9.6_linux_amd64 /usr/bin/restic && \
     chmod +x /usr/bin/restic && \
-    wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_linux_amd64.tar.gz && \
-    tar -zxvf kubebuilder_2.3.1_linux_amd64.tar.gz && \
-    mv kubebuilder_2.3.1_linux_amd64 /usr/local/kubebuilder && \
-    chmod +x /usr/local/kubebuilder && \
-    export PATH=$PATH:/usr/local/kubebuilder/bin && \
-    rm kubebuilder_2.3.1_linux_amd64.tar.gz && \ 
     apt-get remove -y wget bzip2 && \
-    rm -rf /var/lib/apt/lists/* 
+    rm -rf /var/lib/apt/lists/*
+
 
 ADD /bin/linux/amd64/velero /velero
 
