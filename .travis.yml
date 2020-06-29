@@ -1,0 +1,78 @@
+os: linux
+services: docker
+dist: focal
+language: go
+go: stable
+
+env:
+  global:
+  - IMAGE1: quay.io/konveyor/velero
+  - IMAGE2: quay.io/konveyor/velero-restore-helper
+  - DEFAULT_BRANCH: konveyor-dev
+  - DOCKERFILE1: Dockerfile.ubi
+  - DOCKERFILE2: Dockerfile-velero-restore-helper.ubi
+  - DOCKER_CLI_EXPERIMENTAL: enabled
+  - GOPROXY: https://goproxy.io,direct
+
+before_install:
+- |
+  if [ "${TRAVIS_BRANCH}" == "${DEFAULT_BRANCH}" ]; then
+    export TAG=latest
+  else
+    export TAG="${TRAVIS_BRANCH}"
+  fi
+
+# Builds routinely fail due to download failures inside alternate arch docker containers
+# Here we are downloading outside the docker container and copying the deps in
+# Also use -v for downloads/builds to stop no output failures from lxd env buffering.
+before_script:
+- go mod vendor -v
+- git clone https://github.com/konveyor/restic -b ${TRAVIS_BRANCH}
+- pushd restic; go mod vendor -v; popd
+- sed -i 's|-mod=mod|-mod=vendor|g' ${DOCKERFILE1}
+- sed -i 's|-mod=mod|-mod=vendor|g' ${DOCKERFILE2}
+- sed -i 's|go build|go build -v|g' ${DOCKERFILE1}
+- sed -i 's|go build|go build -v|g' ${DOCKERFILE2}
+- sed -i 's|^RUN mkdir -p \$APP_ROOT/src/github.com/restic \\$|COPY --chown=1001 restic/ $APP_ROOT/src/github.com/restic/restic|g' ${DOCKERFILE1}
+- sed -i 's|&& cd \$APP_ROOT/src/github.com/restic \\$||g' ${DOCKERFILE1}
+- sed -i 's|&& git clone https://github.com/konveyor/restic -b .*$||g' ${DOCKERFILE1}
+
+script:
+- docker build -t ${IMAGE1}:${TAG}-${TRAVIS_ARCH} -f ${DOCKERFILE1} .
+- docker build -t ${IMAGE2}:${TAG}-${TRAVIS_ARCH} -f ${DOCKERFILE2} .
+- if [ -n "${QUAY_ROBOT}" ]; then docker login quay.io -u "${QUAY_ROBOT}" -p ${QUAY_TOKEN}; fi
+- if [ -n "${QUAY_ROBOT}" ]; then docker push ${IMAGE1}:${TAG}-${TRAVIS_ARCH}; fi
+- if [ -n "${QUAY_ROBOT}" ]; then docker push ${IMAGE2}:${TAG}-${TRAVIS_ARCH}; fi
+
+jobs:
+  include:
+  - stage: build images
+    arch: ppc64le
+  - arch: s390x
+  - arch: arm64-graviton2
+    virt: vm
+    group: edge
+  - arch: amd64
+  - stage: push manifest
+    language: shell
+    arch: amd64
+    before_script: []
+    script:
+    - |
+      if [ -n "${QUAY_ROBOT}" ]; then
+        docker login quay.io -u "${QUAY_ROBOT}" -p ${QUAY_TOKEN}
+        docker manifest create \
+          ${IMAGE1}:${TAG} \
+          ${IMAGE1}:${TAG}-amd64 \
+          ${IMAGE1}:${TAG}-ppc64le \
+          ${IMAGE1}:${TAG}-s390x \
+          ${IMAGE1}:${TAG}-aarch64
+        docker manifest create \
+          ${IMAGE2}:${TAG} \
+          ${IMAGE2}:${TAG}-amd64 \
+          ${IMAGE2}:${TAG}-ppc64le \
+          ${IMAGE2}:${TAG}-s390x \
+          ${IMAGE2}:${TAG}-aarch64
+        docker manifest push ${IMAGE1}:${TAG}
+        docker manifest push ${IMAGE2}:${TAG}
+      fi

@@ -1,0 +1,23 @@
+# TODO! Find a real ubi8 image for golang 1.16
+FROM quay.io/konveyor/builder:latest AS builder
+ENV GOPATH=$APP_ROOT
+COPY . /go/src/github.com/vmware-tanzu/velero
+WORKDIR /go/src/github.com/vmware-tanzu/velero
+RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static" -X github.com/vmware-tanzu/velero/pkg/buildinfo.Version=konveyor-dev' -o /go/src/velero github.com/vmware-tanzu/velero/cmd/velero
+
+FROM quay.io/konveyor/builder:latest AS restic-builder
+ENV GOPATH=$APP_ROOT
+RUN mkdir -p $APP_ROOT/src/github.com/restic \
+&& cd $APP_ROOT/src/github.com/restic \
+&& git clone https://github.com/konveyor/restic -b konveyor-dev
+WORKDIR $APP_ROOT/src/github.com/restic/restic
+RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static"' -o $APP_ROOT/src/restic github.com/restic/restic/cmd/restic
+
+FROM registry.access.redhat.com/ubi8-minimal
+RUN microdnf -y update && microdnf -y install nmap-ncat && microdnf clean all
+COPY --from=builder /go/src/velero velero
+COPY --from=restic-builder /opt/app-root/src/restic /usr/bin/restic
+
+USER 65534:65534
+
+ENTRYPOINT ["/velero"]
