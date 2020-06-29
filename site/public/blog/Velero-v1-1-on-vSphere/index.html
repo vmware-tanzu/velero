@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    
+    
+    <link rel="stylesheet" href="/styles.666a5dc1cd80e47092a71103358e46b56345de6f3044680f856f219cbc2fe91b.css" integrity="sha256-Zmpdwc2A5HCSpxEDNY5GtWNF3m8wRGgPhW8hnLwv6Rs=">
+    <title>Velero Velero v1.1 backing up and restoring apps on vSphere</title>
+    
+</head>
+<body id="blog">
+<div class="container-fluid site-outer-container">
+    <div class="site-container">
+        <header class="site-header">
+    <div class="site-header-content">
+        <div class="logo">
+            <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo" alt="Homepage"/></a>
+        </div>
+        <ul class="nav-menu" id="header-nav">
+            <li class="home"><a href="/" title="Velero">Home</a></li>
+            <li class="docs"><a href="/docs/v1.4" title="Documentation">Documentation</a></li>
+            <li class="plugins"><a href="/plugins" title="Plugins">Plugins</a></li>
+            <li class="blog"><a href="/blog" title="Blog Posts">Blog</a></li>
+            <li class="community"><a href="/community" title="Community">Community</a></li>
+            <li class="resources"><a href="/resources" title="Resources">Resources</a></li>
+        </ul>
+        <div class="nav-mobile-link">
+            <a href="javascript:void(0);" id="nav-mobile-toggle"></a>
+        </div>
+    </div>
+</header>
+
+        
+    <div class="post-single-hero bg-color-med-blue">
+        <div class="section">
+            <div class="section-content">
+                <h1>Velero v1.1 backing up and restoring apps on vSphere</h1>
+            </div>
+        </div>
+    </div>
+    <div class="post-single-body">
+        <div class="section section-card">
+            <div class="section-content pt-4 pb-0">
+                <div class="post-single-meta">
+                    <div class="post-single-meta-author">
+                        
+                            <div class="post-single-meta-author-avatar">
+                                <img src="/img/contributors/cormac-pic.png" alt="Cormac Hogan">
+                            </div>
+                        
+
+                        <div class="post-single-meta-author-name">
+                            <a href="/tags/Cormac-Hogan">Cormac Hogan</a>
+                        </div>
+                    </div>
+
+                    <div class="post-single-meta-date">
+                        October 08, 2019
+                    </div>
+                </div>
+
+                <div class="post-single-content">
+                    <p>Velero version 1.1 provides support to backup Kubernetes applications deployed on vSphere. This post will provide detailed information on how to install and configure Velero to backup and restore a stateless application (<code>nginx</code>) that is running in Kubernetes on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications on vSphere during a Velero backup. In this case, we rely on a third party program called <code>restic</code>. However this post does not include an example of how to backup a stateful application. That is available in another tutorial which can be found 
+
+    
+
+<a href="">here</a>.</p>
+<h2 id="overview-of-steps">Overview of steps</h2>
+<ul>
+<li>Download and extract Velero v1.1</li>
+<li>Deploy and Configure a Minio Object store</li>
+<li>Install Velero using the <code>velero install</code> command, ensuring that both <code>restic</code> support and a Minio <code>publicUrl</code> are included</li>
+<li>Run a test backup/restore of a stateless application that has been deployed on upstream Kubernetes</li>
+</ul>
+<h2 id="what-this-post-does-not-show">What this post does not show</h2>
+<ul>
+<li>A demonstration on how to do backup/restore of a stateful application (i.e. PVs)</li>
+<li>The assumption is that the Kubernetes nodes in your cluster have internet access in order to pull the Velero images. This guide does not show how to add images using a local repository</li>
+</ul>
+<h2 id="download-and-extract-velero-v11">Download and extract Velero v1.1</h2>
+<p>The 
+
+<a href="https://github.com/heptio/velero/releases/tag/v1.1.0.">Velero v1.1 binary can be found here</a>. Download and extract it to the desktop where you wish to manage your Velero backups, then copy or move the <code>velero</code> binary to somewhere in your $PATH.</p>
+<h2 id="deploy-and-configure-a-minio-object-store-as-a-backup-destination">Deploy and Configure a Minio Object Store as a backup destination</h2>
+<p>Velero sends data and metadata about the Kubernetes objects being backed up to an S3 Object Store. If you do not have an S3 Object Store available, Velero provides the manifest file to create a Minio S3 Object Store on your Kubernetes cluster. This means that all Velero backups can be kept on-premises.</p>
+<ul>
+<li>Note: Stateful backups of applications deployed in Kubernetes on vSphere that use the <code>restic</code> plugin for backing up Persistent Volumes send the backup data to the same S3 Object Store.</li>
+</ul>
+<p>There are a few different steps required to successfully deploy the Minio S3 Object Store.</p>
+<h3 id="1-create-a-minio-credentials-secret-file">1. Create a Minio credentials secret file</h3>
+<p>A simple credentials file containing the login/password (id/key) for the local on-premises Minio S3 Object Store must be created.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ cat credentials-velero
+<span style="color:#f92672">[</span>default<span style="color:#f92672">]</span>
+aws_access_key_id <span style="color:#f92672">=</span> minio
+aws_secret_access_key <span style="color:#f92672">=</span> minio123
+</code></pre></div><h3 id="2-expose-minio-service-on-a-nodeport">2. Expose Minio Service on a NodePort</h3>
+<p>While this step is optional, it is useful for two reasons. The first is that it gives you a way to access the Minio portal through a browser and examine the backups. The second is that it enables you to specify a <code>publicUrl</code> for Minio, which in turn means that you can access backup and restore logs from the Minio S3 Object Store.</p>
+<p>To expose the Minio Service on a NodePort, a modification of the <code>examples/minio/00-minio-deployment.yaml</code> manifest is necessary. The only change is to the type: field, from ClusterIP to NodePort:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">spec:
+<span style="color:#75715e"># ClusterIP is recommended for production environments.</span>
+<span style="color:#75715e"># Change to NodePort if needed per documentation,</span>
+<span style="color:#75715e"># but only if you run Minio in a test/trial environment, for example with Minikube.</span>
+type: NodePort
+</code></pre></div><h3 id="3-create-the-minio-object-store">3. Create the Minio Object Store</h3>
+<p>After making the changes above, simply run the following command to create the Minio Object Store.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl apply -f examples/minio/00-minio-deployment.yaml
+namespace/velero created
+deployment.apps/minio created
+service/minio created
+job.batch/minio-setup created
+</code></pre></div><h3 id="4-verify-minio-object-store-has-deployed-successfully">4. Verify Minio Object Store has deployed successfully</h3>
+<p>Retrieve both the Kubernetes node on which the Minio Pod is running, and the port that the Minio Service has been exposed on. With this information, you can verify that Minio is working.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get pods -n velero
+NAME                     READY   STATUS      RESTARTS   AGE
+minio-66dc75bb8d-95xpp   1/1     Running     <span style="color:#ae81ff">0</span>          25s
+minio-setup-zpnfl        0/1     Completed   <span style="color:#ae81ff">0</span>          25s
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl describe pod minio-66dc75bb8d-95xpp -n velero | grep -i Node:
+Node:               140ab5aa-0159-4612-b68c-df39dbea2245/192.168.192.5
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get svc -n velero
+NAME    TYPE       CLUSTER-IP      EXTERNAL-IP   PORT<span style="color:#f92672">(</span>S<span style="color:#f92672">)</span>          AGE
+minio   NodePort   10.100.200.82   &lt;none&gt;        9000:32109/TCP   5s
+</code></pre></div><p>In the above outputs, the node on which the Minio Object Storage is deployed has IP address <code>192.168.192.5</code>. The NodePort that the Minio Service is exposed is <code>32109</code>. If we now direct a browser to that <code>Node:port</code> combination, we should see the Minio Object Store web interface. You can use the credentials provided in the <code>credentials-velero</code> file earlier to login.</p>
+<p><img src="/img/vsphere-tutorial-icons/Minio.png" alt="Minio Object Store"></p>
+<h2 id="install-velero">Install Velero</h2>
+<p>To install Velero, the <code>velero install</code> command is used. There are a few options that need to be included. Since there is no vSphere plugin at this time, we rely on a third party plugin called <code>restic</code> to make backups of the Persistent Volume contents when Kubernetes is running on vSphere. The command line must include the option to use <code>restic</code>. As we also mentioned, we have setup a <code>publicUrl</code> for Minio, so we should also include this in our command line.</p>
+<p>Here is a sample command based on a default installation on Velero for Kubernetes running on vSphere, ensuring that the <code>credentials-velero</code> secret file created earlier resides in the same directory where the command is run:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero install  --provider aws --bucket velero <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>--secret-file ./credentials-velero <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>--use-volume-snapshots<span style="color:#f92672">=</span>false <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>--use-restic <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>--backup-location-config <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>region<span style="color:#f92672">=</span>minio,s3ForcePathStyle<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;true&#34;</span>,s3Url<span style="color:#f92672">=</span>http://minio.velero.svc:9000,publicUrl<span style="color:#f92672">=</span>http://192.168.192.5:32109
+</code></pre></div><p>Once the command is running, you should observe various output related to the creation of necessary Velero objects in Kubernetes. Everything going well, the output should complete with the following message:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Velero is installed! ⛵ Use <span style="color:#e6db74">&#39;kubectl logs deployment/velero -n velero&#39;</span> to view the status.
+</code></pre></div><p>Yes, that is a small sailboat in the output (Velero is Spanish for sailboat).</p>
+<h2 id="deploy-a-sample-application-to-backup">Deploy a sample application to backup</h2>
+<p>Velero provides a sample <code>nginx</code> application for backup testing. This nginx deployment assumes the presence of a LoadBalancer for its Service. If you do not have a Load Balancer as part of your Container Network Interface (CNI), there are some easily configuration ones available to get your started. One example is MetalLb, available 
+
+<a href="https://metallb.universe.tf/">here</a>.</p>
+<ul>
+<li>Note: This application is stateless. It does not create any Persistent Volumes, thus the restic driver is not utilizied as part of this example. To test whether restic is working correctly, you will need to backup a stateful application that is using Persistent Volumes.</li>
+</ul>
+<p>To deploy the sample nginx application, run the following command:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl apply -f examples/nginx-app/base.yaml
+namespace/nginx-example created
+deployment.apps/nginx-deployment created
+service/my-nginx created
+</code></pre></div><p>Check that the deployment was successful using the following commands:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get ns
+NAME                  STATUS   AGE
+cassandra             Active   23h
+default               Active   5d3h
+kube-public           Active   5d3h
+kube-system           Active   5d3h
+nginx-example         Active   4s
+velero                Active   9m40s
+wavefront-collector   Active   24h
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get deployments --namespace<span style="color:#f92672">=</span>nginx-example
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   2/2     <span style="color:#ae81ff">2</span>            <span style="color:#ae81ff">2</span>           20s
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get svc --namespace<span style="color:#f92672">=</span>nginx-example
+NAME       TYPE           CLUSTER-IP       EXTERNAL-IP                 PORT<span style="color:#f92672">(</span>S<span style="color:#f92672">)</span>        AGE
+my-nginx   LoadBalancer   10.100.200.147   100.64.0.1,192.168.191.70   80:30942/TCP   32s
+</code></pre></div><p>In this example, a Load Balancer has provided the <code>nginx</code> service with an external IP address of 192.168.191.70. If I point a browser to that IP address, I get an nginx landing page identical to that shown below.</p>
+<p><img src="/img/vsphere-tutorial-icons/nginx.png" alt="nginx landing page"></p>
+<p>We&rsquo;re now ready to do a backup and restore of the <code>nginx</code> application.</p>
+<h2 id="take-your-first-velero-backup">Take your first Velero backup</h2>
+<p>In this example, we are going to stipulate at the <code>velero backup</code> command line that it should only backup applications that match <code>app=nginx</code>. Thus, we do not backup everything in the Kubernetes cluster, only the <code>nginx</code> application specific items.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero backup create nginx-backup --selector app<span style="color:#f92672">=</span>nginx
+Backup request <span style="color:#e6db74">&#34;nginx-backup&#34;</span> submitted successfully.
+Run <span style="color:#e6db74">`</span>velero backup describe nginx-backup<span style="color:#e6db74">`</span> or <span style="color:#e6db74">`</span>velero backup logs nginx-backup<span style="color:#e6db74">`</span> <span style="color:#66d9ef">for</span> more details.
+
+$ velero backup get
+NAME           STATUS      CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
+nginx-backup   Completed   2019-08-07 16:13:44 +0100 IST   29d       default            app<span style="color:#f92672">=</span>nginx
+</code></pre></div><p>You can now login to the Minio Object Storage via a browser and verify that the backup actually exists. You should see the name of the backup under the <code>velero/backups</code> folder:</p>
+<p><img src="/img/vsphere-tutorial-icons/minio-nginx-backup.png" alt="Minio Backup Details"></p>
+<h2 id="destroy-your-application">Destroy your application</h2>
+<p>Let’s now go ahead and remove the <code>nginx</code> namespace, then do a restore of the application from our backup. Later we will demonstrate how we can restore our <code>nginx</code> application.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl delete ns nginx-example
+namespace <span style="color:#e6db74">&#34;nginx-example&#34;</span> deleted
+</code></pre></div><p>This command should also have removed the <code>nginx</code> deployment and service.</p>
+<h2 id="do-your-first-velero-restore">Do your first Velero restore</h2>
+<p>Restores are also done from the command line using the <code>velero restore</code> command. You simply need to specify which backup you wish to restore.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero backup get
+NAME           STATUS      CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
+nginx-backup   Completed   2019-08-07 16:13:44 +0100 IST   29d       default            app<span style="color:#f92672">=</span>nginx
+</code></pre></div><div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero restore create nginx-restore --from-backup nginx-backup
+Restore request <span style="color:#e6db74">&#34;nginx-restore&#34;</span> submitted successfully.
+Run <span style="color:#e6db74">`</span>velero restore describe nginx-restore<span style="color:#e6db74">`</span> or <span style="color:#e6db74">`</span>velero restore logs nginx-restore<span style="color:#e6db74">`</span> <span style="color:#66d9ef">for</span> more details.
+</code></pre></div><p>The following command can be used to examine the restore in detail, and check to see if it has successfully completed.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero restore describe nginx-restore
+Name:         nginx-restore
+Namespace:    velero
+Labels:       &lt;none&gt;
+Annotations:  &lt;none&gt;
+
+Phase:  Completed
+
+Backup:  nginx-backup
+
+Namespaces:
+  Included:  *
+  Excluded:  &lt;none&gt;
+
+Resources:
+  Included:        *
+  Excluded:        nodes, events, events.events.k8s.io, backups.velero.io, restores.velero.io, resticrepositories.velero.io
+  Cluster-scoped:  auto
+
+Namespace mappings:  &lt;none&gt;
+
+Label selector:  &lt;none&gt;
+
+Restore PVs:  auto
+</code></pre></div><h2 id="verify-that-the-restore-succeeded">Verify that the restore succeeded</h2>
+<p>You can see that the restore has now completed. Check to see if the namespace, DaemonSet and service has been restored using the <code>kubectl</code> commands shown previously. One item to note is that the <code>nginx</code> service may be restored with a new IP address from the LoadBalancer. This is normal.</p>
+<p>Now let’s see if we can successfully reach our <code>nginx</code> web server on that IP address. Yes we can! Looks like the restore was successful.</p>
+<p><img src="/img/vsphere-tutorial-icons/nginx-restore-new-ip.png" alt="nginx restored"></p>
+<p>Backups and Restores are now working on Kubernetes deployed on vSphere using Velero v1.1.</p>
+<h2 id="feedback-and-participation">Feedback and Participation</h2>
+<p>As always, we welcome feedback and participation in the development of Velero. 
+
+<a href="https://velero.io/community/">All information on how to contact us or become active can be found here</a></p>
+<p>You can find us on 
+
+<a href="https://kubernetes.slack.com/messages/C6VCGP4MT">Kubernetes Slack in the #velero channel</a>, and follow us on Twitter at 
+
+<a href="https://twitter.com/projectvelero">@projectvelero</a>.</p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section pt-3">
+        <div class="section-content section-content-thin">
+            <h5 class="font-color-darker">Related Content</h5>
+<div class="row">
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/cassandra.gif" alt="Velero v1.1 backing up and restoring Stateful apps on vSphere" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/Velero-v1-1-Stateful-Backup-vSphere/" class="post-title">Velero v1.1 backing up and restoring Stateful apps on vSphere</a>
+                </h5>
+                <div class="post-entry">
+                    This post demonstrates how Velero can be used on Kubernetes running on vSphere to backup a Stateful application. For the purposes of this example, we will backup and restore a Cassandra NoSQL database management system.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+    
+</div>
+        </div>
+    </div>
+
+        <div class="section section-background-darkest-blue">
+    <div class="section-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-lg-8">
+                <h5>Getting Started</h5>
+                <p>To help you get started, see the documentation.</p>
+            </div>
+            <div class="col-xs-12 col-sm-6 col-lg-3 offset-lg-1">
+                <p><strong></strong></p>
+                <a href="/docs"
+                   class="btn btn-sm btn-primary btn-no-border">Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="section site-footer">
+    <div class="section-content">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-12 col-md-8 mb-3 mb-md-0">
+                <ul class="social-links text-center text-md-left">
+                    
+                        <li>
+                            
+                                <i class="fab fa-twitter fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://twitter.com/projectvelero">Twitter</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-slack fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://kubernetes.slack.com/messages/velero">Slack</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fas fa-users fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://groups.google.com/forum/#!forum/projectvelero">Google Groups</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fa fa-rss fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="feed.xml">RSS</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-github fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://github.com/vmware-tanzu/velero">GitHub</a>
+                        </li>
+                    
+                </ul>
+            </div>
+            <div class="col-12 col-md-4 text-center text-md-right">
+                <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo"
+                                                              alt="Homepage"/></a>
+            </div>
+        </div>
+        <div class="row align-items-center">
+            <div class="col copyright text-center text-md-right mt-4">
+                &copy; 2020 Velero Authors.
+                <a href="http://vmware.github.io/" class="vm-logo">A VMware-backed project. <img
+                            src="/img/vm-logo.png" alt="VMware logo"/></a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<script defer src="https://use.fontawesome.com/releases/v5.8.1/js/all.js"
+        integrity="sha384-g5uSoOSBd7KkhAMlnQILrecXvzst9TdC09/VM+pjDTCM+1il8RHz5fKANTFFb+gQ"
+        crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" crossorigin="anonymous"></script>
+
+<script src="/js/jquery.matchHeight.js?1593121911"></script>
+<script src="/js/scripts.js?1593121911"></script>
+
+    </div>
+</div>
+</body>
+</html>

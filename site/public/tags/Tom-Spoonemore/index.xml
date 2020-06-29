@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Tom Spoonemore on Velero</title>
+    <link>/tags/Tom-Spoonemore/</link>
+    <description>Recent content in Tom Spoonemore on Velero</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 20 May 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="/tags/Tom-Spoonemore/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Velero 1.0 Has Arrived: Delivering Enhanced Stability, Usability and Extensibility Features</title>
+      <link>/blog/velero-1.0-has-arrived/</link>
+      <pubDate>Mon, 20 May 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/velero-1.0-has-arrived/</guid>
+      <description>Just three months after the release of Velero 0.11, the community’s momentum continues with the delivery of the landmark version 1.0 release. This significant release improves the installation experience, Helm support, the plugin system, and overall stability. We want to thank the community and the team, and acknowledge all of their hard work and amazing contributions to this major milestone.
+Data protection is always a chief concern for application owners who want to make sure that they can restore a cluster to a known good state, recover from a crashed cluster, or migrate to a new environment.</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta name="generator" content="Hugo 0.73.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    
+    
+    <link rel="stylesheet" href="/styles.666a5dc1cd80e47092a71103358e46b56345de6f3044680f856f219cbc2fe91b.css" integrity="sha256-Zmpdwc2A5HCSpxEDNY5GtWNF3m8wRGgPhW8hnLwv6Rs=">
+    <title>Velero </title>
+    
+</head>
+<body id="home">
+<div class="container-fluid site-outer-container">
+    <div class="site-container">
+        <header class="site-header">
+    <div class="site-header-content">
+        <div class="logo">
+            <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo" alt="Homepage"/></a>
+        </div>
+        <ul class="nav-menu" id="header-nav">
+            <li class="home"><a href="/" title="Velero">Home</a></li>
+            <li class="docs"><a href="/docs/v1.4" title="Documentation">Documentation</a></li>
+            <li class="plugins"><a href="/plugins" title="Plugins">Plugins</a></li>
+            <li class="blog"><a href="/blog" title="Blog Posts">Blog</a></li>
+            <li class="community"><a href="/community" title="Community">Community</a></li>
+            <li class="resources"><a href="/resources" title="Resources">Resources</a></li>
+        </ul>
+        <div class="nav-mobile-link">
+            <a href="javascript:void(0);" id="nav-mobile-toggle"></a>
+        </div>
+    </div>
+</header>
+
+        
+    <div class="home-hero bg-color-med-blue"
+         style="background-image: url('/img/heroes/velero.svg')">
+        <div class="section">
+            <div class="section-content">
+                <div class="hero-content">
+                    <h1 class="mb-3">Backup and migrate Kubernetes resources and persistent volumes</h1>
+                    <p>Velero is an open source tool to safely backup and restore, perform disaster recovery, and migrate Kubernetes cluster resources and persistent volumes.</p>
+                </div>
+                <div class="hero-cta mt-4">
+                    <a href="/blog/velero-1.4-community-wave/"
+                       class="btn btn-primary mb-3 mb-sm-0">Latest Release Information</a>
+                    <a href="https://github.com/vmware-tanzu/velero/releases/latest"
+                       class="btn btn-outline-light">Download Velero</a>
+                </div>
+            </div>
+        </div>
+    </div> 
+    <div class="section section-card section-card-offset-top promo-cards">
+        <div class="section-content">
+            <div class="row">
+                <div class="col-md">
+                    <div class="card card-light mb-3 mb-md-0 shadow-sm">
+                        <div class="card-body match-height">
+                            <figure>
+                                <img src="/img/disaster-recover-icon.svg" alt="Disaster Recovery"/>
+                            </figure>
+                            
+                                <h5>Disaster Recovery</h5>
+                            
+                            <p>Reduces time to recovery in case of infrastructure loss, data corruption, and/or service outages.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md">
+                    <div class="card card-light mb-3 mb-md-0 shadow-sm">
+                        <div class="card-body match-height">
+                            <figure>
+                                <img src="/img/data-migration-icon.svg" alt="Data Migration"/>
+                            </figure>
+                            
+                                <h5>Data Migration</h5>
+                            
+                            <p>Enables cluster portability by easily migrating Kubernetes resources from one cluster to another​.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md">
+                    <div class="card card-light mb-3 mb-md-0 shadow-sm">
+                        <div class="card-body match-height">
+                            <figure>
+                                <img src="/img/data-protection-icon.svg" alt="Data Protection"/>
+                            </figure>
+                            
+                                <h5>Data Protection</h5>
+                            
+                            <p>Offers key data protection features such as scheduled backups, retention schedules, and pre or post-backup hooks for custom actions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="section section-grey">
+        <div class="section-content">
+            <div class="row bg-grey">
+                <div class="col-sm-5 mb-3 mb-sm-0">
+                    <h6 class="mb-1">
+                        <a href="/blog/Velero-is-an-Open-Source-Tool-to-Back-up-and-Migrate-Kubernetes-Clusters/">Introduction to Velero</a>
+                    </h6>
+                    <p class="mb-0">Learn about Velero and how to protect your Kubernetes resources and volumes.</p>
+                </div>
+                <div class="col-sm-5 offset-sm-2">
+                    <h6 class="mb-1">
+                        <a href="https://github.com/vmware-tanzu/velero/issues/1327">How Do You Use Velero?</a>
+                    </h6>
+                    <p class="mb-0">See how Velero is helping others and tell the world how you use Velero.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-content">
+            <div class="row">
+                <div class="col">
+                    <h2>Features</h2>
+                </div>
+            </div>
+            
+            <div class="alternating-cards">
+    
+    
+    
+    
+        <div class="row no-gutters align-items-center">
+            
+            
+
+            
+
+            
+                <div class="order-xs-first col-md-3 match-height icon bg-color-light-blue ">
+                    <img src="/img/case-study-icons/case-study-1.svg" alt="Back up Clusters"/>
+                </div>
+            
+            <div class="order-xs-last col-md-9 ">
+                <div class="card-body">
+                    
+                        <h5 class="card-title">Back up Clusters</h5>
+                    
+                    <p class="card-text"><p>Backup your Kubernetes resources and volumes for an entire cluster, or part of a cluster by using namespaces or label selectors.</p>
+</p>
+                    
+                </div>
+            </div>
+        </div>
+    
+        <div class="row no-gutters align-items-center">
+            
+            
+
+            
+                
+                
+            
+
+            
+                <div class="order-xs-first col-md-3 match-height icon bg-color-light-blue order-md-last">
+                    <img src="/img/case-study-icons/case-study-2.svg" alt="Schedule Backups"/>
+                </div>
+            
+            <div class="order-xs-last col-md-9 order-md-first">
+                <div class="card-body">
+                    
+                        <h5 class="card-title">Schedule Backups</h5>
+                    
+                    <p class="card-text"><p>Set schedules to automatically kickoff backups at recurring intervals.</p>
+</p>
+                    
+                </div>
+            </div>
+        </div>
+    
+        <div class="row no-gutters align-items-center">
+            
+            
+
+            
+
+            
+                <div class="order-xs-first col-md-3 match-height icon bg-color-light-blue ">
+                    <img src="/img/case-study-icons/case-study-3.svg" alt="Backup Hooks"/>
+                </div>
+            
+            <div class="order-xs-last col-md-9 ">
+                <div class="card-body">
+                    
+                        <h5 class="card-title">Backup Hooks</h5>
+                    
+                    <p class="card-text"><p>Configure pre and post-backup hooks to perform custom operations before and after Velero backups.</p>
+</p>
+                    
+                </div>
+            </div>
+        </div>
+    
+</div>
+
+        </div>
+    </div>
+
+    <div class="section pt-3">
+        <div class="section-content">
+            <div class="row">
+                <div class="col">
+                    <h2>Blog Highlights</h2>
+                </div>
+            </div>
+            
+            <div class="row">
+    
+
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/csi-announce-blog.jpg" alt="How to use CSI Volume Snapshotting with Velero" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/CSI-integration/" class="post-title">How to use CSI Volume Snapshotting with Velero</a>
+                </h5>
+                <div class="post-entry">
+                    In the Velero 1.4 release, we introduced support for CSI snapshotting v1beta1 APIs. This post provides step-by-step instructions on setting up a CSI environment in Azure, installing Velero 1.4 with the velero-plugin-for-csi, and a demo of this feature in action.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+        
+        
+        
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/post-1.4.jpg" alt="Velero 1.4: Introducing Beta CSI Support, Backup Progress Tracking, and Much More!" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/Velero-1.4-Community-Wave/" class="post-title">Velero 1.4: Introducing Beta CSI Support, Backup Progress Tracking, and Much More!</a>
+                </h5>
+                <div class="post-entry">
+                    Riding a wave of community contributions, Velero 1.4 introduces beta CSI support, improvements to backup progress tracking, and more. A major focus for 1.4 was addressing issues raised by the community, and we are proud to be able to deliver improvements that matter to you.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+        
+        
+        
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/post-1.3.jpg" alt="Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/Velero-1.3-Voyage-Continues/" class="post-title">Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!</a>
+                </h5>
+                <div class="post-entry">
+                    Velero 1.3 includes improvements to CRD backups and restores, multi-arch Docker images including support for arm/arm64 and ppc64le, and many other usability and stability enhancements. This release includes significant contributions by community members, and we’re thrilled to be able to partner with you all in continuing to improve Velero.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+        
+        
+        
+            </div>
+            <div class="row mt-4">
+        
+    
+</div>
+            <div class="row pt-5">
+                <div class="col text-center">
+                    <a href="/blog" class="btn btn-secondary btn-sm">See All Posts</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section section-background-dark-blue">
+        <div class="section-content">
+            <div class="row">
+    <div class="col">
+        <h2 class="mb-2">The Velero Team</h2>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        <p>Velero is released as open source software and provides community support through our GitHub
+            project page.
+            If you encounter an issue or have a question, feel free to reach out on the <strong><a
+                        href="https://github.com/vmware-tanzu/velero/issues" class="light">GitHub issues page
+                    for Velero</a></strong>.</p>
+        <p>The Velero project team welcomes contributions from the community, please see our <strong><a
+                        href="https://velero.io/docs/master/start-contributing/" class="light">contributing
+                    documentation</a></strong>.
+        </p>
+    </div>
+</div>
+<div class="row thumbnail-grid mt-5">
+    
+    
+        <div class="col-xs-12 col-sm-6 col-md-4">
+            <div class="media thumbnail-item">
+                <img src="/img/contributors/steve-kriss.png" class="rounded-circle" alt="Person"/>
+                <div class="media-body align-self-center">
+                    <h6><a href="https://github.com/skriss">Steve Kriss</a></h6>
+                    <p>Tech Lead</p>
+
+                </div>
+            </div>
+        </div>
+    
+        <div class="col-xs-12 col-sm-6 col-md-4">
+            <div class="media thumbnail-item">
+                <img src="/img/contributors/ashish-amarnath.png" class="rounded-circle" alt="Person"/>
+                <div class="media-body align-self-center">
+                    <h6><a href="https://github.com/ashish-amarnath">Ashish Amarnath</a></h6>
+                    <p>Engineer</p>
+
+                </div>
+            </div>
+        </div>
+    
+        <div class="col-xs-12 col-sm-6 col-md-4">
+            <div class="media thumbnail-item">
+                <img src="/img/contributors/carlisia-campos.png" class="rounded-circle" alt="Person"/>
+                <div class="media-body align-self-center">
+                    <h6><a href="https://github.com/carlisia">Carlisia Campos</a></h6>
+                    <p>Engineer</p>
+
+                </div>
+            </div>
+        </div>
+    
+        <div class="col-xs-12 col-sm-6 col-md-4">
+            <div class="media thumbnail-item">
+                <img src="/img/contributors/nolan-brubaker.png" class="rounded-circle" alt="Person"/>
+                <div class="media-body align-self-center">
+                    <h6><a href="https://github.com/nrb">Nolan Brubaker</a></h6>
+                    <p>Engineer</p>
+
+                </div>
+            </div>
+        </div>
+    
+        <div class="col-xs-12 col-sm-6 col-md-4">
+            <div class="media thumbnail-item">
+                <img src="/img/contributors/tim-hinderliter.png" class="rounded-circle" alt="Person"/>
+                <div class="media-body align-self-center">
+                    <h6><a href="https://github.com/timh">Tim Hinderliter</a></h6>
+                    <p>Engineering Manager</p>
+
+                </div>
+            </div>
+        </div>
+    
+        <div class="col-xs-12 col-sm-6 col-md-4">
+            <div class="media thumbnail-item">
+                <img src="/img/contributors/stephanie-bauman.png" class="rounded-circle" alt="Person"/>
+                <div class="media-body align-self-center">
+                    <h6><a href="https://github.com/stephbman">Stephanie Bauman</a></h6>
+                    <p>Product Manager</p>
+
+                </div>
+            </div>
+        </div>
+    
+</div>
+        </div>
+    </div>
+
+        <div class="section section-background-darkest-blue">
+    <div class="section-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-lg-8">
+                <h5>Getting Started</h5>
+                <p>To help you get started, see the documentation.</p>
+            </div>
+            <div class="col-xs-12 col-sm-6 col-lg-3 offset-lg-1">
+                <p><strong></strong></p>
+                <a href="/docs"
+                   class="btn btn-sm btn-primary btn-no-border">Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="section site-footer">
+    <div class="section-content">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-12 col-md-8 mb-3 mb-md-0">
+                <ul class="social-links text-center text-md-left">
+                    
+                        <li>
+                            
+                                <i class="fab fa-twitter fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://twitter.com/projectvelero">Twitter</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-slack fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://kubernetes.slack.com/messages/velero">Slack</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fas fa-users fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://groups.google.com/forum/#!forum/projectvelero">Google Groups</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fa fa-rss fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="feed.xml">RSS</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-github fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://github.com/vmware-tanzu/velero">GitHub</a>
+                        </li>
+                    
+                </ul>
+            </div>
+            <div class="col-12 col-md-4 text-center text-md-right">
+                <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo"
+                                                              alt="Homepage"/></a>
+            </div>
+        </div>
+        <div class="row align-items-center">
+            <div class="col copyright text-center text-md-right mt-4">
+                &copy; 2020 Velero Authors.
+                <a href="http://vmware.github.io/" class="vm-logo">A VMware-backed project. <img
+                            src="/img/vm-logo.png" alt="VMware logo"/></a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<script defer src="https://use.fontawesome.com/releases/v5.8.1/js/all.js"
+        integrity="sha384-g5uSoOSBd7KkhAMlnQILrecXvzst9TdC09/VM+pjDTCM+1il8RHz5fKANTFFb+gQ"
+        crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" crossorigin="anonymous"></script>
+
+<script src="/js/jquery.matchHeight.js?1593121911"></script>
+<script src="/js/scripts.js?1593121911"></script>
+
+    </div>
+</div>
+</body>
+</html>

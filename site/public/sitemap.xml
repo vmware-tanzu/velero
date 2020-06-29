@@ -1,0 +1,4765 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>/tags/Ashish-Amarnath/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/CSI-integration/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Velero-Team/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Nolan-Brubaker/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/release/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/velero/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/Velero-1.4-Community-Wave/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Steve-Kriss/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/Velero-1.3-Voyage-Continues/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/Velero-1.2-Sets-Sail/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Cormac-Hogan/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/how-to/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/kubernetes/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Velero/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/Velero-v1-1-Stateful-Backup-vSphere/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/Velero-v1-1-on-vSphere/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/announcing-gh-move/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Carlisia-Campos/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/announcing-velero-1.1/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/Tom-Spoonemore/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/velero-1.0-has-arrived/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/Velero-is-an-Open-Source-Tool-to-Back-up-and-Migrate-Kubernetes-Clusters/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/</loc>
+    <lastmod>2020-06-23T14:41:14-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/api-types/restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/api-types/schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/basic-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/code-standards/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/contributions/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/contributions/minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/contributions/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/csi/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/custom-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/customize-installation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/examples/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/how-velero-works/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/on-premises/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/overview-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/release-instructions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/self-signed-certificates/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/support-process/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/supported-providers/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/uninstalling/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/upgrade-to-1.4/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/velero-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/website-guidelines/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/master/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/get-started/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/install-overview/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/storage-layout-reorg-v0.10/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/support-matrix/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/upgrading-to-v0.10/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/versions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.10.0/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/expose-minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/get-started/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/install-overview/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/migrating-to-velero/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/support-matrix/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/versions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.11.0/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/cloud-provider-specifics/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/concepts/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.3.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/cloud-provider-specifics/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/concepts/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.4.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/cloud-provider-specifics/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/concepts/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.5.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_backup_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_describe_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_describe_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_describe_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_plugin/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_plugin_add/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_plugin_remove/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_restore_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_schedule_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/cloud-provider-specifics/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/concepts/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.6.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_client/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_client_config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_client_config_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_client_config_set/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_delete_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_delete_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_delete_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_describe_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_describe_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_describe_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_plugin/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_plugin_add/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_plugin_remove/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_restore_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_schedule_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/cloud-common/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_client/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_client_config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_client_config_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_client_config_set/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_delete_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_delete_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_delete_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_describe_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_describe_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_describe_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_plugin/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_plugin_add/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_plugin_remove/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_restore_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_schedule_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/cloud-common/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/debugging-deletes/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.7.1/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_client/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_client_config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_client_config_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_client_config_set/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_completion/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_delete_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_delete_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_delete_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_describe_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_describe_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_describe_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_plugin/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_plugin_add/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_plugin_remove/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_restore_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_schedule_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/cloud-common/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/debugging-deletes/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_client/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_client_config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_client_config_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_client_config_set/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_completion/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_delete_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_delete_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_delete_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_describe_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_describe_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_describe_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_plugin/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_plugin_add/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_plugin_remove/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_restore_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_schedule_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/cloud-common/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/debugging-deletes/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.8.1/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/build-from-scratch/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup_download/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_backup_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_client/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_client_config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_client_config_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_client_config_set/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_completion/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_create_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_create_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_create_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_delete_backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_delete_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_delete_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_describe_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_describe_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_describe_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_get_backups/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_get_restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_get_schedules/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_plugin/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_plugin_add/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_plugin_remove/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restic_repo/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restic_repo_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restic_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restore_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restore_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restore_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restore_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_restore_logs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_schedule_create/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_schedule_delete/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_schedule_describe/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_schedule_get/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_server/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/ark_version/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/cli-reference/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/config-definition/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/install-overview/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/quickstart/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/support-matrix/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/use-cases/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v0.9.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/extend/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/get-started/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/install-overview/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/migrating-to-velero/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/support-matrix/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/upgrade-to-1.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.0.0/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/about/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/aws-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/azure-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/gcp-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/get-started/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/install-overview/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/migrating-to-velero/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/support-matrix/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/upgrade-to-1.1/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.1.0/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/api-types/schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/basic-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/code-standards/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/contributions/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/contributions/minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/contributions/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/custom-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/customize-installation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/examples/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/how-velero-works/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/on-premises/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/overview-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/support-process/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/supported-providers/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/uninstalling/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/upgrade-to-1.2/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/velero-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/website-guidelines/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.2.0/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/api-types/restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/api-types/schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/basic-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/code-standards/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/contributions/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/contributions/minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/contributions/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/csi/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/custom-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/customize-installation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/examples/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/how-velero-works/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/on-premises/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/overview-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/release-instructions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/support-process/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/supported-providers/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/uninstalling/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/upgrade-to-1.3/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/velero-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/website-guidelines/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.0/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/api-types/restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/api-types/schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/basic-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/code-standards/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/contributions/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/contributions/minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/contributions/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/csi/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/custom-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/customize-installation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/examples/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/how-velero-works/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/on-premises/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/overview-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/release-instructions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/support-process/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/supported-providers/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/uninstalling/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/upgrade-to-1.3/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/velero-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/website-guidelines/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.1/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/api-types/restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/api-types/schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/basic-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/code-standards/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/contributions/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/contributions/minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/contributions/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/csi/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/custom-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/customize-installation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/examples/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/how-velero-works/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/on-premises/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/overview-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/release-instructions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/support-process/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/supported-providers/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/uninstalling/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/upgrade-to-1.3/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/velero-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/website-guidelines/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.3.2/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/api-types/backup/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/api-types/backupstoragelocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/api-types/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/api-types/restore/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/api-types/schedule/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/api-types/volumesnapshotlocation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/backup-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/basic-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/build-from-source/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/code-standards/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/contributions/ibm-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/contributions/minio/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/contributions/oracle-config/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/csi/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/custom-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/customize-installation/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/debugging-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/debugging-restores/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/development/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/disaster-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/examples/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/faq/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/hooks/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/how-velero-works/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/image-tagging/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/img/README/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/locations/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/migration-case/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/namespace/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/on-premises/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/output-file-format/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/overview-plugins/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/rbac/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/release-instructions/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/restic/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/restore-reference/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/run-locally/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/self-signed-certificates/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/start-contributing/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/support-process/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/supported-providers/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/troubleshooting/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/uninstalling/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/upgrade-to-1.4/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/velero-install/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/vendoring-dependencies/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/website-guidelines/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/v1.4/zenhub/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/blog/</loc>
+    <lastmod>2020-06-23T14:27:36-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/community/</loc>
+    <lastmod>2020-06-23T14:41:14-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/docs/</loc>
+    <lastmod>2020-06-22T17:26:18-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/plugins/</loc>
+    <lastmod>2020-06-22T11:30:16-07:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/resources/</loc>
+    <lastmod>2020-06-23T14:41:14-07:00</lastmod>
+  </url>
+  
+</urlset>

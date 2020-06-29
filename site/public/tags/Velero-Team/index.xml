@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Velero Team on Velero</title>
+    <link>/tags/Velero-Team/</link>
+    <description>Recent content in Velero Team on Velero</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 27 May 2020 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="/tags/Velero-Team/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>How to use CSI Volume Snapshotting with Velero</title>
+      <link>/blog/CSI-integration/</link>
+      <pubDate>Wed, 27 May 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/CSI-integration/</guid>
+      <description>In the recent 1.4 release of Velero, we announced a new feature of supporting CSI snapshotting using the Kubernetes CSI Snapshot Beta APIs. With this capability of CSI volume snapshotting, Velero can now support any volume provider that has a CSI driver with snapshotting capability, without requiring a Velero-specific volume snapshotter plugin to be available.
+This post has the necessary instructions for you to start using this feature.
+Getting Started Using the CSI volume snapshotting features in Velero involves the following steps.</description>
+    </item>
+    
+    <item>
+      <title>Velero 1.4: Introducing Beta CSI Support, Backup Progress Tracking, and Much More!</title>
+      <link>/blog/Velero-1.4-Community-Wave/</link>
+      <pubDate>Tue, 26 May 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/Velero-1.4-Community-Wave/</guid>
+      <description>The Velero team is excited to announce the launch of Velero v1.4.0! This release is one of our largest since v1.0.0, with many of our new features coming from community contributors.
+Beta CSI Support Velero v1.4.0 now extends Velero’s support for snapshotting beyond Velero’s native VolumeSnapshotter plugins to include beta support for the Kubernetes Container Storage Interface volume snapshotting capabilities.
+The Container Storage Interface (CSI) is a way for container orchestrators such as Kubernetes to provide a standard interface for storage systems, without having to create drivers for each orchestration system.</description>
+    </item>
+    
+    <item>
+      <title>Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!</title>
+      <link>/blog/Velero-1.3-Voyage-Continues/</link>
+      <pubDate>Mon, 02 Mar 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/Velero-1.3-Voyage-Continues/</guid>
+      <description>Velero’s voyage continues with the release of version 1.3, which includes improvements to CRD backups and restores, multi-arch Docker images including support for arm/arm64 and ppc64le, and many other usability and stability enhancements. This release includes significant contributions by community members, and we’re thrilled to be able to partner with you all in continuing to improve Velero.
+Let’s take a deeper look at some of this release’s highlights.
+Custom Resource Definition Backup and Restore Improvements This release includes a number of related bug fixes and improvements to how Velero backs up and restores custom resource definitions (CRDs) and instances of those CRDs.</description>
+    </item>
+    
+    <item>
+      <title>Velero 1.2 Sets Sail by Shifting Plugins Out of Tree, Adding a Structural Schema, and Sharpening Usability</title>
+      <link>/blog/Velero-1.2-Sets-Sail/</link>
+      <pubDate>Thu, 07 Nov 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/Velero-1.2-Sets-Sail/</guid>
+      <description>Velero continues to evolve with the release of version 1.2. With this release, we’ve focused on extracting in-tree cloud provider plugins into their own repositories, making further usability improvements to the restic integration, preparing for the general availability of Kubernetes custom resource definitions (CRDs) by adding a structural schema to our CRDs, and many other new features and usability improvements.
+Let’s take a look at the highlights for this release.</description>
+    </item>
+    
+    <item>
+      <title>Announcing Velero 1.1: Improved restic Support and More Visibility</title>
+      <link>/blog/announcing-velero-1.1/</link>
+      <pubDate>Thu, 22 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/announcing-velero-1.1/</guid>
+      <description>We’ve made big strides in improving Velero. Since our release of version 1.0 in May 2019, we have been hard at work improving our restic support and planning for the future of Velero. In addition, we’ve seen some helpful contributions from the community that will make life easier for all of our users. Also, the Velero community has reached 100 contributors!
+For this release, we’ve focused on improving Velero’s restic integration: making repository locks shorter lived, giving more visibility into restic repositories when migrating clusters, and expanding support to more volume types.</description>
+    </item>
+    
+    <item>
+      <title>Velero 1.0 Has Arrived: Delivering Enhanced Stability, Usability and Extensibility Features</title>
+      <link>/blog/velero-1.0-has-arrived/</link>
+      <pubDate>Mon, 20 May 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/velero-1.0-has-arrived/</guid>
+      <description>Just three months after the release of Velero 0.11, the community’s momentum continues with the delivery of the landmark version 1.0 release. This significant release improves the installation experience, Helm support, the plugin system, and overall stability. We want to thank the community and the team, and acknowledge all of their hard work and amazing contributions to this major milestone.
+Data protection is always a chief concern for application owners who want to make sure that they can restore a cluster to a known good state, recover from a crashed cluster, or migrate to a new environment.</description>
+    </item>
+    
+    <item>
+      <title>Velero is an Open Source Tool to Back up and Migrate Kubernetes Clusters</title>
+      <link>/blog/Velero-is-an-Open-Source-Tool-to-Back-up-and-Migrate-Kubernetes-Clusters/</link>
+      <pubDate>Tue, 09 Apr 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/blog/Velero-is-an-Open-Source-Tool-to-Back-up-and-Migrate-Kubernetes-Clusters/</guid>
+      <description>Velero is an open source tool to safely back up, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud. Velero consists of a server process running as a deployment in your Kubernetes cluster and a command-line interface (CLI) with which DevOps teams and platform operators configure scheduled backups, trigger ad-hoc backups, perform restores, and more.
+What Makes Velero Stand Out? Unlike other tools which directly access the Kubernetes etcd database to perform backups and restores, Velero uses the Kubernetes API to capture the state of cluster resources and to restore them when necessary.</description>
+    </item>
+    
+  </channel>
+</rss>

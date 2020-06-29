@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Velero</title>
+    <link>/docs/v1.4/</link>
+    <description>Recent content on Velero</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    
+	<atom:link href="/docs/v1.4/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/api-types/backup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/api-types/backup/</guid>
+      <description>Backup API Type Use The Backup API type is used as a request for the Velero server to perform a backup. Once created, the Velero Server immediately starts the backup process.
+API GroupVersion Backup belongs to the API group version velero.io/v1.
+Definition Here is a sample Backup object with each of the fields documented:
+# Standard Kubernetes API Version declaration. Required. apiVersion: velero.io/v1 # Standard Kubernetes Kind declaration. Required. kind: Backup # Standard Kubernetes metadata.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/api-types/backupstoragelocation/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/api-types/backupstoragelocation/</guid>
+      <description>Velero Backup Storage Locations Backup Storage Location Velero can store backups in a number of locations. These are represented in the cluster via the BackupStorageLocation CRD.
+Velero must have at least one BackupStorageLocation. By default, this is expected to be named default, however the name can be changed by specifying --default-backup-storage-location on velero server. Backups that do not explicitly specify a storage location will be saved to this BackupStorageLocation.
+A sample YAML BackupStorageLocation looks like the following:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/api-types/README/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/api-types/README/</guid>
+      <description>Table of Contents API types Here we list the API types that have some functionality that you can only configure via json/yaml vs the velero cli (hooks)
+  Backup  Restore  Schedule  BackupStorageLocation  VolumeSnapshotLocation  </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/api-types/restore/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/api-types/restore/</guid>
+      <description>Restore API Type Use The Restore API type is used as a request for the Velero server to perform a Restore. Once created, the Velero Server immediately starts the Restore process.
+API GroupVersion Restore belongs to the API group version velero.io/v1.
+Definition Here is a sample Restore object with each of the fields documented:
+# Standard Kubernetes API Version declaration. Required. apiVersion: velero.io/v1 # Standard Kubernetes Kind declaration. Required. kind: Restore # Standard Kubernetes metadata.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/api-types/schedule/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/api-types/schedule/</guid>
+      <description>Schedule API Type Use The Schedule API type is used as a repeatable request for the Velero server to perform a backup for a given cron notation. Once created, the Velero Server will start the backup process. It will then wait for the next valid point of the given cron expression and execute the backup process on a repeating basis.
+API GroupVersion Schedule belongs to the API group version velero.io/v1.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/api-types/volumesnapshotlocation/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/api-types/volumesnapshotlocation/</guid>
+      <description>Velero Volume Snapshot Location Volume Snapshot Location A volume snapshot location is the location in which to store the volume snapshots created for a backup.
+Velero can be configured to take snapshots of volumes from multiple providers. Velero also allows you to configure multiple possible VolumeSnapshotLocation per provider, although you can only select one location per provider at backup time.
+Each VolumeSnapshotLocation describes a provider + location. These are represented in the cluster via the VolumeSnapshotLocation CRD.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/backup-reference/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/backup-reference/</guid>
+      <description>Backup Reference Exclude Specific Items from Backup It is possible to exclude individual items from being backed up, even if they match the resource/namespace/label selectors defined in the backup spec. To do this, label the item as follows:
+kubectl label -n &amp;lt;ITEM_NAMESPACE&amp;gt; &amp;lt;RESOURCE&amp;gt;/&amp;lt;NAME&amp;gt; velero.io/exclude-from-backup=true </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/basic-install/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/basic-install/</guid>
+      <description>Basic Install   Basic Install   Prerequisites  Install the CLI   Option 1: macOS - Homebrew  Option 2: GitHub release    Install and configure the server components  Command line Autocompletion    Use this doc to get a basic installation of Velero. Refer this document to customize your installation.
+Prerequisites  Access to a Kubernetes cluster, v1.10 or later, with DNS and container networking enabled.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/build-from-source/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/build-from-source/</guid>
+      <description>Build from source Prerequisites  Access to a Kubernetes cluster, version 1.7 or later. A DNS server on the cluster kubectl installed  Go installed (minimum version 1.8)  Get the source Option 1) Get latest (recommended) mkdir $HOME/go export GOPATH=$HOME/go go get github.com/vmware-tanzu/velero Where go is your import path for Go.
+For Go development, it is recommended to add the Go import path ($HOME/go in this example) to your path.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/code-standards/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/code-standards/</guid>
+      <description>Code Standards Adding a changelog Authors are expected to include a changelog file with their pull requests. The changelog file should be a new file created in the changelogs/unreleased folder. The file should follow the naming convention of pr-username and the contents of the file should be your text for the changelog.
+velero/changelogs/unreleased &amp;lt;- folder 000-username &amp;lt;- file  Add that to the PR.
+Code   Log messages are capitalized.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/contributions/ibm-config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/contributions/ibm-config/</guid>
+      <description>Use IBM Cloud Object Storage as Velero&amp;rsquo;s storage destination. You can deploy Velero on IBM Public or Private clouds, or even on any other Kubernetes cluster, but anyway you can use IBM Cloud Object Store as a destination for Velero&amp;rsquo;s backups.
+To set up IBM Cloud Object Storage (COS) as Velero&amp;rsquo;s destination, you:
+ Download an official release of Velero Create your COS instance Create an S3 bucket Define a service that can store data in the bucket Configure and start the Velero server  Download Velero   Download the latest official release&amp;rsquo;s tarball for your client platform.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/contributions/minio/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/contributions/minio/</guid>
+      <description>Quick start evaluation install with Minio The following example sets up the Velero server and client, then backs up and restores a sample application.
+For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster. For additional functionality with this setup, see the section below on how to expose Minio outside your cluster.
+NOTE The example lets you explore basic Velero functionality. Configuring Minio for production is out of scope.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/contributions/oracle-config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/contributions/oracle-config/</guid>
+      <description>Use Oracle Cloud as a Backup Storage Provider for Velero Introduction  Velero is a tool used to backup and migrate Kubernetes applications. Here are the steps to use Oracle Cloud Object Storage as a destination for Velero backups.
+  Download Velero  Create A Customer Secret Key  Create An Oracle Object Storage Bucket  Install Velero  Clean Up  Examples  Additional Reading  Download Velero   Download the latest release of Velero to your development environment.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/csi/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/csi/</guid>
+      <description>Container Storage Interface Snapshot Support in Velero This feature is under development. Documentation may not be up-to-date and features may not work as expected.
+Integrating Container Storage Interface (CSI) snapshot support into Velero enables Velero to backup and restore CSI-backed volumes using the Kubernetes CSI Snapshot Beta APIs.
+By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/custom-plugins/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/custom-plugins/</guid>
+      <description>Plugins Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups &amp;amp; restores without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary containing implementations of Velero&amp;rsquo;s plugin kinds (described below), plus a small amount of boilerplate code to expose the plugin implementations to Velero. This binary is added to a container image that serves as an init container for the Velero server pod and copies the binary into a shared emptyDir volume for the Velero server to access.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/customize-installation/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/customize-installation/</guid>
+      <description>Customize Velero Install   Customize Velero Install   Plugins  Install in any namespace  Use non-file-based identity mechanisms  Enable restic integration  Enable features   Enable server side features  Enable client side features    Customize resource requests and limits  Configure more than one storage location for backups or volume snapshots  Do not configure a backup storage location during install  Install an additional volume snapshot provider  Generate YAML only  Use a storage provider secured by a self-signed certificate  Additional options  Optional Velero CLI configurations   Enabling shell autocompletion   Bash on Linux   Install bash-completion  Enable Velero CLI autocompletion for Bash on Linux    Bash on macOS   Install bash-completion  Enable Velero CLI autocompletion for Bash on macOS    Autocompletion on Zsh        Plugins During install, Velero requires that at least one plugin is added (with the --plugins flag).</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/debugging-install/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/debugging-install/</guid>
+      <description>Debugging Installation Issues General invalid configuration: no configuration has been provided This typically means that no kubeconfig file can be found for the Velero client to use. Velero looks for a kubeconfig in the following locations:
+ the path specified by the --kubeconfig flag, if any the path specified by the $KUBECONFIG environment variable, if any ~/.kube/config  Backups or restores stuck in New phase This means that the Velero controllers are not processing the backups/restores, which usually happens because the Velero server is not running.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/debugging-restores/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/debugging-restores/</guid>
+      <description>Debugging Restores   Example  Structure  Example When Velero finishes a Restore, its status changes to &amp;ldquo;Completed&amp;rdquo; regardless of whether or not there are issues during the process. The number of warnings and errors are indicated in the output columns from velero restore get:
+NAME BACKUP STATUS WARNINGS ERRORS CREATED SELECTOR backup-test-20170726180512 backup-test Completed 155 76 2017-07-26 11:41:14 -0400 EDT &amp;lt;none&amp;gt; backup-test-20170726180513 backup-test Completed 121 14 2017-07-26 11:48:24 -0400 EDT &amp;lt;none&amp;gt; backup-test-2-20170726180514 backup-test-2 Completed 0 0 2017-07-26 13:31:21 -0400 EDT &amp;lt;none&amp;gt; backup-test-2-20170726180515 backup-test-2 Completed 0 1 2017-07-26 13:32:59 -0400 EDT &amp;lt;none&amp;gt; To delve into the warnings and errors into more detail, you can use velero restore describe:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/development/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/development/</guid>
+      <description>Development Update generated files Run make update to regenerate files if you make the following changes:
+ Add/edit/remove command line flags and/or their help text Add/edit/remove commands or subcommands Add new API types Add/edit/remove plugin protobuf message or service definitions  The following files are automatically generated from the source code:
+ The clientset Listers Shared informers Documentation Protobuf/gRPC types  You can run make verify to ensure that all generated files (clientset, listers, shared informers, docs) are up to date.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/disaster-case/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/disaster-case/</guid>
+      <description>Disaster recovery Using Schedules and Read-Only Backup Storage Locations
+If you periodically back up your cluster&amp;rsquo;s resources, you are able to return to a previous state in case of some unexpected mishap, such as a service outage. Doing so with Velero looks like the following:
+  After you first run the Velero server on your cluster, set up a daily backup (replacing &amp;lt;SCHEDULE NAME&amp;gt; in the command as desired):</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/examples/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/examples/</guid>
+      <description>Examples After you set up the Velero server, try these examples:
+Basic example (without PersistentVolumes)   Start the sample nginx app:
+kubectl apply -f examples/nginx-app/base.yaml   Create a backup:
+velero backup create nginx-backup --include-namespaces nginx-example   Simulate a disaster:
+kubectl delete namespaces nginx-example Wait for the namespace to be deleted.
+  Restore your lost resources:
+velero restore create --from-backup nginx-backup   Snapshot example (with PersistentVolumes)  NOTE: For Azure, you must run Kubernetes version 1.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/faq/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/faq/</guid>
+      <description>FAQ When is it appropriate to use Velero instead of etcd&amp;rsquo;s built in backup/restore? Etcd&amp;rsquo;s backup/restore tooling is good for recovering from data loss in a single etcd cluster. For example, it is a good idea to take a backup of etcd prior to upgrading etcd itself. For more sophisticated management of your Kubernetes cluster backups and restores, we feel that Velero is generally a better approach. It gives you the ability to throw away an unstable cluster and restore your Kubernetes resources and data into a new cluster, which you can&amp;rsquo;t do easily just by backing up and restoring etcd.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/hooks/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/hooks/</guid>
+      <description>Hooks Velero currently supports executing commands in containers in pods during a backup.
+Backup Hooks When performing a backup, you can specify one or more commands to execute in a container in a pod when that pod is being backed up. The commands can be configured to run before any custom action processing (&amp;ldquo;pre&amp;rdquo; hooks), or after all custom actions have been completed and any additional items specified by custom action have been backed up (&amp;ldquo;post&amp;rdquo; hooks).</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/how-velero-works/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/how-velero-works/</guid>
+      <description>How Velero Works Each Velero operation &amp;ndash; on-demand backup, scheduled backup, restore &amp;ndash; is a custom resource, defined with a Kubernetes Custom Resource Definition (CRD) and stored in etcd. Velero also includes controllers that process the custom resources to perform backups, restores, and all related operations.
+You can back up or restore all objects in your cluster, or you can filter objects by type, namespace, and/or label.
+Velero is ideal for the disaster recovery use case, as well as for snapshotting your application state, prior to performing system operations on your cluster (e.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/image-tagging/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/image-tagging/</guid>
+      <description>Image tagging policy This document describes Velero&amp;rsquo;s image tagging policy.
+Released versions velero/velero:&amp;lt;SemVer&amp;gt;
+Velero follows the Semantic Versioning standard for releases. Each tag in the github.com/vmware-tanzu/velero repository has a matching image, e.g. velero/velero:v1.0.0.
+Latest velero/velero:latest
+The latest tag follows the most recently released version of Velero.
+Development velero/velero:master
+The master tag follows the latest commit to land on the master branch.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/img/README/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/img/README/</guid>
+      <description>Some of these diagrams (for instance backup-process.png), have been created on draw.io, using the &amp;ldquo;Include a copy of my diagram&amp;rdquo; option. If you want to make changes to these diagrams, try importing them into draw.io, and you should have access to the original shapes/text that went into the originals.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/locations/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/locations/</guid>
+      <description>Backup Storage Locations and Volume Snapshot Locations Overview Velero has two custom resources, BackupStorageLocation and VolumeSnapshotLocation, that are used to configure where Velero backups and their associated persistent volume snapshots are stored.
+A BackupStorageLocation is defined as a bucket, a prefix within that bucket under which all Velero data should be stored, and a set of additional provider-specific fields (e.g. AWS region, Azure storage account, etc.) The API documentation captures the configurable parameters for each in-tree provider.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/migration-case/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/migration-case/</guid>
+      <description>Cluster migration Using Backups and Restores
+Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. In this scenario, we are also assuming that your clusters are hosted by the same cloud provider. Note that Velero does not support the migration of persistent volumes across cloud providers.
+  (Cluster 1) Assuming you haven&amp;rsquo;t already been checkpointing your data with the Velero schedule operation, you need to first back up your entire cluster (replacing &amp;lt;BACKUP-NAME&amp;gt; as desired):</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/namespace/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/namespace/</guid>
+      <description>Run in a non-default namespace The Velero installation and backups by default are run in the velero namespace. However, it is possible to use a different namespace.
+1) Customize the namespace during install Use the --namespace flag, in conjunction with the other flags in the velero install command (as shown in the the Velero install instructions). This will inform Velero where to install.
+2) Customize the namespace for operational commands To have namespace consistency, specify the namespace for all Velero operational commands to be the same as the namespace used to install Velero:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/on-premises/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/on-premises/</guid>
+      <description>On-Premises Environments You can run Velero in an on-premises cluster in different ways depending on your requirements.
+Selecting an object storage provider You must select an object storage backend that Velero can use to store backup data. Supported providers contains information on various options that are supported or have been reported to work by users.
+If you do not already have an object storage system, MinIO is an open-source S3-compatible object storage system that can be installed on-premises and is compatible with Velero.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/output-file-format/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/output-file-format/</guid>
+      <description>Output file format A backup is a gzip-compressed tar file whose name matches the Backup API resource&amp;rsquo;s metadata.name (what is specified during velero backup create &amp;lt;NAME&amp;gt;).
+In cloud object storage, each backup file is stored in its own subdirectory in the bucket specified in the Velero server configuration. This subdirectory includes an additional file called velero-backup.json. The JSON file lists all information about your associated Backup resource, including any default values.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/overview-plugins/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/overview-plugins/</guid>
+      <description>Velero plugin system Velero uses storage provider plugins to integrate with a variety of storage systems to support backup and snapshot operations.
+For server installation, Velero requires that at least one plugin is added (with the --plugins flag). The plugin will be either of the type object store or volume snapshotter, or a plugin that contains both. An exception to this is that when the user is not configuring a backup storage location or a snapshot storage location at the time of install, this flag is optional.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/rbac/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/rbac/</guid>
+      <description>Run Velero more securely with restrictive RBAC settings By default Velero runs with an RBAC policy of ClusterRole cluster-admin. This is to make sure that Velero can back up or restore anything in your cluster. But cluster-admin access is wide open &amp;ndash; it gives Velero components access to everything in your cluster. Depending on your environment and your security needs, you should consider whether to configure additional RBAC policies with more restrictive access.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/release-instructions/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/release-instructions/</guid>
+      <description>Release Instructions Ahead of Time (GA Only) Release Blog Post PR Prepare a PR containing the release blog post. It&amp;rsquo;s usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
+You also need to update site/index.html to have &amp;ldquo;Latest Release Information&amp;rdquo; contain a link to the new post.
+(Pre-Release and GA) Changelog and Docs PR  In a branch, create the file changelogs/CHANGELOG-&amp;lt;major&amp;gt;.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/restic/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/restic/</guid>
+      <description>Restic Integration Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called restic. This support is considered beta quality. Please see the list of limitations to understand if it currently fits your use case.
+Velero has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks).</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/restore-reference/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/restore-reference/</guid>
+      <description>Restore Reference Restoring Into a Different Namespace Velero can restore resources into a different namespace than the one they were backed up from. To do this, use the --namespace-mappings flag:
+velero restore create RESTORE_NAME \  --from-backup BACKUP_NAME \  --namespace-mappings old-ns-1:new-ns-1,old-ns-2:new-ns-2 What happens when user removes restore objects A restore object represents the restore operation. There are two types of deletion for restore objects:
+1. Deleting with velero restore delete This command will delete the custom resource representing it, along with its individual log and results files.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/run-locally/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/run-locally/</guid>
+      <description>Run Velero locally in development Running the Velero server locally can speed up iterative development. This eliminates the need to rebuild the Velero server image and redeploy it to the cluster with each change.
+Run Velero locally with a remote cluster Velero runs against the Kubernetes API server as the endpoint (as per the kubeconfig configuration), so both the Velero server and client use the same client-go to communicate with Kubernetes.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/self-signed-certificates/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/self-signed-certificates/</guid>
+      <description>Use Velero with a storage provider secured by a self-signed certificate If you are using an S3-Compatible storage provider that is secured with a self-signed certificate, connections to the object store may fail with a certificate signed by unknown authority message. In order to proceed, a certificate bundle may be provided when adding the storage provider.
+Trusting a self-signed certificate during installation When using the velero install command, you can use the --cacert flag to provide a path to a PEM-encoded certificate bundle to trust.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/start-contributing/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/start-contributing/</guid>
+      <description>Start contributing Before you start  Please familiarize yourself with the Code of Conduct before contributing. Also, see CONTRIBUTING.md for instructions on the developer certificate of origin that we require.  Finding your way around You may join the Velero community and contribute in many different ways, including helping us design or test new features. For any significant feature we consider adding, we start with a design document. You may find a list of currently in progress new designs here: https://github.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/support-process/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/support-process/</guid>
+      <description>Support Process Weekly Rotation The Velero maintainers use a weekly rotation to manage community support. Each week, a different maintainer is the point person for responding to incoming support issues via Slack, GitHub, and the Google group. The point person is not expected to be on-call 24x7. Instead, they choose one or more hour(s) per day to be available/responding to incoming issues. They will communicate to the community what that time slot will be each week.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/supported-providers/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/supported-providers/</guid>
+      <description>Providers Velero supports a variety of storage providers for different backup and snapshot operations. Velero has a plugin system which allows anyone to add compatibility for additional backup and volume storage platforms without modifying the Velero codebase.
+Velero supported providers    Provider Object Store Volume Snapshotter Plugin Provider Repo Setup Instructions      Amazon Web Services (AWS) AWS S3 AWS EBS  Velero plugin for AWS  AWS Plugin Setup    Google Cloud Platform (GCP) Google Cloud Storage Google Compute Engine Disks  Velero plugin for GCP  GCP Plugin Setup    Microsoft Azure Azure Blob Storage Azure Managed Disks  Velero plugin for Microsoft Azure  Azure Plugin Setup    VMware vSphere 🚫 vSphere Volumes  VMware vSphere  vSphere Plugin Setup    Contact: #Velero Slack, GitHub Issues</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/troubleshooting/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/troubleshooting/</guid>
+      <description>Troubleshooting These tips can help you troubleshoot known issues. If they don&amp;rsquo;t help, you can file an issue, or talk to us on the #velero channel on the Kubernetes Slack server.
+  Troubleshooting   Debug installation/ setup issues  Debug restores  General troubleshooting information   Getting velero debug logs    Known issue with restoring LoadBalancer Service  Miscellaneous issues   Velero reports custom resource not found errors when starting up.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/uninstalling/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/uninstalling/</guid>
+      <description>Uninstalling Velero If you would like to completely uninstall Velero from your cluster, the following commands will remove all resources created by velero install:
+kubectl delete namespace/velero clusterrolebinding/velero kubectl delete crds -l component=velero </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/upgrade-to-1.4/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/upgrade-to-1.4/</guid>
+      <description>Upgrading to Velero 1.4 Prerequisites  Velero v1.3.x installed.  If you&amp;rsquo;re not yet running at least Velero v1.3, see the following:
+  Upgrading to v1.1  Upgrading to v1.2  Upgrading to v1.3  Instructions   Install the Velero v1.4 command-line interface (CLI) by following the instructions here.
+Verify that you&amp;rsquo;ve properly installed it by running:
+velero version --client-only You should see the following output:
+Client: Version: v1.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/velero-install/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/velero-install/</guid>
+      <description>Velero Install CLI This document serves as a guide to using the velero install CLI command to install velero server components into your kubernetes cluster.
+NOTE: velero install will, by default, use the CLI&amp;rsquo;s version information to determine the version of the server compoents to deploy. This behavior may be overridden by using the --image flag. Refer to Building Server Component Container Images.
+Usage This section explains some of the basic flags supported by the velero install CLI command.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/vendoring-dependencies/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/vendoring-dependencies/</guid>
+      <description>Vendoring dependencies Overview We are using dep to manage dependencies. You can install it by following these instructions.
+Adding a new dependency Run dep ensure. If you want to see verbose output, you can append -v as in dep ensure -v.
+Updating an existing dependency Run dep ensure -update &amp;lt;pkg&amp;gt; [&amp;lt;pkg&amp;gt; ...] to update one or more dependencies.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/website-guidelines/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/website-guidelines/</guid>
+      <description>Website Guidelines Running the website locally When making changes to the website, please run the site locally before submitting a PR and manually verify your changes.
+At the root of the project, run:
+make serve-docs This runs all the Ruby dependencies in a container.
+Alternatively, for quickly loading the website, under the velero/site/ directory run:
+bundle exec jekyll serve --livereload --future For more information on how to run the website locally, please see our jekyll documentation.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v1.4/zenhub/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v1.4/zenhub/</guid>
+      <description>ZenHub As an Open Source community, it is necessary for our work, communication, and collaboration to be done in the open. GitHub provides a central repository for code, pull requests, issues, and documentation. When applicable, we will use Google Docs for design reviews, proposals, and other working documents.
+While GitHub issues, milestones, and labels generally work pretty well, the Velero team has found that product planning requires some additional tooling that GitHub projects do not offer.</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,770 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Velero</title>
+    <link>/docs/v0.8.1/</link>
+    <description>Recent content on Velero</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    
+	<atom:link href="/docs/v0.8.1/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/about/</guid>
+      <description>About Heptio Ark Heptio Ark provides customizable degrees of recovery for all Kubernetes objects (Pods, Deployments, Jobs, Custom Resource Definitions, etc.), as well as for persistent volumes. This recovery can be cluster-wide, or fine-tuned according to object type, namespace, or labels.
+Ark is ideal for the disaster recovery use case, as well as for snapshotting your application state, prior to performing system operations on your cluster (e.g. upgrades).
+Features Ark provides the following operations:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/api-types/backup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/api-types/backup/</guid>
+      <description>Backup API Type Use The Backup API type is used as a request for the Ark Server to perform a backup. Once created, the Ark Server immediately starts the backup process.
+API GroupVersion Backup belongs to the API group version ark.heptio.com/v1.
+Definition Here is a sample Backup object with each of the fields documented:
+# Standard Kubernetes API Version declaration. Required. apiVersion: ark.heptio.com/v1 # Standard Kubernetes Kind declaration. Required. kind: Backup # Standard Kubernetes metadata.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/api-types/README/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/api-types/README/</guid>
+      <description>Table of Contents API types   Backup  </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/aws-config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/aws-config/</guid>
+      <description>Run Ark on AWS To set up Ark on AWS, you:
+ Create your S3 bucket Create an AWS IAM user for Ark Configure the server Create a Secret for your credentials  If you do not have the aws CLI locally installed, follow the user guide to set it up.
+Create S3 bucket Heptio Ark requires an object storage bucket to store backups in. Create an S3 bucket, replacing placeholders appropriately:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/azure-config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/azure-config/</guid>
+      <description>Run Ark on Azure To configure Ark on Azure, you:
+ Create your Azure storage account and blob container Create Azure service principal for Ark Configure the server Create a Secret for your credentials  If you do not have the az Azure CLI 2.0 installed locally, follow the install guide to set it up.
+Run:
+az login Kubernetes cluster prerequisites Ensure that the VMs for your agent pool allow Managed Disks.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/build-from-scratch/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/build-from-scratch/</guid>
+      <description>Build from source   Prerequisites  Download  Build  Test  Run  Vendoring dependencies  Prerequisites  Access to a Kubernetes cluster, version 1.7 or later. Version 1.7.5 or later is required to run ark backup delete. A DNS server on the cluster kubectl installed  Go installed (minimum version 1.8)  Download Install with go:
+go get github.com/heptio/ark The files are installed in $GOPATH/src/github.com/heptio/ark.
+Build You can build your Ark image locally on the machine where you run your cluster, or you can push it to a private registry.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark/</guid>
+      <description>ark Back up and restore Kubernetes cluster resources.
+Synopsis Heptio Ark is a tool for managing disaster recovery, specifically for Kubernetes cluster resources. It provides a simple, configurable, and operationally robust way to back up your application state and associated data.
+If you&amp;rsquo;re familiar with kubectl, Ark supports a similar model, allowing you to execute commands such as &amp;lsquo;ark get backup&amp;rsquo; and &amp;lsquo;ark create schedule&amp;rsquo;. The same operations can also be performed as &amp;lsquo;ark backup get&amp;rsquo; and &amp;lsquo;ark schedule create&amp;rsquo;.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup/</guid>
+      <description>ark backup Work with backups
+Synopsis Work with backups
+Options  -h, --help help for backup Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup_create/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup_create/</guid>
+      <description>ark backup create Create a backup
+Synopsis Create a backup
+ark backup create NAME [flags] Options  --exclude-namespaces stringArray namespaces to exclude from the backup --exclude-resources stringArray resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io -h, --help help for create --include-cluster-resources optionalBool[=true] include cluster-scoped resources in the backup --include-namespaces stringArray namespaces to include in the backup (use &#39;*&#39; for all namespaces) (default *) --include-resources stringArray resources to include in the backup, formatted as resource.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup_delete/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup_delete/</guid>
+      <description>ark backup delete Delete a backup
+Synopsis Delete a backup
+ark backup delete NAME [flags] Options  --confirm Confirm deletion -h, --help help for delete Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup_describe/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup_describe/</guid>
+      <description>ark backup describe Describe backups
+Synopsis Describe backups
+ark backup describe [NAME1] [NAME2] [NAME...] [flags] Options  -h, --help help for describe -l, --selector string only show items matching this label selector Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup_download/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup_download/</guid>
+      <description>ark backup download Download a backup
+Synopsis Download a backup
+ark backup download NAME [flags] Options  --force forces the download and will overwrite file if it exists already -h, --help help for download -o, --output string path to output file. Defaults to &amp;lt;NAME&amp;gt;-data.tar.gz in the current directory --timeout duration maximum time to wait to process download request (default 1m0s) Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup_get/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup_get/</guid>
+      <description>ark backup get Get backups
+Synopsis Get backups
+ark backup get [flags] Options  -h, --help help for get --label-columns stringArray a comma-separated list of labels to be displayed as columns -o, --output string Output display format. For create commands, display the object but do not send it to the server. Valid formats are &#39;table&#39;, &#39;json&#39;, and &#39;yaml&#39;. (default &amp;quot;table&amp;quot;) -l, --selector string only show items matching this label selector --show-labels show labels in the last column Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_backup_logs/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_backup_logs/</guid>
+      <description>ark backup logs Get backup logs
+Synopsis Get backup logs
+ark backup logs BACKUP [flags] Options  -h, --help help for logs --timeout duration how long to wait to receive logs (default 1m0s) Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_client/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_client/</guid>
+      <description>ark client Ark client related commands
+Synopsis Ark client related commands
+Options  -h, --help help for client Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_client_config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_client_config/</guid>
+      <description>ark client config Get and set client configuration file values
+Synopsis Get and set client configuration file values
+Options  -h, --help help for config Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_client_config_get/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_client_config_get/</guid>
+      <description>ark client config get Get client configuration file values
+Synopsis Get client configuration file values
+ark client config get [KEY 1] [KEY 2] [...] [flags] Options  -h, --help help for get Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_client_config_set/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_client_config_set/</guid>
+      <description>ark client config set Set client configuration file values
+Synopsis Set client configuration file values
+ark client config set KEY=VALUE [KEY=VALUE]... [flags] Options  -h, --help help for set Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_completion/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_completion/</guid>
+      <description>ark completion Output shell completion code for the specified shell (bash or zsh)
+Synopsis Generate shell completion code.
+Auto completion supports both bash and zsh. Output is to STDOUT.
+Load the ark completion code for bash into the current shell - source &amp;lt;(ark completion bash)
+Load the ark completion code for zsh into the current shell - source &amp;lt;(ark completion zsh)
+ark completion SHELL [flags] Options  -h, --help help for completion Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_create/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_create/</guid>
+      <description>ark create Create ark resources
+Synopsis Create ark resources
+Options  -h, --help help for create Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_create_backup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_create_backup/</guid>
+      <description>ark create backup Create a backup
+Synopsis Create a backup
+ark create backup NAME [flags] Options  --exclude-namespaces stringArray namespaces to exclude from the backup --exclude-resources stringArray resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io -h, --help help for backup --include-cluster-resources optionalBool[=true] include cluster-scoped resources in the backup --include-namespaces stringArray namespaces to include in the backup (use &#39;*&#39; for all namespaces) (default *) --include-resources stringArray resources to include in the backup, formatted as resource.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_create_restore/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_create_restore/</guid>
+      <description>ark create restore Create a restore
+Synopsis Create a restore
+ark create restore [RESTORE_NAME] --from-backup BACKUP_NAME [flags] Examples  # create a restore named &amp;quot;restore-1&amp;quot; from backup &amp;quot;backup-1&amp;quot; ark restore create restore-1 --from-backup backup-1 # create a restore with a default name (&amp;quot;backup-1-&amp;lt;timestamp&amp;gt;&amp;quot;) from backup &amp;quot;backup-1&amp;quot; ark restore create --from-backup backup-1 Options  --exclude-namespaces stringArray namespaces to exclude from the restore --exclude-resources stringArray resources to exclude from the restore, formatted as resource.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_create_schedule/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_create_schedule/</guid>
+      <description>ark create schedule Create a schedule
+Synopsis The &amp;ndash;schedule flag is required, in cron notation:
+   Character Position Character Period Acceptable Values     1 Minute 0-59,*   2 Hour 0-23,*   3 Day of Month 1-31,*   4 Month 1-12,*   5 Day of Week 0-7,*    ark create schedule NAME --schedule [flags] Examples ark create schedule NAME --schedule=&amp;quot;0 */6 * * *&amp;quot; Options  --exclude-namespaces stringArray namespaces to exclude from the backup --exclude-resources stringArray resources to exclude from the backup, formatted as resource.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_delete/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_delete/</guid>
+      <description>ark delete Delete ark resources
+Synopsis Delete ark resources
+Options  -h, --help help for delete Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_delete_backup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_delete_backup/</guid>
+      <description>ark delete backup Delete a backup
+Synopsis Delete a backup
+ark delete backup NAME [flags] Options  --confirm Confirm deletion -h, --help help for backup Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_delete_restore/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_delete_restore/</guid>
+      <description>ark delete restore Delete a restore
+Synopsis Delete a restore
+ark delete restore NAME [flags] Options  -h, --help help for restore Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_delete_schedule/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_delete_schedule/</guid>
+      <description>ark delete schedule Delete a schedule
+Synopsis Delete a schedule
+ark delete schedule NAME [flags] Options  -h, --help help for schedule Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_describe/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_describe/</guid>
+      <description>ark describe Describe ark resources
+Synopsis Describe ark resources
+Options  -h, --help help for describe Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_describe_backups/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_describe_backups/</guid>
+      <description>ark describe backups Describe backups
+Synopsis Describe backups
+ark describe backups [NAME1] [NAME2] [NAME...] [flags] Options  -h, --help help for backups -l, --selector string only show items matching this label selector Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_describe_restores/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_describe_restores/</guid>
+      <description>ark describe restores Describe restores
+Synopsis Describe restores
+ark describe restores [NAME1] [NAME2] [NAME...] [flags] Options  -h, --help help for restores -l, --selector string only show items matching this label selector Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_describe_schedules/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_describe_schedules/</guid>
+      <description>ark describe schedules Describe schedules
+Synopsis Describe schedules
+ark describe schedules [NAME1] [NAME2] [NAME...] [flags] Options  -h, --help help for schedules -l, --selector string only show items matching this label selector Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_get/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_get/</guid>
+      <description>ark get Get ark resources
+Synopsis Get ark resources
+Options  -h, --help help for get Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_get_backups/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_get_backups/</guid>
+      <description>ark get backups Get backups
+Synopsis Get backups
+ark get backups [flags] Options  -h, --help help for backups --label-columns stringArray a comma-separated list of labels to be displayed as columns -o, --output string Output display format. For create commands, display the object but do not send it to the server. Valid formats are &#39;table&#39;, &#39;json&#39;, and &#39;yaml&#39;. (default &amp;quot;table&amp;quot;) -l, --selector string only show items matching this label selector --show-labels show labels in the last column Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_get_restores/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_get_restores/</guid>
+      <description>ark get restores Get restores
+Synopsis Get restores
+ark get restores [flags] Options  -h, --help help for restores --label-columns stringArray a comma-separated list of labels to be displayed as columns -o, --output string Output display format. For create commands, display the object but do not send it to the server. Valid formats are &#39;table&#39;, &#39;json&#39;, and &#39;yaml&#39;. (default &amp;quot;table&amp;quot;) -l, --selector string only show items matching this label selector --show-labels show labels in the last column Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_get_schedules/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_get_schedules/</guid>
+      <description>ark get schedules Get schedules
+Synopsis Get schedules
+ark get schedules [flags] Options  -h, --help help for schedules --label-columns stringArray a comma-separated list of labels to be displayed as columns -o, --output string Output display format. For create commands, display the object but do not send it to the server. Valid formats are &#39;table&#39;, &#39;json&#39;, and &#39;yaml&#39;. (default &amp;quot;table&amp;quot;) -l, --selector string only show items matching this label selector --show-labels show labels in the last column Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_plugin/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_plugin/</guid>
+      <description>ark plugin Work with plugins
+Synopsis Work with plugins
+Options  -h, --help help for plugin Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_plugin_add/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_plugin_add/</guid>
+      <description>ark plugin add Add a plugin
+Synopsis Add a plugin
+ark plugin add IMAGE [flags] Options  -h, --help help for add --image-pull-policy the imagePullPolicy for the plugin container. Valid values are Always, IfNotPresent, Never. (default IfNotPresent) Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_plugin_remove/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_plugin_remove/</guid>
+      <description>ark plugin remove Remove a plugin
+Synopsis Remove a plugin
+ark plugin remove [NAME | IMAGE] [flags] Options  -h, --help help for remove Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_restore/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_restore/</guid>
+      <description>ark restore Work with restores
+Synopsis Work with restores
+Options  -h, --help help for restore Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_restore_create/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_restore_create/</guid>
+      <description>ark restore create Create a restore
+Synopsis Create a restore
+ark restore create [RESTORE_NAME] --from-backup BACKUP_NAME [flags] Examples  # create a restore named &amp;quot;restore-1&amp;quot; from backup &amp;quot;backup-1&amp;quot; ark restore create restore-1 --from-backup backup-1 # create a restore with a default name (&amp;quot;backup-1-&amp;lt;timestamp&amp;gt;&amp;quot;) from backup &amp;quot;backup-1&amp;quot; ark restore create --from-backup backup-1 Options  --exclude-namespaces stringArray namespaces to exclude from the restore --exclude-resources stringArray resources to exclude from the restore, formatted as resource.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_restore_delete/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_restore_delete/</guid>
+      <description>ark restore delete Delete a restore
+Synopsis Delete a restore
+ark restore delete NAME [flags] Options  -h, --help help for delete Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_restore_describe/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_restore_describe/</guid>
+      <description>ark restore describe Describe restores
+Synopsis Describe restores
+ark restore describe [NAME1] [NAME2] [NAME...] [flags] Options  -h, --help help for describe -l, --selector string only show items matching this label selector Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_restore_get/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_restore_get/</guid>
+      <description>ark restore get Get restores
+Synopsis Get restores
+ark restore get [flags] Options  -h, --help help for get --label-columns stringArray a comma-separated list of labels to be displayed as columns -o, --output string Output display format. For create commands, display the object but do not send it to the server. Valid formats are &#39;table&#39;, &#39;json&#39;, and &#39;yaml&#39;. (default &amp;quot;table&amp;quot;) -l, --selector string only show items matching this label selector --show-labels show labels in the last column Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_restore_logs/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_restore_logs/</guid>
+      <description>ark restore logs Get restore logs
+Synopsis Get restore logs
+ark restore logs RESTORE [flags] Options  -h, --help help for logs --timeout duration how long to wait to receive logs (default 1m0s) Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_schedule/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_schedule/</guid>
+      <description>ark schedule Work with schedules
+Synopsis Work with schedules
+Options  -h, --help help for schedule Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context) --log_backtrace_at traceLocation when logging hits line file:N, emit a stack trace (default :0) --log_dir string If non-empty, write log files in this directory --logtostderr log to standard error instead of files -n, --namespace string The namespace in which Ark should operate (default &amp;quot;heptio-ark&amp;quot;) --stderrthreshold severity logs at or above this threshold go to stderr (default 2) -v, --v Level log level for V logs --vmodule moduleSpec comma-separated list of pattern=N settings for file-filtered logging SEE ALSO   ark	- Back up and restore Kubernetes cluster resources.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_schedule_create/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_schedule_create/</guid>
+      <description>ark schedule create Create a schedule
+Synopsis The &amp;ndash;schedule flag is required, in cron notation:
+   Character Position Character Period Acceptable Values     1 Minute 0-59,*   2 Hour 0-23,*   3 Day of Month 1-31,*   4 Month 1-12,*   5 Day of Week 0-7,*    ark schedule create NAME --schedule [flags] Examples ark create schedule NAME --schedule=&amp;quot;0 */6 * * *&amp;quot; Options  --exclude-namespaces stringArray namespaces to exclude from the backup --exclude-resources stringArray resources to exclude from the backup, formatted as resource.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_schedule_delete/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_schedule_delete/</guid>
+      <description>ark schedule delete Delete a schedule
+Synopsis Delete a schedule
+ark schedule delete NAME [flags] Options  -h, --help help for delete Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_schedule_describe/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_schedule_describe/</guid>
+      <description>ark schedule describe Describe schedules
+Synopsis Describe schedules
+ark schedule describe [NAME1] [NAME2] [NAME...] [flags] Options  -h, --help help for describe -l, --selector string only show items matching this label selector Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_schedule_get/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_schedule_get/</guid>
+      <description>ark schedule get Get schedules
+Synopsis Get schedules
+ark schedule get [flags] Options  -h, --help help for get --label-columns stringArray a comma-separated list of labels to be displayed as columns -o, --output string Output display format. For create commands, display the object but do not send it to the server. Valid formats are &#39;table&#39;, &#39;json&#39;, and &#39;yaml&#39;. (default &amp;quot;table&amp;quot;) -l, --selector string only show items matching this label selector --show-labels show labels in the last column Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_server/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_server/</guid>
+      <description>ark server Run the ark server
+Synopsis Run the ark server
+ark server [flags] Options  -h, --help help for server --log-level the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info) --plugin-dir string directory containing Ark plugins (default &amp;quot;/plugins&amp;quot;) Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/ark_version/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/ark_version/</guid>
+      <description>ark version Print the ark version and associated image
+Synopsis Print the ark version and associated image
+ark version [flags] Options  -h, --help help for version Options inherited from parent commands  --alsologtostderr log to standard error as well as files --kubeconfig string Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration --kubecontext string The context to use to talk to the Kubernetes apiserver.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cli-reference/README/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cli-reference/README/</guid>
+      <description>Command line reference The Ark client provides a CLI that allows you to initiate ad-hoc backups, scheduled backups, or restores.
+ The files in the CLI reference directory in the repository enumerate each of the possible ark commands and their flags. This information is available in the CLI, using the --help flag.
+Running the client We recommend that you download a pre-built release, but you can also build and run the ark executable.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/cloud-common/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/cloud-common/</guid>
+      <description>Set up Ark with your cloud provider To run Ark with your cloud provider, you specify provider-specific settings for the Ark server. In version 0.7.0 and later, you can run Ark in any namespace, which requires additional customization. See Run in custom namespace.
+The Ark repository includes a set of example YAML files that specify the settings for each cloud provider. For provider-specific instructions, see:
+  Run Ark on AWS  Run Ark on GCP  Run Ark on Azure  Use IBM Cloud Object Store as Ark&amp;rsquo;s storage destination  Examples After you set up the Ark server, try these examples:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/config-definition/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/config-definition/</guid>
+      <description>Ark Config definition   Overview  Example  Parameter Reference   Main config  AWS  GCP  Azure    Overview Heptio Ark defines its own Config object (a custom resource) for specifying Ark backup and cloud provider settings. When the Ark server is first deployed, it waits until you create a Config&amp;ndash;specifically one named default&amp;ndash;in the heptio-ark namespace.
+ NOTE: There is an underlying assumption that you&amp;rsquo;re running the Ark server as a Kubernetes deployment.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/debugging-deletes/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/debugging-deletes/</guid>
+      <description>Ark version 0.7.0 and later: issue with deleting namespaces and backups Version 0.7.0 introduced the ability to delete backups. However, you may encounter an issue if you try to delete the heptio-ark namespace. The namespace can get stuck in a terminating state, and you cannot delete your backups. To fix:
+  If you don&amp;rsquo;t have it, install jq.
+  Run:
+bash &amp;lt;(kubectl -n heptio-ark get backup -o json | jq -c -r $&amp;#39;.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/debugging-install/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/debugging-install/</guid>
+      <description>Debugging Installation Issues General invalid configuration: no configuration has been provided This typically means that no kubeconfig file can be found for the Ark client to use. Ark looks for a kubeconfig in the following locations:
+ the path specified by the --kubeconfig flag, if any the path specified by the $KUBECONFIG environment variable, if any ~/.kube/config  Backups or restores stuck in New phase This means that the Ark controllers are not processing the backups/restores, which usually happens because the Ark server is not running.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/debugging-restores/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/debugging-restores/</guid>
+      <description>Debugging Restores   Example  Structure  Example When Heptio Ark finishes a Restore, its status changes to &amp;ldquo;Completed&amp;rdquo; regardless of whether or not there are issues during the process. The number of warnings and errors are indicated in the output columns from ark restore get:
+NAME BACKUP STATUS WARNINGS ERRORS CREATED SELECTOR backup-test-20170726180512 backup-test Completed 155 76 2017-07-26 11:41:14 -0400 EDT &amp;lt;none&amp;gt; backup-test-20170726180513 backup-test Completed 121 14 2017-07-26 11:48:24 -0400 EDT &amp;lt;none&amp;gt; backup-test-2-20170726180514 backup-test-2 Completed 0 0 2017-07-26 13:31:21 -0400 EDT &amp;lt;none&amp;gt; backup-test-2-20170726180515 backup-test-2 Completed 0 1 2017-07-26 13:32:59 -0400 EDT &amp;lt;none&amp;gt; To delve into the warnings and errors into more detail, you can use ark restore describe:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/extend/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/extend/</guid>
+      <description>Extend Ark Ark includes mechanisms for extending the core functionality to meet your individual backup/restore needs:
+  Hooks allow you to specify commands to be executed within running pods during a backup. This is useful if you need to run a workload-specific command prior to taking a backup (for example, to flush disk buffers or to freeze a database).  Plugins allow you to develop custom object/block storage back-ends or per-item backup/restore actions that can execute arbitrary logic, including modifying the items being backed up/restored.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/faq/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/faq/</guid>
+      <description>FAQ When is it appropriate to use Ark instead of etcd&amp;rsquo;s built in backup/restore? Etcd&amp;rsquo;s backup/restore tooling is good for recovering from data loss in a single etcd cluster. For example, it is a good idea to take a backup of etcd prior to upgrading etcd istelf. For more sophisticated management of your Kubernetes cluster backups and restores, we feel that Ark is generally a better approach. It gives you the ability to throw away an unstable cluster and restore your Kubernetes resources and data into a new cluster, which you can&amp;rsquo;t do easily just by backing up and restoring etcd.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/gcp-config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/gcp-config/</guid>
+      <description>Run Ark on GCP You can run Kubernetes on Google Cloud Platform in either of:
+ Kubernetes on Google Compute Engine virtual machines Google Kubernetes Engine  If you do not have the gcloud and gsutil CLIs locally installed, follow the user guide to set them up.
+Create GCS bucket Heptio Ark requires an object storage bucket in which to store backups. Create a GCS bucket, replacing placeholder appropriately:
+gsutil mb gs://&amp;lt;YOUR_BUCKET&amp;gt;/ Create service account To integrate Heptio Ark with GCP, create an Ark-specific Service Account:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/hooks/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/hooks/</guid>
+      <description>Hooks Heptio Ark currently supports executing commands in containers in pods during a backup.
+Backup Hooks When performing a backup, you can specify one or more commands to execute in a container in a pod when that pod is being backed up.
+Ark versions prior to v0.7.0 only support hooks that execute prior to any custom action processing (&amp;ldquo;pre&amp;rdquo; hooks).
+As of version v0.7.0, Ark also supports &amp;ldquo;post&amp;rdquo; hooks - these execute after all custom actions have completed, as well as after all the additional items specified by custom actions have been backed up.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/ibm-config/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/ibm-config/</guid>
+      <description>Use IBM Cloud Object Storage as Ark&amp;rsquo;s storage destination. You can deploy Ark on IBM Public or Private clouds, or even on any other Kubernetes cluster, but anyway you can use IBM Cloud Object Store as a destination for Ark&amp;rsquo;s backups.
+To set up IBM Cloud Object Storage (COS) as Ark&amp;rsquo;s destination, you:
+ Create your COS instance Create an S3 bucket Define a service that can store data in the bucket Configure and start the Ark server  Create COS instance If you don’t have a COS instance, you can create a new one, according to the detailed instructions in Creating a new resource instance.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/img/README/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/img/README/</guid>
+      <description>Some of these diagrams (for instance backup-process.png), have been created on draw.io, using the &amp;ldquo;Include a copy of my diagram&amp;rdquo; option. If you want to make changes to these diagrams, try importing them into draw.io, and you should have access to the original shapes/text that went into the originals.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/namespace/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/namespace/</guid>
+      <description>Run in custom namespace In Ark version 0.7.0 and later, you can run Ark in any namespace. To do so, you specify the namespace in the YAML files that configure the Ark server. You then also specify the namespace when you run Ark client commands.
+Edit the example files The Ark repository includes a set of examples that you can use to set up your Ark server. The examples place the server and backup/schedule/restore/config data in the heptio-ark namespace.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/output-file-format/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/output-file-format/</guid>
+      <description>Output file format A backup is a gzip-compressed tar file whose name matches the Backup API resource&amp;rsquo;s metadata.name (what is specified during ark backup create &amp;lt;NAME&amp;gt;).
+In cloud object storage, each backup file is stored in its own subdirectory in the bucket specified in the Ark server configuration. This subdirectory includes an additional file called ark-backup.json. The JSON file lists all information about your associated Backup resource, including any default values.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/plugins/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/plugins/</guid>
+      <description>Plugins Heptio Ark has a plugin architecture that allows users to add their own custom functionality to Ark backups &amp;amp; restores without having to modify/recompile the core Ark binary. To add custom functionality, users simply create their own binary containing an implementation of one of Ark&amp;rsquo;s plugin kinds (described below), plus a small amount of boilerplate code to expose the plugin implementation to Ark. This binary is added to a container image that serves as an init container for the Ark server pod and copies the binary into a shared emptyDir volume for the Ark server to access.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/troubleshooting/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/troubleshooting/</guid>
+      <description>Troubleshooting These tips can help you troubleshoot known issues. If they don&amp;rsquo;t help, you can file an issue, or talk to us on the #ark-dr channel.
+   Debug installation/setup issues
+   Delete namespaces and backups
+   Debug restores
+  </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/use-cases/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/use-cases/</guid>
+      <description>Use Cases This doc provides sample Ark commands for the following common scenarios:
+  Disaster recovery  Cluster migration  Disaster recovery Using Schedules and Restore-Only Mode
+If you periodically back up your cluster&amp;rsquo;s resources, you are able to return to a previous state in case of some unexpected mishap, such as a service outage. Doing so with Heptio Ark looks like the following:
+  After you first run the Ark server on your cluster, set up a daily backup (replacing &amp;lt;SCHEDULE NAME&amp;gt; in the command as desired):</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/docs/v0.8.1/vendoring-dependencies/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/docs/v0.8.1/vendoring-dependencies/</guid>
+      <description>Vendoring dependencies Overview We are using dep to manage dependencies. You can install it by following these instructions.
+Adding a new dependency Run dep ensure. If you want to see verbose output, you can append -v as in dep ensure -v.
+Updating an existing dependency Run dep ensure -update &amp;lt;pkg&amp;gt; [&amp;lt;pkg&amp;gt; ...] to update one or more dependencies.</description>
+    </item>
+    
+  </channel>
+</rss>

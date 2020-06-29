@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    
+    
+    <link rel="stylesheet" href="/styles.666a5dc1cd80e47092a71103358e46b56345de6f3044680f856f219cbc2fe91b.css" integrity="sha256-Zmpdwc2A5HCSpxEDNY5GtWNF3m8wRGgPhW8hnLwv6Rs=">
+    <title>Velero How to use CSI Volume Snapshotting with Velero</title>
+    
+</head>
+<body id="blog">
+<div class="container-fluid site-outer-container">
+    <div class="site-container">
+        <header class="site-header">
+    <div class="site-header-content">
+        <div class="logo">
+            <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo" alt="Homepage"/></a>
+        </div>
+        <ul class="nav-menu" id="header-nav">
+            <li class="home"><a href="/" title="Velero">Home</a></li>
+            <li class="docs"><a href="/docs/v1.4" title="Documentation">Documentation</a></li>
+            <li class="plugins"><a href="/plugins" title="Plugins">Plugins</a></li>
+            <li class="blog"><a href="/blog" title="Blog Posts">Blog</a></li>
+            <li class="community"><a href="/community" title="Community">Community</a></li>
+            <li class="resources"><a href="/resources" title="Resources">Resources</a></li>
+        </ul>
+        <div class="nav-mobile-link">
+            <a href="javascript:void(0);" id="nav-mobile-toggle"></a>
+        </div>
+    </div>
+</header>
+
+        
+    <div class="post-single-hero bg-color-med-blue">
+        <div class="section">
+            <div class="section-content">
+                <h1>How to use CSI Volume Snapshotting with Velero</h1>
+            </div>
+        </div>
+    </div>
+    <div class="post-single-body">
+        <div class="section section-card">
+            <div class="section-content pt-4 pb-0">
+                <div class="post-single-meta">
+                    <div class="post-single-meta-author">
+                        
+
+                        <div class="post-single-meta-author-name">
+                            <a href="/tags/Ashish-Amarnath">Ashish Amarnath</a>
+                        </div>
+                    </div>
+
+                    <div class="post-single-meta-date">
+                        May 27, 2020
+                    </div>
+                </div>
+
+                <div class="post-single-content">
+                    <p>In the recent 
+
+<a href="https://github.com/vmware-tanzu/velero/releases">1.4 release of Velero</a>, we announced a new feature of supporting CSI snapshotting using the 
+
+<a href="https://kubernetes.io/docs/concepts/storage/volume-snapshots/">Kubernetes CSI Snapshot Beta APIs</a>.
+With this capability of CSI volume snapshotting, Velero can now support any volume provider that has a CSI driver with snapshotting capability, without requiring a Velero-specific volume snapshotter plugin to be available.</p>
+<p>This post has the necessary instructions for you to start using this feature.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>Using the CSI volume snapshotting features in Velero involves the following steps.</p>
+<ol>
+<li>Set up a CSI environment with a driver supporting the Kubernetes CSI snapshot beta APIs.</li>
+<li>Install Velero with CSI snapshotting feature enabled.</li>
+<li>Deploy <code>csi-app</code>: a stateful application that uses CSI backed volumes that we will backup and restore.</li>
+<li>Use Velero to backup and restore the <code>csi-app</code>.</li>
+</ol>
+<h2 id="set-up-a-csi-environment">Set up a CSI environment.</h2>
+<p>As the 
+
+<a href="https://kubernetes.io/docs/concepts/storage/volume-snapshots/">Kubernetes CSI Snapshot Beta API</a> is available starting from Kubernetes <code>1.17</code>, you need to run Kubernetes <code>1.17</code> or later.</p>
+<p>This post uses an AKS cluster running Kubernetes <code>1.17</code>, with Azure disk CSI driver as an example.</p>
+<p>Following instructions to install the Azure disk CSI driver from 
+
+<a href="https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/install-csi-driver-master.md">here</a> run the below command</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/master/deploy/install-driver.sh | bash -s master snapshot -- 
+</code></pre></div><p>This script will deploy the following CSI components, CRDs, and necessary RBAC:</p>
+<ul>
+<li>
+
+<a href="https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/csi-azuredisk-controller.yaml"><code>deployment.apps/csi-azuredisk-controller</code></a></li>
+<li>
+
+<a href="https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/csi-azuredisk-node.yaml"><code>daemonset.apps/csi-azuredisk-node</code></a></li>
+<li>
+
+<a href="https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/csi-snapshot-controller.yaml"><code>deployment.apps/csi-snapshot-controller</code></a></li>
+</ul>
+<h2 id="install-velero-with-csi-support-enabled">Install Velero with CSI support enabled</h2>
+<p>The CSI volume snapshot capability is currently, as of Velero 1.4, a beta feature behind the <code>EnableCSI</code> feature flag and is not enabled by default.</p>
+<p>Following instructions from our 
+
+<a href="https://velero.io/docs/csi/">docs website</a>, install Velero with the 
+
+<a href="https://github.com/vmware-tanzu/velero-plugin-for-csi">velero-plugin-for-csi</a> and using the Azure Blob Store as our BackupStorageLocation. Please refer to our 
+
+<a href="https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure">velero-plugin-for-microsoft-azure documentation</a> for instructions on setting up the BackupStorageLocation. Please note that the BackupStorageLocation should be set up before installing Velero.</p>
+<p>Install Velero by running the below command</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">velero install <span style="color:#ae81ff">\ </span>
+--provider azure <span style="color:#ae81ff">\ </span>
+--plugins velero/velero-plugin-for-microsoft-azure:v1.1.0,velero/velero-plugin-for-csi:v0.1.1 <span style="color:#ae81ff">\ </span>
+--bucket $BLOB_CONTAINER <span style="color:#ae81ff">\ </span>
+--secret-file &lt;PATH_TO_CREDS_FILE&gt;/aks-creds <span style="color:#ae81ff">\ </span>
+--backup-location-config resourceGroup<span style="color:#f92672">=</span>$AZURE_BACKUP_RESOURCE_GROUP,storageAccount<span style="color:#f92672">=</span>$AZURE_STORAGE_ACCOUNT_ID,subscriptionId<span style="color:#f92672">=</span>$AZURE_BACKUP_SUBSCRIPTION_ID <span style="color:#ae81ff">\ </span>
+--snapshot-location-config apiTimeout<span style="color:#f92672">=</span>5m,resourceGroup<span style="color:#f92672">=</span>$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId<span style="color:#f92672">=</span>$AZURE_BACKUP_SUBSCRIPTION_ID <span style="color:#ae81ff">\ </span>
+--image velero/velero:v1.4.0 <span style="color:#ae81ff">\ </span>
+--features<span style="color:#f92672">=</span>EnableCSI 
+</code></pre></div><h2 id="deploy-a-stateful-application-with-csi-backed-volumes">Deploy a stateful application with CSI backed volumes</h2>
+<p>Before installing the stateful application with CSI backed volumes, install the storage class and the volume snapshot class for the Azure disk CSI driver by applying the below <code>yaml</code> to our cluster.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml"><span style="color:#66d9ef">apiVersion</span>: storage.k8s.io/v1 
+<span style="color:#66d9ef">kind</span>: StorageClass 
+<span style="color:#66d9ef">metadata</span>: 
+  <span style="color:#66d9ef">name</span>: disk.csi.azure.com 
+<span style="color:#66d9ef">provisioner</span>: disk.csi.azure.com 
+<span style="color:#66d9ef">parameters</span>: 
+  <span style="color:#66d9ef">skuname</span>: StandardSSD_LRS 
+<span style="color:#66d9ef">reclaimPolicy</span>: Delete 
+<span style="color:#66d9ef">volumeBindingMode</span>: Immediate 
+<span style="color:#66d9ef">allowVolumeExpansion</span>: <span style="color:#66d9ef">true</span>
+---
+<span style="color:#66d9ef">apiVersion</span>: snapshot.storage.k8s.io/v1beta1 
+<span style="color:#66d9ef">kind</span>: VolumeSnapshotClass 
+<span style="color:#66d9ef">metadata</span>: 
+  <span style="color:#66d9ef">name</span>: csi-azuredisk-vsc 
+<span style="color:#66d9ef">driver</span>: disk.csi.azure.com 
+<span style="color:#66d9ef">deletionPolicy</span>: Retain 
+<span style="color:#66d9ef">parameters</span>:
+  <span style="color:#66d9ef">tags</span>: <span style="color:#e6db74">&#39;foo=aaa,bar=bbb&#39;</span> 
+</code></pre></div><p>NOTE: The above <code>yaml</code> was sourced from 
+
+<a href="https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/example/storageclass-azuredisk-csi.yaml">StorageClass</a> and 
+
+<a href="https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/example/snapshot/storageclass-azuredisk-snapshot.yaml">VolumeSnapshotClass</a>.</p>
+<p>Deploy the stateful application that is using CSI backed PVCs, in the <code>csi-app</code> namespace by applying the below yaml.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml"><span style="color:#66d9ef">apiVersion</span>: v1
+<span style="color:#66d9ef">kind</span>: Namespace
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">creationTimestamp</span>: <span style="color:#66d9ef">null</span>
+  <span style="color:#66d9ef">name</span>: csi-app
+---
+<span style="color:#66d9ef">kind</span>: Pod
+<span style="color:#66d9ef">apiVersion</span>: v1
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">namespace</span>: csi-app
+  <span style="color:#66d9ef">name</span>: csi-nginx
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">nodeSelector</span>:
+    <span style="color:#66d9ef">kubernetes.io/os</span>: linux
+  <span style="color:#66d9ef">containers</span>:
+    - <span style="color:#66d9ef">image</span>: nginx
+      <span style="color:#66d9ef">name</span>: nginx
+      <span style="color:#66d9ef">command</span>: [ <span style="color:#e6db74">&#34;sleep&#34;</span>, <span style="color:#e6db74">&#34;1000000&#34;</span> ]
+      <span style="color:#66d9ef">volumeMounts</span>:
+        - <span style="color:#66d9ef">name</span>: azuredisk01
+          <span style="color:#66d9ef">mountPath</span>: <span style="color:#e6db74">&#34;/mnt/azuredisk&#34;</span>
+  <span style="color:#66d9ef">volumes</span>:
+    - <span style="color:#66d9ef">name</span>: azuredisk01
+      <span style="color:#66d9ef">persistentVolumeClaim</span>:
+        <span style="color:#66d9ef">claimName</span>: pvc-azuredisk
+---
+<span style="color:#66d9ef">apiVersion</span>: v1
+<span style="color:#66d9ef">kind</span>: PersistentVolumeClaim
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">namespace</span>: csi-app
+  <span style="color:#66d9ef">name</span>: pvc-azuredisk
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">accessModes</span>:
+    - ReadWriteOnce
+  <span style="color:#66d9ef">resources</span>:
+    <span style="color:#66d9ef">requests</span>:
+      <span style="color:#66d9ef">storage</span>: 1Gi
+  <span style="color:#66d9ef">storageClassName</span>: disk.csi.azure.com
+---
+</code></pre></div><p>For demonstration purposes, instead of relying on the application writing data to the mounted CSI volume, exec into the pod running the stateful application to write data into <code>/mnt/azuredisk</code>, where the CSI volume is mounted.
+This is to let us get a consistent checksum value of the data and verify that the data on restore is exacly same as that in the backup.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl -n csi-app exec -ti csi-nginx bash 
+root@csi-nginx:/# <span style="color:#66d9ef">while</span> true; <span style="color:#66d9ef">do</span> echo -n <span style="color:#e6db74">&#34;FOOBARBAZ &#34;</span> &gt;&gt; /mnt/azuredisk/foobar; <span style="color:#66d9ef">done</span> 
+^C 
+root@csi-nginx:/# cksum /mnt/azuredisk/foobar 
+<span style="color:#ae81ff">2279846381</span> <span style="color:#ae81ff">1726530</span> /mnt/azuredisk/foobar 
+</code></pre></div><h2 id="back-up">Back Up</h2>
+<p>Back up the <code>csi-app</code> namespace by running the below command</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero backup create csi-b2 --include-namespaces csi-app --wait 
+Backup request <span style="color:#e6db74">&#34;csi-b2&#34;</span> submitted successfully. 
+Waiting <span style="color:#66d9ef">for</span> backup to complete. You may safely press ctrl-c to stop waiting - your backup will <span style="color:#66d9ef">continue</span> in the background. 
+.................. 
+Backup completed with status: Completed. You may check <span style="color:#66d9ef">for</span> more information using the commands <span style="color:#e6db74">`</span>velero backup describe csi-b2<span style="color:#e6db74">`</span> and <span style="color:#e6db74">`</span>velero backup logs csi-b2<span style="color:#e6db74">`</span>.
+</code></pre></div><h2 id="restore">Restore</h2>
+<p>Before restoring from the backup simulate a disaster by running</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">kubectl delete ns csi-app
+</code></pre></div><p>Once the namespace has been deleted, restore the <code>csi-app</code> from the backup <code>csi-b2</code>.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ velero create restore --from-backup csi-b2 --wait 
+Restore request <span style="color:#e6db74">&#34;csi-b2-20200518085136&#34;</span> submitted successfully. 
+Waiting <span style="color:#66d9ef">for</span> restore to complete. You may safely press ctrl-c to stop waiting - your restore will <span style="color:#66d9ef">continue</span> in the background. 
+.... 
+Restore completed with status: Completed. You may check <span style="color:#66d9ef">for</span> more information using the commands <span style="color:#e6db74">`</span>velero restore describe csi-b2-20200518085136<span style="color:#e6db74">`</span> and <span style="color:#e6db74">`</span>velero restore logs csi-b2-20200518085136<span style="color:#e6db74">`</span>. 
+</code></pre></div><p>Now that the restore has completed and our <code>csi-nginx</code> pod is <code>Running</code>, confirm that contents of <code>/mnt/azuredisk/foobar</code> have been correctly restored.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl -n csi-app exec -ti csi-nginx bash 
+root@csi-nginx:/# cksum /mnt/azuredisk/foobar 
+<span style="color:#ae81ff">2279846381</span> <span style="color:#ae81ff">1726530</span> /mnt/azuredisk/foobar 
+root@csi-nginx:/# 
+</code></pre></div><p>The stateful application that we deployed has been successfully restored with its data intact.
+And that&rsquo;s all it takes to backup and restore a stateful application that uses CSI backed volumes!</p>
+<h2 id="community-engagement">Community Engagement</h2>
+<p>Please try out the CSI support in Velero 1.4. Feature requests, suggestions, bug reports, PRs are all welcome.</p>
+<p>Get in touch with us on 
+
+<a href="https://kubernetes.slack.com/archives/C6VCGP4MT">Kubernetes Slack #velero</a>, 
+
+<a href="https://twitter.com/projectvelero">Twitter</a>, or 
+
+<a href="https://velero.io/community/">Our weekly community calls</a></p>
+<h2 id="resources">Resources</h2>
+<p>More details about CSI volume snapshotting and its support in Velero may be found in the following links:</p>
+<ul>
+<li>
+
+<a href="https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/">Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta</a> for more information on the CSI beta snapshot APIs.</li>
+<li>Prerequisites to use this feature is available 
+
+<a href="https://velero.io/docs/csi">on our website</a>.</li>
+<li>
+
+<a href="https://kubernetes-csi.github.io/docs/sidecar-containers.html">Kubernetes CSI docs</a>: To understand components in a CSI environment</li>
+<li>
+
+<a href="https://github.com/vmware-tanzu/velero-plugin-for-csi">Velero plugin for CSI snapshots</a> for implementation details of the CSI plugin.</li>
+</ul>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section pt-3">
+        <div class="section-content section-content-thin">
+            <h5 class="font-color-darker">Related Content</h5>
+<div class="row">
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/post-1.3.jpg" alt="Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/Velero-1.3-Voyage-Continues/" class="post-title">Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!</a>
+                </h5>
+                <div class="post-entry">
+                    Velero 1.3 includes improvements to CRD backups and restores, multi-arch Docker images including support for arm/arm64 and ppc64le, and many other usability and stability enhancements. This release includes significant contributions by community members, and we’re thrilled to be able to partner with you all in continuing to improve Velero.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/post-1.4.jpg" alt="Velero 1.4: Introducing Beta CSI Support, Backup Progress Tracking, and Much More!" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/Velero-1.4-Community-Wave/" class="post-title">Velero 1.4: Introducing Beta CSI Support, Backup Progress Tracking, and Much More!</a>
+                </h5>
+                <div class="post-entry">
+                    Riding a wave of community contributions, Velero 1.4 introduces beta CSI support, improvements to backup progress tracking, and more. A major focus for 1.4 was addressing issues raised by the community, and we are proud to be able to deliver improvements that matter to you.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+    
+</div>
+        </div>
+    </div>
+
+        <div class="section section-background-darkest-blue">
+    <div class="section-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-lg-8">
+                <h5>Getting Started</h5>
+                <p>To help you get started, see the documentation.</p>
+            </div>
+            <div class="col-xs-12 col-sm-6 col-lg-3 offset-lg-1">
+                <p><strong></strong></p>
+                <a href="/docs"
+                   class="btn btn-sm btn-primary btn-no-border">Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="section site-footer">
+    <div class="section-content">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-12 col-md-8 mb-3 mb-md-0">
+                <ul class="social-links text-center text-md-left">
+                    
+                        <li>
+                            
+                                <i class="fab fa-twitter fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://twitter.com/projectvelero">Twitter</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-slack fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://kubernetes.slack.com/messages/velero">Slack</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fas fa-users fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://groups.google.com/forum/#!forum/projectvelero">Google Groups</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fa fa-rss fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="feed.xml">RSS</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-github fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://github.com/vmware-tanzu/velero">GitHub</a>
+                        </li>
+                    
+                </ul>
+            </div>
+            <div class="col-12 col-md-4 text-center text-md-right">
+                <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo"
+                                                              alt="Homepage"/></a>
+            </div>
+        </div>
+        <div class="row align-items-center">
+            <div class="col copyright text-center text-md-right mt-4">
+                &copy; 2020 Velero Authors.
+                <a href="http://vmware.github.io/" class="vm-logo">A VMware-backed project. <img
+                            src="/img/vm-logo.png" alt="VMware logo"/></a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<script defer src="https://use.fontawesome.com/releases/v5.8.1/js/all.js"
+        integrity="sha384-g5uSoOSBd7KkhAMlnQILrecXvzst9TdC09/VM+pjDTCM+1il8RHz5fKANTFFb+gQ"
+        crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" crossorigin="anonymous"></script>
+
+<script src="/js/jquery.matchHeight.js?1593121911"></script>
+<script src="/js/scripts.js?1593121911"></script>
+
+    </div>
+</div>
+</body>
+</html>

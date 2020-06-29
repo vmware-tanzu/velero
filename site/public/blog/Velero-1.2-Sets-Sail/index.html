@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    
+    
+    <link rel="stylesheet" href="/styles.666a5dc1cd80e47092a71103358e46b56345de6f3044680f856f219cbc2fe91b.css" integrity="sha256-Zmpdwc2A5HCSpxEDNY5GtWNF3m8wRGgPhW8hnLwv6Rs=">
+    <title>Velero Velero 1.2 Sets Sail by Shifting Plugins Out of Tree, Adding a Structural Schema, and Sharpening Usability</title>
+    
+</head>
+<body id="blog">
+<div class="container-fluid site-outer-container">
+    <div class="site-container">
+        <header class="site-header">
+    <div class="site-header-content">
+        <div class="logo">
+            <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo" alt="Homepage"/></a>
+        </div>
+        <ul class="nav-menu" id="header-nav">
+            <li class="home"><a href="/" title="Velero">Home</a></li>
+            <li class="docs"><a href="/docs/v1.4" title="Documentation">Documentation</a></li>
+            <li class="plugins"><a href="/plugins" title="Plugins">Plugins</a></li>
+            <li class="blog"><a href="/blog" title="Blog Posts">Blog</a></li>
+            <li class="community"><a href="/community" title="Community">Community</a></li>
+            <li class="resources"><a href="/resources" title="Resources">Resources</a></li>
+        </ul>
+        <div class="nav-mobile-link">
+            <a href="javascript:void(0);" id="nav-mobile-toggle"></a>
+        </div>
+    </div>
+</header>
+
+        
+    <div class="post-single-hero bg-color-med-blue">
+        <div class="section">
+            <div class="section-content">
+                <h1>Velero 1.2 Sets Sail by Shifting Plugins Out of Tree, Adding a Structural Schema, and Sharpening Usability</h1>
+            </div>
+        </div>
+    </div>
+    <div class="post-single-body">
+        <div class="section section-card">
+            <div class="section-content pt-4 pb-0">
+                <div class="post-single-meta">
+                    <div class="post-single-meta-author">
+                        
+
+                        <div class="post-single-meta-author-name">
+                            <a href="/tags/Steve-Kriss">Steve Kriss</a>
+                        </div>
+                    </div>
+
+                    <div class="post-single-meta-date">
+                        November 07, 2019
+                    </div>
+                </div>
+
+                <div class="post-single-content">
+                    <p>Velero continues to evolve with the release of version 1.2. With this release, we’ve focused on extracting in-tree cloud provider plugins into their own repositories, making further usability improvements to the restic integration, preparing for the general availability of Kubernetes custom resource definitions (CRDs) by adding a structural schema to our CRDs, and many other new features and usability improvements.</p>
+<p>Let’s take a look at the highlights for this release.</p>
+<h2 id="moving-cloud-provider-plugins-out-of-tree">Moving Cloud Provider Plugins Out of Tree</h2>
+<p>Velero has had built-in support for AWS, Microsoft Azure, and Google Cloud Platform (GCP)  since day 1. When Velero moved to a plugin architecture for object store providers and volume snapshotters in version 0.6, the code for these three providers was converted to use the plugin interface provided by this new architecture, but the cloud provider code still remained inside the Velero codebase. This put the AWS, Azure, and GCP plugins in a different position compared with other providers’ plugins, since they automatically shipped with the Velero binary and could include documentation in-tree.</p>
+<p>With version 1.2, we’ve extracted the AWS, Azure, and GCP plugins into their own repositories, one per provider. We now also publish one plugin image per provider. This change brings these providers to parity with other providers’ plugin implementations, reduces the size of the core Velero binary by not requiring each provider’s SDK to be included, and opens the door for the plugins to be maintained and released independently of core Velero.</p>
+<h2 id="restic-integration-improvements">Restic Integration Improvements</h2>
+<p>We’ve continued to work on improving Velero’s restic integration. With this release, we’ve made the following enhancements:</p>
+<ul>
+<li>Restic backup and restore progress is now captured during execution and visible to the user through the <code>velero backup/restore describe --details</code> command. The details are updated every 10 seconds. This provides a new level of visibility into restic operations for users.</li>
+<li>Restic backups of persistent volume claims (PVCs) now remain incremental across the rescheduling of a pod. Previously, if the pod using a PVC was rescheduled, the next restic backup would require a full rescan of the volume’s contents. This improvement potentially makes such backups significantly faster.</li>
+<li>Read-write-many volumes are no longer backed up once for every pod using the volume, but instead just once per Velero backup. This improvement speeds up backups and prevents potential restore issues due to multiple copies of the backup being processed simultaneously.</li>
+</ul>
+<h2 id="clone-pvs-when-cloning-a-namespace">Clone PVs When Cloning a Namespace</h2>
+<p>Before version 1.2, you could clone a Kubernetes namespace by backing it up and then restoring it to a different namespace in the same cluster by using the <code>--namespace-mappings</code> flag with the <code>velero restore create</code> command. However, in this scenario, Velero was unable to clone persistent volumes used by the namespace, leading to errors for users.</p>
+<p>In version 1.2, Velero automatically detects when you are trying to clone an existing namespace, and clones the persistent volumes used by the namespace as well. This doesn’t require the user to specify any additional flags for the <code>velero restore create</code> command.  This change lets you fully achieve your goal of cloning namespaces using persistent storage within a cluster.</p>
+<h2 id="improved-server-side-encryption-support">Improved Server-Side Encryption Support</h2>
+<p>To help you secure your important backup data, we’ve added support for more forms of server-side encryption of backup data on both AWS and GCP. Specifically:</p>
+<ul>
+<li>On AWS, Velero now supports Amazon S3-managed encryption keys (SSE-S3), which uses AES256 encryption, by specifying <code>serverSideEncryption: AES256</code> in a backup storage location’s config.</li>
+<li>On GCP, Velero now supports using a specific Cloud KMS key for server-side encryption by specifying <code>kmsKeyName: &lt;key name&gt;</code> in a backup storage location’s config.</li>
+</ul>
+<h2 id="crd-structural-schema">CRD Structural Schema</h2>
+<p>In Kubernetes 1.16, custom resource definitions (CRDs) reached general availability. Structural schemas are required for CRDs created in the <code>apiextensions.k8s.io/v1</code> API group. Velero now defines a structural schema for each of its CRDs and automatically applies it the user runs the <code>velero install</code> command.  The structural schemas enable the user to get quicker feedback when their backup, restore, or schedule request is invalid, so they can immediately remediate their request.</p>
+<h2 id="and-more">And More</h2>
+<p>There are too many new features and improvements to cover in this short blog post. For full details on all of the changes, see the 
+
+<a href="https://github.com/vmware-tanzu/velero/blob/master/changelogs/CHANGELOG-1.2.md">full changelog</a>.</p>
+<h2 id="community-contributors">Community Contributors</h2>
+<p>Velero’s user and contributor community continues to grow, and it is a huge part of this project’s success. This release includes many community contributions, including from (GitHub handles listed):</p>
+<ul>
+<li>
+
+<a href="https://github.com/betta1">@betta1</a></li>
+<li>
+
+<a href="https://github.com/lintongj">@lintongj</a></li>
+<li>
+
+<a href="https://github.com/spiffcs">@spiffcs</a></li>
+<li>
+
+<a href="https://github.com/s12chung">@s12chung</a></li>
+<li>
+
+<a href="https://github.com/boxcee">@boxcee</a></li>
+<li>
+
+<a href="https://github.com/andyzhangx">@andyzhangx</a></li>
+<li>
+
+<a href="https://github.com/sseago">@sseago</a></li>
+<li>
+
+<a href="https://github.com/Frank51">@Frank51</a></li>
+<li>
+
+<a href="https://github.com/alexander-demichev">@alexander-demichev</a></li>
+</ul>
+<p><strong>Thank you for helping improve the Velero project!</strong></p>
+<h2 id="catch-us-at-kubecon">Catch us at KubeCon</h2>
+<p>If you’re going to KubeCon + CloudNativeCon North America 2019 in San Diego, come hang out with us.! The Velero maintainers will all be attending and would love to chat with you. We’ll be having a Velero community lunch on Wednesday, November 20, at 12:30PM in the convention center.  Come to the VMware booth or look for the Velero signs in the lunch area.</p>
+<p>Check out these talks related to Velero:</p>
+<ul>
+<li>
+
+<a href="https://sched.co/UaXR">CSI Volume Snapshots: On the Way to Faster and Better Backups</a>, by Adnan Abdulhussein and Nolan Brubaker, both from VMware (and core maintainers)</li>
+<li>
+
+<a href="https://sched.co/UaZN">How to Backup and Restore Your Kubernetes Cluster</a>, by Annette Clewett and Dylan Murray, both from Red Hat (Dylan is a Velero contributor)</li>
+</ul>
+<h2 id="join-the-movement--contribute">Join the Movement – Contribute!</h2>
+<p>Velero is better because of our contributors and maintainers. It is because of you that we can bring great software to the community. Please join us during our 
+
+<a href="https://velero.io/community/">online community meetings every Tuesday</a> and catch up with past meetings on YouTube on the 
+
+<a href="https://www.youtube.com/watch?v=nc48ocI-6go&amp;list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM">Velero Community Meetings playlist</a>.</p>
+<p>You can always find the latest project information at 
+
+<a href="https://velero.io">velero.io</a>. Look for issues on GitHub marked 
+
+<a href="https://github.com/vmware-tanzu/velero/issues?q=is:open&#43;is:issue&#43;label:%22Good&#43;first&#43;issue%22">Good first issue</a> or 
+
+<a href="https://github.com/vmware-tanzu/velero/issues?utf8=%e2%9c%93&amp;q=is:open&#43;is:issue&#43;label:%22Help&#43;wanted%22&#43;">Help wanted</a> if you want to roll up your sleeves and write some code with us.</p>
+<p>You can chat with us on 
+
+<a href="https://kubernetes.slack.com/messages/C6VCGP4MT">Kubernetes Slack in the #velero channel</a> and follow us on Twitter at 
+
+<a href="https://twitter.com/projectvelero">@projectvelero</a>.</p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section pt-3">
+        <div class="section-content section-content-thin">
+            <h5 class="font-color-darker">Related Content</h5>
+<div class="row">
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/posts/post-1.3.jpg" alt="Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/Velero-1.3-Voyage-Continues/" class="post-title">Velero 1.3: Improved CRD Backups/Restores, Multi-Arch Docker Images, and More!</a>
+                </h5>
+                <div class="post-entry">
+                    Velero 1.3 includes improvements to CRD backups and restores, multi-arch Docker images including support for arm/arm64 and ppc64le, and many other usability and stability enhancements. This release includes significant contributions by community members, and we’re thrilled to be able to partner with you all in continuing to improve Velero.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+    
+        <div class="col-xs col-md-4">
+    <div class="card card-light mb-3 mb-md-0 blog-card">
+        <div class="card-body match-height">
+            <div class="post-thumbnail">
+                
+                    <img src="/img/Velero.svg" alt="Announcing Velero 1.1: Improved restic Support and More Visibility" />
+                
+            </div>
+            <article class="post">
+                <h5 class="text-center font-weight-medium">
+                    <a href="/blog/announcing-velero-1.1/" class="post-title">Announcing Velero 1.1: Improved restic Support and More Visibility</a>
+                </h5>
+                <div class="post-entry">
+                    For this release, we’ve focused on improving Velero’s restic integration - making repository locks shorter lived, giving more visibility into restic repositories when migrating clusters, and expanding support to more volume types.
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+    
+</div>
+        </div>
+    </div>
+
+        <div class="section section-background-darkest-blue">
+    <div class="section-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-lg-8">
+                <h5>Getting Started</h5>
+                <p>To help you get started, see the documentation.</p>
+            </div>
+            <div class="col-xs-12 col-sm-6 col-lg-3 offset-lg-1">
+                <p><strong></strong></p>
+                <a href="/docs"
+                   class="btn btn-sm btn-primary btn-no-border">Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="section site-footer">
+    <div class="section-content">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-12 col-md-8 mb-3 mb-md-0">
+                <ul class="social-links text-center text-md-left">
+                    
+                        <li>
+                            
+                                <i class="fab fa-twitter fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://twitter.com/projectvelero">Twitter</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-slack fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://kubernetes.slack.com/messages/velero">Slack</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fas fa-users fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://groups.google.com/forum/#!forum/projectvelero">Google Groups</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fa fa-rss fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="feed.xml">RSS</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-github fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://github.com/vmware-tanzu/velero">GitHub</a>
+                        </li>
+                    
+                </ul>
+            </div>
+            <div class="col-12 col-md-4 text-center text-md-right">
+                <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo"
+                                                              alt="Homepage"/></a>
+            </div>
+        </div>
+        <div class="row align-items-center">
+            <div class="col copyright text-center text-md-right mt-4">
+                &copy; 2020 Velero Authors.
+                <a href="http://vmware.github.io/" class="vm-logo">A VMware-backed project. <img
+                            src="/img/vm-logo.png" alt="VMware logo"/></a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<script defer src="https://use.fontawesome.com/releases/v5.8.1/js/all.js"
+        integrity="sha384-g5uSoOSBd7KkhAMlnQILrecXvzst9TdC09/VM+pjDTCM+1il8RHz5fKANTFFb+gQ"
+        crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" crossorigin="anonymous"></script>
+
+<script src="/js/jquery.matchHeight.js?1593121911"></script>
+<script src="/js/scripts.js?1593121911"></script>
+
+    </div>
+</div>
+</body>
+</html>

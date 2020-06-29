@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  
+  
+  <link rel="stylesheet" href="/styles.666a5dc1cd80e47092a71103358e46b56345de6f3044680f856f219cbc2fe91b.css" integrity="sha256-Zmpdwc2A5HCSpxEDNY5GtWNF3m8wRGgPhW8hnLwv6Rs=">
+
+</head>
+
+
+
+    
+    <meta name="robots" content="noindex">
+
+
+
+
+    <title>Velero Docs - </title>
+
+
+<body id="docs">
+<div class="container-fluid site-outer-container">
+    <div class="site-container">
+        <header class="site-header">
+    <div class="site-header-content">
+        <div class="logo">
+            <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo" alt="Homepage"/></a>
+        </div>
+        <ul class="nav-menu" id="header-nav">
+            <li class="home"><a href="/" title="Velero">Home</a></li>
+            <li class="docs"><a href="/docs/v1.4" title="Documentation">Documentation</a></li>
+            <li class="plugins"><a href="/plugins" title="Plugins">Plugins</a></li>
+            <li class="blog"><a href="/blog" title="Blog Posts">Blog</a></li>
+            <li class="community"><a href="/community" title="Community">Community</a></li>
+            <li class="resources"><a href="/resources" title="Resources">Resources</a></li>
+        </ul>
+        <div class="nav-mobile-link">
+            <a href="javascript:void(0);" id="nav-mobile-toggle"></a>
+        </div>
+    </div>
+</header>
+
+        <div class="post-single-hero post-single-hero-short bg-color-med-blue">
+            <div class="section">
+                <div class="section-content">
+                    <h1>Documentation</h1>
+                </div>
+            </div>
+        </div>
+        <div class="section section-card pt-4 pb-0">
+            <div class="container container-max">
+                <div class="row">
+                    <div class="col-md-3 toc">
+                        <div class="row">
+    <div class="dropdown mb-2">
+        
+            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown"
+                    aria-haspopup="true" aria-expanded="false">
+                v1.3.2
+            </button>
+            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                
+                
+                
+
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/master/contributions/minio/">master</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.4/contributions/minio/">v1.4</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.3.2/contributions/minio/">v1.3.2</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.3.1/contributions/minio/">v1.3.1</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.3.0/contributions/minio/">v1.3.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.2.0/contributions/minio/">v1.2.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.1.0/contributions/minio/">v1.1.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v1.0.0/contributions/minio/">v1.0.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.11.0/contributions/minio/">v0.11.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.10.0/contributions/minio/">v0.10.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.9.0/contributions/minio/">v0.9.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.8.1/contributions/minio/">v0.8.1</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.8.0/contributions/minio/">v0.8.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.7.1/contributions/minio/">v0.7.1</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.7.0/contributions/minio/">v0.7.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.6.0/contributions/minio/">v0.6.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.5.0/contributions/minio/">v0.5.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.4.0/contributions/minio/">v0.4.0</a>
+                
+                    
+                    <a class="dropdown-item"
+                       href="/docs/v0.3.0/contributions/minio/">v0.3.0</a>
+                
+            </div>
+        
+    </div>
+</div>
+                        <br/>
+                        <form class="d-flex align-items-center">
+                          <span class="algolia-autocomplete" style="position: relative; display: inline-block; direction: ltr;">
+                            <input type="search" class="form-control docsearch-input" id="search-input" placeholder="Search..."
+                                   aria-label="Search for..." autocomplete="off" spellcheck="false" role="combobox"
+                                   aria-autocomplete="list" aria-expanded="false" aria-owns="algolia-autocomplete-listbox-0"
+                                   dir="auto" style="position: relative; vertical-align: top;">
+                          </span>
+                        </form>
+                        <nav class="navigation">
+    
+    
+    
+        
+        
+        
+        
+
+        
+            <h3>Introduction</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/index.html">About Velero</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/how-velero-works">How Velero works</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/locations">About locations</a>
+                        
+                    </li>
+                
+            </ul>
+        
+            <h3>Install</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/basic-install">Basic Install</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/customize-installation">Customize Installation</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/upgrade-to-1.3">Upgrade to 1.3</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/supported-providers">Supported providers</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/contributions/minio">Evaluation install</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/restic">Restic integration</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/examples">Examples</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/uninstalling">Uninstalling</a>
+                        
+                    </li>
+                
+            </ul>
+        
+            <h3>Use</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/disaster-case">Disaster recovery</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/migration-case">Cluster migration</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/backup-reference">Backup reference</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/restore-reference">Restore reference</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/namespace">Run in any namespace</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/hooks">Extend with hooks</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/csi">CSI Support (beta)</a>
+                        
+                    </li>
+                
+            </ul>
+        
+            <h3>Plugins</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/overview-plugins">Overview</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/custom-plugins">Custom plugins</a>
+                        
+                    </li>
+                
+            </ul>
+        
+            <h3>Troubleshoot</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/troubleshooting">Troubleshooting</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/debugging-install">Troubleshoot an install or setup</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/debugging-restores">Troubleshoot a restore</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/restic#troubleshooting">Troubleshoot Restic</a>
+                        
+                    </li>
+                
+            </ul>
+        
+            <h3>Contribute</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/start-contributing">Start Contributing</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/development">Development</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/build-from-source">Build from source</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/run-locally">Run locally</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/code-standards">Code standards</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/website-guidelines">Website guidelines</a>
+                        
+                    </li>
+                
+            </ul>
+        
+            <h3>More information</h3>
+            <ul>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/output-file-format">Backup file format</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/api-types">API types</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/faq">FAQ</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/zenhub">ZenHub</a>
+                        
+                    </li>
+                
+                    <li>
+                        
+                            <a href="/docs/v1.3.2/support-process">Support Process</a>
+                        
+                    </li>
+                
+            </ul>
+        
+    
+</nav>
+
+                    </div>
+                    <div class="col-md-8">
+                        
+    
+    <div class="alert alert-primary" role="alert">
+        
+            <p>
+                <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+                Documentation for version v1.3.2 is no longer actively maintained.
+                The version you are currently viewing is a static snapshot.
+                For up-to-date documentation, see the <a href="/docs/v1.4/contributions/minio/">latest version</a>.
+            </p>
+        
+    </div>
+
+                        <div class="documentation-container">
+                            <h2 id="quick-start-evaluation-install-with-minio">Quick start evaluation install with Minio</h2>
+<p>The following example sets up the Velero server and client, then backs up and restores a sample application.</p>
+<p>For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
+For additional functionality with this setup, see the section below on how to 
+
+    
+
+<a href="">expose Minio outside your cluster</a>.</p>
+<p><strong>NOTE</strong> The example lets you explore basic Velero functionality. Configuring Minio for production is out of scope.</p>
+<p>See 
+
+    
+
+<a href="/docs/v1.3.2/customize-installation/">Set up Velero on your platform</a> for how to configure Velero for a production environment.</p>
+<p>If you encounter issues with installing or configuring, see 
+
+    
+
+<a href="">Debugging Installation Issues</a>.</p>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li>Access to a Kubernetes cluster, version 1.7 or later.  <strong>Note:</strong> restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. Restic support is not required for this example, but may be of interest later. See 
+
+    
+
+<a href="/docs/v1.3.2/restic/">Restic Integration</a>.</li>
+<li>A DNS server on the cluster</li>
+<li><code>kubectl</code> installed</li>
+</ul>
+<h3 id="download-velero">Download Velero</h3>
+<ol>
+<li>
+<p>Download the 
+
+<a href="https://github.com/vmware-tanzu/velero/releases">latest official release&rsquo;s</a> tarball for your client platform.</p>
+<p><em>We strongly recommend that you use an 
+
+<a href="https://github.com/vmware-tanzu/velero/releases">official release</a> of
+Velero. The tarballs for each release contain the <code>velero</code> command-line client. The code in the master branch
+of the Velero repository is under active development and is not guaranteed to be stable!</em></p>
+</li>
+<li>
+<p>Extract the tarball:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">tar -xvf &lt;RELEASE-TARBALL-NAME&gt;.tar.gz -C /dir/to/extract/to
+</code></pre></div><p>We&rsquo;ll refer to the directory you extracted to as the &ldquo;Velero directory&rdquo; in subsequent steps.</p>
+</li>
+<li>
+<p>Move the <code>velero</code> binary from the Velero directory to somewhere in your PATH.</p>
+</li>
+</ol>
+<h4 id="macos-installation">MacOS Installation</h4>
+<p>On Mac, you can use 
+
+<a href="https://brew.sh">HomeBrew</a> to install the <code>velero</code> client:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">brew install velero
+</code></pre></div><h3 id="set-up-server">Set up server</h3>
+<p>These instructions start the Velero server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster][31] for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run <code>velero describe</code> commands.</p>
+<ol>
+<li>
+<p>Create a Velero-specific credentials file (<code>credentials-velero</code>) in your local directory:</p>
+<pre><code>[default]
+aws_access_key_id = minio
+aws_secret_access_key = minio123
+</code></pre></li>
+<li>
+<p>Start the server and the local storage service. In the Velero directory, run:</p>
+<pre><code>kubectl apply -f examples/minio/00-minio-deployment.yaml
+</code></pre><pre><code>velero install \
+    --provider aws \
+    --plugins velero/velero-plugin-for-aws:v1.0.0 \
+    --bucket velero \
+    --secret-file ./credentials-velero \
+    --use-volume-snapshots=false \
+    --backup-location-config region=minio,s3ForcePathStyle=&quot;true&quot;,s3Url=http://minio.velero.svc:9000
+</code></pre><p>This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no <code>VolumeSnapshotLocation</code> is created (<code>--use-volume-snapshots=false</code>).</p>
+<p>Additionally, you can specify <code>--use-restic</code> to enable restic support, and <code>--wait</code> to wait for the deployment to be ready.</p>
+</li>
+<li>
+<p>Deploy the example nginx application:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">kubectl apply -f examples/nginx-app/base.yaml
+</code></pre></div></li>
+<li>
+<p>Check to see that both the Velero and nginx deployments are successfully created:</p>
+<pre><code>kubectl get deployments -l component=velero --namespace=velero
+kubectl get deployments --namespace=nginx-example
+</code></pre></li>
+</ol>
+<h3 id="back-up">Back up</h3>
+<ol>
+<li>
+<p>Create a backup for any object that matches the <code>app=nginx</code> label selector:</p>
+<pre><code>velero backup create nginx-backup --selector app=nginx
+</code></pre><p>Alternatively if you want to backup all objects <em>except</em> those matching the label <code>backup=ignore</code>:</p>
+<pre><code>velero backup create nginx-backup --selector 'backup notin (ignore)'
+</code></pre></li>
+<li>
+<p>(Optional) Create regularly scheduled backups based on a cron expression using the <code>app=nginx</code> label selector:</p>
+<pre><code>velero schedule create nginx-daily --schedule=&quot;0 1 * * *&quot; --selector app=nginx
+</code></pre><p>Alternatively, you can use some non-standard shorthand cron expressions:</p>
+<pre><code>velero schedule create nginx-daily --schedule=&quot;@daily&quot; --selector app=nginx
+</code></pre><p>See the 
+
+<a href="https://godoc.org/github.com/robfig/cron">cron package&rsquo;s documentation</a> for more usage examples.</p>
+</li>
+<li>
+<p>Simulate a disaster:</p>
+<pre><code>kubectl delete namespace nginx-example
+</code></pre></li>
+<li>
+<p>To check that the nginx deployment and service are gone, run:</p>
+<pre><code>kubectl get deployments --namespace=nginx-example
+kubectl get services --namespace=nginx-example
+kubectl get namespace/nginx-example
+</code></pre><p>You should get no results.</p>
+<p>NOTE: You might need to wait for a few minutes for the namespace to be fully cleaned up.</p>
+</li>
+</ol>
+<h3 id="restore">Restore</h3>
+<ol>
+<li>
+<p>Run:</p>
+<pre><code>velero restore create --from-backup nginx-backup
+</code></pre></li>
+<li>
+<p>Run:</p>
+<pre><code>velero restore get
+</code></pre><p>After the restore finishes, the output looks like the following:</p>
+<pre><code>NAME                          BACKUP         STATUS      WARNINGS   ERRORS    CREATED                         SELECTOR
+nginx-backup-20170727200524   nginx-backup   Completed   0          0         2017-07-27 20:05:24 +0000 UTC   &lt;none&gt;
+</code></pre></li>
+</ol>
+<p>NOTE: The restore can take a few moments to finish. During this time, the <code>STATUS</code> column reads <code>InProgress</code>.</p>
+<p>After a successful restore, the <code>STATUS</code> column is <code>Completed</code>, and <code>WARNINGS</code> and <code>ERRORS</code> are 0. All objects in the <code>nginx-example</code> namespace should be just as they were before you deleted them.</p>
+<p>If there are errors or warnings, you can look at them in detail:</p>
+<pre><code>velero restore describe &lt;RESTORE_NAME&gt;
+</code></pre><p>For more information, see 
+
+    
+
+<a href="/docs/v1.3.2/debugging-restores/">the debugging information</a>.</p>
+<h3 id="clean-up">Clean up</h3>
+<p>If you want to delete any backups you created, including data in object storage and persistent
+volume snapshots, you can run:</p>
+<pre><code>velero backup delete BACKUP_NAME
+</code></pre><p>This asks the Velero server to delete all backup data associated with <code>BACKUP_NAME</code>.  You need to do
+this for each backup you want to permanently delete. A future version of Velero will allow you to
+delete multiple backups by name or label selector.</p>
+<p>Once fully removed, the backup is no longer visible when you run:</p>
+<pre><code>velero backup get BACKUP_NAME
+</code></pre><p>To completely uninstall Velero, minio, and the nginx example app from your Kubernetes cluster:</p>
+<pre><code>kubectl delete namespace/velero clusterrolebinding/velero
+kubectl delete crds -l component=velero
+kubectl delete -f examples/nginx-app/base.yaml
+</code></pre><h2 id="expose-minio-outside-your-cluster-with-a-service">Expose Minio outside your cluster with a Service</h2>
+<p>When you run commands to get logs or describe a backup, the Velero server generates a pre-signed URL to download the requested items. To access these URLs from outside the cluster &ndash; that is, from your Velero client &ndash; you need to make Minio available outside the cluster. You can:</p>
+<ul>
+<li>Change the Minio Service type from <code>ClusterIP</code> to <code>NodePort</code>.</li>
+<li>Set up Ingress for your cluster, keeping Minio Service type <code>ClusterIP</code>.</li>
+</ul>
+<p>You can also specify a <code>publicUrl</code> config field for the pre-signed URL in your backup storage location config.</p>
+<h3 id="expose-minio-with-service-of-type-nodeport">Expose Minio with Service of type NodePort</h3>
+<p>The Minio deployment by default specifies a Service of type <code>ClusterIP</code>. You can change this to <code>NodePort</code> to easily expose a cluster service externally if you can reach the node from your Velero client.</p>
+<p>You must also get the Minio URL, which you can then specify as the value of the <code>publicUrl</code> field in your backup storage location config.</p>
+<ol>
+<li>
+<p>In <code>examples/minio/00-minio-deployment.yaml</code>, change the value of Service <code>spec.type</code> from <code>ClusterIP</code> to <code>NodePort</code>.</p>
+</li>
+<li>
+<p>Get the Minio URL:</p>
+</li>
+</ol>
+<ul>
+<li>
+<p>if you&rsquo;re running Minikube:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">minikube service minio --namespace<span style="color:#f92672">=</span>velero --url
+</code></pre></div></li>
+<li>
+<p>in any other environment:</p>
+<ol>
+<li>
+<p>Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Velero client.</p>
+</li>
+<li>
+<p>Append the value of the NodePort to get a complete URL. You can get this value by running:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">kubectl -n velero get svc/minio -o jsonpath<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;{.spec.ports[0].nodePort}&#39;</span>
+</code></pre></div></li>
+</ol>
+</li>
+</ul>
+<ol>
+<li>Edit your <code>BackupStorageLocation</code> YAML, adding <code>publicUrl: &lt;URL_FROM_PREVIOUS_STEP&gt;</code> as a field under <code>spec.config</code>. You must include the <code>http://</code> or <code>https://</code> prefix.</li>
+</ol>
+<h2 id="accessing-logs-with-an-https-endpoint">Accessing logs with an HTTPS endpoint</h2>
+<p>If you&rsquo;re using Minio with HTTPS, you may see unintelligible text in the output of <code>velero describe</code>, or <code>velero logs</code> commands.</p>
+<p>In order to fix this, you can add a public URL to the <code>BackupStorageLocation</code>.</p>
+<p>In a terminal, run the following:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">kubectl patch -n velero backupstoragelocation default --type merge -p <span style="color:#e6db74">&#39;{&#34;spec&#34;:{&#34;config&#34;:{&#34;publicUrl&#34;:&#34;https://&lt;a public IP for your Minio instance&gt;:9000&#34;}}}&#39;</span>
+</code></pre></div><p>Note that Velero does not support custom, self-signed certificates prior to v1.4.0.</p>
+<h2 id="expose-minio-outside-your-cluster-with-kubernetes-in-docker-kind">Expose Minio outside your cluster with Kubernetes in Docker (KinD):</h2>
+<p>Kubernetes in Docker currently does not have support for NodePort services (see 
+
+<a href="https://github.com/kubernetes-sigs/kind/issues/99">this issue</a>). In this case, you can use a port forward to access the Minio bucket.</p>
+<p>In a terminal, run the following:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">MINIO_POD<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>kubectl get pods -n velero -l component<span style="color:#f92672">=</span>minio -o jsonpath<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;{.items[0].metadata.name}&#39;</span><span style="color:#66d9ef">)</span>
+
+kubectl port-forward $MINIO_POD -n velero 9000:9000
+</code></pre></div><p>Then, in another terminal:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">kubectl edit backupstoragelocation default -n velero
+</code></pre></div><p>Add <code>publicUrl: http://localhost:9000</code> under the <code>spec.config</code> section.</p>
+<h3 id="work-with-ingress">Work with Ingress</h3>
+<p>Configuring Ingress for your cluster is out of scope for the Velero documentation. If you have already set up Ingress, however, it makes sense to continue with it while you run the example Velero configuration with Minio.</p>
+<p>In this case:</p>
+<ol>
+<li>
+<p>Keep the Service type as <code>ClusterIP</code>.</p>
+</li>
+<li>
+<p>Edit your <code>BackupStorageLocation</code> YAML, adding <code>publicUrl: &lt;URL_AND_PORT_OF_INGRESS&gt;</code> as a field under <code>spec.config</code>.</p>
+</li>
+</ol>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="section section-background-darkest-blue">
+    <div class="section-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-lg-8">
+                <h5>Getting Started</h5>
+                <p>To help you get started, see the documentation.</p>
+            </div>
+            <div class="col-xs-12 col-sm-6 col-lg-3 offset-lg-1">
+                <p><strong></strong></p>
+                <a href="/docs"
+                   class="btn btn-sm btn-primary btn-no-border">Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="section site-footer">
+    <div class="section-content">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-12 col-md-8 mb-3 mb-md-0">
+                <ul class="social-links text-center text-md-left">
+                    
+                        <li>
+                            
+                                <i class="fab fa-twitter fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://twitter.com/projectvelero">Twitter</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-slack fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://kubernetes.slack.com/messages/velero">Slack</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fas fa-users fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://groups.google.com/forum/#!forum/projectvelero">Google Groups</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fa fa-rss fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="feed.xml">RSS</a>
+                        </li>
+                    
+                        <li>
+                            
+                                <i class="fab fa-github fa-lg fa-fw mr-1"></i>
+                            
+                            <a href="https://github.com/vmware-tanzu/velero">GitHub</a>
+                        </li>
+                    
+                </ul>
+            </div>
+            <div class="col-12 col-md-4 text-center text-md-right">
+                <a href="/" aria-label="Velero homepage"><img src="/img/Velero.svg" class="logo"
+                                                              alt="Homepage"/></a>
+            </div>
+        </div>
+        <div class="row align-items-center">
+            <div class="col copyright text-center text-md-right mt-4">
+                &copy; 2020 Velero Authors.
+                <a href="http://vmware.github.io/" class="vm-logo">A VMware-backed project. <img
+                            src="/img/vm-logo.png" alt="VMware logo"/></a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+<script defer src="https://use.fontawesome.com/releases/v5.8.1/js/all.js"
+        integrity="sha384-g5uSoOSBd7KkhAMlnQILrecXvzst9TdC09/VM+pjDTCM+1il8RHz5fKANTFFb+gQ"
+        crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" crossorigin="anonymous"></script>
+
+<script src="/js/jquery.matchHeight.js?1593121911"></script>
+<script src="/js/scripts.js?1593121911"></script>
+
+    </div>
+</div>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"></script>
+<script type="text/javascript"> docsearch({
+        apiKey: '3d80f66bb5ecf85f8e2760caef383f24',
+        indexName: 'velero',
+        inputSelector: '.docsearch-input',
+        algoliaOptions: {'facetFilters': ["version:v1.3.2"]},
+        debug: false 
+    });
+</script>
+</body>
+
+</html>
