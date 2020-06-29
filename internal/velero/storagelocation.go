@@ -5,8 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/persistence"
 
 	"github.com/sirupsen/logrus"
 

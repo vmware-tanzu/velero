@@ -87,7 +87,7 @@ spec:
               description: Provider is the provider of the backup storage.
               type: string
             validationFrequency:
-              description: StoreValidationFrequency defines how frequently to validate
+              description: ValidationFrequency defines how frequently to validate
                 the corresponding object storage. A value of 0 disables validation.
               nullable: true
               type: string
