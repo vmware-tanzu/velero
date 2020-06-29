@@ -851,14 +851,15 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	storageLocationInfo := velero.StorageLocation{
+		Client:                          s.mgr.GetClient(),
+		Ctx:                             s.ctx,
+		Log:                             s.logger,
 		DefaultStorageLocation:          s.config.defaultBackupLocation,
 		DefaultStoreValidationFrequency: s.config.defaultStoreValidationFrequency,
 		NewPluginManager:                newPluginManager,
 		NewBackupStore:                  persistence.NewObjectBackupStore,
 	}
 	if err := (&controller.BackupStorageLocationReconciler{
-		Client:          s.mgr.GetClient(),
-		Log:             s.logger,
 		Scheme:          s.mgr.GetScheme(),
 		StorageLocation: storageLocationInfo,
 	}).SetupWithManager(s.mgr); err != nil {

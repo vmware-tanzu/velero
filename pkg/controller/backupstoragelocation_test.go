@@ -89,6 +89,9 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 		storageLocationInfo := velero.StorageLocation{
+			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
+			Log:    velerotest.NewLogger(),
+
 			DefaultStorageLocation:          "default",
 			DefaultStoreValidationFrequency: 0,
 			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
@@ -99,8 +102,6 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		}
 
 		r := &BackupStorageLocationReconciler{
-			Client:          fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			Log:             velerotest.NewLogger(),
 			StorageLocation: storageLocationInfo,
 		}
 
@@ -115,7 +116,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		for i, location := range locations.Items {
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err := r.Client.Get(ctx, key, instance)
+			err := r.StorageLocation.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Status.Phase).To(BeIdenticalTo(testData[i].expectedPhase))
 		}
@@ -157,6 +158,9 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 		storageLocationInfo := velero.StorageLocation{
+			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
+			Log:    velerotest.NewLogger(),
+
 			DefaultStorageLocation:          "default",
 			DefaultStoreValidationFrequency: 0,
 			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
@@ -167,8 +171,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		}
 
 		r := &BackupStorageLocationReconciler{
-			Client:          fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			Log:             velerotest.NewLogger(),
+
 			StorageLocation: storageLocationInfo,
 		}
 
@@ -183,7 +186,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		for i, location := range locations.Items {
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err := r.Client.Get(ctx, key, instance)
+			err := r.StorageLocation.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Status.Phase).To(BeIdenticalTo(testData[i].expectedPhase))
 		}
