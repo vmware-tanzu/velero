@@ -6,7 +6,7 @@
 
         {{ $currentIndex := add $index 1 }}
         {{ $row := mod $currentIndex 3 }}
-        {{ if (eq $row 0) }}
+        {{ if and (eq $row 0) (ne $currentIndex (len $posts)) }}
             </div>
             <div class="row mt-4">
         {{ end }}
