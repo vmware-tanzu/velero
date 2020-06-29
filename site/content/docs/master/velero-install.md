@@ -19,6 +19,7 @@ velero install \
     --velero-pod-cpu-limit <CPU_LIMIT> \
     --velero-pod-mem-limit <MEMORY_LIMIT> \
     [--use-restic] \
+    [--default-volumes-to-restic] \
     [--restic-pod-cpu-request <CPU_REQUEST>] \
     [--restic-pod-mem-request <MEMORY_REQUEST>] \
     [--restic-pod-cpu-limit <CPU_LIMIT>] \

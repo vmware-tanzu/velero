@@ -158,7 +158,87 @@ kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
 
 You're now ready to use Velero with restic.
 
-## Back up
+## To back up
+
+Velero supports two approaches of discovering pod volumes that need to be backed up using restic:
+
+- Opt-in approach: Where every pod containing a volume to be backed up using restic must be annotated with the volume's name.
+- Opt-out approach: Where all pod volumes are backed up using restic, with the ability to opt-out any volumes that should not be backed up.
+
+The following sections provide more details on the two approaches.
+
+### Using the opt-out approach
+
+In this approach, Velero will back up all pod volumes using restic with the exception of:
+
+- Volumes mounting the default service account token
+- Hostpath volumes
+
+It is possible to exclude volumes from being backed up using the `backup.velero.io/backup-volumes-excludes` annotation on the pod.
+
+Instructions to back up using this approach are as follows:
+
+1. Run the following command on each pod that contains volumes that should **not** be backed up using restic
+
+    ```bash
+    kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes-excludes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
+    ```
+    where the volume names are the names of the volumes in the pod sepc.
+
+    For example, in the following pod:
+
+    ```yaml
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: app1
+      namespace: sample
+    spec:
+      containers:
+      - image: k8s.gcr.io/test-webserver
+        name: test-webserver
+        volumeMounts:
+        - name: pvc1-vm
+          mountPath: /volume-1
+        - name: pvc2-vm
+          mountPath: /volume-2
+      volumes:
+      - name: pvc1-vm
+        persistentVolumeClaim:
+          claimName: pvc1
+      - name: pvc2-vm
+          claimName: pvc2
+    ```
+    to exclude restic backup of volume `pvc1-vm`, you would run:
+
+    ```bash
+    kubectl -n sample annotate pod/app1 backup.velero.io/backup-volumes-excludes=pvc1-vm
+    ```
+
+2. Take a Velero backup:
+
+    ```bash
+    velero backup create BACKUP_NAME --default-volumes-to-restic OTHER_OPTIONS
+    ```
+
+    The above steps uses the opt-out approach on a per backup basis.
+
+    Alternatively, this behavior may be enabled on all velero backups running the `velero install` command with the `--default-volumes-to-restic` flag. Refer [install overview][11] for details.
+
+3. When the backup completes, view information about the backups:
+
+    ```bash
+    velero backup describe YOUR_BACKUP_NAME
+    ```
+    ```bash
+    kubectl -n velero get podvolumebackups -l velero.io/backup-name=YOUR_BACKUP_NAME -o yaml
+    ```
+
+### Using opt-in pod volume backup
+
+Velero, by default, uses this approach to discover pod volumes that need to be backed up using restic, where every pod containing a volume to be backed up using restic must be annotated with the volume's name.
+
+Instructions to back up using this approach are as follows:
 
 1. Run the following for each pod that contains a volume to back up:
 
@@ -216,7 +296,9 @@ You're now ready to use Velero with restic.
     kubectl -n velero get podvolumebackups -l velero.io/backup-name=YOUR_BACKUP_NAME -o yaml
     ```
 
-## Restore
+## To restore
+
+Regardless of how volumes are discovered for backup using restic, the process of restoring remains the same.
 
 1. Restore from your Velero backup:
 
@@ -370,8 +452,7 @@ on that node. The controller executes `restic restore` commands to restore pod v
 
 ### Backup
 
-1. The main Velero backup process checks each pod that it's backing up for the annotation specifying a restic backup
-should be taken (`backup.velero.io/backup-volumes`)
+1. Based on configuration, the main Velero backup process uses the opt-in or opt-out approach to check each pod that it's backing up for the volumes to be backed up using restic.
 1. When found, Velero first ensures a restic repository exists for the pod's namespace, by:
     - checking if a `ResticRepository` custom resource already exists
     - if not, creating a new one, and waiting for the `ResticRepository` controller to init/check it
@@ -418,12 +499,6 @@ Velero does not currently provide a mechanism to detect persistent volume claims
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
-### Add backup annotation
-
-Velero does not currently provide a single command or automatic way to backup all volume resources in the cluster without annotating pods or pod templates.
-
-The [velero-volume-controller][10] written by duyanghao helps to solve this problem by adding backup annotation to pods with volumes automatically.
-
 [1]: https://github.com/restic/restic
 [2]: customize-installation.md#enable-restic-integration
 [3]: https://github.com/vmware-tanzu/velero/releases/
@@ -433,4 +508,4 @@ The [velero-volume-controller][10] written by duyanghao helps to solve this prob
 [7]: https://github.com/bitsbeats/velero-pvc-watcher
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
-[10]: https://github.com/duyanghao/velero-volume-controller
+[11]: customize-installation.md#default-pod-volume-backup-to-restic
