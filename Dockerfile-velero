@@ -26,6 +26,7 @@ RUN apt-get update && \
     tar -zxvf kubebuilder_2.3.1_linux_amd64.tar.gz && \
     mv kubebuilder_2.3.1_linux_amd64 /usr/local/kubebuilder && \
     chmod +x /usr/local/kubebuilder && \
+    export PATH=$PATH:/usr/local/kubebuilder/bin && \
     rm kubebuilder_2.3.1_linux_amd64.tar.gz && \ 
     apt-get remove -y wget bzip2 && \
     rm -rf /var/lib/apt/lists/* 
