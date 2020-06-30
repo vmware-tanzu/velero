@@ -37,7 +37,6 @@ import (
 type StorageLocation struct {
 	Client client.Client
 	Ctx    context.Context
-	Log    logrus.FieldLogger
 
 	DefaultStorageLocation          string
 	DefaultStoreValidationFrequency time.Duration
@@ -56,10 +55,7 @@ type StorageLocation struct {
 // This will always return "true" for the first attempt at validating a location, regardless of its validation frequency setting
 // Otherwise, it returns "ready" only when NOW is equal to or after the next validation time
 // (next validation time: last validation time + validation frequency)
-func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageLocation) bool {
-	log := p.Log.WithField("controller", "backupstoragelocation")
-	log = log.WithField("backupstoragelocation", location.Name)
-
+func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageLocation, log logrus.FieldLogger) bool {
 	validationFrequency := p.DefaultStoreValidationFrequency
 	// If the bsl validation frequency is not specifically set, skip this block and continue, using the server's default
 	if location.Spec.ValidationFrequency != nil {
@@ -87,11 +83,11 @@ func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageL
 }
 
 // IsValidFor verifies if a storage is valid for a given backup storage location.
-func (p *StorageLocation) IsValidFor(location *velerov1api.BackupStorageLocation) error {
-	pluginManager := p.NewPluginManager(p.Log)
+func (p *StorageLocation) IsValidFor(location *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
+	pluginManager := p.NewPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, err := p.NewBackupStore(location, pluginManager, p.Log)
+	backupStore, err := p.NewBackupStore(location, pluginManager, log)
 	if err != nil {
 		return err
 	}

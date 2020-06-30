@@ -91,11 +91,10 @@ func TestIsReadyToValidate(t *testing.T) {
 			g := NewWithT(t)
 
 			storageLocationInfo := StorageLocation{
-				Log:                             velerotest.NewLogger(),
 				DefaultStoreValidationFrequency: tt.serverDefaultValidationFrequency,
 			}
 
-			g.Expect(storageLocationInfo.IsReadyToValidate(tt.backupLocation)).To(BeIdenticalTo(tt.ready))
+			g.Expect(storageLocationInfo.IsReadyToValidate(tt.backupLocation, velerotest.NewLogger())).To(BeIdenticalTo(tt.ready))
 		})
 	}
 }
@@ -137,7 +136,6 @@ func TestIsValidFor(t *testing.T) {
 			backupStore.On("IsValid").Return(tt.isValidError)
 
 			storageLocationInfo := StorageLocation{
-				Log:              velerotest.NewLogger(),
 				NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
 					return backupStores[loc.Name], nil
@@ -145,9 +143,9 @@ func TestIsValidFor(t *testing.T) {
 			}
 
 			if tt.expectError {
-				g.Expect(storageLocationInfo.IsValidFor(tt.backupLocation)).NotTo(BeNil())
+				g.Expect(storageLocationInfo.IsValidFor(tt.backupLocation, velerotest.NewLogger())).NotTo(BeNil())
 			} else {
-				g.Expect(storageLocationInfo.IsValidFor(tt.backupLocation)).To(BeNil())
+				g.Expect(storageLocationInfo.IsValidFor(tt.backupLocation, velerotest.NewLogger())).To(BeNil())
 			}
 		})
 	}

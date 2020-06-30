@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,12 +34,14 @@ import (
 type BackupStorageLocationReconciler struct {
 	Scheme          *runtime.Scheme
 	StorageLocation velero.StorageLocation
+
+	Log logrus.FieldLogger
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations/status,verbs=get;update;patch
 func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	log := r.StorageLocation.Log.WithField("controller", "backupstoragelocation")
+	log := r.Log.WithField("controller", "backupstoragelocation")
 
 	log.Info("Checking for existing backup locations ready to be verified; there needs to be at least 1 backup location available")
 
@@ -55,13 +58,13 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	var unavailableErrors []string
 	var someVerified bool
 	for _, location := range locationList.Items {
-		log := log.WithField("backupstoragelocation", location.Name)
+		log := r.Log.WithField("controller", "backupstoragelocation").WithField("backupstoragelocation", location.Name)
 
 		if location.Name == r.StorageLocation.DefaultStorageLocation {
 			defaultFound = true
 		}
 
-		ready := r.StorageLocation.IsReadyToValidate(&location)
+		ready := r.StorageLocation.IsReadyToValidate(&location, log)
 
 		if !ready {
 			continue
@@ -70,7 +73,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 		log.Debug("Backup location ready to be verified")
 
-		if err := r.StorageLocation.IsValidFor(&location); err != nil {
+		if err := r.StorageLocation.IsValidFor(&location, log); err != nil {
 			log.Debug("Backup location verified, not valid")
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
 
@@ -104,7 +107,7 @@ func (r *BackupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 	var availableBSLs []*velerov1api.BackupStorageLocation
 	var unAvailableBSLs []*velerov1api.BackupStorageLocation
 	var unknownBSLs []*velerov1api.BackupStorageLocation
-	log := r.StorageLocation.Log.WithField("controller", "backupstoragelocation")
+	log := r.Log.WithField("controller", "backupstoragelocation")
 
 	for i, location := range locationList.Items {
 		phase := location.Status.Phase

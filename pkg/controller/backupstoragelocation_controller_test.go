@@ -81,9 +81,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 		storageLocationInfo := velero.StorageLocation{
-			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			Log:    velerotest.NewLogger(),
-
+			Client:                          fake.NewFakeClientWithScheme(scheme.Scheme, locations),
 			DefaultStorageLocation:          "default",
 			DefaultStoreValidationFrequency: 0,
 			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
@@ -94,6 +92,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 		r := &BackupStorageLocationReconciler{
 			StorageLocation: storageLocationInfo,
+			Log:             velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctrl.Request{
@@ -152,9 +151,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 		storageLocationInfo := velero.StorageLocation{
-			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			Log:    velerotest.NewLogger(),
-
+			Client:                          fake.NewFakeClientWithScheme(scheme.Scheme, locations),
 			DefaultStorageLocation:          "default",
 			DefaultStoreValidationFrequency: 0,
 			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
@@ -165,8 +162,8 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		}
 
 		r := &BackupStorageLocationReconciler{
-
 			StorageLocation: storageLocationInfo,
+			Log:             velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctrl.Request{

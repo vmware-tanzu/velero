@@ -854,7 +854,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	storageLocationInfo := velero.StorageLocation{
 		Client:                          s.mgr.GetClient(),
 		Ctx:                             s.ctx,
-		Log:                             s.logger,
 		DefaultStorageLocation:          s.config.defaultBackupLocation,
 		DefaultStoreValidationFrequency: s.config.storeValidationFrequency,
 		NewPluginManager:                newPluginManager,
@@ -863,6 +862,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	if err := (&controller.BackupStorageLocationReconciler{
 		Scheme:          s.mgr.GetScheme(),
 		StorageLocation: storageLocationInfo,
+		Log:             s.logger,
 	}).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", "BackupStorageLocation")
 	}
