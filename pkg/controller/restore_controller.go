@@ -53,7 +53,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// nonRestorableResources is a blacklist for the restoration process. Any resources
+// nonRestorableResources is an exclusion list  for the restoration process. Any resources
 // included here are explicitly excluded from the restoration process.
 var nonRestorableResources = []string{
 	"nodes",
