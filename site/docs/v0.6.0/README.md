@@ -47,7 +47,7 @@ git clone git@github.com:heptio/ark.git
 
 > NOTE: Documentation may change between releases. See the [Changelog][20] for links to previous versions of this repository and its docs.
 >
-> To ensure that you are working off a specific release, `git checkout <VERSION_TAG>` where `<VERSION_TAG>` is the appropriate tag for the Ark version you wish to use (e.g. "v0.3.3"). You should `git checkout master` only if you're planning on [building the Ark image from scratch][7].
+> To ensure that you are working off a specific release, `git checkout <VERSION_TAG>` where `<VERSION_TAG>` is the appropriate tag for the Ark version you wish to use (e.g. "v0.3.3"). You should `git checkout main` only if you're planning on [building the Ark image from scratch][7].
 
 ### 2. Setup
 
@@ -192,7 +192,7 @@ Feedback and discussion is available on [the mailing list][24].
 See [the list of releases][6] to find out about feature changes.
 
 [0]: https://github.com/heptio
-[1]: https://travis-ci.org/heptio/ark.svg?branch=master
+[1]: https://travis-ci.org/heptio/ark.svg?branch=main
 [2]: https://travis-ci.org/heptio/ark
 [3]: /
 [4]: https://github.com/heptio/ark/issues
@@ -203,7 +203,7 @@ See [the list of releases][6] to find out about feature changes.
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
-[12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
+[12]: https://github.com/kubernetes/kubernetes/blob/main/cluster/addons/dns/README.md
 [13]: /output-file-format.md
 [14]: https://github.com/kubernetes/kubernetes
 [15]: https://aws.amazon.com/

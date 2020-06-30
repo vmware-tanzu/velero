@@ -42,7 +42,7 @@ See [the list of releases][6] to find out about feature changes.
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
-[12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
+[12]: https://github.com/kubernetes/kubernetes/blob/main/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero

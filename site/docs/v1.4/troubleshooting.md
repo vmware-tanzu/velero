@@ -116,8 +116,8 @@ Now, visiting http://localhost:8085/metrics on a browser should show the metrics
 [2]: debugging-install.md
 [4]: https://github.com/vmware-tanzu/velero/issues
 [5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
-[6]: https://github.com/vmware-tanzu/helm-charts/blob/master/charts/velero
-[7]: https://github.com/vmware-tanzu/helm-charts/blob/master/charts/velero/values.yaml#L44
-[8]: https://github.com/vmware-tanzu/helm-charts/blob/master/charts/velero/values.yaml#L49-L52
+[6]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero
+[7]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero/values.yaml#L44
+[8]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero/values.yaml#L49-L52
 [9]: https://kubectl.docs.kubernetes.io/pages/container_debugging/port_forward_to_pods.html
 [25]: https://kubernetes.slack.com/messages/velero

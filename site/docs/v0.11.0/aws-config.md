@@ -23,7 +23,7 @@ If you do not have the `aws` CLI locally installed, follow the [user guide][5] t
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
 _We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of Velero. The tarballs for each release contain the
-`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the master 
+`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the main 
 branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## Create S3 bucket

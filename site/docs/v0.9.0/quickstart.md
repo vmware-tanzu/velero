@@ -23,7 +23,7 @@ Clone or fork the Ark repository:
 git clone git@github.com:heptio/ark.git
 ```
 
-NOTE: Make sure to check out the appropriate version. We recommend that you check out the latest tagged version. The master branch is under active development and might not be stable.
+NOTE: Make sure to check out the appropriate version. We recommend that you check out the latest tagged version. The main branch is under active development and might not be stable.
 
 ### Set up server
 

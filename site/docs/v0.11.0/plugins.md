@@ -28,4 +28,4 @@ within your plugin.
 
 
 [1]: https://github.com/heptio/velero-plugin-example
-[2]: https://github.com/heptio/velero/blob/master/pkg/plugin/logger.go
+[2]: https://github.com/heptio/velero/blob/main/pkg/plugin/logger.go

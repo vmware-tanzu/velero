@@ -84,4 +84,4 @@ To make sure it's the most up-to-date:
 
 ### Post-release - Windows Chocolatey version update
 
-From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/master/README.md)
+From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)

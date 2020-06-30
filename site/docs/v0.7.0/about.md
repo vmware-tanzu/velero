@@ -77,4 +77,4 @@ Heptio Ark treats object storage as the source of truth. It continuously checks 
 This allows restore functionality to work in a cluster migration scenario, where the original Backup objects do not exist in the new cluster. See the tutorials for details.
 
 [19]: /img/backup-process.png
-[30]: https://github.com/heptio/ark/blob/master/docs/cli-reference/ark_create_backup.md
+[30]: https://github.com/heptio/ark/blob/main/docs/cli-reference/ark_create_backup.md

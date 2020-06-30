@@ -50,7 +50,7 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [3]: contributions/minio.md
 [4]: https://github.com/StackPointCloud/ark-plugin-digitalocean
 [5]: http://www.noobaa.com/
-[6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/master/backupstoragelocation.md
+[6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/backupstoragelocation.md
 [7]: https://aws.amazon.com
 [8]: https://github.com/vmware-tanzu/velero-plugin-for-aws
 [9]: https://azure.com
