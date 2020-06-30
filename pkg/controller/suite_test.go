@@ -57,20 +57,11 @@ var (
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controller Suite")
-
-	// RunSpecsWithDefaultAndCustomReporters(t,
-	// 	"Controller Suite",
-	// 	[]Reporter{envtest.NewlineReporter{}})
 }
 
 var _ = BeforeSuite(func(done Done) {
 	By("bootstrapping test environment")
 	testEnv = newTestEnvironment()
-
-	// Expect((&BackupStorageLocationReconciler{
-	// 	Client: testEnv,
-	// 	// Log:    log.Log,
-	// }).SetupWithManager(testEnv.Manager)).To(Succeed())
 
 	By("starting the manager")
 	go func() {

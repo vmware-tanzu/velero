@@ -23,6 +23,9 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
@@ -31,8 +34,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestIsReadyToValidate(t *testing.T) {
