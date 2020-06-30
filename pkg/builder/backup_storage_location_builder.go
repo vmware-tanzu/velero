@@ -94,3 +94,15 @@ func (b *BackupStorageLocationBuilder) ValidationFrequency(frequency time.Durati
 	b.object.Spec.ValidationFrequency = &metav1.Duration{Duration: frequency}
 	return b
 }
+
+// LastValidationTime sets the BackupStorageLocation's last validated time.
+func (b *BackupStorageLocationBuilder) LastValidationTime(lastValidated time.Time) *BackupStorageLocationBuilder {
+	b.object.Status.LastValidationTime = &metav1.Time{Time: lastValidated}
+	return b
+}
+
+// Phase sets the BackupStorageLocation's status phase.
+func (b *BackupStorageLocationBuilder) Phase(phase velerov1api.BackupStorageLocationPhase) *BackupStorageLocationBuilder {
+	b.object.Status.Phase = phase
+	return b
+}

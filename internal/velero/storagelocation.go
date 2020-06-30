@@ -48,33 +48,37 @@ type StorageLocation struct {
 	NewBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
-// IsReadyToValidate calculates if a given backup storage location is ready to be validated
-// based on the chosen validation frequency. Users can choose any validation frequency for a given location.
-// A backup storage location's validation frequency overrites the server's default value.
-// To skip validation all together, the frequency must be set to zero.
+// IsReadyToValidate calculates if a given backup storage location is ready to be validated.
+//
+// Rules:
+// Users can choose a validation frequency per location. This will overrite the server's default value
+// To skip/stop validation, set the frequency to zero
+// This will always return "true" for the first attempt at validating a location, regardless of its validation frequency setting
+// Otherwise, it returns "ready" only when NOW is equal to or after the next validation time
+// (next validation time: last validation time + validation frequency)
 func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageLocation) bool {
 	log := p.Log.WithField("controller", "backupstoragelocation")
 	log = log.WithField("backupstoragelocation", location.Name)
 
-	storeValidationFrequency := p.DefaultStoreValidationFrequency
-	// If the bsl validation frequency is not specifically set, skip this block and use the server's default
+	validationFrequency := p.DefaultStoreValidationFrequency
+	// If the bsl validation frequency is not specifically set, skip this block and continue, using the server's default
 	if location.Spec.ValidationFrequency != nil {
-		storeValidationFrequency = location.Spec.ValidationFrequency.Duration
-		if storeValidationFrequency == 0 {
+		validationFrequency = location.Spec.ValidationFrequency.Duration
+		if validationFrequency == 0 {
 			log.Debug("Validation period for this backup location is set to 0, skipping validation")
 			return false
 		}
 
-		if storeValidationFrequency < 0 {
-			log.Debugf("Validation period must be non-negative, changing from %d to %d", storeValidationFrequency, p.DefaultStoreValidationFrequency)
-			storeValidationFrequency = p.DefaultStoreValidationFrequency
+		if validationFrequency < 0 {
+			log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, p.DefaultStoreValidationFrequency)
+			validationFrequency = p.DefaultStoreValidationFrequency
 		}
 	}
 
 	lastValidation := location.Status.LastValidationTime
-	if lastValidation != nil {
-		nextValidation := lastValidation.Add(storeValidationFrequency)
-		if time.Now().UTC().Before(nextValidation) {
+	if lastValidation != nil { // always ready to validate the first time around, so only even do this check if this has happened before
+		nextValidation := lastValidation.Add(validationFrequency) // next validation time: last validation time + validation frequency
+		if time.Now().UTC().Before(nextValidation) {              // ready only when NOW is equal to or after the next validation time
 			return false
 		}
 	}

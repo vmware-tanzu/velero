@@ -88,7 +88,6 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			DefaultStoreValidationFrequency: 0,
 			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-				// this gets populated just below, prior to exercising the method under test
 				return backupStores[loc.Name], nil
 			},
 		}
