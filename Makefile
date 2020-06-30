@@ -44,6 +44,9 @@ MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 GIT_SHA = $(shell git rev-parse HEAD)
 GIT_DIRTY = $(shell git status --porcelain 2> /dev/null)
 
+# The default linters used by lint and local-lint
+LINTERS ?= "gosec,goconst,gofmt,goimports,unparam"
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -158,6 +161,7 @@ shell: build-dirs build-image
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
+		-v "$$(pwd)/.go/golangci-lint:/.cache/golangci-lint:delegated" \
 		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
@@ -219,12 +223,32 @@ ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
 
+lint:
+ifneq ($(SKIP_TESTS), 1)
+	@$(MAKE) shell CMD="-c 'hack/lint.sh $(LINTERS)'"
+endif
+
+local-lint:
+ifneq ($(SKIP_TESTS), 1)
+	@hack/lint.sh $(LINTERS)
+endif
+
+lint-all:
+ifneq ($(SKIP_TESTS), 1)
+	@$(MAKE) shell CMD="-c 'hack/lint.sh $(LINTERS) true'"
+endif
+
+local-lint-all:
+ifneq ($(SKIP_TESTS), 1)
+	@hack/lint.sh $(LINTERS) true
+endif
+
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
-	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build
+	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
 
 build-image:
 	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) .
