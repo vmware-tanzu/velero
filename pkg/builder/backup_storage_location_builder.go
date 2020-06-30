@@ -17,6 +17,8 @@ limitations under the License.
 package builder
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -84,5 +86,11 @@ func (b *BackupStorageLocationBuilder) Prefix(val string) *BackupStorageLocation
 // AccessMode sets the BackupStorageLocation's access mode.
 func (b *BackupStorageLocationBuilder) AccessMode(accessMode velerov1api.BackupStorageLocationAccessMode) *BackupStorageLocationBuilder {
 	b.object.Spec.AccessMode = accessMode
+	return b
+}
+
+// ValidationFrequency sets the BackupStorageLocation's validation frequency.
+func (b *BackupStorageLocationBuilder) ValidationFrequency(frequency time.Duration) *BackupStorageLocationBuilder {
+	b.object.Spec.ValidationFrequency = &metav1.Duration{Duration: frequency}
 	return b
 }

@@ -27,12 +27,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -40,35 +40,25 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-type testData struct {
-	name, namespace     string
-	validationFrequency time.Duration
-	isValidError        error
-	expectedPhase       velerov1api.BackupStorageLocationPhase
-	wantErr             bool
-}
-
 var _ = Describe("Backup Storage Location Reconciler", func() {
 	BeforeEach(func() {})
 	AfterEach(func() {})
 
 	It("Should successfully patch a backup storage location object status phase according to whether its storage is valid or not", func() {
-		testData := []testData{
+		tests := []struct {
+			backupLocation *velerov1api.BackupStorageLocation
+			isValidError   error
+			expectedPhase  velerov1api.BackupStorageLocationPhase
+		}{
 			{
-				name:                "location-1",
-				namespace:           "ns-1",
-				validationFrequency: 1 * time.Second,
-				isValidError:        nil,
-				expectedPhase:       velerov1api.BackupStorageLocationPhaseAvailable,
-				wantErr:             false,
+				backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(1 * time.Second).Result(),
+				isValidError:   nil,
+				expectedPhase:  velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 			{
-				name:                "location-2",
-				namespace:           "ns-1",
-				validationFrequency: 1 * time.Second,
-				isValidError:        errors.New("an error"),
-				expectedPhase:       velerov1api.BackupStorageLocationPhaseUnavailable,
-				wantErr:             false,
+				backupLocation: builder.ForBackupStorageLocation("ns-1", "location-2").ValidationFrequency(1 * time.Second).Result(),
+				isValidError:   errors.New("an error"),
+				expectedPhase:  velerov1api.BackupStorageLocationPhaseUnavailable,
 			},
 		}
 
@@ -79,11 +69,13 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		)
 		pluginManager.On("CleanupClients").Return(nil)
 
-		locations := locationList(testData)
-		for i, location := range locations.Items {
+		locations := new(velerov1api.BackupStorageLocationList)
+		for i, test := range tests {
+			location := test.backupLocation
+			locations.Items = append(locations.Items, *location)
 			backupStores[location.Name] = &persistencemocks.BackupStore{}
 			backupStore := backupStores[location.Name]
-			backupStore.On("IsValid").Return(testData[i].isValidError)
+			backupStore.On("IsValid").Return(tests[i].isValidError)
 		}
 
 		// Setup reconciler
@@ -118,27 +110,28 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			instance := &velerov1api.BackupStorageLocation{}
 			err := r.StorageLocation.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
-			Expect(instance.Status.Phase).To(BeIdenticalTo(testData[i].expectedPhase))
+			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}
 	})
 
 	It("Should not patch a backup storage location object status phase if the location's validation frequency is specifically set to zero", func() {
-		testData := []testData{
+		tests := []struct {
+			backupLocation *velerov1api.BackupStorageLocation
+			isValidError   error
+			expectedPhase  velerov1api.BackupStorageLocationPhase
+			wantErr        bool
+		}{
 			{
-				name:                "location-1",
-				namespace:           "ns-1",
-				validationFrequency: 0,
-				isValidError:        nil,
-				expectedPhase:       "",
-				wantErr:             false,
+				backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(0).Result(),
+				isValidError:   nil,
+				expectedPhase:  "",
+				wantErr:        false,
 			},
 			{
-				name:                "location-2",
-				namespace:           "ns-1",
-				validationFrequency: 0,
-				isValidError:        nil,
-				expectedPhase:       "",
-				wantErr:             false,
+				backupLocation: builder.ForBackupStorageLocation("ns-1", "location-2").ValidationFrequency(0).Result(),
+				isValidError:   nil,
+				expectedPhase:  "",
+				wantErr:        false,
 			},
 		}
 
@@ -149,10 +142,12 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		)
 		pluginManager.On("CleanupClients").Return(nil)
 
-		locations := locationList(testData)
-		for i, location := range locations.Items {
+		locations := new(velerov1api.BackupStorageLocationList)
+		for i, test := range tests {
+			location := test.backupLocation
+			locations.Items = append(locations.Items, *location)
 			backupStores[location.Name] = &persistencemocks.BackupStore{}
-			backupStores[location.Name].On("IsValid").Return(testData[i].isValidError)
+			backupStores[location.Name].On("IsValid").Return(tests[i].isValidError)
 		}
 
 		// Setup reconciler
@@ -188,31 +183,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			instance := &velerov1api.BackupStorageLocation{}
 			err := r.StorageLocation.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
-			Expect(instance.Status.Phase).To(BeIdenticalTo(testData[i].expectedPhase))
+			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}
 	})
 })
-
-func locationList(tests []testData) *velerov1api.BackupStorageLocationList {
-	list := new(velerov1api.BackupStorageLocationList)
-
-	for _, test := range tests {
-		item := velerov1api.BackupStorageLocation{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.namespace,
-				Name:      test.name,
-			},
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Provider: "objStoreProvider",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
-						Bucket: "bucket",
-					},
-				},
-				ValidationFrequency: &metav1.Duration{Duration: test.validationFrequency},
-			},
-		}
-		list.Items = append(list.Items, item)
-	}
-	return list
-}
