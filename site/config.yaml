@@ -86,3 +86,9 @@ enableRobotsTXT: true
 enableGitInfo: true
 permalinks:
   posts: "/blog/:slug/"
+outputs:
+  home: ["HTML"]
+  section: ["HTML"]
+  page: ["HTML"]
+  taxonomy: ["HTML"]
+  term: ["HTML"]
