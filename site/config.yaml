@@ -53,7 +53,7 @@ params:
       url: https://groups.google.com/forum/#!forum/projectvelero
     - title: RSS
       fa_icon: fa fa-rss
-      url: feed.xml
+      url: blog/index.xml
     - title: GitHub
       fa_icon: fab fa-github
       url: https://github.com/vmware-tanzu/velero
