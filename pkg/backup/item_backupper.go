@@ -160,6 +160,12 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		}
 	}
 
+	// capture the version of the object before invoking plugin actions as the plugin may update
+	// the group version of the object.
+	// group version of this object
+	// Used on filepath to backup up all groups and versions
+	version := resourceVersion(obj)
+
 	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
@@ -204,10 +210,6 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		return false, kubeerrs.NewAggregate(backupErrs)
 	}
 
-	// group version of this object
-	// Used on filepath to backup up all groups and versions
-	version := resourceVersion(obj)
-
 	// Getting the preferred group version of this resource
 	preferredVersion := preferredGVR.Version
 
@@ -250,6 +252,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 
 	// backing up the preferred version backup without API Group version on path -  this is for backward compability
 
+	log.Debugf("Resource %s/%s, version= %s, preferredVersion=%s", groupResource.String(), name, version, preferredVersion)
 	if version == preferredVersion {
 		if namespace != "" {
 			filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), velerov1api.NamespaceScopedDir, namespace, name+".json")
@@ -272,7 +275,6 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		if _, err := ib.tarWriter.Write(itemBytes); err != nil {
 			return false, errors.WithStack(err)
 		}
-
 	}
 
 	return true, nil
