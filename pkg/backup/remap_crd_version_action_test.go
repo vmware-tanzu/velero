@@ -170,6 +170,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
+			assert.Equal(t, crd.Kind, item.GetObjectKind().GroupVersionKind().GroupKind().Kind)
 			name, _, err := unstructured.NestedString(item.UnstructuredContent(), "metadata", "name")
 			require.NoError(t, err)
 			assert.Equal(t, crd.Name, name)
