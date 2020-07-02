@@ -1,4 +1,7 @@
-# Ark Volume Snapshot Location
+---
+title: "Ark Volume Snapshot Location"
+layout: docs
+---
 
 ## Volume Snapshot Location
 

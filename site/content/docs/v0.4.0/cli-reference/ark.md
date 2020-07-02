@@ -1,4 +1,7 @@
-## ark
+---
+title: "ark"
+layout: docs
+---
 
 Back up and restore Kubernetes cluster resources.
 

@@ -1,4 +1,7 @@
-## ark describe restores
+---
+title: "ark describe restores"
+layout: docs
+---
 
 Describe restores
 

@@ -1,4 +1,7 @@
-## ark restore logs
+---
+title: "ark restore logs"
+layout: docs
+---
 
 Get restore logs
 

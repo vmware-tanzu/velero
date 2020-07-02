@@ -1,4 +1,7 @@
-## ark get schedules
+---
+title: "ark get schedules"
+layout: docs
+---
 
 Get schedules
 

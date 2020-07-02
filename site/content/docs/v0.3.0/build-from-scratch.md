@@ -1,4 +1,7 @@
-# Build From Scratch
+---
+title: "Build From Scratch"
+layout: docs
+---
 
 While the [README][0] pulls from the Heptio image registry, you can also build your own Heptio Ark container with the following steps:
 

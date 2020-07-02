@@ -1,4 +1,7 @@
-# Ark Backup Storage Locations
+---
+title: "Ark Backup Storage Locations"
+layout: docs
+---
 
 ## Backup Storage Location
 

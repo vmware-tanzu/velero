@@ -1,4 +1,7 @@
-# Run Velero locally in development
+---
+title: "Run Velero locally in development"
+layout: docs
+---
 
 Running the Velero server locally can speed up iterative development. This eliminates the need to rebuild the Velero server
 image and redeploy it to the cluster with each change.

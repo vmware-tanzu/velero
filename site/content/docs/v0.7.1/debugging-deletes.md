@@ -1,4 +1,7 @@
-# Ark version 0.7.0 and later: issue with deleting namespaces and backups 
+---
+title: "Ark version 0.7.0 and later: issue with deleting namespaces and backups "
+layout: docs
+---
 
 Version 0.7.0 introduced the ability to delete backups. However, you may encounter an issue if you try to 
 delete the `heptio-ark` namespace. The namespace can get stuck in a terminating state, and you cannot delete your backups. 

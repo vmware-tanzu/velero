@@ -1,4 +1,7 @@
-# Migrating from Heptio Ark to Velero
+---
+title: "Migrating from Heptio Ark to Velero"
+layout: docs
+---
 
 As of v0.11.0, Heptio Ark has become Velero. This means the following changes have been made:
 

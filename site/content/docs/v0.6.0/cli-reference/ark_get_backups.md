@@ -1,4 +1,7 @@
-## ark get backups
+---
+title: "ark get backups"
+layout: docs
+---
 
 Get backups
 

@@ -1,4 +1,7 @@
-# Debugging Restores
+---
+title: "Debugging Restores"
+layout: docs
+---
 
 * [Example][0]
 * [Structure][1]

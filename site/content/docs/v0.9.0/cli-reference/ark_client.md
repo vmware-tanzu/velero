@@ -1,4 +1,7 @@
-## ark client
+---
+title: "ark client"
+layout: docs
+---
 
 Ark client related commands
 

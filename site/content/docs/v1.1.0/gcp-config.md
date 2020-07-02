@@ -1,4 +1,7 @@
-# Run Velero on GCP
+---
+title: "Run Velero on GCP"
+layout: docs
+---
 
 You can run Kubernetes on Google Cloud Platform in either:
 

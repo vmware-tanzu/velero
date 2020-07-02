@@ -1,4 +1,7 @@
-# Customize Velero Install
+---
+title: "Customize Velero Install"
+layout: docs
+---
 
 - [Customize Velero Install](#customize-velero-install)
   - [Plugins](#plugins)

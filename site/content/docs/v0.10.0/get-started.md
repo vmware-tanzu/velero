@@ -1,4 +1,7 @@
-# Getting started
+---
+title: "Getting started"
+layout: docs
+---
 
 The following example sets up the Ark server and client, then backs up and restores a sample application.
 

@@ -1,4 +1,7 @@
-# Set up Ark with your cloud provider
+---
+title: "Set up Ark with your cloud provider"
+layout: docs
+---
 
 To run Ark with your cloud provider, you specify provider-specific settings for the Ark server. In version 0.7.0 and later, you can run Ark in any namespace, which requires additional customization. See [Run in custom namespace][3].
 

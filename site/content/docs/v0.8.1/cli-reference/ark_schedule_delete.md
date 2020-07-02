@@ -1,4 +1,7 @@
-## ark schedule delete
+---
+title: "ark schedule delete"
+layout: docs
+---
 
 Delete a schedule
 

@@ -1,4 +1,7 @@
-## ark restore get
+---
+title: "ark restore get"
+layout: docs
+---
 
 Get restores
 

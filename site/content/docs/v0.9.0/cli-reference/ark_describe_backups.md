@@ -1,4 +1,7 @@
-## ark describe backups
+---
+title: "ark describe backups"
+layout: docs
+---
 
 Describe backups
 

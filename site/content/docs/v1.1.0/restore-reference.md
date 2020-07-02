@@ -1,4 +1,7 @@
-# Restore Reference
+---
+title: "Restore Reference"
+layout: docs
+---
 
 ## Restoring Into a Different Namespace
 

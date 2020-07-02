@@ -1,4 +1,7 @@
-# Command line reference
+---
+title: "Command line reference"
+layout: docs
+---
 
 The Ark client provides a CLI that allows you to initiate ad-hoc backups, scheduled backups, or restores.
 

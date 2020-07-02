@@ -1,4 +1,7 @@
-# Backup Storage Locations and Volume Snapshot Locations
+---
+title: "Backup Storage Locations and Volume Snapshot Locations"
+layout: docs
+---
 
 Velero v0.10 introduces a new way of configuring where Velero backups and their associated persistent volume snapshots are stored.
 

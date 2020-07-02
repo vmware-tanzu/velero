@@ -1,4 +1,7 @@
-# Development 
+---
+title: "Development "
+layout: docs
+---
 
 ## Update generated files
 

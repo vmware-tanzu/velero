@@ -1,4 +1,7 @@
-# Expose Minio outside your cluster
+---
+title: "Expose Minio outside your cluster"
+layout: docs
+---
 
 When you run commands to get logs or describe a backup, the Velero server generates a pre-signed URL to download the requested items. To access these URLs from outside the cluster -- that is, from your Velero client -- you need to make Minio available outside the cluster. You can:
 

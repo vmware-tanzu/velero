@@ -1,4 +1,7 @@
-# Run Ark on GCP
+---
+title: "Run Ark on GCP"
+layout: docs
+---
 
 You can run Kubernetes on Google Cloud Platform in either: 
 

@@ -1,4 +1,7 @@
-## ark delete restore
+---
+title: "ark delete restore"
+layout: docs
+---
 
 Delete a restore
 

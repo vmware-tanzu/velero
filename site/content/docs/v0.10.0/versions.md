@@ -1,4 +1,7 @@
-# Upgrading Ark versions
+---
+title: "Upgrading Ark versions"
+layout: docs
+---
 
 Ark supports multiple concurrent versions. Whether you're setting up Ark for the first time or upgrading to a new version, you need to pay careful attention to versioning. This doc page is new as of version 0.10.0, and will be updated with information about subsequent releases.
 

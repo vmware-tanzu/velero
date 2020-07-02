@@ -1,4 +1,7 @@
-## Examples
+---
+title: "Examples"
+layout: docs
+---
 
 After you set up the Velero server, try these examples:
 

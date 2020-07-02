@@ -1,4 +1,7 @@
-# Run in custom namespace
+---
+title: "Run in custom namespace"
+layout: docs
+---
 
 In Velero version 0.7.0 and later, you can run Velero in any namespace. To do so, you specify the
 namespace in the YAML files that configure the Velero server. You then also specify the namespace when

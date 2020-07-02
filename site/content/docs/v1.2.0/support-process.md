@@ -1,4 +1,7 @@
-# Support Process
+---
+title: "Support Process"
+layout: docs
+---
 
 ## Weekly Rotation
 

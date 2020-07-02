@@ -1,4 +1,7 @@
-## ark delete
+---
+title: "ark delete"
+layout: docs
+---
 
 Delete ark resources
 

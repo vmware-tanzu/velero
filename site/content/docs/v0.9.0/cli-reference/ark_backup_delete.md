@@ -1,4 +1,7 @@
-## ark backup delete
+---
+title: "ark backup delete"
+layout: docs
+---
 
 Delete a backup
 

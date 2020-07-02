@@ -1,4 +1,7 @@
-# Use IBM Cloud Object Storage as Velero's storage destination.
+---
+title: "Use IBM Cloud Object Storage as Velero's storage destination."
+layout: docs
+---
 You can deploy Velero on IBM [Public][5] or [Private][4] clouds, or even on any other Kubernetes cluster, but anyway you can use IBM Cloud Object Store as a destination for Velero's backups.
 
 To set up IBM Cloud Object Storage (COS) as Velero's destination, you:

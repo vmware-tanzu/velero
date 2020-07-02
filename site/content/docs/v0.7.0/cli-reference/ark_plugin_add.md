@@ -1,4 +1,7 @@
-## ark plugin add
+---
+title: "ark plugin add"
+layout: docs
+---
 
 Add a plugin
 

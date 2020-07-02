@@ -44,6 +44,7 @@
                     <div class="col-md-8">
                         {{ .Render "version-warning" }}
                         <div class="documentation-container">
+                            {{ with .Title }}<h1>{{ . }}</h1>{{ end }}
                             {{ .Content }}
                         </div>
                     </div>

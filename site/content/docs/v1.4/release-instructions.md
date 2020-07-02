@@ -1,4 +1,7 @@
-# Release Instructions
+---
+title: "Release Instructions"
+layout: docs
+---
 
 ## Ahead of Time
 

@@ -1,4 +1,7 @@
-# Cloud Provider Specifics
+---
+title: "Cloud Provider Specifics"
+layout: docs
+---
 
 > NOTE: Documentation may change between releases. See the [Changelog][20] for links to previous versions of this repository and its docs.
 >

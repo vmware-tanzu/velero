@@ -1,4 +1,7 @@
-# Hooks
+---
+title: "Hooks"
+layout: docs
+---
 
 Heptio Ark currently supports executing commands in containers in pods during a backup.
 

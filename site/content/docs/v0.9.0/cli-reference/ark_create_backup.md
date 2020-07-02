@@ -1,4 +1,7 @@
-## ark create backup
+---
+title: "ark create backup"
+layout: docs
+---
 
 Create a backup
 

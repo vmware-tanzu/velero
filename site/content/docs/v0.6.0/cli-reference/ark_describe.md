@@ -1,4 +1,7 @@
-## ark describe
+---
+title: "ark describe"
+layout: docs
+---
 
 Describe ark resources
 

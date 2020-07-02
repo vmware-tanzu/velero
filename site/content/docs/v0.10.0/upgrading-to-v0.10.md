@@ -1,4 +1,7 @@
-# Upgrading to Ark v0.10
+---
+title: "Upgrading to Ark v0.10"
+layout: docs
+---
 
 ## Overview
 

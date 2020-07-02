@@ -1,4 +1,7 @@
-## ark client config set
+---
+title: "ark client config set"
+layout: docs
+---
 
 Set client configuration file values
 

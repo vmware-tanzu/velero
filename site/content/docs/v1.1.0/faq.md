@@ -1,4 +1,7 @@
-# FAQ
+---
+title: "FAQ"
+layout: docs
+---
 
 ## When is it appropriate to use Velero instead of etcd's built in backup/restore?
 

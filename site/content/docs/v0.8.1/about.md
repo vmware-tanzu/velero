@@ -1,4 +1,7 @@
-# About Heptio Ark
+---
+title: "About Heptio Ark"
+layout: docs
+---
 
 Heptio Ark provides customizable degrees of recovery for all Kubernetes objects (Pods, Deployments, Jobs, Custom Resource Definitions, etc.), as well as for persistent volumes. This recovery can be cluster-wide, or fine-tuned according to object type, namespace, or labels.
 

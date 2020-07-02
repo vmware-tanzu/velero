@@ -1,4 +1,7 @@
-## ark restic
+---
+title: "ark restic"
+layout: docs
+---
 
 Work with restic
 

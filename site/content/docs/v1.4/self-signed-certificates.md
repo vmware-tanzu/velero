@@ -1,4 +1,7 @@
-# Use Velero with a storage provider secured by a self-signed certificate
+---
+title: "Use Velero with a storage provider secured by a self-signed certificate"
+layout: docs
+---
 
 If you are using an S3-Compatible storage provider that is secured with a self-signed certificate, connections to the object store may fail with a `certificate signed by unknown authority` message.
 In order to proceed, a certificate bundle may be provided when adding the storage provider.

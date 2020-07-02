@@ -1,4 +1,7 @@
-# Concepts
+---
+title: "Concepts"
+layout: docs
+---
 
 * [Overview][0]
 * [Operation types][1]

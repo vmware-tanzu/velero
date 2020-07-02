@@ -1,4 +1,7 @@
-# Vendoring dependencies
+---
+title: "Vendoring dependencies"
+layout: docs
+---
 
 ## Overview
 

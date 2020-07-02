@@ -1,4 +1,7 @@
-# Backup Storage Locations and Volume Snapshot Locations
+---
+title: "Backup Storage Locations and Volume Snapshot Locations"
+layout: docs
+---
 
 ## Overview
 

@@ -1,4 +1,7 @@
-# Ark Config definition
+---
+title: "Ark Config definition"
+layout: docs
+---
 
 * [Overview][8]
 * [Example][9]

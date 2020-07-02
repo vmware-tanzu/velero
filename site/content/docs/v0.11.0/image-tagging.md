@@ -1,4 +1,7 @@
-# Image tagging policy
+---
+title: "Image tagging policy"
+layout: docs
+---
 
 This document describes Velero's image tagging policy.
 

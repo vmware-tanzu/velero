@@ -1,4 +1,7 @@
-# Set up Velero on your platform
+---
+title: "Set up Velero on your platform"
+layout: docs
+---
 
 You can run Velero with a cloud provider or on-premises. For detailed information about the platforms that Velero supports, see [Compatible Storage Providers][99].
 

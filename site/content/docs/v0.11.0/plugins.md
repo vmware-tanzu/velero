@@ -1,4 +1,7 @@
-# Plugins
+---
+title: "Plugins"
+layout: docs
+---
 
 Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups & restores 
 without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary 

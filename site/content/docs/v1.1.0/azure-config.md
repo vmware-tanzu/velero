@@ -1,4 +1,7 @@
-# Run Velero on Azure
+---
+title: "Run Velero on Azure"
+layout: docs
+---
 
 To configure Velero on Azure, you:
 

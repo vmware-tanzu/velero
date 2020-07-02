@@ -1,4 +1,7 @@
-# Build from source
+---
+title: "Build from source"
+layout: docs
+---
 
 * [Prerequisites][1]
 * [Getting the source][2]

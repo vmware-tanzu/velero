@@ -1,4 +1,7 @@
-# Use Cases
+---
+title: "Use Cases"
+layout: docs
+---
 
 This doc provides sample Ark commands for the following common scenarios:
 * [Disaster recovery][0]
