@@ -256,6 +256,8 @@ A list of Velero-specific terms and words to be used consistently across the sit
 <tr><td>On-premises</td><td>On-premises or on-prem rather than on-premise or other variations.</td></tr>
 <tr><td>Backup</td><td>Backup rather than back up, back-up or other variations.</td></tr>
 <tr><td>Plugin</td><td>Plugin rather than plug-in or other variations.</td></tr>
+<tr><td>Allowlist</td><td>Use allowlist instead of whitelist.</td></tr>
+<tr><td>Denylist</td><td>Use denylist instead of blacklist.</td></tr>
 </table>
 
 ## Markdown elements
