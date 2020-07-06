@@ -60,15 +60,16 @@ func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageL
 	// If the bsl validation frequency is not specifically set, skip this block and continue, using the server's default
 	if location.Spec.ValidationFrequency != nil {
 		validationFrequency = location.Spec.ValidationFrequency.Duration
-		if validationFrequency == 0 {
-			log.Debug("Validation period for this backup location is set to 0, skipping validation")
-			return false
-		}
+	}
 
-		if validationFrequency < 0 {
-			log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, p.DefaultStoreValidationFrequency)
-			validationFrequency = p.DefaultStoreValidationFrequency
-		}
+	if validationFrequency == 0 {
+		log.Debug("Validation period for this backup location is set to 0, skipping validation")
+		return false
+	}
+
+	if validationFrequency < 0 {
+		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, p.DefaultStoreValidationFrequency)
+		validationFrequency = p.DefaultStoreValidationFrequency
 	}
 
 	lastValidation := location.Status.LastValidationTime
@@ -83,7 +84,7 @@ func (p *StorageLocation) IsReadyToValidate(location *velerov1api.BackupStorageL
 }
 
 // IsValidFor verifies if a storage is valid for a given backup storage location.
-func (p *StorageLocation) IsValidFor(location *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
+func (p *StorageLocation) IsValid(location *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
 	pluginManager := p.NewPluginManager(log)
 	defer pluginManager.CleanupClients()
 
@@ -99,8 +100,8 @@ func (p *StorageLocation) IsValidFor(location *velerov1api.BackupStorageLocation
 	return nil
 }
 
-// UpdatePhase patches the status.phase field as well as the status.lastValidationTime to the current time
-func (p *StorageLocation) UpdatePhase(location *velerov1api.BackupStorageLocation, phase velerov1api.BackupStorageLocationPhase) error {
+// PatchStatus patches the status.phase field as well as the status.lastValidationTime to the current time
+func (p *StorageLocation) PatchStatus(location *velerov1api.BackupStorageLocation, phase velerov1api.BackupStorageLocationPhase) error {
 	statusPatch := client.MergeFrom(location.DeepCopyObject())
 	location.Status.Phase = phase
 	location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
@@ -111,11 +112,11 @@ func (p *StorageLocation) UpdatePhase(location *velerov1api.BackupStorageLocatio
 	return nil
 }
 
-// BackupStorageLocationsExist verifies if there are any backup storage locations.
+// ListBackupStorageLocations verifies if there are any backup storage locations.
 // For all purposes, if either there is an error while attempting to fetch items or
 // if there are no items an error would be returned since the functioning of the system
 // would be haulted.
-func BackupStorageLocationsExist(kbClient client.Client, ctx context.Context, namespace string) (velerov1api.BackupStorageLocationList, error) {
+func ListBackupStorageLocations(kbClient client.Client, ctx context.Context, namespace string) (velerov1api.BackupStorageLocationList, error) {
 	var locations velerov1api.BackupStorageLocationList
 	if err := kbClient.List(ctx, &locations, &client.ListOptions{
 		Namespace: namespace,

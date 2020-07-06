@@ -68,6 +68,12 @@ func TestIsReadyToValidate(t *testing.T) {
 			ready:                            true,
 		},
 		{
+			name:                             "don't validate when default setting is set to zero and the location setting is not set",
+			serverDefaultValidationFrequency: 0,
+			backupLocation:                   builder.ForBackupStorageLocation("ns-1", "location-2").Result(),
+			ready:                            false,
+		},
+		{
 			name:                             "don't validate when now is before the NEXT validation time (validation frequency + last validation time)",
 			serverDefaultValidationFrequency: 0,
 			backupLocation:                   builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(1 * time.Second).LastValidationTime(time.Now()).Result(),
@@ -100,7 +106,7 @@ func TestIsReadyToValidate(t *testing.T) {
 	}
 }
 
-func TestIsValidFor(t *testing.T) {
+func TestIsValid(t *testing.T) {
 	tests := []struct {
 		name           string
 		backupLocation *velerov1api.BackupStorageLocation
@@ -143,16 +149,17 @@ func TestIsValidFor(t *testing.T) {
 				},
 			}
 
+			actual := storageLocationInfo.IsValid(tt.backupLocation, velerotest.NewLogger())
 			if tt.expectError {
-				g.Expect(storageLocationInfo.IsValidFor(tt.backupLocation, velerotest.NewLogger())).NotTo(BeNil())
+				g.Expect(actual).NotTo(BeNil())
 			} else {
-				g.Expect(storageLocationInfo.IsValidFor(tt.backupLocation, velerotest.NewLogger())).To(BeNil())
+				g.Expect(actual).To(BeNil())
 			}
 		})
 	}
 }
 
-func TestUpdatePhase(t *testing.T) {
+func TestPatchStatus(t *testing.T) {
 	tests := []struct {
 		name           string
 		backupLocation *velerov1api.BackupStorageLocation
@@ -190,9 +197,9 @@ func TestUpdatePhase(t *testing.T) {
 			if tt.expectError {
 				backupLocation := builder.ForBackupStorageLocation("ns-1", "location-2").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 				// an update to a location that was never created will fail:
-				g.Expect(storageLocationInfo.UpdatePhase(backupLocation, tt.newPhase)).NotTo(BeNil())
+				g.Expect(storageLocationInfo.PatchStatus(backupLocation, tt.newPhase)).NotTo(BeNil())
 			} else {
-				g.Expect(storageLocationInfo.UpdatePhase(tt.backupLocation, tt.newPhase)).To(BeNil())
+				g.Expect(storageLocationInfo.PatchStatus(tt.backupLocation, tt.newPhase)).To(BeNil())
 
 				key := client.ObjectKey{Name: tt.backupLocation.Name, Namespace: tt.backupLocation.Namespace}
 				instance := &velerov1api.BackupStorageLocation{}
@@ -204,7 +211,7 @@ func TestUpdatePhase(t *testing.T) {
 	}
 }
 
-func TestBackupStorageLocationsExist(t *testing.T) {
+func TestListBackupStorageLocations(t *testing.T) {
 	tests := []struct {
 		name            string
 		backupLocations *velerov1api.BackupStorageLocationList
@@ -243,10 +250,10 @@ func TestBackupStorageLocationsExist(t *testing.T) {
 
 			client := fake.NewFakeClientWithScheme(scheme.Scheme, tt.backupLocations)
 			if tt.expectError {
-				_, err := BackupStorageLocationsExist(client, context.Background(), "ns-1")
+				_, err := ListBackupStorageLocations(client, context.Background(), "ns-1")
 				g.Expect(err).NotTo(BeNil())
 			} else {
-				_, err := BackupStorageLocationsExist(client, context.Background(), "ns-1")
+				_, err := ListBackupStorageLocations(client, context.Background(), "ns-1")
 				g.Expect(err).To(BeNil())
 			}
 		})

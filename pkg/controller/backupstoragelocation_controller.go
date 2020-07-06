@@ -45,7 +45,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 	log.Info("Checking for existing backup locations ready to be verified; there needs to be at least 1 backup location available")
 
-	locationList, err := velero.BackupStorageLocationsExist(r.StorageLocation.Client, r.StorageLocation.Ctx, req.Namespace)
+	locationList, err := velero.ListBackupStorageLocations(r.StorageLocation.Client, r.StorageLocation.Ctx, req.Namespace)
 	if err != nil {
 		log.WithError(err).Error("No backup storage locations found, at least one is required")
 	}
@@ -56,24 +56,24 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 	var defaultFound bool
 	var unavailableErrors []string
-	var someVerified bool
-	for _, location := range locationList.Items {
+	var anyVerified bool
+	for i := range locationList.Items {
+		location := &locationList.Items[i]
 		log := r.Log.WithField("controller", "backupstoragelocation").WithField("backupstoragelocation", location.Name)
 
 		if location.Name == r.StorageLocation.DefaultStorageLocation {
 			defaultFound = true
 		}
 
-		ready := r.StorageLocation.IsReadyToValidate(&location, log)
-
-		if !ready {
+		if !r.StorageLocation.IsReadyToValidate(location, log) {
 			continue
 		}
-		someVerified = true
 
-		log.Debug("Backup location ready to be verified")
+		anyVerified = true
 
-		if err := r.StorageLocation.IsValidFor(&location, log); err != nil {
+		log.Debug("Verifying backup storage location")
+
+		if err := r.StorageLocation.IsValid(location, log); err != nil {
 			log.Debug("Backup location verified, not valid")
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
 
@@ -81,20 +81,20 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", r.StorageLocation.DefaultStorageLocation)
 			}
 
-			if err2 := r.StorageLocation.UpdatePhase(&location, velerov1api.BackupStorageLocationPhaseUnavailable); err2 != nil {
+			if err2 := r.StorageLocation.PatchStatus(location, velerov1api.BackupStorageLocationPhaseUnavailable); err2 != nil {
 				log.WithError(err).Errorf("Error updating backup location phase to %s", velerov1api.BackupStorageLocationPhaseUnavailable)
 				continue
 			}
 		} else {
 			log.Debug("Backup location verified and it is valid")
-			if err := r.StorageLocation.UpdatePhase(&location, velerov1api.BackupStorageLocationPhaseAvailable); err != nil {
+			if err := r.StorageLocation.PatchStatus(location, velerov1api.BackupStorageLocationPhaseAvailable); err != nil {
 				log.WithError(err).Errorf("Error updating backup location phase to %s", velerov1api.BackupStorageLocationPhaseAvailable)
 				continue
 			}
 		}
 	}
 
-	if !someVerified {
+	if !anyVerified {
 		log.Info("No backup locations were ready to be verified")
 	}
 
@@ -121,18 +121,18 @@ func (r *BackupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 		}
 	}
 
+	numAvailable := len(availableBSLs)
 	numUnavailable := len(unAvailableBSLs)
 	numUnknown := len(unknownBSLs)
-	total := numUnavailable + numUnknown + len(availableBSLs)
 
-	if numUnavailable+numUnknown == len(locationList.Items) { // no available BSL, all are unavailable
+	if numUnavailable+numUnknown == len(locationList.Items) { // no available BSL
 		if len(errs) > 0 {
-			log.Errorf("Amongst the backup locations that were ready to be verified, none were valid (total: %v - unavailable: %v, unknown: %v); at least one valid location is required: %v", total, numUnavailable, numUnknown, strings.Join(errs, "; "))
+			log.Errorf("Current backup storage locations available/unavailable/unknown: %v/%v/%v, %s)", numAvailable, numUnavailable, numUnknown, strings.Join(errs, "; "))
 		} else {
-			log.Errorf("Amongst the backup locations that were ready to be verified, none were valid (total: %v - unavailable: %v, unknown: %v); at least one valid location is required", total, numUnavailable, numUnknown)
+			log.Errorf("Current backup storage locations available/unavailable/unknown: %v/%v/%v)", numAvailable, numUnavailable, numUnknown)
 		}
 	} else if numUnavailable > 0 { // some but not all BSL unavailable
-		log.Warnf("Invalid backup locations detected: (total: %v - unavailable: %v, unknown: %v); at least one valid location is required: %v", total, numUnavailable, numUnknown, strings.Join(errs, "; "))
+		log.Warnf("Invalid backup locations detected: available/unavailable/unknown: %v/%v/%v, %s)", numAvailable, numUnavailable, numUnknown, strings.Join(errs, "; "))
 	}
 
 	if !defaultFound {
