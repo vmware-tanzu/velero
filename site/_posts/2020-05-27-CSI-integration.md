@@ -27,17 +27,17 @@ As the [Kubernetes CSI Snapshot Beta API](https://kubernetes.io/docs/concepts/st
 
 This post uses an AKS cluster running Kubernetes `1.17`, with Azure disk CSI driver as an example.
 
-Following instructions to install the Azure disk CSI driver from [here](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/main/docs/install-csi-driver-main.md) run the below command
+Following instructions to install the Azure disk CSI driver from [here](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/install-csi-driver-master.md) run the below command
 
 ```bash 
-curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/main/deploy/install-driver.sh | bash -s main snapshot -- 
+curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/master/deploy/install-driver.sh | bash -s master snapshot -- 
 ```
 
 This script will deploy the following CSI components, CRDs, and necessary RBAC:
 
-- [`deployment.apps/csi-azuredisk-controller`](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/main/deploy/csi-azuredisk-controller.yaml)
-- [`daemonset.apps/csi-azuredisk-node`](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/main/deploy/csi-azuredisk-node.yaml)
-- [`deployment.apps/csi-snapshot-controller`](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/main/deploy/csi-snapshot-controller.yaml)
+- [`deployment.apps/csi-azuredisk-controller`](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/csi-azuredisk-controller.yaml)
+- [`daemonset.apps/csi-azuredisk-node`](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/csi-azuredisk-node.yaml)
+- [`deployment.apps/csi-snapshot-controller`](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/csi-snapshot-controller.yaml)
 
 ## Install Velero with CSI support enabled
 
@@ -85,7 +85,7 @@ parameters:
   tags: 'foo=aaa,bar=bbb' 
 ```
 
-NOTE: The above `yaml` was sourced from [StorageClass](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/main/deploy/example/storageclass-azuredisk-csi.yaml) and [VolumeSnapshotClass](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/main/deploy/example/snapshot/storageclass-azuredisk-snapshot.yaml).
+NOTE: The above `yaml` was sourced from [StorageClass](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/example/storageclass-azuredisk-csi.yaml) and [VolumeSnapshotClass](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/deploy/example/snapshot/storageclass-azuredisk-snapshot.yaml).
 
 
 Deploy the stateful application that is using CSI backed PVCs, in the `csi-app` namespace by applying the below yaml.
