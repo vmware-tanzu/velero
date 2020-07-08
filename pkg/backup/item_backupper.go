@@ -264,7 +264,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			Name:     filePath,
 			Size:     int64(len(itemBytes)),
 			Typeflag: tar.TypeReg,
-			Mode:     0755,
+			Mode:     0644,
 			ModTime:  time.Now(),
 		}
 
