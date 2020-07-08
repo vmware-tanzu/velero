@@ -49,8 +49,8 @@ var (
 	DefaultVeleroPodMemLimit   = "256Mi"
 	DefaultResticPodCPURequest = "500m"
 	DefaultResticPodMemRequest = "512Mi"
-	DefaultResticPodCPULimit   = "100Mi"
-	DefaultResticPodMemLimit   = "1024Mi"
+	DefaultResticPodCPULimit   = "1000m"
+	DefaultResticPodMemLimit   = "1Gi"
 )
 
 func labels() map[string]string {
