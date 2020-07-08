@@ -44,11 +44,11 @@ if [[ -z "$GITHUB_TOKEN" ]]; then
     exit 1
 fi
 
-# Ensure that we have a clean working tree before we let any changes happen, especially important for cutting release branches.
-#if [[ -n $(git status --short) ]]; then 
-#    echo "Your git working directory is dirty! Please clean up untracked files and stash any changes before proceeding."
-#    exit 3
-#fi
+ Ensure that we have a clean working tree before we let any changes happen, especially important for cutting release branches.
+if [[ -n $(git status --short) ]]; then 
+    echo "Your git working directory is dirty! Please clean up untracked files and stash any changes before proceeding."
+    exit 3
+fi
 
 # Make sure that there's no issue with the environment variable's format before trying to eval the parsed version.
 if ! go run $DIR/chk_version.go --verify;  then
