@@ -14,7 +14,7 @@
 
 FROM ubuntu:focal
 
-LABEL maintainer="Steve Kriss <krisss@vmware.com>"
+LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates wget bzip2 && \

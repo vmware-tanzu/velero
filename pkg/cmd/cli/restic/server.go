@@ -20,18 +20,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
+
+	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -43,6 +48,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+)
+
+var (
+	scheme = runtime.NewScheme()
 )
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -86,6 +98,7 @@ type resticServer struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	fileSystem            filesystem.Interface
+	mgr                   manager.Manager
 }
 
 func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*resticServer, error) {
@@ -130,6 +143,20 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
+	clientConfig, err := factory.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	velerov1api.AddToScheme(scheme)
+	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	s := &resticServer{
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,
@@ -141,6 +168,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		fileSystem:            filesystem.NewFileSystem(),
+		mgr:                   mgr,
 	}
 
 	if err := s.validatePodVolumesHostPath(); err != nil {
@@ -155,8 +183,6 @@ func (s *resticServer) run() {
 
 	s.logger.Info("Starting controllers")
 
-	var wg sync.WaitGroup
-
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,
 		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
@@ -165,14 +191,9 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		backupController.Run(s.ctx, 1)
-	}()
 
 	restoreController := controller.NewPodVolumeRestoreController(
 		s.logger,
@@ -182,26 +203,30 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		restoreController.Run(s.ctx, 1)
-	}()
 
 	go s.veleroInformerFactory.Start(s.ctx.Done())
 	go s.kubeInformerFactory.Start(s.ctx.Done())
 	go s.podInformer.Run(s.ctx.Done())
 	go s.secretInformer.Run(s.ctx.Done())
 
-	s.logger.Info("Controllers started successfully")
+	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
+	// by v2.0, the block from this line and including the `s.mgr.Start() will be
+	// deprecated, since the manager auto-starts all the caches. Until then, we need to start the
+	// cache for them manually.
 
-	<-s.ctx.Done()
+	// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
+	// so the manager will ensure the cache is started and ready before all controller are started
+	s.mgr.Add(managercontroller.Runnable(backupController, 1))
+	s.mgr.Add(managercontroller.Runnable(restoreController, 1))
 
-	s.logger.Info("Waiting for all controllers to shut down gracefully")
-	wg.Wait()
+	s.logger.Info("Controllers starting...")
+
+	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		s.logger.Fatal("Problem starting manager", err)
+	}
 }
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a

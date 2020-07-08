@@ -45,7 +45,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 | 2                  | Hour             | 0-23,*            |
 | 3                  | Day of Month     | 1-31,*            |
 | 4                  | Month            | 1-12,*            |
-| 5                  | Day of Week      | 0-7,*             |
+| 5                  | Day of Week      | 0-6,*             |
 
 The schedule can also be expressed using "@every <duration>" syntax. The duration
 can be specified using a combination of seconds (s), minutes (m), and hours (h), for

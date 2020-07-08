@@ -1,0 +1,22 @@
+name: build-image
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+    - 'hack/build-image/Dockerfile'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Build
+      run: make build-image
+
+    - name: Publish container image
+      run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+       
+        make push-build-image

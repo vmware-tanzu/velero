@@ -29,6 +29,8 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -79,20 +81,19 @@ type RestorerFactory interface {
 }
 
 type repositoryManager struct {
-	namespace                    string
-	veleroClient                 clientset.Interface
-	secretsLister                corev1listers.SecretLister
-	repoLister                   velerov1listers.ResticRepositoryLister
-	repoInformerSynced           cache.InformerSynced
-	backupLocationLister         velerov1listers.BackupStorageLocationLister
-	backupLocationInformerSynced cache.InformerSynced
-	log                          logrus.FieldLogger
-	repoLocker                   *repoLocker
-	repoEnsurer                  *repositoryEnsurer
-	fileSystem                   filesystem.Interface
-	ctx                          context.Context
-	pvcClient                    corev1client.PersistentVolumeClaimsGetter
-	pvClient                     corev1client.PersistentVolumesGetter
+	namespace          string
+	veleroClient       clientset.Interface
+	secretsLister      corev1listers.SecretLister
+	repoLister         velerov1listers.ResticRepositoryLister
+	repoInformerSynced cache.InformerSynced
+	kbClient           kbclient.Client
+	log                logrus.FieldLogger
+	repoLocker         *repoLocker
+	repoEnsurer        *repositoryEnsurer
+	fileSystem         filesystem.Interface
+	ctx                context.Context
+	pvcClient          corev1client.PersistentVolumeClaimsGetter
+	pvClient           corev1client.PersistentVolumesGetter
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -103,23 +104,22 @@ func NewRepositoryManager(
 	secretsInformer cache.SharedIndexInformer,
 	repoInformer velerov1informers.ResticRepositoryInformer,
 	repoClient velerov1client.ResticRepositoriesGetter,
-	backupLocationInformer velerov1informers.BackupStorageLocationInformer,
+	kbClient kbclient.Client,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
-		namespace:                    namespace,
-		veleroClient:                 veleroClient,
-		secretsLister:                corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
-		repoLister:                   repoInformer.Lister(),
-		repoInformerSynced:           repoInformer.Informer().HasSynced,
-		backupLocationLister:         backupLocationInformer.Lister(),
-		backupLocationInformerSynced: backupLocationInformer.Informer().HasSynced,
-		pvcClient:                    pvcClient,
-		pvClient:                     pvClient,
-		log:                          log,
-		ctx:                          ctx,
+		namespace:          namespace,
+		veleroClient:       veleroClient,
+		secretsLister:      corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
+		repoLister:         repoInformer.Lister(),
+		repoInformerSynced: repoInformer.Informer().HasSynced,
+		kbClient:           kbClient,
+		pvcClient:          pvcClient,
+		pvClient:           pvClient,
+		log:                log,
+		ctx:                ctx,
 
 		repoLocker:  newRepoLocker(),
 		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
@@ -245,10 +245,11 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.PasswordFile = file
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := GetCACert(rm.backupLocationLister, rm.namespace, backupLocation)
+	caCert, err := GetCACert(rm.kbClient, rm.namespace, backupLocation)
 	if err != nil {
 		return err
 	}
+
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = TempCACertFile(caCert, backupLocation, rm.fileSystem)
@@ -261,21 +262,13 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.CACertFile = caCertFile
 
 	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
-		if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
-			return errors.New("timed out waiting for cache to sync")
-		}
-
-		env, err := AzureCmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
+		env, err := AzureCmdEnv(rm.kbClient, rm.namespace, backupLocation)
 		if err != nil {
 			return err
 		}
 		cmd.Env = env
 	} else if strings.HasPrefix(cmd.RepoIdentifier, "s3") {
-		if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
-			return errors.New("timed out waiting for cache to sync")
-		}
-
-		env, err := S3CmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
+		env, err := S3CmdEnv(rm.kbClient, rm.namespace, backupLocation)
 		if err != nil {
 			return err
 		}

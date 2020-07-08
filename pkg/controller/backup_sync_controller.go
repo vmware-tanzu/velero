@@ -17,15 +17,15 @@ limitations under the License.
 package controller
 
 import (
-	"encoding/json"
+	"context"
 	"time"
 
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
@@ -36,31 +36,31 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupSyncController struct {
 	*genericController
 
-	backupClient                velerov1client.BackupsGetter
-	backupLocationClient        velerov1client.BackupStorageLocationsGetter
-	podVolumeBackupClient       velerov1client.PodVolumeBackupsGetter
-	backupLister                velerov1listers.BackupLister
-	csiSnapshotClient           *snapshotterClientSet.Clientset
-	kubeClient                  kubernetes.Interface
-	backupStorageLocationLister velerov1listers.BackupStorageLocationLister
-	namespace                   string
-	defaultBackupLocation       string
-	defaultBackupSyncPeriod     time.Duration
-	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	backupClient            velerov1client.BackupsGetter
+	kbClient                client.Client
+	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
+	backupLister            velerov1listers.BackupLister
+	csiSnapshotClient       *snapshotterClientSet.Clientset
+	kubeClient              kubernetes.Interface
+	namespace               string
+	defaultBackupLocation   string
+	defaultBackupSyncPeriod time.Duration
+	newPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
+	newBackupStore          func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
-	backupLocationClient velerov1client.BackupStorageLocationsGetter,
+	kbClient client.Client,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	backupLister velerov1listers.BackupLister,
-	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	syncPeriod time.Duration,
 	namespace string,
 	csiSnapshotClient *snapshotterClientSet.Clientset,
@@ -75,17 +75,16 @@ func NewBackupSyncController(
 	logger.Infof("Backup sync period is %v", syncPeriod)
 
 	c := &backupSyncController{
-		genericController:           newGenericController("backup-sync", logger),
-		backupClient:                backupClient,
-		backupLocationClient:        backupLocationClient,
-		podVolumeBackupClient:       podVolumeBackupClient,
-		namespace:                   namespace,
-		defaultBackupLocation:       defaultBackupLocation,
-		defaultBackupSyncPeriod:     syncPeriod,
-		backupLister:                backupLister,
-		backupStorageLocationLister: backupStorageLocationLister,
-		csiSnapshotClient:           csiSnapshotClient,
-		kubeClient:                  kubeClient,
+		genericController:       newGenericController("backup-sync", logger),
+		backupClient:            backupClient,
+		kbClient:                kbClient,
+		podVolumeBackupClient:   podVolumeBackupClient,
+		namespace:               namespace,
+		defaultBackupLocation:   defaultBackupLocation,
+		defaultBackupSyncPeriod: syncPeriod,
+		backupLister:            backupLister,
+		csiSnapshotClient:       csiSnapshotClient,
+		kubeClient:              kubeClient,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -101,35 +100,38 @@ func NewBackupSyncController(
 
 // orderedBackupLocations returns a new slice with the default backup location first (if it exists),
 // followed by the rest of the locations in no particular order.
-func orderedBackupLocations(locations []*velerov1api.BackupStorageLocation, defaultLocationName string) []*velerov1api.BackupStorageLocation {
-	var result []*velerov1api.BackupStorageLocation
+func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList, defaultLocationName string) []velerov1api.BackupStorageLocation {
+	var result []velerov1api.BackupStorageLocation
 
-	for i := range locations {
-		if locations[i].Name == defaultLocationName {
+	for i := range locationList.Items {
+		if locationList.Items[i].Name == defaultLocationName {
 			// put the default location first
-			result = append(result, locations[i])
+			result = append(result, locationList.Items[i])
 			// append everything before the default
-			result = append(result, locations[:i]...)
+			result = append(result, locationList.Items[:i]...)
 			// append everything after the default
-			result = append(result, locations[i+1:]...)
+			result = append(result, locationList.Items[i+1:]...)
 
 			return result
 		}
 	}
 
-	return locations
+	return locationList.Items
 }
 
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
-	locations, err := c.backupStorageLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
-	if err != nil {
+	locationList := &velerov1api.BackupStorageLocationList{}
+	if err := c.kbClient.List(context.Background(), locationList, &client.ListOptions{
+		Namespace: c.namespace,
+	}); err != nil {
 		c.logger.WithError(errors.WithStack(err)).Error("Error getting backup storage locations from lister")
 		return
 	}
+
 	// sync the default location first, if it exists
-	locations = orderedBackupLocations(locations, c.defaultBackupLocation)
+	locations := orderedBackupLocations(locationList, c.defaultBackupLocation)
 
 	pluginManager := c.newPluginManager(c.logger)
 	defer pluginManager.CleanupClients()
@@ -162,7 +164,7 @@ func (c *backupSyncController) run() {
 
 		log.Debug("Checking backup location for backups to sync into cluster")
 
-		backupStore, err := c.newBackupStore(location, pluginManager, log)
+		backupStore, err := c.newBackupStore(&location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting backup store for this location")
 			continue
@@ -304,23 +306,9 @@ func (c *backupSyncController) run() {
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
 		// update the location's last-synced time field
-		patch := map[string]interface{}{
-			"status": map[string]interface{}{
-				"lastSyncedTime": time.Now().UTC(),
-			},
-		}
-
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("Error marshaling last-synced patch to JSON")
-			continue
-		}
-
-		if _, err = c.backupLocationClient.BackupStorageLocations(c.namespace).Patch(
-			location.Name,
-			types.MergePatchType,
-			patchBytes,
-		); err != nil {
+		statusPatch := client.MergeFrom(location.DeepCopyObject())
+		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
+		if err := c.kbClient.Status().Patch(context.Background(), &location, statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}

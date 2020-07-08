@@ -1,5 +1,5 @@
 /*
-Copyright 2019,2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ type InstallOptions struct {
 	CRDsOnly                          bool
 	CACertFile                        string
 	Features                          string
+	DefaultVolumesToRestic            bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -103,6 +104,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "file containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.StringVar(&o.Features, "features", o.Features, "comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
+	flags.BoolVar(&o.DefaultVolumesToRestic, "default-volumes-to-restic", o.DefaultVolumesToRestic, "bool flag to configure Velero server to use restic by default to backup all pod volumes on all backups. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -126,6 +128,7 @@ func NewInstallOptions() *InstallOptions {
 		UseVolumeSnapshots:      true,
 		NoDefaultBackupLocation: false,
 		CRDsOnly:                false,
+		DefaultVolumesToRestic:  false,
 	}
 }
 
@@ -183,6 +186,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		NoDefaultBackupLocation:           o.NoDefaultBackupLocation,
 		CACertData:                        caCertData,
 		Features:                          strings.Split(o.Features, ","),
+		DefaultVolumesToRestic:            o.DefaultVolumesToRestic,
 	}, nil
 }
 
@@ -372,6 +376,10 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		if len(o.Plugins) == 0 {
 			return errors.New("--plugins flag is required")
 		}
+	}
+
+	if o.DefaultVolumesToRestic && !o.UseRestic {
+		return errors.New("--use-restic is required when using --default-volumes-to-restic")
 	}
 
 	switch {

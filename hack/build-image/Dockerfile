@@ -45,3 +45,6 @@ RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v0.1
     tar xvf goreleaser_Linux_x86_64.tar.gz && \
     mv goreleaser /usr/bin/goreleaser && \
     chmod +x /usr/bin/goreleaser
+
+# get golangci-lint
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.27.0

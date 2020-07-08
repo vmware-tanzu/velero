@@ -5,6 +5,7 @@
   - [Install in any namespace](#install-in-any-namespace)
   - [Use non-file-based identity mechanisms](#use-non-file-based-identity-mechanisms)
   - [Enable restic integration](#enable-restic-integration)
+  - [Enable default use of restic to backup pod volumes](#default-pod-volume-backup-to-restic)
   - [Enable features](#enable-features)
     - [Enable server side features](#enable-server-side-features)
     - [Enable client side features](#enable-client-side-features)
@@ -44,6 +45,14 @@ If you are using an alternate identity mechanism, such as kube2iam/kiam on AWS, 
 By default, `velero install` does not install Velero's [restic integration][3]. To enable it, specify the `--use-restic` flag.
 
 If you've already run `velero install` without the `--use-restic` flag, you can run the same command again, including the `--use-restic` flag, to add the restic integration to your existing install.
+
+## Default Pod Volume backup to restic
+
+By default, `velero install` does not enable use of restic to take backups of all pod volumes. An annotation has to be applied on every pod which contains volumes to be backed up by restic.
+
+To backup all pod volumes using restic without having to apply annotation on the pod, run the `velero install` command with the `--default-volumes-to-restic` flag.
+
+Using this flag requires restic integration to be enabled with the `--use-restic` flag. Please refer to the [restic integration][3] page for more information.
 
 ## Enable features
 

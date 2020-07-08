@@ -43,6 +43,8 @@ toc:
         url: /csi
       - page: Verifying Self-signed Certificates
         url: /self-signed-certificates
+      - page: Changing RBAC permissions
+        url: /rbac
   - title: Plugins
     subfolderitems:
       - page: Overview
@@ -73,6 +75,8 @@ toc:
         url: /code-standards
       - page: Website guidelines
         url: /website-guidelines
+      - page: Documentation style guide
+        url: /style-guide
   - title: More information
     subfolderitems:
       - page: Backup file format

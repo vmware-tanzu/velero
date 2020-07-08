@@ -5,6 +5,7 @@
   - [Install the CLI](#install-the-cli)
     - [Option 1: macOS - Homebrew](#option-1-macos---homebrew)
     - [Option 2: GitHub release](#option-2-github-release)
+    - [Option 3: Windows - Chocolatey](#option-3-windows---chocolatey)
   - [Install and configure the server components](#install-and-configure-the-server-components)
   - [Command line Autocompletion](#command-line-autocompletion)
 
@@ -40,6 +41,14 @@ brew install velero
    ```
 
 1. Move the extracted `velero` binary to somewhere in your `$PATH` (e.g. `/usr/local/bin` for most users).
+
+### Option 3: Windows - Chocolatey
+
+On Windows, you can use [Chocolatey](https://chocolatey.org/install) to install the [velero](https://chocolatey.org/packages/velero) client:
+
+```powershell
+choco install velero
+```
 
 ## Install and configure the server components
 

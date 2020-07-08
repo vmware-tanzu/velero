@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			// Get the list of volumes to back up using restic from the pod's annotations. Remove from this list
 			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			for _, volume := range restic.GetVolumesToBackup(pod) {
+			for _, volume := range restic.GetPodVolumesUsingRestic(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToRestic)) {
 				if found, pvcName := ib.resticSnapshotTracker.HasPVCForPodVolume(pod, volume); found {
 					log.WithFields(map[string]interface{}{
 						"podVolume": volume,
@@ -159,6 +159,12 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			ib.resticSnapshotTracker.Track(pod, resticVolumesToBackup)
 		}
 	}
+
+	// capture the version of the object before invoking plugin actions as the plugin may update
+	// the group version of the object.
+	// group version of this object
+	// Used on filepath to backup up all groups and versions
+	version := resourceVersion(obj)
 
 	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
 	if err != nil {
@@ -204,10 +210,6 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		return false, kubeerrs.NewAggregate(backupErrs)
 	}
 
-	// group version of this object
-	// Used on filepath to backup up all groups and versions
-	version := resourceVersion(obj)
-
 	// Getting the preferred group version of this resource
 	preferredVersion := preferredGVR.Version
 
@@ -250,6 +252,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 
 	// backing up the preferred version backup without API Group version on path -  this is for backward compability
 
+	log.Debugf("Resource %s/%s, version= %s, preferredVersion=%s", groupResource.String(), name, version, preferredVersion)
 	if version == preferredVersion {
 		if namespace != "" {
 			filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), velerov1api.NamespaceScopedDir, namespace, name+".json")
@@ -261,7 +264,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			Name:     filePath,
 			Size:     int64(len(itemBytes)),
 			Typeflag: tar.TypeReg,
-			Mode:     0755,
+			Mode:     0644,
 			ModTime:  time.Now(),
 		}
 
@@ -272,7 +275,6 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		if _, err := ib.tarWriter.Write(itemBytes); err != nil {
 			return false, errors.WithStack(err)
 		}
-
 	}
 
 	return true, nil

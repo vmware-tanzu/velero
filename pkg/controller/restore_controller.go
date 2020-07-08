@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,6 +49,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
@@ -80,7 +83,7 @@ type restoreController struct {
 	restorer               pkgrestore.Restorer
 	backupLister           velerov1listers.BackupLister
 	restoreLister          velerov1listers.RestoreLister
-	backupLocationLister   velerov1listers.BackupStorageLocationLister
+	kbClient               client.Client
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister
 	restoreLogLevel        logrus.Level
 	defaultBackupLocation  string
@@ -88,7 +91,7 @@ type restoreController struct {
 	logFormat              logging.Format
 
 	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewRestoreController(
@@ -98,7 +101,7 @@ func NewRestoreController(
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	restorer pkgrestore.Restorer,
 	backupLister velerov1listers.BackupLister,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbClient client.Client,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
@@ -115,7 +118,7 @@ func NewRestoreController(
 		restorer:               restorer,
 		backupLister:           backupLister,
 		restoreLister:          restoreInformer.Lister(),
-		backupLocationLister:   backupLocationLister,
+		kbClient:               kbClient,
 		snapshotLocationLister: snapshotLocationLister,
 		restoreLogLevel:        restoreLogLevel,
 		defaultBackupLocation:  defaultBackupLocation,
@@ -274,7 +277,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 
 type backupInfo struct {
 	backup      *api.Backup
-	location    *api.BackupStorageLocation
+	location    *velerov1api.BackupStorageLocation
 	backupStore persistence.BackupStore
 }
 
@@ -396,8 +399,11 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 		return backupInfo{}, err
 	}
 
-	location, err := c.backupLocationLister.BackupStorageLocations(c.namespace).Get(backup.Spec.StorageLocation)
-	if err != nil {
+	location := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: c.namespace,
+		Name:      backup.Spec.StorageLocation,
+	}, location); err != nil {
 		return backupInfo{}, errors.WithStack(err)
 	}
 

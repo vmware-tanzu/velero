@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ type podTemplateConfig struct {
 	defaultResticMaintenanceFrequency time.Duration
 	plugins                           []string
 	features                          []string
+	defaultVolumesToRestic            bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -107,6 +108,12 @@ func WithFeatures(features []string) podTemplateOption {
 	}
 }
 
+func WithDefaultVolumesToRestic() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.defaultVolumesToRestic = true
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
@@ -127,6 +134,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 	args := []string{"server"}
 	if len(c.features) > 0 {
 		args = append(args, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
+	}
+
+	if c.defaultVolumesToRestic {
+		args = append(args, "--default-volumes-to-restic=true")
 	}
 
 	containerLabels := labels()

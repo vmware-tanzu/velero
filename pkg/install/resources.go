@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package install
 import (
 	"time"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,9 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/config/crd/crds"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/generated/crds"
 )
 
 // Use "latest" if the build process didn't supply a version
@@ -137,17 +138,17 @@ func Namespace(namespace string) *corev1.Namespace {
 	}
 }
 
-func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *v1.BackupStorageLocation {
-	return &v1.BackupStorageLocation{
+func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *velerov1api.BackupStorageLocation {
+	return &velerov1api.BackupStorageLocation{
 		ObjectMeta: objectMeta(namespace, "default"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "BackupStorageLocation",
-			APIVersion: v1.SchemeGroupVersion.String(),
+			APIVersion: velerov1api.SchemeGroupVersion.String(),
 		},
-		Spec: v1.BackupStorageLocationSpec{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: provider,
-			StorageType: v1.StorageType{
-				ObjectStorage: &v1.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: bucket,
 					Prefix: prefix,
 					CACert: caCert,
@@ -158,14 +159,14 @@ func BackupStorageLocation(namespace, provider, bucket, prefix string, config ma
 	}
 }
 
-func VolumeSnapshotLocation(namespace, provider string, config map[string]string) *v1.VolumeSnapshotLocation {
-	return &v1.VolumeSnapshotLocation{
+func VolumeSnapshotLocation(namespace, provider string, config map[string]string) *velerov1api.VolumeSnapshotLocation {
+	return &velerov1api.VolumeSnapshotLocation{
 		ObjectMeta: objectMeta(namespace, "default"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "VolumeSnapshotLocation",
-			APIVersion: v1.SchemeGroupVersion.String(),
+			APIVersion: velerov1api.SchemeGroupVersion.String(),
 		},
-		Spec: v1.VolumeSnapshotLocationSpec{
+		Spec: velerov1api.VolumeSnapshotLocationSpec{
 			Provider: provider,
 			Config:   config,
 		},
@@ -220,6 +221,7 @@ type VeleroOptions struct {
 	NoDefaultBackupLocation           bool
 	CACertData                        []byte
 	Features                          []string
+	DefaultVolumesToRestic            bool
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -285,6 +287,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	if len(o.Plugins) > 0 {
 		deployOpts = append(deployOpts, WithPlugins(o.Plugins))
+	}
+
+	if o.DefaultVolumesToRestic {
+		deployOpts = append(deployOpts, WithDefaultVolumesToRestic())
 	}
 
 	deploy := Deployment(o.Namespace, deployOpts...)

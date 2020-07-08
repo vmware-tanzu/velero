@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -332,6 +333,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				pluginManager   = &pluginmocks.Manager{}
 				backupStores    = make(map[string]*persistencemocks.BackupStore)
@@ -339,10 +341,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 			c := NewBackupSyncController(
 				client.VeleroV1(),
-				client.VeleroV1(),
+				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -360,7 +361,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			pluginManager.On("CleanupClients").Return(nil)
 
 			for _, location := range test.locations {
-				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+				require.NoError(t, fakeClient.Create(context.Background(), location))
 				backupStores[location.Name] = &persistencemocks.BackupStore{}
 			}
 
@@ -559,15 +560,15 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
 			c := NewBackupSyncController(
 				client.VeleroV1(),
-				client.VeleroV1(),
+				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -652,15 +653,15 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
 			c := NewBackupSyncController(
 				client.VeleroV1(),
-				client.VeleroV1(),
+				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient

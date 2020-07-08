@@ -43,8 +43,8 @@ Example:
     	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
     	corev1listers "k8s.io/client-go/listers/core/v1"
-        
-        velerov1api ""github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+       
+        velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
         velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
     )
 

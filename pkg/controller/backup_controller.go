@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -57,6 +58,8 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupController struct {
@@ -65,12 +68,13 @@ type backupController struct {
 	backupper                   pkgbackup.Backupper
 	lister                      velerov1listers.BackupLister
 	client                      velerov1client.BackupsGetter
+	kbClient                    kbclient.Client
 	clock                       clock.Clock
 	backupLogLevel              logrus.Level
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker               BackupTracker
-	backupLocationLister        velerov1listers.BackupStorageLocationLister
 	defaultBackupLocation       string
+	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
@@ -90,8 +94,9 @@ func NewBackupController(
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbClient kbclient.Client,
 	defaultBackupLocation string,
+	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
@@ -110,8 +115,9 @@ func NewBackupController(
 		backupLogLevel:              backupLogLevel,
 		newPluginManager:            newPluginManager,
 		backupTracker:               backupTracker,
-		backupLocationLister:        backupLocationLister,
+		kbClient:                    kbClient,
 		defaultBackupLocation:       defaultBackupLocation,
+		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
 		snapshotLocationLister:      volumeSnapshotLocationLister,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
@@ -339,6 +345,10 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Spec.StorageLocation = c.defaultBackupLocation
 	}
 
+	if request.Spec.DefaultVolumesToRestic == nil {
+		request.Spec.DefaultVolumesToRestic = &c.defaultVolumesToRestic
+	}
+
 	// add the storage location as a label for easy filtering later.
 	if request.Labels == nil {
 		request.Labels = make(map[string]string)
@@ -364,7 +374,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// validate the storage location, and store the BackupStorageLocation API obj on the request
-	if storageLocation, err := c.backupLocationLister.BackupStorageLocations(request.Namespace).Get(request.Spec.StorageLocation); err != nil {
+	storageLocation := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: request.Namespace,
+		Name:      request.Spec.StorageLocation,
+	}, storageLocation); err != nil {
 		if apierrors.IsNotFound(err) {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: %v", err))
 		} else {
@@ -378,7 +392,6 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
 		}
 	}
-
 	// validate and get the backup's VolumeSnapshotLocations, and store the
 	// VolumeSnapshotLocation API objs on the request
 	if locs, errs := c.validateAndGetSnapshotLocations(request.Backup); len(errs) > 0 {

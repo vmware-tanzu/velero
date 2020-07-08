@@ -44,9 +44,12 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   --output-base ../../.. \
   $@
 
+# Generate manifests e.g. CRD, RBAC etc.
 controller-gen \
-  crd:crdVersions=v1beta1,preserveUnknownFields=false \
-  output:dir=./pkg/generated/crds/manifests \
-  paths=./pkg/apis/velero/v1/...
+  crd:crdVersions=v1beta1,preserveUnknownFields=false,trivialVersions=true \
+  rbac:roleName=manager-role \
+  paths=./pkg/apis/velero/v1/... \
+  paths=./pkg/controller/... \
+  output:crd:artifacts:config=config/crd/bases
 
-go generate ./pkg/generated/crds
+go generate ./config/crd/crds

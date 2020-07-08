@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,6 +71,7 @@ type kubernetesBackupper struct {
 	podCommandExecutor     podexec.PodCommandExecutor
 	resticBackupperFactory restic.BackupperFactory
 	resticTimeout          time.Duration
+	defaultVolumesToRestic bool
 }
 
 type resolvedAction struct {
@@ -103,6 +104,7 @@ func NewKubernetesBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	resticBackupperFactory restic.BackupperFactory,
 	resticTimeout time.Duration,
+	defaultVolumesToRestic bool,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
 		backupClient:           backupClient,
@@ -111,6 +113,7 @@ func NewKubernetesBackupper(
 		podCommandExecutor:     podCommandExecutor,
 		resticBackupperFactory: resticBackupperFactory,
 		resticTimeout:          resticTimeout,
+		defaultVolumesToRestic: defaultVolumesToRestic,
 	}, nil
 }
 
@@ -239,6 +242,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	backupRequest.ResourceIncludesExcludes = getResourceIncludesExcludes(kb.discoveryHelper, backupRequest.Spec.IncludedResources, backupRequest.Spec.ExcludedResources)
 	log.Infof("Including resources: %s", backupRequest.ResourceIncludesExcludes.IncludesString())
 	log.Infof("Excluding resources: %s", backupRequest.ResourceIncludesExcludes.ExcludesString())
+	log.Infof("Backing up all pod volumes using restic: %t", *backupRequest.Backup.Spec.DefaultVolumesToRestic)
 
 	var err error
 	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)

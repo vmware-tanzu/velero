@@ -10,6 +10,7 @@ Velero supports a variety of storage providers for different backup and snapshot
 | [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             | [GCP Plugin Setup][36]        |
 | [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] | [Azure Plugin Setup][37]      |
 | [VMware vSphere][39]              | 🚫                  | vSphere Volumes              | [VMware vSphere][39]                    | [vSphere Plugin Setup][40]    |
+| [Container Storage Interface (CSI)]| 🚫                 | CSI Volumes                  | [Velero plugin for CSI][44]             | [CSI Plugin Setup][45]        |
 
 Contact: [#Velero Slack][28], [GitHub Issues][29]
 
@@ -22,6 +23,7 @@ Contact: [#Velero Slack][28], [GitHub Issues][29]
 | [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
 | [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
 | [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
+| [Storj][41]               | Storj Object Storage         | 🚫                                 | [Storj][42]            | [GitHub Issue][43]              |
 
 ## S3-Compatible object store providers
 
@@ -83,3 +85,8 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [38]: https://www.cloudian.com/
 [39]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere
 [40]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere#installing-the-plugin
+[41]: https://storj.io
+[42]: https://github.com/storj-thirdparty/velero-plugin
+[43]: https://github.com/storj-thirdparty/velero-plugin/issues
+[44]: https://github.com/vmware-tanzu/velero-plugin-for-csi/
+[45]: https://velero.io/docs/v1.4/csi/
