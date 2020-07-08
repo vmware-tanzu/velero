@@ -37,3 +37,4 @@ Example:
 
 ## Open Issues
 - In the CLI, the design proposes to use commas to separate items of a resource type and semicolon to separate key-value pairs.  This follows the convention of using commas to separate items in a list (For example: --include-namespaces ns1,ns2).  However, the syntax for map in labels and annotations use commas to seperate key-value pairs.  So it introduces some inconsistency.
+- For pods that managed by Deployment or DaemonSet, this design may not work because the pods' name is randomly generated and if pods are restarted, they would have different names so the Backup operation may not consider the restarted pods in the sorting algorithm.  This problem will be addressed when we enhance the design to use regular expression to specify the OrderResources instead of exact match. 
