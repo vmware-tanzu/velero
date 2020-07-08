@@ -1,0 +1,1 @@
+Adjust restic default time out to 4 hours and base pod resource requests to 500m CPU/512Mi memory.

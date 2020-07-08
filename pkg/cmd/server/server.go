@@ -84,7 +84,7 @@ const (
 	defaultMetricsAddress = ":8085"
 
 	defaultBackupSyncPeriod           = time.Minute
-	defaultPodVolumeOperationTimeout  = 60 * time.Minute
+	defaultPodVolumeOperationTimeout  = 240 * time.Minute
 	defaultResourceTerminatingTimeout = 10 * time.Minute
 
 	// server's client default qps and burst
