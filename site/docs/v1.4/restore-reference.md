@@ -88,3 +88,4 @@ data:
   # add 1+ key-value pairs here, where the key is the old
   # node name and the value is the new node name.
   <old-node-name>: <new-node-name>
+```
