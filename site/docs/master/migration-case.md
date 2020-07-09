@@ -2,7 +2,7 @@
 
 *Using Backups and Restores*
 
-Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. In this scenario, we are also assuming that your clusters are hosted by the same cloud provider. **Note that Velero does not support the migration of persistent volumes across cloud providers.**
+Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. In this scenario, we are also assuming that your clusters are hosted by the same cloud provider. **Note that Velero does not natively  support the migration of persistent volumes snapshots across cloud providers.** If you would like to migrate volume data between cloud platforms, please enable [restic][2], which will backup volume contents at the filesystem level.
 
 1.  *(Cluster 1)* Assuming you haven't already been checkpointing your data with the Velero `schedule` operation, you need to first back up your entire cluster (replacing `<BACKUP-NAME>` as desired):
 
@@ -48,3 +48,4 @@ Check that the second cluster is behaving as expected:
 If you encounter issues, make sure that Velero is running in the same namespace in both clusters.
 
 [1]: how-velero-works.md#set-a-backup-to-expire
+[2]: restic.md
