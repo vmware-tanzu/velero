@@ -24,9 +24,12 @@ After a restore with the example configuration above, the postgres pod will be e
 The Restore spec will have a `spec.hooks` section matching the same section on the Backup spec except no `pre` hooks can be defined - only `post`.
 Annotations comparable to the annotations used during backup can also be set on pods.
 For each restored pod, the Velero server will check if there are any hooks applicable to the pod.
-If a restored pod has any applicable hooks, Velero will wait for the pod to reach status Ready and then execute the hooks in the pod.
-
+If a restored pod has any applicable hooks, Velero will wait for the container where the hook is to be executed to reach status Running.
+The Restore log will include the results of each post-restore hook and the Restore object status will incorporate the results of hooks.
 The Restore log will include the results of each hook and the Restore object status will incorporate the results of hooks.
+
+A new section at `spec.hooks.resources.initContainers` will allow for injecting initContainers into restored pods.
+Annotations can be set as an alternative to defining the initContainers in the Restore object.
 
 ## Detailed Design
 
@@ -36,10 +39,18 @@ The following annotations are supported:
 - post.hook.restore.velero.io/container
 - post.hook.restore.velero.io/command
 - post.hook.restore.velero.io/on-error
-- post.hook.restore.velero.io/timeout
+- post.hook.restore.velero.io/exec-timeout
+- post.hook.restore.velero.io/wait-timeout
 
+Init restore hooks can be defined by annotation and/or in the new `initContainers` section in the Restore spec.
+The initContainers schema is `pod.spec.initContainers`.
+
+The following annotations are supported:
+- init.hook.restore.velero.io/timeout
+- init.hook.restore.velero.io/initContainers
 
 This is an example of defining hooks in the Restore spec.
+
 ```yaml
 apiVersion: velero.io/v1
 kind: Restore
@@ -63,21 +74,32 @@ spec:
         post:
           -
             exec:
-              container: my-container
+              container: postgres
               command:
-                - /bin/uname
-                - -a
+                - /bin/bash
+                - -c
+                - rm /docker-entrypoint-initdb.d/dump.sql
               onError: Fail
               timeout: 10s
+              readyTimeout: 60s
+        init:
+          timeout: 120s
+          initContainers:
+          - name: restore
+            image: postgres:12
+            command: ["/bin/bash", "-c", "mv /backup/dump.sql /docker-entrypoint-initdb.d/"]
+            volumeMounts:
+            - name: backup
+              mountPath: /backup
 ```
 
 As with Backups, if an annotation is defined on a pod then no hooks from the Restore spec will be applied.
 
 ### Implementation
 
-The types and function in pkg/backup/item_hook_handler.go will be moved to a new package (pkg/util/hooks) and exported so they can be used for both backups and restores.
+The types and function in pkg/backup/item_hook_handler.go will be moved to a new package (pkg/hooks) and exported so they can be used for both backups and restores.
 
-The restore hooks implementation will closely follow the design of restoring pod volumes with restic.
+The post-restore hooks implementation will closely follow the design of restoring pod volumes with restic.
 The pkg/restore.context type will have new fields `hooksWaitGroup` and `hooksErrs` comparable to `resticWaitGroup` and `resticErr`.
 The pkg/restore.context.execute function will start a goroutine for each pod with applicable hooks and then continue with restoring other items.
 Each hooks goroutine will create a pkg/util/hooks.ItemHookHandler for each pod and send any error on the context.hooksErrs channel.
@@ -93,6 +115,12 @@ In practice the restic goroutines will complete before the hooks since the hooks
 Failed hooks with `onError: Continue` will appear in the Restore log but will not affect the status of the parent Restore.
 Failed hooks with `onError: Fail` will cause the parent Restore to have status Partially Failed.
 
+If initContainers are specified for a pod, Velero will inject the containers into the beginning of the pod's initContainers list.
+If a restic initContainer is also being injected, the restore initContainers will be injected directly after the restic initContainer.
+The restore will use a RestoreItemAction to inject the initContainers.
+Stdout and stderr of the restore initContainers will not be added to the Restore logs.
+InitContainers that fail will not affect the parent Restore's status.
+
 ## Alternatives Considered
 
 Wait for all restored Pods to report Ready, then execute the first hook in all applicable Pods simultaneously, then proceed to the next hook, etc.
@@ -103,6 +131,12 @@ That would be confusing since `pre` and `post` would appear in the Backup log bu
 
 Execute restore hooks in parallel for each Pod.
 That would not match the behavior of Backups.
+
+Wait for PodStatus ready before executing the post-restore hooks in any container.
+There are cases where the pod should not report itself ready until after the restore hook has run.
+
+Include the logs from initContainers in the Restore log.
+Unlike exec hooks where stdout and stderr are permanently lost if not added to the Restore log, the logs of the injected initContainers are available through the K8s API with kubectl or another client.
 
 ## Security Considerations
 
