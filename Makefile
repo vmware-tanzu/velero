@@ -40,6 +40,10 @@ CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 li
 CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le linux-arm linux-arm64
 MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 
+# set git sha and tree state
+GIT_SHA = $(shell git rev-parse HEAD)
+GIT_DIRTY = $(shell git status --porcelain 2> /dev/null)
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -113,6 +117,8 @@ local: build-dirs
 	VERSION=$(VERSION) \
 	PKG=$(PKG) \
 	BIN=$(BIN) \
+	GIT_SHA=$(GIT_SHA) \
+	GIT_DIRTY="$(GIT_DIRTY)" \
 	OUTPUT_DIR=$$(pwd)/_output/bin/$(GOOS)/$(GOARCH) \
 	./hack/build.sh
 
@@ -126,6 +132,8 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 		VERSION=$(VERSION) \
 		PKG=$(PKG) \
 		BIN=$(BIN) \
+		GIT_SHA=$(GIT_SHA) \
+		GIT_DIRTY=\"$(GIT_DIRTY)\" \
 		OUTPUT_DIR=/output/$(GOOS)/$(GOARCH) \
 		./hack/build.sh'"
 
