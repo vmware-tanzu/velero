@@ -1,11 +1,11 @@
-## v1.4.1
+## v1.4.2
 ### 2020-07-13
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.4.1
+https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
 
 ### Container Image
-`velero/velero:v1.4.1`
+`velero/velero:v1.4.2`
 
 ### Documentation
 https://velero.io/docs/v1.4/
@@ -16,6 +16,11 @@ https://velero.io/docs/v1.4/upgrade-to-1.4/
 ### All Changes
   * Adjust restic default time out to 4 hours and base pod resource requests to 500m CPU/512Mi memory. (#2696, @nrb)
   * capture version of the CRD prior before invoking the remap_crd_version backup item action (#2683, @ashish-amarnath)
+
+
+## v1.4.1
+
+This tag was created in code, but has no associated docker image due to misconfigured building infrastructure. v1.4.2 fixes this.
 
 ## v1.4.0
 ### 2020-05-26
