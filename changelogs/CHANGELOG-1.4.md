@@ -14,6 +14,7 @@ https://velero.io/docs/v1.4/
 https://velero.io/docs/v1.4/upgrade-to-1.4/
 
 ### All Changes
+  * log a warning instead of erroring if an additional item returned from a plugin can't be found in the Kubernetes API (#2595, @skriss)
   * Adjust restic default time out to 4 hours and base pod resource requests to 500m CPU/512Mi memory. (#2696, @nrb)
   * capture version of the CRD prior before invoking the remap_crd_version backup item action (#2683, @ashish-amarnath)
 
