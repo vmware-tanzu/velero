@@ -30,8 +30,8 @@ var (
 		{Name: "Name", Type: "string", Format: "name"},
 		{Name: "Backup"},
 		{Name: "Status"},
-		{Name: "Warnings"},
 		{Name: "Errors"},
+		{Name: "Warnings"},
 		{Name: "Created"},
 		{Name: "Selector"},
 	}
@@ -60,8 +60,8 @@ func printRestore(restore *v1.Restore) []metav1.TableRow {
 		restore.Name,
 		restore.Spec.BackupName,
 		status,
-		restore.Status.Warnings,
 		restore.Status.Errors,
+		restore.Status.Warnings,
 		restore.CreationTimestamp.Time,
 		metav1.FormatLabelSelector(restore.Spec.LabelSelector),
 	)
