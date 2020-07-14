@@ -47,6 +47,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	locationList, err := velero.ListBackupStorageLocations(r.StorageLocation.Client, r.StorageLocation.Ctx, req.Namespace)
 	if err != nil {
 		log.WithError(err).Error("No backup storage locations found, at least one is required")
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	var defaultFound bool
