@@ -2,7 +2,7 @@ name: build-image
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths:
     - 'hack/build-image/Dockerfile'
 
