@@ -31,6 +31,7 @@ var (
 		{Name: "Provider"},
 		{Name: "Bucket/Prefix"},
 		{Name: "Phase"},
+		{Name: "Last Validated"},
 		{Name: "Access Mode"},
 	}
 )
@@ -64,11 +65,18 @@ func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []m
 		status = "Unknown"
 	}
 
+	lastValidated := location.Status.LastValidationTime
+	LastValidatedStr := "Unknown"
+	if lastValidated != nil {
+		LastValidatedStr = lastValidated.String()
+	}
+
 	row.Cells = append(row.Cells,
 		location.Name,
 		location.Spec.Provider,
 		bucketAndPrefix,
 		status,
+		LastValidatedStr,
 		accessMode,
 	)
 

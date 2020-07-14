@@ -379,6 +379,11 @@ func (in *BackupStorageLocationSpec) DeepCopyInto(out *BackupStorageLocationSpec
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.ValidationFrequency != nil {
+		in, out := &in.ValidationFrequency, &out.ValidationFrequency
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 
@@ -397,6 +402,10 @@ func (in *BackupStorageLocationStatus) DeepCopyInto(out *BackupStorageLocationSt
 	*out = *in
 	if in.LastSyncedTime != nil {
 		in, out := &in.LastSyncedTime, &out.LastSyncedTime
+		*out = (*in).DeepCopy()
+	}
+	if in.LastValidationTime != nil {
+		in, out := &in.LastValidationTime, &out.LastValidationTime
 		*out = (*in).DeepCopy()
 	}
 	return

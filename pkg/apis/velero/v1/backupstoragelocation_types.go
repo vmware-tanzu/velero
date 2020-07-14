@@ -40,6 +40,11 @@ type BackupStorageLocationSpec struct {
 	// +optional
 	// +nullable
 	BackupSyncPeriod *metav1.Duration `json:"backupSyncPeriod,omitempty"`
+
+	// ValidationFrequency defines how frequently to validate the corresponding object storage. A value of 0 disables validation.
+	// +optional
+	// +nullable
+	ValidationFrequency *metav1.Duration `json:"validationFrequency,omitempty"`
 }
 
 // BackupStorageLocationStatus defines the observed state of BackupStorageLocation
@@ -53,6 +58,12 @@ type BackupStorageLocationStatus struct {
 	// +optional
 	// +nullable
 	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
+
+	// LastValidationTime is the last time the backup store location was validated
+	// the cluster.
+	// +optional
+	// +nullable
+	LastValidationTime *metav1.Time `json:"lastValidationTime,omitempty"`
 
 	// LastSyncedRevision is the value of the `metadata/revision` file in the backup
 	// storage location the last time the BSL's contents were synced into the cluster.
@@ -79,6 +90,7 @@ type BackupStorageLocationStatus struct {
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Backup Storage Location status such as Available/Unavailable"
+// +kubebuilder:printcolumn:name="Last Validated",type="date",JSONPath=".status.lastValidationTime",description="LastValidationTime is the last time the backup store location was validated"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BackupStorageLocation is a location where Velero stores backup objects
@@ -94,6 +106,8 @@ type BackupStorageLocation struct {
 // the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
+// +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations/status,verbs=get;update;patch
 
 // BackupStorageLocationList contains a list of BackupStorageLocation
 type BackupStorageLocationList struct {
@@ -124,6 +138,7 @@ type ObjectStorageLocation struct {
 
 // BackupStorageLocationPhase is the lifecycle phase of a Velero BackupStorageLocation.
 // +kubebuilder:validation:Enum=Available;Unavailable
+// +kubebuilder:default=Unavailable
 type BackupStorageLocationPhase string
 
 const (

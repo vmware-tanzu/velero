@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -122,16 +123,14 @@ func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList,
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
-	locationList := &velerov1api.BackupStorageLocationList{}
-	if err := c.kbClient.List(context.Background(), locationList, &client.ListOptions{
-		Namespace: c.namespace,
-	}); err != nil {
-		c.logger.WithError(errors.WithStack(err)).Error("Error getting backup storage locations from lister")
+	locationList, err := velero.ListBackupStorageLocations(c.kbClient, context.Background(), c.namespace)
+	if err != nil {
+		c.logger.WithError(err).Error("No backup storage locations found, at least one is required")
 		return
 	}
 
 	// sync the default location first, if it exists
-	locations := orderedBackupLocations(locationList, c.defaultBackupLocation)
+	locations := orderedBackupLocations(&locationList, c.defaultBackupLocation)
 
 	pluginManager := c.newPluginManager(c.logger)
 	defer pluginManager.CleanupClients()

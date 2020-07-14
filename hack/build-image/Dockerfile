@@ -24,6 +24,13 @@ WORKDIR /go/src/k8s.io
 RUN git config --global advice.detachedHead false
 RUN git clone -b kubernetes-1.17.0 https://github.com/kubernetes/code-generator
 
+RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_linux_amd64.tar.gz && \
+    tar -zxvf kubebuilder_2.3.1_linux_amd64.tar.gz && \
+    mv kubebuilder_2.3.1_linux_amd64 /usr/local/kubebuilder && \
+    chmod +x /usr/local/kubebuilder && \
+    export PATH=$PATH:/usr/local/kubebuilder/bin && \
+    rm kubebuilder_2.3.1_linux_amd64.tar.gz
+
 # get controller-tools
 RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4
 
