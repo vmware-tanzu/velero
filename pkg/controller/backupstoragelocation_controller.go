@@ -18,7 +18,6 @@ package controller
 
 import (
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -48,10 +47,6 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	locationList, err := velero.ListBackupStorageLocations(r.StorageLocation.Client, r.StorageLocation.Ctx, req.Namespace)
 	if err != nil {
 		log.WithError(err).Error("No backup storage locations found, at least one is required")
-	}
-
-	if r.StorageLocation.DefaultStoreValidationFrequency <= 0 {
-		r.StorageLocation.DefaultStoreValidationFrequency = time.Minute
 	}
 
 	var defaultFound bool
