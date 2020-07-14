@@ -335,7 +335,7 @@ func getOrderedResources(resourcePriorities []string, backupResources map[string
 	}
 	sort.Strings(orderedBackupResources)
 
-	// master list: everything in resource priorities, followed by what's in the backup (alphabetized)
+	// main list: everything in resource priorities, followed by what's in the backup (alphabetized)
 	return append(resourcePriorities, orderedBackupResources...)
 }
 
