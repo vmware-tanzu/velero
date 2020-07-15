@@ -853,6 +853,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expectedResult, res)
+
+			// reset defaultBackupLocation resourceVersion
+			defaultBackupLocation.ObjectMeta.ResourceVersion = ""
 		})
 	}
 }

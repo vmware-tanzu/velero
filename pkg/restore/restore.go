@@ -31,7 +31,6 @@ import (
 	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -620,7 +619,7 @@ func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (
 		}
 
 		// Check the namespace associated with the claimRef to see if it's deleting/terminating before proceeding
-		ns, err := ctx.namespaceClient.Get(context.TODO(), namespace, metav1.GetOptions{})
+		ns, err := ctx.namespaceClient.Get(go_context.TODO(), namespace, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			pvLogger.Debugf("namespace %s for PV not found, waiting", namespace)
 			// namespace not found but the PV still exists, so continue to wait
