@@ -1,0 +1,1 @@
+StorageGrid compatibility by removing explicit gzip accept header setting
