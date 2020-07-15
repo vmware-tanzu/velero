@@ -18,7 +18,7 @@ require (
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
 	github.com/joho/godotenv v1.3.0
-	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1-0.20200617021606-4800ca72d403
+	github.com/kubernetes-csi/external-snapshotter/v2 v2.2.0-rc1
 	github.com/onsi/ginkgo v1.13.0
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.8.1
