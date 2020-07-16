@@ -23,23 +23,26 @@ Therefore, Velero needs some mechanism that allows plugin authors who have creat
 
 ## High-Level Design
 Velero will provide a new plugin type that is similar to its existing plugin architecture.
-These plugins will be referred to as `DeletionAction` plugins.
-`DeletionAction` plugins will receive the `Backup` CustomResource being deleted on execution.
+These plugins will be referred to as `DeleteAction` plugins.
+`DeleteAction` plugins will receive the `Backup` CustomResource being deleted on execution.
 
-`DeletionAction` plugins cannot prevent deletion of an item.
-This is because multiple `DeletionAction` plugins can be registered, and this proposal does not include rollback and undoing of a deletion action.
-Thus, if multiple `DeletionAction` plugins have already run but another would request the deletion of a backup stopped, the backup that's retained would be inconsistent.
+`DeleteAction` plugins cannot prevent deletion of an item.
+This is because multiple `DeleteAction` plugins can be registered, and this proposal does not include rollback and undoing of a deletion action.
+Thus, if multiple `DeleteAction` plugins have already run but another would request the deletion of a backup stopped, the backup that's retained would be inconsistent.
 
-`DeletionActions` will apply to `Backup`s based on a label on the `Backup` itself.
-In order to ensure that `Backup`s don't execute `DeletionAction` plugins that are not relevant to them, `DeletionAction` plugins can register an `AppliesTo` function which will define a label selector on Velero backups.
+`DeleteActions` will apply to `Backup`s based on a label on the `Backup` itself.
+In order to ensure that `Backup`s don't execute `DeleteAction` plugins that are not relevant to them, `DeleteAction` plugins can register an `AppliesTo` function which will define a label selector on Velero backups.
+
+`DeleteActions` will be run in alphanumerical order by plugin name.
+This order is somewhat arbitrary, but will be used to give authors and users a somewhat predictable order of events.
 
 ## Detailed Design
-The `DeletionAction` plugins will implement the following Go interface, defined in `pkg/plugin/velero/deletion_action.go`:
+The `DeleteAction` plugins will implement the following Go interface, defined in `pkg/plugin/velero/deletion_action.go`:
 
 ```go
-type DeletionAction struct {
+type DeleteAction struct {
 
-    // AppliesTo will match the DeletionAction plugin against Velero Backups that it should operate against.
+    // AppliesTo will match the DeleteAction plugin against Velero Backups that it should operate against.
     AppliesTo()
 
     // Execute runs the custom plugin logic and may connect to external services.
@@ -54,9 +57,9 @@ The following methods would be added to the `clientmgmt.Manager` interface in `p
 type Manager interface {
     ...
 
-    // GetDeletionActions returns the registered DeletionActions.
+    // GetDeleteActions returns the registered DeleteActions.
     //TODO: do we need to get these by name, or can we get them all?
-    GetDeletionActions([]velero.DeletionAction, error)
+    GetDeleteActions([]velero.DeleteAction, error)
     ...
 ```
 
@@ -68,10 +71,10 @@ TODO
 TODO
 
 ## Compatibility
-Backwards compatibility should be straight-forward; if there are no installed `DeletionAction` plugins, then the backup deletion process will proceed as it does today.
+Backwards compatibility should be straight-forward; if there are no installed `DeleteAction` plugins, then the backup deletion process will proceed as it does today.
 
 ## Implementation
 TODO
 
 ## Open Issues
-In order to add a custom label to the backup, the backup must be modifiable inside of the `BackupItemActon` and `RestoreItemAction` plugins, which it currently is not.
+In order to add a custom label to the backup, the backup must be modifiable inside of the `BackupItemActon` and `RestoreItemAction` plugins, which it currently is not. A work around for now is for the user to apply a label to the backup at creation time, but that is not ideal.
