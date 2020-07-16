@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -150,12 +152,12 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 
 			// set up test data
 			if tc.configMap != nil {
-				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(tc.configMap)
+				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(context.TODO(), tc.configMap, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			if tc.storageClass != nil {
-				_, err := clientset.StorageV1().StorageClasses().Create(tc.storageClass)
+				_, err := clientset.StorageV1().StorageClasses().Create(context.TODO(), tc.storageClass, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 

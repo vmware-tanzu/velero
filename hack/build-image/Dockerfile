@@ -22,7 +22,7 @@ ENV GOPROXY=https://proxy.golang.org
 RUN mkdir -p /go/src/k8s.io
 WORKDIR /go/src/k8s.io
 RUN git config --global advice.detachedHead false
-RUN git clone -b kubernetes-1.17.0 https://github.com/kubernetes/code-generator
+RUN git clone -b v0.18.4 https://github.com/kubernetes/code-generator
 
 RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_linux_amd64.tar.gz && \
     tar -zxvf kubebuilder_2.3.1_linux_amd64.tar.gz && \
@@ -32,7 +32,7 @@ RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/downloa
     rm kubebuilder_2.3.1_linux_amd64.tar.gz
 
 # get controller-tools
-RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4
+RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0
 
 # get goimports (the revision is pinned so we don't indiscriminately update, but the particular commit
 # is not important)

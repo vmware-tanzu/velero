@@ -138,7 +138,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 
 		var pvc *corev1api.PersistentVolumeClaim
 		if volume.PersistentVolumeClaim != nil {
-			pvc, err = b.pvcClient.PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+			pvc, err = b.pvcClient.PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting persistent volume claim for volume"))
 				continue
@@ -158,7 +158,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, pvc)
-		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup); err != nil {
+		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -190,11 +190,11 @@ ForEachVolume:
 }
 
 type pvcGetter interface {
-	Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolumeClaim, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.PersistentVolumeClaim, error)
 }
 
 type pvGetter interface {
-	Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error)
 }
 
 // isHostPathVolume returns true if the volume is either a hostPath pod volume or a persistent
@@ -208,7 +208,7 @@ func isHostPathVolume(volume *corev1api.Volume, pvc *corev1api.PersistentVolumeC
 		return false, nil
 	}
 
-	pv, err := pvGetter.Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := pvGetter.Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 	if err != nil {
 		return false, errors.WithStack(err)
 	}

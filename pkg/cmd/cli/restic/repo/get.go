@@ -17,6 +17,8 @@ limitations under the License.
 package repo
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,12 +45,12 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				repos = new(api.ResticRepositoryList)
 				for _, name := range args {
-					repo, err := veleroClient.VeleroV1().ResticRepositories(f.Namespace()).Get(name, metav1.GetOptions{})
+					repo, err := veleroClient.VeleroV1().ResticRepositories(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					repos.Items = append(repos.Items, *repo)
 				}
 			} else {
-				repos, err = veleroClient.VeleroV1().ResticRepositories(f.Namespace()).List(listOptions)
+				repos, err = veleroClient.VeleroV1().ResticRepositories(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 

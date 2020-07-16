@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,12 +45,12 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				backups = new(api.BackupList)
 				for _, name := range args {
-					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(name, metav1.GetOptions{})
+					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(listOptions)
+				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 

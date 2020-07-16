@@ -17,6 +17,8 @@ limitations under the License.
 package restic
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +35,7 @@ const (
 )
 
 func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string) error {
-	_, err := secretClient.Secrets(namespace).Get(CredentialsSecretName, metav1.GetOptions{})
+	_, err := secretClient.Secrets(namespace).Get(context.TODO(), CredentialsSecretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.WithStack(err)
 	}
@@ -54,7 +56,7 @@ func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespac
 		},
 	}
 
-	if _, err = secretClient.Secrets(namespace).Create(secret); err != nil {
+	if _, err = secretClient.Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 		return errors.Wrapf(err, "error creating %s secret", CredentialsSecretName)
 	}
 
@@ -74,7 +76,7 @@ func NewClientSecretGetter(client corev1client.SecretsGetter) SecretGetter {
 }
 
 func (c *clientSecretGetter) GetSecret(namespace, name string) (*corev1api.Secret, error) {
-	secret, err := c.client.Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := c.client.Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

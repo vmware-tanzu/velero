@@ -225,7 +225,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			},
 		}
 		require.NoError(t, td.sharedInformers.Velero().V1().DeleteBackupRequests().Informer().GetStore().Add(existing))
-		_, err := td.client.VeleroV1().DeleteBackupRequests(td.req.Namespace).Create(existing)
+		_, err := td.client.VeleroV1().DeleteBackupRequests(td.req.Namespace).Create(context.TODO(), existing, metav1.CreateOptions{})
 		require.NoError(t, err)
 
 		require.NoError(t, td.sharedInformers.Velero().V1().DeleteBackupRequests().Informer().GetStore().Add(
@@ -958,7 +958,7 @@ func TestSetVolumeSnapshotContentDeletionPolicy(t *testing.T) {
 				assert.NotNil(t, err)
 			} else {
 				assert.Nil(t, err)
-				actual, err := fakeClient.SnapshotV1beta1().VolumeSnapshotContents().Get(tc.inputVSCName, metav1.GetOptions{})
+				actual, err := fakeClient.SnapshotV1beta1().VolumeSnapshotContents().Get(context.TODO(), tc.inputVSCName, metav1.GetOptions{})
 				assert.Nil(t, err)
 				assert.Equal(t, snapshotv1beta1api.VolumeSnapshotContentDelete, actual.Spec.DeletionPolicy)
 			}

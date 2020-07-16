@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var resticrepositoriesResource = schema.GroupVersionResource{Group: "velero.io",
 var resticrepositoriesKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "ResticRepository"}
 
 // Get takes name of the resticRepository, and returns the corresponding resticRepository object, and an error if there is any.
-func (c *FakeResticRepositories) Get(name string, options v1.GetOptions) (result *velerov1.ResticRepository, err error) {
+func (c *FakeResticRepositories) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.ResticRepository, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(resticrepositoriesResource, c.ns, name), &velerov1.ResticRepository{})
 
@@ -50,7 +52,7 @@ func (c *FakeResticRepositories) Get(name string, options v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of ResticRepositories that match those selectors.
-func (c *FakeResticRepositories) List(opts v1.ListOptions) (result *velerov1.ResticRepositoryList, err error) {
+func (c *FakeResticRepositories) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.ResticRepositoryList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(resticrepositoriesResource, resticrepositoriesKind, c.ns, opts), &velerov1.ResticRepositoryList{})
 
@@ -72,14 +74,14 @@ func (c *FakeResticRepositories) List(opts v1.ListOptions) (result *velerov1.Res
 }
 
 // Watch returns a watch.Interface that watches the requested resticRepositories.
-func (c *FakeResticRepositories) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeResticRepositories) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(resticrepositoriesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a resticRepository and creates it.  Returns the server's representation of the resticRepository, and an error, if there is any.
-func (c *FakeResticRepositories) Create(resticRepository *velerov1.ResticRepository) (result *velerov1.ResticRepository, err error) {
+func (c *FakeResticRepositories) Create(ctx context.Context, resticRepository *velerov1.ResticRepository, opts v1.CreateOptions) (result *velerov1.ResticRepository, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(resticrepositoriesResource, c.ns, resticRepository), &velerov1.ResticRepository{})
 
@@ -90,7 +92,7 @@ func (c *FakeResticRepositories) Create(resticRepository *velerov1.ResticReposit
 }
 
 // Update takes the representation of a resticRepository and updates it. Returns the server's representation of the resticRepository, and an error, if there is any.
-func (c *FakeResticRepositories) Update(resticRepository *velerov1.ResticRepository) (result *velerov1.ResticRepository, err error) {
+func (c *FakeResticRepositories) Update(ctx context.Context, resticRepository *velerov1.ResticRepository, opts v1.UpdateOptions) (result *velerov1.ResticRepository, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(resticrepositoriesResource, c.ns, resticRepository), &velerov1.ResticRepository{})
 
@@ -102,7 +104,7 @@ func (c *FakeResticRepositories) Update(resticRepository *velerov1.ResticReposit
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeResticRepositories) UpdateStatus(resticRepository *velerov1.ResticRepository) (*velerov1.ResticRepository, error) {
+func (c *FakeResticRepositories) UpdateStatus(ctx context.Context, resticRepository *velerov1.ResticRepository, opts v1.UpdateOptions) (*velerov1.ResticRepository, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(resticrepositoriesResource, "status", c.ns, resticRepository), &velerov1.ResticRepository{})
 
@@ -113,7 +115,7 @@ func (c *FakeResticRepositories) UpdateStatus(resticRepository *velerov1.ResticR
 }
 
 // Delete takes name of the resticRepository and deletes it. Returns an error if one occurs.
-func (c *FakeResticRepositories) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeResticRepositories) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(resticrepositoriesResource, c.ns, name), &velerov1.ResticRepository{})
 
@@ -121,15 +123,15 @@ func (c *FakeResticRepositories) Delete(name string, options *v1.DeleteOptions) 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeResticRepositories) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(resticrepositoriesResource, c.ns, listOptions)
+func (c *FakeResticRepositories) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(resticrepositoriesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &velerov1.ResticRepositoryList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched resticRepository.
-func (c *FakeResticRepositories) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.ResticRepository, err error) {
+func (c *FakeResticRepositories) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.ResticRepository, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(resticrepositoriesResource, c.ns, name, pt, data, subresources...), &velerov1.ResticRepository{})
 

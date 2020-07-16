@@ -406,6 +406,10 @@ func TestProcessQueueItem(t *testing.T) {
 
 			defer restorer.AssertExpectations(t)
 			defer backupStore.AssertExpectations(t)
+			defer func() {
+				// reset defaultStorageLocation resourceVersion
+				defaultStorageLocation.ObjectMeta.ResourceVersion = ""
+			}()
 
 			c := NewRestoreController(
 				velerov1api.DefaultNamespace,

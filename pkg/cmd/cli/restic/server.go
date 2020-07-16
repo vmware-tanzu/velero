@@ -245,7 +245,7 @@ func (s *resticServer) validatePodVolumesHostPath() error {
 		}
 	}
 
-	pods, err := s.kubeClient.CoreV1().Pods("").List(metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", os.Getenv("NODE_NAME"))})
+	pods, err := s.kubeClient.CoreV1().Pods("").List(s.ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", os.Getenv("NODE_NAME"))})
 	if err != nil {
 		return errors.WithStack(err)
 	}

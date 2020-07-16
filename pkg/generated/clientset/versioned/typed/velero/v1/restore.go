@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,15 +38,15 @@ type RestoresGetter interface {
 
 // RestoreInterface has methods to work with Restore resources.
 type RestoreInterface interface {
-	Create(*v1.Restore) (*v1.Restore, error)
-	Update(*v1.Restore) (*v1.Restore, error)
-	UpdateStatus(*v1.Restore) (*v1.Restore, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Restore, error)
-	List(opts metav1.ListOptions) (*v1.RestoreList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Restore, err error)
+	Create(ctx context.Context, restore *v1.Restore, opts metav1.CreateOptions) (*v1.Restore, error)
+	Update(ctx context.Context, restore *v1.Restore, opts metav1.UpdateOptions) (*v1.Restore, error)
+	UpdateStatus(ctx context.Context, restore *v1.Restore, opts metav1.UpdateOptions) (*v1.Restore, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Restore, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.RestoreList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Restore, err error)
 	RestoreExpansion
 }
 
@@ -64,20 +65,20 @@ func newRestores(c *VeleroV1Client, namespace string) *restores {
 }
 
 // Get takes name of the restore, and returns the corresponding restore object, and an error if there is any.
-func (c *restores) Get(name string, options metav1.GetOptions) (result *v1.Restore, err error) {
+func (c *restores) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Restore, err error) {
 	result = &v1.Restore{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("restores").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Restores that match those selectors.
-func (c *restores) List(opts metav1.ListOptions) (result *v1.RestoreList, err error) {
+func (c *restores) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RestoreList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +89,13 @@ func (c *restores) List(opts metav1.ListOptions) (result *v1.RestoreList, err er
 		Resource("restores").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested restores.
-func (c *restores) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *restores) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,87 +106,90 @@ func (c *restores) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("restores").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a restore and creates it.  Returns the server's representation of the restore, and an error, if there is any.
-func (c *restores) Create(restore *v1.Restore) (result *v1.Restore, err error) {
+func (c *restores) Create(ctx context.Context, restore *v1.Restore, opts metav1.CreateOptions) (result *v1.Restore, err error) {
 	result = &v1.Restore{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("restores").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(restore).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a restore and updates it. Returns the server's representation of the restore, and an error, if there is any.
-func (c *restores) Update(restore *v1.Restore) (result *v1.Restore, err error) {
+func (c *restores) Update(ctx context.Context, restore *v1.Restore, opts metav1.UpdateOptions) (result *v1.Restore, err error) {
 	result = &v1.Restore{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("restores").
 		Name(restore.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(restore).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *restores) UpdateStatus(restore *v1.Restore) (result *v1.Restore, err error) {
+func (c *restores) UpdateStatus(ctx context.Context, restore *v1.Restore, opts metav1.UpdateOptions) (result *v1.Restore, err error) {
 	result = &v1.Restore{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("restores").
 		Name(restore.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(restore).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the restore and deletes it. Returns an error if one occurs.
-func (c *restores) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *restores) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("restores").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *restores) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *restores) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("restores").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched restore.
-func (c *restores) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Restore, err error) {
+func (c *restores) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Restore, err error) {
 	result = &v1.Restore{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("restores").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

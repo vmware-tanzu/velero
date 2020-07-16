@@ -31,6 +31,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -448,7 +449,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 
 	opts := label.NewListOptionsForBackup(restore.Spec.BackupName)
 
-	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(opts)
+	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(context.TODO(), opts)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -582,7 +583,7 @@ func patchRestore(original, updated *api.Restore, client velerov1client.Restores
 		return nil, errors.Wrap(err, "error creating json merge patch for restore")
 	}
 
-	res, err := client.Restores(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Restores(original.Namespace).Patch(context.TODO(), original.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching restore")
 	}

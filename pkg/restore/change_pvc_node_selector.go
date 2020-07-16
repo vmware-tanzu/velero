@@ -17,6 +17,8 @@ limitations under the License.
 package restore
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -144,7 +146,7 @@ func getNewNodeFromConfigMap(client corev1client.ConfigMapInterface, node string
 
 // isNodeExist check if node resource exist or not
 func isNodeExist(nodeClient corev1client.NodeInterface, name string) (bool, error) {
-	_, err := nodeClient.Get(name, metav1.GetOptions{})
+	_, err := nodeClient.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return false, nil

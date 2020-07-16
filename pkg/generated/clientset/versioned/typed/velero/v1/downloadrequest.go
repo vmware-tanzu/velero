@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,15 +38,15 @@ type DownloadRequestsGetter interface {
 
 // DownloadRequestInterface has methods to work with DownloadRequest resources.
 type DownloadRequestInterface interface {
-	Create(*v1.DownloadRequest) (*v1.DownloadRequest, error)
-	Update(*v1.DownloadRequest) (*v1.DownloadRequest, error)
-	UpdateStatus(*v1.DownloadRequest) (*v1.DownloadRequest, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.DownloadRequest, error)
-	List(opts metav1.ListOptions) (*v1.DownloadRequestList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.DownloadRequest, err error)
+	Create(ctx context.Context, downloadRequest *v1.DownloadRequest, opts metav1.CreateOptions) (*v1.DownloadRequest, error)
+	Update(ctx context.Context, downloadRequest *v1.DownloadRequest, opts metav1.UpdateOptions) (*v1.DownloadRequest, error)
+	UpdateStatus(ctx context.Context, downloadRequest *v1.DownloadRequest, opts metav1.UpdateOptions) (*v1.DownloadRequest, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.DownloadRequest, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.DownloadRequestList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DownloadRequest, err error)
 	DownloadRequestExpansion
 }
 
@@ -64,20 +65,20 @@ func newDownloadRequests(c *VeleroV1Client, namespace string) *downloadRequests 
 }
 
 // Get takes name of the downloadRequest, and returns the corresponding downloadRequest object, and an error if there is any.
-func (c *downloadRequests) Get(name string, options metav1.GetOptions) (result *v1.DownloadRequest, err error) {
+func (c *downloadRequests) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.DownloadRequest, err error) {
 	result = &v1.DownloadRequest{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("downloadrequests").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of DownloadRequests that match those selectors.
-func (c *downloadRequests) List(opts metav1.ListOptions) (result *v1.DownloadRequestList, err error) {
+func (c *downloadRequests) List(ctx context.Context, opts metav1.ListOptions) (result *v1.DownloadRequestList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +89,13 @@ func (c *downloadRequests) List(opts metav1.ListOptions) (result *v1.DownloadReq
 		Resource("downloadrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested downloadRequests.
-func (c *downloadRequests) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *downloadRequests) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,87 +106,90 @@ func (c *downloadRequests) Watch(opts metav1.ListOptions) (watch.Interface, erro
 		Resource("downloadrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a downloadRequest and creates it.  Returns the server's representation of the downloadRequest, and an error, if there is any.
-func (c *downloadRequests) Create(downloadRequest *v1.DownloadRequest) (result *v1.DownloadRequest, err error) {
+func (c *downloadRequests) Create(ctx context.Context, downloadRequest *v1.DownloadRequest, opts metav1.CreateOptions) (result *v1.DownloadRequest, err error) {
 	result = &v1.DownloadRequest{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("downloadrequests").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(downloadRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a downloadRequest and updates it. Returns the server's representation of the downloadRequest, and an error, if there is any.
-func (c *downloadRequests) Update(downloadRequest *v1.DownloadRequest) (result *v1.DownloadRequest, err error) {
+func (c *downloadRequests) Update(ctx context.Context, downloadRequest *v1.DownloadRequest, opts metav1.UpdateOptions) (result *v1.DownloadRequest, err error) {
 	result = &v1.DownloadRequest{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("downloadrequests").
 		Name(downloadRequest.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(downloadRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *downloadRequests) UpdateStatus(downloadRequest *v1.DownloadRequest) (result *v1.DownloadRequest, err error) {
+func (c *downloadRequests) UpdateStatus(ctx context.Context, downloadRequest *v1.DownloadRequest, opts metav1.UpdateOptions) (result *v1.DownloadRequest, err error) {
 	result = &v1.DownloadRequest{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("downloadrequests").
 		Name(downloadRequest.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(downloadRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the downloadRequest and deletes it. Returns an error if one occurs.
-func (c *downloadRequests) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *downloadRequests) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("downloadrequests").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *downloadRequests) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *downloadRequests) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("downloadrequests").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched downloadRequest.
-func (c *downloadRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.DownloadRequest, err error) {
+func (c *downloadRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DownloadRequest, err error) {
 	result = &v1.DownloadRequest{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("downloadrequests").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -51,7 +52,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
-			restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(restoreName, metav1.GetOptions{})
+			restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(context.TODO(), restoreName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				cmd.Exit("Restore %q does not exist.", restoreName)
 			} else if err != nil {

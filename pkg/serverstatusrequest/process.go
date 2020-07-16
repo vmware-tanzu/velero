@@ -17,6 +17,7 @@ limitations under the License.
 package serverstatusrequest
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -61,7 +62,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 		}
 
 		log.Debug("ServerStatusRequest has expired, deleting it")
-		if err := client.ServerStatusRequests(req.Namespace).Delete(req.Name, nil); err != nil {
+		if err := client.ServerStatusRequests(req.Namespace).Delete(context.TODO(), req.Name, metav1.DeleteOptions{}); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -89,7 +90,7 @@ func patch(client velerov1client.ServerStatusRequestsGetter, req *velerov1api.Se
 		return errors.WithStack(err)
 	}
 
-	_, err = client.ServerStatusRequests(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
+	_, err = client.ServerStatusRequests(req.Namespace).Patch(context.TODO(), req.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return errors.WithStack(err)
 	}

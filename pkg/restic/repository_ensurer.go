@@ -170,7 +170,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		close(repoChan)
 	}()
 
-	if _, err := r.repoClient.ResticRepositories(namespace).Create(repo); err != nil {
+	if _, err := r.repoClient.ResticRepositories(namespace).Create(context.TODO(), repo, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrapf(err, "unable to create restic repository resource")
 	}
 

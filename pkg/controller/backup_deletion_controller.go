@@ -201,7 +201,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	}
 
 	// Get the backup we're trying to delete
-	backup, err := c.backupClient.Backups(req.Namespace).Get(req.Spec.BackupName, metav1.GetOptions{})
+	backup, err := c.backupClient.Backups(req.Namespace).Get(context.TODO(), req.Spec.BackupName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// Couldn't find backup - update status to Processed and record the not-found error
 		req, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
@@ -365,7 +365,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 			}
 
 			restoreLog.Info("Deleting restore referencing backup")
-			if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := c.restoreClient.Restores(restore.Namespace).Delete(context.TODO(), restore.Name, metav1.DeleteOptions{}); err != nil {
 				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(restore)).Error())
 			}
 		}
@@ -373,7 +373,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 
 	if len(errs) == 0 {
 		// Only try to delete the backup object from kube if everything preceding went smoothly
-		err = c.backupClient.Backups(backup.Namespace).Delete(backup.Name, nil)
+		err = c.backupClient.Backups(backup.Namespace).Delete(context.TODO(), backup.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "error deleting backup %s", kube.NamespaceAndName(backup)).Error())
 		}
@@ -397,7 +397,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	// Everything deleted correctly, so we can delete all DeleteBackupRequests for this backup
 	if len(errs) == 0 {
 		listOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
-		err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).DeleteCollection(nil, listOptions)
+		err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listOptions)
 		if err != nil {
 			// If this errors, all we can do is log it.
 			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Error("error deleting all associated DeleteBackupRequests after successfully deleting the backup")
@@ -443,7 +443,7 @@ func (c *backupDeletionController) deleteExistingDeletionRequests(req *velerov1a
 			continue
 		}
 
-		if err := c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Delete(dbr.Name, nil); err != nil {
+		if err := c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Delete(context.TODO(), dbr.Name, metav1.DeleteOptions{}); err != nil {
 			errs = append(errs, errors.WithStack(err))
 		}
 	}
@@ -477,7 +477,7 @@ func (c *backupDeletionController) deleteResticSnapshots(backup *velerov1api.Bac
 func setVolumeSnapshotContentDeletionPolicy(vscName string, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) error {
 	log.Infof("Setting DeletionPolicy of CSI volumesnapshotcontent %s to Delete", vscName)
 	pb := []byte(`{"spec":{"deletionPolicy":"Delete"}}`)
-	_, err := csiClient.VolumeSnapshotContents().Patch(vscName, types.MergePatchType, pb)
+	_, err := csiClient.VolumeSnapshotContents().Patch(context.TODO(), vscName, types.MergePatchType, pb, metav1.PatchOptions{})
 	if err != nil {
 		return err
 	}
@@ -507,7 +507,7 @@ func deleteCSIVolumeSnapshots(backupName string, csiSnapshotLister snapshotv1bet
 				continue
 			}
 		}
-		err := csiClient.VolumeSnapshots(csiVS.Namespace).Delete(csiVS.Name, &metav1.DeleteOptions{})
+		err := csiClient.VolumeSnapshots(csiVS.Namespace).Delete(context.TODO(), csiVS.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -541,7 +541,7 @@ func deleteCSIVolumeSnapshotContents(backupName string, csiVSCLister snapshotv1b
 			continue
 		}
 		log.Infof("Deleting volumesnapshotcontent %s", snapCont.Name)
-		err = csiClient.VolumeSnapshotContents().Delete(snapCont.Name, &metav1.DeleteOptions{})
+		err = csiClient.VolumeSnapshotContents().Delete(context.TODO(), snapCont.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, err)
 		}
@@ -575,7 +575,7 @@ func (c *backupDeletionController) deleteExpiredRequests() {
 			reqLog := c.logger.WithFields(logrus.Fields{"namespace": req.Namespace, "name": req.Name})
 			reqLog.Info("Deleting expired DeleteBackupRequest")
 
-			err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Delete(req.Name, nil)
+			err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Delete(context.TODO(), req.Name, metav1.DeleteOptions{})
 			if err != nil {
 				reqLog.WithError(err).Error("Error deleting DeleteBackupRequest")
 			}
@@ -604,7 +604,7 @@ func (c *backupDeletionController) patchDeleteBackupRequest(req *velerov1api.Del
 		return nil, errors.Wrap(err, "error creating json merge patch for DeleteBackupRequest")
 	}
 
-	req, err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
+	req, err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Patch(context.TODO(), req.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching DeleteBackupRequest")
 	}
@@ -633,7 +633,7 @@ func (c *backupDeletionController) patchBackup(backup *velerov1api.Backup, mutat
 		return nil, errors.Wrap(err, "error creating json merge patch for Backup")
 	}
 
-	backup, err = c.backupClient.Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
+	backup, err = c.backupClient.Backups(backup.Namespace).Patch(context.TODO(), backup.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching Backup")
 	}

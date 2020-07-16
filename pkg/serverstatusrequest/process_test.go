@@ -17,6 +17,7 @@ limitations under the License.
 package serverstatusrequest
 
 import (
+	"context"
 	"sort"
 	"testing"
 	"time"
@@ -161,7 +162,7 @@ func TestProcess(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 			}
 
-			res, err := client.VeleroV1().ServerStatusRequests(tc.req.Namespace).Get(tc.req.Name, metav1.GetOptions{})
+			res, err := client.VeleroV1().ServerStatusRequests(tc.req.Namespace).Get(context.TODO(), tc.req.Name, metav1.GetOptions{})
 			if tc.expected == nil {
 				assert.Nil(t, res)
 				assert.True(t, apierrors.IsNotFound(err))

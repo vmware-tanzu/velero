@@ -16,6 +16,7 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -86,7 +88,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 
 			kubeClient := fake.NewSimpleClientset()
 			for _, pod := range tt.pods {
-				_, err := kubeClient.CoreV1().Pods(pod.GetNamespace()).Create(pod)
+				_, err := kubeClient.CoreV1().Pods(pod.GetNamespace()).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Error(err)
 				}

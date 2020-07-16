@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -59,25 +60,25 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				backups = new(velerov1api.BackupList)
 				for _, name := range args {
-					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(name, metav1.GetOptions{})
+					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(listOptions)
+				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 
 			first := true
 			for _, backup := range backups.Items {
 				deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
-				deleteRequestList, err := veleroClient.VeleroV1().DeleteBackupRequests(f.Namespace()).List(deleteRequestListOptions)
+				deleteRequestList, err := veleroClient.VeleroV1().DeleteBackupRequests(f.Namespace()).List(context.TODO(), deleteRequestListOptions)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
 				}
 
 				opts := label.NewListOptionsForBackup(backup.Name)
-				podVolumeBackupList, err := veleroClient.VeleroV1().PodVolumeBackups(f.Namespace()).List(opts)
+				podVolumeBackupList, err := veleroClient.VeleroV1().PodVolumeBackups(f.Namespace()).List(context.TODO(), opts)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
@@ -92,7 +93,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					csiClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
 					cmd.CheckError(err)
 
-					vscList, err = csiClient.SnapshotV1beta1().VolumeSnapshotContents().List(opts)
+					vscList, err = csiClient.SnapshotV1beta1().VolumeSnapshotContents().List(context.TODO(), opts)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "error getting VolumeSnapshotContent objects for backup %s: %v\n", backup.Name, err)
 					}

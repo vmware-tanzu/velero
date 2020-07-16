@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -167,11 +168,11 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	switch {
 	case o.BackupName != "":
-		if _, err := o.client.VeleroV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), o.BackupName, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	case o.ScheduleName != "":
-		backupItems, err := o.client.VeleroV1().Backups(f.Namespace()).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
+		backupItems, err := o.client.VeleroV1().Backups(f.Namespace()).List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
 		if err != nil {
 			return err
 		}
@@ -229,7 +230,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	// PartiallyFailed backup for the provided schedule, and use that specific backup
 	// to restore from.
 	if o.ScheduleName != "" && boolptr.IsSetToTrue(o.AllowPartiallyFailed.Value) {
-		backups, err := o.client.VeleroV1().Backups(f.Namespace()).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
+		backups, err := o.client.VeleroV1().Backups(f.Namespace()).List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
 		if err != nil {
 			return err
 		}
@@ -308,7 +309,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go restoreInformer.Run(stop)
 	}
 
-	restore, err := o.client.VeleroV1().Restores(restore.Namespace).Create(restore)
+	restore, err := o.client.VeleroV1().Restores(restore.Namespace).Create(context.TODO(), restore, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

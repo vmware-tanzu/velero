@@ -203,7 +203,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
 
-			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
+			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(context.TODO(), test.backup.Name, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			assert.Equal(t, velerov1api.BackupPhaseFailedValidation, res.Status.Phase)
@@ -849,10 +849,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
 
-			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
+			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(context.TODO(), test.backup.Name, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expectedResult, res)
+
+			// reset defaultBackupLocation resourceVersion
+			defaultBackupLocation.ObjectMeta.ResourceVersion = ""
 		})
 	}
 }

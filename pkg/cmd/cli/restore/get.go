@@ -17,6 +17,8 @@ limitations under the License.
 package restore
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,12 +45,12 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				restores = new(api.RestoreList)
 				for _, name := range args {
-					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(name, metav1.GetOptions{})
+					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					restores.Items = append(restores.Items, *restore)
 				}
 			} else {
-				restores, err = veleroClient.VeleroV1().Restores(f.Namespace()).List(listOptions)
+				restores, err = veleroClient.VeleroV1().Restores(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 

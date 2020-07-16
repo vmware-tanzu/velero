@@ -121,7 +121,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 	for volume, snapshot := range volumesToRestore {
 		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, snapshot, repo.Spec.ResticIdentifier)
 
-		if err := errorOnly(r.repoManager.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(volumeRestore)); err != nil {
+		if err := errorOnly(r.repoManager.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}

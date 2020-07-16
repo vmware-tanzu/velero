@@ -17,6 +17,7 @@ limitations under the License.
 package kube
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -47,7 +48,7 @@ func NamespaceAndName(objMeta metav1.Object) string {
 func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client corev1client.NamespaceInterface, timeout time.Duration) (bool, error) {
 	var ready bool
 	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		clusterNS, err := client.Get(namespace.Name, metav1.GetOptions{})
+		clusterNS, err := client.Get(context.TODO(), namespace.Name, metav1.GetOptions{})
 
 		if apierrors.IsNotFound(err) {
 			// Namespace isn't in cluster, we're good to create.
@@ -79,7 +80,7 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 		return true, nil
 	}
 
-	clusterNS, err := client.Create(namespace)
+	clusterNS, err := client.Create(context.TODO(), namespace, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
 			// Somehow created after all our polling and marked for deletion, return an error

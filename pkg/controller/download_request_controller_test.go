@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -271,7 +272,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			if tc.downloadRequest != nil {
 				require.NoError(t, harness.informerFactory.Velero().V1().DownloadRequests().Informer().GetStore().Add(tc.downloadRequest))
 
-				_, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Create(tc.downloadRequest)
+				_, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Create(context.TODO(), tc.downloadRequest, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -303,7 +304,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			}
 
 			if tc.expectGetsURL {
-				output, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Get(tc.downloadRequest.Name, metav1.GetOptions{})
+				output, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Get(context.TODO(), tc.downloadRequest.Name, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				assert.Equal(t, string(velerov1api.DownloadRequestPhaseProcessed), string(output.Status.Phase))
@@ -312,7 +313,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			}
 
 			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-				res, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Get(tc.downloadRequest.Name, metav1.GetOptions{})
+				res, err := harness.client.VeleroV1().DownloadRequests(tc.downloadRequest.Namespace).Get(context.TODO(), tc.downloadRequest.Name, metav1.GetOptions{})
 
 				if tc.expired {
 					assert.True(t, apierrors.IsNotFound(err))

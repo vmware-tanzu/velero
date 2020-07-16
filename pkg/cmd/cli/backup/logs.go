@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -51,7 +52,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
-			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(backupName, metav1.GetOptions{})
+			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), backupName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				cmd.Exit("Backup %q does not exist.", backupName)
 			} else if err != nil {

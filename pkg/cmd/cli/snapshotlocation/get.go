@@ -17,6 +17,8 @@ limitations under the License.
 package snapshotlocation
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,12 +42,12 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				locations = new(api.VolumeSnapshotLocationList)
 				for _, name := range args {
-					location, err := veleroClient.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(name, metav1.GetOptions{})
+					location, err := veleroClient.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					locations.Items = append(locations.Items, *location)
 				}
 			} else {
-				locations, err = veleroClient.VeleroV1().VolumeSnapshotLocations(f.Namespace()).List(listOptions)
+				locations, err = veleroClient.VeleroV1().VolumeSnapshotLocations(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 			_, err = output.PrintWithFormat(c, locations)
