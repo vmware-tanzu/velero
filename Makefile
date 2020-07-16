@@ -277,11 +277,11 @@ endif
 build-image:
 	@# When we build a new image we just untag the old one.
 	@# This makes sure we don't leave the orphaned image behind.
-	id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
+	@id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
 	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) . ; \
 	new_id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
-	if [ "$$id" != "$$new_id" ]; then \
-		docker rmi -q $$id || true; \
+	if [ "$$id" != "" ] && [ "$$id" != "$$new_id" ]; then \
+		docker rmi -f $$id || true; \
 	fi
 
 push-build-image:
