@@ -287,6 +287,8 @@ func (c *backupController) processBackup(key string) error {
 		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
 	case velerov1api.BackupPhaseFailed:
 		c.metrics.RegisterBackupFailed(backupScheduleName)
+	case velerov1api.BackupPhaseFailedValidation:
+		c.metrics.RegisterBackupValidationFailure(backupScheduleName)
 	}
 
 	log.Debug("Updating backup's final status")
