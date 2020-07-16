@@ -35,6 +35,7 @@ const (
 	backupSuccessTotal            = "backup_success_total"
 	backupPartialFailureTotal     = "backup_partial_failure_total"
 	backupFailureTotal            = "backup_failure_total"
+	backupValidationFailureTotal  = "backup_validation_failure_total"
 	backupDurationSeconds         = "backup_duration_seconds"
 	backupDeletionAttemptTotal    = "backup_deletion_attempt_total"
 	backupDeletionSuccessTotal    = "backup_deletion_success_total"
@@ -112,6 +113,14 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      backupFailureTotal,
 					Help:      "Total number of failed backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupValidationFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupValidationFailureTotal,
+					Help:      "Total number of validation failed backups",
 				},
 				[]string{scheduleLabel},
 			),
@@ -254,6 +263,9 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
+	if c, ok := m.metrics[backupValidationFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
 	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
@@ -335,6 +347,13 @@ func (m *ServerMetrics) RegisterBackupPartialFailure(backupSchedule string) {
 // RegisterBackupFailed records a failed backup.
 func (m *ServerMetrics) RegisterBackupFailed(backupSchedule string) {
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupValidationFailure records a validation failed backup.
+func (m *ServerMetrics) RegisterBackupValidationFailure(backupSchedule string) {
+	if c, ok := m.metrics[backupValidationFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
 }
