@@ -154,7 +154,7 @@ In order to know the CR created for the particular backup of a volume, Velero ad
 - `velero.io/pv-name` with value as volume that is undergoing backup
 
 Backup name being unique won't cause issues like duplicates in identifying the CR.
-Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
+Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/main/pkg/label/label.go#L35).
 
 If Plugin supports showing progress of the operation it is performing, it does following:
 - finds the VolumePluginBackup CR related to this backup operation by using `tags` passed in CreateSnapshot call
@@ -281,7 +281,7 @@ In order to know the CR created for the particular restore of a volume, Velero a
 - `velero.io/snapshot-id` with value as snapshot id that need to be restored
 - `velero.io/provider` with value as `Provider` in `VolumeSnapshotLocation`
 
-Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
+Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/main/pkg/label/label.go#L35).
 
 Plugin will be able to identify CR by using snapshotID that it received as parameter of CreateVolumeFromSnapshot API, and plugin's Provider name.
 It updates the progress of restore operation regularly if plugin supports feature of showing progress.
@@ -376,7 +376,7 @@ In order to know the CR created for the particular backup of a volume, volume sn
 
 Backup name being unique won't cause issues like duplicates in identifying the CR.
 
-Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
+Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/main/pkg/label/label.go#L35).
 
 Though no restrictions are required on the name of CR, as a general practice, volume snapshotter can name this CR with the value same as return value of CreateSnapshot.
 
