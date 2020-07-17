@@ -39,7 +39,7 @@ BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
-VERSION ?= master
+VERSION ?= main
 
 TAG_LATEST ?= false
 

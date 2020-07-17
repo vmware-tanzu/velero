@@ -208,13 +208,13 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [3]: #build
 [4]: https://blog.golang.org/organizing-go-code
 [5]: https://golang.org/doc/install
-[6]: https://github.com/heptio/ark/tree/master/examples
+[6]: https://github.com/heptio/ark/tree/main/examples
 [7]: #run
 [8]: config-definition.md
 [10]: #vendoring-dependencies
 [11]: vendoring-dependencies.md
 [12]: #test
-[13]: https://github.com/heptio/ark/blob/master/hack/generate-proto.sh
+[13]: https://github.com/heptio/ark/blob/main/hack/generate-proto.sh
 [14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
 [15]: https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file
 [16]: https://cloud.google.com/docs/authentication/getting-started#setting_the_environment_variable

@@ -73,8 +73,8 @@ This same approach can be taken for CA bundles. The bundle can be stored in a
 secret which is referenced on the BSL and written to a temp file prior to
 invoking Restic.
 
-[1](https://github.com/vmware-tanzu/velero/blob/master/pkg/restic/repository_manager.go#L238-L245)
-[2](https://github.com/vmware-tanzu/velero/blob/master/pkg/restic/common.go#L168-L203)
+[1](https://github.com/vmware-tanzu/velero/blob/main/pkg/restic/repository_manager.go#L238-L245)
+[2](https://github.com/vmware-tanzu/velero/blob/main/pkg/restic/common.go#L168-L203)
 
 ## Detailed Design
 
@@ -126,7 +126,7 @@ would look like:
 $ velero client config set cacert PATH
 ```
 
-[1]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/master/velero-plugin-for-aws/object_store.go#L135
-[2]: https://github.com/vmware-tanzu/velero/blob/master/pkg/restic/command.go#L47
-[3]: https://github.com/restic/restic/blob/master/internal/backend/http_transport.go#L81
-[4]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/master/velero-plugin-for-aws/object_store.go#L154
+[1]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/velero-plugin-for-aws/object_store.go#L135
+[2]: https://github.com/vmware-tanzu/velero/blob/main/pkg/restic/command.go#L47
+[3]: https://github.com/restic/restic/blob/main/internal/backend/http_transport.go#L81
+[4]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/velero-plugin-for-aws/object_store.go#L154

@@ -16,6 +16,6 @@ The `latest` tag follows the most recently released version of Velero.
 
 ## Development
 
-`velero/velero:master`
+`velero/velero:main`
 
-The `master` tag follows the latest commit to land on the `master` branch.
+The `main` tag follows the latest commit to land on the `main` branch.

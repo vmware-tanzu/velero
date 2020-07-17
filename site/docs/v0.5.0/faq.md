@@ -22,4 +22,4 @@ Examples of cases where Ark is useful:
 
 Yes, with some exceptions. For example, when Ark restores pods it deletes the `nodeName` from the
 pod so that it can be scheduled onto a new node. You can see some more examples of the differences
-in [pod_restorer.go](https://github.com/heptio/ark/blob/master/pkg/restore/restorers/pod_restorer.go)
+in [pod_restorer.go](https://github.com/heptio/ark/blob/main/pkg/restore/restorers/pod_restorer.go)

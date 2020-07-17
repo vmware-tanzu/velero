@@ -90,7 +90,7 @@ We fixed a large number of bugs and made some smaller usability improvements in 
 
 
 ### All Changes
-  * Corrected the selfLink for Backup CR in site/docs/master/output-file-format.md (#2292, @RushinthJohn)
+  * Corrected the selfLink for Backup CR in site/docs/main/output-file-format.md (#2292, @RushinthJohn)
   * Back up schema-less CustomResourceDefinitions as v1beta1, even if they are retrieved via the v1 endpoint. (#2264, @nrb)
   * Bug fix: restic backup volume snapshot to the second location failed (#2244, @jenting)
   * Added support of using PV name from volumesnapshotter('SetVolumeID') in case of PV renaming during the restore (#2216, @mynktl)

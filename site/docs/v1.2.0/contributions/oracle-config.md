@@ -20,7 +20,7 @@
     wget https://github.com/vmware-tanzu/velero/releases/download/v1.0.0/velero-v1.0.0-linux-amd64.tar.gz
     ```
 
-    *We strongly recommend that you use an official release of Velero. The tarballs for each release contain the velero command-line client. The code in the master branch of the Velero repository is under active development and is not guaranteed to be stable!*
+    *We strongly recommend that you use an official release of Velero. The tarballs for each release contain the velero command-line client. The code in the main branch of the Velero repository is under active development and is not guaranteed to be stable!*
 
 2. Untar the release in your `/usr/bin` directory:  `tar -xzvf <RELEASE-TARBALL-NAME>.tar.gz` 
 

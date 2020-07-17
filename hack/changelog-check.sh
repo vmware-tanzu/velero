@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# docker-push is invoked by the CI/CD system to deploy docker images to Docker Hub.
-# It will build images for all commits to master and all git tags.
-# The highest, non-prerelease semantic version will also be given the `latest` tag.
 
 set +x
 
@@ -37,7 +34,7 @@ if ls ${change_log_file} 1> /dev/null 2>&1; then
     echo "changelog for PR ${pr_number} exists"
     exit 0
 else
-    echo "PR ${pr_number} is missing a changelog. Please refer https://velero.io/docs/master/code-standards/#adding-a-changelog and add a changelog."
+    echo "PR ${pr_number} is missing a changelog. Please refer https://velero.io/docs/main/code-standards/#adding-a-changelog and add a changelog."
     exit 1
 fi
 

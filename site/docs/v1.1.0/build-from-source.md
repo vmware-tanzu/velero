@@ -75,7 +75,7 @@ If after installing Velero you would like to change the image used by its deploy
 kubectl -n velero set image deploy/velero velero=myimagerepo/velero:$VERSION
 ```
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `gcr.io/heptio-images`.
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:main` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `gcr.io/heptio-images`.
 
 Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
 

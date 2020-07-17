@@ -160,5 +160,5 @@ velero backup create full-cluster-backup
 
 [1]: api-types/backupstoragelocation.md
 [2]: api-types/volumesnapshotlocation.md
-[3]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/master/volumesnapshotlocation.md
-[4]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/master/backupstoragelocation.md
+[3]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/volumesnapshotlocation.md
+[4]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/backupstoragelocation.md

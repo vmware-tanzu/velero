@@ -76,7 +76,7 @@ If after installing Velero you would like to change the image used by its deploy
 kubectl -n velero set image deploy/velero velero=myimagerepo/velero:$VERSION
 ```
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero-amd64:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero-amd64:main` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
 
 Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
 
@@ -93,7 +93,7 @@ ARCH=linux-ppc64le make container
 ```
 _Note: By default, ARCH is set to linux-amd64_
 
-To push your image to the registry. For example, if you want to push the `gcr.io/my-registry/velero-amd64:master` image, run:
+To push your image to the registry. For example, if you want to push the `gcr.io/my-registry/velero-amd64:main` image, run:
 
 ```bash
 make push
@@ -108,7 +108,7 @@ ARCH=linux-ppc64le make push
 ```
 _Note: By default, ARCH is set to linux-amd64_
 
-To create and push your manifest to the registry. For example, if you want to create and push the `gcr.io/my-registry/velero:master` manifest, run:
+To create and push your manifest to the registry. For example, if you want to create and push the `gcr.io/my-registry/velero:main` manifest, run:
 
 ```bash
 make manifest

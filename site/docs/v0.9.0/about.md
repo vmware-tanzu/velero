@@ -69,4 +69,4 @@ This allows restore functionality to work in a cluster migration scenario, where
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
-[30]: https://github.com/heptio/ark/blob/master/docs/cli-reference/ark_create_backup.md
+[30]: https://github.com/heptio/ark/blob/main/docs/cli-reference/ark_create_backup.md

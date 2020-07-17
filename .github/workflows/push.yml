@@ -1,8 +1,8 @@
-name: Master CI
+name: Main CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     tags:
       - '*'
 

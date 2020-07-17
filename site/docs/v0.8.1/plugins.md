@@ -32,4 +32,4 @@ within your plugin.
 
 
 [1]: https://github.com/heptio/ark-plugin-example
-[2]: https://github.com/heptio/ark/blob/master/pkg/plugin/logger.go
+[2]: https://github.com/heptio/ark/blob/main/pkg/plugin/logger.go
