@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package hook
 
 import (
 	"encoding/json"
@@ -38,35 +38,35 @@ import (
 type hookPhase string
 
 const (
-	hookPhasePre  hookPhase = "pre"
-	hookPhasePost hookPhase = "post"
+	PhasePre  hookPhase = "pre"
+	PhasePost hookPhase = "post"
 )
 
-// itemHookHandler invokes hooks for an item.
-type itemHookHandler interface {
-	// handleHooks invokes hooks for an item. If the item is a pod and the appropriate annotations exist
+// ItemHookHandler invokes hooks for an item.
+type ItemHookHandler interface {
+	// HandleHooks invokes hooks for an item. If the item is a pod and the appropriate annotations exist
 	// to specify a hook, that is executed. Otherwise, this looks at the backup context's Backup to
 	// determine if there are any hooks relevant to the item, taking into account the hook spec's
 	// namespaces, resources, and label selector.
-	handleHooks(
+	HandleHooks(
 		log logrus.FieldLogger,
 		groupResource schema.GroupResource,
 		obj runtime.Unstructured,
-		resourceHooks []resourceHook,
+		resourceHooks []ResourceHook,
 		phase hookPhase,
 	) error
 }
 
-// defaultItemHookHandler is the default itemHookHandler.
-type defaultItemHookHandler struct {
-	podCommandExecutor podexec.PodCommandExecutor
+// DefaultItemHookHandler is the default itemHookHandler.
+type DefaultItemHookHandler struct {
+	PodCommandExecutor podexec.PodCommandExecutor
 }
 
-func (h *defaultItemHookHandler) handleHooks(
+func (h *DefaultItemHookHandler) HandleHooks(
 	log logrus.FieldLogger,
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
-	resourceHooks []resourceHook,
+	resourceHooks []ResourceHook,
 	phase hookPhase,
 ) error {
 	// We only support hooks on pods right now
@@ -84,7 +84,7 @@ func (h *defaultItemHookHandler) handleHooks(
 
 	// If the pod has the hook specified via annotations, that takes priority.
 	hookFromAnnotations := getPodExecHookFromAnnotations(metadata.GetAnnotations(), phase, log)
-	if phase == hookPhasePre && hookFromAnnotations == nil {
+	if phase == PhasePre && hookFromAnnotations == nil {
 		// See if the pod has the legacy hook annotation keys (i.e. without a phase specified)
 		hookFromAnnotations = getPodExecHookFromAnnotations(metadata.GetAnnotations(), "", log)
 	}
@@ -96,7 +96,7 @@ func (h *defaultItemHookHandler) handleHooks(
 				"hookPhase":  phase,
 			},
 		)
-		if err := h.podCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); err != nil {
+		if err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); err != nil {
 			hookLog.WithError(err).Error("Error executing hook")
 			if hookFromAnnotations.OnError == api.HookErrorModeFail {
 				return err
@@ -114,10 +114,10 @@ func (h *defaultItemHookHandler) handleHooks(
 		}
 
 		var hooks []api.BackupResourceHook
-		if phase == hookPhasePre {
-			hooks = resourceHook.pre
+		if phase == PhasePre {
+			hooks = resourceHook.Pre
 		} else {
-			hooks = resourceHook.post
+			hooks = resourceHook.Post
 		}
 		for _, hook := range hooks {
 			if groupResource == kuberesource.Pods {
@@ -129,7 +129,7 @@ func (h *defaultItemHookHandler) handleHooks(
 							"hookPhase":  phase,
 						},
 					)
-					err := h.podCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.name, hook.Exec)
+					err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.Name, hook.Exec)
 					if err != nil {
 						hookLog.WithError(err).Error("Error executing hook")
 						if hook.Exec.OnError == api.HookErrorModeFail {
@@ -205,23 +205,24 @@ func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhas
 	}
 }
 
-type resourceHook struct {
-	name          string
-	namespaces    *collections.IncludesExcludes
-	resources     *collections.IncludesExcludes
-	labelSelector labels.Selector
-	pre           []api.BackupResourceHook
-	post          []api.BackupResourceHook
+// ResourceHook is a hook for a given resource.
+type ResourceHook struct {
+	Name          string
+	Namespaces    *collections.IncludesExcludes
+	Resources     *collections.IncludesExcludes
+	LabelSelector labels.Selector
+	Pre           []api.BackupResourceHook
+	Post          []api.BackupResourceHook
 }
 
-func (r resourceHook) applicableTo(groupResource schema.GroupResource, namespace string, labels labels.Set) bool {
-	if r.namespaces != nil && !r.namespaces.ShouldInclude(namespace) {
+func (r ResourceHook) applicableTo(groupResource schema.GroupResource, namespace string, labels labels.Set) bool {
+	if r.Namespaces != nil && !r.Namespaces.ShouldInclude(namespace) {
 		return false
 	}
-	if r.resources != nil && !r.resources.ShouldInclude(groupResource.String()) {
+	if r.Resources != nil && !r.Resources.ShouldInclude(groupResource.String()) {
 		return false
 	}
-	if r.labelSelector != nil && !r.labelSelector.Matches(labels) {
+	if r.LabelSelector != nil && !r.LabelSelector.Matches(labels) {
 		return false
 	}
 	return true
