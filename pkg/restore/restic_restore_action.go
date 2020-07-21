@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -77,7 +78,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
 
 	opts := label.NewListOptionsForBackup(input.Restore.Spec.BackupName)
-	podVolumeBackupList, err := a.podVolumeBackupClient.List(opts)
+	podVolumeBackupList, err := a.podVolumeBackupClient.List(context.TODO(), opts)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -237,7 +238,7 @@ func getPluginConfig(kind framework.PluginKind, name string, client corev1client
 		LabelSelector: fmt.Sprintf("velero.io/plugin-config,%s=%s", name, kind),
 	}
 
-	list, err := client.List(opts)
+	list, err := client.List(context.TODO(), opts)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

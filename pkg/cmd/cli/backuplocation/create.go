@@ -17,6 +17,7 @@ limitations under the License.
 package backuplocation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -55,14 +58,14 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name             string
-	Provider         string
-	Bucket           string
-	Prefix           string
-	BackupSyncPeriod time.Duration
-	Config           flag.Map
-	Labels           flag.Map
-	AccessMode       *flag.Enum
+	Name                                  string
+	Provider                              string
+	Bucket                                string
+	Prefix                                string
+	BackupSyncPeriod, ValidationFrequency time.Duration
+	Config                                flag.Map
+	Labels                                flag.Map
+	AccessMode                            *flag.Enum
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -80,7 +83,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the backup storage provider (e.g. aws, azure, gcp)")
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
-	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync")
+	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
+	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "how often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup storage location")
 	flags.Var(
@@ -116,10 +120,14 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	var backupSyncPeriod *metav1.Duration
+	var backupSyncPeriod, validationFrequency *metav1.Duration
 
 	if c.Flags().Changed("backup-sync-period") {
 		backupSyncPeriod = &metav1.Duration{Duration: o.BackupSyncPeriod}
+	}
+
+	if c.Flags().Changed("validation-frequency") {
+		validationFrequency = &metav1.Duration{Duration: o.ValidationFrequency}
 	}
 
 	backupStorageLocation := &velerov1api.BackupStorageLocation{
@@ -136,9 +144,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					Prefix: o.Prefix,
 				},
 			},
-			Config:           o.Config.Data(),
-			AccessMode:       velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
-			BackupSyncPeriod: backupSyncPeriod,
+			Config:              o.Config.Data(),
+			AccessMode:          velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
+			BackupSyncPeriod:    backupSyncPeriod,
+			ValidationFrequency: validationFrequency,
 		},
 	}
 
@@ -146,12 +155,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	client, err := f.Client()
+	client, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
 
-	if _, err := client.VeleroV1().BackupStorageLocations(backupStorageLocation.Namespace).Create(backupStorageLocation); err != nil {
+	if err := client.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
 

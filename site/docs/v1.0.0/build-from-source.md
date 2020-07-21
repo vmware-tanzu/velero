@@ -58,7 +58,7 @@ make build
 
 See the **Cross compiling** section below for details on building for alternate OS/architecture combinations.
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:main` image, set `$REGISTRY` to `gcr.io/my-registry`. Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
 
 ```bash
 make container
@@ -232,13 +232,13 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [3]: #build
 [4]: https://blog.golang.org/organizing-go-code
 [5]: https://golang.org/doc/install
-[6]: https://github.com/vmware-tanzu/velero/tree/master/examples
+[6]: https://github.com/vmware-tanzu/velero/tree/main/examples
 [7]: #run
 [8]: config-definition.md
 [10]: #vendoring-dependencies
 [11]: vendoring-dependencies.md
 [12]: #test
-[13]: https://github.com/vmware-tanzu/velero/blob/master/hack/generate-proto.sh
+[13]: https://github.com/vmware-tanzu/velero/blob/main/hack/generate-proto.sh
 [14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
 [15]: https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file
 [16]: https://cloud.google.com/docs/authentication/getting-started#setting_the_environment_variable

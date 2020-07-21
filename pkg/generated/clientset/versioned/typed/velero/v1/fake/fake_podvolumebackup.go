@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var podvolumebackupsResource = schema.GroupVersionResource{Group: "velero.io", V
 var podvolumebackupsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "PodVolumeBackup"}
 
 // Get takes name of the podVolumeBackup, and returns the corresponding podVolumeBackup object, and an error if there is any.
-func (c *FakePodVolumeBackups) Get(name string, options v1.GetOptions) (result *velerov1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podvolumebackupsResource, c.ns, name), &velerov1.PodVolumeBackup{})
 
@@ -50,7 +52,7 @@ func (c *FakePodVolumeBackups) Get(name string, options v1.GetOptions) (result *
 }
 
 // List takes label and field selectors, and returns the list of PodVolumeBackups that match those selectors.
-func (c *FakePodVolumeBackups) List(opts v1.ListOptions) (result *velerov1.PodVolumeBackupList, err error) {
+func (c *FakePodVolumeBackups) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.PodVolumeBackupList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(podvolumebackupsResource, podvolumebackupsKind, c.ns, opts), &velerov1.PodVolumeBackupList{})
 
@@ -72,14 +74,14 @@ func (c *FakePodVolumeBackups) List(opts v1.ListOptions) (result *velerov1.PodVo
 }
 
 // Watch returns a watch.Interface that watches the requested podVolumeBackups.
-func (c *FakePodVolumeBackups) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePodVolumeBackups) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podvolumebackupsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a podVolumeBackup and creates it.  Returns the server's representation of the podVolumeBackup, and an error, if there is any.
-func (c *FakePodVolumeBackups) Create(podVolumeBackup *velerov1.PodVolumeBackup) (result *velerov1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Create(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackup, opts v1.CreateOptions) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podvolumebackupsResource, c.ns, podVolumeBackup), &velerov1.PodVolumeBackup{})
 
@@ -90,7 +92,7 @@ func (c *FakePodVolumeBackups) Create(podVolumeBackup *velerov1.PodVolumeBackup)
 }
 
 // Update takes the representation of a podVolumeBackup and updates it. Returns the server's representation of the podVolumeBackup, and an error, if there is any.
-func (c *FakePodVolumeBackups) Update(podVolumeBackup *velerov1.PodVolumeBackup) (result *velerov1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Update(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackup, opts v1.UpdateOptions) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(podvolumebackupsResource, c.ns, podVolumeBackup), &velerov1.PodVolumeBackup{})
 
@@ -102,7 +104,7 @@ func (c *FakePodVolumeBackups) Update(podVolumeBackup *velerov1.PodVolumeBackup)
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodVolumeBackups) UpdateStatus(podVolumeBackup *velerov1.PodVolumeBackup) (*velerov1.PodVolumeBackup, error) {
+func (c *FakePodVolumeBackups) UpdateStatus(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackup, opts v1.UpdateOptions) (*velerov1.PodVolumeBackup, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(podvolumebackupsResource, "status", c.ns, podVolumeBackup), &velerov1.PodVolumeBackup{})
 
@@ -113,7 +115,7 @@ func (c *FakePodVolumeBackups) UpdateStatus(podVolumeBackup *velerov1.PodVolumeB
 }
 
 // Delete takes name of the podVolumeBackup and deletes it. Returns an error if one occurs.
-func (c *FakePodVolumeBackups) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePodVolumeBackups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podvolumebackupsResource, c.ns, name), &velerov1.PodVolumeBackup{})
 
@@ -121,15 +123,15 @@ func (c *FakePodVolumeBackups) Delete(name string, options *v1.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePodVolumeBackups) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podvolumebackupsResource, c.ns, listOptions)
+func (c *FakePodVolumeBackups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podvolumebackupsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &velerov1.PodVolumeBackupList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched podVolumeBackup.
-func (c *FakePodVolumeBackups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(podvolumebackupsResource, c.ns, name, pt, data, subresources...), &velerov1.PodVolumeBackup{})
 

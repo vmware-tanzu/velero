@@ -20,7 +20,7 @@ WARNING: It is recommended to run the Ark server in one namespace, and place you
 restores, and config in a different namespace. You might encounter issues with deleting a single Ark
 namespace that contains everything.
 
-For all cloud providers, edit `https://github.com/heptio/ark/blob/master/examples/common/00-prereqs.yaml`. This file defines:
+For all cloud providers, edit `https://github.com/heptio/ark/blob/main/examples/common/00-prereqs.yaml`. This file defines:
 
 * CustomResourceDefinitions for the Ark objects (backups, schedules, restores, configs, downloadrequests)
 * The namespace where the Ark server runs
@@ -33,24 +33,24 @@ For all cloud providers, edit `https://github.com/heptio/ark/blob/master/example
 
 For AWS, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/common/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/aws/00-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/common/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/aws/00-ark-config.yaml`
 
 
 ### GCP
 
 For GCP, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/common/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/gcp/00-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/common/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/gcp/00-ark-config.yaml`
 
 
 ### Azure
 
 For Azure, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/azure/00-ark-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/azure/10-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/azure/00-ark-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/azure/10-ark-config.yaml`
 
 
 ## Specify the namespace in client commands
@@ -63,4 +63,4 @@ ark client config set namespace=<NAMESPACE_VALUE>
 
 
 
-[0]: https://github.com/heptio/ark/tree/master/examples
+[0]: https://github.com/heptio/ark/tree/main/examples

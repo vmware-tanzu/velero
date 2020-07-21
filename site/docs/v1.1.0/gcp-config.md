@@ -12,7 +12,7 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
 1. Download the [latest official release's](https://github.com/vmware-tanzu/velero/releases) tarball for your client platform.
 
     _We strongly recommend that you use an [official release](https://github.com/vmware-tanzu/velero/releases) of
-Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
+Velero. The tarballs for each release contain the `velero` command-line client. The code in the main branch
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:

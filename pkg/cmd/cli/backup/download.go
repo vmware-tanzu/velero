@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,7 +44,8 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "download NAME",
-		Short: "Download a backup",
+		Short: "Download all Kubernetes manifests for a backup",
+		Long:  "Download all Kubernetes manifests for a backup. Contents of persistent volume snapshots are not included.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
@@ -86,7 +88,7 @@ func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Fac
 	veleroClient, err := f.Client()
 	cmd.CheckError(err)
 
-	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{}); err != nil {
+	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), o.Name, metav1.GetOptions{}); err != nil {
 		return err
 	}
 

@@ -16,6 +16,6 @@ The `latest` tag follows the most recently released version of Ark.
 
 ## Development
 
-`gcr.io/heptio-images/ark:master`
+`gcr.io/heptio-images/ark:main`
 
-The `master` tag follows the latest commit to land on the `master` branch.
+The `main` tag follows the latest commit to land on the `main` branch.

@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,6 +33,7 @@ import (
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,13 +49,13 @@ import (
 	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
+
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -68,6 +68,14 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
+	"github.com/vmware-tanzu/velero/internal/velero"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 const (
@@ -75,7 +83,8 @@ const (
 	defaultMetricsAddress = ":8085"
 
 	defaultBackupSyncPeriod           = time.Minute
-	defaultPodVolumeOperationTimeout  = 60 * time.Minute
+	defaultStoreValidationFrequency   = time.Minute
+	defaultPodVolumeOperationTimeout  = 240 * time.Minute
 	defaultResourceTerminatingTimeout = 10 * time.Minute
 
 	// server's client default qps and burst
@@ -116,7 +125,7 @@ var disableControllerList = []string{
 type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
-	defaultBackupTTL                                                        time.Duration
+	defaultBackupTTL, storeValidationFrequency                              time.Duration
 	restoreResourcePriorities                                               []string
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -126,6 +135,7 @@ type serverConfig struct {
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
 	defaultResticMaintenanceFrequency                                       time.Duration
+	defaultVolumesToRestic                                                  bool
 }
 
 type controllerRunInfo struct {
@@ -144,6 +154,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultVolumeSnapshotLocations:    make(map[string]string),
 			backupSyncPeriod:                  defaultBackupSyncPeriod,
 			defaultBackupTTL:                  defaultBackupTTL,
+			storeValidationFrequency:          defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:         defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:         defaultRestorePriorities,
 			clientQPS:                         defaultClientQPS,
@@ -152,6 +163,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			resourceTerminatingTimeout:        defaultResourceTerminatingTimeout,
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
+			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
 		}
 	)
 
@@ -206,6 +218,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringSliceVar(&config.disabledControllers, "disable-controllers", config.disabledControllers, fmt.Sprintf("list of controllers to disable on startup. Valid values are %s", strings.Join(disableControllerList, ",")))
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
+	command.Flags().DurationVar(&config.storeValidationFrequency, "store-validation-frequency", config.storeValidationFrequency, "how often to verify if the storage is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
 	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
 	command.Flags().Float32Var(&config.clientQPS, "client-qps", config.clientQPS, "maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached")
 	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
@@ -213,6 +226,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "how long to wait by default before backups can be garbage collected")
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default")
+	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "backup all volumes with restic by default")
 
 	return command
 }
@@ -237,6 +251,7 @@ type server struct {
 	resticManager                       restic.RepositoryManager
 	metrics                             *metrics.ServerMetrics
 	config                              serverConfig
+	mgr                                 manager.Manager
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -283,12 +298,22 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	var csiSnapClient *snapshotv1beta1client.Clientset
-	if features.IsEnabled(api.CSIFeatureFlag) {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		csiSnapClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
 		if err != nil {
 			cancelFunc()
 			return nil, err
 		}
+	}
+
+	scheme := runtime.NewScheme()
+	velerov1api.AddToScheme(scheme)
+	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		cancelFunc()
+		return nil, err
 	}
 
 	s := &server{
@@ -308,6 +333,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		logLevel:                            logger.Level,
 		pluginRegistry:                      pluginRegistry,
 		config:                              config,
+		mgr:                                 mgr,
 	}
 
 	return s, nil
@@ -335,15 +361,6 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.validateBackupStorageLocations(); err != nil {
-		return err
-	}
-
-	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).
-			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
-	}
-
 	if err := s.initRestic(); err != nil {
 		return err
 	}
@@ -360,7 +377,7 @@ func (s *server) run() error {
 func (s *server) namespaceExists(namespace string) error {
 	s.logger.WithField("namespace", namespace).Info("Checking existence of namespace")
 
-	if _, err := s.kubeClient.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+	if _, err := s.kubeClient.CoreV1().Namespaces().Get(s.ctx, namespace, metav1.GetOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -397,14 +414,14 @@ func (s *server) veleroResourcesExist() error {
 
 	var veleroGroupVersion *metav1.APIResourceList
 	for _, gv := range s.discoveryHelper.Resources() {
-		if gv.GroupVersion == api.SchemeGroupVersion.String() {
+		if gv.GroupVersion == velerov1api.SchemeGroupVersion.String() {
 			veleroGroupVersion = gv
 			break
 		}
 	}
 
 	if veleroGroupVersion == nil {
-		return errors.Errorf("Velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", api.SchemeGroupVersion)
+		return errors.Errorf("Velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", velerov1api.SchemeGroupVersion)
 	}
 
 	foundResources := sets.NewString()
@@ -413,13 +430,13 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	var errs []error
-	for kind := range api.CustomResources() {
+	for kind := range velerov1api.CustomResources() {
 		if foundResources.Has(kind) {
 			s.logger.WithField("kind", kind).Debug("Found custom resource")
 			continue
 		}
 
-		errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, api.SchemeGroupVersion))
+		errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, velerov1api.SchemeGroupVersion))
 	}
 
 	if len(errs) > 0 {
@@ -428,39 +445,6 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	s.logger.Info("All Velero custom resource definitions exist")
-	return nil
-}
-
-// validateBackupStorageLocations checks to ensure all backup storage locations exist
-// and have a compatible layout, and returns an error if not.
-func (s *server) validateBackupStorageLocations() error {
-	s.logger.Info("Checking that all backup storage locations are valid")
-
-	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
-	defer pluginManager.CleanupClients()
-
-	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	var invalid []string
-	for _, location := range locations.Items {
-		backupStore, err := persistence.NewObjectBackupStore(&location, pluginManager, s.logger)
-		if err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
-			continue
-		}
-
-		if err := backupStore.IsValid(); err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "backup store for location %q is invalid", location.Name).Error())
-		}
-	}
-
-	if len(invalid) > 0 {
-		return errors.Errorf("some backup storage locations are invalid: %s", strings.Join(invalid, "; "))
-	}
-
 	return nil
 }
 
@@ -505,7 +489,7 @@ var defaultRestorePriorities = []string{
 
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
-	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
 	} else if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
@@ -540,7 +524,7 @@ func (s *server) initRestic() error {
 		secretsInformer,
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.mgr.GetClient(),
 		s.kubeClient.CoreV1(),
 		s.kubeClient.CoreV1(),
 		s.logger,
@@ -561,12 +545,12 @@ func (s *server) getCSISnapshotListers() (snapshotv1beta1listers.VolumeSnapshotL
 
 	// If CSI is enabled, check for the CSI groups and generate the listers
 	// If CSI isn't enabled, return empty listers.
-	if features.IsEnabled(api.CSIFeatureFlag) {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
 		switch {
 		case apierrors.IsNotFound(err):
 			// CSI is enabled, but the required CRDs aren't installed, so halt.
-			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
+			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
 		case err == nil:
 			// CSI is enabled, and the resources were found.
 			// Instantiate the listers fully
@@ -585,7 +569,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
-	var wg sync.WaitGroup
 
 	go func() {
 		metricsMux := http.NewServeMux()
@@ -608,10 +591,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
 			s.veleroClient.VeleroV1(),
-			s.veleroClient.VeleroV1(),
+			s.mgr.GetClient(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.csiSnapshotClient,
@@ -637,6 +619,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
+			s.config.defaultVolumesToRestic,
 		)
 		cmd.CheckError(err)
 
@@ -649,8 +632,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.mgr.GetClient(),
 			s.config.defaultBackupLocation,
+			s.config.defaultVolumesToRestic,
 			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,
@@ -688,7 +672,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.mgr.GetClient(),
 		)
 
 		return controllerRunInfo{
@@ -708,7 +692,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			csiVSLister,
 			csiVSCLister,
@@ -743,7 +727,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			restorer,
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			s.logger,
 			s.logLevel,
@@ -764,7 +748,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.mgr.GetClient(),
 			s.resticManager,
 			s.config.defaultResticMaintenanceFrequency,
 		)
@@ -780,7 +764,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().DownloadRequests(),
 			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			newPluginManager,
 			s.logger,
@@ -867,23 +851,38 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
-	// now that the informer caches have all synced, we can start running the controllers
-	for i := range controllers {
-		controllerRunInfo := controllers[i]
-
-		wg.Add(1)
-		go func() {
-			controllerRunInfo.controller.Run(ctx, controllerRunInfo.numWorkers)
-			wg.Done()
-		}()
+	storageLocationInfo := velero.StorageLocation{
+		Client:                          s.mgr.GetClient(),
+		Ctx:                             s.ctx,
+		DefaultStorageLocation:          s.config.defaultBackupLocation,
+		DefaultStoreValidationFrequency: s.config.storeValidationFrequency,
+		NewPluginManager:                newPluginManager,
+		NewBackupStore:                  persistence.NewObjectBackupStore,
+	}
+	if err := (&controller.BackupStorageLocationReconciler{
+		Scheme:          s.mgr.GetScheme(),
+		StorageLocation: storageLocationInfo,
+		Log:             s.logger,
+	}).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", "BackupStorageLocation")
 	}
 
-	s.logger.Info("Server started successfully")
+	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
+	// by v2.0, the block from this line and including the `s.mgr.Start() will be
+	// deprecated, since the manager auto-starts all the caches. Until then, we need to start the
+	// cache for them manually.
+	for i := range controllers {
+		controllerRunInfo := controllers[i]
+		// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
+		// so the manager will ensure the cache is started and ready before all controller are started
+		s.mgr.Add(managercontroller.Runnable(controllerRunInfo.controller, controllerRunInfo.numWorkers))
+	}
 
-	<-ctx.Done()
+	s.logger.Info("Server starting...")
 
-	s.logger.Info("Waiting for all controllers to shut down gracefully")
-	wg.Wait()
+	if err := s.mgr.Start(s.ctx.Done()); err != nil {
+		s.logger.Fatal("Problem starting manager", err)
+	}
 
 	return nil
 }
@@ -911,7 +910,7 @@ func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInforme
 	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
 	w := &CSIInformerFactoryWrapper{}
 
-	if features.IsEnabled(api.CSIFeatureFlag) {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		w.factory = snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(c, 0)
 	}
 	return w
@@ -919,14 +918,14 @@ func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInforme
 
 // Start proxies the Start call to the CSI SharedInformerFactory.
 func (w *CSIInformerFactoryWrapper) Start(stopCh <-chan struct{}) {
-	if features.IsEnabled(api.CSIFeatureFlag) {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		w.factory.Start(stopCh)
 	}
 }
 
 // WaitForCacheSync proxies the WaitForCacheSync call to the CSI SharedInformerFactory.
 func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
-	if features.IsEnabled(api.CSIFeatureFlag) {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		return w.factory.WaitForCacheSync(stopCh)
 	}
 	return nil

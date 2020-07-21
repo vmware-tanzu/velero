@@ -17,6 +17,8 @@ limitations under the License.
 package schedule
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,12 +45,12 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				schedules = new(api.ScheduleList)
 				for _, name := range args {
-					schedule, err := veleroClient.VeleroV1().Schedules(f.Namespace()).Get(name, metav1.GetOptions{})
+					schedule, err := veleroClient.VeleroV1().Schedules(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					schedules.Items = append(schedules.Items, *schedule)
 				}
 			} else {
-				schedules, err = veleroClient.VeleroV1().Schedules(f.Namespace()).List(listOptions)
+				schedules, err = veleroClient.VeleroV1().Schedules(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 

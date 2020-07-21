@@ -197,7 +197,7 @@ func (kr *kubernetesRestorer) Restore(
 		snapshotLocationLister:  snapshotLocationLister,
 	}
 
-	restoreCtx := &context{
+	restoreCtx := &restoreContext{
 		backup:                     req.Backup,
 		backupReader:               req.BackupReader,
 		restore:                    req.Restore,
@@ -289,7 +289,7 @@ func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper)
 	return resolved, nil
 }
 
-type context struct {
+type restoreContext struct {
 	backup                     *velerov1api.Backup
 	backupReader               io.Reader
 	restore                    *velerov1api.Restore
@@ -335,11 +335,11 @@ func getOrderedResources(resourcePriorities []string, backupResources map[string
 	}
 	sort.Strings(orderedBackupResources)
 
-	// master list: everything in resource priorities, followed by what's in the backup (alphabetized)
+	// main list: everything in resource priorities, followed by what's in the backup (alphabetized)
 	return append(resourcePriorities, orderedBackupResources...)
 }
 
-func (ctx *context) execute() (Result, Result) {
+func (ctx *restoreContext) execute() (Result, Result) {
 	warnings, errs := Result{}, Result{}
 
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
@@ -533,7 +533,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 }
 
-func (ctx *context) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
+func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
 	var actions []resolvedAction
 	for _, action := range ctx.actions {
 		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
@@ -554,7 +554,7 @@ func (ctx *context) getApplicableActions(groupResource schema.GroupResource, nam
 	return actions
 }
 
-func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, error) {
+func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (bool, error) {
 	pvLogger := ctx.log.WithField("pvName", name)
 
 	var shouldRestore bool
@@ -619,7 +619,7 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 		}
 
 		// Check the namespace associated with the claimRef to see if it's deleting/terminating before proceeding
-		ns, err := ctx.namespaceClient.Get(namespace, metav1.GetOptions{})
+		ns, err := ctx.namespaceClient.Get(go_context.TODO(), namespace, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			pvLogger.Debugf("namespace %s for PV not found, waiting", namespace)
 			// namespace not found but the PV still exists, so continue to wait
@@ -648,7 +648,7 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 }
 
 // crdAvailable waits for a CRD to be available for use before letting the restore continue.
-func (ctx *context) crdAvailable(name string, crdClient client.Dynamic) (bool, error) {
+func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (bool, error) {
 	crdLogger := ctx.log.WithField("crdName", name)
 
 	var available bool
@@ -685,7 +685,7 @@ func (ctx *context) crdAvailable(name string, crdClient client.Dynamic) (bool, e
 
 // restoreResource restores the specified cluster or namespace scoped resource. If namespace is
 // empty we are restoring a cluster level resource, otherwise into the specified namespace.
-func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace string, items []string) (Result, Result) {
+func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNamespace string, items []string) (Result, Result) {
 	warnings, errs := Result{}, Result{}
 
 	if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
@@ -731,7 +731,7 @@ func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace
 	return warnings, errs
 }
 
-func (ctx *context) getResourceClient(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (client.Dynamic, error) {
+func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (client.Dynamic, error) {
 	key := resourceClientKey{
 		resource:  groupResource.WithVersion(obj.GroupVersionKind().Version),
 		namespace: namespace,
@@ -767,7 +767,7 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 	return fmt.Sprintf("%s/%s/%s", groupResource.String(), namespace, name)
 }
 
-func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (Result, Result) {
+func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (Result, Result) {
 	warnings, errs := Result{}, Result{}
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
 
@@ -1158,7 +1158,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 // given a new name if and only if (a) a PV with the original name already exists in-cluster, and
 // (b) in the backup, the PV is claimed by a PVC in a namespace that's being remapped during the
 // restore.
-func shouldRenamePV(ctx *context, obj *unstructured.Unstructured, client client.Dynamic) (bool, error) {
+func shouldRenamePV(ctx *restoreContext, obj *unstructured.Unstructured, client client.Dynamic) (bool, error) {
 	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
 		ctx.log.Debugf("Persistent volume does not need to be renamed because restore is not remapping any namespaces")
 		return false, nil
@@ -1193,7 +1193,7 @@ func shouldRenamePV(ctx *context, obj *unstructured.Unstructured, client client.
 }
 
 // restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod
-func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured, originalNamespace string) {
+func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstructured, originalNamespace string) {
 	if ctx.resticRestorer == nil {
 		ctx.log.Warn("No restic restorer, not restoring pod's volumes")
 	} else {
@@ -1238,7 +1238,7 @@ func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
 	return false
 }
 
-func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *context) bool {
+func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {
 	if len(ctx.podVolumeBackups) == 0 {
 		return false
 	}
@@ -1336,7 +1336,7 @@ func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResou
 
 // unmarshal reads the specified file, unmarshals the JSON contained within it
 // and returns an Unstructured object.
-func (ctx *context) unmarshal(filePath string) (*unstructured.Unstructured, error) {
+func (ctx *restoreContext) unmarshal(filePath string) (*unstructured.Unstructured, error) {
 	var obj unstructured.Unstructured
 
 	bytes, err := ctx.fileSystem.ReadFile(filePath)

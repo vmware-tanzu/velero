@@ -1,0 +1,6 @@
+improve builder image handling so that we don't rebuild each `make shell` 
+first check if there are pending changed on the build-image dockerfile if so build it.
+then check if there is an image in the registry if so pull it.
+then build an image cause we don't have a cached image. (this handles the backward compat case.)
+fix make clean to clear go mod cache before removing dirs (for containerized builds)
+

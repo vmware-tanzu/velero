@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,9 +50,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// nonRestorableResources is a blacklist for the restoration process. Any resources
+// nonRestorableResources is an exclusion list  for the restoration process. Any resources
 // included here are explicitly excluded from the restoration process.
 var nonRestorableResources = []string{
 	"nodes",
@@ -80,7 +84,7 @@ type restoreController struct {
 	restorer               pkgrestore.Restorer
 	backupLister           velerov1listers.BackupLister
 	restoreLister          velerov1listers.RestoreLister
-	backupLocationLister   velerov1listers.BackupStorageLocationLister
+	kbClient               client.Client
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister
 	restoreLogLevel        logrus.Level
 	defaultBackupLocation  string
@@ -88,7 +92,7 @@ type restoreController struct {
 	logFormat              logging.Format
 
 	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewRestoreController(
@@ -98,7 +102,7 @@ func NewRestoreController(
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	restorer pkgrestore.Restorer,
 	backupLister velerov1listers.BackupLister,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbClient client.Client,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
@@ -115,7 +119,7 @@ func NewRestoreController(
 		restorer:               restorer,
 		backupLister:           backupLister,
 		restoreLister:          restoreInformer.Lister(),
-		backupLocationLister:   backupLocationLister,
+		kbClient:               kbClient,
 		snapshotLocationLister: snapshotLocationLister,
 		restoreLogLevel:        restoreLogLevel,
 		defaultBackupLocation:  defaultBackupLocation,
@@ -274,7 +278,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 
 type backupInfo struct {
 	backup      *api.Backup
-	location    *api.BackupStorageLocation
+	location    *velerov1api.BackupStorageLocation
 	backupStore persistence.BackupStore
 }
 
@@ -396,8 +400,11 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 		return backupInfo{}, err
 	}
 
-	location, err := c.backupLocationLister.BackupStorageLocations(c.namespace).Get(backup.Spec.StorageLocation)
-	if err != nil {
+	location := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: c.namespace,
+		Name:      backup.Spec.StorageLocation,
+	}, location); err != nil {
 		return backupInfo{}, errors.WithStack(err)
 	}
 
@@ -442,7 +449,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 
 	opts := label.NewListOptionsForBackup(restore.Spec.BackupName)
 
-	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(opts)
+	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(context.TODO(), opts)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -576,7 +583,7 @@ func patchRestore(original, updated *api.Restore, client velerov1client.Restores
 		return nil, errors.Wrap(err, "error creating json merge patch for restore")
 	}
 
-	res, err := client.Restores(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Restores(original.Namespace).Patch(context.TODO(), original.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching restore")
 	}

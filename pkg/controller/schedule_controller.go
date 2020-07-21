@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -258,7 +259,7 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 	// lead to performance issues).
 	log.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
 	backup := getBackup(item, now)
-	if _, err := c.backupsClient.Backups(backup.Namespace).Create(backup); err != nil {
+	if _, err := c.backupsClient.Backups(backup.Namespace).Create(context.TODO(), backup, metav1.CreateOptions{}); err != nil {
 		return errors.Wrap(err, "error creating Backup")
 	}
 
@@ -313,7 +314,7 @@ func patchSchedule(original, updated *api.Schedule, client velerov1client.Schedu
 		return nil, errors.Wrap(err, "error creating json merge patch for schedule")
 	}
 
-	res, err := client.Schedules(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Schedules(original.Namespace).Patch(context.TODO(), original.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching schedule")
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package client
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -97,21 +99,21 @@ type dynamicResourceClient struct {
 var _ Dynamic = &dynamicResourceClient{}
 
 func (d *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Create(obj, metav1.CreateOptions{})
+	return d.resourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
 func (d *dynamicResourceClient) List(options metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	return d.resourceClient.List(options)
+	return d.resourceClient.List(context.TODO(), options)
 }
 
 func (d *dynamicResourceClient) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return d.resourceClient.Watch(options)
+	return d.resourceClient.Watch(context.TODO(), options)
 }
 
 func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Get(name, opts)
+	return d.resourceClient.Get(context.TODO(), name, opts)
 }
 
 func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Patch(name, types.MergePatchType, data, metav1.PatchOptions{})
+	return d.resourceClient.Patch(context.TODO(), name, types.MergePatchType, data, metav1.PatchOptions{})
 }

@@ -34,7 +34,7 @@ Add that to the PR.
 
 For imports, we use the following convention:
 
-<group><version><api | client | informer | ...>
+`<group><version><api | client | informer | ...>`
 
 Example:
 

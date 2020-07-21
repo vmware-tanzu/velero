@@ -10,7 +10,7 @@ twitter:
   card: summary
 vm_logo: vm-logo.png
 gh_repo: https://github.com/vmware-tanzu/velero
-markdown: redcarpet
+markdown: kramdown
 hero:
   background-color: med-blue
 footer:
@@ -50,10 +50,10 @@ defaults:
     values:
       layout: "default"
   - scope:
-      path: docs/master
+      path: docs/main
     values:
-      version: master
-      gh: https://github.com/vmware-tanzu/velero/tree/master
+      version: main
+      gh: https://github.com/vmware-tanzu/velero/tree/main
       layout: "docs"
   - scope:
       path: docs/v1.4
@@ -178,7 +178,7 @@ collections:
 versioning: true
 latest: v1.4
 versions:
-- master
+- main
 - v1.4
 - v1.3.2
 - v1.3.1
@@ -231,6 +231,3 @@ exclude:
   - CNAME
   - Runbook.docx
   - '*.sh'
-
-redcarpet:
-    extensions: ["no_intra_emphasis", "tables", "autolink", "strikethrough", "with_toc_data"]

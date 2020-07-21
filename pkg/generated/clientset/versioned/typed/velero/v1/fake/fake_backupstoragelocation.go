@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var backupstoragelocationsResource = schema.GroupVersionResource{Group: "velero.
 var backupstoragelocationsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "BackupStorageLocation"}
 
 // Get takes name of the backupStorageLocation, and returns the corresponding backupStorageLocation object, and an error if there is any.
-func (c *FakeBackupStorageLocations) Get(name string, options v1.GetOptions) (result *velerov1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(backupstoragelocationsResource, c.ns, name), &velerov1.BackupStorageLocation{})
 
@@ -50,7 +52,7 @@ func (c *FakeBackupStorageLocations) Get(name string, options v1.GetOptions) (re
 }
 
 // List takes label and field selectors, and returns the list of BackupStorageLocations that match those selectors.
-func (c *FakeBackupStorageLocations) List(opts v1.ListOptions) (result *velerov1.BackupStorageLocationList, err error) {
+func (c *FakeBackupStorageLocations) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.BackupStorageLocationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(backupstoragelocationsResource, backupstoragelocationsKind, c.ns, opts), &velerov1.BackupStorageLocationList{})
 
@@ -72,14 +74,14 @@ func (c *FakeBackupStorageLocations) List(opts v1.ListOptions) (result *velerov1
 }
 
 // Watch returns a watch.Interface that watches the requested backupStorageLocations.
-func (c *FakeBackupStorageLocations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeBackupStorageLocations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(backupstoragelocationsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a backupStorageLocation and creates it.  Returns the server's representation of the backupStorageLocation, and an error, if there is any.
-func (c *FakeBackupStorageLocations) Create(backupStorageLocation *velerov1.BackupStorageLocation) (result *velerov1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Create(ctx context.Context, backupStorageLocation *velerov1.BackupStorageLocation, opts v1.CreateOptions) (result *velerov1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(backupstoragelocationsResource, c.ns, backupStorageLocation), &velerov1.BackupStorageLocation{})
 
@@ -90,7 +92,7 @@ func (c *FakeBackupStorageLocations) Create(backupStorageLocation *velerov1.Back
 }
 
 // Update takes the representation of a backupStorageLocation and updates it. Returns the server's representation of the backupStorageLocation, and an error, if there is any.
-func (c *FakeBackupStorageLocations) Update(backupStorageLocation *velerov1.BackupStorageLocation) (result *velerov1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Update(ctx context.Context, backupStorageLocation *velerov1.BackupStorageLocation, opts v1.UpdateOptions) (result *velerov1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(backupstoragelocationsResource, c.ns, backupStorageLocation), &velerov1.BackupStorageLocation{})
 
@@ -102,7 +104,7 @@ func (c *FakeBackupStorageLocations) Update(backupStorageLocation *velerov1.Back
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeBackupStorageLocations) UpdateStatus(backupStorageLocation *velerov1.BackupStorageLocation) (*velerov1.BackupStorageLocation, error) {
+func (c *FakeBackupStorageLocations) UpdateStatus(ctx context.Context, backupStorageLocation *velerov1.BackupStorageLocation, opts v1.UpdateOptions) (*velerov1.BackupStorageLocation, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(backupstoragelocationsResource, "status", c.ns, backupStorageLocation), &velerov1.BackupStorageLocation{})
 
@@ -113,7 +115,7 @@ func (c *FakeBackupStorageLocations) UpdateStatus(backupStorageLocation *velerov
 }
 
 // Delete takes name of the backupStorageLocation and deletes it. Returns an error if one occurs.
-func (c *FakeBackupStorageLocations) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeBackupStorageLocations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(backupstoragelocationsResource, c.ns, name), &velerov1.BackupStorageLocation{})
 
@@ -121,15 +123,15 @@ func (c *FakeBackupStorageLocations) Delete(name string, options *v1.DeleteOptio
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeBackupStorageLocations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(backupstoragelocationsResource, c.ns, listOptions)
+func (c *FakeBackupStorageLocations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(backupstoragelocationsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &velerov1.BackupStorageLocationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched backupStorageLocation.
-func (c *FakeBackupStorageLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(backupstoragelocationsResource, c.ns, name, pt, data, subresources...), &velerov1.BackupStorageLocation{})
 

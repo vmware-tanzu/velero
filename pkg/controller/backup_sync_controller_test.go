@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -332,6 +333,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				pluginManager   = &pluginmocks.Manager{}
 				backupStores    = make(map[string]*persistencemocks.BackupStore)
@@ -339,10 +341,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 			c := NewBackupSyncController(
 				client.VeleroV1(),
-				client.VeleroV1(),
+				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -360,7 +361,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			pluginManager.On("CleanupClients").Return(nil)
 
 			for _, location := range test.locations {
-				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+				require.NoError(t, fakeClient.Create(context.Background(), location))
 				backupStores[location.Name] = &persistencemocks.BackupStore{}
 			}
 
@@ -380,14 +381,14 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			for _, existingBackup := range test.existingBackups {
 				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(existingBackup))
 
-				_, err := client.VeleroV1().Backups(test.namespace).Create(existingBackup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(context.TODO(), existingBackup, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			for _, existingPodVolumeBackup := range test.existingPodVolumeBackups {
 				require.NoError(t, sharedInformers.Velero().V1().PodVolumeBackups().Informer().GetStore().Add(existingPodVolumeBackup))
 
-				_, err := client.VeleroV1().PodVolumeBackups(test.namespace).Create(existingPodVolumeBackup)
+				_, err := client.VeleroV1().PodVolumeBackups(test.namespace).Create(context.TODO(), existingPodVolumeBackup, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 			client.ClearActions()
@@ -408,7 +409,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 				// process the cloud backups
 				for _, cloudBackupData := range backupDataSet {
-					obj, err := client.VeleroV1().Backups(test.namespace).Get(cloudBackupData.backup.Name, metav1.GetOptions{})
+					obj, err := client.VeleroV1().Backups(test.namespace).Get(context.TODO(), cloudBackupData.backup.Name, metav1.GetOptions{})
 					require.NoError(t, err)
 
 					// did this cloud backup already exist in the cluster?
@@ -443,7 +444,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 					// process the cloud pod volume backups for this backup, if any
 					for _, podVolumeBackup := range cloudBackupData.podVolumeBackups {
-						objPodVolumeBackup, err := client.VeleroV1().PodVolumeBackups(test.namespace).Get(podVolumeBackup.Name, metav1.GetOptions{})
+						objPodVolumeBackup, err := client.VeleroV1().PodVolumeBackups(test.namespace).Get(context.TODO(), podVolumeBackup.Name, metav1.GetOptions{})
 						require.NoError(t, err)
 
 						// did this cloud pod volume backup already exist in the cluster?
@@ -559,15 +560,15 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
 			c := NewBackupSyncController(
 				client.VeleroV1(),
-				client.VeleroV1(),
+				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -584,7 +585,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup), "Error adding backup to informer")
 
 				// add test backup to client
-				_, err := client.VeleroV1().Backups(test.namespace).Create(backup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(context.TODO(), backup, metav1.CreateOptions{})
 				require.NoError(t, err, "Error adding backup to clientset")
 
 				// if we expect this backup to be deleted, set up the expected DeleteAction
@@ -652,15 +653,15 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
 			c := NewBackupSyncController(
 				client.VeleroV1(),
-				client.VeleroV1(),
+				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -677,7 +678,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup), "Error adding backup to informer")
 
 				// add test backup to client
-				_, err := client.VeleroV1().Backups(test.namespace).Create(backup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(context.TODO(), backup, metav1.CreateOptions{})
 				require.NoError(t, err, "Error adding backup to clientset")
 
 				// if we expect this backup to be deleted, set up the expected DeleteAction
@@ -716,7 +717,7 @@ func getDeleteActions(actions []core.Action) []core.Action {
 
 func numBackups(t *testing.T, c *fake.Clientset, ns string) (int, error) {
 	t.Helper()
-	existingK8SBackups, err := c.VeleroV1().Backups(ns).List(metav1.ListOptions{})
+	existingK8SBackups, err := c.VeleroV1().Backups(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -726,7 +727,7 @@ func numBackups(t *testing.T, c *fake.Clientset, ns string) (int, error) {
 
 func numPodVolumeBackups(t *testing.T, c *fake.Clientset, ns string) (int, error) {
 	t.Helper()
-	existingK8SPodvolumeBackups, err := c.VeleroV1().PodVolumeBackups(ns).List(metav1.ListOptions{})
+	existingK8SPodvolumeBackups, err := c.VeleroV1().PodVolumeBackups(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return 0, err
 	}

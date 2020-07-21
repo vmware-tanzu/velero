@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	rbac "k8s.io/api/rbac/v1"
 	rbacbeta "k8s.io/api/rbac/v1beta1"
@@ -45,7 +47,7 @@ type v1ClusterRoleBindingLister struct {
 }
 
 func (v1 v1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
-	crbList, err := v1.client.List(metav1.ListOptions{})
+	crbList, err := v1.client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -62,7 +64,7 @@ type v1beta1ClusterRoleBindingLister struct {
 }
 
 func (v1beta1 v1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
-	crbList, err := v1beta1.client.List(metav1.ListOptions{})
+	crbList, err := v1beta1.client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

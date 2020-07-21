@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -125,6 +125,12 @@ func (b *BackupBuilder) LabelSelector(selector *metav1.LabelSelector) *BackupBui
 // SnapshotVolumes sets the Backup's "snapshot volumes" flag.
 func (b *BackupBuilder) SnapshotVolumes(val bool) *BackupBuilder {
 	b.object.Spec.SnapshotVolumes = &val
+	return b
+}
+
+// DefaultVolumesToRestic sets the Backup's "DefaultVolumesToRestic" flag.
+func (b *BackupBuilder) DefaultVolumesToRestic(val bool) *BackupBuilder {
+	b.object.Spec.DefaultVolumesToRestic = &val
 	return b
 }
 

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,15 +38,15 @@ type BackupStorageLocationsGetter interface {
 
 // BackupStorageLocationInterface has methods to work with BackupStorageLocation resources.
 type BackupStorageLocationInterface interface {
-	Create(*v1.BackupStorageLocation) (*v1.BackupStorageLocation, error)
-	Update(*v1.BackupStorageLocation) (*v1.BackupStorageLocation, error)
-	UpdateStatus(*v1.BackupStorageLocation) (*v1.BackupStorageLocation, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.BackupStorageLocation, error)
-	List(opts metav1.ListOptions) (*v1.BackupStorageLocationList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.BackupStorageLocation, err error)
+	Create(ctx context.Context, backupStorageLocation *v1.BackupStorageLocation, opts metav1.CreateOptions) (*v1.BackupStorageLocation, error)
+	Update(ctx context.Context, backupStorageLocation *v1.BackupStorageLocation, opts metav1.UpdateOptions) (*v1.BackupStorageLocation, error)
+	UpdateStatus(ctx context.Context, backupStorageLocation *v1.BackupStorageLocation, opts metav1.UpdateOptions) (*v1.BackupStorageLocation, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.BackupStorageLocation, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.BackupStorageLocationList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BackupStorageLocation, err error)
 	BackupStorageLocationExpansion
 }
 
@@ -64,20 +65,20 @@ func newBackupStorageLocations(c *VeleroV1Client, namespace string) *backupStora
 }
 
 // Get takes name of the backupStorageLocation, and returns the corresponding backupStorageLocation object, and an error if there is any.
-func (c *backupStorageLocations) Get(name string, options metav1.GetOptions) (result *v1.BackupStorageLocation, err error) {
+func (c *backupStorageLocations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.BackupStorageLocation, err error) {
 	result = &v1.BackupStorageLocation{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of BackupStorageLocations that match those selectors.
-func (c *backupStorageLocations) List(opts metav1.ListOptions) (result *v1.BackupStorageLocationList, err error) {
+func (c *backupStorageLocations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.BackupStorageLocationList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +89,13 @@ func (c *backupStorageLocations) List(opts metav1.ListOptions) (result *v1.Backu
 		Resource("backupstoragelocations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested backupStorageLocations.
-func (c *backupStorageLocations) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *backupStorageLocations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,87 +106,90 @@ func (c *backupStorageLocations) Watch(opts metav1.ListOptions) (watch.Interface
 		Resource("backupstoragelocations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a backupStorageLocation and creates it.  Returns the server's representation of the backupStorageLocation, and an error, if there is any.
-func (c *backupStorageLocations) Create(backupStorageLocation *v1.BackupStorageLocation) (result *v1.BackupStorageLocation, err error) {
+func (c *backupStorageLocations) Create(ctx context.Context, backupStorageLocation *v1.BackupStorageLocation, opts metav1.CreateOptions) (result *v1.BackupStorageLocation, err error) {
 	result = &v1.BackupStorageLocation{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(backupStorageLocation).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a backupStorageLocation and updates it. Returns the server's representation of the backupStorageLocation, and an error, if there is any.
-func (c *backupStorageLocations) Update(backupStorageLocation *v1.BackupStorageLocation) (result *v1.BackupStorageLocation, err error) {
+func (c *backupStorageLocations) Update(ctx context.Context, backupStorageLocation *v1.BackupStorageLocation, opts metav1.UpdateOptions) (result *v1.BackupStorageLocation, err error) {
 	result = &v1.BackupStorageLocation{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
 		Name(backupStorageLocation.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(backupStorageLocation).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *backupStorageLocations) UpdateStatus(backupStorageLocation *v1.BackupStorageLocation) (result *v1.BackupStorageLocation, err error) {
+func (c *backupStorageLocations) UpdateStatus(ctx context.Context, backupStorageLocation *v1.BackupStorageLocation, opts metav1.UpdateOptions) (result *v1.BackupStorageLocation, err error) {
 	result = &v1.BackupStorageLocation{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
 		Name(backupStorageLocation.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(backupStorageLocation).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the backupStorageLocation and deletes it. Returns an error if one occurs.
-func (c *backupStorageLocations) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *backupStorageLocations) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *backupStorageLocations) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *backupStorageLocations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched backupStorageLocation.
-func (c *backupStorageLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.BackupStorageLocation, err error) {
+func (c *backupStorageLocations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BackupStorageLocation, err error) {
 	result = &v1.BackupStorageLocation{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("backupstoragelocations").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

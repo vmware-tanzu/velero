@@ -1,0 +1,14 @@
+name: Pull Request Linter Check
+on: [pull_request]
+jobs:
+
+  build:
+    name: Run Linter Check
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out the code
+      uses: actions/checkout@v2
+
+    - name: Linter check
+      run: make lint

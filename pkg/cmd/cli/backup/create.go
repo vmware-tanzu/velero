@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,11 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"time"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -81,6 +84,7 @@ type CreateOptions struct {
 	Name                    string
 	TTL                     time.Duration
 	SnapshotVolumes         flag.OptionalBool
+	DefaultVolumesToRestic  flag.OptionalBool
 	IncludeNamespaces       flag.StringArray
 	ExcludeNamespaces       flag.StringArray
 	IncludeResources        flag.StringArray
@@ -123,6 +127,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the backup")
 	f.NoOptDefVal = "true"
+
+	f = flags.VarPF(&o.DefaultVolumesToRestic, "default-volumes-to-restic", "", "use restic by default to backup all pod volumes")
+	f.NoOptDefVal = "true"
 }
 
 // BindWait binds the wait flag separately so it is not called by other create
@@ -142,19 +149,28 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
+	client, err := f.KubebuilderClient()
+	if err != nil {
+		return err
+	}
+
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
 		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
 	}
 
 	if o.StorageLocation != "" {
-		if _, err := o.client.VeleroV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
+		location := &velerov1api.BackupStorageLocation{}
+		if err := client.Get(context.Background(), kbclient.ObjectKey{
+			Namespace: f.Namespace(),
+			Name:      o.StorageLocation,
+		}, location); err != nil {
 			return err
 		}
 	}
 
 	for _, loc := range o.SnapshotLocations {
-		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(loc, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(context.TODO(), loc, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -229,7 +245,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go backupInformer.Run(stop)
 	}
 
-	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
+	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(context.TODO(), backup, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -269,7 +285,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 	var backupBuilder *builder.BackupBuilder
 
 	if o.FromSchedule != "" {
-		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(o.FromSchedule, metav1.GetOptions{})
+		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(context.TODO(), o.FromSchedule, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -294,6 +310,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 		if o.IncludeClusterResources.Value != nil {
 			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
+		}
+		if o.DefaultVolumesToRestic.Value != nil {
+			backupBuilder.DefaultVolumesToRestic(*o.DefaultVolumesToRestic.Value)
 		}
 	}
 

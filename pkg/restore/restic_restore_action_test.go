@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -204,7 +206,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			clientsetVelero := velerofake.NewSimpleClientset()
 
 			for _, podVolumeBackup := range tc.podVolumeBackups {
-				_, err := clientsetVelero.VeleroV1().PodVolumeBackups(veleroNs).Create(podVolumeBackup)
+				_, err := clientsetVelero.VeleroV1().PodVolumeBackups(veleroNs).Create(context.TODO(), podVolumeBackup, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 

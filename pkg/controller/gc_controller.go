@@ -17,14 +17,18 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -45,7 +49,7 @@ type gcController struct {
 	backupLister              velerov1listers.BackupLister
 	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
-	backupLocationLister      velerov1listers.BackupStorageLocationLister
+	kbClient                  client.Client
 
 	clock clock.Clock
 }
@@ -56,7 +60,7 @@ func NewGCController(
 	backupInformer velerov1informers.BackupInformer,
 	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister,
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbClient client.Client,
 ) Interface {
 	c := &gcController{
 		genericController:         newGenericController("gc-controller", logger),
@@ -64,7 +68,7 @@ func NewGCController(
 		backupLister:              backupInformer.Lister(),
 		deleteBackupRequestLister: deleteBackupRequestLister,
 		deleteBackupRequestClient: deleteBackupRequestClient,
-		backupLocationLister:      backupLocationLister,
+		kbClient:                  kbClient,
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -130,11 +134,14 @@ func (c *gcController) processQueueItem(key string) error {
 
 	log.Info("Backup has expired")
 
-	loc, err := c.backupLocationLister.BackupStorageLocations(ns).Get(backup.Spec.StorageLocation)
-	if apierrors.IsNotFound(err) {
-		log.Warnf("Backup cannot be garbage-collected because backup storage location %s does not exist", backup.Spec.StorageLocation)
-	}
-	if err != nil {
+	loc := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: ns,
+		Name:      backup.Spec.StorageLocation,
+	}, loc); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Warnf("Backup cannot be garbage-collected because backup storage location %s does not exist", backup.Spec.StorageLocation)
+		}
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
@@ -166,7 +173,7 @@ func (c *gcController) processQueueItem(key string) error {
 	log.Info("Creating a new deletion request")
 	req := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
 
-	if _, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(req); err != nil {
+	if _, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(context.TODO(), req, metav1.CreateOptions{}); err != nil {
 		return errors.Wrap(err, "error creating DeleteBackupRequest")
 	}
 

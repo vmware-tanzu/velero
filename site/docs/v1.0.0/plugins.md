@@ -78,5 +78,5 @@ for an example of this -- in particular, the `getPluginConfig(...)` function.
 
 
 [1]: https://github.com/vmware-tanzu/velero-plugin-example
-[2]: https://github.com/vmware-tanzu/velero/blob/master/pkg/plugin/logger.go
-[3]: https://github.com/vmware-tanzu/velero/blob/master/pkg/restore/restic_restore_action.go
+[2]: https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/logger.go
+[3]: https://github.com/vmware-tanzu/velero/blob/main/pkg/restore/restic_restore_action.go

@@ -17,6 +17,7 @@ limitations under the License.
 package schedule
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -45,7 +46,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 | 2                  | Hour             | 0-23,*            |
 | 3                  | Day of Month     | 1-31,*            |
 | 4                  | Month            | 1-12,*            |
-| 5                  | Day of Week      | 0-7,*             |
+| 5                  | Day of Week      | 0-6,*             |
 
 The schedule can also be expressed using "@every <duration>" syntax. The duration
 can be specified using a combination of seconds (s), minutes (m), and hours (h), for
@@ -141,7 +142,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	_, err = veleroClient.VeleroV1().Schedules(schedule.Namespace).Create(schedule)
+	_, err = veleroClient.VeleroV1().Schedules(schedule.Namespace).Create(context.TODO(), schedule, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

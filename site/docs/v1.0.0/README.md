@@ -22,7 +22,7 @@ You can run Velero in clusters on a cloud provider or on-premises. For detailed 
 We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the
 `velero` command-line client. Follow the [installation instructions][28] to get started.
 
-_The code and sample YAML files in the master branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
+_The code and sample YAML files in the main branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## More information
 
@@ -54,18 +54,18 @@ Feedback and discussion are available on [the mailing list][24].
 
 See [the list of releases][6] to find out about feature changes.
 
-[1]: https://travis-ci.org/vmware-tanzu/velero.svg?branch=master
+[1]: https://travis-ci.org/vmware-tanzu/velero.svg?branch=main
 [2]: https://travis-ci.org/vmware-tanzu/velero
 
 [4]: https://github.com/vmware-tanzu/velero/issues
-[5]: https://github.com/vmware-tanzu/velero/blob/master/CONTRIBUTING.md
+[5]: https://github.com/vmware-tanzu/velero/blob/main/CONTRIBUTING.md
 [6]: https://github.com/vmware-tanzu/velero/releases
 
-[8]: https://github.com/vmware-tanzu/velero/blob/master/CODE_OF_CONDUCT.md
+[8]: https://github.com/vmware-tanzu/velero/blob/main/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
-[12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
+[12]: https://github.com/kubernetes/kubernetes/blob/main/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
 
 [24]: https://groups.google.com/forum/#!forum/projectvelero

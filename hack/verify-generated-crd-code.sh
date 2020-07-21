@@ -19,10 +19,10 @@ HACK_DIR=$(dirname "${BASH_SOURCE}")
 ${HACK_DIR}/update-generated-crd-code.sh --verify-only
 
 # ensure no changes to generated CRDs
-if ! git diff --exit-code pkg/generated/crds/crds.go >/dev/null; then
+if ! git diff --exit-code config/crd/crds/crds.go >/dev/null; then
   # revert changes to state before running CRD generation to stay consistent
   # with code-generator `--verify-only` option which discards generated changes
-  git checkout pkg/generated/crds
+  git checkout config/crd/bases
 
   echo "CRD verification - failed! Generated CRDs are out-of-date, please run 'make update'."
   exit 1

@@ -16,7 +16,7 @@ To store your backups, schedules, restores, and config in another namespace, you
 files, changing `heptio-ark` to your desired namespace. You also need to create the
 `cloud-credentials` secret in your desired namespace.
 
-For all cloud providers, edit `https://github.com/heptio/ark/blob/master/examples/common/00-prereqs.yaml`. This file defines:
+For all cloud providers, edit `https://github.com/heptio/ark/blob/main/examples/common/00-prereqs.yaml`. This file defines:
 
 * CustomResourceDefinitions for the Ark objects (backups, schedules, restores, configs, downloadrequests)
 * The namespace where the Ark server runs
@@ -29,31 +29,31 @@ For all cloud providers, edit `https://github.com/heptio/ark/blob/master/example
 
 For AWS, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/aws/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/aws/00-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/aws/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/aws/00-ark-config.yaml`
 
 
 ### GCP
 
 For GCP, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/gcp/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/gcp/00-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/gcp/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/gcp/00-ark-config.yaml`
 
 
 ### Azure
 
 For Azure, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/azure/00-ark-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/azure/10-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/azure/00-ark-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/azure/10-ark-config.yaml`
 
 ### IBM
 
 For IBM, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/ibm/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/ibm/00-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/ibm/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/main/examples/ibm/00-ark-config.yaml`
 
 ## Specify the namespace in client commands
 
@@ -65,4 +65,4 @@ ark client config set namespace=<NAMESPACE_VALUE>
 
 
 
-[0]: https://github.com/heptio/ark/tree/master/examples
+[0]: https://github.com/heptio/ark/tree/main/examples

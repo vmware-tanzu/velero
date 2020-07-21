@@ -17,6 +17,7 @@ limitations under the License.
 package serverstatus
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
@@ -43,11 +44,11 @@ func (g *DefaultServerStatusGetter) GetServerStatus(client velerov1client.Server
 			builder.WithGenerateName("velero-cli-"),
 		).Result()
 
-	created, err := client.ServerStatusRequests(g.Namespace).Create(req)
+	created, err := client.ServerStatusRequests(g.Namespace).Create(context.TODO(), req, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	defer client.ServerStatusRequests(g.Namespace).Delete(created.Name, nil)
+	defer client.ServerStatusRequests(g.Namespace).Delete(context.TODO(), created.Name, metav1.DeleteOptions{})
 
 	listOptions := metav1.ListOptions{
 		// TODO: once the minimum supported Kubernetes version is v1.9.0, uncomment the following line.
@@ -55,7 +56,7 @@ func (g *DefaultServerStatusGetter) GetServerStatus(client velerov1client.Server
 		//FieldSelector:   "metadata.name=" + req.Name
 		ResourceVersion: created.ResourceVersion,
 	}
-	watcher, err := client.ServerStatusRequests(g.Namespace).Watch(listOptions)
+	watcher, err := client.ServerStatusRequests(g.Namespace).Watch(context.TODO(), listOptions)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

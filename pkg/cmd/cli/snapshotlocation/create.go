@@ -17,6 +17,7 @@ limitations under the License.
 package snapshotlocation
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -110,7 +111,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	if _, err := client.VeleroV1().VolumeSnapshotLocations(volumeSnapshotLocation.Namespace).Create(volumeSnapshotLocation); err != nil {
+	if _, err := client.VeleroV1().VolumeSnapshotLocations(volumeSnapshotLocation.Namespace).Create(context.TODO(), volumeSnapshotLocation, metav1.CreateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
 
