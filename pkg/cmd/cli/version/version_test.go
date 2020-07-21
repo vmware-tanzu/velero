@@ -73,7 +73,7 @@ func TestPrintVersion(t *testing.T) {
 		{
 			name:                "server status getter returns normally",
 			clientOnly:          false,
-			serverStatusRequest: builder.ForServerStatusRequest("velero", "ssr-1").ServerVersion("v1.0.1").Result(),
+			serverStatusRequest: builder.ForServerStatusRequest("velero", "ssr-1", "0").ServerVersion("v1.0.1").Result(),
 			getterError:         nil,
 			want:                clientVersion + "Server:\n\tVersion: v1.0.1\n",
 		},

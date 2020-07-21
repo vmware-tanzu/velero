@@ -30,8 +30,13 @@ import (
 )
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
+	// serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
+	// 	Timeout: 5 * time.Second,
+	// }
+
 	serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
-		Timeout: 5 * time.Second,
+		Namespace: f.Namespace(),
+		Timeout:   5 * time.Second,
 	}
 
 	c := &cobra.Command{
@@ -40,18 +45,40 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
+			fmt.Println("hererer")
 
-			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
-				Namespace: f.Namespace(),
-				Timeout:   5 * time.Second,
-			}
-
-			client, err := f.Client()
+			mgr, err := f.KubebuilderManager()
+			// client, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			veleroClient := client.VeleroV1()
+			fmt.Println("hererer2222")
 
-			serverStatus, err := serverStatusGetter.GetServerStatus(veleroClient)
+			// serverStatusList := new(velerov1api.ServerStatusRequestList)
+			// serverStatusList, err := velero.ListBackupStorageLocations(r.StorageLocation.Client, r.StorageLocation.Ctx, req.Namespace)
+
+			// var serverStatusList velerov1api.ServerStatusRequestList
+			// if err := kbClient.List(context.Background(), &serverStatusList, &kbclient.ListOptions{
+			// 	Namespace: f.Namespace(),
+			// }); err != nil {
+			// 	fmt.Fprintf(os.Stdout, "<error getting plugin information: %s>\n", err)
+			// 	return
+			// }
+
+			// err = client.Get(context.Background(), kbclient.ObjectKey{
+			// 	Namespace: f.Namespace(),
+			// 	// Timeout:   5 * time.Second,
+			// }, serverStatus)
+			// if err != nil {
+			// 	fmt.Fprintf(os.Stdout, "<error getting plugin information: %s>\n", err)
+			// 	return
+			// }
+
+			// client, err := f.Client()
+			// cmd.CheckError(err)
+
+			// veleroClient := client.VeleroV1()
+
+			serverStatus, err := serverStatusGetter.GetServerStatus(mgr)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "<error getting plugin information: %s>\n", err)
 				return

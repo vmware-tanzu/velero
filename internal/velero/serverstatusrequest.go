@@ -14,23 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serverstatusrequest
+package velero
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
@@ -43,55 +40,41 @@ type PluginLister interface {
 
 // Process fills out new ServerStatusRequest objects and deletes processed ones
 // that have expired.
-func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerStatusRequestsGetter, pluginLister PluginLister, clock clock.Clock, log logrus.FieldLogger) error {
-	switch req.Status.Phase {
+func Process(statusRequest *velerov1api.ServerStatusRequest, kbClient client.Client, pluginLister PluginLister, clock clock.Clock, log logrus.FieldLogger) error {
+	switch statusRequest.Status.Phase {
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing new ServerStatusRequest")
-		return errors.WithStack(patch(client, req, func(req *velerov1api.ServerStatusRequest) {
-			req.Status.ServerVersion = buildinfo.Version
-			req.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}
-			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
-			req.Status.Plugins = plugins(pluginLister)
+		return errors.WithStack(patch(kbClient, statusRequest, func(statusRequest *velerov1api.ServerStatusRequest) {
+			statusRequest.Status.ServerVersion = buildinfo.Version
+			statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}
+			statusRequest.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
+			statusRequest.Status.Plugins = plugins(pluginLister)
 		}))
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
-		expiration := req.Status.ProcessedTimestamp.Add(ttl)
+		expiration := statusRequest.Status.ProcessedTimestamp.Add(ttl)
 		if expiration.After(clock.Now()) {
 			log.Debug("ServerStatusRequest has not expired")
 			return nil
 		}
 
 		log.Debug("ServerStatusRequest has expired, deleting it")
-		if err := client.ServerStatusRequests(req.Namespace).Delete(context.TODO(), req.Name, metav1.DeleteOptions{}); err != nil {
+		if err := kbClient.Delete(context.TODO(), statusRequest); err != nil {
 			return errors.WithStack(err)
 		}
 
 		return nil
 	default:
-		return errors.Errorf("unexpected ServerStatusRequest phase %q", req.Status.Phase)
+		return errors.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
 	}
 }
 
-func patch(client velerov1client.ServerStatusRequestsGetter, req *velerov1api.ServerStatusRequest, updateFunc func(*velerov1api.ServerStatusRequest)) error {
-	originalJSON, err := json.Marshal(req)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+func patch(kbClient client.Client, statusRequest *velerov1api.ServerStatusRequest, updateFunc func(*velerov1api.ServerStatusRequest)) error {
+	patch := client.MergeFrom(statusRequest.DeepCopyObject())
 
-	updateFunc(req)
+	updateFunc(statusRequest)
 
-	updatedJSON, err := json.Marshal(req)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(originalJSON, updatedJSON)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	_, err = client.ServerStatusRequests(req.Namespace).Patch(context.TODO(), req.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
+	if err := kbClient.Status().Patch(context.TODO(), statusRequest, patch); err != nil {
 		return errors.WithStack(err)
 	}
 

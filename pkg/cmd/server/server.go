@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -94,15 +95,14 @@ const (
 	defaultProfilerAddress = "localhost:6060"
 
 	// keys used to map out available controllers with disable-controllers flag
-	BackupControllerKey              = "backup"
-	BackupSyncControllerKey          = "backup-sync"
-	ScheduleControllerKey            = "schedule"
-	GcControllerKey                  = "gc"
-	BackupDeletionControllerKey      = "backup-deletion"
-	RestoreControllerKey             = "restore"
-	DownloadRequestControllerKey     = "download-request"
-	ResticRepoControllerKey          = "restic-repo"
-	ServerStatusRequestControllerKey = "server-status-request"
+	BackupControllerKey          = "backup"
+	BackupSyncControllerKey      = "backup-sync"
+	ScheduleControllerKey        = "schedule"
+	GcControllerKey              = "gc"
+	BackupDeletionControllerKey  = "backup-deletion"
+	RestoreControllerKey         = "restore"
+	DownloadRequestControllerKey = "download-request"
+	ResticRepoControllerKey      = "restic-repo"
 
 	defaultControllerWorkers = 1
 	// the default TTL for a backup
@@ -119,7 +119,6 @@ var disableControllerList = []string{
 	RestoreControllerKey,
 	DownloadRequestControllerKey,
 	ResticRepoControllerKey,
-	ServerStatusRequestControllerKey,
 }
 
 type serverConfig struct {
@@ -777,30 +776,15 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	serverStatusRequestControllerRunInfo := func() controllerRunInfo {
-		serverStatusRequestController := controller.NewServerStatusRequestController(
-			s.logger,
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
-			s.pluginRegistry,
-		)
-
-		return controllerRunInfo{
-			controller: serverStatusRequestController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	enabledControllers := map[string]func() controllerRunInfo{
-		BackupSyncControllerKey:          backupSyncControllerRunInfo,
-		BackupControllerKey:              backupControllerRunInfo,
-		ScheduleControllerKey:            scheduleControllerRunInfo,
-		GcControllerKey:                  gcControllerRunInfo,
-		BackupDeletionControllerKey:      deletionControllerRunInfo,
-		RestoreControllerKey:             restoreControllerRunInfo,
-		ResticRepoControllerKey:          resticRepoControllerRunInfo,
-		DownloadRequestControllerKey:     downloadrequestControllerRunInfo,
-		ServerStatusRequestControllerKey: serverStatusRequestControllerRunInfo,
+		BackupSyncControllerKey:      backupSyncControllerRunInfo,
+		BackupControllerKey:          backupControllerRunInfo,
+		ScheduleControllerKey:        scheduleControllerRunInfo,
+		GcControllerKey:              gcControllerRunInfo,
+		BackupDeletionControllerKey:  deletionControllerRunInfo,
+		RestoreControllerKey:         restoreControllerRunInfo,
+		ResticRepoControllerKey:      resticRepoControllerRunInfo,
+		DownloadRequestControllerKey: downloadrequestControllerRunInfo,
 	}
 
 	if s.config.restoreOnly {
@@ -866,6 +850,17 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		Log:             s.logger,
 	}).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", "BackupStorageLocation")
+	}
+
+	if err := (&controller.ServerStatusRequestReconciler{
+		Scheme:         s.mgr.GetScheme(),
+		Client:         s.mgr.GetClient(),
+		Ctx:            s.ctx,
+		PluginRegistry: s.pluginRegistry,
+		Clock:          clock.RealClock{},
+		Log:            s.logger,
+	}).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", "ServerStatusRequest")
 	}
 
 	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
