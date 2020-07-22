@@ -137,6 +137,19 @@ type RestoreStatus struct {
 	// FailureReason is an error that caused the entire restore to fail.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// StartTimestamp records the time the restore operation was started.
+	// The server's time is used for StartTimestamps
+	// +optional
+	// +nullable
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+
+	// CompletionTimestamp records the time the restore operation was completed.
+	// Completion time is recorded even on failed restore.
+	// The server's time is used for StartTimestamps
+	// +optional
+	// +nullable
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 }
 
 // +genclient
