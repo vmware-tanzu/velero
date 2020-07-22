@@ -1146,6 +1146,14 @@ func (in *RestoreStatus) DeepCopyInto(out *RestoreStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.StartTimestamp != nil {
+		in, out := &in.StartTimestamp, &out.StartTimestamp
+		*out = (*in).DeepCopy()
+	}
+	if in.CompletionTimestamp != nil {
+		in, out := &in.CompletionTimestamp, &out.CompletionTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
