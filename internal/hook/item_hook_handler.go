@@ -42,6 +42,25 @@ const (
 	PhasePost hookPhase = "post"
 )
 
+const (
+	// Backup hook annotations
+	podBackupHookContainerAnnotationKey = "hook.backup.velero.io/container"
+	podBackupHookCommandAnnotationKey   = "hook.backup.velero.io/command"
+	podBackupHookOnErrorAnnotationKey   = "hook.backup.velero.io/on-error"
+	podBackupHookTimeoutAnnotationKey   = "hook.backup.velero.io/timeout"
+
+	// Restore hook annotations
+	podRestoreHookContainerAnnotationKey            = "post.hook.restore.velero.io/container"
+	podRestoreHookCommandAnnotationKey              = "post.hook.restore.velero.io/command"
+	podRestoreHookOnErrorAnnotationKey              = "post.hook.restore.velero.io/on-error"
+	podRestoreHookTimeoutAnnotationKey              = "post.hook.restore.velero.io/exec-timeout"
+	podRestoreHookWaitTimeoutAnnotationKey          = "post.hook.restore.velero.io/wait-timeout"
+	podRestoreHookInitContainerImageAnnotationKey   = "init.hook.restore.velero.io/container-image"
+	podRestoreHookInitContainerNameAnnotationKey    = "init.hook.restore.velero.io/container-name"
+	podRestoreHookInitContainerCommandAnnotationKey = "init.hook.restore.velero.io/command"
+	podRestoreHookInitContainerTimeoutAnnotationKey = "init.hook.restore.velero.io/timeout"
+)
+
 // ItemHookHandler invokes hooks for an item.
 type ItemHookHandler interface {
 	// HandleHooks invokes hooks for an item. If the item is a pod and the appropriate annotations exist
@@ -143,13 +162,6 @@ func (h *DefaultItemHookHandler) HandleHooks(
 
 	return nil
 }
-
-const (
-	podBackupHookContainerAnnotationKey = "hook.backup.velero.io/container"
-	podBackupHookCommandAnnotationKey   = "hook.backup.velero.io/command"
-	podBackupHookOnErrorAnnotationKey   = "hook.backup.velero.io/on-error"
-	podBackupHookTimeoutAnnotationKey   = "hook.backup.velero.io/timeout"
-)
 
 func phasedKey(phase hookPhase, key string) string {
 	if phase != "" {
