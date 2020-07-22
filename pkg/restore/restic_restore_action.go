@@ -130,8 +130,16 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 		)
 	}
 
+	runAsRoot, runAsGroup := getSecurityContext(log, config)
+
+	securityContext, err := kube.ParseSecurityContext(runAsRoot, runAsGroup)
+	if err != nil {
+		log.Errorf("Using default resource values, couldn't parse resource requirements: %s.", err)
+	}
+
 	initContainerBuilder := newResticInitContainerBuilder(image, string(input.Restore.UID))
 	initContainerBuilder.Resources(&resourceReqs)
+	initContainerBuilder.SecurityContext(&securityContext)
 
 	for volumeName := range volumeSnapshots {
 		mount := &corev1.VolumeMount{
@@ -209,6 +217,16 @@ func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string
 	}
 
 	return config.Data["cpuLimit"], config.Data["memLimit"]
+}
+
+// getSecurityContext extracts securityContext runAsUser and runAsGroup from a ConfigMap.
+func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string) {
+	if config == nil {
+		log.Debug("No config found for plugin")
+		return "", ""
+	}
+
+	return config.Data["secCtxRunAsUser"], config.Data["secCtxRunAsGroup"]
 }
 
 // TODO eventually this can move to pkg/plugin/framework since it'll be used across multiple

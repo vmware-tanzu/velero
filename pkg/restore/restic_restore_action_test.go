@@ -111,6 +111,8 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
 	)
 
+	securityContext, _ := kube.ParseSecurityContext("", "")
+
 	var (
 		restoreName = "my-restore"
 		backupName  = "test-backup"
@@ -134,6 +136,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				InitContainers(
 					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
 						Resources(&resourceReqs).
+						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).Result()).
 				Result(),
 		},
@@ -150,6 +153,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				InitContainers(
 					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
 						Resources(&resourceReqs).
+						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
@@ -189,6 +193,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				InitContainers(
 					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
 						Resources(&resourceReqs).
+						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),

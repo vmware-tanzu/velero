@@ -88,6 +88,12 @@ func (b *ContainerBuilder) Resources(resources *corev1api.ResourceRequirements) 
 	return b
 }
 
+// SecurityContext sets the container's SecurityContext.
+func (b *ContainerBuilder) SecurityContext(securityContext *corev1api.SecurityContext) *ContainerBuilder {
+	b.object.SecurityContext = securityContext
+	return b
+}
+
 func (b *ContainerBuilder) Env(vars ...*corev1api.EnvVar) *ContainerBuilder {
 	for _, v := range vars {
 		b.object.Env = append(b.object.Env, *v)
