@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -40,7 +41,7 @@ type Request struct {
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
 	ResourceIncludesExcludes  *collections.IncludesExcludes
-	ResourceHooks             []resourceHook
+	ResourceHooks             []hook.ResourceHook
 	ResolvedActions           []resolvedAction
 
 	VolumeSnapshots  []*volume.Snapshot
