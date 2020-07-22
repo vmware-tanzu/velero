@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 func NewCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "completion SHELL",
-		Short: "Output shell completion code for the specified shell (bash or zsh)",
+		Short: "Output shell completion code for the specified shell (bash or zsh).",
 		Long: `Generate shell completion code.
 
 Auto completion supports both bash and zsh. Output is to STDOUT.
