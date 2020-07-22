@@ -13,6 +13,7 @@ If you're using Velero and want to add your organization to this list,
 <a href="https://banzaicloud.com/" border="0" target="_blank"><img alt="banzaicloud.com" src="site/img/adopters/banzaicloud.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://storj.io/" border="0" target="_blank"><img alt="https://storj.io/" src="https://storj.io//press-kit/storj-logo-blue-horizontal-labs.png" height="50"></a>&nbsp; &nbsp; &nbsp;
 
 ## Success Stories
 
@@ -53,6 +54,9 @@ MayaData is a large user of Velero as well as a contributor. MayaData offers a D
 
 **[Okteto][93]**  
 Okteto integrates Velero in [Okteto Cloud][94] and [Okteto Enterprise][95] to periodically backup and restore our clusters for disaster recovery. Velero is also a core software building block to provide namespace cloning capabilities, a feature that allows our users cloning staging environments into their personal development namespace for providing production-like development environments.
+
+**[Storj Labs][96]**  
+“Storj Labs offers a Kubernetes Backup that uses Velero and Restic to backup all ETCD and K8s configuration data, as well as snapshot any persistent volumes associated with clusters. This gives Kubernetes environments end-to-end encrypted, multi-region backups without requiring any special configuration. Tardigrade by Storj Labs provides decentralized cloud storage with better performance, at just a fraction of the cost of other providers.”
 ​
 ## Adding your organization to the list of Velero Adopters
 
@@ -102,3 +106,5 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 [93]: https://okteto.com
 [94]: https://cloud.okteto.com
 [95]: https://okteto.com/enterprise/
+
+[96]: https://storj.io/
