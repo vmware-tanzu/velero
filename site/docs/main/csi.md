@@ -37,10 +37,10 @@ This section documents some of the choices made during implementation of the Vel
 
 1. Volumesnapshots created by the plugin will be retained only for the lifetime of the backup even if the `DeletionPolicy` on the volumesnapshotclass is set to `Retain`. To accomplish this, during deletion of the backup the prior to deleting the volumesnapshot, volumesnapshotcontent object will be patched to set its `DeletionPolicy` to `Delete`. Thus deleting volumesnapshot object will result in cascade delete of the volumesnapshotcontent and the snapshot in the storage provider.
 1. Volumesnapshotcontent objects created during a velero backup that are dangling, unbound to a volumesnapshot object, will also be discovered, through labels, and deleted on backup deletion.
-
-# Known Limitations
-
-1. The Velero [CSI plugin](https://github.com/vmware-tanzu/velero-plugin-for-csi/), to backup CSI backed PVCs, will choose the first VolumeSnapshotClass in the cluster that has the same driver name. _[Issue #17](https://github.com/vmware-tanzu/velero-plugin-for-csi/issues/17)_
+1. The Velero CSI plugin, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster that has the same driver name and also has the `velero.io/csi-volumesnapshot-class` label set on it, like
+```yaml
+velero.io/csi-volumesnapshot-class: "true"
+```
 
 # Roadmap
 
