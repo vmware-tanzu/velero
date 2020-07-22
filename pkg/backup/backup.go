@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -179,13 +180,13 @@ func getNamespaceIncludesExcludes(backup *velerov1api.Backup) *collections.Inclu
 	return collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
 }
 
-func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]resourceHook, error) {
-	resourceHooks := make([]resourceHook, 0, len(hookSpecs))
+func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]hook.ResourceHook, error) {
+	resourceHooks := make([]hook.ResourceHook, 0, len(hookSpecs))
 
 	for _, s := range hookSpecs {
 		h, err := getResourceHook(s, discoveryHelper)
 		if err != nil {
-			return []resourceHook{}, err
+			return []hook.ResourceHook{}, err
 		}
 
 		resourceHooks = append(resourceHooks, h)
@@ -194,21 +195,21 @@ func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryH
 	return resourceHooks, nil
 }
 
-func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (resourceHook, error) {
-	h := resourceHook{
-		name:       hookSpec.Name,
-		namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
-		resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
-		pre:        hookSpec.PreHooks,
-		post:       hookSpec.PostHooks,
+func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (hook.ResourceHook, error) {
+	h := hook.ResourceHook{
+		Name:       hookSpec.Name,
+		Namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
+		Resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
+		Pre:        hookSpec.PreHooks,
+		Post:       hookSpec.PostHooks,
 	}
 
 	if hookSpec.LabelSelector != nil {
 		labelSelector, err := metav1.LabelSelectorAsSelector(hookSpec.LabelSelector)
 		if err != nil {
-			return resourceHook{}, errors.WithStack(err)
+			return hook.ResourceHook{}, errors.WithStack(err)
 		}
-		h.labelSelector = labelSelector
+		h.LabelSelector = labelSelector
 	}
 
 	return h, nil
@@ -312,8 +313,8 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		resticBackupper:         resticBackupper,
 		resticSnapshotTracker:   newPVCSnapshotTracker(),
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
-		itemHookHandler: &defaultItemHookHandler{
-			podCommandExecutor: kb.podCommandExecutor,
+		itemHookHandler: &hook.DefaultItemHookHandler{
+			PodCommandExecutor: kb.podCommandExecutor,
 		},
 	}
 

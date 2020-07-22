@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package hook
 
 import (
 	"fmt"
@@ -40,7 +40,7 @@ type mockItemHookHandler struct {
 	mock.Mock
 }
 
-func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook, phase hookPhase) error {
+func (h *mockItemHookHandler) HandleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []ResourceHook, phase hookPhase) error {
 	args := h.Called(log, groupResource, obj, resourceHooks, phase)
 	return args.Error(0)
 }
@@ -50,7 +50,7 @@ func TestHandleHooksSkips(t *testing.T) {
 		name          string
 		groupResource string
 		item          runtime.Unstructured
-		hooks         []resourceHook
+		hooks         []ResourceHook
 	}{
 		{
 			name:          "not a pod",
@@ -89,22 +89,22 @@ func TestHandleHooksSkips(t *testing.T) {
 				}
 				`,
 			),
-			hooks: []resourceHook{
+			hooks: []ResourceHook{
 				{
-					name:       "ns exclude",
-					namespaces: collections.NewIncludesExcludes().Excludes("ns"),
+					Name:       "ns exclude",
+					Namespaces: collections.NewIncludesExcludes().Excludes("ns"),
 				},
 				{
-					name:      "resource exclude",
-					resources: collections.NewIncludesExcludes().Includes("widgets.group"),
+					Name:      "resource exclude",
+					Resources: collections.NewIncludesExcludes().Includes("widgets.group"),
 				},
 				{
-					name:          "label selector mismatch",
-					labelSelector: parseLabelSelectorOrDie("color=green"),
+					Name:          "label selector mismatch",
+					LabelSelector: parseLabelSelectorOrDie("color=green"),
 				},
 				{
-					name: "missing exec hook",
-					pre: []v1.BackupResourceHook{
+					Name: "missing exec hook",
+					Pre: []v1.BackupResourceHook{
 						{},
 						{},
 					},
@@ -118,12 +118,12 @@ func TestHandleHooksSkips(t *testing.T) {
 			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
-			h := &defaultItemHookHandler{
-				podCommandExecutor: podCommandExecutor,
+			h := &DefaultItemHookHandler{
+				PodCommandExecutor: podCommandExecutor,
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.handleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, hookPhasePre)
+			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre)
 			assert.NoError(t, err)
 		})
 	}
@@ -135,7 +135,7 @@ func TestHandleHooks(t *testing.T) {
 		phase                 hookPhase
 		groupResource         string
 		item                  runtime.Unstructured
-		hooks                 []resourceHook
+		hooks                 []ResourceHook
 		hookErrorsByContainer map[string]error
 		expectedError         error
 		expectedPodHook       *v1.ExecHook
@@ -143,7 +143,7 @@ func TestHandleHooks(t *testing.T) {
 	}{
 		{
 			name:          "pod, no annotation, spec (multiple pre hooks) = run spec",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -154,10 +154,10 @@ func TestHandleHooks(t *testing.T) {
 				"name": "name"
 			}
 		}`),
-			hooks: []resourceHook{
+			hooks: []ResourceHook{
 				{
-					name: "hook1",
-					pre: []v1.BackupResourceHook{
+					Name: "hook1",
+					Pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
@@ -173,8 +173,8 @@ func TestHandleHooks(t *testing.T) {
 					},
 				},
 				{
-					name: "hook2",
-					pre: []v1.BackupResourceHook{
+					Name: "hook2",
+					Pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "2a",
@@ -193,7 +193,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, no annotation, spec (multiple post hooks) = run spec",
-			phase:         hookPhasePost,
+			phase:         PhasePost,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -204,10 +204,10 @@ func TestHandleHooks(t *testing.T) {
 				"name": "name"
 			}
 		}`),
-			hooks: []resourceHook{
+			hooks: []ResourceHook{
 				{
-					name: "hook1",
-					post: []v1.BackupResourceHook{
+					Name: "hook1",
+					Post: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
@@ -223,8 +223,8 @@ func TestHandleHooks(t *testing.T) {
 					},
 				},
 				{
-					name: "hook2",
-					post: []v1.BackupResourceHook{
+					Name: "hook2",
+					Post: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "2a",
@@ -243,7 +243,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation (legacy), no spec = run annotation",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -265,7 +265,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation (pre), no spec = run annotation",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -287,7 +287,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation (post), no spec = run annotation",
-			phase:         hookPhasePost,
+			phase:         PhasePost,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -309,7 +309,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation & spec = run annotation",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -328,10 +328,10 @@ func TestHandleHooks(t *testing.T) {
 				Container: "c",
 				Command:   []string{"/bin/ls"},
 			},
-			hooks: []resourceHook{
+			hooks: []ResourceHook{
 				{
-					name: "hook1",
-					pre: []v1.BackupResourceHook{
+					Name: "hook1",
+					Pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
@@ -344,7 +344,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation, onError=fail = return error",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -370,7 +370,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation, onError=continue = return nil",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -396,7 +396,7 @@ func TestHandleHooks(t *testing.T) {
 		},
 		{
 			name:          "pod, spec, onError=fail = don't run other hooks",
-			phase:         hookPhasePre,
+			phase:         PhasePre,
 			groupResource: "pods",
 			item: velerotest.UnstructuredOrDie(`
 		{
@@ -407,10 +407,10 @@ func TestHandleHooks(t *testing.T) {
 				"name": "name"
 			}
 		}`),
-			hooks: []resourceHook{
+			hooks: []ResourceHook{
 				{
-					name: "hook1",
-					pre: []v1.BackupResourceHook{
+					Name: "hook1",
+					Pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
@@ -427,8 +427,8 @@ func TestHandleHooks(t *testing.T) {
 					},
 				},
 				{
-					name: "hook2",
-					pre: []v1.BackupResourceHook{
+					Name: "hook2",
+					Pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "2",
@@ -439,8 +439,8 @@ func TestHandleHooks(t *testing.T) {
 					},
 				},
 				{
-					name: "hook3",
-					pre: []v1.BackupResourceHook{
+					Name: "hook3",
+					Pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "3",
@@ -463,8 +463,8 @@ func TestHandleHooks(t *testing.T) {
 			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
-			h := &defaultItemHookHandler{
-				podCommandExecutor: podCommandExecutor,
+			h := &DefaultItemHookHandler{
+				PodCommandExecutor: podCommandExecutor,
 			}
 
 			if test.expectedPodHook != nil {
@@ -472,16 +472,16 @@ func TestHandleHooks(t *testing.T) {
 			} else {
 			hookLoop:
 				for _, resourceHook := range test.hooks {
-					for _, hook := range resourceHook.pre {
+					for _, hook := range resourceHook.Pre {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
-						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
+						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.Name, hook.Exec).Return(hookError)
 						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
 							break hookLoop
 						}
 					}
-					for _, hook := range resourceHook.post {
+					for _, hook := range resourceHook.Post {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
-						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
+						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.Name, hook.Exec).Return(hookError)
 						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
 							break hookLoop
 						}
@@ -490,7 +490,7 @@ func TestHandleHooks(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.handleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
+			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
@@ -503,7 +503,7 @@ func TestHandleHooks(t *testing.T) {
 }
 
 func TestGetPodExecHookFromAnnotations(t *testing.T) {
-	phases := []hookPhase{"", hookPhasePre, hookPhasePost}
+	phases := []hookPhase{"", PhasePre, PhasePost}
 	for _, phase := range phases {
 		tests := []struct {
 			name         string
@@ -680,14 +680,14 @@ func TestResourceHookApplicableTo(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			h := resourceHook{
-				namespaces: collections.NewIncludesExcludes().Includes(test.includedNamespaces...).Excludes(test.excludedNamespaces...),
-				resources:  collections.NewIncludesExcludes().Includes(test.includedResources...).Excludes(test.excludedResources...),
+			h := ResourceHook{
+				Namespaces: collections.NewIncludesExcludes().Includes(test.includedNamespaces...).Excludes(test.excludedNamespaces...),
+				Resources:  collections.NewIncludesExcludes().Includes(test.includedResources...).Excludes(test.excludedResources...),
 			}
 			if test.labelSelector != "" {
 				selector, err := labels.Parse(test.labelSelector)
 				require.NoError(t, err)
-				h.labelSelector = selector
+				h.LabelSelector = selector
 			}
 
 			result := h.applicableTo(test.resource, test.namespace, test.labels)
