@@ -136,7 +136,7 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 			sourceName = o.ScheduleName
 		}
 
-		o.RestoreName = fmt.Sprintf("%s-%s", sourceName, time.Now().Forspamat("20060102150405"))
+		o.RestoreName = fmt.Sprintf("%s-%s", sourceName, time.Now().Format("20060102150405"))
 	}
 
 	client, err := f.Client()
