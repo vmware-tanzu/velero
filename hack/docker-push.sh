@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2019 the Velero contributors.
+# Copyright 2020 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -86,4 +86,4 @@ echo "TAG_LATEST: $TAG_LATEST"
 
 echo "Building and pushing container images."
 
-VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push all-manifests
+VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers
