@@ -1,9 +1,10 @@
 name: 'Auto Assign PRs'
 on: pull_request
 
-jobs: add-reviewers:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: kentaro-m/auto-assign-action@v1.1.1
-      with: 
-        configuration-path: ".github/auto_assign.yml"
+jobs: 
+  add-reviews:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kentaro-m/auto-assign-action@v1.1.1
+        with: 
+          configuration-path: ".github/auto_assign.yml"
