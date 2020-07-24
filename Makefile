@@ -65,6 +65,7 @@ RESTIC_VERSION ?= 0.9.6
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le
+BUILDX_OUTPUT_TYPE ?= registry
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
@@ -101,6 +102,12 @@ all-build: $(addprefix build-, $(CLI_PLATFORMS))
 all-containers: container-builder-env
 	@$(MAKE) --no-print-directory container
 	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
+
+local-all-containers:
+	@$(MAKE) --no-print-directory all-containers \
+	CI=true \
+	BUILDX_OUTPUT_TYPE=docker \
+	BUILDX_PLATFORMS=$(subst -,/,$(ARCH))
 
 local: build-dirs
 	GOOS=$(GOOS) \
@@ -172,7 +179,7 @@ ifneq ($(BUILDX_ENABLED), true)
 	$(error buildx not enabled, refusing to run this recipe)
 endif
 	@docker buildx build --pull \
-	--output=type=registry \
+	--output=type=$(BUILDX_OUTPUT_TYPE) \
 	--platform $(BUILDX_PLATFORMS) \
 	$(addprefix -t , $(IMAGE_TAGS)) \
 	--build-arg=PKG=$(PKG) \
