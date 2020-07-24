@@ -52,6 +52,14 @@ else
 	IMAGE_TAGS ?= $(IMAGE):$(VERSION)
 endif
 
+ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
+	BUILDX_ENABLED ?= true
+else
+	BUILDX_ENABLED ?= false
+endif
+
+CI ?= false
+
 # The version of restic binary to be downloaded for power architecture
 RESTIC_VERSION ?= 0.9.6
 
@@ -90,7 +98,7 @@ build-%:
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
-all-containers: container-build-env
+all-containers: container-builder-env
 	@$(MAKE) --no-print-directory container
 	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
 
@@ -144,7 +152,10 @@ shell: build-dirs build-env
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
-container-build-env:
+container-builder-env:
+ifneq ($(BUILDX_ENABLED), true)
+	$(error buildx not enabled, refusing to run this recipe)
+endif
 	@docker buildx build \
 	--target=builder-env \
 	--build-arg=PKG=$(PKG) \
@@ -154,6 +165,12 @@ container-build-env:
 	-f Dockerfile .
 
 container:
+ifneq ($(CI), true)
+	$(error this is meant to only run in a github workflow, set CI to true if you know what you are doing)
+endif
+ifneq ($(BUILDX_ENABLED), true)
+	$(error buildx not enabled, refusing to run this recipe)
+endif
 	@docker buildx build --pull \
 	--output=type=registry \
 	--platform $(BUILDX_PLATFORMS) \
@@ -217,21 +234,25 @@ build-env:
 ifneq ($(shell git diff --quiet HEAD -- hack/build-image/Dockerfile; echo $$?), 0)
 	@echo "Local changes detected in hack/build-image/Dockerfile"
 	@echo "Preparing a new builder-image"
-	@make build-image
+	$(MAKE) build-image
 else ifneq ($(BUILDER_IMAGE_CACHED),)
 	@echo "Using Cached Image: $(BUILDER_IMAGE)"
 else
 	@echo "Trying to pull build-image: $(BUILDER_IMAGE)"
-	docker pull -q $(BUILDER_IMAGE) || make build-image
+	docker pull -q $(BUILDER_IMAGE) || $(MAKE) build-image
 endif
 
 build-image:
 	@# When we build a new image we just untag the old one.
 	@# This makes sure we don't leave the orphaned image behind.
-	@id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
-	cd hack/build-image && docker buildx build --output=type=docker --pull -t $(BUILDER_IMAGE) . ; \
-	new_id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
-	if [ "$$id" != "" ] && [ "$$id" != "$$new_id" ]; then \
+	$(eval old_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
+ifeq ($(BUILDX_ENABLED), true)
+	@cd hack/build-image && docker buildx build --output=type=docker --pull -t $(BUILDER_IMAGE) .
+else
+	@cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) .
+endif
+	$(eval new_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
+	@if [ "$(old_id)" != "" ] && [ "$(old_id)" != "$(new_id)" ]; then \
 		docker rmi -f $$id || true; \
 	fi
 
