@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "version",
-		Short: "Print the velero version and associated image",
+		Short: "Print the velero version and associated image.",
 		Run: func(c *cobra.Command, args []string) {
 			var veleroClient velerov1client.ServerStatusRequestsGetter
 
@@ -55,8 +55,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 		},
 	}
 
-	c.Flags().DurationVar(&serverStatusGetter.Timeout, "timeout", serverStatusGetter.Timeout, "maximum time to wait for server version to be reported")
-	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "only get velero client version, not server version")
+	c.Flags().DurationVar(&serverStatusGetter.Timeout, "timeout", serverStatusGetter.Timeout, "Maximum time to wait for server version to be reported.")
+	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "Only get velero client version, not server version.")
 
 	return c
 }
