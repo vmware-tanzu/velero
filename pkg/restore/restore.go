@@ -317,6 +317,8 @@ type restoreContext struct {
 	pvRenamer                  func(string) (string, error)
 	discoveryHelper            discovery.Helper
 	resourcePriorities         []string
+	hooksWaitGroup             sync.WaitGroup
+	hooksErrs                  chan error
 }
 
 type resourceClientKey struct {
