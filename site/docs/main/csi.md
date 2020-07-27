@@ -53,7 +53,7 @@ Velero's CSI support does not rely on the Velero VolumeSnapshotter plugin interf
 
 Instead, Velero uses a collection of BackupItemAction plugins that act first against PersistentVolumeClaims.
 
-When this BackupItemAction sees PersistentVolumeClaims pointing to a PersistentVolume backed by a CSI driver, it will create a CSI VolumeSnapshot object with the PersistentVolumeClaim as a source.
+When this BackupItemAction sees PersistentVolumeClaims pointing to a PersistentVolume backed by a CSI driver, it will choose the VolumeSnapshotClass with the same driver name that has the `velero.io/csi-volumesnapshot-class` label to create a CSI VolumeSnapshot object with the PersistentVolumeClaim as a source.
 This VolumeSnapshot object resides in the same namespace as the PersistentVolumeClaim that was used as a source.
 
 From there, the CSI external-snapshotter controller will see the VolumeSnapshot and create a VolumeSnapshotContent object, a cluster-scoped resource that will point to the actual, disk-based snapshot in the storage system.
@@ -63,7 +63,8 @@ Once an ID is generated and the storage system marks the snapshot as usable for 
 Velero will include the generated VolumeSnapshot and VolumeSnapshotContent objects in the backup tarball, as well as upload all VolumeSnapshots and VolumeSnapshotContents objects in a JSON file to the object storage system.
 When Velero synchronizes backups into a new cluster, VolumeSnapshotContent objects will be synced into the cluster as well, so that Velero can manage backup expiration appropriately.
 
-VolumeSnapshotContents will have a `DeletionPolicy` of `Retain` for the life of the Velero backup in order to prevent them from being deleted on the storage system.
+The `DeletionPolicy` on the VolumeSnapshotContent will be the same as the `DeletionPolicy` on the VolumeSnapshotClass that was used to create the VolumeSnapshot. Setting a `DeletionPolicy` of `Retain` on the VolumeSnapshotClass will preserve the volume snapshot in the storage system for the lifetime of the Velero backup and will prevent the deletion of the volume snapshot, in the storage system, in the event of a disaster where the namespace with the VolumeSnapshot object may be lost.
+
 When the Velero backup expires, the VolumeSnapshot objects will be deleted and the VolumeSnapshotContent objects will be updated to have a `DeletionPolicy` of `Delete`, in order to free space on the storage system.
 
 For more details on how each plugin works, see the [CSI plugin repo][2]'s documentation.
