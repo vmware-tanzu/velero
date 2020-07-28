@@ -10,6 +10,8 @@
     - [Enable server side features](#enable-server-side-features)
     - [Enable client side features](#enable-client-side-features)
   - [Customize resource requests and limits](#customize-resource-requests-and-limits)
+    - [Install with custom resource requests and limits](install-with-custom-resource-requests-and-limits)
+    - [Update resource requests and limits after install](update-resource-requests-and-limits-after-install)
   - [Configure more than one storage location for backups or volume snapshots](#configure-more-than-one-storage-location-for-backups-or-volume-snapshots)
   - [Do not configure a backup storage location during install](#do-not-configure-a-backup-storage-location-during-install)
   - [Install an additional volume snapshot provider](#install-an-additional-volume-snapshot-provider)
@@ -95,10 +97,108 @@ velero client config set features=
 
 ## Customize resource requests and limits
 
-By default, the Velero deployment requests 500m CPU, 128Mi memory and sets a limit of 1000m CPU, 256Mi.
-Default requests and limits are not set for the restic pods as CPU/Memory usage can depend heavily on the size of volumes being backed up.
+Velero sets resource requests and limits by defaults at installation for the Velero pod and the restic pod, if you using the [restic integration](/docs/main/restic/).
 
-Customization of these resource requests and limits may be performed using the [velero install][6] CLI command.
+<table caption="Velero Customize resource requests and limits defaults" >
+  <tr><th>Setting</th><th>Velero pod defaults</th><th>restic pod defaults (Velero 1.4.2 and later)</th></tr>
+  <tr><td>CPU request</td><td>500m</td><td>500m</td></tr>
+  <tr><td>Memory requests</td><td>128Mi</td><td>512Mi</td></tr>
+  <tr><td>CPU limit</td><td>1000m (1)</td><td>1000m (1)</td></tr>
+  <tr><td>Memory limit</td><td>256Mi</td><td>1024Mi</td></tr>
+</table>
+
+### Install with custom resource requests and limits
+
+You can customize these resource requests and limit when you first install using the [velero install][6] CLI command.
+
+```
+velero install \
+  --velero-pod-cpu-request <CPU_REQUEST>] \
+  --velero-pod-mem-request <MEMORY_REQUEST>] \
+  --velero-pod-cpu-limit <CPU_LIMIT>] \
+  --velero-pod-mem-limit <MEMORY_LIMIT>]
+  [--use-restic] \
+  [--default-volumes-to-restic] \
+  [--restic-pod-cpu-request <CPU_REQUEST>] \
+  [--restic-pod-mem-request <MEMORY_REQUEST>] \
+  [--restic-pod-cpu-limit <CPU_LIMIT>] \
+  [--restic-pod-mem-limit <MEMORY_LIMIT>]
+```
+
+### Update resource requests and limits after install
+
+After installation you can adjust the resource requests and limits in the Velero Deployment spec restic DeamonSet spec, if you are using the restic integration.
+
+**Velero pod**
+
+1. Open the Velero Deployment spec.
+
+    ```
+    kubectl edit deploy velero -n velero
+    ```
+
+1. Update the `spec.template.spec.containers.args.resources.limits` and `spec.template.spec.containers.args.resources.requests` values.
+
+    ```yaml
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            resources:
+              limits:
+                cpu: "1"
+                memory: 256Mi
+              requests:
+                cpu: 500m
+                memory: 128Mi
+    ```
+
+**restic pod**
+
+1. Open the restic DeamonSet spec.
+
+    ```
+    kubectl edit daemonset restic -n velero
+    ```
+
+1. Update the `spec.template.spec.containers.args.resources.limits` and `spec.template.spec.containers.args.resources.requests` values.
+
+    ```yaml
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            resources:
+              limits:
+                cpu: "1"
+                memory: 1024Mi
+              requests:
+                cpu: 500m
+                memory: 512Mi
+    ```
+
+Additionally, may want to update the the default Velero restic pod operation timeout (default 240 minutes) to allow large more backups time to complete. You can adjust this timeout by adding the `- --restic-timeout` argument to the Velero Deployment spec.
+
+**NOTE:** Changes made to this timeout value will revert back to the default value if you re-run the Velero install command.
+
+1. Open the Velero Deployment spec.
+
+    ```
+    kubectl edit deploy velero -n velero
+    ```
+
+1. Add `- --restic-timeout` to `spec.template.spec.containers.args`.
+
+    ```yaml
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - --restic-timeout=24h
+    ```
 
 ## Configure more than one storage location for backups or volume snapshots
 
@@ -304,4 +404,4 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
 [9]: self-signed-certificates.md
 [10]: csi.md
-[11]: https://github.com/vmware-tanzu/velero/blob/main/pkg/apis/velero/v1/constants.go
+[11]: https://github.com/vmware-tanzu/velero/blob/master/pkg/apis/velero/v1/constants.go

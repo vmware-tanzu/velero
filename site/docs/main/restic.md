@@ -1,40 +1,43 @@
 # Restic Integration
 
-Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality. Please see the list of [limitations](#limitations) to understand if it currently fits your use case.
+Velero supports backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality. Please see the list of [limitations](#limitations) to understand if it currently fits your use case.
 
-Velero has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of
+Velero allows you to take snapshots of persistent volumes as part of your backups if you’re using one of
 the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks).
-We also provide a plugin model that enables anyone to implement additional object and block storage backends, outside the
+It also provides a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.
 
-We integrated restic with Velero so that users have an out-of-the-box solution for backing up and restoring almost any type of Kubernetes
-volume*. This is a new capability for Velero, not a replacement for existing functionality. If you're running on AWS, and
-taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you've
+The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This is a new capability for Velero, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you've
 been waiting for a snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
 local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
-cross-volume-type data migrations. Stay tuned as this evolves!
+cross-volume-type data migrations.
 
-\* hostPath volumes are not supported, but the [new local volume type][4] is supported.
+**NOTE:** hostPath volumes are not supported, but the [local volume type][4] is supported.
 
-## Setup
+## Install restic
 
-### Prerequisites
+**Prerequisites**
+- Understand how Velero performs [backups with the restic integration](#how-backup-and-restore-work-with-restic).
+- [Download][3] the latest Velero release.
+- Kubernetes v1.10.0 and later. Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
+- If you are using RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure you must modify the restic DaemonSet spec before installing. See the [Configure restic DaemonSet spec](#configure-restic-daemonset-spec) section for more details.
 
-- Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
+To install restic, use the `--use-restic` flag in the `velero install` command. See the [install overview][2] for more details on other flags for the install command.
 
-### Instructions
+```
+velero install --use-restic
+```
 
-Ensure you've [downloaded latest release][3].
+When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
-To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details. When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
-
-Please note: For some PaaS/CaaS platforms based on Kubernetes such as RancherOS, OpenShift and Enterprise PKS, some modifications are required to the restic DaemonSet spec.
+### Configure restic DaemonSet spec
+The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure.
 
 **RancherOS**
 
-The host path for volumes is not `/var/lib/kubelet/pods`, rather it is `/opt/rke/var/lib/kubelet/pods`
+Update the host path for volumes from `/var/lib/kubelet/pods` to `/opt/rke/var/lib/kubelet/pods`.
 
 ```yaml
 hostPath:
@@ -48,9 +51,11 @@ hostPath:
   path: /opt/rke/var/lib/kubelet/pods
 ```
 
+Now you can [install Velero](#install-restic) with the restic integration.
+
 **OpenShift**
 
-The restic containers should be running in a `privileged` mode to be able to mount the correct hostpath to pods volumes.
+To be able to mount the correct hostpath to pods volumes, run the restic containers in a `privileged` mode.
 
 1. Add the `velero` ServiceAccount to the `privileged` SCC:
 
@@ -58,7 +63,7 @@ The restic containers should be running in a `privileged` mode to be able to mou
     $ oc adm policy add-scc-to-user privileged -z velero -n velero
     ```
 
-2. For OpenShift version  >= `4.1`, Modify the DaemonSet yaml to request a privileged mode:
+2. For OpenShift version  >= `4.1`, modify the DaemonSet yaml to request a privileged mode:
 
     ```diff
     @@ -67,3 +67,5 @@ spec:
@@ -78,7 +83,7 @@ The restic containers should be running in a `privileged` mode to be able to mou
       -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
     ```
 
-3. For OpenShift version  < `4.1`, Modify the DaemonSet yaml to request a privileged mode and mount the correct hostpath to pods volumes.
+3. For OpenShift version  < `4.1`, modify the DaemonSet yaml to request a privileged mode and mount the correct hostpath to pods volumes.
 
     ```diff
     @@ -35,7 +35,7 @@ spec:
@@ -98,7 +103,7 @@ The restic containers should be running in a `privileged` mode to be able to mou
     +            privileged: true
     ```
 
-    or 
+    or
 
     ```shell
     oc patch ds/restic \
@@ -133,7 +138,9 @@ oc annotate namespace <velero namespace> openshift.io/node-selector=""
 oc create -n <velero namespace> -f ds.yaml
 ```
 
-**Enterprise PKS**
+Now you can [install Velero](#install-restic) with the restic integration.
+
+**VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**
 
 You need to enable the `Allow Privileged` option in your plan configuration so that restic is able to mount the hostpath.
 
@@ -143,6 +150,7 @@ The hostPath should be changed from `/var/lib/kubelet/pods` to `/var/vcap/data/k
 hostPath:
   path: /var/vcap/data/kubelet/pods
 ```
+Now you can [install Velero](#install-restic) with the restic integration.
 
 **Microsoft Azure**
 
@@ -155,8 +163,7 @@ kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
   --type json \
   --patch '[{"op":"add","path":"/mountOptions/-","value":"nouser_xattr"}]'
 ```
-
-You're now ready to use Velero with restic.
+Now you can [install Velero](#install-restic) with the restic integration.
 
 ## To back up
 
@@ -328,12 +335,13 @@ PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (e.g. by a Rep
 volumes will be full rather than incremental, because the pod volume's lifecycle is assumed to be defined by its pod.
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
+- If you plan to use the Velero restic integration to backup 100GB of data or more, you may need to [customize the resource limits](/docs/main/customize-installation/#customize-resource-requests-and-limits) to make sure backups complete successfully.
 
 ## Customize Restore Helper Container
 
 Velero uses a helper init container when performing a restic restore. By default, the image for this container is `velero/velero-restic-restore-helper:<VERSION>`,
 where `VERSION` matches the version/tag of the main Velero image. You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with
-the alternate image. 
+the alternate image.
 
 In addition, you can customize the resource requirements for the init container, should you need.
 
@@ -367,7 +375,7 @@ data:
   # "cpuRequest" sets the request.cpu value on the restic init containers during restore.
   # If not set, it will default to "100m". A value of "0" is treated as unbounded.
   cpuRequest: 200m
-  
+
   # "memRequest" sets the request.memory value on the restic init containers during restore.
   # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memRequest: 128Mi
@@ -375,7 +383,7 @@ data:
   # "cpuLimit" sets the request.cpu value on the restic init containers during restore.
   # If not set, it will default to "100m". A value of "0" is treated as unbounded.
   cpuLimit: 200m
-  
+
   # "memLimit" sets the request.memory value on the restic init containers during restore.
   # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memLimit: 128Mi
