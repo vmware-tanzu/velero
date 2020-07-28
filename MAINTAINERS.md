@@ -22,6 +22,6 @@
 | ----------------------------- | :---------------------: |
 | Technical Lead | Nolan Brubaker (nrb) |
 | Kubernetes CSI Liaison | Nolan Brubaker (nrb), Ashish Amarnath (ashish-amarnath) |
-| Deployment | Carlisia Campos (carlisia), Carlos Tadeu Panato Junior (cpanato) | 
+| Deployment | Carlisia Campos (carlisia), Carlos Tadeu Panato Junior (cpanato), JenTing Hsiao (jenting) | 
 | Community Management | Jonas Rosland (jonasrosland) |
 | Product Management | Stephanie Bauman (stephbman) |
