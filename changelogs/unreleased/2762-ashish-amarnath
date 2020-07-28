@@ -1,0 +1,1 @@
+Exclude volumes mounting secrets and configmaps from defaulting volume backups to restic
