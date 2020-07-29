@@ -5,3 +5,12 @@ on:
     branches: [ main ]
     paths:
     - 'hack/build-image/Dockerfile'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Build
+      run: make build-image
