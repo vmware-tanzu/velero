@@ -269,25 +269,16 @@ ifneq ($(shell git diff --quiet HEAD -- hack/build-image/Dockerfile; echo $$?), 
 	@make build-image
 else ifneq ($(BUILDER_IMAGE_CACHED),)
 	@echo "Using Cached Image: $(BUILDER_IMAGE)"
-else
-	@echo "Trying to pull build-image: $(BUILDER_IMAGE)"
-	docker pull -q $(BUILDER_IMAGE) || make build-image
 endif
 
 build-image:
 	@# When we build a new image we just untag the old one.
 	@# This makes sure we don't leave the orphaned image behind.
 	@id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
-	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) . ; \
 	new_id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
 	if [ "$$id" != "" ] && [ "$$id" != "$$new_id" ]; then \
 		docker rmi -f $$id || true; \
 	fi
-
-push-build-image:
-	@# this target will push the build-image it assumes you already have docker
-	@# credentials needed to accomplish this.
-	docker push $(BUILDER_IMAGE)
 
 clean:
 # if we have a cached image then use it to run go clean --modcache
@@ -304,16 +295,13 @@ endif
 modules:
 	go mod tidy
 
-
 .PHONY: verify-modules
 verify-modules: modules
 	@if !(git diff --quiet HEAD -- go.sum go.mod); then \
 		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
 	fi
 
-
 ci: verify-modules verify all test
-
 
 changelog:
 	hack/changelog.sh
