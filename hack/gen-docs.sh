@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2019 the Velero contributors.
+# Copyright 2020 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,88 +21,92 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+DOCS_DIRECTORY=site/content/docs
+DATA_DOCS_DIRECTORY=site/data/docs
+CONFIG_FILE=site/config.yaml
+
 # don't run if there's already a directory for the target docs version
-if [[ -d site/docs/$NEW_DOCS_VERSION ]]; then
-    echo "ERROR: site/docs/$NEW_DOCS_VERSION already exists"
+if [[ -d $DOCS_DIRECTORY/$NEW_DOCS_VERSION ]]; then
+    echo "ERROR: $DOCS_DIRECTORY/$NEW_DOCS_VERSION already exists"
     exit 1
 fi
 
-# get the alphabetically last item in site/docs to use as PREVIOUS_DOCS_VERSION
+# get the alphabetically last item in $DOCS_DIRECTORY to use as PREVIOUS_DOCS_VERSION
 # if not explicitly specified by the user
 if [[ -z "${PREVIOUS_DOCS_VERSION:-}" ]]; then
     echo "PREVIOUS_DOCS_VERSION was not specified, getting the latest version"
-    PREVIOUS_DOCS_VERSION=$(ls -1 site/docs/ | tail -n 1)
+    PREVIOUS_DOCS_VERSION=$(ls -1 $DOCS_DIRECTORY/ | tail -n 1)
 fi
 
 # make a copy of the previous versioned docs dir
-echo "Creating copy of docs directory site/docs/$PREVIOUS_DOCS_VERSION in site/docs/$NEW_DOCS_VERSION"
-cp -r site/docs/${PREVIOUS_DOCS_VERSION}/ site/docs/${NEW_DOCS_VERSION}/
+echo "Creating copy of docs directory $DOCS_DIRECTORY/$PREVIOUS_DOCS_VERSION in $DOCS_DIRECTORY/$NEW_DOCS_VERSION"
+cp -r $DOCS_DIRECTORY/${PREVIOUS_DOCS_VERSION}/ $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/
 
-# 'git add' the previous version's docs as-is so we get a useful diff when we copy the main docs in
+# 'git add' the previous version's docs as-is so we get a useful diff when we copy the master docs in
 echo "Running 'git add' for previous version's doc contents to use as a base for diff"
-git add site/docs/${NEW_DOCS_VERSION}
+git add -f $DOCS_DIRECTORY/${NEW_DOCS_VERSION}
 
-# now copy the contents of site/docs/main into the same directory so we can get a nice
+# now copy the contents of $DOCS_DIRECTORY/master into the same directory so we can get a nice
 # git diff of what changed since previous version
-echo "Copying site/docs/main/ to site/docs/${NEW_DOCS_VERSION}/"
-rm -rf site/docs/${NEW_DOCS_VERSION}/ && cp -r site/docs/main/ site/docs/${NEW_DOCS_VERSION}/
+echo "Copying $DOCS_DIRECTORY/master/ to $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/"
+rm -rf $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/ && cp -r $DOCS_DIRECTORY/master/ $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/
 
 # make a copy of the previous versioned ToC
 NEW_DOCS_TOC="$(echo ${NEW_DOCS_VERSION} | tr . -)-toc"
 PREVIOUS_DOCS_TOC="$(echo ${PREVIOUS_DOCS_VERSION} | tr . -)-toc"
 
-echo "Creating copy of site/_data/$PREVIOUS_DOCS_TOC.yml at site/_data/$NEW_DOCS_TOC.yml"
-cp site/_data/$PREVIOUS_DOCS_TOC.yml site/_data/$NEW_DOCS_TOC.yml
+echo "Creating copy of $DATA_DOCS_DIRECTORY/$PREVIOUS_DOCS_TOC.yml at $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml"
+cp $DATA_DOCS_DIRECTORY/$PREVIOUS_DOCS_TOC.yml $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
 
-# 'git add' the previous version's ToC content as-is so we get a useful diff when we copy the main ToC in
+# 'git add' the previous version's ToC content as-is so we get a useful diff when we copy the master ToC in
 echo "Running 'git add' for previous version's ToC to use as a base for diff"
-git add site/_data/$NEW_DOCS_TOC.yml
+git add $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
 
-# now copy the main ToC so we can get a nice git diff of what changed since previous version
-echo "Copying site/_data/main-toc.yml to site/_data/$NEW_DOCS_TOC.yml"
-rm site/_data/$NEW_DOCS_TOC.yml && cp site/_data/main-toc.yml site/_data/$NEW_DOCS_TOC.yml
+# now copy the master ToC so we can get a nice git diff of what changed since previous version
+echo "Copying $DATA_DOCS_DIRECTORY/master-toc.yml to $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml"
+rm $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml && cp $DATA_DOCS_DIRECTORY/master-toc.yml $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
 
 # replace known version-specific links -- the sed syntax is slightly different in OS X and Linux,
 # so check which OS we're running on.
 if [[ $(uname) == "Darwin" ]]; then
     echo "[OS X] updating version-specific links"
-    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://velero.io/docs/main|https://velero.io/docs/$VELERO_VERSION|g"
-    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/vmware-tanzu/velero/blob/main|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://velero.io/docs/master|https://velero.io/docs/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/vmware-tanzu/velero/blob/master|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
 
-    echo "[OS X] Updating latest version in _config.yml"
-    sed -i '' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" site/_config.yml
+    echo "[OS X] Updating latest version in $CONFIG_FILE"
+    sed -i '' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" $CONFIG_FILE
 
     # newlines and lack of indentation are requirements for this sed syntax
     # which is doing an append
-    echo "[OS X] Adding latest version to versions list in _config.yml"
-    sed -i '' "/- main/a\\
-- ${NEW_DOCS_VERSION}
-" site/_config.yml
+    echo "[OS X] Adding latest version to versions list in $CONFIG_FILE"
+    sed -i '' "/- master/a\\
+\ \ \ \ - ${NEW_DOCS_VERSION}
+" $CONFIG_FILE
 
     echo "[OS X] Adding ToC mapping entry"
-    sed -i '' "/main: main-toc/a\\
+    sed -i '' "/master: master-toc/a\\
 ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}
-" site/_data/toc-mapping.yml
+" $DATA_DOCS_DIRECTORY/toc-mapping.yml
 
 else
     echo "[Linux] updating version-specific links"
-    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://velero.io/docs/main|https://velero.io/docs/$VELERO_VERSION|g"
-    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://github.com/vmware-tanzu/velero/blob/main|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://velero.io/docs/master|https://velero.io/docs/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://github.com/vmware-tanzu/velero/blob/master|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
 
-    echo "[Linux] Updating latest version in _config.yml"
-    sed -i'' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" site/_config.yml
+    echo "[Linux] Updating latest version in $CONFIG_FILE"
+    sed -i'' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" $CONFIG_FILE
     
-    echo "[Linux] Adding latest version to versions list in _config.yml"
-    sed -i'' "/- main/a - ${NEW_DOCS_VERSION}" site/_config.yml
+    echo "[Linux] Adding latest version to versions list in $CONFIG_FILE"
+    sed -i'' "/- master/a - ${NEW_DOCS_VERSION}" $CONFIG_FILE
     
     echo "[Linux] Adding ToC mapping entry"
-    sed -i'' "/main: main-toc/a ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}" site/_data/toc-mapping.yml
+    sed -i'' "/master: master-toc/a ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}" $DATA_DOCS_DIRECTORY/toc-mapping.yml
 fi
 
-echo "Success! site/docs/$NEW_DOCS_VERSION has been created."
+echo "Success! $DOCS_DIRECTORY/$NEW_DOCS_VERSION has been created."
 echo ""
 echo "The next steps are:"
-echo "  1. Consult site/README-JEKYLL.md for further manual steps required to finalize the new versioned docs generation."
+echo "  1. Consult site/README-HUGO.md for further manual steps required to finalize the new versioned docs generation."
 echo "  2. Run a 'git diff' to review all changes made to the docs since the previous version."
 echo "  3. Make any manual changes/corrections necessary."
 echo "  4. Run 'git add' to stage all unstaged changes, then 'git commit'."
