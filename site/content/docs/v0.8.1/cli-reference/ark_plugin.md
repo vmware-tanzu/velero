@@ -1,4 +1,7 @@
-## ark plugin
+---
+title: "ark plugin"
+layout: docs
+---
 
 Work with plugins
 

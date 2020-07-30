@@ -1,4 +1,7 @@
-## ark schedule
+---
+title: "ark schedule"
+layout: docs
+---
 
 Work with schedules
 

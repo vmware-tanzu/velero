@@ -1,4 +1,7 @@
-# Run in custom namespace
+---
+title: "Run in custom namespace"
+layout: docs
+---
 
 In Ark version 0.7.0 and later, you can run Ark in any namespace. To do so, you specify the namespace in the YAML files that configure the Ark server. You then also specify the namespace when you run Ark client commands.
 

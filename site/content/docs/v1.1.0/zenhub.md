@@ -1,4 +1,7 @@
-# ZenHub
+---
+title: "ZenHub"
+layout: docs
+---
 
 As an Open Source community, it is necessary for our work, communication, and collaboration to be done in the open.
 GitHub provides a central repository for code, pull requests, issues, and documentation.  When applicable, we will use Google Docs for design reviews, proposals, and other working documents.

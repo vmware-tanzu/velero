@@ -1,4 +1,7 @@
-# How Ark Works
+---
+title: "How Ark Works"
+layout: docs
+---
 
 Each Ark operation -- on-demand backup, scheduled backup, restore -- is a custom resource, defined with a Kubernetes [Custom Resource Definition (CRD)][20] and stored in [etcd][22]. The config custom resource specifies core information and options such as cloud provider settings. Ark also includes controllers that process the custom resources to perform backups, restores, and all related operations.
 

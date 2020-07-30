@@ -1,4 +1,7 @@
-# Upgrading to Velero 1.1
+---
+title: "Upgrading to Velero 1.1"
+layout: docs
+---
 
 ## Prerequisites
 - [Velero v1.0][1] installed.

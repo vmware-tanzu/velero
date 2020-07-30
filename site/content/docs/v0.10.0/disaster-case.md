@@ -1,4 +1,7 @@
-# Disaster recovery
+---
+title: "Disaster recovery"
+layout: docs
+---
 
 *Using Schedules and Restore-Only Mode*
 

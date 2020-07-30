@@ -8,10 +8,10 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 ## All community meetings
 
 * Community Meetings Playlist
-{% youtube videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM %}
+{{< youtube "videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM" >}}
 
 * Velero Demo and Deep Dives Playlist
-{% youtube videoseries?list=PL7bmigfV0EqT82eQaVCslWWM4k4d63KyK %}
+{{< youtube "videoseries?list=PL7bmigfV0EqT82eQaVCslWWM4k4d63KyK" >}}
 
 ## Podcast shows
 
@@ -23,32 +23,32 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 * Kubecon NA 2019 - How to Backup and Restore Your Kubernetes Cluster - Annette Clewett & Dylan Murray, Red Hat:
 
-    {% youtube JyzgS-KKuoo %}
+    {{< youtube JyzgS-KKuoo >}}
 
 
 * Kubernetes Back Up, Restore and Migration with Velero - A NewStack interview, with guests: Carlisia Campos, Tom Spoonemore, and Efri Nattel-Shayo:
 
-    {% youtube 71NoY5CIcQ8 %}
+    {{< youtube 71NoY5CIcQ8 >}}
 
 
 * How to migrate applications between Kubernetes clusters using Velero:
 
-    {% youtube IZlwKMoqBqE %}
+    {{< youtube IZlwKMoqBqE >}}
 
 
 * TGIK 080: Velero 1.0:
 
-    {% youtube tj5Ey2bHsfM %}
+    {{< youtube tj5Ey2bHsfM >}}
 
 
 * Watch our recent webinar on backup and migration strategies:
 
-    {% youtube csrSPt3HFtg %}
+    {{< youtube csrSPt3HFtg >}}
 
 
 * Velero demo by Just me and Opensource - [ Kube 45 ] Velero - Backup & Restore Kubernetes Cluster:
 
-    {% youtube C9hzrexaIDA %}
+    {{< youtube C9hzrexaIDA >}}
 
 ## Blog posts
 

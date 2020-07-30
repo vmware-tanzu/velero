@@ -1,4 +1,7 @@
-# Website Guidelines
+---
+title: "Website Guidelines"
+layout: docs
+---
 
 ## Running the website locally
 

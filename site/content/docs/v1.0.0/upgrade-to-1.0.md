@@ -1,4 +1,7 @@
-# Upgrading to Velero 1.0
+---
+title: "Upgrading to Velero 1.0"
+layout: docs
+---
 
 ## Prerequisites
 - Velero v0.11 installed. If you're not already on v0.11, see the [instructions for upgrading to v0.11][0]. **Upgrading directly from v0.10.x or earlier to v1.0 is not supported!**

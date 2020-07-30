@@ -1,5 +1,7 @@
-
-# Velero plugin system
+---
+title: "Velero plugin system"
+layout: docs
+---
 
 Velero uses storage provider plugins to integrate with a variety of storage systems to support backup and snapshot operations.
 

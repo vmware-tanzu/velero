@@ -1,4 +1,7 @@
-# Velero Install CLI
+---
+title: "Velero Install CLI"
+layout: docs
+---
 
 This document serves as a guide to using the `velero install` CLI command to install `velero` server components into your kubernetes cluster.
 

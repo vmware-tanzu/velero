@@ -1,4 +1,7 @@
-# Run Ark on Azure
+---
+title: "Run Ark on Azure"
+layout: docs
+---
 
 To configure Ark on Azure, you:
 

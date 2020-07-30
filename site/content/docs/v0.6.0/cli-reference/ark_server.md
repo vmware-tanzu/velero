@@ -1,4 +1,7 @@
-## ark server
+---
+title: "ark server"
+layout: docs
+---
 
 Run the ark server
 

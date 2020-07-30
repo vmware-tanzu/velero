@@ -1,4 +1,7 @@
-## ark plugin remove
+---
+title: "ark plugin remove"
+layout: docs
+---
 
 Remove a plugin
 

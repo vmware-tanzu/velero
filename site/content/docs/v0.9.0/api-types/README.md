@@ -1,4 +1,7 @@
-# Table of Contents
+---
+title: "Table of Contents"
+layout: docs
+---
 
 ## API types
 

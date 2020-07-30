@@ -1,4 +1,7 @@
-# Backup Reference
+---
+title: "Backup Reference"
+layout: docs
+---
 
 ## Exclude Specific Items from Backup
 

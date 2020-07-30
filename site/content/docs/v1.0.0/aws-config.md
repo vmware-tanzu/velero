@@ -1,4 +1,7 @@
-# Run Velero on AWS
+---
+title: "Run Velero on AWS"
+layout: docs
+---
 
 To set up Velero on AWS, you:
 

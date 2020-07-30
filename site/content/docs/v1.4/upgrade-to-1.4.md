@@ -1,4 +1,7 @@
-# Upgrading to Velero 1.4
+---
+title: "Upgrading to Velero 1.4"
+layout: docs
+---
 
 ## Prerequisites
 

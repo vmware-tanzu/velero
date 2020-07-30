@@ -1,4 +1,7 @@
-# Basic Install
+---
+title: "Basic Install"
+layout: docs
+---
 
 - [Basic Install](#basic-install)
   - [Prerequisites](#prerequisites)

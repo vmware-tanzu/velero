@@ -1,4 +1,7 @@
-# Backup API Type
+---
+title: "Backup API Type"
+layout: docs
+---
 
 ## Use
 

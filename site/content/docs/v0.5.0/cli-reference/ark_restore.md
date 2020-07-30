@@ -1,4 +1,7 @@
-## ark restore
+---
+title: "ark restore"
+layout: docs
+---
 
 Work with restores
 

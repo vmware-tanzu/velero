@@ -1,4 +1,7 @@
-# Run Ark on AWS
+---
+title: "Run Ark on AWS"
+layout: docs
+---
 
 To set up Ark on AWS, you:
 

@@ -1,4 +1,7 @@
-## ark version
+---
+title: "ark version"
+layout: docs
+---
 
 Print the ark version and associated image
 

@@ -1,4 +1,7 @@
-## ark backup download
+---
+title: "ark backup download"
+layout: docs
+---
 
 Download a backup
 

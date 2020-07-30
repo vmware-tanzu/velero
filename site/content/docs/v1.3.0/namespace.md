@@ -1,4 +1,7 @@
-# Run in a non-default namespace
+---
+title: "Run in a non-default namespace"
+layout: docs
+---
 
 The Velero installation and backups by default are run in the `velero` namespace. However, it is possible to use a different namespace.
 

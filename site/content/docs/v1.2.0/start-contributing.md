@@ -1,4 +1,7 @@
-## Start contributing
+---
+title: "Start contributing"
+layout: docs
+---
 
 ### Before you start
 

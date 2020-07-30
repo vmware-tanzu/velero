@@ -1,4 +1,7 @@
-# Schedule API Type
+---
+title: "Schedule API Type"
+layout: docs
+---
 
 ## Use
 

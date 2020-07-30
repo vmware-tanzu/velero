@@ -1,4 +1,7 @@
-# Velero Backup Storage Locations
+---
+title: "Velero Backup Storage Locations"
+layout: docs
+---
 
 ## Backup Storage Location
 

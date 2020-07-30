@@ -1,4 +1,7 @@
-# Supported Kubernetes Versions
+---
+title: "Supported Kubernetes Versions"
+layout: docs
+---
 
 - In general, Velero works on Kubernetes version 1.7 or later (when Custom Resource Definitions were introduced).
 - Restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. See [Restic Integration][17].

@@ -1,4 +1,7 @@
-# Cloud Provider Specifics
+---
+title: "Cloud Provider Specifics"
+layout: docs
+---
 
 While the [Quickstart][0] uses a local storage service to quickly set up Heptio Ark as a demonstration, this document details additional configurations that are required when integrating with the cloud providers below:
 

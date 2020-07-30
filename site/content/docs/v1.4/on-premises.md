@@ -1,4 +1,7 @@
-# On-Premises Environments
+---
+title: "On-Premises Environments"
+layout: docs
+---
 
 You can run Velero in an on-premises cluster in different ways depending on your requirements.
 

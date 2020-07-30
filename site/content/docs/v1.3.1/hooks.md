@@ -1,4 +1,7 @@
-# Hooks
+---
+title: "Hooks"
+layout: docs
+---
 
 Velero currently supports executing commands in containers in pods during a backup.
 

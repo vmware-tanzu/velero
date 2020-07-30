@@ -1,4 +1,7 @@
-# Container Storage Interface Snapshot Support in Velero
+---
+title: "Container Storage Interface Snapshot Support in Velero"
+layout: docs
+---
 
 _This feature is under development. Documentation may not be up-to-date and features may not work as expected._
 

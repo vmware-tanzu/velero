@@ -1,4 +1,7 @@
-## Quick start evaluation install with Minio
+---
+title: "Quick start evaluation install with Minio"
+layout: docs
+---
 
 The following example sets up the Velero server and client, then backs up and restores a sample application.
 

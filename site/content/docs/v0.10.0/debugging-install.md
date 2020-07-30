@@ -1,4 +1,7 @@
-# Debugging Installation Issues
+---
+title: "Debugging Installation Issues"
+layout: docs
+---
 
 ## General
 

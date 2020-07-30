@@ -1,4 +1,7 @@
-## ark restic server
+---
+title: "ark restic server"
+layout: docs
+---
 
 Run the ark restic server
 

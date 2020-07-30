@@ -1,4 +1,7 @@
-# Compatible Storage Providers
+---
+title: "Compatible Storage Providers"
+layout: docs
+---
 
 Velero supports a variety of storage providers for different backup and snapshot operations. As of version 0.6.0, a plugin system allows anyone to add compatibility for additional backup and volume storage platforms without modifying the Velero codebase.
 

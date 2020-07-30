@@ -1,4 +1,7 @@
-# Restic Integration
+---
+title: "Restic Integration"
+layout: docs
+---
 
 As of version 0.9.0, Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called 
 [restic][1].

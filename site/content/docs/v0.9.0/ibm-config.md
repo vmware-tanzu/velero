@@ -1,4 +1,7 @@
-# Use IBM Cloud Object Storage as Ark's storage destination.
+---
+title: "Use IBM Cloud Object Storage as Ark's storage destination."
+layout: docs
+---
 You can deploy Ark on IBM [Public][5] or [Private][4] clouds, or even on any other Kubernetes cluster, but anyway you can use IBM Cloud Object Store as a destination for Ark's backups. 
 
 To set up IBM Cloud Object Storage (COS) as Ark's destination, you:

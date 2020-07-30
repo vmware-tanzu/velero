@@ -1,4 +1,7 @@
-## ark restic repo
+---
+title: "ark restic repo"
+layout: docs
+---
 
 Work with restic repositories
 

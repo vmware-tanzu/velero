@@ -1,4 +1,7 @@
-## ark describe schedules
+---
+title: "ark describe schedules"
+layout: docs
+---
 
 Describe schedules
 

@@ -1,4 +1,7 @@
-# Extend Ark
+---
+title: "Extend Ark"
+layout: docs
+---
 
 Ark includes mechanisms for extending the core functionality to meet your individual backup/restore needs:
 

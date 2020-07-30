@@ -1,4 +1,7 @@
-# Object Storage Layout Changes in v0.10
+---
+title: "Object Storage Layout Changes in v0.10"
+layout: docs
+---
 
 ## Overview
 

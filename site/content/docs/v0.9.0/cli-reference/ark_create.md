@@ -1,4 +1,7 @@
-## ark create
+---
+title: "ark create"
+layout: docs
+---
 
 Create ark resources
 

@@ -1,4 +1,7 @@
-# Run in custom namespace
+---
+title: "Run in custom namespace"
+layout: docs
+---
 
 You can run Velero in any namespace.
 

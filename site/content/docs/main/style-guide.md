@@ -1,5 +1,7 @@
-
-# Documentation Style Guide
+---
+title: "Documentation Style Guide"
+layout: docs
+---
 
 _This style guide is adapted from the [Kubernetes style guide](https://kubernetes.io/docs/contribute/style/style-guide/)._
 

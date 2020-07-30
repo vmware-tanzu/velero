@@ -1,4 +1,7 @@
-# Output file format
+---
+title: "Output file format"
+layout: docs
+---
 
 A backup is a gzip-compressed tar file whose name matches the Backup API resource's `metadata.name` (what is specified during `velero backup create <NAME>`).
 

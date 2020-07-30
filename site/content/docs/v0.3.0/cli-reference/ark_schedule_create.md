@@ -1,4 +1,7 @@
-## ark schedule create
+---
+title: "ark schedule create"
+layout: docs
+---
 
 Create a schedule
 

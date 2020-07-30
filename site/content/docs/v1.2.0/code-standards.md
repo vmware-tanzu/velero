@@ -1,4 +1,7 @@
-# Code Standards
+---
+title: "Code Standards"
+layout: docs
+---
 
 ## Adding a changelog
 

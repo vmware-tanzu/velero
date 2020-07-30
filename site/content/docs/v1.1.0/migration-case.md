@@ -1,4 +1,7 @@
-# Cluster migration
+---
+title: "Cluster migration"
+layout: docs
+---
 
 *Using Backups and Restores*
 

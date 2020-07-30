@@ -1,4 +1,7 @@
-## ark get
+---
+title: "ark get"
+layout: docs
+---
 
 Get ark resources
 

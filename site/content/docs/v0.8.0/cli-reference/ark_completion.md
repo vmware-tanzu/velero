@@ -1,4 +1,7 @@
-## ark completion
+---
+title: "ark completion"
+layout: docs
+---
 
 Output shell completion code for the specified shell (bash or zsh)
 

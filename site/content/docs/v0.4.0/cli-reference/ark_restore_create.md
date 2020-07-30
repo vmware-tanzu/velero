@@ -1,4 +1,7 @@
-## ark restore create
+---
+title: "ark restore create"
+layout: docs
+---
 
 Create a restore
 

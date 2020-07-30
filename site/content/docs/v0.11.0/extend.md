@@ -1,4 +1,7 @@
-# Extend Velero
+---
+title: "Extend Velero"
+layout: docs
+---
 
 Velero includes mechanisms for extending the core functionality to meet your individual backup/restore needs:
 

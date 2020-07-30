@@ -1,4 +1,7 @@
-## ark restic repo get
+---
+title: "ark restic repo get"
+layout: docs
+---
 
 Get restic repositories
 

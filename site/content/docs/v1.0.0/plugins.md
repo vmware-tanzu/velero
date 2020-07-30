@@ -1,4 +1,7 @@
-# Plugins
+---
+title: "Plugins"
+layout: docs
+---
 
 Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups & restores without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary containing implementations of Velero's plugin kinds (described below), plus a small amount of boilerplate code to expose the plugin implementations to Velero. This binary is added to a container image that serves as an init container for the Velero server pod and copies the binary into a shared emptyDir volume for the Velero server to access.
 

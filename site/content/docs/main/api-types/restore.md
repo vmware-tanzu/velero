@@ -1,4 +1,7 @@
-# Restore API Type
+---
+title: "Restore API Type"
+layout: docs
+---
 
 ## Use
 

@@ -1,3 +1,6 @@
+---
+version: v0.7.1
+---
 # Heptio Ark
 
 **Maintainers:** [Heptio][0]

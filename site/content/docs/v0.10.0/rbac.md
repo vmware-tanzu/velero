@@ -1,4 +1,7 @@
-# Run Ark more securely with restrictive RBAC settings
+---
+title: "Run Ark more securely with restrictive RBAC settings"
+layout: docs
+---
 
 By default Ark runs with an RBAC policy of ClusterRole `cluster-admin`. This is to make sure that Ark can back up or restore anything in your cluster. But `cluster-admin` access is wide open -- it gives Ark components access to everything in your cluster. Depending on your environment and your security needs, you should consider whether to configure additional RBAC policies with more restrictive access. 
 

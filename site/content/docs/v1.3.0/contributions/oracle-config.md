@@ -1,4 +1,7 @@
-# Use Oracle Cloud as a Backup Storage Provider for Velero
+---
+title: "Use Oracle Cloud as a Backup Storage Provider for Velero"
+layout: docs
+---
 
 ## Introduction
 
