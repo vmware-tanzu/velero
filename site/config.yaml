@@ -1,233 +1,94 @@
-# Site settings
+#baseURL: "https://velero.io/"
+disablePathToLower: true
+languageCode: en-us
+DefaultContentLanguage: "en"
 title: Velero
-email:
-author: Velero Authors
-description: Backup and migrate Kubernetes resources and persistent volumes
-#url: velero.io
-logo: Velero.svg
-twitter:
-  username: projectvelero
-  card: summary
-vm_logo: vm-logo.png
-gh_repo: https://github.com/vmware-tanzu/velero
-markdown: kramdown
-hero:
-  background-color: med-blue
-footer:
-  title: Getting Started
-  content: To help you get started, see the documentation.
-  cta_title: ''
-  cta_url: /docs
-  cta_text: Documentation
-  vm-link: http://vmware.github.io/
-
-footer_social_links:
-  Twitter:
-    fa_icon: fab fa-twitter
-    url: https://twitter.com/projectvelero
-  Slack:
-    fa_icon: fab fa-slack
-    url: https://kubernetes.slack.com/messages/velero
-  Google Groups:
-    fa_icon: fas fa-users
-    url: https://groups.google.com/forum/#!forum/projectvelero
-  RSS:
-    fa_icon: fa fa-rss
-    url: feed.xml
-  GitHub:
-    fa_icon: fab fa-github
-    url: https://github.com/vmware-tanzu/velero
-
-defaults:
-  - scope:
-      path: "" # an empty string here means all files in the project
-      type: "posts"
-    values:
-      layout: "posts"
-  - scope:
-      path: ""
-      type: "pages"
-    values:
-      layout: "default"
-  - scope:
-      path: docs/main
-    values:
-      version: main
-      gh: https://github.com/vmware-tanzu/velero/tree/main
-      layout: "docs"
-  - scope:
-      path: docs/v1.4
-    values:
-      version: v1.4
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.4.0
-      layout: "docs"
-  - scope:
-      path: docs/v1.3.2
-    values:
-      version: v1.3.2
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.3.2
-      layout: "docs"
-  - scope:
-      path: docs/v1.3.1
-    values:
-      version: v1.3.1
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.3.1
-      layout: "docs"
-  - scope:
-      path: docs/v1.3.0
-    values:
-      version: v1.3.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.3.0
-      layout: "docs"
-  - scope:
-      path: docs/v1.2.0
-    values:
-      version: v1.2.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.2.0
-      layout: "docs"
-  - scope:
-      path: docs/v1.1.0
-    values:
-      version: v1.1.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.1.0
-      layout: "docs"
-  - scope:
-      path: docs/v1.0.0
-    values:
-      version: v1.0.0
-      gh: https:/github.com/vmware-tanzu/velero/tree/v1.0.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.11.0
-    values:
-      version: v0.11.0
-      gh: https:/github.com/vmware-tanzu/velero/tree/v0.11.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.10.0
-    values:
-      version: v0.10.0
-      gh: https:/github.com/vmware-tanzu/velero/tree/v0.10.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.9.0
-    values:
-      version: v0.9.0
-      gh: https:/github.com/vmware-tanzu/velero/tree/v0.9.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.8.1
-    values:
-      version: v0.8.1
-      gh: https:/github.com/vmware-tanzu/velero/tree/v0.8.1
-      layout: "docs"
-  - scope:
-      path: docs/v0.8.0
-    values:
-      version: v0.8.0
-      gh: https:/github.com/vmware-tanzu/velero/tree/v0.8.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.7.1
-    values:
-      version: v0.7.1
-      gh: https://github.com/vmware-tanzu/velero/tree/v0.7.1
-      layout: "docs"
-  - scope:
-      path: docs/v0.7.0
-    values:
-      version: v0.7.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v0.7.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.6.0
-    values:
-      version: v0.6.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v0.6.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.5.0
-    values:
-      version: v0.5.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v0.5.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.4.0
-    values:
-      version: v0.4.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v0.4.0
-      layout: "docs"
-  - scope:
-      path: docs/v0.3.0
-    values:
-      version: v0.3.0
-      gh: https://github.com/vmware-tanzu/velero/tree/v0.3.0
-      layout: "docs"
-
-page_gen:
-  - data: shortlinks
-    template: redirect
-    name: key
-    dir: docs
-
-collections:
-  - contributors
-  - casestudies
-  - plugin-list
-
-versioning: true
-latest: v1.4
-versions:
-- main
-- v1.4
-- v1.3.2
-- v1.3.1
-- v1.3.0
-- v1.2.0
-- v1.1.0
-- v1.0.0
-- v0.11.0
-- v0.10.0
-- v0.9.0
-- v0.8.1
-- v0.8.0
-- v0.7.1
-- v0.7.0
-- v0.6.0
-- v0.5.0
-- v0.4.0
-- v0.3.0
-
-# Build settings
-permalink: /blog/:title/
-sass:
-  sass_dir: css
-  style: :compressed
-
-# Use the following plug-ins
-plugins:
-  - jekyll-readme-index # use README.md as index.html
-  - jekyll-sitemap # Create a sitemap using the official Jekyll sitemap gem
-  - jekyll-feed # Create an Atom feed using the official Jekyll feed gem
-  - jekyll-relative-links # Used to auto generate md links to html links
-  - jekyll-optional-front-matter # Parse Markdown files that do not have front-matter callouts
-  - jekyll-titles-from-headings # pull the page title from the first Markdown heading when none is specified.
-  - jekyll-paginate # pagination object for collections (e.g. posts)
-  - jekyll-redirect-from
-  - jekyll-seo-tag
-  - jemoji
-
-# Include these subdirectories
-include:
-  - CONTRIBUTING.md
-  - README.md
-
-# Exclude these files from your production _site
-exclude:
-  - Gemfile
-  - Gemfile.lock
-  - README-JEKYLL.md
-  - LICENSE
-  - CNAME
-  - Runbook.docx
-  - '*.sh'
+frontmatter:
+  date: [":filename", ":default"]
+params:
+  author: Velero Authors
+  vm_logo: vm-logo.png
+  logo: Velero.svg
+  hero:
+    backgroundColor: med-blue
+  versioning: true
+  latest: v1.4
+  versions:
+    - master
+    - v1.4
+    - v1.3.2
+    - v1.3.1
+    - v1.3.0
+    - v1.2.0
+    - v1.1.0
+    - v1.0.0
+    - v0.11.0
+    - v0.10.0
+    - v0.9.0
+    - v0.8.1
+    - v0.8.0
+    - v0.7.1
+    - v0.7.0
+    - v0.6.0
+    - v0.5.0
+    - v0.4.0
+    - v0.3.0
+  gh_repo: https://github.com/vmware-tanzu/velero
+  footer:
+    title: Getting Started
+    content: To help you get started, see the documentation.
+    cta_title: ''
+    cta_url: /docs
+    cta_text: Documentation
+    vm_link: http://vmware.github.io/
+  footer_social_links:
+    - title: Twitter
+      fa_icon: fab fa-twitter
+      url: https://twitter.com/projectvelero
+    - title: Slack
+      fa_icon: fab fa-slack
+      url: https://kubernetes.slack.com/messages/velero
+    - title: Google Groups
+      fa_icon: fas fa-users
+      url: https://groups.google.com/forum/#!forum/projectvelero
+    - title: RSS
+      fa_icon: fa fa-rss
+      url: blog/index.xml
+    - title: GitHub
+      fa_icon: fab fa-github
+      url: https://github.com/vmware-tanzu/velero
+minify:
+  disableCSS: false
+  disableHTML: false
+  disableJS: false
+  disableJSON: false
+  disableSVG: false
+  disableXML: true
+  minifyOutput: false
+  tdewolff:
+    css:
+      decimals: -1
+      keepCSS2: true
+    html:
+      keepConditionalComments: true
+      keepDefaultAttrVals: true
+      keepDocumentTags: true
+      keepEndTags: true
+      keepQuotes: true
+      keepWhitespace: false
+    js: {}
+    json: {}
+    svg:
+      decimals: -1
+    xml:
+      keepWhitespace: false
+enableRobotsTXT: true
+enableGitInfo: true
+permalinks:
+  posts: "/blog/:slug/"
+outputs:
+  home: ["HTML"]
+  section: ["HTML"]
+  page: ["HTML"]
+  taxonomy: ["HTML"]
+  term: ["HTML"]

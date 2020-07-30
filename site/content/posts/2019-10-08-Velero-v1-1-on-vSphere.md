@@ -1,6 +1,6 @@
 ---
 title: Velero v1.1 backing up and restoring apps on vSphere
-redirect_from: /Velero-v1-1-on-vSphere/
+slug: Velero-v1-1-on-vSphere
 image: /img/posts/vsphere-logo.jpg
 excerpt: A How-To guide to run Velero on vSphere.
 author_name: Cormac Hogan

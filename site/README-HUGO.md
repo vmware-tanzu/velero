@@ -6,32 +6,31 @@ To run this site in a Docker container, you can use `make serve-docs` from the r
 
 Install the following for an easy to use dev environment:
 
-* `brew install rbenv`
-* `rbenv install 2.6.3`
-* `gem install bundler`
+* `brew install hugo`
 
 # Dependencies for Linux
 If you are running a build on Ubuntu you will need the following packages:
-* ruby
-* ruby-dev
-* ruby-bundler
-* build-essential
-* zlib1g-dev
-* nginx (or apache2)
+* hugo
 
 
 # Local Development
-1. Install Jekyll and plug-ins in one fell swoop. `gem install github-pages`
-This mirrors the plug-ins used by GitHub Pages on your local machine including Jekyll, Sass, etc.
-2. Clone down your own fork, or clone the main repo `git clone https://github.com/vmware-tanzu/velero` and add your own remote.
-3. `cd velero/site`
-4. `rbenv local 2.6.3`
-5. `bundle install`
-6. Serve the site and watch for markup/sass changes `jekyll serve --livereload --incremental`. You may need to run `bundle exec jekyll serve --livereload --incremental`.
-7. View your website at http://127.0.0.1:4000/
-8. Commit any changes and push everything to your fork.
-9. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
+1. Clone down your own fork, or clone the main repo `git clone https://github.com/vmware-tanzu/velero` and add your own remote.
+1. `cd velero/site`
+1. Serve the site and watch for markup/sass changes `hugo serve`.
+1. View your website at http://127.0.0.1:1313/
+1. Commit any changes and push everything to your fork.
+1. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
 
+# Jetbrains IDE setup (IntelliJ, Goland, etc)
+1. Install the `Hugo Integration` plugin: https://plugins.jetbrains.com/plugin/13215-hugo-integration
+    - Under `Preferences...` -> `Plugins`
+1. Create a new configuration:
+    - Click `Edit Configurations...`
+    - Click the `+` button to create a new configuration and select `Hugo`
+    - Select `hugo serve` and make sure it is running under the `site` directory
+    - Save and run the new Configuration
+    - View your website at http://127.0.0.1:1313/
+    - Any changes in `site` will reload the website automatically
 
 # Adding a New Docs Version
 
@@ -43,7 +42,5 @@ To add a new set of versioned docs to go with a new Velero release:
    # set to the appropriate version numbers
    NEW_DOCS_VERSION=vX.Y VELERO_VERSION=vX.Y.Z make gen-docs
    ```
-
-1. In `site/_config.yml`, under the `defaults` field, add an entry for the new version just under `main` by copying the most recent version's entry and updating the version numbers.
 
 1. [Pre-release only] In `site/_config.yml`, revert the change to the `latest` field, so the pre-release docs do not become the default.

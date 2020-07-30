@@ -1,6 +1,6 @@
 ---
 title: Velero v1.1 backing up and restoring Stateful apps on vSphere
-redirect_from: /Velero-v1-1-Stateful-Backup-vSphere/
+slug: Velero-v1-1-Stateful-Backup-vSphere
 image: /img/posts/cassandra.gif
 excerpt: This post demonstrates how Velero can be used on Kubernetes running on vSphere to backup a Stateful application. For the purposes of this example, we will backup and restore a Cassandra NoSQL database management system.
 author_name: Cormac Hogan

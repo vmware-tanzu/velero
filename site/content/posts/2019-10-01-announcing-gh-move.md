@@ -1,6 +1,6 @@
 ---
 title: Announcing a new GitHub home for Velero
-redirect_from: /announcing-gh-move/
+slug: announcing-gh-move
 image: /img/posts/vmware-tanzu.png
 excerpt: The next Velero release (v1.2) will be built out of a new GitHub organization, and we have significant changes to our plugins.
 author_name: Carlisia Campos
