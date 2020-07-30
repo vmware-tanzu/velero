@@ -1,10 +1,10 @@
 [build]
   base = "site/"
-  command = "jekyll build"
-  publish = "site/_site"
+  command = "hugo --gc --minify"
+  publish = "site/public"
 
-# Using the * -> :splat rule should redirect anything under master to the matching file under main
-[[redirects]]
-  from = "/docs/master/*"
-  to = "/docs/main/:splat"
+[context.production.environment]
+  HUGO_VERSION = "0.73.0"
 
+[context.deploy-preview.environment]
+  HUGO_VERSION = "0.73.0"

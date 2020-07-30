@@ -14,7 +14,7 @@ params:
   versioning: true
   latest: v1.4
   versions:
-    - master
+    - main
     - v1.4
     - v1.3.2
     - v1.3.1
