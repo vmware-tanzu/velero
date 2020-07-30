@@ -8,7 +8,7 @@ It also provides a plugin model that enables anyone to implement additional obje
 main Velero repository.
 
 The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This is a new capability for Velero, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you've
-been waiting for a snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
+been waiting for a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
 local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
@@ -37,7 +37,7 @@ The steps in this section are only needed if you are installing on RancherOS, Op
 
 **RancherOS**
 
-Update the host path for volumes from `/var/lib/kubelet/pods` to `/opt/rke/var/lib/kubelet/pods`.
+Update the host path for volumes in the restic DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to `/opt/rke/var/lib/kubelet/pods`.
 
 ```yaml
 hostPath:

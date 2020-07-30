@@ -10,8 +10,8 @@
     - [Enable server side features](#enable-server-side-features)
     - [Enable client side features](#enable-client-side-features)
   - [Customize resource requests and limits](#customize-resource-requests-and-limits)
-    - [Install with custom resource requests and limits](install-with-custom-resource-requests-and-limits)
-    - [Update resource requests and limits after install](update-resource-requests-and-limits-after-install)
+    - [Install with custom resource requests and limits](#install-with-custom-resource-requests-and-limits)
+    - [Update resource requests and limits after install](#update-resource-requests-and-limits-after-install)
   - [Configure more than one storage location for backups or volume snapshots](#configure-more-than-one-storage-location-for-backups-or-volume-snapshots)
   - [Do not configure a backup storage location during install](#do-not-configure-a-backup-storage-location-during-install)
   - [Install an additional volume snapshot provider](#install-an-additional-volume-snapshot-provider)
@@ -97,13 +97,13 @@ velero client config set features=
 
 ## Customize resource requests and limits
 
-Velero sets resource requests and limits by defaults at installation for the Velero pod and the restic pod, if you using the [restic integration](/docs/main/restic/).
+At installation, Velero sets default resource requests and limits for the Velero pod and the restic pod, if you using the [restic integration](/docs/main/restic/).
 
 <table caption="Velero Customize resource requests and limits defaults" >
   <tr><th>Setting</th><th>Velero pod defaults</th><th>restic pod defaults (Velero 1.4.2 and later)</th></tr>
   <tr><td>CPU request</td><td>500m</td><td>500m</td></tr>
   <tr><td>Memory requests</td><td>128Mi</td><td>512Mi</td></tr>
-  <tr><td>CPU limit</td><td>1000m (1)</td><td>1000m (1)</td></tr>
+  <tr><td>CPU limit</td><td>1000m (1 CPU)</td><td>1000m (1 CPU)</td></tr>
   <tr><td>Memory limit</td><td>256Mi</td><td>1024Mi</td></tr>
 </table>
 
@@ -113,10 +113,10 @@ You can customize these resource requests and limit when you first install using
 
 ```
 velero install \
-  --velero-pod-cpu-request <CPU_REQUEST>] \
-  --velero-pod-mem-request <MEMORY_REQUEST>] \
-  --velero-pod-cpu-limit <CPU_LIMIT>] \
-  --velero-pod-mem-limit <MEMORY_LIMIT>]
+  --velero-pod-cpu-request <CPU_REQUEST> \
+  --velero-pod-mem-request <MEMORY_REQUEST> \
+  --velero-pod-cpu-limit <CPU_LIMIT> \
+  --velero-pod-mem-limit <MEMORY_LIMIT> \
   [--use-restic] \
   [--default-volumes-to-restic] \
   [--restic-pod-cpu-request <CPU_REQUEST>] \
@@ -127,7 +127,7 @@ velero install \
 
 ### Update resource requests and limits after install
 
-After installation you can adjust the resource requests and limits in the Velero Deployment spec restic DeamonSet spec, if you are using the restic integration.
+After installation you can adjust the resource requests and limits in the Velero Deployment spec or restic DeamonSet spec, if you are using the restic integration.
 
 **Velero pod**
 
@@ -179,7 +179,7 @@ After installation you can adjust the resource requests and limits in the Velero
                 memory: 512Mi
     ```
 
-Additionally, may want to update the the default Velero restic pod operation timeout (default 240 minutes) to allow large more backups time to complete. You can adjust this timeout by adding the `- --restic-timeout` argument to the Velero Deployment spec.
+Additionally, you may want to update the the default Velero restic pod operation timeout (default 240 minutes) to allow large more backups time to complete. You can adjust this timeout by adding the `- --restic-timeout` argument to the Velero Deployment spec.
 
 **NOTE:** Changes made to this timeout value will revert back to the default value if you re-run the Velero install command.
 
@@ -404,4 +404,4 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
 [9]: self-signed-certificates.md
 [10]: csi.md
-[11]: https://github.com/vmware-tanzu/velero/blob/master/pkg/apis/velero/v1/constants.go
+[11]: https://github.com/vmware-tanzu/velero/blob/main/pkg/apis/velero/v1/constants.go
