@@ -1,11 +1,11 @@
 <header class="site-header">
     <div class="site-header-content">
         <div class="logo">
-            <a href="/" aria-label="Velero homepage"><img src="/img/{{ site.logo }}" class="logo" alt="Homepage"/></a>
+            <a href="/" aria-label="Velero homepage"><img src="/img/{{ .Site.Params.logo }}" class="logo" alt="Homepage"/></a>
         </div>
         <ul class="nav-menu" id="header-nav">
-            <li class="home"><a href="/" title="{{ site.title }}">Home</a></li>
-            <li class="docs"><a href="/docs/{{ site.latest }}" title="Documentation">Documentation</a></li>
+            <li class="home"><a href="/" title="{{ .Site.Title }}">Home</a></li>
+            <li class="docs"><a href="/docs/{{ .Site.Params.latest }}" title="Documentation">Documentation</a></li>
             <li class="plugins"><a href="/plugins" title="Plugins">Plugins</a></li>
             <li class="blog"><a href="/blog" title="Blog Posts">Blog</a></li>
             <li class="community"><a href="/community" title="Community">Community</a></li>

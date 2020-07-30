@@ -2,18 +2,18 @@
     <div class="card card-light mb-3 mb-md-0 blog-card">
         <div class="card-body match-height">
             <div class="post-thumbnail">
-                {% if post.image %}
-                <img src="{{ post.image }}" alt="{{ post.title }}" />
-                {% else %}
-                <img src="/img/{{ site.logo }}" alt="{{ post.title }}" />
-                {% endif %}
+                {{ if .Params.image }}
+                    <img src="{{ .Params.image }}" alt="{{ .Title }}" />
+                {{ else }}
+                    <img src="/img/{{ .Site.Params.logo }}" alt="{{ .Title }}" />
+                {{ end }}
             </div>
             <article class="post">
                 <h5 class="text-center font-weight-medium">
-                    <a href="{{ site.baseurl }}{{ post.url }}" class="post-title">{{ post.title }}</a>
+                    <a href="{{ .Permalink }}" class="post-title">{{ .Title }}</a>
                 </h5>
                 <div class="post-entry">
-                    {{ post.excerpt | strip_html }}
+                    {{ plainify .Params.excerpt }}
                 </div>
             </article>
         </div>

@@ -1,26 +1,33 @@
-{{casestudy_background}}
 <div class="alternating-cards">
-  {% for casestudy in site.casestudies %}
+  {{ $caseStudies := .Site.GetPage "/casestudies" }}
+  {{ $caseStudyBackground := .Params.backgrounds.case_study }}
+  {{ $limit := .Scratch.Get "limit" }}
+  {{ range $index, $page := sort (first $limit $caseStudies.Resources) "Name" "asc" }}
     <div class="row no-gutters align-items-center">
-      {% if casestudy.icon %}
-      <div class="order-xs-first col-md-3 match-height icon bg-color-{{ page.backgrounds.case_study }} {%  cycle('order-md-first', 'order-md-last') %}">
-        <img src="/img/case-study-icons/{{ casestudy.icon }}" alt="{{ casestudy.title }}"/>
-      </div>
-      {% endif %}
-      <div class="order-xs-last col-md-9 {% cycle('order-md-last', 'order-md-first') %}">
+      {{ $iconClassName := "" }}
+      {{ $bodyClassName := "" }}
+
+      {{ if not (modBool $index 2) }}
+        {{ $iconClassName = "order-md-last" }}
+        {{ $bodyClassName = "order-md-first" }}
+      {{ end }}
+
+      {{ if .Params.icon }}
+        <div class="order-xs-first col-md-3 match-height icon bg-color-{{ $caseStudyBackground }} {{ $iconClassName }}">
+          <img src="/img/case-study-icons/{{ .Params.icon }}" alt="{{ .Title }}"/>
+        </div>
+      {{ end }}
+      <div class="order-xs-last col-md-9 {{ $bodyClassName }}">
         <div class="card-body">
-          {% if casestudy.title != blank %}
-          <h5 class="card-title">{{ casestudy.title }}</h5>
-          {% endif %}
-          <p class="card-text">{{ casestudy.content | markdownify }}</p>
-          {% for link in casestudy.links %}
-          <a class="card-link btn btn-primary btn-sm" href="{{ link[1] }}">{{ link[0] }}</a>
-          {% endfor %}
+          {{ if .Title }}
+            <h5 class="card-title">{{ .Title }}</h5>
+          {{ end }}
+          <p class="card-text">{{ .Content }}</p>
+          {{ range $key, $val := .Params.links }}
+            <a class="card-link btn btn-primary btn-sm" href="{{ $val  }}">{{ $key }}</a>
+          {{ end }}
         </div>
       </div>
     </div>
-    {% if limit > 0 and forloop.index >= limit %}
-        {% break %}
-    {% endif %}
-  {% endfor %}
+  {{ end }}
 </div>

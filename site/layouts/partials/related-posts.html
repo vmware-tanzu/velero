@@ -1,10 +1,6 @@
 <h5 class="font-color-darker">Related Content</h5>
 <div class="row">
-  {% for category in site.categories limit:1 %}
-
-  {% for post in category[1] limit:2 %}
-    {% include blog-post-card.html %}
-
-  {% endfor %}
-  {% endfor %}
+  {{ range .Site.RegularPages.Related . | first 2 }}
+    {{ partial "blog-post-card.html" . }}
+  {{ end }}
 </div>

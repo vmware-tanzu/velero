@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  {{ $options := (dict "targetPath" "styles.css" "outputStyle" "compressed" "enableSourceMap" true) }}
+  {{ $styles := resources.Get "styles.scss" | toCSS $options | resources.Fingerprint }}
+  <link rel="stylesheet" href="{{ $styles.Permalink | relURL }}" integrity="{{ $styles.Data.Integrity }}">
+  {{ block "title" . }}<title>{{ .Site.Title }} {{ .Page.Title }}</title>{{ end }}
+</head>
+<body id="{{ .CurrentSection.Params.id }}">
+<div class="container-fluid site-outer-container">
+  <div class="site-container">
+    {{ .Render "site-header" }}
+    {{ block "main" . }}
+      <div class="post-single-hero bg-color-{{ $.Site.Params.hero.backgroundColor }}">
+        <div class="section">
+          <div class="section-content">
+            <h1>{{ .Title }}</h1>
+          </div>
+        </div>
+      </div>
+      <div class="post-single-body">
+        <div class="section section-card">
+          <div class="section-content pt-4 pb-0">
+            {{ block "content" . }}
+              {{ .Content }}
+            {{ end }}
+          </div>
+        </div>
+      </div>
+    {{ end }}
+    {{ .Render "footer" }}
+  </div>
+</div>
+</body>
+</html>

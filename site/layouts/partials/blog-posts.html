@@ -1,13 +1,14 @@
 <div class="row">
-{% for post in site.posts %}
-    {% include blog-post-card.html %}
-        {% if limit > 0 and forloop.index >= limit %}
-         {% break %}
-        {% endif %}
-        {% assign row = forloop.index | modulo: 3 %}
-{% if row == 0 %}
+    {{ $posts := (.Scratch.Get "posts") }}
+
+    {{ range $index, $post := $posts }}
+    {{ partial "blog-post-card.html" . }}
+
+    {{ $currentIndex := add $index 1 }}
+    {{ $row := mod $currentIndex 3 }}
+    {{ if and (eq $row 0) (ne $currentIndex (len $posts)) }}
 </div>
 <div class="row mt-4">
-{% endif %}
-{% endfor %}
+    {{ end }}
+    {{ end }}
 </div>

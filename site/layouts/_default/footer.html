@@ -1,0 +1,60 @@
+<div class="section section-background-darkest-blue">
+    <div class="section-content">
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 col-lg-8">
+                <h5>{{ .Site.Params.footer.title }}</h5>
+                <p>{{ .Site.Params.footer.content }}</p>
+            </div>
+            <div class="col-xs-12 col-sm-6 col-lg-3 offset-lg-1">
+                <p><strong>{{ .Site.Params.footer.cta_title }}</strong></p>
+                <a href="{{ .Site.Params.footer.cta_url }}"
+                   class="btn btn-sm btn-primary btn-no-border">{{ .Site.Params.footer.cta_text }}</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="section site-footer">
+    <div class="section-content">
+        <div class="row justify-content-between align-items-center">
+            <div class="col-12 col-md-8 mb-3 mb-md-0">
+                <ul class="social-links text-center text-md-left">
+                    {{ range .Site.Params.footer_social_links }}
+                        <li>
+                            {{ if .fa_icon }}
+                                <i class="{{ .fa_icon }} fa-lg fa-fw mr-1"></i>
+                            {{ end }}
+                            <a href="{{ .url }}">{{ .title }}</a>
+                        </li>
+                    {{ end }}
+                </ul>
+            </div>
+            <div class="col-12 col-md-4 text-center text-md-right">
+                <a href="/" aria-label="Velero homepage"><img src="/img/{{ .Site.Params.logo }}" class="logo"
+                                                              alt="Homepage"/></a>
+            </div>
+        </div>
+        <div class="row align-items-center">
+            <div class="col copyright text-center text-md-right mt-4">
+                &copy; {{ now.Format "2006" }} {{ .Site.Params.Author }}.
+                <a href="{{ .Site.Params.footer.vm_link }}" class="vm-logo">A VMware-backed project. <img
+                            src="/img/{{ .Site.Params.vm_logo }}" alt="VMware logo"/></a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- JS -->
+<script defer src="https://use.fontawesome.com/releases/v5.8.1/js/all.js"
+        integrity="sha384-g5uSoOSBd7KkhAMlnQILrecXvzst9TdC09/VM+pjDTCM+1il8RHz5fKANTFFb+gQ"
+        crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" crossorigin="anonymous"></script>
+
+<script src="/js/jquery.matchHeight.js?{{ now.Unix }}"></script>
+<script src="/js/scripts.js?{{ now.Unix }}"></script>
