@@ -35,6 +35,11 @@ if ! command -v controller-gen > /dev/null; then
   exit 1
 fi
 
+if ! command -v kustomize > /dev/null; then
+  echo "kustomize is missing"
+  exit 1
+fi
+
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
   github.com/vmware-tanzu/velero/pkg/generated \
@@ -51,5 +56,26 @@ controller-gen \
   paths=./pkg/apis/velero/v1/... \
   paths=./pkg/controller/... \
   output:crd:artifacts:config=config/crd/bases
+
+# Add lables and annotations for CRDs by kustomize
+# The controller-tool is not prefer to do this https://github.com/kubernetes-sigs/controller-tools/issues/454
+pushd config/crd/bases
+for crd in *.yaml; do
+  echo $crd
+  cat <<EOF > kustomization.yaml
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  resources:
+  - $crd
+  commonLabels:
+    app.kubernetes.io/name: velero
+  commonAnnotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+EOF
+  kustomize build -o $crd
+  rm kustomization.yaml
+done
+popd
 
 go generate ./config/crd/crds

@@ -34,6 +34,13 @@ RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/downloa
 # get controller-tools
 RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0
 
+# get kustomize
+RUN wget --quiet https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.8.1/kustomize_v3.8.1_linux_amd64.tar.gz && \
+    tar -zxvf kustomize_v3.8.1_linux_amd64.tar.gz && \
+    mv kustomize /usr/bin/kustomize && \
+    chmod +x /usr/bin/kustomize && \
+    rm kustomize_v3.8.1_linux_amd64.tar.gz
+
 # get goimports (the revision is pinned so we don't indiscriminately update, but the particular commit
 # is not important)
 RUN go get golang.org/x/tools/cmd/goimports@11e9d9cc0042e6bd10337d4d2c3e5d9295508e7d
