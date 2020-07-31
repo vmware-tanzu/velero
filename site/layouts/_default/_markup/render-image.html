@@ -1,0 +1,11 @@
+{{ $link := .Destination }}
+{{ if not (strings.HasPrefix $link "http") }}
+    {{ if strings.HasSuffix .Page.Parent.RelPermalink "docs/" }}
+        {{ $link = printf "%s%s" .Page.RelPermalink .Destination }}
+    {{ else }}
+        {{ $link = printf "%s%s" .Page.Parent.RelPermalink .Destination }}
+    {{ end }}
+{{ end }}
+<p>
+    <img src="{{ .Destination | safeURL }}" alt="{{ .Text }}" {{ with .Title}} title="{{ . }}"{{ end }} />
+</p>
