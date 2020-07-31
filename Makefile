@@ -338,7 +338,7 @@ serve-docs: build-image-hugo
 #   4. Copies the previous version's ToC file and runs 'git add' to establish
 #      a useful baseline to diff against.
 #   5. Replaces the content of the new ToC file with the master ToC.
-#   6. Update site/_config.yml and site/_data/toc-mapping.yml to include entries
+#   6. Update site/config.yaml and site/_data/toc-mapping.yml to include entries
 #      for the new version.
 #
 # The unstaged changes in the working directory can now easily be diff'ed against the

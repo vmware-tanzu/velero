@@ -24,6 +24,7 @@ set -o pipefail
 DOCS_DIRECTORY=site/content/docs
 DATA_DOCS_DIRECTORY=site/data/docs
 CONFIG_FILE=site/config.yaml
+MAIN_BRANCH=main
 
 # don't run if there's already a directory for the target docs version
 if [[ -d $DOCS_DIRECTORY/$NEW_DOCS_VERSION ]]; then
@@ -42,14 +43,14 @@ fi
 echo "Creating copy of docs directory $DOCS_DIRECTORY/$PREVIOUS_DOCS_VERSION in $DOCS_DIRECTORY/$NEW_DOCS_VERSION"
 cp -r $DOCS_DIRECTORY/${PREVIOUS_DOCS_VERSION}/ $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/
 
-# 'git add' the previous version's docs as-is so we get a useful diff when we copy the master docs in
+# 'git add' the previous version's docs as-is so we get a useful diff when we copy the $MAIN_BRANCH docs in
 echo "Running 'git add' for previous version's doc contents to use as a base for diff"
 git add -f $DOCS_DIRECTORY/${NEW_DOCS_VERSION}
 
-# now copy the contents of $DOCS_DIRECTORY/master into the same directory so we can get a nice
+# now copy the contents of $DOCS_DIRECTORY/$MAIN_BRANCH into the same directory so we can get a nice
 # git diff of what changed since previous version
-echo "Copying $DOCS_DIRECTORY/master/ to $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/"
-rm -rf $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/ && cp -r $DOCS_DIRECTORY/master/ $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/
+echo "Copying $DOCS_DIRECTORY/$MAIN_BRANCH/ to $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/"
+rm -rf $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/ && cp -r $DOCS_DIRECTORY/$MAIN_BRANCH/ $DOCS_DIRECTORY/${NEW_DOCS_VERSION}/
 
 # make a copy of the previous versioned ToC
 NEW_DOCS_TOC="$(echo ${NEW_DOCS_VERSION} | tr . -)-toc"
@@ -58,20 +59,20 @@ PREVIOUS_DOCS_TOC="$(echo ${PREVIOUS_DOCS_VERSION} | tr . -)-toc"
 echo "Creating copy of $DATA_DOCS_DIRECTORY/$PREVIOUS_DOCS_TOC.yml at $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml"
 cp $DATA_DOCS_DIRECTORY/$PREVIOUS_DOCS_TOC.yml $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
 
-# 'git add' the previous version's ToC content as-is so we get a useful diff when we copy the master ToC in
+# 'git add' the previous version's ToC content as-is so we get a useful diff when we copy the $MAIN_BRANCH ToC in
 echo "Running 'git add' for previous version's ToC to use as a base for diff"
 git add $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
 
-# now copy the master ToC so we can get a nice git diff of what changed since previous version
-echo "Copying $DATA_DOCS_DIRECTORY/master-toc.yml to $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml"
-rm $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml && cp $DATA_DOCS_DIRECTORY/master-toc.yml $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
+# now copy the $MAIN_BRANCH ToC so we can get a nice git diff of what changed since previous version
+echo "Copying $DATA_DOCS_DIRECTORY/$MAIN_BRANCH-toc.yml to $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml"
+rm $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml && cp $DATA_DOCS_DIRECTORY/$MAIN_BRANCH-toc.yml $DATA_DOCS_DIRECTORY/$NEW_DOCS_TOC.yml
 
 # replace known version-specific links -- the sed syntax is slightly different in OS X and Linux,
 # so check which OS we're running on.
 if [[ $(uname) == "Darwin" ]]; then
     echo "[OS X] updating version-specific links"
-    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://velero.io/docs/master|https://velero.io/docs/$VELERO_VERSION|g"
-    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/vmware-tanzu/velero/blob/master|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://velero.io/docs/$MAIN_BRANCH|https://velero.io/docs/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/vmware-tanzu/velero/blob/$MAIN_BRANCH|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
 
     echo "[OS X] Updating latest version in $CONFIG_FILE"
     sed -i '' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" $CONFIG_FILE
@@ -79,28 +80,28 @@ if [[ $(uname) == "Darwin" ]]; then
     # newlines and lack of indentation are requirements for this sed syntax
     # which is doing an append
     echo "[OS X] Adding latest version to versions list in $CONFIG_FILE"
-    sed -i '' "/- master/a\\
+    sed -i '' "/- $MAIN_BRANCH/a\\
 \ \ \ \ - ${NEW_DOCS_VERSION}
 " $CONFIG_FILE
 
     echo "[OS X] Adding ToC mapping entry"
-    sed -i '' "/master: master-toc/a\\
+    sed -i '' "/$MAIN_BRANCH: $MAIN_BRANCH-toc/a\\
 ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}
 " $DATA_DOCS_DIRECTORY/toc-mapping.yml
 
 else
     echo "[Linux] updating version-specific links"
-    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://velero.io/docs/master|https://velero.io/docs/$VELERO_VERSION|g"
-    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://github.com/vmware-tanzu/velero/blob/master|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://velero.io/docs/$MAIN_BRANCH|https://velero.io/docs/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://github.com/vmware-tanzu/velero/blob/$MAIN_BRANCH|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
 
     echo "[Linux] Updating latest version in $CONFIG_FILE"
     sed -i'' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" $CONFIG_FILE
     
     echo "[Linux] Adding latest version to versions list in $CONFIG_FILE"
-    sed -i'' "/- master/a - ${NEW_DOCS_VERSION}" $CONFIG_FILE
+    sed -i'' "/- $MAIN_BRANCH/a - ${NEW_DOCS_VERSION}" $CONFIG_FILE
     
     echo "[Linux] Adding ToC mapping entry"
-    sed -i'' "/master: master-toc/a ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}" $DATA_DOCS_DIRECTORY/toc-mapping.yml
+    sed -i'' "/$MAIN_BRANCH: $MAIN_BRANCH-toc/a ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}" $DATA_DOCS_DIRECTORY/toc-mapping.yml
 fi
 
 echo "Success! $DOCS_DIRECTORY/$NEW_DOCS_VERSION has been created."
