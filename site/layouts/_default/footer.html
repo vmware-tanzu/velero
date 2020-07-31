@@ -24,7 +24,11 @@
                             {{ if .fa_icon }}
                                 <i class="{{ .fa_icon }} fa-lg fa-fw mr-1"></i>
                             {{ end }}
-                            <a href="{{ .url }}">{{ .title }}</a>
+                            {{ $link := .url }}
+                            {{ if not (strings.HasPrefix .url "http") }}
+                                {{ $link = printf "%s%s" $.Site.BaseURL .url }}
+                            {{ end }}
+                            <a href="{{ $link }}">{{ .title }}</a>
                         </li>
                     {{ end }}
                 </ul>
