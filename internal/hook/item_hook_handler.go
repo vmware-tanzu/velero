@@ -19,20 +19,26 @@ package hook
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
+	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type hookPhase string
@@ -76,6 +82,87 @@ type ItemHookHandler interface {
 	) error
 }
 
+// ItemRestoreHookHandler invokes restore hooks for an item
+type ItemRestoreHookHandler interface {
+	HandleRestoreHooks(
+		log logrus.FieldLogger,
+		groupResource schema.GroupResource,
+		obj runtime.Unstructured,
+		rh []ResourceRestoreHook,
+	) (runtime.Unstructured, error)
+}
+
+// InitContainerRestoreHookHandler is the restore hook handler to add init containers to restored pods.
+type InitContainerRestoreHookHandler struct{}
+
+// HandleRestoreHooks runs the restore hooks for an item.
+// If the item is a pod, then hooks are chosen to be run as follows:
+// If the pod has the appropriate annotations specifying the hook action, then hooks from the annotation are run
+// Otherwise, the supplied ResourceRestoreHooks are applied.
+func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
+	log logrus.FieldLogger,
+	groupResource schema.GroupResource,
+	obj runtime.Unstructured,
+	resourceRestoreHooks []ResourceRestoreHook,
+) (runtime.Unstructured, error) {
+	// We only support hooks on pods right now
+	if groupResource != kuberesource.Pods {
+		return nil, nil
+	}
+
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get a metadata accessor")
+	}
+	pod := new(corev1api.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	initContainers := []corev1api.Container{}
+	// If this pod had pod volumes backed up using restic, then we want to the pod volumes restored prior to
+	// running the restore hook init containers. This allows the restore hook init containers to prepare the
+	// restored data to be consumed by the application container(s).
+	// So if there is a "resitc-wait" init container already on the pod at index 0, we'll preserve that and run
+	// it before running any other init container.
+	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == restic.InitContainer {
+		initContainers = append(initContainers, pod.Spec.InitContainers[0])
+		pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
+	}
+
+	hooksFromAnnotations := getInitRestoreHookFromAnnotation(kube.NamespaceAndName(pod), metadata.GetAnnotations(), log)
+	if hooksFromAnnotations != nil {
+		log.Infof("Handling InitRestoreHooks from pod annotaions")
+		initContainers = append(initContainers, hooksFromAnnotations.InitContainers...)
+	} else {
+		log.Infof("Handling InitRestoreHooks from RestoreSpec")
+		// pod did not have the annotations appropriate for restore hooks
+		// running applicable ResourceRestoreHooks supplied.
+		namespace := metadata.GetNamespace()
+		labels := labels.Set(metadata.GetLabels())
+
+		for _, rh := range resourceRestoreHooks {
+			if !rh.Selector.applicableTo(groupResource, namespace, labels) {
+				continue
+			}
+			for _, hook := range rh.RestoreHooks {
+				if hook.Init != nil {
+					initContainers = append(initContainers, hook.Init.InitContainers...)
+				}
+			}
+		}
+	}
+
+	pod.Spec.InitContainers = append(initContainers, pod.Spec.InitContainers...)
+	log.Infof("Returning pod %s/%s with %d init container(s)", pod.Namespace, pod.Name, len(pod.Spec.InitContainers))
+
+	podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return &unstructured.Unstructured{Object: podMap}, nil
+}
+
 // DefaultItemHookHandler is the default itemHookHandler.
 type DefaultItemHookHandler struct {
 	PodCommandExecutor podexec.PodCommandExecutor
@@ -117,7 +204,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 		)
 		if err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); err != nil {
 			hookLog.WithError(err).Error("Error executing hook")
-			if hookFromAnnotations.OnError == api.HookErrorModeFail {
+			if hookFromAnnotations.OnError == velerov1api.HookErrorModeFail {
 				return err
 			}
 		}
@@ -128,11 +215,11 @@ func (h *DefaultItemHookHandler) HandleHooks(
 	labels := labels.Set(metadata.GetLabels())
 	// Otherwise, check for hooks defined in the backup spec.
 	for _, resourceHook := range resourceHooks {
-		if !resourceHook.applicableTo(groupResource, namespace, labels) {
+		if !resourceHook.Selector.applicableTo(groupResource, namespace, labels) {
 			continue
 		}
 
-		var hooks []api.BackupResourceHook
+		var hooks []velerov1api.BackupResourceHook
 		if phase == PhasePre {
 			hooks = resourceHook.Pre
 		} else {
@@ -151,7 +238,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 					err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.Name, hook.Exec)
 					if err != nil {
 						hookLog.WithError(err).Error("Error executing hook")
-						if hook.Exec.OnError == api.HookErrorModeFail {
+						if hook.Exec.OnError == velerov1api.HookErrorModeFail {
 							return err
 						}
 					}
@@ -177,25 +264,16 @@ func getHookAnnotation(annotations map[string]string, key string, phase hookPhas
 // getPodExecHookFromAnnotations returns an ExecHook based on the annotations, as long as the
 // 'command' annotation is present. If it is absent, this returns nil.
 // If there is an error in parsing a supplied timeout, it is logged.
-func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase, log logrus.FieldLogger) *api.ExecHook {
+func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase, log logrus.FieldLogger) *velerov1api.ExecHook {
 	commandValue := getHookAnnotation(annotations, podBackupHookCommandAnnotationKey, phase)
 	if commandValue == "" {
 		return nil
 	}
-	var command []string
-	// check for json array
-	if commandValue[0] == '[' {
-		if err := json.Unmarshal([]byte(commandValue), &command); err != nil {
-			command = []string{commandValue}
-		}
-	} else {
-		command = append(command, commandValue)
-	}
 
 	container := getHookAnnotation(annotations, podBackupHookContainerAnnotationKey, phase)
 
-	onError := api.HookErrorMode(getHookAnnotation(annotations, podBackupHookOnErrorAnnotationKey, phase))
-	if onError != api.HookErrorModeContinue && onError != api.HookErrorModeFail {
+	onError := velerov1api.HookErrorMode(getHookAnnotation(annotations, podBackupHookOnErrorAnnotationKey, phase))
+	if onError != velerov1api.HookErrorModeContinue && onError != velerov1api.HookErrorModeFail {
 		onError = ""
 	}
 
@@ -209,25 +287,42 @@ func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhas
 		}
 	}
 
-	return &api.ExecHook{
+	return &velerov1api.ExecHook{
 		Container: container,
-		Command:   command,
+		Command:   parseStringToCommand(commandValue),
 		OnError:   onError,
 		Timeout:   metav1.Duration{Duration: timeout},
 	}
 }
 
-// ResourceHook is a hook for a given resource.
-type ResourceHook struct {
-	Name          string
+func parseStringToCommand(commandValue string) []string {
+	var command []string
+	// check for json array
+	if commandValue[0] == '[' {
+		if err := json.Unmarshal([]byte(commandValue), &command); err != nil {
+			command = []string{commandValue}
+		}
+	} else {
+		command = append(command, commandValue)
+	}
+	return command
+}
+
+type ResourceHookSelector struct {
 	Namespaces    *collections.IncludesExcludes
 	Resources     *collections.IncludesExcludes
 	LabelSelector labels.Selector
-	Pre           []api.BackupResourceHook
-	Post          []api.BackupResourceHook
 }
 
-func (r ResourceHook) applicableTo(groupResource schema.GroupResource, namespace string, labels labels.Set) bool {
+// ResourceHook is a hook for a given resource.
+type ResourceHook struct {
+	Name     string
+	Selector ResourceHookSelector
+	Pre      []velerov1api.BackupResourceHook
+	Post     []velerov1api.BackupResourceHook
+}
+
+func (r ResourceHookSelector) applicableTo(groupResource schema.GroupResource, namespace string, labels labels.Set) bool {
 	if r.Namespaces != nil && !r.Namespaces.ShouldInclude(namespace) {
 		return false
 	}
@@ -238,4 +333,77 @@ func (r ResourceHook) applicableTo(groupResource schema.GroupResource, namespace
 		return false
 	}
 	return true
+}
+
+// ResourceRestoreHook is a restore hook for a given resource.
+type ResourceRestoreHook struct {
+	Name         string
+	Selector     ResourceHookSelector
+	RestoreHooks []velerov1api.RestoreResourceHook
+}
+
+func getInitRestoreHookFromAnnotation(podName string, annotations map[string]string, log logrus.FieldLogger) *velerov1api.InitRestoreHook {
+	containerImage := annotations[podRestoreHookInitContainerImageAnnotationKey]
+	containerName := annotations[podRestoreHookInitContainerNameAnnotationKey]
+	command := annotations[podRestoreHookInitContainerCommandAnnotationKey]
+	if containerImage == "" {
+		log.Infof("Pod %s has no %s annotation, no initRestoreHook in annotation", podName, podRestoreHookInitContainerImageAnnotationKey)
+		return nil
+	}
+	if command == "" {
+		log.Infof("RestoreHook init contianer for pod %s is using container's default entrypoint", podName, containerImage)
+	}
+	if containerName == "" {
+		uid, err := uuid.NewV4()
+		uuidStr := "deadfeed"
+		if err != nil {
+			log.Errorf("Failed to generate UUID for container name")
+		} else {
+			uuidStr = strings.Split(uid.String(), "-")[0]
+		}
+		containerName = fmt.Sprintf("velero-restore-init-%s", uuidStr)
+		log.Infof("Pod %s has no %s annotation, using generated name %s for initContainer", podName, podRestoreHookInitContainerNameAnnotationKey, containerName)
+	}
+
+	return &velerov1api.InitRestoreHook{
+		InitContainers: []corev1api.Container{
+			{
+				Image:   containerImage,
+				Name:    containerName,
+				Command: parseStringToCommand(command),
+			},
+		},
+	}
+}
+
+// GetRestoreHooksFromSpec returns a list of ResourceRestoreHooks from the restore Spec.
+func GetRestoreHooksFromSpec(hooksSpec *velerov1api.RestoreHooks) ([]ResourceRestoreHook, error) {
+	if hooksSpec == nil {
+		return []ResourceRestoreHook{}, nil
+	}
+	restoreHooks := make([]ResourceRestoreHook, 0, len(hooksSpec.Resources))
+	for _, rs := range hooksSpec.Resources {
+		rh := ResourceRestoreHook{
+			Name: rs.Name,
+			Selector: ResourceHookSelector{
+				Namespaces: collections.NewIncludesExcludes().Includes(rs.IncludedNamespaces...).Excludes(rs.ExcludedNamespaces...),
+				// these hooks ara applicable only to pods.
+				// TODO: resolve the pods resource via discovery?
+				Resources: collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+			},
+			// TODO does this work for ExecRestoreHook as well?
+			RestoreHooks: rs.PostHooks,
+		}
+
+		if rs.LabelSelector != nil {
+			ls, err := metav1.LabelSelectorAsSelector(rs.LabelSelector)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			rh.Selector.LabelSelector = ls
+		}
+		restoreHooks = append(restoreHooks, rh)
+	}
+
+	return restoreHooks, nil
 }
