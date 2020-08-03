@@ -7,8 +7,7 @@ the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Az
 It also provides a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.
 
-The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This is a new capability for Velero, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you've
-been waiting for a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
+The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
 local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
@@ -16,14 +15,15 @@ cross-volume-type data migrations.
 
 **NOTE:** hostPath volumes are not supported, but the [local volume type][4] is supported.
 
-## Install restic
+## Setup restic
 
-**Prerequisites**
+### Prerequisites
+
 - Understand how Velero performs [backups with the restic integration](#how-backup-and-restore-work-with-restic).
 - [Download][3] the latest Velero release.
 - Kubernetes v1.10.0 and later. Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
-- If you are using RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure you must modify the restic DaemonSet spec before installing. See the [Configure restic DaemonSet spec](#configure-restic-daemonset-spec) section for more details.
 
+### Install restic 
 To install restic, use the `--use-restic` flag in the `velero install` command. See the [install overview][2] for more details on other flags for the install command.
 
 ```
@@ -33,9 +33,12 @@ velero install --use-restic
 When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
 ### Configure restic DaemonSet spec
-The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure.
+
+After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure.
+
 
 **RancherOS**
+
 
 Update the host path for volumes in the restic DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to `/opt/rke/var/lib/kubelet/pods`.
 
@@ -51,9 +54,9 @@ hostPath:
   path: /opt/rke/var/lib/kubelet/pods
 ```
 
-Now you can [install Velero](#install-restic) with the restic integration.
 
 **OpenShift**
+
 
 To be able to mount the correct hostpath to pods volumes, run the restic containers in a `privileged` mode.
 
@@ -138,8 +141,6 @@ oc annotate namespace <velero namespace> openshift.io/node-selector=""
 oc create -n <velero namespace> -f ds.yaml
 ```
 
-Now you can [install Velero](#install-restic) with the restic integration.
-
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**
 
 You need to enable the `Allow Privileged` option in your plan configuration so that restic is able to mount the hostpath.
@@ -150,7 +151,7 @@ The hostPath should be changed from `/var/lib/kubelet/pods` to `/var/vcap/data/k
 hostPath:
   path: /var/vcap/data/kubelet/pods
 ```
-Now you can [install Velero](#install-restic) with the restic integration.
+
 
 **Microsoft Azure**
 
@@ -163,7 +164,7 @@ kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
   --type json \
   --patch '[{"op":"add","path":"/mountOptions/-","value":"nouser_xattr"}]'
 ```
-Now you can [install Velero](#install-restic) with the restic integration.
+
 
 ## To back up
 
