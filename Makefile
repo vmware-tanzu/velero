@@ -58,14 +58,17 @@ else
 	BUILDX_ENABLED ?= false
 endif
 
-CI ?= false
+define BUILDX_ERROR
+buildx not enabled, refusing to run this recipe
+see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-velero for more info
+endef
 
 # The version of restic binary to be downloaded for power architecture
 RESTIC_VERSION ?= 0.9.6
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
-BUILDX_PLATFORMS ?= linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le
-BUILDX_OUTPUT_TYPE ?= registry
+BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
+BUILDX_OUTPUT_TYPE ?= docker
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
@@ -102,12 +105,6 @@ all-build: $(addprefix build-, $(CLI_PLATFORMS))
 all-containers: container-builder-env
 	@$(MAKE) --no-print-directory container
 	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
-
-local-all-containers:
-	@$(MAKE) --no-print-directory all-containers \
-	CI=true \
-	BUILDX_OUTPUT_TYPE=docker \
-	BUILDX_PLATFORMS=$(subst -,/,$(ARCH))
 
 local: build-dirs
 	GOOS=$(GOOS) \
@@ -161,7 +158,7 @@ shell: build-dirs build-env
 
 container-builder-env:
 ifneq ($(BUILDX_ENABLED), true)
-	$(error buildx not enabled, refusing to run this recipe)
+	$(error $(BUILDX_ERROR))
 endif
 	@docker buildx build \
 	--target=builder-env \
@@ -172,11 +169,8 @@ endif
 	-f Dockerfile .
 
 container:
-ifneq ($(CI), true)
-	$(error this is meant to only run in a github workflow, set CI to true if you know what you are doing)
-endif
 ifneq ($(BUILDX_ENABLED), true)
-	$(error buildx not enabled, refusing to run this recipe)
+	$(error $(BUILDX_ERROR))
 endif
 	@docker buildx build --pull \
 	--output=type=$(BUILDX_OUTPUT_TYPE) \
