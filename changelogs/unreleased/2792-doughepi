@@ -1,1 +1,1 @@
-Add the ability to set the allowPrivilegeEscalation flag in the securityContext for the Restore restore helper.
+Add the ability to set the allowPrivilegeEscalation flag in the securityContext for the Restic restore helper.
