@@ -76,76 +76,55 @@ If after installing Velero you would like to change the image used by its deploy
 kubectl -n velero set image deploy/velero velero=myimagerepo/velero:$VERSION
 ```
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero-amd64:main` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
+To build a Velero container image, you need to configure `buildx` first.
 
-Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
+### Buildx
+
+Docker Buildx is a CLI plugin that extends the docker command with the full support of the features provided by Moby BuildKit builder toolkit. It provides the same user experience as docker build with many new features like creating scoped builder instances and building against multiple nodes concurrently.
+
+More information in the [docker docs][23] and in the [buildx github][24] repo.
+
+### Image building
+
+Set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:main` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
+
+Optionally, set the `$VERSION` environment variable to change the image tag or `$BIN` to change which binary to build a container image for. Then, run:
 
 ```bash
 make container
 ```
+_Note: To build build container images for both `velero` and `velero-restic-restore-helper`, run: `make all-containers`_
 
-For any specific platform, run `ARCH=<GOOS>-<GOARCH> make container`
 
-For example, to build an image for the Power (ppc64le), run:
+### Cross platform building
 
-```bash
-ARCH=linux-ppc64le make container
-```
-_Note: By default, ARCH is set to linux-amd64_
+Docker `buildx` platforms currently supported:
+* `linux/amd64`
+* `linux/arm64`
+* `linux/arm/v7`
+* `linux/ppc64le`
 
-To push your image to the registry. For example, if you want to push the `gcr.io/my-registry/velero-amd64:main` image, run:
+For any specific platform, run `BUILDX_PLATFORMS=<GOOS>/<GOARCH> make container`
 
-```bash
-make push
-```
-
-For any specific platform, run `ARCH=<GOOS>-<GOARCH> make push`
-
-For example, to push image for the Power (ppc64le), run:
+For example, to build an image for arm64, run:
 
 ```bash
-ARCH=linux-ppc64le make push
+BUILDX_PLATFORMS=linux/arm64 make container
 ```
-_Note: By default, ARCH is set to linux-amd64_
+_Note: By default, `$BUILDX_PLATFORMS` is set to `linux/amd64`_
 
-To create and push your manifest to the registry. For example, if you want to create and push the `gcr.io/my-registry/velero:main` manifest, run:
+To push your image to the registry, run the `make container` command with `$BUILDX_OUTPUT_TYPE` set to `registry`. For example:
 
 ```bash
-make manifest
+REGISTRY=myrepo BUILDX_PLATFORMS=linux/arm64 BUILDX_OUTPUT_TYPE=registry make container
 ```
 
-For any specific platform, run `MANIFEST_PLATFORMS=<GOARCH> make manifest`
-
-For example, to create and push manifest only for amd64, run:
+With `buildx`, you can also build all supported platforms at the same time and push a multi-arch image to the registry. For example:
 
 ```bash
-MANIFEST_PLATFORMS=amd64 make manifest
+REGISTRY=myrepo VERSION=foo BUILDX_PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le BUILDX_OUTPUT_TYPE=registry make all-containers
 ```
-_Note: By default, MANIFEST_PLATFORMS is set to amd64, ppc64le_
-
-To run the entire workflow, run:
-
-`REGISTRY=<$REGISTRY> VERSION=<$VERSION> ARCH=<GOOS>-<GOARCH> MANIFEST_PLATFORMS=<GOARCH> make container push manifest`
-
-For example, to run the workflow only for amd64
-
-```bash
-REGISTRY=myrepo VERSION=foo MANIFEST_PLATFORMS=amd64 make container push manifest
-```
-
-_Note: By default, ARCH is set to linux-amd64_
-
-For example, to run the workflow only for ppc64le
-
-```bash
-REGISTRY=myrepo VERSION=foo ARCH=linux-ppc64le MANIFEST_PLATFORMS=ppc64le make container push manifest
-```
-
-For example, to run the workflow for all supported platforms
-
-```bash
-REGISTRY=myrepo VERSION=foo make all-containers all-push all-manifests
-```
+_Note: when building for more than 1 platform at the same time, you need to set `BUILDX_OUTPUT_TYPE` to `registry` as local multi-arch images are not supported [yet][25]._
 
 Note: if you want to update the image but not change its name, you will have to trigger Kubernetes to pick up the new image. One way of doing so is by deleting the Velero deployment pod:
 
@@ -156,3 +135,6 @@ kubectl -n velero delete pods -l deploy=velero
 [4]: https://blog.golang.org/organizing-go-code
 [5]: https://golang.org/doc/install
 [22]: https://github.com/vmware-tanzu/velero/releases
+[23]: https://docs.docker.com/buildx/working-with-buildx/
+[24]: https://github.com/docker/buildx
+[25]: https://github.com/moby/moby/pull/38738
