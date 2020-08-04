@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ParseSecurityContext(runAsUser string, runAsGroup string) (corev1.SecurityContext, error) {
+func ParseSecurityContext(runAsUser string, runAsGroup string, allowPrivilegeEscalation string) (corev1.SecurityContext, error) {
 	securityContext := corev1.SecurityContext{}
 
 	if runAsUser != "" {
@@ -42,6 +42,15 @@ func ParseSecurityContext(runAsUser string, runAsGroup string) (corev1.SecurityC
 		}
 
 		securityContext.RunAsGroup = &parsedRunAsGroup
+	}
+
+	if allowPrivilegeEscalation != "" {
+		parsedAllowPrivilegeEscalation, err := strconv.ParseBool(allowPrivilegeEscalation)
+		if err != nil {
+			return securityContext, errors.WithStack(errors.Errorf(`Security context allowPrivilegeEscalation "%s" is not a boolean`, allowPrivilegeEscalation))
+		}
+
+		securityContext.AllowPrivilegeEscalation = &parsedAllowPrivilegeEscalation
 	}
 
 	return securityContext, nil
