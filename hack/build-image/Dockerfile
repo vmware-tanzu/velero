@@ -14,9 +14,11 @@
 
 FROM golang:1.14
 
+ARG GOPROXY
+
 ENV GO111MODULE=on
 # Use a proxy for go modules to reduce the likelihood of various hosts being down and breaking the build
-ENV GOPROXY=https://proxy.golang.org
+ENV GOPROXY=${GOPROXY}
 
 # get code-generation tools (for now keep in GOPATH since they're not fully modules-compatible yet)
 RUN mkdir -p /go/src/k8s.io

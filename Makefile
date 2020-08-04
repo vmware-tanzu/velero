@@ -23,6 +23,9 @@ PKG := github.com/vmware-tanzu/velero
 # Where to push the docker image.
 REGISTRY ?= velero
 
+# Image name
+IMAGE ?= $(REGISTRY)/$(BIN)
+
 # Build image handling. We push a build image for every changed version of 
 # /hack/build-image/Dockerfile. We tag the dockerfile with the short commit hash
 # of the commit that changed it. When determining if there is a build image in
@@ -43,16 +46,37 @@ VERSION ?= main
 
 TAG_LATEST ?= false
 
+ifeq ($(TAG_LATEST), true)
+	IMAGE_TAGS ?= $(IMAGE):$(VERSION) $(IMAGE):latest
+else
+	IMAGE_TAGS ?= $(IMAGE):$(VERSION)
+endif
+
+ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
+	BUILDX_ENABLED ?= true
+else
+	BUILDX_ENABLED ?= false
+endif
+
+define BUILDX_ERROR
+buildx not enabled, refusing to run this recipe
+see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-velero for more info
+endef
+
 # The version of restic binary to be downloaded for power architecture
 RESTIC_VERSION ?= 0.9.6
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
-CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le linux-arm linux-arm64
-MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
+BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
+BUILDX_OUTPUT_TYPE ?= docker
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
-GIT_DIRTY = $(shell git status --porcelain 2> /dev/null)
+ifneq ($(shell git status --porcelain 2> /dev/null),)
+	GIT_TREE_STATE ?= dirty
+else
+	GIT_TREE_STATE ?= clean
+endif
 
 # The default linters used by lint and local-lint
 LINTERS ?= "gosec,goconst,gofmt,goimports,unparam"
@@ -64,36 +88,7 @@ LINTERS ?= "gosec,goconst,gofmt,goimports,unparam"
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
-
-# Set default base image dynamically for each arch
-ifeq ($(GOARCH),amd64)
-		DOCKERFILE ?= Dockerfile-$(BIN)
-local-arch:
-	@echo "local environment for amd64 is up-to-date"
-endif
-ifeq ($(GOARCH),arm)
-		DOCKERFILE ?= Dockerfile-$(BIN)-arm
-local-arch:
-	@mkdir -p _output/bin/linux/arm/
-	@wget -q -O - https://github.com/restic/restic/releases/download/v$(RESTIC_VERSION)/restic_$(RESTIC_VERSION)_linux_arm.bz2 | bunzip2 > _output/bin/linux/arm/restic
-	@chmod a+x _output/bin/linux/arm/restic
-endif
-ifeq ($(GOARCH),arm64)
-		DOCKERFILE ?= Dockerfile-$(BIN)-arm64
-local-arch:
-	@mkdir -p _output/bin/linux/arm64/
-	@wget -q -O - https://github.com/restic/restic/releases/download/v$(RESTIC_VERSION)/restic_$(RESTIC_VERSION)_linux_arm64.bz2 | bunzip2 > _output/bin/linux/arm64/restic
-	@chmod a+x _output/bin/linux/arm64/restic
-endif
-ifeq ($(GOARCH),ppc64le)
-                DOCKERFILE ?= Dockerfile-$(BIN)-ppc64le
-local-arch:
-	RESTIC_VERSION=$(RESTIC_VERSION) \
-        ./hack/get-restic-ppc64le.sh
-endif
-
-MULTIARCH_IMAGE = $(REGISTRY)/$(BIN)
-IMAGE ?= $(REGISTRY)/$(BIN)-$(GOARCH)
+GOPROXY ?= https://proxy.golang.org
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
@@ -106,23 +101,11 @@ build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
 	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restic-restore-helper
 
-container-%:
-	@$(MAKE) --no-print-directory ARCH=$* container
-	@$(MAKE) --no-print-directory ARCH=$* container BIN=velero-restic-restore-helper
-
-push-%:
-	@$(MAKE) --no-print-directory ARCH=$* push
-	@$(MAKE) --no-print-directory ARCH=$* push BIN=velero-restic-restore-helper
-
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
-all-containers: $(addprefix container-, $(CONTAINER_PLATFORMS))
-
-all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
-
-all-manifests:
-	@$(MAKE) manifest
-	@$(MAKE) manifest BIN=velero-restic-restore-helper
+all-containers: container-builder-env
+	@$(MAKE) --no-print-directory container
+	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
 
 local: build-dirs
 	GOOS=$(GOOS) \
@@ -131,7 +114,7 @@ local: build-dirs
 	PKG=$(PKG) \
 	BIN=$(BIN) \
 	GIT_SHA=$(GIT_SHA) \
-	GIT_DIRTY="$(GIT_DIRTY)" \
+	GIT_TREE_STATE=$(GIT_TREE_STATE) \
 	OUTPUT_DIR=$$(pwd)/_output/bin/$(GOOS)/$(GOARCH) \
 	./hack/build.sh
 
@@ -146,12 +129,11 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 		PKG=$(PKG) \
 		BIN=$(BIN) \
 		GIT_SHA=$(GIT_SHA) \
-		GIT_DIRTY=\"$(GIT_DIRTY)\" \
+		GIT_TREE_STATE=$(GIT_TREE_STATE) \
 		OUTPUT_DIR=/output/$(GOOS)/$(GOARCH) \
 		./hack/build.sh'"
 
 TTY := $(shell tty -s && echo "-t")
-
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-env
@@ -175,46 +157,35 @@ shell: build-dirs build-env
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
-DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
+container-builder-env:
+ifneq ($(BUILDX_ENABLED), true)
+	$(error $(BUILDX_ERROR))
+endif
+	@docker buildx build \
+	--target=builder-env \
+	--build-arg=GOPROXY=$(GOPROXY) \
+	--build-arg=PKG=$(PKG) \
+	--build-arg=VERSION=$(VERSION) \
+	--build-arg=GIT_SHA=$(GIT_SHA) \
+	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	-f Dockerfile .
 
-all-containers:
-	$(MAKE) container
-	$(MAKE) container BIN=velero-restic-restore-helper
-
-container: local-arch .container-$(DOTFILE_IMAGE) container-name
-.container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
-	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
-	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
-	@docker images -q $(IMAGE):$(VERSION) > $@
-
-container-name:
+container:
+ifneq ($(BUILDX_ENABLED), true)
+	$(error $(BUILDX_ERROR))
+endif
+	@docker buildx build --pull \
+	--output=type=$(BUILDX_OUTPUT_TYPE) \
+	--platform $(BUILDX_PLATFORMS) \
+	$(addprefix -t , $(IMAGE_TAGS)) \
+	--build-arg=PKG=$(PKG) \
+	--build-arg=BIN=$(BIN) \
+	--build-arg=VERSION=$(VERSION) \
+	--build-arg=GIT_SHA=$(GIT_SHA) \
+	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
+	-f Dockerfile .
 	@echo "container: $(IMAGE):$(VERSION)"
-
-push: .push-$(DOTFILE_IMAGE) push-name
-.push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
-	@docker push $(IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
-endif
-	@docker images -q $(IMAGE):$(VERSION) > $@
-
-push-name:
-	@echo "pushed: $(IMAGE):$(VERSION)"
-
-manifest: .manifest-$(MULTIARCH_IMAGE) manifest-name
-.manifest-$(MULTIARCH_IMAGE):
-	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
-		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
-	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge $(MULTIARCH_IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create $(MULTIARCH_IMAGE):latest \
-		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
-	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge $(MULTIARCH_IMAGE):latest
-endif
-
-manifest-name:
-	@echo "pushed: $(MULTIARCH_IMAGE):$(VERSION)"
 
 SKIP_TESTS ?=
 test: build-dirs
@@ -266,21 +237,25 @@ build-env:
 ifneq ($(shell git diff --quiet HEAD -- hack/build-image/Dockerfile; echo $$?), 0)
 	@echo "Local changes detected in hack/build-image/Dockerfile"
 	@echo "Preparing a new builder-image"
-	@make build-image
+	$(MAKE) build-image
 else ifneq ($(BUILDER_IMAGE_CACHED),)
 	@echo "Using Cached Image: $(BUILDER_IMAGE)"
 else
 	@echo "Trying to pull build-image: $(BUILDER_IMAGE)"
-	docker pull -q $(BUILDER_IMAGE) || make build-image
+	docker pull -q $(BUILDER_IMAGE) || $(MAKE) build-image
 endif
 
 build-image:
 	@# When we build a new image we just untag the old one.
 	@# This makes sure we don't leave the orphaned image behind.
-	@id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
-	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) . ; \
-	new_id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
-	if [ "$$id" != "" ] && [ "$$id" != "$$new_id" ]; then \
+	$(eval old_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
+ifeq ($(BUILDX_ENABLED), true)
+	@cd hack/build-image && docker buildx build --build-arg=GOPROXY=$(GOPROXY) --output=type=docker --pull -t $(BUILDER_IMAGE) .
+else
+	@cd hack/build-image && docker build --build-arg=GOPROXY=$(GOPROXY) --pull -t $(BUILDER_IMAGE) .
+endif
+	$(eval new_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
+	@if [ "$(old_id)" != "" ] && [ "$(old_id)" != "$(new_id)" ]; then \
 		docker rmi -f $$id || true; \
 	fi
 
@@ -296,7 +271,6 @@ ifneq ($(strip $(BUILDER_IMAGE_CACHED)),)
 	$(MAKE) shell CMD="-c 'go clean --modcache'"
 	docker rmi -f $(BUILDER_IMAGE) || true
 endif
-	rm -rf .container-* _output/.dockerfile-* .push-*
 	rm -rf .go _output
 
 
