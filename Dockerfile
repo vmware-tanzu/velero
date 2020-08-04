@@ -13,6 +13,7 @@
 # limitations under the License.
 FROM --platform=$BUILDPLATFORM golang:1.14 as builder-env
 
+ARG GOPROXY
 ARG PKG
 ARG VERSION
 ARG GIT_SHA
@@ -20,7 +21,7 @@ ARG GIT_TREE_STATE
 
 ENV CGO_ENABLED=0 \
     GO111MODULE=on \
-    GOPROXY=https://proxy.golang.org \
+    GOPROXY=${GOPROXY} \
     LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION}" \
     LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA}" \
     LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"

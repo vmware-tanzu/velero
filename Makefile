@@ -88,6 +88,7 @@ LINTERS ?= "gosec,goconst,gofmt,goimports,unparam"
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
+GOPROXY ?= https://proxy.golang.org
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
@@ -162,6 +163,7 @@ ifneq ($(BUILDX_ENABLED), true)
 endif
 	@docker buildx build \
 	--target=builder-env \
+	--build-arg=GOPROXY=$(GOPROXY) \
 	--build-arg=PKG=$(PKG) \
 	--build-arg=VERSION=$(VERSION) \
 	--build-arg=GIT_SHA=$(GIT_SHA) \
@@ -248,9 +250,9 @@ build-image:
 	@# This makes sure we don't leave the orphaned image behind.
 	$(eval old_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
 ifeq ($(BUILDX_ENABLED), true)
-	@cd hack/build-image && docker buildx build --output=type=docker --pull -t $(BUILDER_IMAGE) .
+	@cd hack/build-image && docker buildx build --build-arg=GOPROXY=$(GOPROXY) --output=type=docker --pull -t $(BUILDER_IMAGE) .
 else
-	@cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) .
+	@cd hack/build-image && docker build --build-arg=GOPROXY=$(GOPROXY) --pull -t $(BUILDER_IMAGE) .
 endif
 	$(eval new_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
 	@if [ "$(old_id)" != "" ] && [ "$(old_id)" != "$(new_id)" ]; then \
