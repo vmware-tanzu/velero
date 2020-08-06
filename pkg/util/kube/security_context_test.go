@@ -17,11 +17,12 @@ limitations under the License.
 package kube
 
 import (
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestParseSecurityContext(t *testing.T) {
