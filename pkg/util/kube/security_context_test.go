@@ -21,12 +21,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestParseSecurityContext(t *testing.T) {
 	type args struct {
-		runAsUser  string
-		runAsGroup string
+		runAsUser                string
+		runAsGroup               string
+		allowPrivilegeEscalation string
 	}
 	tests := []struct {
 		name     string
@@ -34,23 +37,33 @@ func TestParseSecurityContext(t *testing.T) {
 		wantErr  bool
 		expected *corev1.SecurityContext
 	}{
-		{"valid security context", args{"1001", "999"}, false, &corev1.SecurityContext{
-			RunAsUser:  pointInt64(1001),
-			RunAsGroup: pointInt64(999),
+		{"valid security context", args{"1001", "999", "true"}, false, &corev1.SecurityContext{
+			RunAsUser:                pointInt64(1001),
+			RunAsGroup:               pointInt64(999),
+			AllowPrivilegeEscalation: boolptr.True(),
 		}},
-		{"security context without runAsGroup", args{"1001", ""}, false, &corev1.SecurityContext{
+		{
+			"another valid security context",
+			args{"1001", "999", "false"}, false, &corev1.SecurityContext{
+				RunAsUser:                pointInt64(1001),
+				RunAsGroup:               pointInt64(999),
+				AllowPrivilegeEscalation: boolptr.False(),
+			},
+		},
+		{"security context without runAsGroup", args{"1001", "", ""}, false, &corev1.SecurityContext{
 			RunAsUser: pointInt64(1001),
 		}},
-		{"security context without runAsUser", args{"", "999"}, false, &corev1.SecurityContext{
+		{"security context without runAsUser", args{"", "999", ""}, false, &corev1.SecurityContext{
 			RunAsGroup: pointInt64(999),
 		}},
-		{"empty context without runAsUser", args{"", ""}, false, &corev1.SecurityContext{}},
-		{"invalid security context runAsUser", args{"not a number", ""}, true, nil},
-		{"invalid security context runAsGroup", args{"", "not a number"}, true, nil},
+		{"empty context without runAsUser", args{"", "", ""}, false, &corev1.SecurityContext{}},
+		{"invalid security context runAsUser", args{"not a number", "", ""}, true, nil},
+		{"invalid security context runAsGroup", args{"", "not a number", ""}, true, nil},
+		{"invalid security context allowPrivilegeEscalation", args{"", "", "not a bool"}, true, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSecurityContext(tt.args.runAsUser, tt.args.runAsGroup)
+			got, err := ParseSecurityContext(tt.args.runAsUser, tt.args.runAsGroup, tt.args.allowPrivilegeEscalation)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

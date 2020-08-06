@@ -111,7 +111,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
 	)
 
-	securityContext, _ := kube.ParseSecurityContext("", "")
+	securityContext, _ := kube.ParseSecurityContext("", "", "")
 
 	var (
 		restoreName = "my-restore"
