@@ -58,7 +58,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 
   - Cluster-scoped resources are not included when namespace filtering is used. Default: `false`.
 
-    * Some related cluster-scoped resources may still be backed/restored up if triggered by a custom action (e.g. PVC->PV) unless `--include-cluster-resources=false`.
+    * Some related cluster-scoped resources may still be backed/restored up if triggered by a custom action (for example, PVC->PV) unless `--include-cluster-resources=false`.
 
 * Backup entire cluster including cluster-scoped resources.
 
