@@ -16,7 +16,7 @@
 
 {{ if not (isset .CurrentSection.Params "version") }}
   {{ $latest_url := replace .Permalink "/docs" (printf "/docs/%s" .Site.Params.latest) | relURL }}
-  <meta http-equiv="refresh" content="time; URL={{ $latest_url }}" />
+  <meta http-equiv="refresh" content="0; URL={{ $latest_url }}" />
 {{ end }}
 
 <body id="docs">
