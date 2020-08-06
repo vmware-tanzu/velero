@@ -17,6 +17,7 @@ limitations under the License.
 package kube
 
 import (
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,14 +39,14 @@ func TestParseSecurityContext(t *testing.T) {
 		{"valid security context", args{"1001", "999", "true"}, false, &corev1.SecurityContext{
 			RunAsUser:                pointInt64(1001),
 			RunAsGroup:               pointInt64(999),
-			AllowPrivilegeEscalation: pointBool(true),
+			AllowPrivilegeEscalation: boolptr.True(),
 		}},
 		{
 			"another valid security context",
 			args{"1001", "999", "false"}, false, &corev1.SecurityContext{
 				RunAsUser:                pointInt64(1001),
 				RunAsGroup:               pointInt64(999),
-				AllowPrivilegeEscalation: pointBool(false),
+				AllowPrivilegeEscalation: boolptr.False(),
 			},
 		},
 		{"security context without runAsGroup", args{"1001", "", ""}, false, &corev1.SecurityContext{
@@ -76,10 +77,6 @@ func TestParseSecurityContext(t *testing.T) {
 			assert.Equal(t, tt.expected.RunAsGroup, got.RunAsGroup)
 		})
 	}
-}
-
-func pointBool(b bool) *bool {
-	return &b
 }
 
 func pointInt64(i int64) *int64 {
