@@ -137,8 +137,8 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
-						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).Result()).
-				Result(),
+						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
+						Command([]string{"/velero-restic-restore-helper"}).Result()).Result(),
 		},
 		{
 			name: "Restoring pod with other initContainers adds the restic initContainer as the first one",
@@ -154,7 +154,8 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
-						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).Result(),
+						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
+						Command([]string{"/velero-restic-restore-helper"}).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
@@ -194,7 +195,8 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
-						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).Result(),
+						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).
+						Command([]string{"/velero-restic-restore-helper"}).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
@@ -250,5 +252,47 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			assert.Equal(t, tc.want, updatedPod)
 		})
 	}
+}
 
+func TestGetCommand(t *testing.T) {
+	configMapWithData := func(key, val string) *corev1api.ConfigMap {
+		return &corev1api.ConfigMap{
+			Data: map[string]string{
+				key: val,
+			},
+		}
+	}
+	testCases := []struct {
+		name      string
+		configMap *corev1api.ConfigMap
+		expected  []string
+	}{
+		{
+			name:      "should get default command when config key is missing",
+			configMap: configMapWithData("non-matching-key", "val"),
+			expected:  []string{defaultCommand},
+		},
+		{
+			name:      "should get default command when config key is empty",
+			configMap: configMapWithData("command", ""),
+			expected:  []string{defaultCommand},
+		},
+		{
+			name:      "should get default command when config is nil",
+			configMap: nil,
+			expected:  []string{defaultCommand},
+		},
+		{
+			name:      "should get command from config",
+			configMap: configMapWithData("command", "foobarbz"),
+			expected:  []string{"foobarbz"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := getCommand(velerotest.NewLogger(), tc.configMap)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
 }

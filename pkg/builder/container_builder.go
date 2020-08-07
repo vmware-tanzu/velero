@@ -110,8 +110,8 @@ func (b *ContainerBuilder) Command(command []string) *ContainerBuilder {
 	if b.object.Command == nil {
 		b.object.Command = []string{}
 	}
-	for _, c := range command {
-		b.object.Command = append(b.object.Command, c)
-	}
+
+	b.object.Command = append(b.object.Command, command...)
+
 	return b
 }
