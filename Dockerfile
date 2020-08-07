@@ -30,8 +30,6 @@ WORKDIR /go/src/github.com/vmware-tanzu/velero
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
-RUN go mod download
-
 RUN apt-get update && apt-get install -y bzip2
 
 FROM --platform=$BUILDPLATFORM builder-env as builder
