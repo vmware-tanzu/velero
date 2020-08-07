@@ -26,7 +26,7 @@
                             {{ end }}
                             {{ $link := .url }}
                             {{ if not (strings.HasPrefix .url "http") }}
-                                {{ $link = printf "%s%s" $.Site.BaseURL .url }}
+                                {{ $link = (.url | absURL) }}
                             {{ end }}
                             <a href="{{ $link }}">{{ .title }}</a>
                         </li>
