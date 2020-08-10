@@ -23,7 +23,8 @@ cross-volume-type data migrations.
 - [Download][3] the latest Velero release.
 - Kubernetes v1.10.0 and later. Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
 
-### Install restic 
+### Install restic
+
 To install restic, use the `--use-restic` flag in the `velero install` command. See the [install overview][2] for more details on other flags for the install command.
 
 ```
@@ -58,7 +59,7 @@ hostPath:
 **OpenShift**
 
 
-To be able to mount the correct hostpath to pods volumes, run the restic containers in a `privileged` mode.
+To mount the correct hostpath to pods volumes, run the restic pod in `privileged` mode.
 
 1. Add the `velero` ServiceAccount to the `privileged` SCC:
 

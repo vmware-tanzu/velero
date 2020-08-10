@@ -100,7 +100,7 @@ velero client config set features=
 At installation, Velero sets default resource requests and limits for the Velero pod and the restic pod, if you using the [restic integration](/docs/main/restic/).
 
 <table caption="Velero Customize resource requests and limits defaults" >
-  <tr><th>Setting</th><th>Velero pod defaults</th><th>restic pod defaults (Velero 1.4.2 and later)</th></tr>
+  <tr><th>Setting</th><th>Velero pod defaults</th><th>restic pod defaults</th></tr>
   <tr><td>CPU request</td><td>500m</td><td>500m</td></tr>
   <tr><td>Memory requests</td><td>128Mi</td><td>512Mi</td></tr>
   <tr><td>CPU limit</td><td>1000m (1 CPU)</td><td>1000m (1 CPU)</td></tr>
@@ -135,7 +135,7 @@ Update the `spec.template.spec.containers.resources.limits` and `spec.template.s
 
 ```bash
 kubectl patch deployment velero -n velero --patch \
-'{"spec":{"template":{"spec":{"containers":[{"name": "velero", "resources": {"limits":{"cpu": "1", "memory": "128Mi"}, "requests": {"cpu": "1", "memory": "256Mi"}}}]}}}}'
+'{"spec":{"template":{"spec":{"containers":[{"name": "velero", "resources": {"limits":{"cpu": "1", "memory": "256Mi"}, "requests": {"cpu": "1", "memory": "128Mi"}}}]}}}}'
 ```
 
 **restic pod**
@@ -144,10 +144,10 @@ Update the `spec.template.spec.containers.resources.limits` and `spec.template.s
 
 ```bash
 kubectl patch daemonset restic -n velero --patch \
-'{"spec":{"template":{"spec":{"containers":[{"name": "restic", "resources": {"limits":{"cpu": "1", "memory": "512Mi"}, "requests": {"cpu": "1", "memory": "1024Mi"}}}]}}}}'
+'{"spec":{"template":{"spec":{"containers":[{"name": "restic", "resources": {"limits":{"cpu": "1", "memory": "1024Mi"}, "requests": {"cpu": "1", "memory": "512Mi"}}}]}}}}'
 ```
 
-Additionally, you may want to update the the default Velero restic pod operation timeout (default 240 minutes) to allow large more backups time to complete. You can adjust this timeout by adding the `- --restic-timeout` argument to the Velero Deployment spec.
+Additionally, you may want to update the the default Velero restic pod operation timeout (default 240 minutes) to allow larger backups more time to complete. You can adjust this timeout by adding the `- --restic-timeout` argument to the Velero Deployment spec.
 
 **NOTE:** Changes made to this timeout value will revert back to the default value if you re-run the Velero install command.
 
@@ -157,7 +157,7 @@ Additionally, you may want to update the the default Velero restic pod operation
     kubectl edit deploy velero -n velero
     ```
 
-1. Add `- --restic-timeout` to `spec.template.spec.containers.args`.
+1. Add `- --restic-timeout` to `spec.template.spec.containers`.
 
     ```yaml
     spec:
@@ -165,7 +165,7 @@ Additionally, you may want to update the the default Velero restic pod operation
         spec:
           containers:
           - args:
-            - --restic-timeout=24h
+            - --restic-timeout=240m
     ```
 
 ## Configure more than one storage location for backups or volume snapshots
