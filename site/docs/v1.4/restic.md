@@ -98,7 +98,7 @@ The restic containers should be running in a `privileged` mode to be able to mou
     +            privileged: true
     ```
 
-    or 
+    or
 
     ```shell
     oc patch ds/restic \
@@ -246,12 +246,13 @@ PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (e.g. by a Rep
 volumes will be full rather than incremental, because the pod volume's lifecycle is assumed to be defined by its pod.
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
+- If you plan to use the Velero restic integration to backup 100GB of data or more, you may need to [customize the resource limits](/docs/main/customize-installation/#customize-resource-requests-and-limits) to make sure backups complete successfully.
 
 ## Customize Restore Helper Container
 
 Velero uses a helper init container when performing a restic restore. By default, the image for this container is `velero/velero-restic-restore-helper:<VERSION>`,
 where `VERSION` matches the version/tag of the main Velero image. You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with
-the alternate image. 
+the alternate image.
 
 In addition, you can customize the resource requirements for the init container, should you need.
 
@@ -285,7 +286,7 @@ data:
   # "cpuRequest" sets the request.cpu value on the restic init containers during restore.
   # If not set, it will default to "100m". A value of "0" is treated as unbounded.
   cpuRequest: 200m
-  
+
   # "memRequest" sets the request.memory value on the restic init containers during restore.
   # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memRequest: 128Mi
@@ -293,7 +294,7 @@ data:
   # "cpuLimit" sets the request.cpu value on the restic init containers during restore.
   # If not set, it will default to "100m". A value of "0" is treated as unbounded.
   cpuLimit: 200m
-  
+
   # "memLimit" sets the request.memory value on the restic init containers during restore.
   # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memLimit: 128Mi
