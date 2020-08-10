@@ -21,6 +21,12 @@ Velero uses object storage to store backups and associated artifacts. It also op
 
 There are supported storage providers for both cloud-provider environments and on-premises environments. For more details on on-premises scenarios, see the [on-premises documentation][2].
 
+### Velero on Windows
+
+Velero does not officially support Windows, but it has been tested successfully when backing up stateless Windows applications only. If you want to test Velero on Windows, note that the restic integration and backups of stateful applications or PersistentVolumes are not supported.
+
+To backup stateless Windows applications, Velero must deployed as a Windows container. While Velero does not provide official Windows images, its possible for you to build your own Velero Windows container image to use. Note that this image must be built on a Windows node.
+
 ## Install the CLI
 
 ### Option 1: macOS - Homebrew
