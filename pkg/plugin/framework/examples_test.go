@@ -18,8 +18,9 @@ package framework
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 func ExampleNewServer_volumeSnapshotter() {
