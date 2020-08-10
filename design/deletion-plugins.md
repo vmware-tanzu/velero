@@ -1,5 +1,7 @@
 # Deletion Plugins
 
+Status: Alternative Proposal
+
 
 ## Abstract
 Velero should introduce a new type of plugin that runs when a backup is deleted.
