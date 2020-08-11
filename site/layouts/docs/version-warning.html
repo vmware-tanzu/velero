@@ -1,7 +1,7 @@
 {{ if ne .CurrentSection.Params.version .Site.Params.latest }}
   {{ $latest_url := replace .Permalink .CurrentSection.Params.version .Site.Params.latest | relURL }}
   <div class="alert alert-primary" role="alert">
-    {{ if eq .CurrentSection.Params.version "master" }}
+    {{ if eq .CurrentSection.Params.version "main" }}
       <p>
         <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
         This is the documentation for the latest development version of Velero. Both code and docs may be
