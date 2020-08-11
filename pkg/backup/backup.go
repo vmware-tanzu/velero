@@ -197,11 +197,13 @@ func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryH
 
 func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (hook.ResourceHook, error) {
 	h := hook.ResourceHook{
-		Name:       hookSpec.Name,
-		Namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
-		Resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
-		Pre:        hookSpec.PreHooks,
-		Post:       hookSpec.PostHooks,
+		Name: hookSpec.Name,
+		Selector: hook.ResourceHookSelector{
+			Namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
+			Resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
+		},
+		Pre:  hookSpec.PreHooks,
+		Post: hookSpec.PostHooks,
 	}
 
 	if hookSpec.LabelSelector != nil {
@@ -209,7 +211,7 @@ func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelpe
 		if err != nil {
 			return hook.ResourceHook{}, errors.WithStack(err)
 		}
-		h.LabelSelector = labelSelector
+		h.Selector.LabelSelector = labelSelector
 	}
 
 	return h, nil
