@@ -26,12 +26,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
@@ -91,20 +95,20 @@ func TestHandleHooksSkips(t *testing.T) {
 			),
 			hooks: []ResourceHook{
 				{
-					Name:       "ns exclude",
-					Namespaces: collections.NewIncludesExcludes().Excludes("ns"),
+					Name:     "ns exclude",
+					Selector: ResourceHookSelector{Namespaces: collections.NewIncludesExcludes().Excludes("ns")},
 				},
 				{
-					Name:      "resource exclude",
-					Resources: collections.NewIncludesExcludes().Includes("widgets.group"),
+					Name:     "resource exclude",
+					Selector: ResourceHookSelector{Resources: collections.NewIncludesExcludes().Includes("widgets.group")},
 				},
 				{
-					Name:          "label selector mismatch",
-					LabelSelector: parseLabelSelectorOrDie("color=green"),
+					Name:     "label selector mismatch",
+					Selector: ResourceHookSelector{LabelSelector: parseLabelSelectorOrDie("color=green")},
 				},
 				{
 					Name: "missing exec hook",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{},
 						{},
 					},
@@ -138,7 +142,7 @@ func TestHandleHooks(t *testing.T) {
 		hooks                 []ResourceHook
 		hookErrorsByContainer map[string]error
 		expectedError         error
-		expectedPodHook       *v1.ExecHook
+		expectedPodHook       *velerov1api.ExecHook
 		expectedPodHookError  error
 	}{
 		{
@@ -157,15 +161,15 @@ func TestHandleHooks(t *testing.T) {
 			hooks: []ResourceHook{
 				{
 					Name: "hook1",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1a",
 								Command:   []string{"pre-1a"},
 							},
 						},
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1b",
 								Command:   []string{"pre-1b"},
 							},
@@ -174,15 +178,15 @@ func TestHandleHooks(t *testing.T) {
 				},
 				{
 					Name: "hook2",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "2a",
 								Command:   []string{"2a"},
 							},
 						},
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "2b",
 								Command:   []string{"2b"},
 							},
@@ -207,15 +211,15 @@ func TestHandleHooks(t *testing.T) {
 			hooks: []ResourceHook{
 				{
 					Name: "hook1",
-					Post: []v1.BackupResourceHook{
+					Post: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1a",
 								Command:   []string{"pre-1a"},
 							},
 						},
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1b",
 								Command:   []string{"pre-1b"},
 							},
@@ -224,15 +228,15 @@ func TestHandleHooks(t *testing.T) {
 				},
 				{
 					Name: "hook2",
-					Post: []v1.BackupResourceHook{
+					Post: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "2a",
 								Command:   []string{"2a"},
 							},
 						},
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "2b",
 								Command:   []string{"2b"},
 							},
@@ -258,7 +262,7 @@ func TestHandleHooks(t *testing.T) {
 				}
 			}
 		}`),
-			expectedPodHook: &v1.ExecHook{
+			expectedPodHook: &velerov1api.ExecHook{
 				Container: "c",
 				Command:   []string{"/bin/ls"},
 			},
@@ -280,7 +284,7 @@ func TestHandleHooks(t *testing.T) {
 				}
 			}
 		}`),
-			expectedPodHook: &v1.ExecHook{
+			expectedPodHook: &velerov1api.ExecHook{
 				Container: "c",
 				Command:   []string{"/bin/ls"},
 			},
@@ -302,7 +306,7 @@ func TestHandleHooks(t *testing.T) {
 				}
 			}
 		}`),
-			expectedPodHook: &v1.ExecHook{
+			expectedPodHook: &velerov1api.ExecHook{
 				Container: "c",
 				Command:   []string{"/bin/ls"},
 			},
@@ -324,16 +328,16 @@ func TestHandleHooks(t *testing.T) {
 				}
 			}
 		}`),
-			expectedPodHook: &v1.ExecHook{
+			expectedPodHook: &velerov1api.ExecHook{
 				Container: "c",
 				Command:   []string{"/bin/ls"},
 			},
 			hooks: []ResourceHook{
 				{
 					Name: "hook1",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1a",
 								Command:   []string{"1a"},
 							},
@@ -360,10 +364,10 @@ func TestHandleHooks(t *testing.T) {
 				}
 			}
 		}`),
-			expectedPodHook: &v1.ExecHook{
+			expectedPodHook: &velerov1api.ExecHook{
 				Container: "c",
 				Command:   []string{"/bin/ls"},
-				OnError:   v1.HookErrorModeFail,
+				OnError:   velerov1api.HookErrorModeFail,
 			},
 			expectedPodHookError: errors.New("pod hook error"),
 			expectedError:        errors.New("pod hook error"),
@@ -386,10 +390,10 @@ func TestHandleHooks(t *testing.T) {
 				}
 			}
 		}`),
-			expectedPodHook: &v1.ExecHook{
+			expectedPodHook: &velerov1api.ExecHook{
 				Container: "c",
 				Command:   []string{"/bin/ls"},
-				OnError:   v1.HookErrorModeContinue,
+				OnError:   velerov1api.HookErrorModeContinue,
 			},
 			expectedPodHookError: errors.New("pod hook error"),
 			expectedError:        nil,
@@ -410,16 +414,16 @@ func TestHandleHooks(t *testing.T) {
 			hooks: []ResourceHook{
 				{
 					Name: "hook1",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1a",
 								Command:   []string{"1a"},
-								OnError:   v1.HookErrorModeContinue,
+								OnError:   velerov1api.HookErrorModeContinue,
 							},
 						},
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "1b",
 								Command:   []string{"1b"},
 							},
@@ -428,21 +432,21 @@ func TestHandleHooks(t *testing.T) {
 				},
 				{
 					Name: "hook2",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "2",
 								Command:   []string{"2"},
-								OnError:   v1.HookErrorModeFail,
+								OnError:   velerov1api.HookErrorModeFail,
 							},
 						},
 					},
 				},
 				{
 					Name: "hook3",
-					Pre: []v1.BackupResourceHook{
+					Pre: []velerov1api.BackupResourceHook{
 						{
-							Exec: &v1.ExecHook{
+							Exec: &velerov1api.ExecHook{
 								Container: "3",
 								Command:   []string{"3"},
 							},
@@ -475,14 +479,14 @@ func TestHandleHooks(t *testing.T) {
 					for _, hook := range resourceHook.Pre {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
 						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.Name, hook.Exec).Return(hookError)
-						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
+						if hookError != nil && hook.Exec.OnError == velerov1api.HookErrorModeFail {
 							break hookLoop
 						}
 					}
 					for _, hook := range resourceHook.Post {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
 						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.Name, hook.Exec).Return(hookError)
-						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
+						if hookError != nil && hook.Exec.OnError == velerov1api.HookErrorModeFail {
 							break hookLoop
 						}
 					}
@@ -508,7 +512,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 		tests := []struct {
 			name         string
 			annotations  map[string]string
-			expectedHook *v1.ExecHook
+			expectedHook *velerov1api.ExecHook
 		}{
 			{
 				name:         "missing command annotation",
@@ -519,7 +523,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 				annotations: map[string]string{
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "[blarg",
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"[blarg"},
 				},
 			},
@@ -528,7 +532,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 				annotations: map[string]string{
 					phasedKey(phase, podBackupHookCommandAnnotationKey): `["a","b","c"]`,
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"a", "b", "c"},
 				},
 			},
@@ -537,7 +541,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 				annotations: map[string]string{
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"/usr/bin/foo"},
 				},
 			},
@@ -545,22 +549,22 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 				name: "hook mode set to continue",
 				annotations: map[string]string{
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
-					phasedKey(phase, podBackupHookOnErrorAnnotationKey): string(v1.HookErrorModeContinue),
+					phasedKey(phase, podBackupHookOnErrorAnnotationKey): string(velerov1api.HookErrorModeContinue),
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"/usr/bin/foo"},
-					OnError: v1.HookErrorModeContinue,
+					OnError: velerov1api.HookErrorModeContinue,
 				},
 			},
 			{
 				name: "hook mode set to fail",
 				annotations: map[string]string{
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
-					phasedKey(phase, podBackupHookOnErrorAnnotationKey): string(v1.HookErrorModeFail),
+					phasedKey(phase, podBackupHookOnErrorAnnotationKey): string(velerov1api.HookErrorModeFail),
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"/usr/bin/foo"},
-					OnError: v1.HookErrorModeFail,
+					OnError: velerov1api.HookErrorModeFail,
 				},
 			},
 			{
@@ -569,7 +573,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
 					phasedKey(phase, podBackupHookTimeoutAnnotationKey): "5m3s",
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"/usr/bin/foo"},
 					Timeout: metav1.Duration{Duration: 5*time.Minute + 3*time.Second},
 				},
@@ -580,7 +584,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
 					phasedKey(phase, podBackupHookTimeoutAnnotationKey): "invalid",
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Command: []string{"/usr/bin/foo"},
 				},
 			},
@@ -590,7 +594,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 					phasedKey(phase, podBackupHookContainerAnnotationKey): "some-container",
 					phasedKey(phase, podBackupHookCommandAnnotationKey):   "/usr/bin/foo",
 				},
-				expectedHook: &v1.ExecHook{
+				expectedHook: &velerov1api.ExecHook{
 					Container: "some-container",
 					Command:   []string{"/usr/bin/foo"},
 				},
@@ -681,16 +685,18 @@ func TestResourceHookApplicableTo(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			h := ResourceHook{
-				Namespaces: collections.NewIncludesExcludes().Includes(test.includedNamespaces...).Excludes(test.excludedNamespaces...),
-				Resources:  collections.NewIncludesExcludes().Includes(test.includedResources...).Excludes(test.excludedResources...),
+				Selector: ResourceHookSelector{
+					Namespaces: collections.NewIncludesExcludes().Includes(test.includedNamespaces...).Excludes(test.excludedNamespaces...),
+					Resources:  collections.NewIncludesExcludes().Includes(test.includedResources...).Excludes(test.excludedResources...),
+				},
 			}
 			if test.labelSelector != "" {
 				selector, err := labels.Parse(test.labelSelector)
 				require.NoError(t, err)
-				h.LabelSelector = selector
+				h.Selector.LabelSelector = selector
 			}
 
-			result := h.applicableTo(test.resource, test.namespace, test.labels)
+			result := h.Selector.applicableTo(test.resource, test.namespace, test.labels)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -702,4 +708,670 @@ func parseLabelSelectorOrDie(s string) labels.Selector {
 		panic(err)
 	}
 	return ret
+}
+
+func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
+	testCases := []struct {
+		name             string
+		inputAnnotations map[string]string
+		expected         velerov1api.InitRestoreHook
+		expectNil        bool
+	}{
+		{
+			name:      "should return nil when container image is empty",
+			expectNil: true,
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "",
+				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
+				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator",
+			},
+		},
+		{
+			name:      "should return nil when container image is missing",
+			expectNil: true,
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
+				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator",
+			},
+		},
+		{
+			name:      "should generate container name when container name is empty",
+			expectNil: false,
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
+				podRestoreHookInitContainerNameAnnotationKey:    "",
+				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator /user-data full",
+			},
+			expected: velerov1api.InitRestoreHook{
+				InitContainers: []corev1api.Container{
+					*builder.ForContainer("restore-init1", "busy-box").
+						Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
+				},
+			},
+		},
+		{
+			name:      "should generate container name when container name is missing",
+			expectNil: false,
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
+				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator /user-data full",
+			},
+			expected: velerov1api.InitRestoreHook{
+				InitContainers: []corev1api.Container{
+					*builder.ForContainer("restore-init1", "busy-box").
+						Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
+				},
+			},
+		},
+		{
+			name:      "should return expected init container when all annotations are specified",
+			expectNil: false,
+			expected: velerov1api.InitRestoreHook{
+				InitContainers: []corev1api.Container{
+					*builder.ForContainer("restore-init1", "busy-box").
+						Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
+				},
+			},
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
+				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
+				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator /user-data full",
+			},
+		},
+		{
+			name:      "should return expected init container when all annotations are specified with command as a JSON array",
+			expectNil: false,
+			expected: velerov1api.InitRestoreHook{
+				InitContainers: []corev1api.Container{
+					*builder.ForContainer("restore-init1", "busy-box").
+						Command([]string{"a", "b", "c"}).Result(),
+				},
+			},
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
+				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
+				podRestoreHookInitContainerCommandAnnotationKey: `["a","b","c"]`,
+			},
+		},
+		{
+			name:      "should return expected init container when all annotations are specified with command as malformed a JSON array",
+			expectNil: false,
+			expected: velerov1api.InitRestoreHook{
+				InitContainers: []corev1api.Container{
+					*builder.ForContainer("restore-init1", "busy-box").
+						Command([]string{"[foobarbaz"}).Result(),
+				},
+			},
+			inputAnnotations: map[string]string{
+				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
+				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
+				podRestoreHookInitContainerCommandAnnotationKey: "[foobarbaz",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := getInitRestoreHookFromAnnotation("test/pod1", tc.inputAnnotations, velerotest.NewLogger())
+			if tc.expectNil {
+				assert.Nil(t, actual)
+				return
+			}
+			assert.NotEmpty(t, actual.InitContainers[0].Name)
+			assert.Equal(t, len(tc.expected.InitContainers), len(actual.InitContainers))
+			assert.Equal(t, tc.expected.InitContainers[0].Image, actual.InitContainers[0].Image)
+			assert.Equal(t, tc.expected.InitContainers[0].Command, actual.InitContainers[0].Command)
+		})
+	}
+}
+
+func TestGetRestoreHooksFromSpec(t *testing.T) {
+	testCases := []struct {
+		name          string
+		hookSpec      *velerov1api.RestoreHooks
+		expected      []ResourceRestoreHook
+		expectedError error
+	}{
+		{
+			name:          "should return empty hooks and no error when hookSpec is nil",
+			hookSpec:      nil,
+			expected:      []ResourceRestoreHook{},
+			expectedError: nil,
+		},
+		{
+			name: "should return empty hooks and no error when hookSpec resources is nil",
+			hookSpec: &velerov1api.RestoreHooks{
+				Resources: nil,
+			},
+			expected:      []ResourceRestoreHook{},
+			expectedError: nil,
+		},
+		{
+			name: "should return empty hooks and no error when hookSpec resources is empty",
+			hookSpec: &velerov1api.RestoreHooks{
+				Resources: []velerov1api.RestoreResourceHookSpec{},
+			},
+			expected:      []ResourceRestoreHook{},
+			expectedError: nil,
+		},
+		{
+			name: "should return hooks specified in the hookSpec initContainer hooks only",
+			hookSpec: &velerov1api.RestoreHooks{
+				Resources: []velerov1api.RestoreResourceHookSpec{
+					{
+						Name:               "h1",
+						IncludedNamespaces: []string{"ns1", "ns2", "ns3"},
+						ExcludedNamespaces: []string{"ns4", "ns5", "ns6"},
+						IncludedResources:  []string{kuberesource.Pods.Resource},
+						PostHooks: []velerov1api.RestoreResourceHook{
+							{
+								Init: &velerov1api.InitRestoreHook{
+									InitContainers: []corev1api.Container{
+										*builder.ForContainer("restore-init1", "busy-box").
+											Command([]string{"foobarbaz"}).Result(),
+										*builder.ForContainer("restore-init2", "busy-box").
+											Command([]string{"foobarbaz"}).Result(),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []ResourceRestoreHook{
+				{
+					Name: "h1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes([]string{"ns1", "ns2", "ns3"}...).Excludes([]string{"ns4", "ns5", "ns6"}...),
+						Resources:  collections.NewIncludesExcludes().Includes([]string{kuberesource.Pods.Resource}...),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init1", "busy-box").
+										Command([]string{"foobarbaz"}).Result(),
+									*builder.ForContainer("restore-init2", "busy-box").
+										Command([]string{"foobarbaz"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := GetRestoreHooksFromSpec(tc.hookSpec)
+
+			assert.Equal(t, tc.expected, actual)
+			assert.Equal(t, tc.expectedError, err)
+		})
+	}
+}
+
+func TestHandleRestoreHooks(t *testing.T) {
+	testCases := []struct {
+		name          string
+		podInput      corev1api.Pod
+		restoreHooks  []ResourceRestoreHook
+		expectedPod   *corev1api.Pod
+		expectedError error
+	}{
+		{
+			name: "should handle hook from annotation no hooks in spec on pod with no init containers",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						podRestoreHookInitContainerImageAnnotationKey:   "nginx",
+						podRestoreHookInitContainerNameAnnotationKey:    "restore-init-container",
+						podRestoreHookInitContainerCommandAnnotationKey: `["a", "b", "c"]`,
+					},
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						podRestoreHookInitContainerImageAnnotationKey:   "nginx",
+						podRestoreHookInitContainerNameAnnotationKey:    "restore-init-container",
+						podRestoreHookInitContainerCommandAnnotationKey: `["a", "b", "c"]`,
+					},
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restore-init-container", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+					},
+				},
+			},
+		},
+		{
+			name: "should handle hook from annotation no hooks in spec on pod with init containers",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						podRestoreHookInitContainerImageAnnotationKey:   "nginx",
+						podRestoreHookInitContainerNameAnnotationKey:    "restore-init-container",
+						podRestoreHookInitContainerCommandAnnotationKey: `["a", "b", "c"]`,
+					},
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+						*builder.ForContainer("init-app-step3", "busy-box").
+							Command([]string{"init-step3"}).Result(),
+					},
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						podRestoreHookInitContainerImageAnnotationKey:   "nginx",
+						podRestoreHookInitContainerNameAnnotationKey:    "restore-init-container",
+						podRestoreHookInitContainerCommandAnnotationKey: `["a", "b", "c"]`,
+					},
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restore-init-container", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+						*builder.ForContainer("init-app-step3", "busy-box").
+							Command([]string{"init-step3"}).Result(),
+					},
+				},
+			},
+		},
+		{
+			name: "should handle hook from annotation ignoring hooks in spec",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						podRestoreHookInitContainerImageAnnotationKey:   "nginx",
+						podRestoreHookInitContainerNameAnnotationKey:    "restore-init-container",
+						podRestoreHookInitContainerCommandAnnotationKey: `["a", "b", "c"]`,
+					},
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+						*builder.ForContainer("init-app-step3", "busy-box").
+							Command([]string{"init-step3"}).Result(),
+					},
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						podRestoreHookInitContainerImageAnnotationKey:   "nginx",
+						podRestoreHookInitContainerNameAnnotationKey:    "restore-init-container",
+						podRestoreHookInitContainerCommandAnnotationKey: `["a", "b", "c"]`,
+					},
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restore-init-container", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+						*builder.ForContainer("init-app-step3", "busy-box").
+							Command([]string{"init-step3"}).Result(),
+					},
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "ignore-hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("should-not exist", "does-not-matter").
+										Command([]string{""}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should handle hook from spec on pod with no init containers",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restore-init-container-1", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("restore-init-container-2", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+					},
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+									*builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should handle hook from spec when no restore hook annotation and existing init containers",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+						*builder.ForContainer("init-app-step3", "busy-box").
+							Command([]string{"init-step3"}).Result(),
+					},
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restore-init-container-1", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("restore-init-container-2", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+						*builder.ForContainer("init-app-step3", "busy-box").
+							Command([]string{"init-step3"}).Result(),
+					},
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+									*builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "shoud not apply any restore hook init containers when resource hook selector mismatch",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Excludes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+									*builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should preserve restic-wait init container when it is the only existing init container",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restic-wait", "bus-box").
+							Command([]string{"restic-restore"}).Result(),
+					},
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restic-wait", "bus-box").
+							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("restore-init-container-1", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("restore-init-container-2", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+					},
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+									*builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			name: "should preserve restic-wait init container when it exits with other init containers",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restic-wait", "bus-box").
+							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+					},
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restic-wait", "bus-box").
+							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("restore-init-container-1", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("restore-init-container-2", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+						*builder.ForContainer("init-app-step1", "busy-box").
+							Command([]string{"init-step1"}).Result(),
+						*builder.ForContainer("init-app-step2", "busy-box").
+							Command([]string{"init-step2"}).Result(),
+					},
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+									*builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "shoud not apply any restore hook init containers when resource hook is nil",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			restoreHooks: nil,
+		},
+		{
+			name: "shoud not apply any restore hook init containers when resource hook is empty",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := InitContainerRestoreHookHandler{}
+			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.podInput)
+			assert.NoError(t, err)
+			actual, err := handler.HandleRestoreHooks(velerotest.NewLogger(), kuberesource.Pods, &unstructured.Unstructured{Object: podMap}, tc.restoreHooks)
+			assert.Equal(t, tc.expectedError, err)
+			actualPod := new(corev1api.Pod)
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(actual.UnstructuredContent(), actualPod)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedPod, actualPod)
+		})
+	}
 }

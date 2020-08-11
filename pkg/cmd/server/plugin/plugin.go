@@ -44,6 +44,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
+				RegisterRestoreItemAction("velero.io/init-restore-hook", newInitRestoreHookPodAction).
 				RegisterRestoreItemAction("velero.io/service", newServiceRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/service-account", newServiceAccountRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/add-pvc-from-pod", newAddPVCFromPodRestoreItemAction).
@@ -117,6 +118,10 @@ func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 
 func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewPodAction(logger), nil
+}
+
+func newInitRestoreHookPodAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewInitRestoreHookPodAction(logger), nil
 }
 
 func newResticRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
