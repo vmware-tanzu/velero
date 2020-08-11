@@ -73,6 +73,7 @@ if [[ $(uname) == "Darwin" ]]; then
     echo "[OS X] updating version-specific links"
     find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://velero.io/docs/$MAIN_BRANCH|https://velero.io/docs/$VELERO_VERSION|g"
     find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/vmware-tanzu/velero/blob/$MAIN_BRANCH|https://github.com/vmware-tanzu/velero/blob/$VELERO_VERSION|g"
+    find $DOCS_DIRECTORY/${NEW_DOCS_VERSION} -type f -name "_index.md" | xargs sed -i '' "s|version: $MAIN_BRANCH|version: $NEW_DOCS_VERSION|g"
 
     echo "[OS X] Updating latest version in $CONFIG_FILE"
     sed -i '' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" $CONFIG_FILE
