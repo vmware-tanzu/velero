@@ -57,12 +57,9 @@ FROM ubuntu:focal
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
-ARG BIN
-
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /output /
 
 USER nobody:nogroup
 
-ENTRYPOINT ["/${BIN}"]
