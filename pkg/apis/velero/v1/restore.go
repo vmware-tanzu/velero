@@ -135,10 +135,10 @@ type RestoreResourceHookSpec struct {
 // RestoreResourceHook defines a restore hook for a resource.
 type RestoreResourceHook struct {
 	// Exec defines an exec restore hook.
-	Exec *ExecRestoreHook `json:"exec"`
+	Exec *ExecRestoreHook `json:"exec,omitempty"`
 
 	// Init defines an init restore hook.
-	Init *InitRestoreHook `json:"init"`
+	Init *InitRestoreHook `json:"init,omitempty"`
 }
 
 // ExecRestoreHook is a hook that uses pod exec API to execute a command inside a container in a pod
