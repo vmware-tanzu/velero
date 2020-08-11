@@ -17,6 +17,7 @@ limitations under the License.
 package hook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -74,6 +76,7 @@ type ItemHookHandler interface {
 	// determine if there are any hooks relevant to the item, taking into account the hook spec's
 	// namespaces, resources, and label selector.
 	HandleHooks(
+		ctx context.Context,
 		log logrus.FieldLogger,
 		groupResource schema.GroupResource,
 		obj runtime.Unstructured,
@@ -169,6 +172,7 @@ type DefaultItemHookHandler struct {
 }
 
 func (h *DefaultItemHookHandler) HandleHooks(
+	ctx context.Context,
 	log logrus.FieldLogger,
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
@@ -464,12 +468,15 @@ type NamedExecRestoreHook struct {
 // hooks from the restore resource are accumulated.
 func GroupRestoreExecHooks(
 	resourceRestoreHooks []ResourceRestoreHook,
-	obj *unstructured.Unstructured,
+	pod *v1.Pod,
 	log logrus.FieldLogger,
 ) (map[string][]NamedExecRestoreHook, error) {
 	byContainer := map[string][]NamedExecRestoreHook{}
 
-	metadata, err := meta.Accessor(obj)
+	if pod == nil {
+		return byContainer, nil
+	}
+	metadata, err := meta.Accessor(pod)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

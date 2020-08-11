@@ -18,6 +18,7 @@ package backup
 
 import (
 	"archive/tar"
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -121,7 +122,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	log.Info("Backing up item")
 
 	log.Debug("Executing pre hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre); err != nil {
+	if err := ib.itemHookHandler.HandleHooks(context.Background(), log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre); err != nil {
 		return false, err
 	}
 
@@ -173,7 +174,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 
 		// if there was an error running actions, execute post hooks and return
 		log.Debug("Executing post hooks")
-		if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost); err != nil {
+		if err := ib.itemHookHandler.HandleHooks(context.Background(), log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost); err != nil {
 			backupErrs = append(backupErrs, err)
 		}
 
@@ -203,7 +204,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	}
 
 	log.Debug("Executing post hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost); err != nil {
+	if err := ib.itemHookHandler.HandleHooks(context.Background(), log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost); err != nil {
 		backupErrs = append(backupErrs, err)
 	}
 

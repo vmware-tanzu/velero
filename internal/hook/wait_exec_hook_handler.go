@@ -11,32 +11,42 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 )
 
-// WaitExecHookHandler executes hooks in a pod's containers once they become ready.
-type WaitExecHookHandler interface {
-	HandleHooks(
-		ctx context.Context,
-		log logrus.FieldLogger,
-		pod *v1.Pod,
-		byContainer map[string][]NamedExecRestoreHook,
-	) []error
+type WaitExecHookHandler struct {
+	PodsGetter           cache.Getter
+	PodCommandExecutor   podexec.PodCommandExecutor
+	ResourceRestoreHooks []ResourceRestoreHook
 }
 
-type DefaultWaitExecHookHandler struct {
-	PodsGetter         cache.Getter
-	PodCommandExecutor podexec.PodCommandExecutor
-}
+var _ ItemHookHandler = &WaitExecHookHandler{}
 
-var _ WaitExecHookHandler = &DefaultWaitExecHookHandler{}
-
-func (e *DefaultWaitExecHookHandler) HandleHooks(
+func (e *WaitExecHookHandler) HandleHooks(
 	ctx context.Context,
 	log logrus.FieldLogger,
-	pod *v1.Pod,
-	byContainer map[string][]NamedExecRestoreHook,
-) []error {
+	groupResource schema.GroupResource,
+	obj runtime.Unstructured,
+	resourceHooks []ResourceHook,
+	phase hookPhase,
+) error {
+	byContainer, err := GroupRestoreExecHooks(e.ResourceRestoreHooks, nil, log)
+	if err != nil {
+		log.WithError(err).Error("get post-restore exec hooks for pod")
+		return err
+	}
+	if len(byContainer) == 0 {
+		return nil
+	}
+
+	pod := new(v1.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pod); err != nil {
+		log.WithError(err).Error("error converting unstructured pod")
+		return err
+	}
+
 	// If hooks are defined for a container that does not exist in the pod log a warning and discard
 	// those hooks to avoid waiting for a container that will never become ready. After that if
 	// there are no hooks left to be executed return immediately.
@@ -157,7 +167,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			if hook.executed {
 				continue
 			}
-			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed", hook.Hook.Container, pod.Namespace, pod.Name)
+			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed", hook.Name, hook.Hook.Container, pod.Namespace, pod.Name)
 			hookLog := log.WithFields(
 				logrus.Fields{
 					"hookSource": hook.Source,
@@ -172,7 +182,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 		}
 	}
 
-	return errors
+	return kubeerrs.NewAggregate(errors)
 }
 
 func podHasContainer(pod *v1.Pod, containerName string) bool {

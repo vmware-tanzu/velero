@@ -201,9 +201,10 @@ func (kr *kubernetesRestorer) Restore(
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 	hooksCtx, hooksCancelFunc := go_context.WithCancel(go_context.Background())
-	waitExecHookHandler := &hook.DefaultWaitExecHookHandler{
-		PodCommandExecutor: kr.podCommandExecutor,
-		PodsGetter:         kr.podGetter,
+	waitExecHookHandler := &hook.WaitExecHookHandler{
+		PodCommandExecutor:   kr.podCommandExecutor,
+		PodsGetter:           kr.podGetter,
+		ResourceRestoreHooks: resourceRestoreHooks,
 	}
 
 	pvRestorer := &pvRestorer{
@@ -244,7 +245,7 @@ func (kr *kubernetesRestorer) Restore(
 		resourcePriorities:         kr.resourcePriorities,
 		resourceRestoreHooks:       resourceRestoreHooks,
 		hooksErrs:                  make(chan error),
-		waitExecHookHandler:        waitExecHookHandler,
+		itemHookHandler:            waitExecHookHandler,
 		hooksContext:               hooksCtx,
 		hooksCancelFunc:            hooksCancelFunc,
 	}
@@ -344,7 +345,7 @@ type restoreContext struct {
 	hooksWaitGroup             sync.WaitGroup
 	hooksErrs                  chan error
 	resourceRestoreHooks       []hook.ResourceRestoreHook
-	waitExecHookHandler        hook.WaitExecHookHandler
+	itemHookHandler            hook.ItemHookHandler
 	hooksContext               go_context.Context
 	hooksCancelFunc            go_context.CancelFunc
 }
@@ -1182,18 +1183,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if groupResource == kuberesource.Pods {
-		execHooksByContainer, err := hook.GroupRestoreExecHooks(
-			ctx.resourceRestoreHooks,
-			createdObj,
-			ctx.log,
-		)
-		if err != nil {
-			ctx.log.Errorf("Error getting exec hooks for pod %s/%s: %v", namespace, name, err)
-			errs.Add(namespace, errors.Wrapf(err, "failed to get exec hooks for pod %s/%s", namespace, name))
-		}
-		if len(execHooksByContainer) > 0 {
-			ctx.waitExec(execHooksByContainer, createdObj)
-		}
+		ctx.waitExec(createdObj)
 	}
 
 	// Wait for a CRD to be available for instantiating resources
@@ -1286,26 +1276,23 @@ func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstr
 }
 
 // waitExec executes hooks in a restored pod's containers when they become ready
-func (ctx *restoreContext) waitExec(byContainer map[string][]hook.NamedExecRestoreHook, createdObj *unstructured.Unstructured) {
+func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 	ctx.hooksWaitGroup.Add(1)
 	go func() {
 		// Done() will only be called after all errors have been successfully sent
 		// on the ctx.resticErrs channel
 		defer ctx.hooksWaitGroup.Done()
 
-		pod := new(v1.Pod)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
-			ctx.log.WithError(err).Error("error converting unstructured pod")
-			ctx.hooksErrs <- err
-			return
-		}
-
-		if errs := ctx.waitExecHookHandler.HandleHooks(ctx.hooksContext, ctx.log, pod, byContainer); errs != nil {
-			ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully execute post-restore hooks")
-
-			for _, err := range errs {
-				ctx.hooksErrs <- err
+		if err := ctx.itemHookHandler.HandleHooks(ctx.hooksContext, ctx.log, kuberesource.Pods, createdObj, nil, hook.PhasePost); err != nil {
+			ctx.hooksCancelFunc()
+			// Errors are already logged in the HandleHooks method
+			if agg, ok := err.(kubeerrs.Aggregate); ok {
+				for _, err := range agg.Errors() {
+					ctx.hooksErrs <- err
+				}
+				return
 			}
+			ctx.hooksErrs <- err
 		}
 	}()
 }

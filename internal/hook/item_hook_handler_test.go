@@ -17,6 +17,7 @@ limitations under the License.
 package hook
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -127,7 +128,7 @@ func TestHandleHooksSkips(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre)
+			err := h.HandleHooks(context.Background(), velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre)
 			assert.NoError(t, err)
 		})
 	}
@@ -494,7 +495,7 @@ func TestHandleHooks(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
+			err := h.HandleHooks(context.Background(), velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
@@ -1071,10 +1072,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		l := velerotest.NewLogger()
-		podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
-		assert.Nil(t, err)
-		obj := &unstructured.Unstructured{Object: podMap}
-		actual, err := GroupRestoreExecHooks(tc.resourceRestoreHooks, obj, l)
+		actual, err := GroupRestoreExecHooks(tc.resourceRestoreHooks, tc.pod, l)
 		assert.Nil(t, err)
 		assert.Equal(t, tc.expected, actual)
 	}
