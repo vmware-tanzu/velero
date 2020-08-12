@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,19 +40,19 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete backups",
-		Example: `  # delete a backup named "backup-1"
+		Example: `  # Delete a backup named "backup-1."
   velero backup delete backup-1
 
-  # delete a backup named "backup-1" without prompting for confirmation
+  # Delete a backup named "backup-1" without prompting for confirmation.
   velero backup delete backup-1 --confirm
 
-  # delete backups named "backup-1" and "backup-2"
+  # Delete backups named "backup-1" and "backup-2."
   velero backup delete backup-1 backup-2
 
-  # delete all backups triggered by schedule "schedule-1"
+  # Delete all backups triggered by schedule "schedule-1."
   velero backup delete --selector velero.io/schedule-name=schedule-1
  
-  # delete all backups
+  # Delete all backups.
   velero backup delete --all
   `,
 		Run: func(c *cobra.Command, args []string) {

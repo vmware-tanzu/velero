@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ func (o *DeleteOptions) Validate(c *cobra.Command, f client.Factory, args []stri
 func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm deletion")
 	flags.BoolVar(&o.all, "all", o.all, "Delete all "+o.singularTypeName+"s")
-	flags.VarP(&o.Selector, "selector", "l", "Delete all "+o.singularTypeName+"s matching this label selector")
+	flags.VarP(&o.Selector, "selector", "l", "Delete all "+o.singularTypeName+"s matching this label selector.")
 }
 
 // GetConfirmation ensures that the user confirms the action before proceeding.

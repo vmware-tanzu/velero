@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -83,18 +83,18 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the backup storage provider (e.g. aws, azure, gcp)")
-	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
-	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
-	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "how often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
-	flags.Var(&o.Config, "config", "configuration key-value pairs")
-	flags.Var(&o.Labels, "labels", "labels to apply to the backup storage location")
-	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "file containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
+	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the backup storage provider (e.g. aws, azure, gcp).")
+	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "Name of the object storage bucket where backups should be stored.")
+	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "How often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
+	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "How often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
+	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
+	flags.Var(&o.Labels, "labels", "Labels to apply to the backup storage location.")
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.Var(
 		o.AccessMode,
 		"access-mode",
-		fmt.Sprintf("access mode for the backup storage location. Valid values are %s", strings.Join(o.AccessMode.AllowedValues(), ",")),
+		fmt.Sprintf("Access mode for the backup storage location. Valid values are %s", strings.Join(o.AccessMode.AllowedValues(), ",")),
 	)
 }
 

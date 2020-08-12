@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,19 +44,19 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule SCHEDULE_NAME]",
 		Short: "Create a restore",
-		Example: `  # create a restore named "restore-1" from backup "backup-1"
+		Example: `  # Create a restore named "restore-1" from backup "backup-1."
   velero restore create restore-1 --from-backup backup-1
 
-  # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
+  # Create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1."
   velero restore create --from-backup backup-1
  
-  # create a restore from the latest successful backup triggered by schedule "schedule-1"
+  # Create a restore from the latest successful backup triggered by schedule "schedule-1."
   velero restore create --from-schedule schedule-1
 
-  # create a restore from the latest successful OR partially-failed backup triggered by schedule "schedule-1"
+  # Create a restore from the latest successful OR partially-failed backup triggered by schedule "schedule-1."
   velero restore create --from-schedule schedule-1 --allow-partially-failed
 
-  # create a restore for only persistentvolumeclaims and persistentvolumes within a backup
+  # Create a restore for only persistentvolumeclaims and persistentvolumes within a backup.
   velero restore create --from-backup backup-2 --include-resources persistentvolumeclaims,persistentvolumes
   `,
 		Args: cobra.MaximumNArgs(1),
@@ -104,27 +104,27 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.BackupName, "from-backup", "", "backup to restore from")
-	flags.StringVar(&o.ScheduleName, "from-schedule", "", "schedule to restore from")
-	flags.Var(&o.IncludeNamespaces, "include-namespaces", "namespaces to include in the restore (use '*' for all namespaces)")
-	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the restore")
-	flags.Var(&o.NamespaceMappings, "namespace-mappings", "namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
-	flags.Var(&o.Labels, "labels", "labels to apply to the restore")
-	flags.Var(&o.IncludeResources, "include-resources", "resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)")
-	flags.Var(&o.ExcludeResources, "exclude-resources", "resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io")
-	flags.VarP(&o.Selector, "selector", "l", "only restore resources matching this label selector")
-	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "whether to restore volumes from snapshots")
+	flags.StringVar(&o.BackupName, "from-backup", "", "Backup to restore from")
+	flags.StringVar(&o.ScheduleName, "from-schedule", "", "Schedule to restore from")
+	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the restore (use '*' for all namespaces)")
+	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "Namespaces to exclude from the restore.")
+	flags.Var(&o.NamespaceMappings, "namespace-mappings", "Namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
+	flags.Var(&o.Labels, "labels", "Labels to apply to the restore.")
+	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
+	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io.")
+	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
+	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the restore")
+	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the restore.")
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.AllowPartiallyFailed, "allow-partially-failed", "", "if using --from-schedule, whether to consider PartiallyFailed backups when looking for the most recent one. This flag has no effect if not using --from-schedule.")
+	f = flags.VarPF(&o.AllowPartiallyFailed, "allow-partially-failed", "", "If using --from-schedule, whether to consider PartiallyFailed backups when looking for the most recent one. This flag has no effect if not using --from-schedule.")
 	f.NoOptDefVal = "true"
 
-	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
+	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "Wait for the operation to complete.")
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
