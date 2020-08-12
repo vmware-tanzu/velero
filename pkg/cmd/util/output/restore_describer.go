@@ -48,6 +48,20 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 
 		d.Printf("Phase:\t%s%s\n", restore.Status.Phase, resultsNote)
 
+		d.Println()
+		// "<n/a>" output should only be applicable for restore that failed validation
+		if restore.Status.StartTimestamp == nil || restore.Status.StartTimestamp.IsZero() {
+			d.Printf("Started:\t%s\n", "<n/a>")
+		} else {
+			d.Printf("Started:\t%s\n", restore.Status.StartTimestamp)
+		}
+
+		if restore.Status.CompletionTimestamp == nil || restore.Status.CompletionTimestamp.IsZero() {
+			d.Printf("Completed:\t%s\n", "<n/a>")
+		} else {
+			d.Printf("Completed:\t%s\n", restore.Status.CompletionTimestamp)
+		}
+
 		if len(restore.Status.ValidationErrors) > 0 {
 			d.Println()
 			d.Printf("Validation errors:")

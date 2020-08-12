@@ -104,8 +104,8 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
     
     tag_and_push
 else
-    echo "Checking out upstream/master."
-    git checkout upstream/master
+    echo "Checking out upstream/main."
+    git checkout upstream/main
 
     tag_and_push
 fi

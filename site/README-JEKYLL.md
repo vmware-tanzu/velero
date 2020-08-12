@@ -44,6 +44,6 @@ To add a new set of versioned docs to go with a new Velero release:
    NEW_DOCS_VERSION=vX.Y VELERO_VERSION=vX.Y.Z make gen-docs
    ```
 
-1. In `site/_config.yml`, under the `defaults` field, add an entry for the new version just under `master` by copying the most recent version's entry and updating the version numbers.
+1. In `site/_config.yml`, under the `defaults` field, add an entry for the new version just under `main` by copying the most recent version's entry and updating the version numbers.
 
 1. [Pre-release only] In `site/_config.yml`, revert the change to the `latest` field, so the pre-release docs do not become the default.

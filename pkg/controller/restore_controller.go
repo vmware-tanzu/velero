@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
@@ -54,7 +55,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// nonRestorableResources is a blacklist for the restoration process. Any resources
+// nonRestorableResources is an exclusion list  for the restoration process. Any resources
 // included here are explicitly excluded from the restoration process.
 var nonRestorableResources = []string{
 	"nodes",
@@ -90,6 +91,7 @@ type restoreController struct {
 	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
 	logFormat              logging.Format
+	clock                  clock.Clock
 
 	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -125,6 +127,7 @@ func NewRestoreController(
 		defaultBackupLocation:  defaultBackupLocation,
 		metrics:                metrics,
 		logFormat:              logFormat,
+		clock:                  &clock.RealClock{},
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -235,6 +238,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 		c.metrics.RegisterRestoreValidationFailed(backupScheduleName)
 	} else {
+		restore.Status.StartTimestamp = &metav1.Time{Time: c.clock.Now()}
 		restore.Status.Phase = api.RestorePhaseInProgress
 	}
 
@@ -268,6 +272,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 		c.metrics.RegisterRestoreSuccess(backupScheduleName)
 	}
 
+	restore.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
 	c.logger.Debug("Updating restore's final status")
 	if _, err = patchRestore(original, restore, c.restoreClient); err != nil {
 		c.logger.WithError(errors.WithStack(err)).Info("Error updating restore's final status")

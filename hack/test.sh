@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Copyright 2016 The Kubernetes Authors.
+# Modifications Copyright 2020 The Velero Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +24,7 @@ export CGO_ENABLED=0
 TARGETS=(
   ./cmd/...
   ./pkg/...
+  ./internal/...
 )
 
 if [[ ${#@} -ne 0 ]]; then

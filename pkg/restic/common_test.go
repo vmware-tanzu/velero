@@ -507,6 +507,50 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			},
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
+		{
+			name:                   "should exclude volumes mounting secrets",
+			defaultVolumesToRestic: true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToExcludeAnnotation: "nonResticPV1,nonResticPV2,nonResticPV3",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						// Restic Volumes
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+						/// Excluded from restic through annotation
+						{Name: "nonResticPV1"}, {Name: "nonResticPV2"}, {Name: "nonResticPV3"},
+						// Excluded from restic because hostpath
+						{Name: "superSecret", VolumeSource: corev1api.VolumeSource{Secret: &corev1api.SecretVolumeSource{SecretName: "super-secret"}}},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
+		{
+			name:                   "should exclude volumes mounting config maps",
+			defaultVolumesToRestic: true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToExcludeAnnotation: "nonResticPV1,nonResticPV2,nonResticPV3",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						// Restic Volumes
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+						/// Excluded from restic through annotation
+						{Name: "nonResticPV1"}, {Name: "nonResticPV2"}, {Name: "nonResticPV3"},
+						// Excluded from restic because hostpath
+						{Name: "appCOnfig", VolumeSource: corev1api.VolumeSource{ConfigMap: &corev1api.ConfigMapVolumeSource{LocalObjectReference: corev1api.LocalObjectReference{Name: "app-config"}}}},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
 	}
 
 	for _, tc := range testCases {

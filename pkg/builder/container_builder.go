@@ -88,6 +88,12 @@ func (b *ContainerBuilder) Resources(resources *corev1api.ResourceRequirements) 
 	return b
 }
 
+// SecurityContext sets the container's SecurityContext.
+func (b *ContainerBuilder) SecurityContext(securityContext *corev1api.SecurityContext) *ContainerBuilder {
+	b.object.SecurityContext = securityContext
+	return b
+}
+
 func (b *ContainerBuilder) Env(vars ...*corev1api.EnvVar) *ContainerBuilder {
 	for _, v := range vars {
 		b.object.Env = append(b.object.Env, *v)
@@ -97,5 +103,15 @@ func (b *ContainerBuilder) Env(vars ...*corev1api.EnvVar) *ContainerBuilder {
 
 func (b *ContainerBuilder) PullPolicy(pullPolicy corev1api.PullPolicy) *ContainerBuilder {
 	b.object.ImagePullPolicy = pullPolicy
+	return b
+}
+
+func (b *ContainerBuilder) Command(command []string) *ContainerBuilder {
+	if b.object.Command == nil {
+		b.object.Command = []string{}
+	}
+
+	b.object.Command = append(b.object.Command, command...)
+
 	return b
 }

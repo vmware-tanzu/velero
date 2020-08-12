@@ -22,8 +22,8 @@ ${HACK_DIR}/update-generated-crd-code.sh --verify-only
 if ! git diff --exit-code config/crd/crds/crds.go >/dev/null; then
   # revert changes to state before running CRD generation to stay consistent
   # with code-generator `--verify-only` option which discards generated changes
-  git checkout config/crd/bases
+  git checkout config/crd
 
-  echo "CRD verification - failed! Generated CRDs are out-of-date, please run 'make update'."
+  echo "CRD verification - failed! Generated CRDs are out-of-date, please run 'make update' and 'git add' the generated file(s)."
   exit 1
 fi

@@ -276,7 +276,7 @@ The value for these flags will be stored as annotations.
 
 #### Handling CA certs
 
-In anticipation of a new configuration implementation to handle custom CA certs (as per design doc https://github.com/vmware-tanzu/velero/blob/master/design/custom-ca-support.md), a new flag `velero storage-location create/set --cacert-file mapStringString` is proposed. It sets the configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file.
+In anticipation of a new configuration implementation to handle custom CA certs (as per design doc https://github.com/vmware-tanzu/velero/blob/main/design/custom-ca-support.md), a new flag `velero storage-location create/set --cacert-file mapStringString` is proposed. It sets the configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file.
 
 See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for more clarification.
 

@@ -21,5 +21,5 @@ If you are ready to jump in and test, add code, or help with documentation, plea
 
 [1]: https://github.com/vmware-tanzu/velero/blob/v1.4.0/CODE_OF_CONDUCT.md
 [2]: https://github.com/vmware-tanzu/velero/blob/v1.4.0/CONTRIBUTING.md
-[3]: https://github.com/vmware-tanzu/velero/blob/master/.github/ISSUE_TEMPLATE/feature-enhancement-request.md
-[4]: https://github.com/vmware-tanzu/velero/blob/master/.github/ISSUE_TEMPLATE/bug_report.md
+[3]: https://github.com/vmware-tanzu/velero/blob/main/.github/ISSUE_TEMPLATE/feature-enhancement-request.md
+[4]: https://github.com/vmware-tanzu/velero/blob/main/.github/ISSUE_TEMPLATE/bug_report.md

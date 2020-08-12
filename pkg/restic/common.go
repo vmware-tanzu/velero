@@ -170,6 +170,14 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 		if pv.HostPath != nil {
 			continue
 		}
+		// don't backup volumes mounting secrets. Secrets will be backed up separately.
+		if pv.Secret != nil {
+			continue
+		}
+		// don't backup volumes mounting config maps. Config maps will be backed up separately.
+		if pv.ConfigMap != nil {
+			continue
+		}
 		// don't backup volumes that are included in the exclude list.
 		if contains(volsToExclude, pv.Name) {
 			continue

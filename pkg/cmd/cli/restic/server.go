@@ -18,11 +18,15 @@ package restic
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -57,6 +61,11 @@ var (
 	scheme = runtime.NewScheme()
 )
 
+const (
+	// the port where prometheus metrics are exposed
+	defaultMetricsAddress = ":8085"
+)
+
 func NewServerCommand(f client.Factory) *cobra.Command {
 	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
 	formatFlag := logging.NewFormatFlag()
@@ -74,7 +83,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logger.Infof("Starting Velero restic server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
-			s, err := newResticServer(logger, f)
+			s, err := newResticServer(logger, f, defaultMetricsAddress)
 			cmd.CheckError(err)
 
 			s.run()
@@ -99,9 +108,11 @@ type resticServer struct {
 	cancelFunc            context.CancelFunc
 	fileSystem            filesystem.Interface
 	mgr                   manager.Manager
+	metrics               *metrics.ServerMetrics
+	metricsAddress        string
 }
 
-func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*resticServer, error) {
+func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAddress string) (*resticServer, error) {
 
 	kubeClient, err := factory.KubeClient()
 	if err != nil {
@@ -169,6 +180,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 		cancelFunc:            cancelFunc,
 		fileSystem:            filesystem.NewFileSystem(),
 		mgr:                   mgr,
+		metricsAddress:        metricAddress,
 	}
 
 	if err := s.validatePodVolumesHostPath(); err != nil {
@@ -181,6 +193,18 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 func (s *resticServer) run() {
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		s.logger.Infof("Starting metric server for restic at address [%s]", s.metricsAddress)
+		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+			s.logger.Fatalf("Failed to start metric server for restic at [%s]: %v", s.metricsAddress, err)
+		}
+	}()
+	s.metrics = metrics.NewResticServerMetrics()
+	s.metrics.RegisterAllMetrics()
+	s.metrics.InitResticMetricsForNode(os.Getenv("NODE_NAME"))
+
 	s.logger.Info("Starting controllers")
 
 	backupController := controller.NewPodVolumeBackupController(
@@ -191,6 +215,7 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
+		s.metrics,
 		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)

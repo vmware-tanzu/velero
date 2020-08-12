@@ -3,7 +3,7 @@
 Status: Accepted
 
 Some features may take a while to get fully implemented, and we don't necessarily want to have long-lived feature branches
-A simple feature flag implementation allows code to be merged into master, but not used unless a flag is set.
+A simple feature flag implementation allows code to be merged into main, but not used unless a flag is set.
 
 ## Goals
 

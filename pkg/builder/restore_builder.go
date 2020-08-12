@@ -17,6 +17,8 @@ limitations under the License.
 package builder
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -131,5 +133,17 @@ func (b *RestoreBuilder) Phase(phase velerov1api.RestorePhase) *RestoreBuilder {
 // RestorePVs sets the Restore's restore PVs.
 func (b *RestoreBuilder) RestorePVs(val bool) *RestoreBuilder {
 	b.object.Spec.RestorePVs = &val
+	return b
+}
+
+// StartTimestamp sets the Restore's start timestamp.
+func (b *RestoreBuilder) StartTimestamp(val time.Time) *RestoreBuilder {
+	b.object.Status.StartTimestamp = &metav1.Time{Time: val}
+	return b
+}
+
+// CompletionTimestamp sets the Restore's completion timestamp.
+func (b *RestoreBuilder) CompletionTimestamp(val time.Time) *RestoreBuilder {
+	b.object.Status.CompletionTimestamp = &metav1.Time{Time: val}
 	return b
 }

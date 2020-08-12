@@ -1,8 +1,8 @@
-name: Master CI
+name: Main CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     tags:
       - '*'
 
@@ -21,6 +21,13 @@ jobs:
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: crazy-max/ghaction-docker-buildx@v3
+      with:
+        buildx-version: latest
+        qemu-version: latest
 
     - name: Build
       run: make local

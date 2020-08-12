@@ -137,7 +137,7 @@
 ### Highlights:
   * Ark now has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic](https://github.com/restic/restic).
     This provides users an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume, whether or not it has snapshot support
-    integrated with Ark. For more information, see the [documentation](https://github.com/heptio/ark/blob/master/docs/restic.md).
+    integrated with Ark. For more information, see the [documentation](https://github.com/vmware-tanzu/velero/blob/main/docs/restic.md).
   * Support for Prometheus metrics has been added! View total number of backup attempts (including success or failure), total backup size in bytes, and backup
     durations. More metrics coming in future releases!
 

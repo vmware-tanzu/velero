@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -156,6 +157,7 @@ func TestPVBHandler(t *testing.T) {
 			c := &podVolumeBackupController{
 				genericController: newGenericController("pod-volume-backup", velerotest.NewLogger()),
 				nodeName:          controllerNode,
+				metrics:           metrics.NewResticServerMetrics(),
 			}
 
 			c.pvbHandler(test.obj)

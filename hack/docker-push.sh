@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2019 the Velero contributors.
+# Copyright 2020 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # docker-push is invoked by the CI/CD system to deploy docker images to Docker Hub.
-# It will build images for all commits to master and all git tags.
+# It will build images for all commits to main and all git tags.
 # The highest, non-prerelease semantic version will also be given the `latest` tag.
 
 set +x
@@ -56,26 +56,30 @@ elif [[ "$triggeredBy" == "tags" ]]; then
     TAG=$(echo $GITHUB_REF | cut -d / -f 3)
 fi
 
-if [[ "$BRANCH" == "master" ]]; then
+if [[ "$BRANCH" == "main" ]]; then
     VERSION="$BRANCH"
 elif [[ ! -z "$TAG" ]]; then
     # Explicitly checkout tags when building from a git tag.
-    # This is not needed when building from master
+    # This is not needed when building from main
     git fetch --tags
     # Calculate the latest release if there's a tag.
     highest_release
     VERSION="$TAG"
 else
-    echo "We're not on master and we're not building a tag, exit early."
+    echo "We're not on main and we're not building a tag, exit early."
     exit 0
 fi
 
-# Assume we're not tagging `latest` by default, and never on master.
+# Assume we're not tagging `latest` by default, and never on main.
 TAG_LATEST=false
-if [[ "$BRANCH" == "master" ]]; then
-    echo "Building master, not tagging latest."
+if [[ "$BRANCH" == "main" ]]; then
+    echo "Building main, not tagging latest."
 elif [[ "$TAG" == "$HIGHEST" ]]; then
     TAG_LATEST=true
+fi
+
+if [[ -z "$BUILDX_PLATFORMS" ]]; then
+    BUILDX_PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le"
 fi
 
 # Debugging info
@@ -83,7 +87,12 @@ echo "Highest tag found: $HIGHEST"
 echo "BRANCH: $BRANCH"
 echo "TAG: $TAG"
 echo "TAG_LATEST: $TAG_LATEST"
+echo "BUILDX_PLATFORMS: $BUILDX_PLATFORMS"
 
 echo "Building and pushing container images."
 
-VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push all-manifests
+VERSION="$VERSION" \
+TAG_LATEST="$TAG_LATEST" \
+BUILDX_PLATFORMS="$BUILDX_PLATFORMS" \
+BUILDX_OUTPUT_TYPE="registry" \
+make all-containers

@@ -1,0 +1,16 @@
+name: 'Auto Assign PR Reviewers'
+# pull_request_target means that this will run on pull requests, but in the context of the base repo.
+# This should mean PRs from forks are supported.
+on: 
+  pull_request_target:
+    types: [opened, reopened, sychronized]
+
+
+jobs: 
+  add-reviews:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kentaro-m/auto-assign-action@v1.1.1
+        with: 
+          configuration-path: ".github/auto_assign.yml"
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'

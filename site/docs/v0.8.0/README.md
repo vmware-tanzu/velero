@@ -41,7 +41,7 @@ Clone or fork the Ark repository:
 git clone git@github.com:heptio/ark.git
 ```
 
-NOTE: Make sure to check out the appropriate version. We recommend that you check out the latest tagged version. The master branch is under active development and might not be stable.
+NOTE: Make sure to check out the appropriate version. We recommend that you check out the latest tagged version. The main branch is under active development and might not be stable.
 
 ### Set up server
 
@@ -187,18 +187,18 @@ Feedback and discussion is available on [the mailing list][24].
 See [the list of releases][6] to find out about feature changes.
 
 [0]: https://github.com/heptio
-[1]: https://travis-ci.org/heptio/ark.svg?branch=master
+[1]: https://travis-ci.org/heptio/ark.svg?branch=main
 [2]: https://travis-ci.org/heptio/ark
 [3]: /cloud-common.md
 [4]: https://github.com/heptio/ark/issues
-[5]: https://github.com/heptio/ark/blob/master/CONTRIBUTING.md
+[5]: https://github.com/heptio/ark/blob/main/CONTRIBUTING.md
 [6]: https://github.com/heptio/ark/releases
 [7]: /build-from-scratch.md
-[8]: https://github.com/heptio/ark/blob/master/CODE_OF_CONDUCT.md
+[8]: https://github.com/heptio/ark/blob/main/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
-[12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
+[12]: https://github.com/kubernetes/kubernetes/blob/main/cluster/addons/dns/README.md
 [13]: /output-file-format.md
 [14]: https://github.com/kubernetes/kubernetes
 [15]: https://aws.amazon.com/

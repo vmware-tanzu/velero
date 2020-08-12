@@ -317,6 +317,8 @@ type restoreContext struct {
 	pvRenamer                  func(string) (string, error)
 	discoveryHelper            discovery.Helper
 	resourcePriorities         []string
+	hooksWaitGroup             sync.WaitGroup
+	hooksErrs                  chan error
 }
 
 type resourceClientKey struct {
@@ -335,7 +337,7 @@ func getOrderedResources(resourcePriorities []string, backupResources map[string
 	}
 	sort.Strings(orderedBackupResources)
 
-	// master list: everything in resource priorities, followed by what's in the backup (alphabetized)
+	// main list: everything in resource priorities, followed by what's in the backup (alphabetized)
 	return append(resourcePriorities, orderedBackupResources...)
 }
 

@@ -16,6 +16,6 @@ The `latest` tag follows the most recently released version of Velero.
 
 ## Development
 
-`gcr.io/heptio-images/velero:master`
+`gcr.io/heptio-images/velero:main`
 
-The `master` tag follows the latest commit to land on the `master` branch.
+The `main` tag follows the latest commit to land on the `main` branch.

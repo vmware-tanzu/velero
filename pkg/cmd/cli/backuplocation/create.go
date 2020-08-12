@@ -19,6 +19,8 @@ package backuplocation
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -65,6 +67,7 @@ type CreateOptions struct {
 	BackupSyncPeriod, ValidationFrequency time.Duration
 	Config                                flag.Map
 	Labels                                flag.Map
+	CACertFile                            string
 	AccessMode                            *flag.Enum
 }
 
@@ -87,6 +90,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "How often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
 	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup storage location.")
+ 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.Var(
 		o.AccessMode,
 		"access-mode",
@@ -122,6 +126,18 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	var backupSyncPeriod, validationFrequency *metav1.Duration
 
+	var caCertData []byte
+	if o.CACertFile != "" {
+		realPath, err := filepath.Abs(o.CACertFile)
+		if err != nil {
+			return err
+		}
+		caCertData, err = ioutil.ReadFile(realPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	if c.Flags().Changed("backup-sync-period") {
 		backupSyncPeriod = &metav1.Duration{Duration: o.BackupSyncPeriod}
 	}
@@ -142,6 +158,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: o.Bucket,
 					Prefix: o.Prefix,
+					CACert: caCertData,
 				},
 			},
 			Config:              o.Config.Data(),

@@ -109,12 +109,12 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [3]: #build
 [4]: ../README.md#quickstart
 [5]: https://golang.org/doc/install
-[6]: https://github.com/heptio/ark/tree/master/examples
+[6]: https://github.com/heptio/ark/tree/main/examples
 [7]: #run
 [8]: config-definition.md
 [9]: cloud-common.md
 [10]: #vendoring-dependencies
 [11]: vendoring-dependencies.md
 [12]: #test
-[13]: https://github.com/heptio/ark/blob/master/hack/generate-proto.sh
+[13]: https://github.com/heptio/ark/blob/main/hack/generate-proto.sh
 [14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3

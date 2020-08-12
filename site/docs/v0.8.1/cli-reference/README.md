@@ -16,5 +16,5 @@ In general, Ark will search for your cluster credentials in the following order:
 * `$KUBECONFIG` environment variable
 * In-cluster credentials--this only works when you are running Ark in a pod
 
-[1]: https://github.com/heptio/ark/tree/master/docs/cli-reference
+[1]: https://github.com/heptio/ark/tree/main/docs/cli-reference
 [26]: https://github.com/heptio/ark/releases

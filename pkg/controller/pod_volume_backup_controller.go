@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -40,6 +41,7 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -58,6 +60,7 @@ type podVolumeBackupController struct {
 	pvLister              corev1listers.PersistentVolumeLister
 	kbClient              client.Client
 	nodeName              string
+	metrics               *metrics.ServerMetrics
 
 	processBackupFunc func(*velerov1api.PodVolumeBackup) error
 	fileSystem        filesystem.Interface
@@ -73,6 +76,7 @@ func NewPodVolumeBackupController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
+	metrics *metrics.ServerMetrics,
 	kbClient client.Client,
 	nodeName string,
 ) Interface {
@@ -86,6 +90,7 @@ func NewPodVolumeBackupController(
 		pvLister:              pvInformer.Lister(),
 		kbClient:              kbClient,
 		nodeName:              nodeName,
+		metrics:               metrics,
 
 		fileSystem: filesystem.NewFileSystem(),
 		clock:      &clock.RealClock{},
@@ -125,6 +130,8 @@ func (c *podVolumeBackupController) pvbHandler(obj interface{}) {
 		log.Debug("Backup is not new, not enqueuing")
 		return
 	}
+
+	c.metrics.RegisterPodVolumeBackupEnqueue(c.nodeName)
 
 	log.Debug("Enqueueing")
 	c.enqueue(obj)
@@ -172,6 +179,10 @@ func loggerForPodVolumeBackup(baseLogger logrus.FieldLogger, req *velerov1api.Po
 	}
 
 	return log
+}
+
+func getOwningBackup(req *velerov1api.PodVolumeBackup) string {
+	return fmt.Sprintf("%s/%s", req.Namespace, req.OwnerReferences[0].Name)
 }
 
 func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBackup) error {
@@ -312,7 +323,12 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		log.WithError(err).Error("Error setting PodVolumeBackup phase to Completed")
 		return err
 	}
-
+	latencyDuration := req.Status.CompletionTimestamp.Time.Sub(req.Status.StartTimestamp.Time)
+	latencySeconds := float64(latencyDuration / time.Second)
+	backupName := getOwningBackup(req)
+	c.metrics.ObserveRestiOpLatency(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
+	c.metrics.RegisterResticOpLatencyGauge(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
+	c.metrics.RegisterPodVolumeBackupDequeue(c.nodeName)
 	log.Info("Backup completed")
 
 	return nil

@@ -44,6 +44,7 @@ const (
 	defaultImageBase       = "velero/velero-restic-restore-helper"
 	defaultCPURequestLimit = "100m"
 	defaultMemRequestLimit = "128Mi"
+	defaultCommand         = "/velero-restic-restore-helper"
 )
 
 type ResticRestoreAction struct {
@@ -130,8 +131,16 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 		)
 	}
 
+	runAsRoot, runAsGroup, allowPrivilegeEscalation := getSecurityContext(log, config)
+
+	securityContext, err := kube.ParseSecurityContext(runAsRoot, runAsGroup, allowPrivilegeEscalation)
+	if err != nil {
+		log.Errorf("Using default resource values, couldn't parse resource requirements: %s.", err)
+	}
+
 	initContainerBuilder := newResticInitContainerBuilder(image, string(input.Restore.UID))
 	initContainerBuilder.Resources(&resourceReqs)
+	initContainerBuilder.SecurityContext(&securityContext)
 
 	for volumeName := range volumeSnapshots {
 		mount := &corev1.VolumeMount{
@@ -140,6 +149,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 		}
 		initContainerBuilder.VolumeMounts(mount)
 	}
+	initContainerBuilder.Command(getCommand(log, config))
 
 	initContainer := *initContainerBuilder.Result()
 	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
@@ -154,6 +164,21 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	}
 
 	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+}
+
+func getCommand(log logrus.FieldLogger, config *corev1.ConfigMap) []string {
+	if config == nil {
+		log.Debug("No config found for plugin")
+		return []string{defaultCommand}
+	}
+
+	if config.Data["command"] == "" {
+		log.Debugf("No custom command configured")
+		return []string{defaultCommand}
+	}
+
+	log.Debugf("Using custom command %s", config.Data["command"])
+	return []string{config.Data["command"]}
 }
 
 func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
@@ -209,6 +234,16 @@ func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string
 	}
 
 	return config.Data["cpuLimit"], config.Data["memLimit"]
+}
+
+// getSecurityContext extracts securityContext runAsUser, runAsGroup, and allowPrivilegeEscalation from a ConfigMap.
+func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string, string) {
+	if config == nil {
+		log.Debug("No config found for plugin")
+		return "", "", ""
+	}
+
+	return config.Data["secCtxRunAsUser"], config.Data["secCtxRunAsGroup"], config.Data["secCtxAllowPrivilegeEscalation"]
 }
 
 // TODO eventually this can move to pkg/plugin/framework since it'll be used across multiple

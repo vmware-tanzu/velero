@@ -56,6 +56,12 @@ func (b *PodBuilder) ObjectMeta(opts ...ObjectMetaOpt) *PodBuilder {
 	return b
 }
 
+// ServiceAccount sets serviceAccounts on pod.
+func (b *PodBuilder) ServiceAccount(sa string) *PodBuilder {
+	b.object.Spec.ServiceAccountName = sa
+	return b
+}
+
 // Volumes appends to the pod's volumes
 func (b *PodBuilder) Volumes(volumes ...*corev1api.Volume) *PodBuilder {
 	for _, v := range volumes {

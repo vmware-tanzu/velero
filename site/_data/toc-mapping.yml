@@ -2,7 +2,7 @@
 # (TOC). You'll want to use this after any revamps to information architecture, to ensure
 # that the navigation for older versions still work.
 
-master: master-toc
+main: main-toc
 v1.4: v1-4-toc
 v1.3.2: v1-3-2-toc
 v1.3.1: v1-3-1-toc
