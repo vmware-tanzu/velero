@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,19 +39,19 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete schedules",
-		Example: `	# delete a schedule named "schedule-1"
+		Example: `	# Delete a schedule named "schedule-1."
 		velero schedule delete schedule-1
 	
-		# delete a schedule named "schedule-1" without prompting for confirmation
+		# Delete a schedule named "schedule-1" without prompting for confirmation.
 		velero schedule delete schedule-1 --confirm
 	
-		# delete schedules named "schedule-1" and "schedule-2"
+		# Delete schedules named "schedule-1" and "schedule-2."
 		velero schedule delete schedule-1 schedule-2
 	
-		# delete all schedules labelled with foo=bar"
+		# Delete all schedules labelled with foo=bar."
 		velero schedule delete --selector foo=bar
 		
-		# delete all schedules
+		# Delete all schedules.
 		velero schedule delete --all`,
 
 		Run: func(c *cobra.Command, args []string) {

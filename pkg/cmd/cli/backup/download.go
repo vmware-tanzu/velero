@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,11 +76,11 @@ func NewDownloadOptions() *DownloadOptions {
 }
 
 func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVarP(&o.Output, "output", "o", o.Output, "path to output file. Defaults to <NAME>-data.tar.gz in the current directory")
-	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
-	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
+	flags.StringVarP(&o.Output, "output", "o", o.Output, "Path to output file. Defaults to <NAME>-data.tar.gz in the current directory.")
+	flags.BoolVar(&o.Force, "force", o.Force, "Forces the download and will overwrite file if it exists already.")
+	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "Maximum time to wait to process download request.")
 	flags.BoolVar(&o.InsecureSkipTLSVerify, "insecure-skip-tls-verify", o.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "path to a certificate bundle to use when verifying TLS connections")
+	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 
 }
 

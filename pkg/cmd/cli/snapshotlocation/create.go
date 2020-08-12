@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,9 +67,9 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the volume snapshot provider (e.g. aws, azure, gcp)")
-	flags.Var(&o.Config, "config", "configuration key-value pairs")
-	flags.Var(&o.Labels, "labels", "labels to apply to the volume snapshot location")
+	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the volume snapshot provider (e.g. aws, azure, gcp).")
+	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
+	flags.Var(&o.Labels, "labels", "Labels to apply to the volume snapshot location.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {

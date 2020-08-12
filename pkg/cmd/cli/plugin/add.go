@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 		},
 	}
 
-	c.Flags().Var(imagePullPolicyFlag, "image-pull-policy", fmt.Sprintf("the imagePullPolicy for the plugin container. Valid values are %s.", strings.Join(imagePullPolicies, ", ")))
+	c.Flags().Var(imagePullPolicyFlag, "image-pull-policy", fmt.Sprintf("The imagePullPolicy for the plugin container. Valid values are %s.", strings.Join(imagePullPolicies, ", ")))
 
 	return c
 }

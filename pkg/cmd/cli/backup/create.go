@@ -52,22 +52,22 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
-		Example: `	# create a backup containing all resources
+		Example: `	# Create a backup containing all resources.
 	velero backup create backup1
 
-	# create a backup including only the nginx namespace
+	# Create a backup including only the nginx namespace.
 	velero backup create nginx-backup --include-namespaces nginx
 
-	# create a backup excluding the velero and default namespaces
+	# Create a backup excluding the velero and default namespaces.
 	velero backup create backup2 --exclude-namespaces velero,default
 
-	# create a backup based on a schedule named daily-backup
+	# Create a backup based on a schedule named daily-backup.
 	velero backup create --from-schedule daily-backup
 
-	# view the YAML for a backup that doesn't snapshot volumes, without sending it to the server
+	# View the YAML for a backup that doesn't snapshot volumes, without sending it to the server.
 	velero backup create backup3 --snapshot-volumes=false -o yaml
 
-	# wait for a backup to complete before returning from the command
+	# Wait for a backup to complete before returning from the command.
 	velero backup create backup4 --wait`,
 	}
 
@@ -111,37 +111,37 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.DurationVar(&o.TTL, "ttl", o.TTL, "how long before the backup can be garbage collected")
-	flags.Var(&o.IncludeNamespaces, "include-namespaces", "namespaces to include in the backup (use '*' for all namespaces)")
-	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the backup")
-	flags.Var(&o.IncludeResources, "include-resources", "resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)")
-	flags.Var(&o.ExcludeResources, "exclude-resources", "resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io")
-	flags.Var(&o.Labels, "labels", "labels to apply to the backup")
-	flags.StringVar(&o.StorageLocation, "storage-location", "", "location in which to store the backup")
-	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "list of locations (at most one per provider) where volume snapshots should be stored")
-	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
-	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
+	flags.DurationVar(&o.TTL, "ttl", o.TTL, "How long before the backup can be garbage collected.")
+	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the backup (use '*' for all namespaces).")
+	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "Namespaces to exclude from the backup.")
+	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
+	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io.")
+	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
+	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
+	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
+	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
+	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the backup")
+	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup")
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.DefaultVolumesToRestic, "default-volumes-to-restic", "", "use restic by default to backup all pod volumes")
+	f = flags.VarPF(&o.DefaultVolumesToRestic, "default-volumes-to-restic", "", "Use restic by default to backup all pod volumes")
 	f.NoOptDefVal = "true"
 }
 
 // BindWait binds the wait flag separately so it is not called by other create
 // commands that reuse CreateOptions's BindFlags method.
 func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
-	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
+	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "Wait for the operation to complete.")
 }
 
 // BindFromSchedule binds the from-schedule flag separately so it is not called
 // by other create commands that reuse CreateOptions's BindFlags method.
 func (o *CreateOptions) BindFromSchedule(flags *pflag.FlagSet) {
-	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from the template of an existing schedule. Cannot be used with any other filters. Backup name is optional if used.")
+	flags.StringVar(&o.FromSchedule, "from-schedule", "", "Create a backup from the template of an existing schedule. Cannot be used with any other filters. Backup name is optional if used.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -156,7 +156,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
-		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
+		return fmt.Errorf("A backup name is required, unless you are creating based on a schedule.")
 	}
 
 	if o.StorageLocation != "" {
