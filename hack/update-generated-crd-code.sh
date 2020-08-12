@@ -52,4 +52,13 @@ controller-gen \
   paths=./pkg/controller/... \
   output:crd:artifacts:config=config/crd/bases
 
+# this is a super hacky workaround for https://github.com/kubernetes/kubernetes/issues/91395
+# which a result of fixing the validation on CRD objects. The validation ensures the fields that are list map keys, are either marked
+# as required or have default values to ensure merging of list map items work as expected.
+# With "containerPort" and "protocol" being considered as x-kubernetes-list-map-keys in the container ports, and "protocol" was not
+# a required field, the CRD would fail validation with errors similar to the one reported in https://github.com/kubernetes/kubernetes/issues/91395.
+# once controller-gen (above) is able to generate CRDs with `protocol` as a required field, this hack can be removed.
+kubectl patch -f config/crd/bases/velero.io_restores.yaml -p "$(cat hack/restore-crd-patch.json)" --type=json --local=true  -o yaml > /tmp/velero.io_restores-yaml.patched
+mv /tmp/velero.io_restores-yaml.patched config/crd/bases/velero.io_restores.yaml
+
 go generate ./config/crd/crds
