@@ -21,6 +21,8 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -186,4 +188,25 @@ func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 	}
 
 	return res
+}
+
+// GetResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
+// discovery helper to resolve them to fully-qualified group-resource names, and returns an
+// IncludesExcludes list.
+func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *IncludesExcludes {
+	resources := GenerateIncludesExcludes(
+		includes,
+		excludes,
+		func(item string) string {
+			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
+			if err != nil {
+				return ""
+			}
+
+			gr := gvr.GroupResource()
+			return gr.String()
+		},
+	)
+
+	return resources
 }

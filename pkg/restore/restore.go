@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -154,7 +154,7 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	// get resource includes-excludes
-	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, req.Restore.Spec.IncludedResources, req.Restore.Spec.ExcludedResources)
+	resourceIncludesExcludes := collections.GetResourceIncludesExcludes(kr.discoveryHelper, req.Restore.Spec.IncludedResources, req.Restore.Spec.ExcludedResources)
 
 	// get namespace includes-excludes
 	namespaceIncludesExcludes := collections.NewIncludesExcludes().
@@ -228,27 +228,6 @@ func (kr *kubernetesRestorer) Restore(
 	return restoreCtx.execute()
 }
 
-// getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
-// discovery helper to resolve them to fully-qualified group-resource names, and returns an
-// IncludesExcludes list.
-func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *collections.IncludesExcludes {
-	resources := collections.GenerateIncludesExcludes(
-		includes,
-		excludes,
-		func(item string) string {
-			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
-			if err != nil {
-				return ""
-			}
-
-			gr := gvr.GroupResource()
-			return gr.String()
-		},
-	)
-
-	return resources
-}
-
 type resolvedAction struct {
 	velero.RestoreItemAction
 
@@ -266,7 +245,7 @@ func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper)
 			return nil, err
 		}
 
-		resources := getResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
+		resources := collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
 		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
 
 		selector := labels.Everything()
