@@ -34,6 +34,14 @@ func WithName(val string) func(obj metav1.Object) {
 	}
 }
 
+// WithResourceVersion is a functional option that applies the specified
+// resourceVersion to an object
+func WithResourceVersion(val string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetResourceVersion(val)
+	}
+}
+
 // WithLabels is a functional option that applies the specified
 // label keys/values to an object.
 func WithLabels(vals ...string) func(obj metav1.Object) {
