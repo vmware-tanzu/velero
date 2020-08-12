@@ -133,6 +133,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				TTL:                     metav1.Duration{Duration: o.BackupOptions.TTL},
 				StorageLocation:         o.BackupOptions.StorageLocation,
 				VolumeSnapshotLocations: o.BackupOptions.SnapshotLocations,
+				DefaultVolumesToRestic:  o.BackupOptions.DefaultVolumesToRestic.Value,
 			},
 			Schedule: o.Schedule,
 		},
