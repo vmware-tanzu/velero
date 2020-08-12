@@ -830,7 +830,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 				)).
 				Result(),
 			expected: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+				"container1": {
 					{
 						Name:   "<from-annotation>",
 						Source: "annotation",
@@ -866,7 +866,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 			pod: builder.ForPod("default", "my-pod").Result(),
 			expected: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+				"container1": {
 					{
 						Name:   "hook1",
 						Source: "backupSpec",
@@ -910,7 +910,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 				)).
 				Result(),
 			expected: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+				"container1": {
 					{
 						Name:   "<from-annotation>",
 						Source: "annotation",
@@ -1019,7 +1019,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 			pod: builder.ForPod("default", "my-pod").Result(),
 			expected: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+				"container1": {
 					{
 						Name:   "hook1",
 						Source: "backupSpec",
@@ -1054,7 +1054,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 						},
 					},
 				},
-				"container2": []NamedExecRestoreHook{
+				"container2": {
 					{
 						Name:   "hook1",
 						Source: "backupSpec",
