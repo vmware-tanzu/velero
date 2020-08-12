@@ -23,9 +23,9 @@ There are supported storage providers for both cloud-provider environments and o
 
 ### Velero on Windows
 
-Velero does not officially support Windows, but it has been tested successfully when backing up stateless Windows applications only. If you want to test Velero on Windows, note that the restic integration and backups of stateful applications or PersistentVolumes are not supported.
+Velero does not officially support Windows. In testing, the Velero team was able to backup stateless Windows applications only. The restic integration and backups of stateful applications or PersistentVolumes were not supported.
 
-To backup stateless Windows applications, Velero must deployed as a Windows container. While Velero does not provide official Windows images, its possible for you to build your own Velero Windows container image to use. Note that this image must be built on a Windows node.
+If you want to perform your own testing of Velero on Windows, you must deploy Velero as a Windows container. Velero does not provide official Windows images, but its possible for you to build your own Velero Windows container image to use. Note that you must build this image on a Windows node.
 
 ## Install the CLI
 
