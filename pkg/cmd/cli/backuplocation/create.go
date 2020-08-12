@@ -90,7 +90,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "How often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
 	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup storage location.")
- 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.Var(
 		o.AccessMode,
 		"access-mode",
