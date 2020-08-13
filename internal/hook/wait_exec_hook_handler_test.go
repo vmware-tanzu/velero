@@ -92,7 +92,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			groupResource: "pods",
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "<from-annotation>",
 						HookSource: "annotation",
@@ -161,7 +161,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			groupResource: "pods",
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "<from-annotation>",
 						HookSource: "annotation",
@@ -230,7 +230,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			groupResource: "pods",
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "<from-annotation>",
 						HookSource: "annotation",
@@ -299,7 +299,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			groupResource: "pods",
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "<from-annotation>",
 						HookSource: "annotation",
@@ -385,7 +385,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			expectedErrors: nil,
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -434,7 +434,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			expectedErrors: nil,
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -465,7 +465,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -496,7 +496,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -527,7 +527,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -568,7 +568,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				Result(),
 			expectedErrors: nil,
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -578,7 +578,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						},
 					},
 				},
-				"container2": []PodExecRestoreHook{
+				"container2": {
 					{
 						HookName:   "my-hook-1",
 						HookSource: "backupSpec",
@@ -871,7 +871,7 @@ func TestMaxHookWait(t *testing.T) {
 			name:   "should return 0 if all hooks are 0 or negative",
 			expect: 0,
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
 							ExecTimeout: metav1.Duration{time.Second},
@@ -890,7 +890,7 @@ func TestMaxHookWait(t *testing.T) {
 			name:   "should return biggest wait timeout from multiple hooks in multiple containers",
 			expect: time.Hour,
 			byContainer: map[string][]PodExecRestoreHook{
-				"container1": []PodExecRestoreHook{
+				"container1": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
 							WaitTimeout: metav1.Duration{time.Second},
@@ -902,7 +902,7 @@ func TestMaxHookWait(t *testing.T) {
 						},
 					},
 				},
-				"container2": []PodExecRestoreHook{
+				"container2": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
 							WaitTimeout: metav1.Duration{time.Hour},

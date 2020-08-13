@@ -1296,7 +1296,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 			ctx.log,
 		)
 		if err != nil {
-			ctx.log.WithError(err).Error("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
+			ctx.log.WithError(err).Errorf("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
 			ctx.hooksErrs <- err
 			return
 		}
