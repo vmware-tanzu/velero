@@ -717,19 +717,19 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 		expected         *velerov1api.ExecRestoreHook
 	}{
 		{
-			name:             "command is missing",
+			name:             "should return nil when command is missing",
 			inputAnnotations: nil,
 			expected:         nil,
 		},
 		{
-			name: "command is empty",
+			name: "should return nil when command is empty string",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: "",
 			},
 			expected: nil,
 		},
 		{
-			name: "command is a string",
+			name: "should return a hook when 1 item command is a string",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: "/usr/bin/foo",
 			},
@@ -738,7 +738,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "command is a json array",
+			name: "should return a multi-item hook when command is a json array",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: `["a","b","c"]`,
 			},
@@ -747,7 +747,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "error mode is continue",
+			name: "error mode continue should be in returned hook when set in annotation",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: "/usr/bin/foo",
 				podRestoreHookOnErrorAnnotationKey: string(velerov1api.HookErrorModeContinue),
@@ -758,7 +758,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "error mode is fail",
+			name: "error mode fail should be in returned hook when set in annotation",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: "/usr/bin/foo",
 				podRestoreHookOnErrorAnnotationKey: string(velerov1api.HookErrorModeFail),
@@ -769,7 +769,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "exec and wait timeouts are set",
+			name: "exec and wait timeouts should be in returned hook when set in annotations",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey:     "/usr/bin/foo",
 				podRestoreHookTimeoutAnnotationKey:     "45s",
@@ -782,7 +782,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "container is specified",
+			name: "container should be in returned hook when set in annotation",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey:   "/usr/bin/foo",
 				podRestoreHookContainerAnnotationKey: "my-app",
@@ -793,7 +793,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "bad exec timeout",
+			name: "bad exec timeout should be discarded",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey:   "/usr/bin/foo",
 				podRestoreHookContainerAnnotationKey: "my-app",
@@ -806,7 +806,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			},
 		},
 		{
-			name: "bad wait timeout",
+			name: "bad wait timeout should be discarded",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey:     "/usr/bin/foo",
 				podRestoreHookContainerAnnotationKey:   "my-app",
@@ -837,13 +837,13 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 		expected             map[string][]PodExecRestoreHook
 	}{
 		{
-			name:                 "no spec hooks, no annotation hook",
+			name:                 "should return empty map when neither spec hooks nor annotations hooks are set",
 			resourceRestoreHooks: nil,
 			pod:                  builder.ForPod("default", "my-pod").Result(),
 			expected:             map[string][]PodExecRestoreHook{},
 		},
 		{
-			name:                 "no spec hooks, annotation hook",
+			name:                 "should return hook from annotation when no spec hooks are set",
 			resourceRestoreHooks: nil,
 			pod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
@@ -874,7 +874,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 		},
 		{
-			name:                 "no spec hooks, annotation hook without container name",
+			name:                 "should default to first pod container when not set in annotation",
 			resourceRestoreHooks: nil,
 			pod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
@@ -904,7 +904,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "spec hooks, no annotation hook",
+			name: "should return hook from spec for pod with no hook annotations",
 			resourceRestoreHooks: []ResourceRestoreHook{
 				{
 					Name:     "hook1",
@@ -944,7 +944,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "spec hook without container name, no annotation hook",
+			name: "should default to first container pod when unset in spec hook",
 			resourceRestoreHooks: []ResourceRestoreHook{
 				{
 					Name:     "hook1",
@@ -983,7 +983,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "both spec and annotation hooks",
+			name: "should return hook from annotation ignoring hooks in spec",
 			resourceRestoreHooks: []ResourceRestoreHook{
 				{
 					Name:     "hook1",
@@ -1030,7 +1030,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "spec only has init hooks, no annotation hooks",
+			name: "should return empty map when only has init hook and pod has no hook annotations",
 			resourceRestoreHooks: []ResourceRestoreHook{
 				{
 					Name:     "hook1",
@@ -1050,7 +1050,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			expected: map[string][]PodExecRestoreHook{},
 		},
 		{
-			name: "spec has exec hook for pod in different namespace, no annotation hooks",
+			name: "should return empty map when spec has exec hook for pod in different namespace and pod has no hook annotations",
 			resourceRestoreHooks: []ResourceRestoreHook{
 				{
 					Name: "hook1",
@@ -1074,7 +1074,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 			expected: map[string][]PodExecRestoreHook{},
 		},
 		{
-			name: "multiple spec hooks for multiple containers, no annotation hook",
+			name: "should return map with multiple keys when spec hooks apply to multiple containers in pod and has no hook annotations",
 			resourceRestoreHooks: []ResourceRestoreHook{
 				{
 					Name:     "hook1",
@@ -1183,10 +1183,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		l := velerotest.NewLogger()
-		actual, err := GroupRestoreExecHooks(tc.resourceRestoreHooks, tc.pod, l)
-		assert.Nil(t, err)
-		assert.Equal(t, tc.expected, actual)
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := GroupRestoreExecHooks(tc.resourceRestoreHooks, tc.pod, velerotest.NewLogger())
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expected, actual)
+		})
 	}
 }
 

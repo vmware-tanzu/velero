@@ -71,7 +71,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 		sharedHooksContextTimeout time.Duration
 	}{
 		{
-			name: "annotation, executes successfully",
+			name: "should return no error when hook from annotation executes successfully",
 			initialPod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
 					podRestoreHookCommandAnnotationKey, "/usr/bin/foo",
@@ -140,7 +140,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			expectedErrors: nil,
 		},
 		{
-			name: "annotation, execution fails OnError mode Fail",
+			name: "should return an error when hook from annotation fails with on error mode fail",
 			initialPod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
 					podRestoreHookCommandAnnotationKey, "/usr/bin/foo",
@@ -209,7 +209,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			expectedErrors: []error{errors.New("pod hook error")},
 		},
 		{
-			name: "annotation, execution fails OnError mode Continue",
+			name: "should return no error when hook from annotation fails with on error mode continue",
 			initialPod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
 					podRestoreHookCommandAnnotationKey, "/usr/bin/foo",
@@ -278,7 +278,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			expectedErrors: nil,
 		},
 		{
-			name: "annotation, container starts running after 10ms then execution succeeds",
+			name: "should return no error when hook from annotation executes after 10ms wait for container to start",
 			initialPod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
 					podRestoreHookCommandAnnotationKey, "/usr/bin/foo",
@@ -370,7 +370,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			},
 		},
 		{
-			name:          "spec hook, container ready immediately, execution succeeds",
+			name:          "should return no error when hook from spec executes successfully",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
@@ -419,7 +419,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			},
 		},
 		{
-			name:          "spec hook wait timeout expires with OnError mode Continue",
+			name:          "should return no error when spec hook with wait timeout expires with OnError mode Continue",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
@@ -450,7 +450,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			expectedExecutions: []expectedExecution{},
 		},
 		{
-			name:          "spec hook wait timeout expires with OnError mode Fail",
+			name:          "should return an error when spec hook with wait timeout expires with OnError mode Fail",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
@@ -481,7 +481,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			expectedExecutions: []expectedExecution{},
 		},
 		{
-			name:          "shared hooks context canceled before spec hook with OnError mode Continue executes",
+			name:          "should return an error when shared hooks context is canceled before spec hook with OnError mode Fail executes",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
@@ -512,8 +512,9 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			sharedHooksContextTimeout: time.Millisecond,
 		},
 		{
-			name:          "shared hooks context canceled before spec hook with OnError mode Fail executes",
-			groupResource: "pods",
+			name:           "should return no error when shared hooks context is canceled before spec hook with OnError mode Continue executes",
+			expectedErrors: nil,
+			groupResource:  "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
 					Name: "container1",
@@ -525,7 +526,6 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
 			byContainer: map[string][]PodExecRestoreHook{
 				"container1": []PodExecRestoreHook{
 					{
@@ -534,7 +534,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Hook: velerov1api.ExecRestoreHook{
 							Container: "container1",
 							Command:   []string{"/usr/bin/foo"},
-							OnError:   velerov1api.HookErrorModeFail,
+							OnError:   velerov1api.HookErrorModeContinue,
 						},
 					},
 				},
@@ -543,7 +543,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			sharedHooksContextTimeout: time.Millisecond,
 		},
 		{
-			name:          "2 spec hooks, 2 different containers, 1st container starts running after 10ms, 2nd container after 20ms, both succeed",
+			name:          "shoudl return no error with 2 spec hooks in 2 different containers, 1st container starts running after 10ms, 2nd container after 20ms, both succeed",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
