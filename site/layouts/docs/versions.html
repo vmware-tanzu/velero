@@ -1,0 +1,23 @@
+<div class="row">
+    <div class="dropdown mb-2">
+        {{ if $.Site.Params.versioning }}
+            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown"
+                    aria-haspopup="true" aria-expanded="false">
+                {{ .CurrentSection.Params.version }}
+            </button>
+            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                {{ $original_version := printf "/%s/" .CurrentSection.Params.version }}
+                {{ $latest_url := replace .Params.url .CurrentSection.Params.version .Site.Params.latest | relURL }}
+                {{ $currentUrl := .Permalink }}
+
+                {{ range .Site.Params.versions }}
+                    {{ $new_version := printf "/%s/" . }}
+                    <a class="dropdown-item"
+                       href="{{ replace $currentUrl $original_version $new_version | relURL }}">{{ . }}</a>
+                {{ end }}
+            </div>
+        {{ else }}
+            <span>{{ .Site.Params.latest }}</span>
+        {{ end }}
+    </div>
+</div>

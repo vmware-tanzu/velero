@@ -1,0 +1,42 @@
+{{ define "main" }}
+  <div class="post-single-hero bg-color-{{ $.Site.Params.hero.backgroundColor }}">
+    <div class="section">
+      <div class="section-content">
+        <h1>{{ .Title }}</h1>
+      </div>
+    </div>
+  </div>
+  <div class="post-single-body">
+    <div class="section section-card">
+      <div class="section-content pt-4 pb-0">
+        <div class="post-single-meta">
+          <div class="post-single-meta-author">
+            {{ if .Params.author_avatar }}
+              <div class="post-single-meta-author-avatar">
+                <img src="{{ .Params.author_avatar }}" alt="{{ .Params.author_name }}">
+              </div>
+            {{ end }}
+
+            <div class="post-single-meta-author-name">
+              <a href="/tags/{{ .Params.author_name | urlize }}">{{ .Params.author_name }}</a>
+            </div>
+          </div>
+
+          <div class="post-single-meta-date">
+            {{ .Date.Format  "January 02, 2006" }}
+          </div>
+        </div>
+
+        <div class="post-single-content">
+          {{ .Content }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section pt-3">
+    <div class="section-content section-content-thin">
+      {{ partial "related-posts.html" . }}
+    </div>
+  </div>
+{{ end }}

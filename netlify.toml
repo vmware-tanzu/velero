@@ -1,10 +1,12 @@
 [build]
   base = "site/"
-  command = "jekyll build"
-  publish = "site/_site"
+  command = "hugo --gc --minify --baseURL $BASE_URL"
+  publish = "site/public"
 
-# Using the * -> :splat rule should redirect anything under master to the matching file under main
-[[redirects]]
-  from = "/docs/master/*"
-  to = "/docs/main/:splat"
+[context.production.environment]
+  HUGO_VERSION = "0.73.0"
+  BASE_URL = "https://velero.io"
 
+[context.deploy-preview.environment]
+  HUGO_VERSION = "0.73.0"
+  BASE_URL = "https://deploy-preview-2720--velero.netlify.app"

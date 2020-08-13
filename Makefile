@@ -36,6 +36,8 @@ BUILDER_IMAGE_TAG := $(shell git log -1 --pretty=%h hack/build-image/Dockerfile)
 BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
 BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 
+HUGO_IMAGE := hugo-builder
+
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
 # if it wasn't specified by the caller.
@@ -264,6 +266,9 @@ push-build-image:
 	@# credentials needed to accomplish this.
 	docker push $(BUILDER_IMAGE)
 
+build-image-hugo:
+	cd site && docker build --pull -t $(HUGO_IMAGE) .
+
 clean:
 # if we have a cached image then use it to run go clean --modcache
 # this test checks if we there is an image id in the BUILDER_IMAGE_CACHED variable.
@@ -272,6 +277,7 @@ ifneq ($(strip $(BUILDER_IMAGE_CACHED)),)
 	docker rmi -f $(BUILDER_IMAGE) || true
 endif
 	rm -rf .go _output
+	docker rmi $(HUGO_IMAGE)
 
 
 .PHONY: modules
@@ -314,14 +320,13 @@ release:
 		PUBLISH=$(PUBLISH) \
 		./hack/goreleaser.sh'"
 
-serve-docs:
+serve-docs: build-image-hugo
 	docker run \
 	--rm \
-	-v "$$(pwd)/site:/srv/jekyll" \
-	-it -p 4000:4000 \
-	jekyll/jekyll \
-	jekyll serve --livereload --incremental
-
+	-v "$$(pwd)/site:/srv/hugo" \
+	-it -p 1313:1313 \
+	$(HUGO_IMAGE) \
+	hugo server --bind=0.0.0.0 --enableGitInfo=false
 # gen-docs generates a new versioned docs directory under site/docs. It follows
 # the following process:
 #   1. Copies the contents of the most recently tagged docs directory into the new
@@ -333,7 +338,7 @@ serve-docs:
 #   4. Copies the previous version's ToC file and runs 'git add' to establish
 #      a useful baseline to diff against.
 #   5. Replaces the content of the new ToC file with the master ToC.
-#   6. Update site/_config.yml and site/_data/toc-mapping.yml to include entries
+#   6. Update site/config.yaml and site/_data/toc-mapping.yml to include entries
 #      for the new version.
 #
 # The unstaged changes in the working directory can now easily be diff'ed against the
