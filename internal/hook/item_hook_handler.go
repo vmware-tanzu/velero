@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -468,7 +467,7 @@ type NamedExecRestoreHook struct {
 // hooks from the restore resource are accumulated.
 func GroupRestoreExecHooks(
 	resourceRestoreHooks []ResourceRestoreHook,
-	pod *v1.Pod,
+	pod *corev1api.Pod,
 	log logrus.FieldLogger,
 ) (map[string][]NamedExecRestoreHook, error) {
 	byContainer := map[string][]NamedExecRestoreHook{}
