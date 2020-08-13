@@ -751,7 +751,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			name: "error mode is continue",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: "/usr/bin/foo",
-				podRestoreHookOnErrorAnnotationKey: "Continue",
+				podRestoreHookOnErrorAnnotationKey: string(velerov1api.HookErrorModeContinue),
 			},
 			expected: &velerov1api.ExecRestoreHook{
 				Command: []string{"/usr/bin/foo"},
@@ -762,7 +762,7 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 			name: "error mode is fail",
 			inputAnnotations: map[string]string{
 				podRestoreHookCommandAnnotationKey: "/usr/bin/foo",
-				podRestoreHookOnErrorAnnotationKey: "Fail",
+				podRestoreHookOnErrorAnnotationKey: string(velerov1api.HookErrorModeFail),
 			},
 			expected: &velerov1api.ExecRestoreHook{
 				Command: []string{"/usr/bin/foo"},
