@@ -463,7 +463,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
+			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			byContainer: map[string][]PodExecRestoreHook{
 				"container1": []PodExecRestoreHook{
 					{
@@ -494,7 +494,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
+			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			byContainer: map[string][]PodExecRestoreHook{
 				"container1": []PodExecRestoreHook{
 					{

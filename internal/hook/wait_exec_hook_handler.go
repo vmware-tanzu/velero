@@ -90,6 +90,8 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	// check if that hook has a timeout and skip execution if expired.
 	ctx, cancel := context.WithCancel(ctx)
 	maxWait := maxHookWait(byContainer)
+	// If no hook has a wait timeout then this function will continue waiting for containers to
+	// become ready until the shared hook context is canceled.
 	if maxWait > 0 {
 		ctx, cancel = context.WithTimeout(ctx, maxWait)
 	}
@@ -112,6 +114,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 
 		for containerName, hooks := range byContainer {
 			if !isContainerRunning(newPod, containerName) {
+				log.Infof("Container % in pod %s/%s is not running: post-restore hooks will not yet be executed", containerName, newPod.Namespace, newPod.Name)
 				continue
 			}
 			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newPod)
@@ -196,7 +199,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			if hook.executed {
 				continue
 			}
-			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed", hook.HookName, hook.Hook.Container, pod.Namespace, pod.Name)
+			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed: %v", hook.HookName, hook.Hook.Container, pod.Namespace, pod.Name, ctx.Err())
 			hookLog := log.WithFields(
 				logrus.Fields{
 					"hookSource": hook.HookSource,
