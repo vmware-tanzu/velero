@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package backup
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"strings"
@@ -99,6 +100,64 @@ func (r *itemCollector) getGroupItems(log logrus.FieldLogger, group *metav1.APIR
 	return items, nil
 }
 
+// sortResourcesByOrder sorts items by the names specified in "order".  Items are not in order will be put at the end in original order.
+func sortResourcesByOrder(log logrus.FieldLogger, items []*kubernetesResource, order []string) []*kubernetesResource {
+	if len(order) == 0 {
+		return items
+	}
+	log.Debugf("Sorting resources using the following order %v...", order)
+	itemMap := make(map[string]*kubernetesResource)
+	for _, item := range items {
+		var fullname string
+		if item.namespace != "" {
+			fullname = fmt.Sprintf("%s/%s", item.namespace, item.name)
+		} else {
+			fullname = item.name
+		}
+		itemMap[fullname] = item
+	}
+	var sortedItems []*kubernetesResource
+	// First select items from the order
+	for _, name := range order {
+		if item, ok := itemMap[name]; ok {
+			sortedItems = append(sortedItems, item)
+			log.Debugf("%s added to sorted resource list.", item.name)
+			delete(itemMap, name)
+		} else {
+			log.Warnf("Cannot find resource '%s'.", name)
+		}
+	}
+	// Now append the rest in sortedGroupItems, maintain the original order
+	for _, item := range items {
+		var fullname string
+		if item.namespace != "" {
+			fullname = fmt.Sprintf("%s/%s", item.namespace, item.name)
+		} else {
+			fullname = item.name
+		}
+		if _, ok := itemMap[fullname]; !ok {
+			//This item has been inserted in the result
+			continue
+		}
+		sortedItems = append(sortedItems, item)
+		log.Debugf("%s added to sorted resource list.", item.name)
+	}
+	return sortedItems
+}
+
+// getOrderedResourcesForType gets order of resourceType from orderResources.
+func getOrderedResourcesForType(log logrus.FieldLogger, orderedResources map[string]string, resourceType string) []string {
+	if orderedResources == nil {
+		return nil
+	}
+	orderStr, ok := orderedResources[resourceType]
+	if !ok || len(orderStr) == 0 {
+		return nil
+	}
+	orders := strings.Split(orderStr, ",")
+	return orders
+}
+
 // getResourceItems collects all relevant items for a given group-version-resource.
 func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.GroupVersion, resource metav1.APIResource) ([]*kubernetesResource, error) {
 	log = log.WithField("resource", resource.Name)
@@ -111,6 +170,7 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 		clusterScoped = !resource.Namespaced
 	)
 
+	orders := getOrderedResourcesForType(log, r.backupRequest.Backup.Spec.OrderedResources, resource.Name)
 	// Getting the preferred group version of this resource
 	preferredGVR, _, err := r.discoveryHelper.ResourceFor(gr.WithVersion(""))
 	if err != nil {
@@ -259,6 +319,9 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 				path:          path,
 			})
 		}
+	}
+	if len(orders) > 0 {
+		items = sortResourcesByOrder(r.log, items, orders)
 	}
 
 	return items, nil

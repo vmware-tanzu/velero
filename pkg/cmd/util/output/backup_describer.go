@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -215,6 +215,14 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 					d.Printf("\t\t\t\tTimeout:\t%s\n", hook.Exec.Timeout.Duration)
 				}
 			}
+		}
+	}
+
+	if spec.OrderedResources != nil {
+		d.Println()
+		d.Printf("OrderedResources:\n")
+		for key, value := range spec.OrderedResources {
+			d.Printf("\t%s: %s\n", key, value)
 		}
 	}
 

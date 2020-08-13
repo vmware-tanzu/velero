@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,9 @@ const testNamespace = "velero"
 func TestCreateOptions_BuildBackup(t *testing.T) {
 	o := NewCreateOptions()
 	o.Labels.Set("velero.io/test=true")
+	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
+	orders, err := parseOrderedResources(o.OrderedResources)
+	assert.NoError(t, err)
 
 	backup, err := o.BuildBackup(testNamespace)
 	assert.NoError(t, err)
@@ -42,11 +45,16 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 		IncludedNamespaces:      []string(o.IncludeNamespaces),
 		SnapshotVolumes:         o.SnapshotVolumes.Value,
 		IncludeClusterResources: o.IncludeClusterResources.Value,
+		OrderedResources:        orders,
 	}, backup.Spec)
 
 	assert.Equal(t, map[string]string{
 		"velero.io/test": "true",
 	}, backup.GetLabels())
+	assert.Equal(t, map[string]string{
+		"pods":                   "p1,p2",
+		"persistentvolumeclaims": "pvc1,pvc2",
+	}, backup.Spec.OrderedResources)
 }
 
 func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
@@ -86,4 +94,28 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 			"custom-label":                "true",
 		}, backup.GetLabels())
 	})
+}
+
+func TestCreateOptions_OrderedResources(t *testing.T) {
+	orderedResources, err := parseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
+	assert.NotNil(t, err)
+
+	orderedResources, err = parseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
+	assert.NoError(t, err)
+
+	expectedResources := map[string]string{
+		"pods":                   "ns1/p1,ns1/p2",
+		"persistentvolumeclaims": "ns2/pvc1,ns2/pvc2",
+	}
+	assert.Equal(t, orderedResources, expectedResources)
+
+	orderedResources, err = parseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumes=pv1,pv2")
+	assert.NoError(t, err)
+
+	expectedMixedResources := map[string]string{
+		"pods":              "ns1/p1,ns1/p2",
+		"persistentvolumes": "pv1,pv2",
+	}
+	assert.Equal(t, orderedResources, expectedMixedResources)
+
 }
