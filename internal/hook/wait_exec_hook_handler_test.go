@@ -64,7 +64,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 		// Used as argument to HandleHooks and first state added to ListerWatcher
 		initialPod                *v1.Pod
 		groupResource             string
-		byContainer               map[string][]NamedExecRestoreHook
+		byContainer               map[string][]PodExecRestoreHook
 		expectedExecutions        []expectedExecution
 		expectedErrors            []error
 		changes                   []change
@@ -91,11 +91,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			groupResource: "pods",
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -160,11 +160,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			groupResource: "pods",
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -229,11 +229,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			groupResource: "pods",
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -298,11 +298,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			groupResource: "pods",
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -384,11 +384,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			expectedErrors: nil,
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container: "container1",
 							Command:   []string{"/usr/bin/foo"},
@@ -433,11 +433,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			expectedErrors: nil,
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -464,11 +464,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -495,11 +495,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container: "container1",
 							Command:   []string{"/usr/bin/foo"},
@@ -526,11 +526,11 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container: "container1",
 							Command:   []string{"/usr/bin/foo"},
@@ -567,21 +567,21 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				}).
 				Result(),
 			expectedErrors: nil,
-			byContainer: map[string][]NamedExecRestoreHook{
-				"container1": []NamedExecRestoreHook{
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container: "container1",
 							Command:   []string{"/usr/bin/foo"},
 						},
 					},
 				},
-				"container2": []NamedExecRestoreHook{
+				"container2": []PodExecRestoreHook{
 					{
-						Name:   "my-hook-1",
-						Source: "backupSpec",
+						HookName:   "my-hook-1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container: "container2",
 							Command:   []string{"/usr/bin/bar"},

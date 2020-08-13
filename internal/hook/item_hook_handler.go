@@ -452,11 +452,11 @@ func getPodExecRestoreHookFromAnnotations(annotations map[string]string, log log
 	}
 }
 
-type NamedExecRestoreHook struct {
-	Name     string
-	Source   string
-	Hook     velerov1api.ExecRestoreHook
-	executed bool
+type PodExecRestoreHook struct {
+	HookName   string
+	HookSource string
+	Hook       velerov1api.ExecRestoreHook
+	executed   bool
 }
 
 // GroupRestoreExecHooks returns a list of hooks to be executed in a pod grouped by
@@ -466,8 +466,8 @@ func GroupRestoreExecHooks(
 	resourceRestoreHooks []ResourceRestoreHook,
 	pod *corev1api.Pod,
 	log logrus.FieldLogger,
-) (map[string][]NamedExecRestoreHook, error) {
-	byContainer := map[string][]NamedExecRestoreHook{}
+) (map[string][]PodExecRestoreHook, error) {
+	byContainer := map[string][]PodExecRestoreHook{}
 
 	if pod == nil || len(pod.Spec.Containers) == 0 {
 		return byContainer, nil
@@ -482,11 +482,11 @@ func GroupRestoreExecHooks(
 		if hookFromAnnotation.Container == "" {
 			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
 		}
-		byContainer[hookFromAnnotation.Container] = []NamedExecRestoreHook{
+		byContainer[hookFromAnnotation.Container] = []PodExecRestoreHook{
 			{
-				Name:   "<from-annotation>",
-				Source: "annotation",
-				Hook:   *hookFromAnnotation,
+				HookName:   "<from-annotation>",
+				HookSource: "annotation",
+				Hook:       *hookFromAnnotation,
 			},
 		}
 		return byContainer, nil
@@ -503,10 +503,10 @@ func GroupRestoreExecHooks(
 			if rh.Exec == nil {
 				continue
 			}
-			named := NamedExecRestoreHook{
-				Name:   rrh.Name,
-				Hook:   *rh.Exec,
-				Source: "backupSpec",
+			named := PodExecRestoreHook{
+				HookName:   rrh.Name,
+				Hook:       *rh.Exec,
+				HookSource: "backupSpec",
 			}
 			// default to first container in pod if unset, without mutating resource restore hook
 			if named.Hook.Container == "" {

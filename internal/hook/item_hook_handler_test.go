@@ -834,13 +834,13 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 		name                 string
 		resourceRestoreHooks []ResourceRestoreHook
 		pod                  *corev1api.Pod
-		expected             map[string][]NamedExecRestoreHook
+		expected             map[string][]PodExecRestoreHook
 	}{
 		{
 			name:                 "no spec hooks, no annotation hook",
 			resourceRestoreHooks: nil,
 			pod:                  builder.ForPod("default", "my-pod").Result(),
-			expected:             map[string][]NamedExecRestoreHook{},
+			expected:             map[string][]PodExecRestoreHook{},
 		},
 		{
 			name:                 "no spec hooks, annotation hook",
@@ -857,11 +857,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{
+			expected: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -887,11 +887,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{
+			expected: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -927,11 +927,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{
+			expected: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
-						Name:   "hook1",
-						Source: "backupSpec",
+						HookName:   "hook1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -966,11 +966,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{
+			expected: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
-						Name:   "hook1",
-						Source: "backupSpec",
+						HookName:   "hook1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -1013,11 +1013,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{
+			expected: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
-						Name:   "<from-annotation>",
-						Source: "annotation",
+						HookName:   "<from-annotation>",
+						HookSource: "annotation",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -1047,7 +1047,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{},
+			expected: map[string][]PodExecRestoreHook{},
 		},
 		{
 			name: "spec has exec hook for pod in different namespace, no annotation hooks",
@@ -1071,7 +1071,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 				},
 			},
 			pod:      builder.ForPod("default", "my-pod").Result(),
-			expected: map[string][]NamedExecRestoreHook{},
+			expected: map[string][]PodExecRestoreHook{},
 		},
 		{
 			name: "multiple spec hooks for multiple containers, no annotation hook",
@@ -1130,11 +1130,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					Name: "container1",
 				}).
 				Result(),
-			expected: map[string][]NamedExecRestoreHook{
+			expected: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
-						Name:   "hook1",
-						Source: "backupSpec",
+						HookName:   "hook1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
@@ -1144,8 +1144,8 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 						},
 					},
 					{
-						Name:   "hook1",
-						Source: "backupSpec",
+						HookName:   "hook1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/bar"},
@@ -1155,8 +1155,8 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 						},
 					},
 					{
-						Name:   "hook2",
-						Source: "backupSpec",
+						HookName:   "hook2",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container1",
 							Command:     []string{"/usr/bin/aaa"},
@@ -1168,8 +1168,8 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 				},
 				"container2": {
 					{
-						Name:   "hook1",
-						Source: "backupSpec",
+						HookName:   "hook1",
+						HookSource: "backupSpec",
 						Hook: velerov1api.ExecRestoreHook{
 							Container:   "container2",
 							Command:     []string{"/usr/bin/baz"},

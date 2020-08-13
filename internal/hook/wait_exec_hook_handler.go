@@ -36,7 +36,7 @@ type WaitExecHookHandler interface {
 		ctx context.Context,
 		log logrus.FieldLogger,
 		pod *v1.Pod,
-		byContainer map[string][]NamedExecRestoreHook,
+		byContainer map[string][]PodExecRestoreHook,
 	) []error
 }
 
@@ -65,7 +65,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	ctx context.Context,
 	log logrus.FieldLogger,
 	pod *v1.Pod,
-	byContainer map[string][]NamedExecRestoreHook,
+	byContainer map[string][]PodExecRestoreHook,
 ) []error {
 	if pod == nil {
 		return nil
@@ -142,14 +142,14 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 
 				hookLog := log.WithFields(
 					logrus.Fields{
-						"hookSource": hook.Source,
+						"hookSource": hook.HookSource,
 						"hookType":   "exec",
 						"hookPhase":  "post",
 					},
 				)
 				// Check the individual hook's wait timeout is not expired
 				if hook.Hook.WaitTimeout.Duration != 0 && time.Since(waitStart) > hook.Hook.WaitTimeout.Duration {
-					err := fmt.Errorf("Hook %s in container %s in pod %s/%s expired before executing", hook.Name, hook.Hook.Container, pod.Namespace, pod.Name)
+					err := fmt.Errorf("Hook %s in container %s in pod %s/%s expired before executing", hook.HookName, hook.Hook.Container, pod.Namespace, pod.Name)
 					hookLog.Error(err)
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						errors = append(errors, err)
@@ -163,7 +163,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					OnError:   hook.Hook.OnError,
 					Timeout:   hook.Hook.ExecTimeout,
 				}
-				if err := e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.Name, eh); err != nil {
+				if err := e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.HookName, eh); err != nil {
 					hookLog.WithError(err).Error("Error executing hook")
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						errors = append(errors, err)
@@ -206,10 +206,10 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			if hook.executed {
 				continue
 			}
-			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed", hook.Name, hook.Hook.Container, pod.Namespace, pod.Name)
+			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed", hook.HookName, hook.Hook.Container, pod.Namespace, pod.Name)
 			hookLog := log.WithFields(
 				logrus.Fields{
-					"hookSource": hook.Source,
+					"hookSource": hook.HookSource,
 					"hookType":   "exec",
 					"hookPhase":  "post",
 				},
