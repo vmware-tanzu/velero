@@ -27,10 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
@@ -66,9 +64,9 @@ func TestWaitExecHandleHooks(t *testing.T) {
 		// Used as argument to HandleHooks and first state added to ListerWatcher
 		initialPod                *v1.Pod
 		groupResource             string
-		resourceRestoreHooks      []ResourceRestoreHook
+		byContainer               map[string][]NamedExecRestoreHook
 		expectedExecutions        []expectedExecution
-		expectedError             error
+		expectedErrors            []error
 		changes                   []change
 		sharedHooksContextTimeout time.Duration
 	}{
@@ -92,8 +90,22 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			groupResource:        "pods",
-			resourceRestoreHooks: nil,
+			groupResource: "pods",
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "<from-annotation>",
+						Source: "annotation",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
 			expectedExecutions: []expectedExecution{
 				{
 					name: "<from-annotation>",
@@ -125,7 +137,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Result(),
 				},
 			},
-			expectedError: nil,
+			expectedErrors: nil,
 		},
 		{
 			name: "annotation, execution fails OnError mode Fail",
@@ -147,8 +159,22 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			groupResource:        "pods",
-			resourceRestoreHooks: nil,
+			groupResource: "pods",
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "<from-annotation>",
+						Source: "annotation",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeFail,
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
 			expectedExecutions: []expectedExecution{
 				{
 					name: "<from-annotation>",
@@ -180,7 +206,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Result(),
 				},
 			},
-			expectedError: errors.New("pod hook error"),
+			expectedErrors: []error{errors.New("pod hook error")},
 		},
 		{
 			name: "annotation, execution fails OnError mode Continue",
@@ -202,8 +228,22 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			groupResource:        "pods",
-			resourceRestoreHooks: nil,
+			groupResource: "pods",
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "<from-annotation>",
+						Source: "annotation",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
 			expectedExecutions: []expectedExecution{
 				{
 					name: "<from-annotation>",
@@ -235,7 +275,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Result(),
 				},
 			},
-			expectedError: nil,
+			expectedErrors: nil,
 		},
 		{
 			name: "annotation, container starts running after 10ms then execution succeeds",
@@ -257,8 +297,22 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			groupResource:        "pods",
-			resourceRestoreHooks: nil,
+			groupResource: "pods",
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "<from-annotation>",
+						Source: "annotation",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
 			expectedExecutions: []expectedExecution{
 				{
 					name: "<from-annotation>",
@@ -290,7 +344,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Result(),
 				},
 			},
-			expectedError: nil,
+			expectedErrors: nil,
 			changes: []change{
 				{
 					wait: 10 * time.Millisecond,
@@ -329,16 +383,15 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedError: nil,
-			resourceRestoreHooks: []ResourceRestoreHook{
-				{
-					Name: "my-hook-1",
-					RestoreHooks: []velerov1api.RestoreResourceHook{
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container: "container1",
-								Command:   []string{"/usr/bin/foo"},
-							},
+			expectedErrors: nil,
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container: "container1",
+							Command:   []string{"/usr/bin/foo"},
 						},
 					},
 				},
@@ -379,18 +432,17 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedError: nil,
-			resourceRestoreHooks: []ResourceRestoreHook{
-				{
-					Name: "my-hook-1",
-					RestoreHooks: []velerov1api.RestoreResourceHook{
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container:   "container1",
-								Command:     []string{"/usr/bin/foo"},
-								OnError:     velerov1api.HookErrorModeContinue,
-								WaitTimeout: metav1.Duration{time.Millisecond},
-							},
+			expectedErrors: nil,
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							WaitTimeout: metav1.Duration{time.Millisecond},
 						},
 					},
 				},
@@ -411,18 +463,17 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedError: errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed"),
-			resourceRestoreHooks: []ResourceRestoreHook{
-				{
-					Name: "my-hook-1",
-					RestoreHooks: []velerov1api.RestoreResourceHook{
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container:   "container1",
-								Command:     []string{"/usr/bin/foo"},
-								OnError:     velerov1api.HookErrorModeFail,
-								WaitTimeout: metav1.Duration{time.Millisecond},
-							},
+			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeFail,
+							WaitTimeout: metav1.Duration{time.Millisecond},
 						},
 					},
 				},
@@ -443,17 +494,16 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedError: errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed"),
-			resourceRestoreHooks: []ResourceRestoreHook{
-				{
-					Name: "my-hook-1",
-					RestoreHooks: []velerov1api.RestoreResourceHook{
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container: "container1",
-								Command:   []string{"/usr/bin/foo"},
-								OnError:   velerov1api.HookErrorModeFail,
-							},
+			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container: "container1",
+							Command:   []string{"/usr/bin/foo"},
+							OnError:   velerov1api.HookErrorModeFail,
 						},
 					},
 				},
@@ -475,17 +525,16 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedError: errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed"),
-			resourceRestoreHooks: []ResourceRestoreHook{
-				{
-					Name: "my-hook-1",
-					RestoreHooks: []velerov1api.RestoreResourceHook{
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container: "container1",
-								Command:   []string{"/usr/bin/foo"},
-								OnError:   velerov1api.HookErrorModeFail,
-							},
+			expectedErrors: []error{errors.New("Hook my-hook-1 in container container1 in pod default/my-pod not executed")},
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container: "container1",
+							Command:   []string{"/usr/bin/foo"},
+							OnError:   velerov1api.HookErrorModeFail,
 						},
 					},
 				},
@@ -517,22 +566,25 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedError: nil,
-			resourceRestoreHooks: []ResourceRestoreHook{
-				{
-					Name: "my-hook-1",
-					RestoreHooks: []velerov1api.RestoreResourceHook{
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container: "container1",
-								Command:   []string{"/usr/bin/foo"},
-							},
+			expectedErrors: nil,
+			byContainer: map[string][]NamedExecRestoreHook{
+				"container1": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container: "container1",
+							Command:   []string{"/usr/bin/foo"},
 						},
-						{
-							Exec: &velerov1api.ExecRestoreHook{
-								Container: "container2",
-								Command:   []string{"/usr/bin/bar"},
-							},
+					},
+				},
+				"container2": []NamedExecRestoreHook{
+					{
+						Name:   "my-hook-1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container: "container2",
+							Command:   []string{"/usr/bin/bar"},
 						},
 					},
 				},
@@ -668,10 +720,9 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
-			h := &WaitExecHookHandler{
-				PodCommandExecutor:   podCommandExecutor,
-				ListWatchFactory:     &fakeListWatchFactory{source},
-				ResourceRestoreHooks: test.resourceRestoreHooks,
+			h := &DefaultWaitExecHookHandler{
+				PodCommandExecutor: podCommandExecutor,
+				ListWatchFactory:   &fakeListWatchFactory{source},
 			}
 
 			for _, e := range test.expectedExecutions {
@@ -685,18 +736,14 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				ctx, _ = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
 			}
 
-			groupResource := schema.ParseGroupResource(test.groupResource)
-			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.initialPod)
-			assert.Nil(t, err)
-			item := &unstructured.Unstructured{Object: obj}
-			err = h.HandleHooks(ctx, velerotest.NewLogger(), groupResource, item, nil, "post")
+			// TODO get the byContainer map or specify it in the unit tests
+			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer)
 
-			if test.expectedError != nil {
-				assert.EqualError(t, err, test.expectedError.Error())
-				return
+			// for i, ee := range test.expectedErrors {
+			require.Len(t, errs, len(test.expectedErrors))
+			for i, ee := range test.expectedErrors {
+				assert.EqualError(t, errs[i], ee.Error())
 			}
-
-			require.NoError(t, err)
 		})
 	}
 }

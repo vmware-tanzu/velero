@@ -17,7 +17,6 @@ limitations under the License.
 package hook
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -75,7 +74,6 @@ type ItemHookHandler interface {
 	// determine if there are any hooks relevant to the item, taking into account the hook spec's
 	// namespaces, resources, and label selector.
 	HandleHooks(
-		ctx context.Context,
 		log logrus.FieldLogger,
 		groupResource schema.GroupResource,
 		obj runtime.Unstructured,
@@ -171,7 +169,6 @@ type DefaultItemHookHandler struct {
 }
 
 func (h *DefaultItemHookHandler) HandleHooks(
-	ctx context.Context,
 	log logrus.FieldLogger,
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,

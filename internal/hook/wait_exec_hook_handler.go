@@ -25,14 +25,20 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 )
+
+type WaitExecHookHandler interface {
+	HandleHooks(
+		ctx context.Context,
+		log logrus.FieldLogger,
+		pod *v1.Pod,
+		byContainer map[string][]NamedExecRestoreHook,
+	) []error
+}
 
 type ListWatchFactory interface {
 	NewListWatch(namespace string, selector fields.Selector) cache.ListerWatcher
@@ -48,35 +54,21 @@ func (d *DefaultListWatchFactory) NewListWatch(namespace string, selector fields
 
 var _ ListWatchFactory = &DefaultListWatchFactory{}
 
-type WaitExecHookHandler struct {
-	ListWatchFactory     ListWatchFactory
-	PodCommandExecutor   podexec.PodCommandExecutor
-	ResourceRestoreHooks []ResourceRestoreHook
+type DefaultWaitExecHookHandler struct {
+	ListWatchFactory   ListWatchFactory
+	PodCommandExecutor podexec.PodCommandExecutor
 }
 
-var _ ItemHookHandler = &WaitExecHookHandler{}
+var _ WaitExecHookHandler = &DefaultWaitExecHookHandler{}
 
-func (e *WaitExecHookHandler) HandleHooks(
+func (e *DefaultWaitExecHookHandler) HandleHooks(
 	ctx context.Context,
 	log logrus.FieldLogger,
-	groupResource schema.GroupResource,
-	obj runtime.Unstructured,
-	resourceHooks []ResourceHook,
-	phase hookPhase,
-) error {
-	if groupResource != kuberesource.Pods {
+	pod *v1.Pod,
+	byContainer map[string][]NamedExecRestoreHook,
+) []error {
+	if pod == nil {
 		return nil
-	}
-	pod := new(v1.Pod)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pod); err != nil {
-		log.WithError(err).Error("error converting unstructured pod")
-		return err
-	}
-
-	byContainer, err := GroupRestoreExecHooks(e.ResourceRestoreHooks, pod, log)
-	if err != nil {
-		log.WithError(err).Error("get post-restore exec hooks for pod")
-		return err
 	}
 	if len(byContainer) == 0 {
 		return nil
@@ -229,7 +221,7 @@ func (e *WaitExecHookHandler) HandleHooks(
 		}
 	}
 
-	return kubeerrs.NewAggregate(errors)
+	return errors
 }
 
 func podHasContainer(pod *v1.Pod, containerName string) bool {

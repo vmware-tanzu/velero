@@ -17,7 +17,6 @@ limitations under the License.
 package hook
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -128,7 +127,7 @@ func TestHandleHooksSkips(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.HandleHooks(context.Background(), velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre)
+			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre)
 			assert.NoError(t, err)
 		})
 	}
@@ -495,7 +494,7 @@ func TestHandleHooks(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.HandleHooks(context.Background(), velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
+			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
