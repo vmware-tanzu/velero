@@ -318,6 +318,16 @@ spec:
                         are ANDed.
                       type: object
                   type: object
+                orderedResources:
+                  additionalProperties:
+                    type: string
+                  description: OrderedResources specifies the backup order of resources
+                    of specific Kind. The map key is the Kind name and value is a
+                    list of resource names separeted by commas. Each resource name
+                    has format "namespace/resourcename".  For cluster resources, simply
+                    use "resourcename".
+                  nullable: true
+                  type: object
                 snapshotVolumes:
                   description: SnapshotVolumes specifies whether to take cloud snapshots
                     of any PV's referenced in the set of objects included in the Backup.

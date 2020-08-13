@@ -19,6 +19,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,6 +97,7 @@ type CreateOptions struct {
 	StorageLocation         string
 	SnapshotLocations       []string
 	FromSchedule            string
+	OrderedResources        string
 
 	client veleroclient.Interface
 }
@@ -120,6 +122,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
+	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
@@ -281,6 +284,28 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	return nil
 }
 
+// parseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
+// Resource names in the list are in format 'namespace/resourcename' and separated by commas.
+// Key-value pairs in the mapping are separated by semi-colon.
+// Ex: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.
+func parseOrderedResources(orderMapStr string) (map[string]string, error) {
+	entries := strings.Split(orderMapStr, ";")
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("Invalid OrderedResources '%s'.", orderMapStr)
+	}
+	orderedResources := make(map[string]string)
+	for _, entry := range entries {
+		kv := strings.Split(entry, "=")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("Invalid OrderedResources '%s'.", entry)
+		}
+		kind := strings.TrimSpace(kv[0])
+		order := strings.TrimSpace(kv[1])
+		orderedResources[kind] = order
+	}
+	return orderedResources, nil
+}
+
 func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, error) {
 	var backupBuilder *builder.BackupBuilder
 
@@ -304,6 +329,13 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...)
+		if len(o.OrderedResources) > 0 {
+			orders, err := parseOrderedResources(o.OrderedResources)
+			if err != nil {
+				return nil, err
+			}
+			backupBuilder.OrderedResources(orders)
+		}
 
 		if o.SnapshotVolumes.Value != nil {
 			backupBuilder.SnapshotVolumes(*o.SnapshotVolumes.Value)

@@ -252,6 +252,13 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.OrderedResources != nil {
+		in, out := &in.OrderedResources, &out.OrderedResources
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

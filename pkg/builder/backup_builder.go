@@ -181,3 +181,9 @@ func (b *BackupBuilder) Hooks(hooks velerov1api.BackupHooks) *BackupBuilder {
 	b.object.Spec.Hooks = hooks
 	return b
 }
+
+// OrderedResources sets the Backup's OrderedResources
+func (b *BackupBuilder) OrderedResources(orders map[string]string) *BackupBuilder {
+	b.object.Spec.OrderedResources = orders
+	return b
+}
