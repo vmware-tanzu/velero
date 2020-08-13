@@ -1,0 +1,32 @@
+<div class="row">
+  <div class="col">
+    <h2 class="mb-2">The {{ .Site.Title }} Team</h2>
+  </div>
+</div>
+<div class="row">
+  <div class="col">
+    <p>{{ .Site.Title }} is released as open source software and provides community support through our GitHub
+      project page.
+      If you encounter an issue or have a question, feel free to reach out on the <strong><a
+                href="{{ .Site.Params.Gh_repo }}/issues" class="light">GitHub issues page
+          for {{ .Site.Title }}</a></strong>.</p>
+    <p>The Velero project team welcomes contributions from the community, please see our <strong><a
+                href="https://velero.io/docs/master/start-contributing/" class="light">contributing
+          documentation</a></strong>.
+    </p>
+  </div>
+</div>
+<div class="row thumbnail-grid mt-5">
+  {{ $contributors := .Site.GetPage "/contributors" }}
+  {{ range $contributors.Resources }}
+    <div class="col-xs-12 col-sm-6 col-md-4">
+      <div class="media thumbnail-item">
+        <img src="{{ .Params.image }}" class="rounded-circle" alt="Person"/>
+        <div class="media-body align-self-center">
+          <h6><a href="https://github.com/{{ .Params.github_handle }}">{{ .Params.first_name }} {{ .Params.last_name }}</a></h6>
+          {{ .Content }}
+        </div>
+      </div>
+    </div>
+  {{ end }}
+</div>

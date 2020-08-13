@@ -1,0 +1,17 @@
+{{ define "main" }}
+    <div class="post-single-hero bg-color-{{ $.Site.Params.hero.backgroundColor }}">
+        <div class="section">
+            <div class="section-content">
+                <h1>Posts by {{ .Title }}</h1>
+            </div>
+        </div>
+    </div>
+    <div class="post-single-body">
+        <div class="section section-card">
+            <div class="section-content pt-4 pb-0">
+                {{ .Scratch.Set "posts" .Pages }}
+                {{ partial "blog-posts.html" . }}
+            </div>
+        </div>
+    </div>
+{{ end }}

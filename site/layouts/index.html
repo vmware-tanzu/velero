@@ -1,0 +1,132 @@
+{{ define "main" }}
+  <div class="home-hero bg-color-{{ $.Site.Params.hero.backgroundColor }}"
+       style="background-image: url('{{ $.Param "hero.banner" }}')">
+    <div class="section">
+      <div class="section-content">
+        <div class="hero-content">
+          <h1 class="mb-3">{{ $.Param "hero.headline" }}</h1>
+          <p>{{ $.Param "hero.content" }}</p>
+        </div>
+        <div class="hero-cta mt-4">
+          <a href="{{ $.Param "hero.cta_link1.url" }}"
+             class="btn btn-primary mb-3 mb-sm-0">{{ $.Param "hero.cta_link1.text" }}</a>
+          <a href="{{ $.Param "hero.cta_link2.url" }}"
+             class="btn btn-outline-light">{{ $.Param "hero.cta_link2.text" }}</a>
+        </div>
+      </div>
+    </div>
+  </div> <!-- /home-hero -->
+  <div class="section section-card section-card-offset-top promo-cards">
+    <div class="section-content">
+      <div class="row">
+        <div class="col-md">
+          <div class="card card-light mb-3 mb-md-0 shadow-sm">
+            <div class="card-body match-height">
+              <figure>
+                <img src="{{ $.Param "hero.promo1.icon" }}" alt="{{ $.Param "hero.promo1.title" }}"/>
+              </figure>
+              {{ if $.Param "hero.promo1.url" }}
+                <h5>
+                  <a href="{{ $.Param "hero.promo1.url" }}"
+                     class="dark">{{ $.Param "hero.promo1.title" }}</a>
+                </h5>
+              {{ else }}
+                <h5>{{ $.Param "hero.promo1.title" }}</h5>
+              {{ end }}
+              <p>{{ $.Param "hero.promo1.content" }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md">
+          <div class="card card-light mb-3 mb-md-0 shadow-sm">
+            <div class="card-body match-height">
+              <figure>
+                <img src="{{ $.Param "hero.promo2.icon" }}" alt="{{ $.Param "hero.promo2.title" }}"/>
+              </figure>
+              {{ if $.Param "hero.promo2.url" }}
+                <h5>
+                  <a href="{{ $.Param "hero.promo2.url" }}"
+                     class="dark">{{ $.Param "hero.promo2.title" }}</a>
+                </h5>
+              {{ else }}
+                <h5>{{ $.Param "hero.promo2.title" }}</h5>
+              {{ end }}
+              <p>{{ $.Param "hero.promo2.content" }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md">
+          <div class="card card-light mb-3 mb-md-0 shadow-sm">
+            <div class="card-body match-height">
+              <figure>
+                <img src="{{ $.Param "hero.promo3.icon" }}" alt="{{ $.Param "hero.promo3.title" }}"/>
+              </figure>
+              {{ if $.Param "hero.promo3.url" }}
+                <h5>
+                  <a href="{{ $.Param "hero.promo3.url" }}"
+                     class="dark">{{ $.Param "hero.promo3.title" }}</a>
+                </h5>
+              {{ else }}
+                <h5>{{ $.Param "hero.promo3.title" }}</h5>
+              {{ end }}
+              <p>{{ $.Param "hero.promo3.content" }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="section section-grey">
+    <div class="section-content">
+      <div class="row bg-grey">
+        <div class="col-sm-5 mb-3 mb-sm-0">
+          <h6 class="mb-1">
+            <a href="{{ $.Param "secondary_ctas.cta1.url" }}">{{ $.Param "secondary_ctas.cta1.title" }}</a>
+          </h6>
+          <p class="mb-0">{{ $.Param "secondary_ctas.cta1.content" }}</p>
+        </div>
+        <div class="col-sm-5 offset-sm-2">
+          <h6 class="mb-1">
+            <a href="{{ $.Param "secondary_ctas.cta2.url" }}">{{ $.Param "secondary_ctas.cta2.title" }}</a>
+          </h6>
+          <p class="mb-0">{{ $.Param "secondary_ctas.cta2.content" }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-content">
+      <div class="row">
+        <div class="col">
+          <h2>Features</h2>
+        </div>
+      </div>
+      {{ .Scratch.Set "limit" "3" }}
+      {{ partial "case-studies-alternating.html" . }}
+    </div>
+  </div>
+
+  <div class="section pt-3">
+    <div class="section-content">
+      <div class="row">
+        <div class="col">
+          <h2>Blog Highlights</h2>
+        </div>
+      </div>
+      {{ .Scratch.Set "posts" (first 3 (.Site.GetPage "/posts").Pages) }}
+      {{ partial "blog-posts.html" . }}
+      <div class="row pt-5">
+        <div class="col text-center">
+          <a href="/blog" class="btn btn-secondary btn-sm">See All Posts</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section section-background-{{ $.Param "backgrounds.team" }}">
+    <div class="section-content">
+      {{ partial "contributors.html" . }}
+    </div>
+  </div>
+{{ end }}

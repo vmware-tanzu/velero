@@ -1,0 +1,33 @@
+<div class="alternating-cards">
+  {{ $caseStudies := .Site.GetPage "/casestudies" }}
+  {{ $caseStudyBackground := .Params.backgrounds.case_study }}
+  {{ $limit := .Scratch.Get "limit" }}
+  {{ range $index, $page := sort (first $limit $caseStudies.Resources) "Name" "asc" }}
+    <div class="row no-gutters align-items-center">
+      {{ $iconClassName := "" }}
+      {{ $bodyClassName := "" }}
+
+      {{ if not (modBool $index 2) }}
+        {{ $iconClassName = "order-md-last" }}
+        {{ $bodyClassName = "order-md-first" }}
+      {{ end }}
+
+      {{ if .Params.icon }}
+        <div class="order-xs-first col-md-3 match-height icon bg-color-{{ $caseStudyBackground }} {{ $iconClassName }}">
+          <img src="/img/case-study-icons/{{ .Params.icon }}" alt="{{ .Title }}"/>
+        </div>
+      {{ end }}
+      <div class="order-xs-last col-md-9 {{ $bodyClassName }}">
+        <div class="card-body">
+          {{ if .Title }}
+            <h5 class="card-title">{{ .Title }}</h5>
+          {{ end }}
+          <p class="card-text">{{ .Content }}</p>
+          {{ range $key, $val := .Params.links }}
+            <a class="card-link btn btn-primary btn-sm" href="{{ $val  }}">{{ $key }}</a>
+          {{ end }}
+        </div>
+      </div>
+    </div>
+  {{ end }}
+</div>
