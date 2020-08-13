@@ -70,9 +70,6 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	if pod == nil {
 		return nil
 	}
-	if len(byContainer) == 0 {
-		return nil
-	}
 
 	// If hooks are defined for a container that does not exist in the pod log a warning and discard
 	// those hooks to avoid waiting for a container that will never become ready. After that if
@@ -92,14 +89,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	// the pod and watch the pod for up to that long. Before executing any hook in a container,
 	// check if that hook has a timeout and skip execution if expired.
 	ctx, cancel := context.WithCancel(ctx)
-	var maxWait time.Duration
-	for _, hooks := range byContainer {
-		for _, hook := range hooks {
-			if hook.Hook.WaitTimeout.Duration > maxWait {
-				maxWait = hook.Hook.WaitTimeout.Duration
-			}
-		}
-	}
+	maxWait := maxHookWait(byContainer)
 	if maxWait > 0 {
 		ctx, cancel = context.WithTimeout(ctx, maxWait)
 	}
@@ -249,4 +239,16 @@ func isContainerRunning(pod *v1.Pod, containerName string) bool {
 	}
 
 	return false
+}
+
+func maxHookWait(byContainer map[string][]PodExecRestoreHook) time.Duration {
+	var maxWait time.Duration
+	for _, hooks := range byContainer {
+		for _, hook := range hooks {
+			if hook.Hook.WaitTimeout.Duration > maxWait {
+				maxWait = hook.Hook.WaitTimeout.Duration
+			}
+		}
+	}
+	return maxWait
 }

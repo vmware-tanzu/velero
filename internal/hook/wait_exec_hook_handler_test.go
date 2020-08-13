@@ -792,7 +792,7 @@ func TestIsContainerRunning(t *testing.T) {
 		expect    bool
 	}{
 		{
-			name:      "running",
+			name:      "should return true when running",
 			container: "container1",
 			expect:    true,
 			pod: builder.ForPod("default", "my-pod").
@@ -805,7 +805,7 @@ func TestIsContainerRunning(t *testing.T) {
 				Result(),
 		},
 		{
-			name:      "no state",
+			name:      "should return false when no state is set",
 			container: "container1",
 			expect:    false,
 			pod: builder.ForPod("default", "my-pod").
@@ -816,7 +816,7 @@ func TestIsContainerRunning(t *testing.T) {
 				Result(),
 		},
 		{
-			name:      "waiting",
+			name:      "should return false when waiting",
 			container: "container1",
 			expect:    false,
 			pod: builder.ForPod("default", "my-pod").
@@ -829,7 +829,7 @@ func TestIsContainerRunning(t *testing.T) {
 				Result(),
 		},
 		{
-			name:      "running, first terminated",
+			name:      "should return true when running and first container is terminated",
 			container: "container1",
 			expect:    true,
 			pod: builder.ForPod("default", "my-pod").
@@ -851,6 +851,75 @@ func TestIsContainerRunning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := isContainerRunning(test.pod, test.container)
+			assert.Equal(t, actual, test.expect)
+		})
+	}
+}
+
+func TestMaxHookWait(t *testing.T) {
+	tests := []struct {
+		name        string
+		byContainer map[string][]PodExecRestoreHook
+		expect      time.Duration
+	}{
+		{
+			name:        "should return 0 for nil map",
+			byContainer: nil,
+			expect:      0,
+		},
+		{
+			name:   "should return 0 if all hooks are 0 or negative",
+			expect: 0,
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{0},
+						},
+					},
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							WaitTimeout: metav1.Duration{-1},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:   "should return biggest wait timeout from multiple hooks in multiple containers",
+			expect: time.Hour,
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": []PodExecRestoreHook{
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							WaitTimeout: metav1.Duration{time.Second},
+						},
+					},
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							WaitTimeout: metav1.Duration{time.Second},
+						},
+					},
+				},
+				"container2": []PodExecRestoreHook{
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							WaitTimeout: metav1.Duration{time.Hour},
+						},
+					},
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := maxHookWait(test.byContainer)
 			assert.Equal(t, actual, test.expect)
 		})
 	}
