@@ -792,6 +792,32 @@ func TestGetPodExecRestoreHookFromAnnotations(t *testing.T) {
 				Container: "my-app",
 			},
 		},
+		{
+			name: "bad exec timeout",
+			inputAnnotations: map[string]string{
+				podRestoreHookCommandAnnotationKey:   "/usr/bin/foo",
+				podRestoreHookContainerAnnotationKey: "my-app",
+				podRestoreHookTimeoutAnnotationKey:   "none",
+			},
+			expected: &velerov1api.ExecRestoreHook{
+				Command:     []string{"/usr/bin/foo"},
+				Container:   "my-app",
+				ExecTimeout: metav1.Duration{0},
+			},
+		},
+		{
+			name: "bad wait timeout",
+			inputAnnotations: map[string]string{
+				podRestoreHookCommandAnnotationKey:     "/usr/bin/foo",
+				podRestoreHookContainerAnnotationKey:   "my-app",
+				podRestoreHookWaitTimeoutAnnotationKey: "none",
+			},
+			expected: &velerov1api.ExecRestoreHook{
+				Command:     []string{"/usr/bin/foo"},
+				Container:   "my-app",
+				ExecTimeout: metav1.Duration{0},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

@@ -202,8 +202,7 @@ func (kr *kubernetesRestorer) Restore(
 	}
 	hooksCtx, hooksCancelFunc := go_context.WithCancel(go_context.Background())
 	waitExecHookHandler := &hook.DefaultWaitExecHookHandler{
-		PodCommandExecutor:   kr.podCommandExecutor,
-		ResourceRestoreHooks: resourceRestoreHooks,
+		PodCommandExecutor: kr.podCommandExecutor,
 		ListWatchFactory: &hook.DefaultListWatchFactory{
 			PodsGetter: kr.podGetter,
 		},
