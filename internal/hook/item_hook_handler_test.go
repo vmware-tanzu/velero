@@ -828,6 +828,39 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				Result(),
+			expected: map[string][]NamedExecRestoreHook{
+				"container1": {
+					{
+						Name:   "<from-annotation>",
+						Source: "annotation",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                 "no spec hooks, annotation hook without container name",
+			resourceRestoreHooks: nil,
+			pod: builder.ForPod("default", "my-pod").
+				ObjectMeta(builder.WithAnnotations(
+					podRestoreHookCommandAnnotationKey, "/usr/bin/foo",
+					podRestoreHookOnErrorAnnotationKey, string(velerov1api.HookErrorModeContinue),
+					podRestoreHookTimeoutAnnotationKey, "1s",
+					podRestoreHookWaitTimeoutAnnotationKey, "1m",
+				)).
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
 				Result(),
 			expected: map[string][]NamedExecRestoreHook{
 				"container1": {
@@ -864,7 +897,50 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					},
 				},
 			},
-			pod: builder.ForPod("default", "my-pod").Result(),
+			pod: builder.ForPod("default", "my-pod").
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				Result(),
+			expected: map[string][]NamedExecRestoreHook{
+				"container1": {
+					{
+						Name:   "hook1",
+						Source: "backupSpec",
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Minute},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "spec hook without container name, no annotation hook",
+			resourceRestoreHooks: []ResourceRestoreHook{
+				{
+					Name:     "hook1",
+					Selector: ResourceHookSelector{},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Exec: &velerov1api.ExecRestoreHook{
+								Command:     []string{"/usr/bin/foo"},
+								OnError:     velerov1api.HookErrorModeContinue,
+								ExecTimeout: metav1.Duration{time.Second},
+								WaitTimeout: metav1.Duration{time.Minute},
+							},
+						},
+					},
+				},
+			},
+			pod: builder.ForPod("default", "my-pod").
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				Result(),
 			expected: map[string][]NamedExecRestoreHook{
 				"container1": {
 					{
@@ -908,6 +984,9 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					podRestoreHookTimeoutAnnotationKey, "1s",
 					podRestoreHookWaitTimeoutAnnotationKey, "1m",
 				)).
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
 				Result(),
 			expected: map[string][]NamedExecRestoreHook{
 				"container1": {
@@ -938,7 +1017,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					},
 				},
 			},
-			pod:      builder.ForPod("default", "my-pod").Result(),
+			pod: builder.ForPod("default", "my-pod").
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				Result(),
 			expected: map[string][]NamedExecRestoreHook{},
 		},
 		{
@@ -1017,7 +1100,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 					},
 				},
 			},
-			pod: builder.ForPod("default", "my-pod").Result(),
+			pod: builder.ForPod("default", "my-pod").
+				Containers(&corev1api.Container{
+					Name: "container1",
+				}).
+				Result(),
 			expected: map[string][]NamedExecRestoreHook{
 				"container1": {
 					{

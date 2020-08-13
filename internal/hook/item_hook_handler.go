@@ -472,7 +472,7 @@ func GroupRestoreExecHooks(
 ) (map[string][]NamedExecRestoreHook, error) {
 	byContainer := map[string][]NamedExecRestoreHook{}
 
-	if pod == nil {
+	if pod == nil || len(pod.Spec.Containers) == 0 {
 		return byContainer, nil
 	}
 	metadata, err := meta.Accessor(pod)
@@ -481,6 +481,10 @@ func GroupRestoreExecHooks(
 	}
 	hookFromAnnotation := getPodExecRestoreHookFromAnnotations(metadata.GetAnnotations(), log)
 	if hookFromAnnotation != nil {
+		// default to first container in pod if unset
+		if hookFromAnnotation.Container == "" {
+			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
+		}
 		byContainer[hookFromAnnotation.Container] = []NamedExecRestoreHook{
 			{
 				Name:   "<from-annotation>",
@@ -506,6 +510,10 @@ func GroupRestoreExecHooks(
 				Name:   rrh.Name,
 				Hook:   *rh.Exec,
 				Source: "backupSpec",
+			}
+			// default to first container in pod if unset, without mutating resource restore hook
+			if named.Hook.Container == "" {
+				named.Hook.Container = pod.Spec.Containers[0].Name
 			}
 			byContainer[named.Hook.Container] = append(byContainer[named.Hook.Container], named)
 		}
