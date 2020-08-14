@@ -165,8 +165,11 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 }
 
 func (f *factory) KubebuilderManager() (manager.Manager, error) {
+	// ctx, cancelFunc := context.WithCancel(context.Background())
+
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
+		// cancelFunc()
 		fmt.Println("o noez")
 		return nil, err
 	}
@@ -177,15 +180,15 @@ func (f *factory) KubebuilderManager() (manager.Manager, error) {
 		Scheme: scheme,
 	})
 	if err != nil {
+		// cancelFunc()
 		fmt.Println("o crapolaz")
-
-		b := ctrl.NewControllerManagedBy(mgr)
-		// b.Watches(src source.Source, eventhandler handler.EventHandler, opts ...builder.WatchesOption)
-
-		fmt.Println(b)
 
 		return nil, err
 	}
+
+	// if err := mgr.Start(ctx.Done()); err != nil {
+	// 	return nil, err
+	// }
 
 	return mgr, nil
 }

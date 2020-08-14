@@ -51,7 +51,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			// client, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			fmt.Println("hererer2222")
+			fmt.Println("hererer2222-eeee")
 
 			// serverStatusList := new(velerov1api.ServerStatusRequestList)
 			// serverStatusList, err := velero.ListBackupStorageLocations(r.StorageLocation.Client, r.StorageLocation.Ctx, req.Namespace)

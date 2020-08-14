@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
 
-const statusRequestResyncPeriod = 5 * time.Minute
+// const statusRequestResyncPeriod = 5 * time.Minute
 
 // ServerStatusRequestReconciler reconciles a ServerStatusRequest object
 type ServerStatusRequestReconciler struct {
@@ -60,11 +59,11 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		if apierrors.IsNotFound(err) {
 			// server status request no longer exists
 			log.WithError(err).Debug("ServerStatusRequest not found")
-			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
+			return ctrl.Result{}, nil
 		}
 
 		// Error reading the object - requeue the request.
-		return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+		return ctrl.Result{}, err
 	}
 
 	log = r.Log.WithFields(logrus.Fields{
@@ -75,10 +74,11 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 	err := velero.Process(statusRequest.DeepCopy(), r.Client, r.PluginRegistry, r.Clock, log)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
+	// return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *ServerStatusRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
