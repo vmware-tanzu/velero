@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -55,50 +56,38 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 		return nil, errors.WithStack(err)
 	}
 
-	out := make(chan *velerov1api.ServerStatusRequest, 1)
+	out := make(chan interface{}, 1)
 	defer close(out)
 
 	addFunc := func(obj interface{}) {
 		fmt.Println("\n\ninside addFunc *** ")
-		var statusReq *velerov1api.ServerStatusRequest
-
-		defer func() {
-			out <- statusReq
-		}()
-
-		statusReq, ok := obj.(*velerov1api.ServerStatusRequest)
-		if !ok {
-			fmt.Printf("unexpected type %+v", obj)
-			return
-		}
-
-		fmt.Println("\n\nCREATED NEW")
+		out <- obj
 	}
 
 	updateFunc := func(_, newObj interface{}) {
-		var statusReq *velerov1api.ServerStatusRequest
-		defer func() {
-			out <- statusReq
-		}()
-
-		statusReq, ok := newObj.(*velerov1api.ServerStatusRequest)
-		if !ok {
-			fmt.Printf("unexpected type %+v", newObj)
-			return
-		}
-
-		fmt.Printf("\n\nUPDATED NEW %+v", statusReq)
+		fmt.Println("\n\ninside updateFunc ### ")
+		out <- newObj
 	}
 
 	reqInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    addFunc,
 		UpdateFunc: updateFunc,
 	})
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
 
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		fmt.Println(err, "unable to continue running manager")
-		os.Exit(1)
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+			fmt.Println(err, "unable to continue running manager")
+			cancel()
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
 
 	if err := mgr.GetClient().Create(context.TODO(), req, &kbclient.CreateOptions{}); err != nil {
 		return nil, errors.WithStack(err)
@@ -111,9 +100,19 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 Loop:
 	for {
 		select {
-		case statusReq := <-out:
-			fmt.Printf("\n\nss after but inside select: %+v", statusReq)
-			req = statusReq
+		case obj := <-out:
+			fmt.Printf("\n\nss after but inside select: %+v", obj)
+			statusRequest, ok := obj.(*velerov1api.ServerStatusRequest)
+
+			// statusReq, ok := obj.(*velerov1api.ServerStatusRequest)
+			if !ok {
+				fmt.Printf("unexpected type %+v", obj)
+				return nil, errors.New("unexpected type")
+			}
+
+			req = statusRequest
+			// fmt.Println("\n\nCREATED NEW")
+
 			break Loop
 		case <-expired.C:
 			fmt.Println("time out!!!!")
