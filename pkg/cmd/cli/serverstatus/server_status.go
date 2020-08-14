@@ -18,8 +18,6 @@ package serverstatus
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -27,7 +25,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -45,80 +42,61 @@ type DefaultServerStatusGetter struct {
 }
 
 func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*velerov1api.ServerStatusRequest, error) {
-	req := builder.ForServerStatusRequest(g.Namespace, "", "0").
-		ObjectMeta(
-			builder.WithGenerateName("velero-cli-"),
-		).Result()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	// create an informer for the target resource
-	reqInformer, err := mgr.GetCache().GetInformer(context.TODO(), req)
+	serverReq := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
+
+	informer, err := mgr.GetCache().GetInformer(ctx, serverReq)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	out := make(chan interface{}, 1)
-	defer close(out)
-
-	addFunc := func(obj interface{}) {
-		fmt.Println("\n\ninside addFunc *** ")
-		out <- obj
+	addResult := make(chan interface{}, 1)
+	addFunc := func(result interface{}) {
+		addResult <- result
 	}
-
-	updateFunc := func(_, newObj interface{}) {
-		fmt.Println("\n\ninside updateFunc ### ")
-		out <- newObj
-	}
-
-	reqInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    addFunc,
-		UpdateFunc: updateFunc,
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: addFunc,
 	})
-	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
 
+	stopMgr := make(chan struct{})
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
-
-		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-			fmt.Println(err, "unable to continue running manager")
-			cancel()
-			os.Exit(1)
+		defer func() {
+			wg.Done()
+		}()
+		if err := mgr.Start(stopMgr); err != nil {
+			addResult <- errors.New("manager didn't start")
 		}
 	}()
 
-	<-ctx.Done()
-
-	if err := mgr.GetClient().Create(context.TODO(), req, &kbclient.CreateOptions{}); err != nil {
+	if err := mgr.GetClient().Create(ctx, serverReq, &kbclient.CreateOptions{}); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	timeOut := 10 * time.Second
-	expired := time.NewTimer(timeOut)
-	defer expired.Stop()
-
-Loop:
-	for {
-		select {
-		case obj := <-out:
-			fmt.Printf("\n\nss after but inside select: %+v", obj)
-			statusRequest, ok := obj.(*velerov1api.ServerStatusRequest)
-
-			// statusReq, ok := obj.(*velerov1api.ServerStatusRequest)
-			if !ok {
-				fmt.Printf("unexpected type %+v", obj)
-				return nil, errors.New("unexpected type")
-			}
-
-			req = statusRequest
-			// fmt.Println("\n\nCREATED NEW")
-
-			break Loop
-		case <-expired.C:
-			fmt.Println("time out!!!!")
-			return nil, errors.New("timed out waiting for server status request to be processed")
-		}
+	var result interface{}
+	select {
+	case result = <-addResult:
+	case <-ctx.Done():
 	}
 
-	return req, nil
+	// Terminate the manger goroutine and wait for it to respond
+	// that it has terminated.
+	close(stopMgr)
+	wg.Wait()
+
+	if result == nil {
+		return nil, errors.New("timed out")
+	}
+
+	switch req := result.(type) {
+	case *velerov1api.ServerStatusRequest:
+		return req, nil
+	case error:
+		return nil, err
+	default:
+		return nil, errors.New("unknown response")
+	}
 }
