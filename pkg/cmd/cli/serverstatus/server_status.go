@@ -19,12 +19,14 @@ package serverstatus
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/tools/cache"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -55,15 +57,29 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 
 	out := make(chan *velerov1api.ServerStatusRequest, 1)
 	defer close(out)
+
+	addFunc := func(obj interface{}) {
+		fmt.Println("\n\ninside addFunc *** ")
+		var statusReq *velerov1api.ServerStatusRequest
+
+		defer func() {
+			out <- statusReq
+		}()
+
+		statusReq, ok := obj.(*velerov1api.ServerStatusRequest)
+		if !ok {
+			fmt.Printf("unexpected type %+v", obj)
+			return
+		}
+
+		fmt.Println("\n\nCREATED NEW")
+	}
+
 	updateFunc := func(_, newObj interface{}) {
 		var statusReq *velerov1api.ServerStatusRequest
 		defer func() {
 			out <- statusReq
 		}()
-
-		// inside the updateFunc, once the resource has the terminal state you're looking for, send that object to a channel
-		// (create that channel before you create the informer,
-		// and receive from the channel after the informer has been configured and you want to use the value)
 
 		statusReq, ok := newObj.(*velerov1api.ServerStatusRequest)
 		if !ok {
@@ -72,17 +88,17 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 		}
 
 		fmt.Printf("\n\nUPDATED NEW %+v", statusReq)
-
-		// if statusReq.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed {
-		// req = statusReq
-		// }
 	}
 
-	fmt.Printf("ss before: %+v\n\n", req)
-
 	reqInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    addFunc,
 		UpdateFunc: updateFunc,
 	})
+
+	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+		fmt.Println(err, "unable to continue running manager")
+		os.Exit(1)
+	}
 
 	if err := mgr.GetClient().Create(context.TODO(), req, &kbclient.CreateOptions{}); err != nil {
 		return nil, errors.WithStack(err)
@@ -104,8 +120,6 @@ Loop:
 			return nil, errors.New("timed out waiting for server status request to be processed")
 		}
 	}
-
-	fmt.Printf("\n\nss after: %+v", req)
 
 	return req, nil
 }
