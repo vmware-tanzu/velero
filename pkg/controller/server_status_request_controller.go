@@ -74,6 +74,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 
 	err := velero.Process(statusRequest.DeepCopy(), r.Client, r.PluginRegistry, r.Clock, log)
 	if err != nil {
+		log.WithError(err).Error("Unable to process the request")
 		return ctrl.Result{}, err
 	}
 

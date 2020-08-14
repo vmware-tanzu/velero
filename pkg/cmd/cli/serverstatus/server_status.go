@@ -22,14 +22,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -93,7 +88,6 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 		return nil, errors.WithStack(err)
 	}
 
-	// HOLD HERE
 	timeOut := 10 * time.Second
 	expired := time.NewTimer(timeOut)
 	defer expired.Stop()
@@ -114,56 +108,4 @@ Loop:
 	fmt.Printf("\n\nss after: %+v", req)
 
 	return req, nil
-}
-
-type ServerStatusRequest2Reconciler struct {
-	scheme *runtime.Scheme
-	Client kbclient.Client
-}
-
-func (r *ServerStatusRequest2Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	fmt.Println("inside reconciler")
-	return ctrl.Result{}, nil
-}
-
-func thisone(mgr manager.Manager) error {
-	fmt.Println("inside thisone")
-
-	c, err := controller.New("serverstatusrequest", mgr,
-		controller.Options{Reconciler: &ServerStatusRequest2Reconciler{
-			Client: mgr.GetClient(),
-			scheme: mgr.GetScheme(),
-		}})
-	if err != nil {
-		fmt.Println("Failed creating controller")
-		return err
-	}
-
-	// Watch for changes to ServerStatusRequest
-	// err = c.Watch(
-	// 	&source.Kind{Type: &velerov1api.ServerStatusRequest{}},
-	// 	&handler.EnqueueRequestForObject{})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// Watch for changes to Deployments created by a ServerStatusRequest and trigger a Reconcile for the owner
-	err = c.Watch(
-		&source.Kind{Type: &velerov1api.ServerStatusRequest{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &velerov1api.ServerStatusRequest{},
-		})
-	if err != nil {
-		fmt.Println("Failed adding the watch")
-		return err
-	}
-
-	return nil
-}
-
-func (r *ServerStatusRequest2Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&velerov1api.ServerStatusRequest{}).
-		Complete(r)
 }

@@ -43,7 +43,7 @@ type PluginLister interface {
 func Process(statusRequest *velerov1api.ServerStatusRequest, kbClient client.Client, pluginLister PluginLister, clock clock.Clock, log logrus.FieldLogger) error {
 	switch statusRequest.Status.Phase {
 	case "", velerov1api.ServerStatusRequestPhaseNew:
-		log.Info("Processing new zzzzz ServerStatusRequest")
+		log.Info("Processing new wwww ServerStatusRequest")
 		err := patch(kbClient, statusRequest, func(statusRequest *velerov1api.ServerStatusRequest) {
 			statusRequest.Status.ServerVersion = buildinfo.Version
 			statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}
@@ -51,7 +51,6 @@ func Process(statusRequest *velerov1api.ServerStatusRequest, kbClient client.Cli
 			statusRequest.Status.Plugins = plugins(pluginLister)
 		})
 		if err != nil {
-			log.Error("----XXX ERROR", err)
 			return errors.WithStack(err)
 		}
 		log.Infof("inside updateFunc phase now is ---->> %s", statusRequest.Status.Phase)
