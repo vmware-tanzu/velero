@@ -50,7 +50,7 @@ type Factory interface {
 	// KubebuilderClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubebuilderClient() (kbclient.Client, error)
-	// KubebuilderManager returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
+	// KubebuilderManager returns a controller-runtime manager. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubebuilderManager() (manager.Manager, error)
 	// SetBasename changes the basename for an already-constructed client.

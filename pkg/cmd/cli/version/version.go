@@ -47,7 +47,15 @@ func NewCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 
 			}
-			printVersion(os.Stdout, clientOnly, mgr, f.Namespace(), timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+
+			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
+				Namespace: f.Namespace(),
+				Context:   ctx,
+			}
+
+			printVersion(os.Stdout, clientOnly, mgr, serverStatusGetter)
 		},
 	}
 
@@ -57,7 +65,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	return c
 }
 
-func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, namespace string, timeout time.Duration) {
+func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, serverStatusGetter serverstatus.ServerStatusGetter) {
 	fmt.Fprintln(w, "Client:")
 	fmt.Fprintf(w, "\tVersion: %s\n", buildinfo.Version)
 	fmt.Fprintf(w, "\tGit commit: %s\n", buildinfo.FormattedGitSHA())
@@ -66,10 +74,7 @@ func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, namespace s
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	serverStatus, err := serverstatus.GetServerStatus(mgr, namespace, ctx)
+	serverStatus, err := serverStatusGetter.GetServerStatus(mgr)
 	if err != nil {
 		fmt.Fprintf(w, "<error getting server version: %s>\n", err)
 		return

@@ -46,7 +46,12 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
-			serverStatus, err := serverstatus.GetServerStatus(mgr, f.Namespace(), ctx)
+			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
+				Namespace: f.Namespace(),
+				Context:   ctx,
+			}
+
+			serverStatus, err := serverStatusGetter.GetServerStatus(mgr)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "<error getting plugin information: %s>\n", err)
 				return

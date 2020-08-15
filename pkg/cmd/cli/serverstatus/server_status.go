@@ -29,10 +29,19 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-func GetServerStatus(mgr manager.Manager, namespace string, ctx context.Context) (*velerov1api.ServerStatusRequest, error) {
-	serverReq := builder.ForServerStatusRequest(namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
+type ServerStatusGetter interface {
+	GetServerStatus(mgr manager.Manager) (*velerov1api.ServerStatusRequest, error)
+}
 
-	informer, err := mgr.GetCache().GetInformer(ctx, serverReq)
+type DefaultServerStatusGetter struct {
+	Namespace string
+	Context   context.Context
+}
+
+func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*velerov1api.ServerStatusRequest, error) {
+	serverReq := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
+
+	informer, err := mgr.GetCache().GetInformer(g.Context, serverReq)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -64,14 +73,14 @@ func GetServerStatus(mgr manager.Manager, namespace string, ctx context.Context)
 		wg.Wait()
 	}()
 
-	if err := mgr.GetClient().Create(ctx, serverReq, &kbclient.CreateOptions{}); err != nil {
+	if err := mgr.GetClient().Create(g.Context, serverReq, &kbclient.CreateOptions{}); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var result interface{}
 	select {
 	case result = <-addFuncResult:
-	case <-ctx.Done():
+	case <-g.Context.Done():
 	}
 
 	if result == nil {
@@ -80,9 +89,9 @@ func GetServerStatus(mgr manager.Manager, namespace string, ctx context.Context)
 
 	switch req := result.(type) {
 	case *velerov1api.ServerStatusRequest:
-		// if req.Status.Phase != velerov1api.ServerStatusRequestPhaseProcessed {
-		// 	return nil, errors.New("request not processed")
-		// }
+		if req.Status.Phase != velerov1api.ServerStatusRequestPhaseProcessed {
+			return nil, errors.New("request has not been processed")
+		}
 		return req, nil
 	case error:
 		return nil, err
