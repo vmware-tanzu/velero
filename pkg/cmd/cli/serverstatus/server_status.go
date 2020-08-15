@@ -57,6 +57,13 @@ func GetServerStatus(mgr manager.Manager, namespace string, ctx context.Context)
 		}
 	}()
 
+	// Terminate the manager goroutine and wait for it to respond
+	// that it has terminated.
+	defer func() {
+		close(stopMgr)
+		wg.Wait()
+	}()
+
 	if err := mgr.GetClient().Create(ctx, serverReq, &kbclient.CreateOptions{}); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -67,20 +74,15 @@ func GetServerStatus(mgr manager.Manager, namespace string, ctx context.Context)
 	case <-ctx.Done():
 	}
 
-	// Terminate the manager goroutine and wait for it to respond
-	// that it has terminated.
-	close(stopMgr)
-	wg.Wait()
-
 	if result == nil {
 		return nil, errors.New("timed out")
 	}
 
 	switch req := result.(type) {
 	case *velerov1api.ServerStatusRequest:
-		if req.Status.Phase != velerov1api.ServerStatusRequestPhaseProcessed {
-			return nil, errors.New("request not processed")
-		}
+		// if req.Status.Phase != velerov1api.ServerStatusRequestPhaseProcessed {
+		// 	return nil, errors.New("request not processed")
+		// }
 		return req, nil
 	case error:
 		return nil, err
