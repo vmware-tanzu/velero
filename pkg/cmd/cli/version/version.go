@@ -17,6 +17,7 @@ limitations under the License.
 package version
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -33,43 +34,30 @@ import (
 
 func NewCommand(f client.Factory) *cobra.Command {
 	var clientOnly bool
-	serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
-		Namespace: f.Namespace(),
-		Timeout:   5 * time.Second,
-	}
+	timeout := 5 * time.Second
 
 	c := &cobra.Command{
 		Use:   "version",
 		Short: "Print the velero version and associated image",
 		Run: func(c *cobra.Command, args []string) {
 			var mgr manager.Manager
-
-			// var veleroClient velerov1client.ServerStatusRequestsGetter
-
 			if !clientOnly {
 				var err error
-				// client, err := f.Client()
-				// cmd.CheckError(err)
-
-				// veleroClient = client.VeleroV1()
-
 				mgr, err = f.KubebuilderManager()
-				// client, err := f.KubebuilderClient()
 				cmd.CheckError(err)
 
 			}
-			serverStatusGetter.Namespace = f.Namespace()
-			printVersion(os.Stdout, clientOnly, mgr, serverStatusGetter)
+			printVersion(os.Stdout, clientOnly, mgr, f.Namespace(), timeout)
 		},
 	}
 
-	c.Flags().DurationVar(&serverStatusGetter.Timeout, "timeout", serverStatusGetter.Timeout, "Maximum time to wait for server version to be reported")
-	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "Only get velero client version, not server version")
+	c.Flags().DurationVar(&timeout, "timeout", timeout, "maximum time to wait for server version to be reported. Default is 5 seconds.")
+	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "only get velero client version, not server version")
 
 	return c
 }
 
-func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, serverStatusGetter *serverstatus.DefaultServerStatusGetter) {
+func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, namespace string, timeout time.Duration) {
 	fmt.Fprintln(w, "Client:")
 	fmt.Fprintf(w, "\tVersion: %s\n", buildinfo.Version)
 	fmt.Fprintf(w, "\tGit commit: %s\n", buildinfo.FormattedGitSHA())
@@ -78,7 +66,10 @@ func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, serverStatu
 		return
 	}
 
-	serverStatus, err := serverStatusGetter.GetServerStatus(mgr)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	serverStatus, err := serverstatus.GetServerStatus(mgr, namespace, ctx)
 	if err != nil {
 		fmt.Fprintf(w, "<error getting server version: %s>\n", err)
 		return

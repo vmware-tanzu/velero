@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
 
-// const statusRequestResyncPeriod = 5 * time.Minute
+const statusRequestResyncPeriod = 5 * time.Minute
 
 // ServerStatusRequestReconciler reconciles a ServerStatusRequest object
 type ServerStatusRequestReconciler struct {
@@ -78,8 +79,8 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, err
 	}
 
-	// return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
+	// return ctrl.Result{}, nil
 }
 
 func (r *ServerStatusRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {

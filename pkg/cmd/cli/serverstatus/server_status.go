@@ -19,7 +19,6 @@ package serverstatus
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/tools/cache"
@@ -28,33 +27,19 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
 
-type ServerStatusGetter interface {
-	GetServerStatus(client velerov1client.ServerStatusRequestsGetter) (*velerov1api.ServerStatusRequest, error)
-}
-
-// select stmt waiting for a time out or a response (data on the channel)
-type DefaultServerStatusGetter struct {
-	Namespace string
-	Timeout   time.Duration
-}
-
-func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*velerov1api.ServerStatusRequest, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	serverReq := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
+func GetServerStatus(mgr manager.Manager, namespace string, ctx context.Context) (*velerov1api.ServerStatusRequest, error) {
+	serverReq := builder.ForServerStatusRequest(namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
 
 	informer, err := mgr.GetCache().GetInformer(ctx, serverReq)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	addResult := make(chan interface{}, 1)
+	addFuncResult := make(chan interface{}, 1)
 	addFunc := func(result interface{}) {
-		addResult <- result
+		addFuncResult <- result
 	}
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: addFunc,
@@ -68,7 +53,7 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 			wg.Done()
 		}()
 		if err := mgr.Start(stopMgr); err != nil {
-			addResult <- errors.New("manager didn't start")
+			addFuncResult <- errors.New("manager didn't start")
 		}
 	}()
 
@@ -78,11 +63,11 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 
 	var result interface{}
 	select {
-	case result = <-addResult:
+	case result = <-addFuncResult:
 	case <-ctx.Done():
 	}
 
-	// Terminate the manger goroutine and wait for it to respond
+	// Terminate the manager goroutine and wait for it to respond
 	// that it has terminated.
 	close(stopMgr)
 	wg.Wait()
@@ -93,6 +78,9 @@ func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*veler
 
 	switch req := result.(type) {
 	case *velerov1api.ServerStatusRequest:
+		if req.Status.Phase != velerov1api.ServerStatusRequestPhaseProcessed {
+			return nil, errors.New("request not processed")
+		}
 		return req, nil
 	case error:
 		return nil, err
