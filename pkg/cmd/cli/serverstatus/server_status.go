@@ -18,84 +18,65 @@ package serverstatus
 
 import (
 	"context"
-	"sync"
+	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/vmware-tanzu/velero/internal/backoff"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
 type ServerStatusGetter interface {
-	GetServerStatus(mgr manager.Manager) (*velerov1api.ServerStatusRequest, error)
+	GetServerStatus(kbClient kbclient.Client) (*velerov1api.ServerStatusRequest, error)
 }
 
 type DefaultServerStatusGetter struct {
 	Namespace string
-	Context   context.Context
+	Timeout   time.Duration
 }
 
-func (g *DefaultServerStatusGetter) GetServerStatus(mgr manager.Manager) (*velerov1api.ServerStatusRequest, error) {
-	serverReq := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
+func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*velerov1api.ServerStatusRequest, error) {
+	created := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
 
-	informer, err := mgr.GetCache().GetInformer(g.Context, serverReq)
-	if err != nil {
+	if err := kbClient.Create(context.Background(), created, &kbclient.CreateOptions{}); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	addFuncResult := make(chan interface{}, 1)
-	addFunc := func(result interface{}) {
-		addFuncResult <- result
-	}
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: addFunc,
-	})
+	key := client.ObjectKey{Name: created.Name, Namespace: g.Namespace}
+	var attempt int
+	expired := time.NewTimer(g.Timeout)
+	defer expired.Stop()
 
-	stopMgr := make(chan struct{})
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer func() {
-			wg.Done()
-		}()
-		if err := mgr.Start(stopMgr); err != nil {
-			addFuncResult <- errors.New("manager didn't start")
+	for {
+		select {
+		case <-expired.C:
+			return nil, errors.New("timed out waiting for server status request to be processed")
+		case <-time.After(backoff.Default.Duration(attempt)):
 		}
-	}()
 
-	// Terminate the manager goroutine and wait for it to respond
-	// that it has terminated.
-	defer func() {
-		close(stopMgr)
-		wg.Wait()
-	}()
-
-	if err := mgr.GetClient().Create(g.Context, serverReq, &kbclient.CreateOptions{}); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	var result interface{}
-	select {
-	case result = <-addFuncResult:
-	case <-g.Context.Done():
-	}
-
-	if result == nil {
-		return nil, errors.New("timed out")
-	}
-
-	switch req := result.(type) {
-	case *velerov1api.ServerStatusRequest:
-		if req.Status.Phase != velerov1api.ServerStatusRequestPhaseProcessed {
-			return nil, errors.New("request has not been processed")
+		updated := &velerov1api.ServerStatusRequest{}
+		err := kbClient.Get(context.Background(), key, updated)
+		if err != nil {
+			attempt++
+			continue
 		}
-		return req, nil
-	case error:
-		return nil, err
-	default:
-		return nil, errors.New("unknown response")
+
+		// TODO: once the minimum supported Kubernetes version is v1.9.0, remove the following check.
+		// See http://issue.k8s.io/51046 for details.
+		if updated.Name != created.Name {
+			continue
+		}
+
+		if updated.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed {
+			created = updated
+			break
+		}
+
+		attempt = 0
 	}
+
+	return created, nil
 }

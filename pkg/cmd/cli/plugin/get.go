@@ -17,7 +17,6 @@ limitations under the License.
 package plugin
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
@@ -40,18 +39,15 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			mgr, err := f.KubebuilderManager()
+			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
 
 			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
 				Namespace: f.Namespace(),
-				Context:   ctx,
+				Timeout:   timeout,
 			}
 
-			serverStatus, err := serverStatusGetter.GetServerStatus(mgr)
+			serverStatus, err := serverStatusGetter.GetServerStatus(kbClient)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "<error getting plugin information: %s>\n", err)
 				return

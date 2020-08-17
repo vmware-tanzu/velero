@@ -45,7 +45,6 @@ func Process(req *velerov1api.ServerStatusRequest, kbClient kbclient.Client, plu
 	switch req.Status.Phase {
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing yyy new ServerStatusRequest")
-		log.Info("--->>> buildinfo.Version is...: ", buildinfo.Version)
 		return errors.WithStack(patch(kbClient, req, func(req *velerov1api.ServerStatusRequest) {
 			req.Status.ServerVersion = buildinfo.Version
 			req.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}

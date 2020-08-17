@@ -24,12 +24,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 )
 
 func TestPrintVersion(t *testing.T) {
@@ -82,23 +83,18 @@ func TestPrintVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
+				kbClient           = fake.NewFakeClientWithScheme(scheme.Scheme)
 				serverStatusGetter = new(mockServerStatusGetter)
 				buf                = new(bytes.Buffer)
 			)
 			defer serverStatusGetter.AssertExpectations(t)
 
-			cfg, err := config.GetConfig()
-			assert.NoError(t, err)
-
-			mgr, err := manager.New(cfg, manager.Options{})
-			assert.NoError(t, err)
-
 			// GetServerStatus should only be called when clientOnly = false
 			if !tc.clientOnly {
-				serverStatusGetter.On("GetServerStatus", mgr).Return(tc.serverStatusRequest, tc.getterError)
+				serverStatusGetter.On("GetServerStatus", kbClient).Return(tc.serverStatusRequest, tc.getterError)
 			}
 
-			printVersion(buf, tc.clientOnly, mgr, serverStatusGetter)
+			printVersion(buf, tc.clientOnly, kbClient, serverStatusGetter)
 
 			assert.Equal(t, tc.want, buf.String())
 		})
@@ -112,12 +108,12 @@ type mockServerStatusGetter struct {
 }
 
 // GetServerStatus provides a mock function with given fields: mgr
-func (_m *mockServerStatusGetter) GetServerStatus(mgr manager.Manager) (*velerov1.ServerStatusRequest, error) {
-	ret := _m.Called(mgr)
+func (_m *mockServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*velerov1.ServerStatusRequest, error) {
+	ret := _m.Called(kbClient)
 
 	var r0 *velerov1.ServerStatusRequest
-	if rf, ok := ret.Get(0).(func(manager.Manager) *velerov1.ServerStatusRequest); ok {
-		r0 = rf(mgr)
+	if rf, ok := ret.Get(0).(func(kbclient.Client) *velerov1.ServerStatusRequest); ok {
+		r0 = rf(kbClient)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*velerov1.ServerStatusRequest)
@@ -125,8 +121,8 @@ func (_m *mockServerStatusGetter) GetServerStatus(mgr manager.Manager) (*velerov
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(manager.Manager) error); ok {
-		r1 = rf(mgr)
+	if rf, ok := ret.Get(1).(func(kbclient.Client) error); ok {
+		r1 = rf(kbClient)
 	} else {
 		r1 = ret.Error(1)
 	}

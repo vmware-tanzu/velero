@@ -17,14 +17,13 @@ limitations under the License.
 package version
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -40,22 +39,19 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Use:   "version",
 		Short: "Print the velero version and associated image",
 		Run: func(c *cobra.Command, args []string) {
-			var mgr manager.Manager
+			var kbClient kbclient.Client
 			if !clientOnly {
 				var err error
-				mgr, err = f.KubebuilderManager()
+				kbClient, err = f.KubebuilderClient()
 				cmd.CheckError(err)
-
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
 
 			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
 				Namespace: f.Namespace(),
-				Context:   ctx,
+				Timeout:   timeout,
 			}
 
-			printVersion(os.Stdout, clientOnly, mgr, serverStatusGetter)
+			printVersion(os.Stdout, clientOnly, kbClient, serverStatusGetter)
 		},
 	}
 
@@ -65,7 +61,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	return c
 }
 
-func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, serverStatusGetter serverstatus.ServerStatusGetter) {
+func printVersion(w io.Writer, clientOnly bool, kbClient kbclient.Client, serverStatusGetter serverstatus.ServerStatusGetter) {
 	fmt.Fprintln(w, "Client:")
 	fmt.Fprintf(w, "\tVersion: %s\n", buildinfo.Version)
 	fmt.Fprintf(w, "\tGit commit: %s\n", buildinfo.FormattedGitSHA())
@@ -74,7 +70,7 @@ func printVersion(w io.Writer, clientOnly bool, mgr manager.Manager, serverStatu
 		return
 	}
 
-	serverStatus, err := serverStatusGetter.GetServerStatus(mgr)
+	serverStatus, err := serverStatusGetter.GetServerStatus(kbClient)
 	if err != nil {
 		fmt.Fprintf(w, "<error getting server version: %s>\n", err)
 		return

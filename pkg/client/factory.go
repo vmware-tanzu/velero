@@ -20,7 +20,6 @@ import (
 	"os"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
@@ -50,9 +48,6 @@ type Factory interface {
 	// KubebuilderClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubebuilderClient() (kbclient.Client, error)
-	// KubebuilderManager returns a controller-runtime manager. It uses the following priority to specify the cluster
-	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
-	KubebuilderManager() (manager.Manager, error)
 	// SetBasename changes the basename for an already-constructed client.
 	// This is useful for generating clients that require a different user-agent string below the root `velero`
 	// command, such as the server subcommand.
@@ -161,24 +156,6 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 	})
 
 	return kubebuilderClient, nil
-}
-
-func (f *factory) KubebuilderManager() (manager.Manager, error) {
-	clientConfig, err := f.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	scheme := runtime.NewScheme()
-	velerov1api.AddToScheme(scheme)
-	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
-		Scheme: scheme,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return mgr, nil
 }
 
 func (f *factory) SetBasename(name string) {
