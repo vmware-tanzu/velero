@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/backoff"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
@@ -35,7 +35,7 @@ type ServerStatusGetter interface {
 
 type DefaultServerStatusGetter struct {
 	Namespace string
-	Timeout   time.Duration
+	Context   context.Context
 }
 
 func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*velerov1api.ServerStatusRequest, error) {
@@ -45,38 +45,29 @@ func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*
 		return nil, errors.WithStack(err)
 	}
 
+	ctx, cancel := context.WithCancel(g.Context)
+	defer cancel()
+
 	key := client.ObjectKey{Name: created.Name, Namespace: g.Namespace}
-	var attempt int
-	expired := time.NewTimer(g.Timeout)
-	defer expired.Stop()
-
-	for {
-		select {
-		case <-expired.C:
-			return nil, errors.New("timed out waiting for server status request to be processed")
-		case <-time.After(backoff.Default.Duration(attempt)):
-		}
-
+	checkFunc := func() {
 		updated := &velerov1api.ServerStatusRequest{}
-		err := kbClient.Get(context.Background(), key, updated)
-		if err != nil {
-			attempt++
-			continue
+		if err := kbClient.Get(ctx, key, updated); err != nil {
+			return
 		}
 
 		// TODO: once the minimum supported Kubernetes version is v1.9.0, remove the following check.
 		// See http://issue.k8s.io/51046 for details.
 		if updated.Name != created.Name {
-			continue
+			return
 		}
 
 		if updated.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed {
 			created = updated
-			break
+			cancel()
 		}
-
-		attempt = 0
 	}
+
+	wait.Until(checkFunc, 250*time.Millisecond, ctx.Done())
 
 	return created, nil
 }

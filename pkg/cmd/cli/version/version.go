@@ -17,6 +17,7 @@ limitations under the License.
 package version
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -46,11 +47,13 @@ func NewCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+
 			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
 				Namespace: f.Namespace(),
-				Timeout:   timeout,
+				Context:   ctx,
 			}
-
 			printVersion(os.Stdout, clientOnly, kbClient, serverStatusGetter)
 		},
 	}
