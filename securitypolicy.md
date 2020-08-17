@@ -5,7 +5,7 @@ Velero is an open source tool with a growing community devoted to safe backup an
 
 ## Supported Versions
 
-The Velero project maintains the following [governance document](https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md), [release document](https://github.com/vmware-tanzu/velero/blob/f42c63af1b9af445e38f78a7256b1c48ef79c10e/site/docs/main/release-instructions.md) , and [support document](https://velero.io/docs/main/support-process/). Please refer to these for release and related details. The most recent version of Velero is supported. Each [release](https://github.com/vmware-tanzu/velero/releases) includes information about upgrading to the latest version.
+The Velero project maintains the following [governance document](https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md), [release document](https://github.com/vmware-tanzu/velero/blob/f42c63af1b9af445e38f78a7256b1c48ef79c10e/site/docs/main/release-instructions.md), and [support document](https://velero.io/docs/main/support-process/). Please refer to these for release and related details. Only the most recent version of Velero is supported. Each [release](https://github.com/vmware-tanzu/velero/releases) includes information about upgrading to the latest version.
 
 
 ## Reporting a Vulnerability - Private Disclosure Process
