@@ -38,6 +38,7 @@ func DefaultLogger(level logrus.Level, format Format) *logrus.Logger {
 
 	if format == FormatJSON {
 		logger.Formatter = new(logrus.JSONFormatter)
+		logrus.ErrorKey = "error.message"
 	}
 
 	// Make sure the output is set to stdout so log messages don't show up as errors in cloud log dashboards.
