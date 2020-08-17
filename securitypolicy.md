@@ -18,7 +18,7 @@ If you know of a publicly disclosed security vulnerability for Velero, please **
 
 **IMPORTANT: Do not file public issues on GitHub for security vulnerabilities**
 
-To report a vulnerability or a security-related issue, please contact the Velero private email address with the details of the vulnerability. The email will be fielded by the VMware Security Team, which is made up of Velero maintainers who have committer and release permissions. Emails will be addressed within 3 business days, including a detailed plan to investigate the issue and any potential workarounds to perform in the meantime. Do not report non-security-impacting bugs through this channel. Use [GitHub issues](https://github.com/vmware-tanzu/velero/issues/new/choose) instead.
+To report a vulnerability or a security-related issue, please contact the VMware email address with the details of the vulnerability. The email will be fielded by the VMware Security Team and then shared with the Velero maintainers who have committer and release permissions. Emails will be addressed within 3 business days, including a detailed plan to investigate the issue and any potential workarounds to perform in the meantime. Do not report non-security-impacting bugs through this channel. Use [GitHub issues](https://github.com/vmware-tanzu/velero/issues/new/choose) instead.
 
 
 ## Proposed Email Content
@@ -28,7 +28,7 @@ Provide a descriptive subject line and in the body of the email include the foll
 
 
 *   Basic identity information, such as your name and your affiliation or company.
-*   Detailed steps to reproduce the vulnerability  (POC scripts, screenshots, and compressed packet captures are all helpful to us).
+*   Detailed steps to reproduce the vulnerability  (POC scripts, screenshots, and logs are all helpful to us).
 *   Description of the effects of the vulnerability on Velero and the related hardware and software configurations, so that the VMware Security Team can reproduce it.
 *   How the vulnerability affects Velero usage and an estimation of the attack surface, if there is one.
 *   List other projects or dependencies that were used in conjunction with Velero to produce the vulnerability.
