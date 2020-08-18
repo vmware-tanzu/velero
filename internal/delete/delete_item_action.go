@@ -62,11 +62,6 @@ func InvokeDeleteActions(ctx *Context) error {
 		return errors.Wrapf(err, "error resolving actions")
 	}
 
-	// We may have a faked file system passed in from tests, so generate one here, just in case the caller didn't make one.
-	if ctx.Filesystem == nil {
-		ctx.Filesystem = filesystem.NewFileSystem()
-	}
-
 	// get items out of backup tarball into a temp directory
 	dir, err := archive.NewExtractor(ctx.Log, ctx.Filesystem).UnzipAndExtractBackup(ctx.BackupReader)
 	if err != nil {

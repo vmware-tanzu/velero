@@ -50,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -314,7 +315,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		Actions:         actions,
 		Log:             c.logger,
 		DiscoveryHelper: c.helper,
-		Filesystem:      nil,
+		Filesystem:      filesystem.NewFileSystem(),
 	}
 	err = delete.InvokeDeleteActions(ctx)
 	if err != nil {
