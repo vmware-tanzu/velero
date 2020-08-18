@@ -256,7 +256,7 @@ func (m *manager) GetDeleteItemAction(name string) (velero.DeleteItemAction, err
 	// Backwards compatibility with non-namespaced plugins, following principle of least surprise
 	// since DeleteItemActions were not bundled with Velero when plugins were non-namespaced.
 	if !strings.Contains(name, "/") {
-		name = "velero.io" + name
+		name = "velero.io/" + name
 	}
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindDeleteItemAction, name)
 	if err != nil {

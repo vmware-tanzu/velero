@@ -476,6 +476,23 @@ func TestGetRestoreItemActions(t *testing.T) {
 	}
 }
 
+func TestGetDeleteItemAction(t *testing.T) {
+	getPluginTest(t,
+		framework.PluginKindDeleteItemAction,
+		"velero.io/deleter",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetDeleteItemAction(name)
+		},
+		func(name string, sharedPluginProcess RestartableProcess) interface{} {
+			return &restartableDeleteItemAction{
+				key:                 kindAndName{kind: framework.PluginKindDeleteItemAction, name: name},
+				sharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
 func TestGetDeleteItemActions(t *testing.T) {
 	tests := []struct {
 		name                       string
