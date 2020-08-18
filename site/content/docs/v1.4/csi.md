@@ -31,7 +31,7 @@ velero install \
 ...
 ```
 
-To include the status of CSI objects associated with a Velero backup or restore in `velero backup describe` or `velero restore describe` output, run `velero client config set features=EnableCSI`.
+To include the status of CSI objects associated with a Velero backup in `velero backup describe` output, run `velero client config set features=EnableCSI`.
 See [Enabling Features][1] for more information about managing client-side feature flags.
 
 # Implementation Choices
