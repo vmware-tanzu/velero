@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -469,6 +469,105 @@ func TestGetRestoreItemActions(t *testing.T) {
 				var actual []interface{}
 				for i := range restoreItemActions {
 					actual = append(actual, restoreItemActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
+func TestGetDeleteItemAction(t *testing.T) {
+	getPluginTest(t,
+		framework.PluginKindDeleteItemAction,
+		"velero.io/deleter",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetDeleteItemAction(name)
+		},
+		func(name string, sharedPluginProcess RestartableProcess) interface{} {
+			return &restartableDeleteItemAction{
+				key:                 kindAndName{kind: framework.PluginKindDeleteItemAction, name: name},
+				sharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
+func TestGetDeleteItemActions(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := framework.PluginKindDeleteItemAction
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &mockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &restartableRestoreItemAction{
+					key:                 kindAndName{kind: pluginKind, name: pluginName},
+					sharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("newRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			deleteItemActions, err := m.GetDeleteItemActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, deleteItemActions)
+				assert.EqualError(t, err, "newRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range deleteItemActions {
+					actual = append(actual, deleteItemActions[i])
 				}
 				assert.Equal(t, expectedActions, actual)
 			}

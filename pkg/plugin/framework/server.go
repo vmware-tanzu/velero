@@ -67,6 +67,13 @@ type Server interface {
 	// RegisterRestoreItemActions registers multiple restore item actions.
 	RegisterRestoreItemActions(map[string]HandlerInitializer) Server
 
+	// RegisterDeleteItemAction registers a delete item action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterDeleteItemAction(pluginName string, initializer HandlerInitializer) Server
+
+	// RegisterDeleteItemActions registers multiple Delete item actions.
+	RegisterDeleteItemActions(map[string]HandlerInitializer) Server
+
 	// Server runs the plugin server.
 	Serve()
 }
@@ -81,6 +88,7 @@ type server struct {
 	volumeSnapshotter *VolumeSnapshotterPlugin
 	objectStore       *ObjectStorePlugin
 	restoreItemAction *RestoreItemActionPlugin
+	deleteItemAction  *DeleteItemActionPlugin
 }
 
 // NewServer returns a new Server
@@ -96,6 +104,7 @@ func NewServer() Server {
 		volumeSnapshotter: NewVolumeSnapshotterPlugin(serverLogger(log)),
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
 		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
+		deleteItemAction:  NewDeleteItemActionPlugin(serverLogger(log)),
 	}
 }
 
@@ -152,6 +161,18 @@ func (s *server) RegisterRestoreItemAction(name string, initializer HandlerIniti
 func (s *server) RegisterRestoreItemActions(m map[string]HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterRestoreItemAction(name, m[name])
+	}
+	return s
+}
+
+func (s *server) RegisterDeleteItemAction(name string, initializer HandlerInitializer) Server {
+	s.deleteItemAction.register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterDeleteItemActions(m map[string]HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterDeleteItemAction(name, m[name])
 	}
 	return s
 }
