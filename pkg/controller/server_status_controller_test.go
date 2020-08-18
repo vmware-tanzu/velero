@@ -114,15 +114,17 @@ var _ = Describe("Server Status Request Reconciler", func() {
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 
+			k8sClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.req)
+
 			serverStatusInfo := velero.ServerStatus{
-				Client:         fake.NewFakeClientWithScheme(scheme.Scheme),
+				Client:         k8sClient,
 				PluginRegistry: test.reqPluginLister,
 				Clock:          clock.NewFakeClock(now),
 			}
 
 			r = ServerStatusRequestReconciler{
 				// Client:       fake.NewFakeClientWithScheme(scheme.Scheme, serverRequests),
-				Client:       fake.NewFakeClientWithScheme(scheme.Scheme, test.req),
+				Client:       k8sClient,
 				ServerStatus: serverStatusInfo,
 				Ctx:          context.Background(),
 				Log:          velerotest.NewLogger(),
@@ -137,6 +139,16 @@ var _ = Describe("Server Status Request Reconciler", func() {
 
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{RequeueAfter: statusRequestResyncPeriod}))
 			Expect(err).To(BeNil())
+
+			srs := &velerov1api.ServerStatusRequest{}
+			// Wait for reconciliation to happen.
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx,
+					client.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, srs); err != nil {
+					return false
+				}
+				return srs.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed
+			}, timeout).Should(BeTrue())
 
 			// time.Sleep(3 * time.Minute)
 			// r.Reconcile(ctrl.Request{

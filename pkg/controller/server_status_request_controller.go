@@ -87,7 +87,6 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		if err := r.ServerStatus.PatchStatusProcessed(statusRequest, r.Ctx); err != nil {
 			log.WithError(err).Error("Unable to update the request")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
-			// return ctrl.Result{}, err
 		}
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
@@ -95,18 +94,15 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		if expiration.After(r.ServerStatus.Clock.Now()) {
 			log.Debug("ServerStatusRequest has not expired")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
-			// return ctrl.Result{}, nil
 		}
 
 		log.Debug("ServerStatusRequest has expired, deleting it")
 		if err := r.Client.Delete(r.Ctx, statusRequest); err != nil {
 			log.WithError(err).Error("Unable to delete the request")
-			// return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
 			return ctrl.Result{}, nil
 		}
 	default:
 		log.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
-		// return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, errors.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
 		return ctrl.Result{}, errors.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
 	}
 
