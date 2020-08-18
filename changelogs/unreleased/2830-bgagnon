@@ -1,0 +1,1 @@
+When JSON logging format is enabled, place error message at "error.message" instead of "error" for compatibility with Elasticsearch/ELK and the Elastic Common Schema
