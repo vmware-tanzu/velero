@@ -38,6 +38,23 @@ func DefaultLogger(level logrus.Level, format Format) *logrus.Logger {
 
 	if format == FormatJSON {
 		logger.Formatter = new(logrus.JSONFormatter)
+		// Error hooks inject nested fields under "error.*" with the error
+		// string message at "error".
+		//
+		// This structure is incompatible with recent Elasticsearch versions
+		// where dots in field names are automatically expanded to objects;
+		// field "error" cannot be both a string and an object at the same
+		// time.
+		//
+		// ELK being a popular choice for log ingestion and a common reason
+		// for enabling JSON logging in the first place, we avoid this mapping
+		// problem by nesting the error's message at "error.message".
+		//
+		// This also follows the Elastic Common Schema (ECS) recommendation.
+		// https://www.elastic.co/guide/en/ecs/current/ecs-error.html
+		logrus.ErrorKey = "error.message"
+	} else {
+		logrus.ErrorKey = "error"
 	}
 
 	// Make sure the output is set to stdout so log messages don't show up as errors in cloud log dashboards.
