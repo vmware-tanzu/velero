@@ -514,6 +514,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 }
 
+// TODO: this should be combined with DeleteItemActions at some point.
 func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
 	var actions []resolvedAction
 	for _, action := range ctx.actions {

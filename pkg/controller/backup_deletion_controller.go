@@ -302,12 +302,14 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	defer closeAndRemoveFile(backupFile, c.logger)
 
 	actions, err := pluginManager.GetDeleteItemActions()
+	log.Debugf("%d actions before invoking actions", len(actions))
 	if err != nil {
 		return errors.Wrap(err, "error getting delete item actions")
 	}
 	// don't defer CleanupClients here, since it was already called above.
 
 	ctx := &delete.Context{
+		Backup:          backup,
 		BackupReader:    backupFile,
 		Actions:         actions,
 		Log:             c.logger,
