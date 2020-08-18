@@ -852,13 +852,18 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", "BackupStorageLocation")
 	}
 
-	if err := (&controller.ServerStatusRequestReconciler{
-		Scheme:         s.mgr.GetScheme(),
+	serverStatusInfo := velero.ServerStatus{
 		Client:         s.mgr.GetClient(),
-		Ctx:            s.ctx,
 		PluginRegistry: s.pluginRegistry,
 		Clock:          clock.RealClock{},
-		Log:            s.logger,
+	}
+	if err := (&controller.ServerStatusRequestReconciler{
+		Scheme:       s.mgr.GetScheme(),
+		Client:       s.mgr.GetClient(),
+		Ctx:          s.ctx,
+		ServerStatus: serverStatusInfo,
+
+		Log: s.logger,
 	}).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", "ServerStatusRequest")
 	}

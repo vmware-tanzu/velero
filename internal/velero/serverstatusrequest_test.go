@@ -23,7 +23,6 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +41,7 @@ func statusRequestBuilder(resourceVersion string) *builder.ServerStatusRequestBu
 	return builder.ForServerStatusRequest(velerov1api.DefaultNamespace, "sr-1", resourceVersion)
 }
 
-func TestProcess(t *testing.T) {
+func TestPatchStatusProcessed(t *testing.T) {
 	// now will be used to set the fake clock's time; capture
 	// it here so it can be referenced in the test case defs.
 	now, err := time.Parse(time.RFC1123, time.RFC1123)
@@ -56,7 +55,6 @@ func TestProcess(t *testing.T) {
 		req             *velerov1api.ServerStatusRequest
 		reqPluginLister *fakePluginLister
 		expected        *velerov1api.ServerStatusRequest
-		expectedErrMsg  string
 	}{
 		{
 			name: "server status request with empty phase gets processed",
@@ -115,41 +113,37 @@ func TestProcess(t *testing.T) {
 				Result(),
 		},
 		{
-			name: "server status request with phase=Processed gets deleted if expired",
+			name: "server status request with phase=Processed gets processed",
 			req: statusRequestBuilder("0").
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
-				ProcessedTimestamp(now.Add(-61 * time.Second)).
 				Result(),
 			reqPluginLister: &fakePluginLister{
 				plugins: []framework.PluginIdentifier{
+					{
+						Name: "velero.io/aws",
+						Kind: "ObjectStore",
+					},
 					{
 						Name: "custom.io/myown",
 						Kind: "VolumeSnapshotter",
 					},
 				},
 			},
-			expected: nil,
-		},
-		{
-			name: "server status request with phase=Processed does not get deleted if not expired",
-			req: statusRequestBuilder("0").
+			expected: statusRequestBuilder("1").
+				ServerVersion(buildinfo.Version).
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
-				ProcessedTimestamp(now.Add(-59 * time.Second)).
+				ProcessedTimestamp(now).
+				Plugins([]velerov1api.PluginInfo{
+					{
+						Name: "velero.io/aws",
+						Kind: "ObjectStore",
+					},
+					{
+						Name: "custom.io/myown",
+						Kind: "VolumeSnapshotter",
+					},
+				}).
 				Result(),
-			expected: statusRequestBuilder("0").
-				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
-				ProcessedTimestamp(now.Add(-59 * time.Second)).
-				Result(),
-		},
-		{
-			name: "server status request with invalid phase returns an error",
-			req: statusRequestBuilder("0").
-				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
-				Result(),
-			expected: statusRequestBuilder("0").
-				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
-				Result(),
-			expectedErrMsg: "unexpected ServerStatusRequest phase \"an-invalid-phase\"",
 		},
 	}
 
@@ -157,18 +151,18 @@ func TestProcess(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			kbClient := fake.NewFakeClientWithScheme(scheme.Scheme, tc.req)
-
-			err := Process(tc.req, kbClient, tc.reqPluginLister, clock.NewFakeClock(now), logrus.StandardLogger())
-			if tc.expectedErrMsg == "" {
-				assert.Nil(t, err)
-			} else {
-				assert.EqualError(t, err, tc.expectedErrMsg)
+			serverStatusInfo := ServerStatus{
+				Client:         fake.NewFakeClientWithScheme(scheme.Scheme, tc.req),
+				PluginRegistry: tc.reqPluginLister,
+				Clock:          clock.NewFakeClock(now),
 			}
+
+			err := serverStatusInfo.PatchStatusProcessed(tc.req, context.Background())
+			assert.Nil(t, err)
 
 			key := client.ObjectKey{Name: tc.req.Name, Namespace: tc.req.Namespace}
 			instance := &velerov1api.ServerStatusRequest{}
-			err = kbClient.Get(context.Background(), key, instance)
+			err = serverStatusInfo.Client.Get(context.Background(), key, instance)
 
 			if tc.expected == nil {
 				g.Expect(&velerov1api.ServerStatusRequest{}).To(BeEquivalentTo((&velerov1api.ServerStatusRequest{})))

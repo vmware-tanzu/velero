@@ -18,26 +18,36 @@ package controller
 
 import (
 	"context"
+	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
+
+const (
+	ttl                       = time.Minute
+	statusRequestResyncPeriod = 1 * time.Minute
+)
+
+type PluginLister interface {
+	// List returns all PluginIdentifiers for kind.
+	List(kind framework.PluginKind) []framework.PluginIdentifier
+}
 
 // ServerStatusRequestReconciler reconciles a ServerStatusRequest object
 type ServerStatusRequestReconciler struct {
-	Scheme         *runtime.Scheme
-	Client         client.Client
-	Ctx            context.Context
-	PluginRegistry clientmgmt.Registry
-	Clock          clock.Clock
+	Scheme       *runtime.Scheme
+	Client       client.Client
+	Ctx          context.Context
+	ServerStatus velero.ServerStatus
 
 	Log logrus.FieldLogger
 }
@@ -59,6 +69,8 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			return ctrl.Result{}, nil
 		}
 
+		log.WithError(err).Debug("Error getting ServerStatusRequest")
+		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
 
@@ -68,10 +80,34 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		"phase":               statusRequest.Status.Phase,
 	})
 
-	err := velero.Process(statusRequest.DeepCopy(), r.Client, r.PluginRegistry, r.Clock, log)
-	if err != nil {
-		log.WithError(err).Error("Unable to process the request")
-		return ctrl.Result{}, err
+	switch statusRequest.Status.Phase {
+	case "", velerov1api.ServerStatusRequestPhaseNew:
+		log.Info("Processing new ServerStatusRequest")
+
+		if err := r.ServerStatus.PatchStatusProcessed(statusRequest, r.Ctx); err != nil {
+			log.WithError(err).Error("Unable to update the request")
+			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+			// return ctrl.Result{}, err
+		}
+	case velerov1api.ServerStatusRequestPhaseProcessed:
+		log.Debug("Checking whether ServerStatusRequest has expired")
+		expiration := statusRequest.Status.ProcessedTimestamp.Add(ttl)
+		if expiration.After(r.ServerStatus.Clock.Now()) {
+			log.Debug("ServerStatusRequest has not expired")
+			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
+			// return ctrl.Result{}, nil
+		}
+
+		log.Debug("ServerStatusRequest has expired, deleting it")
+		if err := r.Client.Delete(r.Ctx, statusRequest); err != nil {
+			log.WithError(err).Error("Unable to delete the request")
+			// return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+			return ctrl.Result{}, nil
+		}
+	default:
+		log.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
+		// return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, errors.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
+		return ctrl.Result{}, errors.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
 	}
 
 	return ctrl.Result{}, nil
