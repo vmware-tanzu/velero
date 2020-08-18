@@ -19,7 +19,9 @@ package delete
 import (
 	"io"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
@@ -48,17 +50,21 @@ func InvokeDeleteActions(ctx *Context) error {
 	}
 
 	// // get items out of backup tarball into a temp directory
-	// dir, err := archive.NewExtractor(ctx.Log, ctx.Filesystem).UnzipAndExtractBackup(ctx.BackupReader)
-	// if err != nil {
-	// 	return errors.Wrapf(err, "error extracting backup")
+	dir, err := archive.NewExtractor(ctx.Log, ctx.Filesystem).UnzipAndExtractBackup(ctx.BackupReader)
+	if err != nil {
+		return errors.Wrapf(err, "error extracting backup")
 
-	// }
-	// defer ctx.Filesystem.RemoveAll(dir)
+	}
+	defer ctx.Filesystem.RemoveAll(dir)
+	ctx.Log.Debugf("Downloaded and extracted the backup file to: %s", dir)
 
-	// backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir)
-	// if err != nil {
-	// 	return errors.Wrapf(err, "error parsing backup contents")
-	// }
+	backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing backup contents")
+	}
+	for _, r := range backupResources {
+		ctx.Log.Debugf("Have this resource: %#v", r)
+	}
 	// // iterate through resources. Need to transform these from a map into a string, probably with some ordering like in restore.
 	// for _, resource := range backupResources {
 	// 	gvr, _, err := ctx.DiscoveryHelper.ResourceFor(schema.ParseGroupKind(resource).WithVersion(""))
