@@ -429,7 +429,7 @@ func getPodExecRestoreHookFromAnnotations(annotations map[string]string, log log
 		if temp, err := time.ParseDuration(execTimeoutString); err == nil {
 			execTimeout = temp
 		} else {
-			log.Warn(errors.Wrapf(err, "Unable to parse exec timeout %s, discarding", execTimeoutString))
+			log.Warn(errors.Wrapf(err, "Unable to parse exec timeout %s, ignoring", execTimeoutString))
 		}
 	}
 
@@ -439,7 +439,7 @@ func getPodExecRestoreHookFromAnnotations(annotations map[string]string, log log
 		if temp, err := time.ParseDuration(waitTimeoutString); err == nil {
 			waitTimeout = temp
 		} else {
-			log.Warn(errors.Wrapf(err, "Unable to parse wait timeout %s, discarding", waitTimeoutString))
+			log.Warn(errors.Wrapf(err, "Unable to parse wait timeout %s, ignoring", waitTimeoutString))
 		}
 	}
 

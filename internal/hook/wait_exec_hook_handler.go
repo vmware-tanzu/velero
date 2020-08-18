@@ -175,7 +175,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	selector := fields.OneTermEqualSelector("metadata.name", pod.Name)
 	lw := e.ListWatchFactory.NewListWatch(pod.Namespace, selector)
 
-	_, controller := cache.NewInformer(lw, pod, 0, cache.ResourceEventHandlerFuncs{
+	_, podWatcher := cache.NewInformer(lw, pod, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: handler,
 		UpdateFunc: func(_, newObj interface{}) {
 			handler(newObj)
@@ -187,7 +187,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 		},
 	})
 
-	controller.Run(ctx.Done())
+	podWatcher.Run(ctx.Done())
 
 	// There are some cases where this function could return with unexecuted hooks: the pod may
 	// be deleted, a hook with OnError mode Fail could fail, or it may timeout waiting for
