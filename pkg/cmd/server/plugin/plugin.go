@@ -55,7 +55,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
 				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
-				RegisterDeleteItemAction("velero.io/test-delete", newDeletePlugin).
+				RegisterDeleteItemAction("velero.io/test-delete-plug", newDeletePlugin).
 				Serve()
 		},
 	}

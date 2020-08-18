@@ -20,6 +20,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
+var _ velero.DeleteItemAction = (*DeletePlugin)(nil)
+
 type DeletePlugin struct {
 	log logrus.FieldLogger
 }
@@ -33,7 +35,7 @@ func (p *DeletePlugin) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{}, nil
 }
 
-func (p *DeletePlugin) Execute(velero.DeleteItemActionExecuteInput) error {
+func (p *DeletePlugin) Execute(input *velero.DeleteItemActionExecuteInput) error {
 	p.log.Debug("In DeletePlugin Execute")
 	return nil
 }
