@@ -1,0 +1,23 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message DeleteItemActionExecuteRequest {
+    string plugin = 1;
+    bytes item = 2;
+    bytes backup = 3;
+}
+
+service DeleteItemAction {
+    rpc AppliesTo(DeleteItemActionAppliesToRequest) returns (DeleteItemActionAppliesToResponse);
+    rpc Execute(DeleteItemActionExecuteRequest) returns (Empty);
+}
+
+message DeleteItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message DeleteItemActionAppliesToResponse {
+    ResourceSelector ResourceSelector = 1;
+}

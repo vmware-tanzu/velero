@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,12 @@ type Manager interface {
 
 	// GetRestoreItemAction returns the restore item action plugin for name.
 	GetRestoreItemAction(name string) (velero.RestoreItemAction, error)
+
+	// GetDeleteItemActions returns all delete item action plugins.
+	GetDeleteItemActions() ([]velero.DeleteItemAction, error)
+
+	// GetDeleteItemAction returns the delete item action plugin for name.
+	GetDeleteItemAction(name string) (velero.DeleteItemAction, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
@@ -222,5 +228,41 @@ func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, e
 	}
 
 	r := newRestartableRestoreItemAction(name, restartableProcess)
+	return r, nil
+}
+
+// GetDeleteItemActions returns all delete item actions as restartableDeleteItemActions.
+func (m *manager) GetDeleteItemActions() ([]velero.DeleteItemAction, error) {
+	list := m.registry.List(framework.PluginKindDeleteItemAction)
+
+	actions := make([]velero.DeleteItemAction, 0, len(list))
+
+	for i := range list {
+		id := list[i]
+
+		r, err := m.GetDeleteItemAction(id.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		actions = append(actions, r)
+	}
+
+	return actions, nil
+}
+
+// GetDeleteItemAction returns a restartableDeleteItemAction for name.
+func (m *manager) GetDeleteItemAction(name string) (velero.DeleteItemAction, error) {
+	// Backwards compatibility with non-namespaced plugins, following principle of least surprise
+	// since DeleteItemActions were not bundled with Velero when plugins were non-namespaced.
+	if !strings.Contains(name, "/") {
+		name = "velero.io/" + name
+	}
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindDeleteItemAction, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newRestartableDeleteItemAction(name, restartableProcess)
 	return r, nil
 }

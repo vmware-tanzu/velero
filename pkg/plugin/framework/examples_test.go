@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@ package framework
 import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 func ExampleNewServer_volumeSnapshotter() {
 	NewServer(). // call the server
 			RegisterVolumeSnapshotter("example.io/volumesnapshotter", newVolumeSnapshotter). // register the plugin with a valid name
-			Serve()                                                                          // serve the plugin
+			RegisterDeleteItemAction("example.io/delete-item-action", newDeleteItemAction).
+			Serve() // serve the plugin
 }
 
 func newVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
@@ -86,6 +89,32 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 
 func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	b.FieldLogger.Infof("DeleteSnapshot called")
+
+	// ...
+
+	return nil
+}
+
+// Implement all methods for the DeleteItemAction interface
+
+func newDeleteItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return DeleteItemAction{FieldLogger: logger}, nil
+}
+
+type DeleteItemAction struct {
+	FieldLogger logrus.FieldLogger
+}
+
+func (d *DeleteItemAction) AppliesTo() (velero.ResourceSelector, error) {
+	d.FieldLogger.Infof("AppliesTo called")
+
+	// ...
+
+	return velero.ResourceSelector{}, nil
+}
+
+func (d *DeleteItemAction) Execute(input *velero.DeleteItemActionExecuteInput) error {
+	d.FieldLogger.Infof("Execute called")
 
 	// ...
 
