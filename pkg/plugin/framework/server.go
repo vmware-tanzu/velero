@@ -205,6 +205,7 @@ func (s *server) Serve() {
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindVolumeSnapshotter, s.volumeSnapshotter)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStore, s.objectStore)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindRestoreItemAction, s.restoreItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindDeleteItemAction, s.deleteItemAction)...)
 
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
@@ -216,6 +217,7 @@ func (s *server) Serve() {
 			string(PluginKindObjectStore):       s.objectStore,
 			string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
 			string(PluginKindRestoreItemAction): s.restoreItemAction,
+			string(PluginKindDeleteItemAction):  s.deleteItemAction,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})
