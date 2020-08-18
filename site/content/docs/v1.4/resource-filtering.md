@@ -1,4 +1,7 @@
-# Resource Filtering
+---
+title: "Resource filtering"
+layout: docs
+---
 
 *Filter objects by namespace, type, or labels.*
 
