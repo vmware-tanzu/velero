@@ -183,7 +183,7 @@ The following sections provide more details on the two approaches.
 
 In this approach, Velero will back up all pod volumes using restic with the exception of:
 
-- Volumes mounting the default service account token
+- Volumes mounting the default service account token, kubernetes secrets, and config maps
 - Hostpath volumes
 
 It is possible to exclude volumes from being backed up using the `backup.velero.io/backup-volumes-excludes` annotation on the pod.
