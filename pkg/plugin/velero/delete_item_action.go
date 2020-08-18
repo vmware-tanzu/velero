@@ -19,7 +19,7 @@ package velero
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // DeleteItemAction is an actor that performs an operation on an individual item being restored.
@@ -41,5 +41,5 @@ type DeleteItemActionExecuteInput struct {
 	// Item is the item taken from the pristine backed up version of resource.
 	Item runtime.Unstructured
 	// Backup is the representation of the restore resource processed by Velero.
-	Backup *api.Backup
+	Backup *velerov1api.Backup
 }
