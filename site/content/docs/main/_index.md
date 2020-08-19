@@ -1,5 +1,6 @@
 ---
-version: main
+cascade:
+  version: main
 ---
 ![100]
 

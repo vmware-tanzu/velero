@@ -1,5 +1,4 @@
 ---
-version: v1.4
 layout: docs
 title: API Types
 ---
