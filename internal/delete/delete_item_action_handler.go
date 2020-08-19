@@ -19,7 +19,6 @@ package delete
 import (
 	"encoding/json"
 	"io"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -107,7 +106,7 @@ func InvokeDeleteActions(ctx *Context) error {
 
 			// Process individual items from the backup
 			for _, item := range items {
-				itemPath := getItemFilePath(dir, resource, namespace, item)
+				itemPath := archive.GetItemFilePath(dir, resource, namespace, item)
 
 				// obj is the Unstructured item from the backup
 				obj, err := ctx.unmarshal(itemPath)
@@ -217,14 +216,4 @@ func resolveActions(actions []velero.DeleteItemAction, helper discovery.Helper) 
 	}
 
 	return resolved, nil
-}
-
-// getItemFilePath returns an item's file path once extracted from a Velero backup tarball.
-func getItemFilePath(rootDir, groupResource, namespace, name string) string {
-	switch namespace {
-	case "":
-		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.ClusterScopedDir, name+".json")
-	default:
-		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.NamespaceScopedDir, namespace, name+".json")
-	}
 }

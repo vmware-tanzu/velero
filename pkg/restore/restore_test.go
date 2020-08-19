@@ -2589,14 +2589,6 @@ func TestIsCompleted(t *testing.T) {
 	}
 }
 
-func TestGetItemFilePath(t *testing.T) {
-	res := getItemFilePath("root", "resource", "", "item")
-	assert.Equal(t, "root/resources/resource/cluster/item.json", res)
-
-	res = getItemFilePath("root", "resource", "namespace", "item")
-	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
-}
-
 func Test_getOrderedResources(t *testing.T) {
 	tests := []struct {
 		name               string
