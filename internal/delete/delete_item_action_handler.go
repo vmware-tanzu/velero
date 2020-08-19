@@ -111,23 +111,26 @@ func InvokeDeleteActions(ctx *Context) error {
 
 				// obj is the Unstructured item from the backup
 				obj, err := ctx.unmarshal(itemPath)
-				nsLog.Infof("Testing delete item actions for %s", obj.GetName())
 				if err != nil {
 					return errors.Wrapf(err, "Could not unmarshal item: %v", item)
 				}
+
+				itemLog := nsLog.WithField("item", obj.GetName())
+				itemLog.Infof("invoking DeleteItemAction plugins")
 
 				for _, action := range actions {
 					if !action.selector.Matches(labels.Set(obj.GetLabels())) {
 						continue
 					}
-
-					ctx.Log.Infof("Executing item action for %v", groupResource.String)
-
-					// TODO: create a set of errors & warnings similar to how restores work and put them in the log.
 					err = action.Execute(&velero.DeleteItemActionExecuteInput{
 						Item:   obj,
 						Backup: ctx.Backup,
 					})
+					// Since we want to keep looping even on errors, log them instead of just returning.
+					if err != nil {
+						itemLog.WithError(err).Error("plugin error")
+
+					}
 				}
 			}
 		}
