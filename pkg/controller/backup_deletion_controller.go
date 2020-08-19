@@ -318,7 +318,8 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		Filesystem:      filesystem.NewFileSystem(),
 	}
 
-	//TODO: Wrap this in a gofunc
+	// Optimization: wrap in a gofunc? Would be useful for large backups with lots of objects.
+	// but what do we do with the error returned? We can't just swallow it as that may lead to dangling resources.
 	err = delete.InvokeDeleteActions(ctx)
 	if err != nil {
 		return errors.Wrap(err, "error invoking delete item actions")
