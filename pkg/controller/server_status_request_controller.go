@@ -34,7 +34,7 @@ import (
 
 const (
 	ttl                       = time.Minute
-	statusRequestResyncPeriod = 1 * time.Minute
+	statusRequestResyncPeriod = 5 * time.Minute
 )
 
 type PluginLister interface {
@@ -84,7 +84,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing new ServerStatusRequest")
 
-		if err := r.ServerStatus.PatchStatusProcessed(statusRequest, r.Ctx); err != nil {
+		if err := r.ServerStatus.PatchStatusProcessed(r.Client, statusRequest, r.Ctx); err != nil {
 			log.WithError(err).Error("Unable to update the request")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
 		}

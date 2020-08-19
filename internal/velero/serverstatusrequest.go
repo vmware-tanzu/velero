@@ -30,21 +30,20 @@ import (
 )
 
 type ServerStatus struct {
-	Client         client.Client
 	PluginRegistry PluginLister
 	Clock          clock.Clock
 }
 
 // PatchStatusProcessed patches status fields, including loading the plugin info, and updates
 // the ServerStatusRequest.Status.Phase to ServerStatusRequestPhaseProcessed.
-func (s *ServerStatus) PatchStatusProcessed(req *velerov1api.ServerStatusRequest, ctx context.Context) error {
+func (s *ServerStatus) PatchStatusProcessed(kbClient client.Client, req *velerov1api.ServerStatusRequest, ctx context.Context) error {
 	statusPatch := client.MergeFrom(req.DeepCopyObject())
 	req.Status.ServerVersion = buildinfo.Version
 	req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
 	req.Status.ProcessedTimestamp = &metav1.Time{Time: s.Clock.Now()}
 	req.Status.Plugins = loadPlugins(s.PluginRegistry)
 
-	if err := s.Client.Status().Patch(ctx, req, statusPatch); err != nil {
+	if err := kbClient.Status().Patch(ctx, req, statusPatch); err != nil {
 		return errors.WithStack(err)
 	}
 

@@ -152,26 +152,25 @@ func TestPatchStatusProcessed(t *testing.T) {
 			g := NewWithT(t)
 
 			serverStatusInfo := ServerStatus{
-				Client:         fake.NewFakeClientWithScheme(scheme.Scheme, tc.req),
 				PluginRegistry: tc.reqPluginLister,
 				Clock:          clock.NewFakeClock(now),
 			}
 
-			err := serverStatusInfo.PatchStatusProcessed(tc.req, context.Background())
+			kbClient := fake.NewFakeClientWithScheme(scheme.Scheme, tc.req)
+			err := serverStatusInfo.PatchStatusProcessed(kbClient, tc.req, context.Background())
 			assert.Nil(t, err)
 
 			key := client.ObjectKey{Name: tc.req.Name, Namespace: tc.req.Namespace}
 			instance := &velerov1api.ServerStatusRequest{}
-			err = serverStatusInfo.Client.Get(context.Background(), key, instance)
+			err = kbClient.Get(context.Background(), key, instance)
 
 			if tc.expected == nil {
-				g.Expect(&velerov1api.ServerStatusRequest{}).To(BeEquivalentTo((&velerov1api.ServerStatusRequest{})))
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			} else {
 				sortPluginsByKindAndName(tc.expected.Status.Plugins)
 				sortPluginsByKindAndName(instance.Status.Plugins)
-				g.Expect(tc.expected.Status.Plugins).To(BeEquivalentTo((instance.Status.Plugins)))
-				g.Expect(tc.expected).To(BeEquivalentTo((instance)))
+				g.Expect(instance.Status.Plugins).To(BeEquivalentTo((tc.expected.Status.Plugins)))
+				g.Expect(instance).To(BeEquivalentTo((tc.expected)))
 				g.Expect(err).To(BeNil())
 			}
 		})

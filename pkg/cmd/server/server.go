@@ -853,7 +853,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	serverStatusInfo := velero.ServerStatus{
-		Client:         s.mgr.GetClient(),
 		PluginRegistry: s.pluginRegistry,
 		Clock:          clock.RealClock{},
 	}

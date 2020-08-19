@@ -22,11 +22,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -56,12 +56,14 @@ var _ = Describe("Server Status Request Reconciler", func() {
 		tests := []struct {
 			req             *velerov1api.ServerStatusRequest
 			reqPluginLister *fakePluginLister
-			expectedPhase   velerov1api.ServerStatusRequestPhase
+			expected        *velerov1api.ServerStatusRequest
+			expectedRequeue ctrl.Result
+			expectedErrMsg  string
 		}{
 			{
+				// server status request with phase=empty will be processed
 				req: statusRequestBuilder("1").
 					ServerVersion(buildinfo.Version).
-					// Phase(velerov1api.ServerStatusRequestPhaseNew).
 					ProcessedTimestamp(now).
 					Plugins([]velerov1api.PluginInfo{
 						{
@@ -78,53 +80,146 @@ var _ = Describe("Server Status Request Reconciler", func() {
 						},
 					},
 				},
-				expectedPhase: velerov1api.ServerStatusRequestPhaseProcessed,
+				expected: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase(velerov1api.ServerStatusRequestPhaseProcessed).
+					ProcessedTimestamp(now).
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
 			},
-			// {
-			// 	req: statusRequestBuilder("1").
-			// 		ServerVersion(buildinfo.Version).
-			// 		Phase(velerov1api.ServerStatusRequestPhaseProcessed).
-			// 		ProcessedTimestamp(now).
-			// 		Plugins([]velerov1api.PluginInfo{
-			// 			{
-			// 				Name: "custom.io/myown",
-			// 				Kind: "VolumeSnapshotter",
-			// 			},
-			// 		}).
-			// 		Result(),
-			// 	reqPluginLister: &fakePluginLister{
-			// 		plugins: []framework.PluginIdentifier{
-			// 			{
-			// 				Name: "custom.io/myown",
-			// 				Kind: "VolumeSnapshotter",
-			// 			},
-			// 		},
-			// 	},
-			// 	expectedPhase: velerov1api.ServerStatusRequestPhaseNew,
-			// },
+			{
+				// server status request with phase=new will be processed
+				req: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase(velerov1api.ServerStatusRequestPhaseNew).
+					ProcessedTimestamp(now).
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				reqPluginLister: &fakePluginLister{
+					plugins: []framework.PluginIdentifier{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					},
+				},
+				expected: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase(velerov1api.ServerStatusRequestPhaseProcessed).
+					ProcessedTimestamp(now).
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
+			},
+			{
+				// server status request with phase=Processed does not get deleted if not expired
+				req: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase(velerov1api.ServerStatusRequestPhaseProcessed).
+					ProcessedTimestamp(now). // not yet expired
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myotherown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				reqPluginLister: &fakePluginLister{
+					plugins: []framework.PluginIdentifier{
+						{
+							Name: "custom.io/myotherown",
+							Kind: "VolumeSnapshotter",
+						},
+					},
+				},
+				expected: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase(velerov1api.ServerStatusRequestPhaseProcessed).
+					ProcessedTimestamp(now).
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: statusRequestResyncPeriod},
+			},
+			{
+				// server status request with phase=Processed gets deleted if expire
+				req: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase(velerov1api.ServerStatusRequestPhaseProcessed).
+					ProcessedTimestamp(now.Add(-61 * time.Second)). // expired
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myotherown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				reqPluginLister: &fakePluginLister{
+					plugins: []framework.PluginIdentifier{
+						{
+							Name: "custom.io/myotherown",
+							Kind: "VolumeSnapshotter",
+						},
+					},
+				},
+				expected:        nil,
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
+			},
+			{
+				// server status request with invalid phase returns an error
+				req: statusRequestBuilder("1").
+					ServerVersion(buildinfo.Version).
+					Phase("an-invalid-phase").
+					ProcessedTimestamp(now).
+					Plugins([]velerov1api.PluginInfo{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					}).
+					Result(),
+				reqPluginLister: &fakePluginLister{
+					plugins: []framework.PluginIdentifier{
+						{
+							Name: "custom.io/myown",
+							Kind: "VolumeSnapshotter",
+						},
+					},
+				},
+				expectedErrMsg:  "unexpected ServerStatusRequest phase \"an-invalid-phase\"",
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
+			},
 		}
 
-		var r ServerStatusRequestReconciler
-
-		// serverRequests := new(velerov1api.ServerStatusRequestList)
 		for _, test := range tests {
-			// serverRequest := test.req
-			// serverRequests.Items = append(serverRequests.Items, *serverRequest)
-
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-
-			k8sClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.req)
-
 			serverStatusInfo := velero.ServerStatus{
-				Client:         k8sClient,
 				PluginRegistry: test.reqPluginLister,
 				Clock:          clock.NewFakeClock(now),
 			}
-
-			r = ServerStatusRequestReconciler{
-				// Client:       fake.NewFakeClientWithScheme(scheme.Scheme, serverRequests),
-				Client:       k8sClient,
+			r := ServerStatusRequestReconciler{
+				Client:       fake.NewFakeClientWithScheme(scheme.Scheme, test.req),
 				ServerStatus: serverStatusInfo,
 				Ctx:          context.Background(),
 				Log:          velerotest.NewLogger(),
@@ -137,63 +232,25 @@ var _ = Describe("Server Status Request Reconciler", func() {
 				},
 			})
 
-			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{RequeueAfter: statusRequestResyncPeriod}))
-			Expect(err).To(BeNil())
+			Expect(actualResult).To(BeEquivalentTo(test.expectedRequeue))
+			if test.expectedErrMsg == "" {
+				Expect(err).To(BeNil())
+			} else {
+				Expect(err.Error()).To(BeEquivalentTo(test.expectedErrMsg))
+				return
+			}
 
-			srs := &velerov1api.ServerStatusRequest{}
-			// Wait for reconciliation to happen.
-			Eventually(func() bool {
-				if err := k8sClient.Get(ctx,
-					client.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, srs); err != nil {
-					return false
-				}
-				return srs.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed
-			}, timeout).Should(BeTrue())
-
-			// time.Sleep(3 * time.Minute)
-			// r.Reconcile(ctrl.Request{
-			// 	NamespacedName: types.NamespacedName{
-			// 		Namespace: velerov1api.DefaultNamespace,
-			// 		Name:      test.req.Name,
-			// 	},
-			// })
-
-		}
-
-		requests := new(velerov1api.ServerStatusRequestList)
-		err = r.Client.List(context.Background(), requests, &kbclient.ListOptions{
-			Namespace: velerov1api.DefaultNamespace,
-		})
-		Expect(err).To(BeNil())
-
-		for _, test := range tests {
-			// Assertion
-
-			// _, err := r.Reconcile(ctrl.Request{
-			// 	NamespacedName: types.NamespacedName{
-			// 		Namespace: velerov1api.DefaultNamespace,
-			// 		Name:      test.req.Name,
-			// 	},
-			// })
-			// Expect(err).To(BeNil())
-
-			key := client.ObjectKey{Name: test.req.Name, Namespace: velerov1api.DefaultNamespace}
 			instance := &velerov1api.ServerStatusRequest{}
-			err = r.Client.Get(ctx, key, instance)
-			Expect(err).To(BeNil())
-			// Expect(err).ToNot(BeNil())
-			Expect(instance.Status.Phase).To(BeIdenticalTo(test.expectedPhase))
+			err = r.Client.Get(ctx, kbclient.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, instance)
+
+			// Assertions
+			if test.expected == nil {
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			} else {
+				Expect(err).To(BeNil())
+				Eventually(instance.Status.Phase == test.expected.Status.Phase, timeout).Should(BeTrue())
+			}
 		}
-
-		// Assertions
-		// for i, serverRequest := range serverRequests.Items {
-		// 	key := client.ObjectKey{Name: serverRequest.Name, Namespace: serverRequest.Namespace}
-		// 	instance := &velerov1api.ServerStatusRequest{}
-		// 	err := r.Client.Get(ctx, key, instance)
-		// 	Expect(err).To(BeNil())
-		// 	Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
-		// }
-
 	})
 })
 
