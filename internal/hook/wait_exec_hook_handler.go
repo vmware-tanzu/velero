@@ -99,6 +99,12 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 
 	var errors []error
 
+	// The first time this handler is called after a container starts running it will execute all
+	// pending hooks for that container. Subsequent invocations of this handler will never execute
+	// hooks in that container. It uses the byContainer map to keep track of which containers have
+	// not yet been observed to be running. It relies on the Informer not to be called concurrently.
+	// When a container is observed running and its hooks are executed, the container is deleted
+	// from the byContainer map. When the map is empty the watch is ended.
 	handler := func(newObj interface{}) {
 		newPod, ok := newObj.(*v1.Pod)
 		if !ok {
