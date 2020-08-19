@@ -317,6 +317,8 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		DiscoveryHelper: c.helper,
 		Filesystem:      filesystem.NewFileSystem(),
 	}
+
+	//TODO: Wrap this in a gofunc
 	err = delete.InvokeDeleteActions(ctx)
 	if err != nil {
 		return errors.Wrap(err, "error invoking delete item actions")

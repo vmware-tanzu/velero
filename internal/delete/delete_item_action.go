@@ -135,7 +135,7 @@ func InvokeDeleteActions(ctx *Context) error {
 	return nil
 }
 
-// getApplicableActions takes resolved DeleteItemActions and filters them for a given group/resource an namespace.
+// getApplicableActions takes resolved DeleteItemActions and filters them for a given group/resource and namespace.
 func (ctx *Context) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
 	var actions []resolvedAction
 
