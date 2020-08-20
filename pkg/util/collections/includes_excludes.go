@@ -21,9 +21,10 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 )
 
 type globStringSet struct {

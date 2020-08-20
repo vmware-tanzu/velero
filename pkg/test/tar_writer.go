@@ -26,9 +26,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/vmware-tanzu/velero/pkg/util/encode"
 )
 
 type TarWriter struct {

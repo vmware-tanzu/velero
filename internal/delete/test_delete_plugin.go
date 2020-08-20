@@ -17,6 +17,7 @@ package delete
 
 import (
 	"github.com/sirupsen/logrus"
+
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
