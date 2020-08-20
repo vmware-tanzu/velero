@@ -145,7 +145,7 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 			// test harness contains the fake API server/discovery client
 			h := newHarness(t)
 			for _, r := range tc.apiResources {
-				h.AddItems(t, r)
+				h.addResource(t, r)
 			}
 
 			actions := []velero.DeleteItemAction{}
@@ -174,6 +174,7 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 	}
 }
 
+// TODO: unify this with the test harness in pkg/restore/restore_test.go
 type harness struct {
 	*test.APIServer
 	discoveryHelper discovery.Helper
@@ -194,7 +195,8 @@ func newHarness(t *testing.T) *harness {
 	}
 }
 
-func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
+// addResource adds an APIResource and it's items to a faked API server for testing.
+func (h *harness) addResource(t *testing.T, resource *test.APIResource) {
 	t.Helper()
 
 	h.DiscoveryClient.WithAPIResource(resource)
