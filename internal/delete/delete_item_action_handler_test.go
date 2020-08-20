@@ -126,7 +126,18 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
 			},
 		},
-		// TODO: name: actions with label selector
+		{
+			name:   "single action with label selector runs only for those items",
+			backup: builder.ForBackup("velero", "velero").Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("app", "app1")).Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").ObjectMeta(builder.WithLabels("app", "app1")).Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForLabelSelector("app=app1"): {"ns-1/pod-1", "ns-2/pvc-2"},
+			},
+		},
 	}
 
 	for _, tc := range tests {
