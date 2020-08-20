@@ -685,7 +685,7 @@ func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNa
 	for _, item := range items {
 		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
 
-		obj, err := ctx.unmarshal(itemPath)
+		obj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 		if err != nil {
 			errs.Add(targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
 			continue
@@ -972,7 +972,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}
 
 			additionalResourceID := getResourceID(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
-			additionalObj, err := ctx.unmarshal(itemPath)
+			additionalObj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 			if err != nil {
 				errs.Add(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
 			}
@@ -1304,22 +1304,4 @@ func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResou
 	}
 	// Assume any other resource isn't complete and can be restored
 	return false, nil
-}
-
-// unmarshal reads the specified file, unmarshals the JSON contained within it
-// and returns an Unstructured object.
-func (ctx *restoreContext) unmarshal(filePath string) (*unstructured.Unstructured, error) {
-	var obj unstructured.Unstructured
-
-	bytes, err := ctx.fileSystem.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(bytes, &obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return &obj, nil
 }

@@ -17,12 +17,10 @@ limitations under the License.
 package delete
 
 import (
-	"encoding/json"
 	"io"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -108,7 +106,7 @@ func InvokeDeleteActions(ctx *Context) error {
 				itemPath := archive.GetItemFilePath(dir, resource, namespace, item)
 
 				// obj is the Unstructured item from the backup
-				obj, err := ctx.unmarshal(itemPath)
+				obj, err := archive.Unmarshal(ctx.Filesystem, itemPath)
 				if err != nil {
 					return errors.Wrapf(err, "Could not unmarshal item: %v", item)
 				}
@@ -157,23 +155,6 @@ func (ctx *Context) getApplicableActions(groupResource schema.GroupResource, nam
 	}
 
 	return actions
-}
-
-// unmarshal reads a JSON file into an Unstructured data object.
-func (ctx *Context) unmarshal(filePath string) (*unstructured.Unstructured, error) {
-	var obj unstructured.Unstructured
-
-	bytes, err := ctx.Filesystem.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(bytes, &obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return &obj, nil
 }
 
 // resolvedActions are DeleteItemActions decorated with resource/namespace include/exclude collections, as well as label selectors for easy comparison.

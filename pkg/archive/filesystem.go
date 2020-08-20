@@ -17,9 +17,13 @@ limitations under the License.
 package archive
 
 import (
+	"encoding/json"
 	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 // GetItemFilePath returns an item's file path once extracted from a Velero backup archive.
@@ -30,4 +34,22 @@ func GetItemFilePath(rootDir, groupResource, namespace, name string) string {
 	default:
 		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.NamespaceScopedDir, namespace, name+".json")
 	}
+}
+
+// Unmarshal reads the specified file, unmarshals the JSON contained within it
+// and returns an Unstructured object.
+func Unmarshal(fs filesystem.Interface, filePath string) (*unstructured.Unstructured, error) {
+	var obj unstructured.Unstructured
+
+	bytes, err := fs.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(bytes, &obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return &obj, nil
 }
