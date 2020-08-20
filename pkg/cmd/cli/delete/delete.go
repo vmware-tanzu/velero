@@ -23,6 +23,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restore"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/schedule"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backuplocation"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -41,10 +42,14 @@ func NewCommand(f client.Factory) *cobra.Command {
 	scheduleCommand := schedule.NewDeleteCommand(f, "schedule")
 	scheduleCommand.Aliases = []string{"schedules"}
 
+	backuplocationCommand := backuplocation.NewDeleteCommand(f, "backup-location")
+	backuplocationCommand.Aliases = []string{"backup-locations"}
+
 	c.AddCommand(
 		backupCommand,
 		restoreCommand,
 		scheduleCommand,
+		backuplocationCommand,
 	)
 
 	return c
