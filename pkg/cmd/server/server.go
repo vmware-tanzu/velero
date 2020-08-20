@@ -95,14 +95,15 @@ const (
 	defaultProfilerAddress = "localhost:6060"
 
 	// keys used to map out available controllers with disable-controllers flag
-	BackupControllerKey          = "backup"
-	BackupSyncControllerKey      = "backup-sync"
-	ScheduleControllerKey        = "schedule"
-	GcControllerKey              = "gc"
-	BackupDeletionControllerKey  = "backup-deletion"
-	RestoreControllerKey         = "restore"
-	DownloadRequestControllerKey = "download-request"
-	ResticRepoControllerKey      = "restic-repo"
+	BackupControllerKey              = "backup"
+	BackupSyncControllerKey          = "backup-sync"
+	ScheduleControllerKey            = "schedule"
+	GcControllerKey                  = "gc"
+	BackupDeletionControllerKey      = "backup-deletion"
+	RestoreControllerKey             = "restore"
+	DownloadRequestControllerKey     = "download-request"
+	ResticRepoControllerKey          = "restic-repo"
+	ServerStatusRequestControllerKey = "server-status-request"
 
 	defaultControllerWorkers = 1
 	// the default TTL for a backup
@@ -119,6 +120,7 @@ var disableControllerList = []string{
 	RestoreControllerKey,
 	DownloadRequestControllerKey,
 	ResticRepoControllerKey,
+	ServerStatusRequestControllerKey,
 }
 
 type serverConfig struct {
@@ -786,6 +788,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		ResticRepoControllerKey:      resticRepoControllerRunInfo,
 		DownloadRequestControllerKey: downloadrequestControllerRunInfo,
 	}
+	// Note: all runtime type controllers that can be disabled are grouped separately, below:
+	enabledRuntimeControllers := make(map[string]struct{})
+	enabledRuntimeControllers[ServerStatusRequestControllerKey] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -804,6 +809,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			delete(enabledControllers, controllerName)
 		} else {
 			s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
+		}
+	}
+	// remove disabled runtime type controllers
+	for _, controllerName := range s.config.disabledControllers {
+		if _, ok := enabledRuntimeControllers[controllerName]; ok {
+			s.logger.Infof("Disabling controller: %s", controllerName)
+			delete(enabledRuntimeControllers, controllerName)
 		}
 	}
 
@@ -849,22 +861,23 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		StorageLocation: storageLocationInfo,
 		Log:             s.logger,
 	}).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", "BackupStorageLocation")
+		s.logger.Fatal(err, "unable to create controller", "controller", "backup-storage-location")
 	}
 
-	serverStatusInfo := velero.ServerStatus{
-		PluginRegistry: s.pluginRegistry,
-		Clock:          clock.RealClock{},
-	}
-	if err := (&controller.ServerStatusRequestReconciler{
-		Scheme:       s.mgr.GetScheme(),
-		Client:       s.mgr.GetClient(),
-		Ctx:          s.ctx,
-		ServerStatus: serverStatusInfo,
-
-		Log: s.logger,
-	}).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", "ServerStatusRequest")
+	if _, ok := enabledRuntimeControllers[ServerStatusRequestControllerKey]; ok {
+		serverStatusInfo := velero.ServerStatus{
+			PluginRegistry: s.pluginRegistry,
+			Clock:          clock.RealClock{},
+		}
+		if err := (&controller.ServerStatusRequestReconciler{
+			Scheme:       s.mgr.GetScheme(),
+			Client:       s.mgr.GetClient(),
+			Ctx:          s.ctx,
+			ServerStatus: serverStatusInfo,
+			Log:          s.logger,
+		}).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", ServerStatusRequestControllerKey)
+		}
 	}
 
 	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller

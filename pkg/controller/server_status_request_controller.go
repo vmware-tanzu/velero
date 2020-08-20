@@ -65,11 +65,11 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	statusRequest := &velerov1api.ServerStatusRequest{}
 	if err := r.Client.Get(r.Ctx, req.NamespacedName, statusRequest); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.WithError(err).Debug("ServerStatusRequest not found")
+			log.WithError(err).Error("ServerStatusRequest not found")
 			return ctrl.Result{}, nil
 		}
 
-		log.WithError(err).Debug("Error getting ServerStatusRequest")
+		log.WithError(err).Error("Error getting ServerStatusRequest")
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
@@ -102,8 +102,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 			return ctrl.Result{}, nil
 		}
 	default:
-		log.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
-		return ctrl.Result{}, errors.Errorf("unexpected ServerStatusRequest phase %q", statusRequest.Status.Phase)
+		return ctrl.Result{}, errors.New("unexpected ServerStatusRequest phase")
 	}
 
 	return ctrl.Result{}, nil
