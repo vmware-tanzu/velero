@@ -53,7 +53,7 @@ func InvokeDeleteActions(ctx *Context) error {
 
 	// No actions installed and no error means we don't have to continue;
 	// just do the backup deletion without worrying about plugins.
-	if (ctx.resolvedActions == nil || len(ctx.resolvedActions) == 0) && err == nil {
+	if len(ctx.resolvedActions) == 0 && err == nil {
 		ctx.Log.Debug("No delete item actions present, proceeding with rest of backup deletion process")
 		return nil
 	} else if err != nil {
