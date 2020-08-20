@@ -48,7 +48,7 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 		backup       *velerov1api.Backup
 		apiResources []*test.APIResource
 		tarball      io.Reader
-		actions      map[*recordResourcesAction][]string
+		actions      map[*recordResourcesAction][]string // recordResourceActions are the plugins that will capture item ids, the []string values are the ids we'll test against.
 	}{
 		{
 			name:   "single action with no selector runs for all items",
@@ -148,6 +148,7 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 				h.addResource(t, r)
 			}
 
+			// Get the plugins out of the map in order to use them.
 			actions := []velero.DeleteItemAction{}
 			for action := range tc.actions {
 				actions = append(actions, action)
@@ -165,6 +166,7 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 			err := InvokeDeleteActions(c)
 			require.NoError(t, err)
 
+			// Compare the plugins against the ids that we wanted.
 			for action, want := range tc.actions {
 				sort.Strings(want)
 				sort.Strings(action.ids)
