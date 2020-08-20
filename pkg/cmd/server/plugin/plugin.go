@@ -22,7 +22,6 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
-	"github.com/vmware-tanzu/velero/internal/delete"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
@@ -55,7 +54,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
 				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
-				RegisterDeleteItemAction("velero.io/test-delete-plug", newDeletePlugin).
 				Serve()
 		},
 	}
@@ -198,8 +196,4 @@ func newChangePVCNodeSelectorItemAction(f client.Factory) veleroplugin.HandlerIn
 			client.CoreV1().Nodes(),
 		), nil
 	}
-}
-
-func newDeletePlugin(logger logrus.FieldLogger) (interface{}, error) {
-	return delete.NewDeletePlugin(logger), nil
 }
