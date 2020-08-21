@@ -98,6 +98,69 @@ make container
 ```
 _Note: To build build container images for both `velero` and `velero-restic-restore-helper`, run: `make all-containers`_
 
+### Publishing container images to a registry
+
+To publish container images to a registry, the following one time setup is necessary:
+
+1. If you are building cross platform container images
+    ```bash
+    $ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    ```
+1. Create and bootstrap a new docker buildx builder
+    ```bash
+    $ docker buildx create --use --name builder
+      builder
+    $ docker buildx inspect --bootstrap
+      [+] Building 2.6s (1/1) FINISHED
+      => [internal] booting buildkit                                2.6s
+      => => pulling image moby/buildkit:buildx-stable-1             1.9s
+      => => creating container buildx_buildkit_builder0             0.7s
+    Name:   builder
+    Driver: docker-container
+
+    Nodes:
+    Name:      builder0
+    Endpoint:  unix:///var/run/docker.sock
+    Status:    running
+    Platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+    ```
+    NOTE: Without the above setup, the output of `docker buildx inspect --bootstrap` will be:
+    ```bash
+    $ docker buildx inspect --bootstrap
+    Name:   default
+    Driver: docker
+
+    Nodes:
+    Name:      default
+    Endpoint:  default
+    Status:    running
+    Platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+    ```
+    And the `REGISTRY=myrepo BUILDX_OUTPUT_TYPE=registry make container` will fail with the below error:
+    ```bash
+    $ REGISTRY=ashishamarnath BUILDX_PLATFORMS=linux/arm64 BUILDX_OUTPUT_TYPE=registry make container
+    auto-push is currently not implemented for docker driver
+    make: *** [container] Error 1
+    ```
+
+Having completed the above one time setup, now the output of `docker buildx inspect --bootstrap` should be like
+
+```bash
+$ docker buildx inspect --bootstrap
+Name:   builder
+Driver: docker-container
+
+Nodes:
+Name:      builder0
+Endpoint:  unix:///var/run/docker.sock
+Status:    running
+Platforms: linux/amd64, linux/arm64, linux/riscv64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v
+```
+
+Now build and push the container image by running the `make container` command with `$BUILDX_OUTPUT_TYPE` set to `registry`
+```bash
+$ REGISTRY=myrepo BUILDX_OUTPUT_TYPE=registry make container
+```
 
 ### Cross platform building
 
@@ -115,12 +178,6 @@ For example, to build an image for arm64, run:
 BUILDX_PLATFORMS=linux/arm64 make container
 ```
 _Note: By default, `$BUILDX_PLATFORMS` is set to `linux/amd64`_
-
-To push your image to the registry, run the `make container` command with `$BUILDX_OUTPUT_TYPE` set to `registry`. For example:
-
-```bash
-REGISTRY=myrepo BUILDX_PLATFORMS=linux/arm64 BUILDX_OUTPUT_TYPE=registry make container
-```
 
 With `buildx`, you can also build all supported platforms at the same time and push a multi-arch image to the registry. For example:
 
