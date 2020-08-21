@@ -28,7 +28,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 function tag_and_push() {
     echo "Tagging and pushing $VELERO_VERSION"
     git tag $VELERO_VERSION
-    git push $VELERO_VERSION
+    git push upstream $VELERO_VERSION
 }
 
 # For now, have the person doing the release pass in the VELERO_VERSION variable as an environment variable.
@@ -44,7 +44,7 @@ if [[ -z "$GITHUB_TOKEN" ]]; then
     exit 1
 fi
 
- Ensure that we have a clean working tree before we let any changes happen, especially important for cutting release branches.
+# Ensure that we have a clean working tree before we let any changes happen, especially important for cutting release branches.
 if [[ -n $(git status --short) ]]; then 
     echo "Your git working directory is dirty! Please clean up untracked files and stash any changes before proceeding."
     exit 3
@@ -77,7 +77,7 @@ read -p "Ready to continue? "
 echo "Alright, let's go."
 
 echo "Pulling down all git tags and branches before doing any work."
-git fetch upstream --all --tags
+git fetch upstream --tags
 
 # If we've got a patch release, we'll need to create a release branch for it.
 if [[ "$VELERO_PATCH" > 0 ]]; then
