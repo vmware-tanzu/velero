@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -154,7 +153,7 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	// get resource includes-excludes
-	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, req.Restore.Spec.IncludedResources, req.Restore.Spec.ExcludedResources)
+	resourceIncludesExcludes := collections.GetResourceIncludesExcludes(kr.discoveryHelper, req.Restore.Spec.IncludedResources, req.Restore.Spec.ExcludedResources)
 
 	// get namespace includes-excludes
 	namespaceIncludesExcludes := collections.NewIncludesExcludes().
@@ -228,27 +227,6 @@ func (kr *kubernetesRestorer) Restore(
 	return restoreCtx.execute()
 }
 
-// getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
-// discovery helper to resolve them to fully-qualified group-resource names, and returns an
-// IncludesExcludes list.
-func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *collections.IncludesExcludes {
-	resources := collections.GenerateIncludesExcludes(
-		includes,
-		excludes,
-		func(item string) string {
-			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
-			if err != nil {
-				return ""
-			}
-
-			gr := gvr.GroupResource()
-			return gr.String()
-		},
-	)
-
-	return resources
-}
-
 type resolvedAction struct {
 	velero.RestoreItemAction
 
@@ -266,7 +244,7 @@ func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper)
 			return nil, err
 		}
 
-		resources := getResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
+		resources := collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
 		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
 
 		selector := labels.Everything()
@@ -435,7 +413,7 @@ func (ctx *restoreContext) execute() (Result, Result) {
 			// create a blank one.
 			if namespace != "" && !existingNamespaces.Has(targetNamespace) {
 				logger := ctx.log.WithField("namespace", namespace)
-				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", namespace), targetNamespace)
+				ns := getNamespace(logger, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", namespace), targetNamespace)
 				if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 					errs.AddVeleroError(err)
 					continue
@@ -490,15 +468,6 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	return warnings, errs
 }
 
-func getItemFilePath(rootDir, groupResource, namespace, name string) string {
-	switch namespace {
-	case "":
-		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.ClusterScopedDir, name+".json")
-	default:
-		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.NamespaceScopedDir, namespace, name+".json")
-	}
-}
-
 // getNamespace returns a namespace API object that we should attempt to
 // create before restoring anything into it. It will come from the backup
 // tarball if it exists, else will be a new one. If from the tarball, it
@@ -535,6 +504,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 }
 
+// TODO: this should be combined with DeleteItemActions at some point.
 func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
 	var actions []resolvedAction
 	for _, action := range ctx.actions {
@@ -713,9 +683,9 @@ func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNa
 	groupResource := schema.ParseGroupResource(resource)
 
 	for _, item := range items {
-		itemPath := getItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
+		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
 
-		obj, err := ctx.unmarshal(itemPath)
+		obj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 		if err != nil {
 			errs.Add(targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
 			continue
@@ -804,7 +774,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// if the namespace scoped resource should be restored, ensure that the namespace into
 		// which the resource is being restored into exists.
 		// This is the *remapped* namespace that we are ensuring exists.
-		nsToEnsure := getNamespace(ctx.log, getItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
+		nsToEnsure := getNamespace(ctx.log, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
 		if _, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 			errs.AddVeleroError(err)
 			return warnings, errs
@@ -988,7 +958,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		obj = unstructuredObj
 
 		for _, additionalItem := range executeOutput.AdditionalItems {
-			itemPath := getItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
+			itemPath := archive.GetItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
 
 			if _, err := ctx.fileSystem.Stat(itemPath); err != nil {
 				ctx.log.WithError(err).WithFields(logrus.Fields{
@@ -1002,7 +972,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}
 
 			additionalResourceID := getResourceID(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
-			additionalObj, err := ctx.unmarshal(itemPath)
+			additionalObj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 			if err != nil {
 				errs.Add(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
 			}
@@ -1334,22 +1304,4 @@ func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResou
 	}
 	// Assume any other resource isn't complete and can be restored
 	return false, nil
-}
-
-// unmarshal reads the specified file, unmarshals the JSON contained within it
-// and returns an Unstructured object.
-func (ctx *restoreContext) unmarshal(filePath string) (*unstructured.Unstructured, error) {
-	var obj unstructured.Unstructured
-
-	bytes, err := ctx.fileSystem.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(bytes, &obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return &obj, nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,8 +36,10 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/internal/delete"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -48,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -76,6 +79,7 @@ type backupDeletionController struct {
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore            func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	metrics                   *metrics.ServerMetrics
+	helper                    discovery.Helper
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -96,6 +100,7 @@ func NewBackupDeletionController(
 	csiSnapshotClient *snapshotterClientSet.Clientset,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
+	helper discovery.Helper,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController("backup-deletion", logger),
@@ -113,6 +118,7 @@ func NewBackupDeletionController(
 		csiSnapshotContentLister:  csiSnapshotContentLister,
 		csiSnapshotClient:         csiSnapshotClient,
 		metrics:                   metrics,
+		helper:                    helper,
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
@@ -287,6 +293,36 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	backupStore, err := c.newBackupStore(location, pluginManager, log)
 	if err != nil {
 		errs = append(errs, err.Error())
+	}
+
+	// Download the tarball
+	backupFile, err := downloadToTempFile(backup.Name, backupStore, log)
+	if err != nil {
+		return errors.Wrap(err, "error downloading backup")
+	}
+	defer closeAndRemoveFile(backupFile, c.logger)
+
+	actions, err := pluginManager.GetDeleteItemActions()
+	log.Debugf("%d actions before invoking actions", len(actions))
+	if err != nil {
+		return errors.Wrap(err, "error getting delete item actions")
+	}
+	// don't defer CleanupClients here, since it was already called above.
+
+	ctx := &delete.Context{
+		Backup:          backup,
+		BackupReader:    backupFile,
+		Actions:         actions,
+		Log:             c.logger,
+		DiscoveryHelper: c.helper,
+		Filesystem:      filesystem.NewFileSystem(),
+	}
+
+	// Optimization: wrap in a gofunc? Would be useful for large backups with lots of objects.
+	// but what do we do with the error returned? We can't just swallow it as that may lead to dangling resources.
+	err = delete.InvokeDeleteActions(ctx)
+	if err != nil {
+		return errors.Wrap(err, "error invoking delete item actions")
 	}
 
 	if backupStore != nil {

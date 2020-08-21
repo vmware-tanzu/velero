@@ -35,6 +35,7 @@ Velero currently supports the following kinds of plugins:
 - **Volume Snapshotter** - creates volume snapshots (during backup) and restores volumes from snapshots (during restore)
 - **Backup Item Action** - executes arbitrary logic for individual items prior to storing them in a backup file
 - **Restore Item Action** - executes arbitrary logic for individual items prior to restoring them into a cluster
+- **Delete Item Action** - executes arbitrary logic based on individual items within a backup prior to deleting the backup
 
 ## Plugin Logging
 

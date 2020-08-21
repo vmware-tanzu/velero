@@ -108,5 +108,5 @@ func (s *DeleteItemActionGRPCServer) Execute(ctx context.Context, req *proto.Del
 		return nil, newGRPCError(err)
 	}
 
-	return nil, nil
+	return &proto.Empty{}, nil
 }
