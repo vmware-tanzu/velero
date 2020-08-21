@@ -189,6 +189,9 @@ endif
 	-f Dockerfile .
 	@echo "container: $(IMAGE):$(VERSION)"
 
+push-container: container
+	docker push $(IMAGE):$(VERSION)
+
 SKIP_TESTS ?=
 test: build-dirs
 ifneq ($(SKIP_TESTS), 1)
