@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,10 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 )
 
 type globStringSet struct {
@@ -186,4 +189,25 @@ func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 	}
 
 	return res
+}
+
+// GetResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
+// discovery helper to resolve them to fully-qualified group-resource names, and returns an
+// IncludesExcludes list.
+func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *IncludesExcludes {
+	resources := GenerateIncludesExcludes(
+		includes,
+		excludes,
+		func(item string) string {
+			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
+			if err != nil {
+				return ""
+			}
+
+			gr := gvr.GroupResource()
+			return gr.String()
+		},
+	)
+
+	return resources
 }

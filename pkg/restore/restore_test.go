@@ -17,9 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -54,7 +51,6 @@ import (
 	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -78,16 +74,16 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "no filters restores everything",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.PVs(),
@@ -101,16 +97,16 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "included resources filter only restores resources of those types",
 			restore: defaultRestore().IncludedResources("pods").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.PVs(),
@@ -123,16 +119,16 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "excluded resources filter only restores resources not of those types",
 			restore: defaultRestore().ExcludedResources("pvs").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.PVs(),
@@ -145,20 +141,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "included namespaces filter only restores resources in those namespaces",
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -173,20 +169,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "excluded namespaces filter only restores resources not in those namespaces",
 			restore: defaultRestore().ExcludedNamespaces("ns-2").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -201,20 +197,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "IncludeClusterResources=false only restores namespaced resources",
 			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -229,20 +225,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "label selector only restores matching resources",
 			restore: defaultRestore().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 					builder.ForPersistentVolume("pv-2").ObjectMeta(builder.WithLabels("a", "c")).Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -258,20 +254,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "should include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=true",
 			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(true).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -287,20 +283,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "should not include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=false",
 			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -316,20 +312,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "should not include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=nil",
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -345,20 +341,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "should include cluster-scoped resources if restoring all namespaces and IncludeClusterResources=true",
 			restore: defaultRestore().IncludeClusterResources(true).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -374,20 +370,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "should not include cluster-scoped resources if restoring all namespaces and IncludeClusterResources=false",
 			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -402,20 +398,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "when a wildcard and a specific resource are included, the wildcard takes precedence",
 			restore: defaultRestore().IncludedResources("*", "pods").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -431,20 +427,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "wildcard excludes are ignored",
 			restore: defaultRestore().ExcludedResources("*").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -460,20 +456,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "unresolvable included resources are ignored",
 			restore: defaultRestore().IncludedResources("pods", "unresolvable").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -487,20 +483,20 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:    "unresolvable excluded resources are ignored",
 			restore: defaultRestore().ExcludedResources("deployments", "unresolvable").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.Deployments(),
@@ -515,7 +511,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:         "mirror pods are not restored",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithAnnotations(corev1api.MirrorPodAnnotationKey, "foo")).Result()).done(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithAnnotations(corev1api.MirrorPodAnnotationKey, "foo")).Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
 			want:         map[*test.APIResource][]string{test.Pods(): {}},
 		},
@@ -523,7 +519,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:         "service accounts are restored",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).done(),
+			tarball:      test.NewTarWriter(t).AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).Done(),
 			apiResources: []*test.APIResource{test.ServiceAccounts()},
 			want:         map[*test.APIResource][]string{test.ServiceAccounts(): {"ns-1/sa-1"}},
 		},
@@ -579,13 +575,13 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 					builder.ForPod("ns-3", "pod-3").Result(),
 				).
-				done(),
+				Done(),
 			want: map[*test.APIResource][]string{
 				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
 			},
@@ -597,13 +593,13 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 					builder.ForPod("ns-3", "pod-3").Result(),
 				).
-				done(),
+				Done(),
 			want: map[*test.APIResource][]string{
 				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2"},
 			},
@@ -657,28 +653,28 @@ func TestRestoreResourcePriorities(t *testing.T) {
 			name:    "resources are restored according to the specified resource priorities",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
-				addItems("persistentvolumes",
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
-				addItems("deployments.apps",
+				AddItems("deployments.apps",
 					builder.ForDeployment("ns-1", "deploy-1").Result(),
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
-				addItems("serviceaccounts",
+				AddItems("serviceaccounts",
 					builder.ForServiceAccount("ns-1", "sa-1").Result(),
 					builder.ForServiceAccount("ns-2", "sa-2").Result(),
 				).
-				addItems("persistentvolumeclaims",
+				AddItems("persistentvolumeclaims",
 					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
 					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 				test.PVs(),
@@ -739,8 +735,8 @@ func TestInvalidTarballContents(t *testing.T) {
 			name:    "empty tarball returns an error",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				done(),
+			tarball: test.NewTarWriter(t).
+				Done(),
 			wantErrs: Result{
 				Velero: []string{"error parsing backup contents: directory \"resources\" does not exist"},
 			},
@@ -749,12 +745,12 @@ func TestInvalidTarballContents(t *testing.T) {
 			name:    "invalid JSON is reported as an error and restore continues",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				add("resources/pods/namespaces/ns-1/pod-1.json", []byte("invalid JSON")).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				Add("resources/pods/namespaces/ns-1/pod-1.json", []byte("invalid JSON")).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-2").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -815,8 +811,8 @@ func TestRestoreItems(t *testing.T) {
 			name:    "metadata other than namespace/name/labels/annotations gets removed",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").
 						ObjectMeta(
 							builder.WithLabels("key-1", "val-1"),
@@ -826,7 +822,7 @@ func TestRestoreItems(t *testing.T) {
 						).
 						Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -845,8 +841,8 @@ func TestRestoreItems(t *testing.T) {
 			name:    "status gets removed",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods",
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
 					&corev1api.Pod{
 						TypeMeta: metav1.TypeMeta{
 							APIVersion: "v1",
@@ -861,7 +857,7 @@ func TestRestoreItems(t *testing.T) {
 						},
 					},
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -875,9 +871,9 @@ func TestRestoreItems(t *testing.T) {
 			name:    "object gets labeled with full backup and restore names when they're both shorter than 63 characters",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -891,9 +887,9 @@ func TestRestoreItems(t *testing.T) {
 				Backup("the-really-long-kube-service-name-that-is-exactly-63-characters").
 				Result(),
 			backup: builder.ForBackup(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -915,9 +911,9 @@ func TestRestoreItems(t *testing.T) {
 				Backup("the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
 				Result(),
 			backup: builder.ForBackup(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -937,9 +933,9 @@ func TestRestoreItems(t *testing.T) {
 			name:    "no error when service account already exists in cluster and is identical to the backed up one",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
@@ -951,8 +947,8 @@ func TestRestoreItems(t *testing.T) {
 			name:    "service account secrets and image pull secrets are restored when service account already exists in cluster",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("serviceaccounts", &corev1api.ServiceAccount{
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", &corev1api.ServiceAccount{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: "v1",
 						Kind:       "ServiceAccount",
@@ -964,7 +960,7 @@ func TestRestoreItems(t *testing.T) {
 					Secrets:          []corev1api.ObjectReference{{Name: "secret-1"}},
 					ImagePullSecrets: []corev1api.LocalObjectReference{{Name: "pull-secret-1"}},
 				}).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
@@ -990,7 +986,7 @@ func TestRestoreItems(t *testing.T) {
 			h := newHarness(t)
 
 			for _, r := range tc.apiResources {
-				h.addItems(t, r)
+				h.AddItems(t, r)
 			}
 
 			data := Request{
@@ -1080,10 +1076,10 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "single action with no selector runs for all items",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction): {"ns-1/pod-1", "ns-2/pod-2", "pv-1", "pv-2"},
@@ -1093,10 +1089,10 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "single action with a resource selector for namespaced resources runs only for matching resources",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForResource("pods"): {"ns-1/pod-1", "ns-2/pod-2"},
@@ -1106,10 +1102,10 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "single action with a resource selector for cluster-scoped resources runs only for matching resources",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForResource("persistentvolumes"): {"pv-1", "pv-2"},
@@ -1119,11 +1115,11 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "single action with a namespace selector runs only for resources in that namespace",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1"},
@@ -1133,11 +1129,11 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "single action with a resource and namespace selector runs only for matching resources in that namespace",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("pods"): {"ns-1/pod-1"},
@@ -1147,11 +1143,11 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "multiple actions, each with a different resource selector using short name, run for matching resources",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForResource("po"): {"ns-1/pod-1", "ns-2/pod-2"},
@@ -1162,10 +1158,10 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			name:    "actions with selectors that don't match anything don't run for any resources",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
@@ -1179,7 +1175,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			h := newHarness(t)
 
 			for _, r := range tc.apiResources {
-				h.addItems(t, r)
+				h.AddItems(t, r)
 			}
 
 			actions := []velero.RestoreItemAction{}
@@ -1271,7 +1267,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			name:         "action that adds a label to item gets restored",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).done(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
 			actions: []velero.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
@@ -1288,7 +1284,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			name:         "action that removes a label to item gets restored",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result()).done(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
 			actions: []velero.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
@@ -1307,7 +1303,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			h := newHarness(t)
 
 			for _, r := range tc.apiResources {
-				h.addItems(t, r)
+				h.AddItems(t, r)
 			}
 
 			// every restored item should have the restore and backup name labels, set
@@ -1364,7 +1360,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			name:         "additional items that are already being restored are not restored twice",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).done(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
@@ -1387,7 +1383,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			name:         "when using a restore namespace filter, additional items that are in a non-included namespace are not restored",
 			restore:      defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).done(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
@@ -1409,10 +1405,10 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			name:    "when using a restore namespace filter, additional items that are cluster-scoped are restored when IncludeClusterResources=nil",
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
@@ -1435,10 +1431,10 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			name:    "additional items that are cluster-scoped are not restored when IncludeClusterResources=false",
 			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
@@ -1461,10 +1457,10 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			name:    "when using a restore resource filter, additional items that are non-included resources are not restored",
 			restore: defaultRestore().IncludedResources("pods").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				addItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
-				done(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
+				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
@@ -1490,7 +1486,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			h := newHarness(t)
 
 			for _, r := range tc.apiResources {
-				h.addItems(t, r)
+				h.AddItems(t, r)
 			}
 
 			data := Request{
@@ -1643,7 +1639,7 @@ func TestShouldRestore(t *testing.T) {
 			}
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource)
+				h.AddItems(t, resource)
 			}
 
 			for _, ns := range tc.namespaces {
@@ -1804,11 +1800,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).ClaimRef("ns-1", "pvc-1").Result(),
 				).
-				addItems("persistentvolumeclaims",
+				AddItems("persistentvolumeclaims",
 					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
 						VolumeName("pv-1").
 						ObjectMeta(
@@ -1816,7 +1812,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						).
 						Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(),
@@ -1837,11 +1833,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of retain has no snapshot and does not exist in-cluster, it gets restored, without its claim ref",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).ClaimRef("ns-1", "pvc-1").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(),
@@ -1861,11 +1857,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of delete has a snapshot and does not exist in-cluster, the snapshot and PV are restored",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).AWSEBSVolumeID("old-volume").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(),
@@ -1907,14 +1903,14 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of retain has a snapshot and does not exist in-cluster, the snapshot and PV are restored",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").
 						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						AWSEBSVolumeID("old-volume").
 						Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(),
@@ -1956,14 +1952,14 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of delete has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").
 						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
 						AWSEBSVolumeID("old-volume").
 						Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("pv-1").
@@ -2008,14 +2004,14 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").
 						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						AWSEBSVolumeID("old-volume").
 						Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("pv-1").
@@ -2060,16 +2056,16 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is renamed",
 			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems(
+			tarball: test.NewTarWriter(t).
+				AddItems(
 					"persistentvolumes",
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
 				).
-				addItems(
+				AddItems(
 					"persistentvolumeclaims",
 					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
@@ -2124,16 +2120,16 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV does not exist in-cluster, the PV is not renamed",
 			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems(
+			tarball: test.NewTarWriter(t).
+				AddItems(
 					"persistentvolumes",
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
 				).
-				addItems(
+				AddItems(
 					"persistentvolumeclaims",
 					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(),
@@ -2182,14 +2178,14 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems("persistentvolumes",
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").
 						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						AWSEBSVolumeID("old-volume").
 						Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("pv-1").
@@ -2243,16 +2239,16 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is renamed by volumesnapshotter",
 			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
 			backup:  defaultBackup().Result(),
-			tarball: newTarWriter(t).
-				addItems(
+			tarball: test.NewTarWriter(t).
+				AddItems(
 					"persistentvolumes",
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
 				).
-				addItems(
+				AddItems(
 					"persistentvolumeclaims",
 					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
 				).
-				done(),
+				Done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
@@ -2322,7 +2318,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			}
 
 			for _, r := range tc.apiResources {
-				h.addItems(t, r)
+				h.AddItems(t, r)
 			}
 
 			// Collect the IDs of all of the wanted resources so we can ensure the
@@ -2434,19 +2430,19 @@ func TestRestoreWithRestic(t *testing.T) {
 
 			// needed only to indicate resource types that can be restored, in this case, pods
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource)
+				h.AddItems(t, resource)
 			}
 
-			tarball := newTarWriter(t)
+			tarball := test.NewTarWriter(t)
 
 			// these backed up pods don't have any PVBs associated with them, so a call to RestorePodVolumes is not expected to be made for them
 			for _, pod := range tc.podWithoutPVBs {
-				tarball.addItems("pods", pod)
+				tarball.AddItems("pods", pod)
 			}
 
 			// these backed up pods have PVBs associated with them, so a call to RestorePodVolumes will be made for each of them
 			for _, pod := range tc.podWithPVBs {
-				tarball.addItems("pods", pod)
+				tarball.AddItems("pods", pod)
 
 				// the restore process adds these labels before restoring, so we must add them here too otherwise they won't match
 				pod.Labels = map[string]string{"velero.io/backup-name": tc.backup.Name, "velero.io/restore-name": tc.restore.Name}
@@ -2467,7 +2463,7 @@ func TestRestoreWithRestic(t *testing.T) {
 				Restore:          tc.restore,
 				Backup:           tc.backup,
 				PodVolumeBackups: tc.podVolumeBackups,
-				BackupReader:     tarball.done(),
+				BackupReader:     tarball.Done(),
 			}
 
 			warnings, errs := h.restorer.Restore(
@@ -2587,14 +2583,6 @@ func TestIsCompleted(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestGetItemFilePath(t *testing.T) {
-	res := getItemFilePath("root", "resource", "", "item")
-	assert.Equal(t, "root/resources/resource/cluster/item.json", res)
-
-	res = getItemFilePath("root", "resource", "namespace", "item")
-	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
 }
 
 func Test_getOrderedResources(t *testing.T) {
@@ -2739,78 +2727,6 @@ func assertEmptyResults(t *testing.T, res ...Result) {
 	}
 }
 
-type tarWriter struct {
-	t   *testing.T
-	buf *bytes.Buffer
-	gzw *gzip.Writer
-	tw  *tar.Writer
-}
-
-func newTarWriter(t *testing.T) *tarWriter {
-	tw := new(tarWriter)
-	tw.t = t
-	tw.buf = new(bytes.Buffer)
-	tw.gzw = gzip.NewWriter(tw.buf)
-	tw.tw = tar.NewWriter(tw.gzw)
-
-	return tw
-}
-
-func (tw *tarWriter) addItems(groupResource string, items ...metav1.Object) *tarWriter {
-	tw.t.Helper()
-
-	for _, obj := range items {
-
-		var path string
-		if obj.GetNamespace() == "" {
-			path = fmt.Sprintf("resources/%s/cluster/%s.json", groupResource, obj.GetName())
-		} else {
-			path = fmt.Sprintf("resources/%s/namespaces/%s/%s.json", groupResource, obj.GetNamespace(), obj.GetName())
-		}
-
-		tw.add(path, obj)
-	}
-
-	return tw
-}
-
-func (tw *tarWriter) add(name string, obj interface{}) *tarWriter {
-	tw.t.Helper()
-
-	var data []byte
-	var err error
-
-	switch obj.(type) {
-	case runtime.Object:
-		data, err = encode.Encode(obj.(runtime.Object), "json")
-	case []byte:
-		data = obj.([]byte)
-	default:
-		data, err = json.Marshal(obj)
-	}
-	require.NoError(tw.t, err)
-
-	require.NoError(tw.t, tw.tw.WriteHeader(&tar.Header{
-		Name:     name,
-		Size:     int64(len(data)),
-		Typeflag: tar.TypeReg,
-		Mode:     0755,
-		ModTime:  time.Now(),
-	}))
-
-	_, err = tw.tw.Write(data)
-	require.NoError(tw.t, err)
-
-	return tw
-}
-
-func (tw *tarWriter) done() *bytes.Buffer {
-	require.NoError(tw.t, tw.tw.Close())
-	require.NoError(tw.t, tw.gzw.Close())
-
-	return tw.buf
-}
-
 type harness struct {
 	*test.APIServer
 
@@ -2845,7 +2761,7 @@ func newHarness(t *testing.T) *harness {
 	}
 }
 
-func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
+func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
 	t.Helper()
 
 	h.DiscoveryClient.WithAPIResource(resource)

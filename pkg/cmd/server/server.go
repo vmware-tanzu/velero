@@ -699,6 +699,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.csiSnapshotClient,
 			newPluginManager,
 			s.metrics,
+			s.discoveryHelper,
 		)
 
 		return controllerRunInfo{

@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 	"time"
 
@@ -72,6 +74,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		nil, // csiSnapshotClient
 		nil, // new plugin manager func
 		metrics.NewServerMetrics(),
+		nil, // discovery helper
 	).(*backupDeletionController)
 
 	// Error splitting key
@@ -168,6 +171,7 @@ func setupBackupDeletionControllerTest(t *testing.T, objects ...runtime.Object) 
 			nil, // csiSnapshotClient
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			metrics.NewServerMetrics(),
+			nil, // discovery helper
 		).(*backupDeletionController),
 
 		req: req,
@@ -500,10 +504,12 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		pluginManager := &pluginmocks.Manager{}
 		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
+		pluginManager.On("GetDeleteItemActions").Return(nil, nil)
 		pluginManager.On("CleanupClients")
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
 		td.backupStore.On("GetBackupVolumeSnapshots", td.req.Spec.BackupName).Return(snapshots, nil)
+		td.backupStore.On("GetBackupContents", td.req.Spec.BackupName).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
@@ -659,10 +665,12 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		pluginManager := &pluginmocks.Manager{}
 		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
+		pluginManager.On("GetDeleteItemActions").Return(nil, nil)
 		pluginManager.On("CleanupClients")
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
 		td.backupStore.On("GetBackupVolumeSnapshots", td.req.Spec.BackupName).Return(snapshots, nil)
+		td.backupStore.On("GetBackupContents", td.req.Spec.BackupName).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
@@ -865,6 +873,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				nil, // csiSnapshotClient
 				nil, // new plugin manager func
 				metrics.NewServerMetrics(),
+				nil, // discovery helper,
 			).(*backupDeletionController)
 
 			fakeClock := &clock.FakeClock{}
