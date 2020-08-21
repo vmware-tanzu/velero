@@ -14,13 +14,13 @@ For each major or minor release, create and publish a blog post to let folks kno
 What to include in a release blog:
 * Thank all contributors for their involvement in the release.
   * Where possible shoutout folks by name or consider spotlighting new maintainers.
-* Highlight the themes, or areas of focus, for the release. Some examples of themes are security, bug fixes, feature improvements. See past Velero [release blogs](/blogs/test) for more examples.
+* Highlight the themes, or areas of focus, for the release. Some examples of themes are security, bug fixes, feature improvements. See past Velero [release blogs][1] for more examples.
 * Include summaries of new features or workflows introduced in a release.
   * This can also include new project initiatives, like a code-of-conduct update.
   * Consider creating additional blog posts that go through new features in more detail. Plan to publish additional blogs after the release blog (all blogs don’t have to be publish all at once).
 
 Release blog post PR:
-* Prepare a PR containing the release blog post. Read the [website guidelines](/website-guidelines) for more information on creating a blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
+* Prepare a PR containing the release blog post. Read the [website guidelines][2] for more information on creating a blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
 * You also need to update `site/index.html` to have "Latest Release Information" contain a link to the new post.
 * Plan to publish this blog the same day as the release.
 
@@ -116,3 +116,6 @@ What to include:
 * Thank all contributors
 * A brief list of highlights in the release
 * Link to the release blog post, release notes, and/or github release page
+
+[1]: https://velero.io/blog
+[2]: website-guidelines.md
