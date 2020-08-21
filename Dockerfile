@@ -22,9 +22,7 @@ ARG GIT_TREE_STATE
 ENV CGO_ENABLED=0 \
     GO111MODULE=on \
     GOPROXY=${GOPROXY} \
-    LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION}" \
-    LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA}" \
-    LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"
+    LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"
 
 WORKDIR /go/src/github.com/vmware-tanzu/velero
 

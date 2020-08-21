@@ -1,0 +1,1 @@
+🐛 fix passing LDFLAGS across build stages
