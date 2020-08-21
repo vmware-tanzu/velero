@@ -14,7 +14,7 @@ For each major or minor release, create and publish a blog post to let folks kno
 What to include in a release blog:
 * Thank all contributors for their involvement in the release.
   * Where possible shoutout folks by name or consider spotlighting new maintainers.
-* Highlight the themes, or areas of focus, for the release. Some examples of themes are security, bug fixes, feature improvements. See past Velero [release blogs][1] for more examples.
+* Highlight the themes, or areas of focus, for the release. Some examples of themes are security, bug fixes, feature improvements. See past Velero [release blog posts][1] for more examples.
 * Include summaries of new features or workflows introduced in a release.
   * This can also include new project initiatives, like a code-of-conduct update.
   * Consider creating additional blog posts that go through new features in more detail. Plan to publish additional blogs after the release blog (all blogs don’t have to be publish all at once).
