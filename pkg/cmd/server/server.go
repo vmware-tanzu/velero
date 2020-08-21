@@ -808,14 +808,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger.Infof("Disabling controller: %s", controllerName)
 			delete(enabledControllers, controllerName)
 		} else {
-			s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
-		}
-	}
-	// remove disabled runtime type controllers
-	for _, controllerName := range s.config.disabledControllers {
-		if _, ok := enabledRuntimeControllers[controllerName]; ok {
-			s.logger.Infof("Disabling controller: %s", controllerName)
-			delete(enabledRuntimeControllers, controllerName)
+			// maybe it is a runtime type controllers, so attempt to remove that
+			if _, ok := enabledRuntimeControllers[controllerName]; ok {
+				s.logger.Infof("Disabling controller: %s", controllerName)
+				delete(enabledRuntimeControllers, controllerName)
+			} else {
+				s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
+			}
 		}
 	}
 

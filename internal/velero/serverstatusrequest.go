@@ -29,6 +29,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
+// ServerStatus holds information for retrieving installed
+// plugins and for updating the ServerStatusRequest timestamp.
 type ServerStatus struct {
 	PluginRegistry PluginLister
 	Clock          clock.Clock
@@ -41,7 +43,7 @@ func (s *ServerStatus) PatchStatusProcessed(kbClient client.Client, req *velerov
 	req.Status.ServerVersion = buildinfo.Version
 	req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
 	req.Status.ProcessedTimestamp = &metav1.Time{Time: s.Clock.Now()}
-	req.Status.Plugins = loadPlugins(s.PluginRegistry)
+	req.Status.Plugins = getInstalledPluginInfo(s.PluginRegistry)
 
 	if err := kbClient.Status().Patch(ctx, req, statusPatch); err != nil {
 		return errors.WithStack(err)
@@ -55,7 +57,7 @@ type PluginLister interface {
 	List(kind framework.PluginKind) []framework.PluginIdentifier
 }
 
-func loadPlugins(pluginLister PluginLister) []velerov1api.PluginInfo {
+func getInstalledPluginInfo(pluginLister PluginLister) []velerov1api.PluginInfo {
 	var plugins []velerov1api.PluginInfo
 	for _, v := range framework.AllPluginKinds() {
 		list := pluginLister.List(v)

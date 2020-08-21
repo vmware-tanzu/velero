@@ -206,7 +206,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 						},
 					},
 				},
-				expectedErrMsg:  "unexpected ServerStatusRequest phase \"an-invalid-phase\"",
+				expectedErrMsg:  "unexpected ServerStatusRequest phase",
 				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
 			},
 		}
