@@ -172,12 +172,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	client, err := f.KubebuilderClient()
+	kbClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
 
-	if err := client.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
+	if err := kbClient.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
 
