@@ -26,7 +26,7 @@ of the Velero repository is under active development and is not guaranteed to be
     tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
 
-    We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
+    The directory you extracted is called the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
@@ -44,7 +44,7 @@ Several comments:
 
 2. Velero uses an AWS S3 compatible API. Which means it authenticates using a signature created from a pair of access and secret keys — a set of HMAC credentials. You can create these HMAC credentials by specifying `{“HMAC”:true}` as an optional inline parameter. See step 3 in the [Service credentials][3] guide.
 
-3. After successfully creating a Service credential, you can view the JSON definition of the credential. Under the `cos_hmac_keys` entry there are `access_key_id` and `secret_access_key`. We will use them in the next step.
+3. After successfully creating a Service credential, you can view the JSON definition of the credential. Under the `cos_hmac_keys` entry there are `access_key_id` and `secret_access_key`. Use them in the next step.
 
 4. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
 
@@ -54,7 +54,7 @@ Several comments:
     aws_secret_access_key=<SECRET_ACCESS_KEY>
     ```
 
-    where the access key id and secret are the values that we got above.
+    Where the access key id and secret are the values that you got above.
 
 ## Install and start Velero
 
@@ -69,7 +69,7 @@ velero install \
     --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>
 ```
 
-Velero does not currently have a volume snapshot plugin for IBM Cloud, so creating volume snapshots is disabled.
+Velero does not have a volume snapshot plugin for IBM Cloud, so creating volume snapshots is disabled.
 
 Additionally, you can specify `--use-restic` to enable [restic support][16], and `--wait` to wait for the deployment to be ready.
 

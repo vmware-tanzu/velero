@@ -22,7 +22,7 @@ Refer [this document](customize-installation.md) to customize your installation.
 
 Velero uses object storage to store backups and associated artifacts. It also optionally integrates with supported block storage systems to snapshot your persistent volumes. Before beginning the installation process, you should identify the object storage provider and optional block storage provider(s) you'll be using from the list of [compatible providers][0].
 
-There are supported storage providers for both cloud-provider environments and on-premises environments. For more details on on-premises scenarios, see the [on-premises documentation][2].
+Velero supports storage providers for both cloud-provider environments and on-premises environments. For more details on on-premises scenarios, see the [on-premises documentation][2].
 
 ### Velero on Windows
 
@@ -49,7 +49,7 @@ brew install velero
    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz
    ```
 
-1. Move the extracted `velero` binary to somewhere in your `$PATH` (e.g. `/usr/local/bin` for most users).
+1. Move the extracted `velero` binary to somewhere in your `$PATH` (`/usr/local/bin` for most users).
 
 ### Option 3: Windows - Chocolatey
 
