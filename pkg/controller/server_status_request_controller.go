@@ -105,7 +105,9 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 		return ctrl.Result{}, errors.New("unexpected ServerStatusRequest phase")
 	}
 
-	return ctrl.Result{}, nil
+	// Requeue is mostly to handle deleting any expired status requests that were not
+	// deleted as part of the normal client flow for whatever reason.
+	return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
 }
 
 func (r *ServerStatusRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {

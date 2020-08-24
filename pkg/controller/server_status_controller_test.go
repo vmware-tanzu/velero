@@ -91,7 +91,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 						},
 					}).
 					Result(),
-				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: statusRequestResyncPeriod},
 			},
 			{
 				// server status request with phase=new will be processed
@@ -125,7 +125,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 						},
 					}).
 					Result(),
-				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: statusRequestResyncPeriod},
 			},
 			{
 				// server status request with phase=Processed does not get deleted if not expired
@@ -183,10 +183,10 @@ var _ = Describe("Server Status Request Reconciler", func() {
 					},
 				},
 				expected:        nil,
-				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: 0},
+				expectedRequeue: ctrl.Result{Requeue: false, RequeueAfter: statusRequestResyncPeriod},
 			},
 			{
-				// server status request with invalid phase returns an error
+				// server status request with invalid phase returns an error and does not requeue
 				req: statusRequestBuilder("1").
 					ServerVersion(buildinfo.Version).
 					Phase("an-invalid-phase").
