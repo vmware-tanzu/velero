@@ -3,13 +3,26 @@ title: "Release Instructions"
 layout: docs
 ---
 
-## Ahead of Time
+This page covers the steps to perform when releasing a new version of Velero.
 
-### (GA Only) Release Blog Post PR
+## Preparing for a release
 
-Prepare a PR containing the release blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
+### (GA Only) Create release blog post
 
-You also need to update `site/index.html` to have "Latest Release Information" contain a link to the new post.
+For each major or minor release, create and publish a blog post to let folks know what's new.
+
+What to include in a release blog:
+* Thank all contributors for their involvement in the release.
+  * Where possible shoutout folks by name or consider spotlighting new maintainers.
+* Highlight the themes, or areas of focus, for the release. Some examples of themes are security, bug fixes, feature improvements. See past Velero [release blog posts][1] for more examples.
+* Include summaries of new features or workflows introduced in a release.
+  * This can also include new project initiatives, like a code-of-conduct update.
+  * Consider creating additional blog posts that go through new features in more detail. Plan to publish additional blogs after the release blog (all blogs don’t have to be publish all at once).
+
+Release blog post PR:
+* Prepare a PR containing the release blog post. Read the [website guidelines][2] for more information on creating a blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
+* You also need to update `site/index.html` to have "Latest Release Information" contain a link to the new post.
+* Plan to publish this blog the same day as the release.
 
 ### (Pre-Release and GA) Changelog and Docs PR
 
@@ -36,7 +49,7 @@ You also need to update `site/index.html` to have "Latest Release Information" c
 
 ### (Pre-Release and GA) GitHub Token
 
-To run the `goreleaser` process to generate a GitHub release, you'll need to have a GitHub token. See https://goreleaser.com/environment/ for more details. 
+To run the `goreleaser` process to generate a GitHub release, you'll need to have a GitHub token. See https://goreleaser.com/environment/ for more details.
 
 You may regenerate the token for every release if you prefer.
 
@@ -52,39 +65,57 @@ You may regenerate the token for every release if you prefer.
 1.  Click "Regenerate token".
 1.  Save the token value somewhere - you'll need it during the release, in the `GITHUB_TOKEN` environment variable.
 
-## During Release
+## Release steps
 
-This process is the same for both pre-release and GA, except for the fact that there will not be a blog post PR to merge for pre-release versions.
+Once you have done the prep steps, use the steps below to perform a release. This process is the same for both pre-release and GA, except for the fact that there will not be a blog post PR to merge for pre-release versions.
 
 1.  Merge the changelog + docs PR, so that it's included in the release tag.
+
 1.  Set your GitHub token as an environment variable. `export GITHUB_TOKEN=<your token value>`
+
 1.  Run `/hack/release-tools/tag-release.sh` and follow the instructions.
 
 1.  Navigate to the draft GitHub release, at https://github.com/vmware-tanzu/velero/releases.
+
 1.  If this is a patch release (e.g. `v1.2.1`), note that the full `CHANGELOG-1.2.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
+
 1.  Do a quick review for formatting. **Note:** the `goreleaser` process should detect if it's a pre-release version, and check that box in the GitHub release appropriately, but it's always worth double-checking.
+
 1.  Publish the release.
+
 1.  By now, the Docker images should have been published. Perform a smoke-test - for example:
+
     - Download the CLI from the GitHub release
     - Use it to install Velero into a cluster (or manually update an existing deployment to use the new images)
     - Verify that `velero version` shows the expected output
+
     - Run a backup/restore and ensure it works
+
 1.  (GA Only) Merge the blog post PR.
-1.  Announce the release:
-    - Twitter (mention a few highlights, link to the blog post)
-    - Slack channel
-    - Google group (this doesn't get a lot of traffic, and recent releases may not have been posted here)
 
-### Post-release - Homebrew version update
+1. Update Homebrew version. From a Mac, you can run `brew bump-formula-pr` to create a new PR with the updated release's information. To make sure it's the most up-to-date:
 
-From a Mac, you can run `brew bump-formula-pr` to create a new PR with the updated release's information.
+    1. If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
 
-To make sure it's the most up-to-date:
+    1. Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 
-1. If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
-1. Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
-1. Run `hack/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
+    1. Run `hack/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
 
-### Post-release - Windows Chocolatey version update
+1. Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
 
-From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
+## Announce a release
+
+Once you are finished doing the release, let the rest of the world know its available by posting messages in the following places.
+
+1. Velero's Twitter account. Maintainers are encouraged to help spread the word by posting or reposting on social media.
+1. Community Slack channel.
+1. Google group message.
+
+What to include:
+
+* Thank all contributors
+* A brief list of highlights in the release
+* Link to the release blog post, release notes, and/or github release page
+
+[1]: https://velero.io/blog
+[2]: website-guidelines.md
