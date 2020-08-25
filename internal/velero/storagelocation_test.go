@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -97,11 +96,15 @@ func TestIsReadyToValidate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			storageLocationInfo := StorageLocation{
-				DefaultStoreValidationFrequency: tt.serverDefaultValidationFrequency,
+			locationStore := LocationStore{
+				location: tt.backupLocation,
+				defaultLocationInfo: DefaultBackupLocationInfo{
+					DefaultStoreValidationFrequency: tt.serverDefaultValidationFrequency,
+				},
+				log: velerotest.NewLogger(),
 			}
 
-			g.Expect(storageLocationInfo.IsReadyToValidate(tt.backupLocation, velerotest.NewLogger())).To(BeIdenticalTo(tt.ready))
+			g.Expect(locationStore.IsReadyToValidate()).To(BeIdenticalTo(tt.ready))
 		})
 	}
 }
@@ -111,19 +114,16 @@ func TestIsValid(t *testing.T) {
 		name           string
 		backupLocation *velerov1api.BackupStorageLocation
 		isValidError   error
-		expectError    bool
 	}{
 		{
 			name:           "do not expect an error when store is valid",
 			backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").Result(),
 			isValidError:   nil,
-			expectError:    false,
 		},
 		{
 			name:           "expect an error when store is not valid",
 			backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").Result(),
 			isValidError:   errors.New("an error"),
-			expectError:    true,
 		},
 	}
 
@@ -142,70 +142,21 @@ func TestIsValid(t *testing.T) {
 			backupStore := backupStores[location.Name]
 			backupStore.On("IsValid").Return(tt.isValidError)
 
-			storageLocationInfo := StorageLocation{
+			storeManager := BackupStoreManager{
 				NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
 					return backupStores[loc.Name], nil
 				},
 			}
 
-			actual := storageLocationInfo.IsValid(tt.backupLocation, velerotest.NewLogger())
-			if tt.expectError {
+			locationStore, err := NewLocationStore(storeManager, DefaultBackupLocationInfo{}, tt.backupLocation, velerotest.NewLogger())
+			g.Expect(err).To(BeNil())
+
+			actual := locationStore.IsValid()
+			if tt.isValidError != nil {
 				g.Expect(actual).NotTo(BeNil())
 			} else {
 				g.Expect(actual).To(BeNil())
-			}
-		})
-	}
-}
-
-func TestPatchStatus(t *testing.T) {
-	tests := []struct {
-		name           string
-		backupLocation *velerov1api.BackupStorageLocation
-		newPhase       velerov1api.BackupStorageLocationPhase
-		expectError    bool
-	}{
-		{
-			name:           "an update to the same phase should succeed",
-			backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
-			newPhase:       velerov1api.BackupStorageLocationPhaseAvailable,
-			expectError:    false,
-		},
-		{
-			name:           "an update to a different phase should succeed",
-			backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
-			newPhase:       velerov1api.BackupStorageLocationPhaseUnavailable,
-			expectError:    false,
-		},
-		{
-			name:           "an update to a location that doesn't exist should fail (see actual test)",
-			backupLocation: builder.ForBackupStorageLocation("ns-1", "location-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
-			newPhase:       velerov1api.BackupStorageLocationPhaseUnavailable,
-			expectError:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			g := NewWithT(t)
-
-			storageLocationInfo := StorageLocation{
-				Client: fake.NewFakeClientWithScheme(scheme.Scheme, tt.backupLocation),
-			}
-
-			if tt.expectError {
-				backupLocation := builder.ForBackupStorageLocation("ns-1", "location-2").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
-				// an update to a location that was never created will fail:
-				g.Expect(storageLocationInfo.PatchStatus(backupLocation, tt.newPhase)).NotTo(BeNil())
-			} else {
-				g.Expect(storageLocationInfo.PatchStatus(tt.backupLocation, tt.newPhase)).To(BeNil())
-
-				key := client.ObjectKey{Name: tt.backupLocation.Name, Namespace: tt.backupLocation.Namespace}
-				instance := &velerov1api.BackupStorageLocation{}
-				err := storageLocationInfo.Client.Get(context.Background(), key, instance)
-				g.Expect(err).To(BeNil())
-				g.Expect(instance.Status.Phase).To(BeIdenticalTo(tt.newPhase))
 			}
 		})
 	}
@@ -218,7 +169,7 @@ func TestListBackupStorageLocations(t *testing.T) {
 		expectError     bool
 	}{
 		{
-			name: "1 existing location",
+			name: "1 existing location does not return an error",
 			backupLocations: &velerov1api.BackupStorageLocationList{
 				Items: []velerov1api.BackupStorageLocation{
 					*builder.ForBackupStorageLocation("ns-1", "location-1").Result(),
@@ -227,7 +178,7 @@ func TestListBackupStorageLocations(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "multiple existing location",
+			name: "multiple existing location does not return an error",
 			backupLocations: &velerov1api.BackupStorageLocationList{
 				Items: []velerov1api.BackupStorageLocation{
 					*builder.ForBackupStorageLocation("ns-1", "location-1").Result(),
@@ -238,7 +189,7 @@ func TestListBackupStorageLocations(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:            "no existing locations",
+			name:            "no existing locations returns an error",
 			backupLocations: &velerov1api.BackupStorageLocationList{},
 			expectError:     true,
 		},
@@ -250,10 +201,10 @@ func TestListBackupStorageLocations(t *testing.T) {
 
 			client := fake.NewFakeClientWithScheme(scheme.Scheme, tt.backupLocations)
 			if tt.expectError {
-				_, err := ListBackupStorageLocations(client, context.Background(), "ns-1")
+				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
 				g.Expect(err).NotTo(BeNil())
 			} else {
-				_, err := ListBackupStorageLocations(client, context.Background(), "ns-1")
+				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
 				g.Expect(err).To(BeNil())
 			}
 		})

@@ -123,7 +123,7 @@ func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList,
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
-	locationList, err := velero.ListBackupStorageLocations(c.kbClient, context.Background(), c.namespace)
+	locationList, err := velero.ListBackupStorageLocations(context.Background(), c.kbClient, c.namespace)
 	if err != nil {
 		c.logger.WithError(err).Error("No backup storage locations found, at least one is required")
 		return
