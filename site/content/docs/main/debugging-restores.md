@@ -93,13 +93,13 @@ Errors:
 
 ## Structure
 
-Errors appear for incomplete or partial restores. Warnings appear for non-blocking issues (e.g. the
+Errors appear for incomplete or partial restores. Warnings appear for non-blocking issues, for example, the
 restore looks "normal" and all resources referenced in the backup exist in some form, although some
-of them may have been pre-existing).
+of them may have been pre-existing.
 
 Both errors and warnings are structured in the same way:
 
-* `Velero`: A list of system-related issues encountered by the Velero server (e.g. couldn't read directory).
+* `Velero`: A list of system-related issues encountered by the Velero server. For example, Velero couldn't read a directory.
 
 * `Cluster`: A list of issues related to the restore of cluster-scoped resources.
 

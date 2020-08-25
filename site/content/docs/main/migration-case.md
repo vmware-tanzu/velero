@@ -5,7 +5,7 @@ layout: docs
 
 *Using Backups and Restores*
 
-Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. In this scenario, we are also assuming that your clusters are hosted by the same cloud provider. **Note that Velero does not natively  support the migration of persistent volumes snapshots across cloud providers.** If you would like to migrate volume data between cloud platforms, please enable [restic][2], which will backup volume contents at the filesystem level.
+Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. This scenario assumes that your clusters are hosted by the same cloud provider. **Note that Velero does not natively  support the migration of persistent volumes snapshots across cloud providers.** If you would like to migrate volume data between cloud platforms, please enable [restic][2], which will backup volume contents at the filesystem level.
 
 1.  *(Cluster 1)* Assuming you haven't already been checkpointing your data with the Velero `schedule` operation, you need to first back up your entire cluster (replacing `<BACKUP-NAME>` as desired):
 
@@ -13,7 +13,7 @@ Velero can help you port your resources from one cluster to another, as long as 
     velero backup create <BACKUP-NAME>
     ```
 
-    The default backup retention period, expressed as TTL (time to live), is 30 days (720 hours); you can use the `--ttl <DURATION>` flag to change this as necessary. See [how velero works][1] for more information about backup expiry. 
+    The default backup retention period, expressed as TTL (time to live), is 30 days (720 hours); you can use the `--ttl <DURATION>` flag to change this as necessary. See [how velero works][1] for more information about backup expiry.
 
 1.  *(Cluster 2)* Configure `BackupStorageLocations` and `VolumeSnapshotLocations`, pointing to the locations used by *Cluster 1*, using `velero backup-location create` and `velero snapshot-location create`. Make sure to configure the `BackupStorageLocations` as read-only
     by using the `--access-mode=ReadOnly` flag for `velero backup-location create`.

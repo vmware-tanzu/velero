@@ -4,7 +4,7 @@ layout: docs
 ---
 
 If you are using an S3-Compatible storage provider that is secured with a self-signed certificate, connections to the object store may fail with a `certificate signed by unknown authority` message.
-In order to proceed, a certificate bundle may be provided when adding the storage provider.
+To proceed, provide a certificate bundle when adding the storage provider.
 
 ## Trusting a self-signed certificate during installation
 

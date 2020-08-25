@@ -38,11 +38,11 @@ spec:
   # Array of namespaces to exclude from the restore. Optional.
   excludedNamespaces:
   - some-namespace
-  # Array of resources to include in the restore. Resources may be shortcuts (e.g. 'po' for 'pods')
+  # Array of resources to include in the restore. Resources may be shortcuts (for example 'po' for 'pods')
   # or fully-qualified. If unspecified, all resources are included. Optional.
   includedResources:
   - '*'
-  # Array of resources to exclude from the restore. Resources may be shortcuts (e.g. 'po' for 'pods')
+  # Array of resources to exclude from the restore. Resources may be shortcuts (for example 'po' for 'pods')
   # or fully-qualified. Optional.
   excludedResources:
   - storageclasses.storage.k8s.io

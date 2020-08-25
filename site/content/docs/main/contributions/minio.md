@@ -34,7 +34,7 @@ of the Velero repository is under active development and is not guaranteed to be
     tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
 
-    We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
+    The directory you extracted is called the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
@@ -71,7 +71,7 @@ These instructions start the Velero server and a Minio instance that is accessib
         --secret-file ./credentials-velero \
         --use-volume-snapshots=false \
         --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000 \
-        --snapshot-location-config region="default" 
+        --snapshot-location-config region="default"
     ```
 
     This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no `VolumeSnapshotLocation` is created (`--use-volume-snapshots=false`).
@@ -237,7 +237,7 @@ You must also get the Minio URL, which you can then specify as the value of the 
 
 If you're using Minio with HTTPS, you may see unintelligible text in the output of `velero describe`, or `velero logs` commands.
 
-In order to fix this, you can add a public URL to the `BackupStorageLocation`.
+To fix this, you can add a public URL to the `BackupStorageLocation`.
 
 In a terminal, run the following:
 
@@ -249,7 +249,7 @@ If your certificate is self-signed, see the [documentation on self-signed certif
 
 ## Expose Minio outside your cluster with Kubernetes in Docker (KinD):
 
-Kubernetes in Docker currently does not have support for NodePort services (see [this issue](https://github.com/kubernetes-sigs/kind/issues/99)). In this case, you can use a port forward to access the Minio bucket.
+Kubernetes in Docker does not have support for NodePort services (see [this issue](https://github.com/kubernetes-sigs/kind/issues/99)). In this case, you can use a port forward to access the Minio bucket.
 
 In a terminal, run the following:
 

@@ -7,17 +7,17 @@ layout: docs
 
 Velero has two custom resources, `BackupStorageLocation` and `VolumeSnapshotLocation`, that are used to configure where Velero backups and their associated persistent volume snapshots are stored.
 
-A `BackupStorageLocation` is defined as a bucket, a prefix within that bucket under which all Velero data should be stored, and a set of additional provider-specific fields (e.g. AWS region, Azure storage account, etc.) The [API documentation][1] captures the configurable parameters for each in-tree provider.
+A `BackupStorageLocation` is defined as a bucket, a prefix within that bucket under which all Velero data is stored, and a set of additional provider-specific fields (AWS region, Azure storage account, etc.) The [API documentation][1] captures the configurable parameters for each in-tree provider.
 
-A `VolumeSnapshotLocation` is defined entirely by provider-specific fields (e.g. AWS region, Azure resource group, Portworx snapshot type, etc.) The [API documentation][2] captures the configurable parameters for each in-tree provider.
+A `VolumeSnapshotLocation` is defined entirely by provider-specific fields (AWS region, Azure resource group, Portworx snapshot type, etc.) The [API documentation][2] captures the configurable parameters for each in-tree provider.
 
 The user can pre-configure one or more possible `BackupStorageLocations` and one or more `VolumeSnapshotLocations`, and can select *at backup creation time* the location in which the backup and associated snapshots should be stored.
 
 This configuration design enables a number of different use cases, including:
 
-- Take snapshots of more than one kind of persistent volume in a single Velero backup (e.g. in a cluster with both EBS volumes and Portworx volumes)
+- Take snapshots of more than one kind of persistent volume in a single Velero backup. For example, in a cluster with both EBS volumes and Portworx volumes
 - Have some Velero backups go to a bucket in an eastern USA region, and others go to a bucket in a western USA region
-- For volume providers that support it (e.g. Portworx), have some snapshots be stored locally on the cluster and have others be stored in the cloud
+- For volume providers that support it, like Portworx, you can have some snapshots stored locally on the cluster and have others stored in the cloud
 
 ## Limitations / Caveats
 
@@ -27,15 +27,15 @@ This configuration design enables a number of different use cases, including:
 
 - Each Velero backup has one `BackupStorageLocation`, and one `VolumeSnapshotLocation` per volume provider. It is not possible (yet) to send a single Velero backup to multiple backup storage locations simultaneously, or a single volume snapshot to multiple locations simultaneously. However, you can always set up multiple scheduled backups that differ only in the storage locations used if redundancy of backups across locations is important.
 
-- Cross-provider snapshots are not supported. If you have a cluster with more than one type of volume (e.g. EBS and Portworx), but you only have a `VolumeSnapshotLocation` configured for EBS, then Velero will **only** snapshot the EBS volumes.
+- Cross-provider snapshots are not supported. If you have a cluster with more than one type of volume, like EBS and Portworx, but you only have a `VolumeSnapshotLocation` configured for EBS, then Velero will **only** snapshot the EBS volumes.
 
 - Restic data is stored under a prefix/subdirectory of the main Velero bucket, and will go into the bucket corresponding to the `BackupStorageLocation` selected by the user at backup creation time.
 
 ## Examples
 
-Let's look at some examples of how we can use this configuration mechanism to address some common use cases:
+Let's look at some examples of how you can use this configuration mechanism to address some common use cases:
 
-#### Take snapshots of more than one kind of persistent volume in a single Velero backup (e.g. in a cluster with both EBS volumes and Portworx volumes)
+#### Take snapshots of more than one kind of persistent volume in a single Velero backup
 
 During server configuration:
 
@@ -95,7 +95,7 @@ velero backup create full-cluster-alternate-location-backup \
     --storage-location s3-alt-region
 ```
 
-#### For volume providers that support it (e.g. Portworx), have some snapshots be stored locally on the cluster and have others be stored in the cloud
+#### For volume providers that support it (like Portworx), have some snapshots be stored locally on the cluster and have others be stored in the cloud
 
 During server configuration:
 
@@ -112,8 +112,8 @@ velero snapshot-location create portworx-cloud \
 During backup creation:
 
 ```shell
-# Note that since in this example we have two possible volume snapshot locations for the Portworx
-# provider, we need to explicitly specify which one to use when creating a backup. Alternately,
+# Note that since in this example you have two possible volume snapshot locations for the Portworx
+# provider, you need to explicitly specify which one to use when creating a backup. Alternately,
 # you can set the --default-volume-snapshot-locations flag on the `velero server` command (run by
 # the Velero deployment) to specify which location should be used for each provider by default, in
 # which case you don't need to specify it when creating a backup.

@@ -44,7 +44,7 @@ into the Velero server pod. Ensure the following:
 #### Using kube2iam
 This means that Velero can't read the content of the S3 bucket. Ensure the following:
 
-* There is a Trust Policy document allowing the role used by kube2iam to assume Velero's role, as stated in the AWS config documentation.
+* A Trust Policy document exists that allows the role used by kube2iam to assume Velero's role, as stated in the AWS config documentation.
 * The new Velero role has all the permissions listed in the documentation regarding S3.
 
 

@@ -34,7 +34,7 @@ Note that the Makefile targets assume building from a git repository. When build
 
 There are a number of different ways to build `velero` depending on your needs. This section outlines the main possibilities.
 
-When building by using `make`, it will place the binaries under `_output/bin/$GOOS/$GOARCH`. For example, you will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`. `make` will also splice version and git commit information in so that `velero version` displays proper output. 
+When building by using `make`, it will place the binaries under `_output/bin/$GOOS/$GOARCH`. For example, you will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`. `make` will also splice version and git commit information in so that `velero version` displays proper output.
 
 Note: `velero install` will also use the version information to determine which tagged image to deploy. If you would like to overwrite what image gets deployed, use the `image` flag (see below for instructions on how to build images).
 
@@ -101,7 +101,7 @@ _Note: To build build container images for both `velero` and `velero-restic-rest
 
 ### Cross platform building
 
-Docker `buildx` platforms currently supported:
+Docker `buildx` platforms supported:
 * `linux/amd64`
 * `linux/arm64`
 * `linux/arm/v7`

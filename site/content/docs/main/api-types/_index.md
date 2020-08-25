@@ -3,7 +3,7 @@ layout: docs
 title: API types
 ---
 
-Here we list the API types that have some functionality that you can only configure via json/yaml vs the `velero` cli
+Here's a list the API types that have some functionality that you can only configure via json/yaml vs the `velero` cli
 (hooks)
 
 * [Backup][1]

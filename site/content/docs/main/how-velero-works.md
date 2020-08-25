@@ -7,7 +7,7 @@ Each Velero operation -- on-demand backup, scheduled backup, restore -- is a cus
 
 You can back up or restore all objects in your cluster, or you can filter objects by type, namespace, and/or label.
 
-Velero is ideal for the disaster recovery use case, as well as for snapshotting your application state, prior to performing system operations on your cluster (e.g. upgrades).
+Velero is ideal for the disaster recovery use case, as well as for snapshotting your application state, prior to performing system operations on your cluster, like upgrades.
 
 ## On-demand backups
 
@@ -67,7 +67,7 @@ When you create a backup, you can specify a TTL (time to live) by adding the fla
 * All PersistentVolume snapshots
 * All associated Restores
 
-The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied. 
+The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied.
 
 ## Object storage sync
 
@@ -82,4 +82,3 @@ Likewise, if a backup object exists in Kubernetes but not in object storage, it 
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
-

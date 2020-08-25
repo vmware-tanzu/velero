@@ -29,7 +29,7 @@ You will need to give your plugin(s) a name when registering them by calling the
 
 ## Plugin Kinds
 
-Velero currently supports the following kinds of plugins:
+Velero supports the following kinds of plugins:
 
 - **Object Store** - persists and retrieves backups, backup logs and restore logs
 - **Volume Snapshotter** - creates volume snapshots (during backup) and restores volumes from snapshots (during restore)
@@ -46,7 +46,7 @@ plugins will also emit debug-level logs. See the [sample repository][1] for an e
 
 ## Plugin Configuration
 
-Velero uses a ConfigMap-based convention for providing configuration to plugins. If your plugin needs to be configured at runtime, 
+Velero uses a ConfigMap-based convention for providing configuration to plugins. If your plugin needs to be configured at runtime,
 define a ConfigMap like the following:
 
 ```yaml
@@ -56,19 +56,19 @@ metadata:
   # any name can be used; Velero uses the labels (below)
   # to identify it rather than the name
   name: my-plugin-config
-  
+
   # must be in the namespace where the velero deployment
   # is running
   namespace: velero
-  
+
   labels:
     # this value-less label identifies the ConfigMap as
-    # config for a plugin (i.e. the built-in change storageclass
+    # config for a plugin (the built-in change storageclass
     # restore item action plugin)
     velero.io/plugin-config: ""
-    
+
     # add a label whose key corresponds to the fully-qualified
-    # plugin name (e.g. mydomain.io/my-plugin-name), and whose
+    # plugin name (for example mydomain.io/my-plugin-name), and whose
     # value is the plugin type (BackupItemAction, RestoreItemAction,
     # ObjectStore, or VolumeSnapshotter)
     <fully-qualified-plugin-name>: <plugin-type>
