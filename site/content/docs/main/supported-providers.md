@@ -13,7 +13,7 @@ Velero supports a variety of storage providers for different backup and snapshot
 | [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             | [GCP Plugin Setup][36]        |
 | [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] | [Azure Plugin Setup][37]      |
 | [VMware vSphere][39]              | 🚫                  | vSphere Volumes              | [VMware vSphere][39]                    | [vSphere Plugin Setup][40]    |
-| [Container Storage Interface (CSI)]| 🚫                 | CSI Volumes                  | [Velero plugin for CSI][44]             | [CSI Plugin Setup][45]        |
+| [Container Storage Interface (CSI)][44]| 🚫                 | CSI Volumes                  | [Velero plugin for CSI][44]             | [CSI Plugin Setup][45]        |
 
 Contact: [#Velero Slack][28], [GitHub Issues][29]
 

@@ -6,7 +6,7 @@ layout: docs
 ## Use
 
 The `Schedule` API type is used as a repeatable request for the Velero server to perform a backup for a given cron notation. Once created, the
-Velero Server will start the backup process. It will then wait for the next valid point of the given cron expression and execute the backup 
+Velero Server will start the backup process. It will then wait for the next valid point of the given cron expression and execute the backup
 process on a repeating basis.
 
 ## API GroupVersion
@@ -41,11 +41,11 @@ spec:
     # Array of namespaces to exclude from the scheduled backup. Optional.
     excludedNamespaces:
     - some-namespace
-    # Array of resources to include in the scheduled backup. Resources may be shortcuts (e.g. 'po' for 'pods')
+    # Array of resources to include in the scheduled backup. Resources may be shortcuts (for example 'po' for 'pods')
     # or fully-qualified. If unspecified, all resources are included. Optional.
     includedResources:
     - '*'
-    # Array of resources to exclude from the scheduled backup. Resources may be shortcuts (e.g. 'po' for 'pods')
+    # Array of resources to exclude from the scheduled backup. Resources may be shortcuts (for example 'po' for 'pods')
     # or fully-qualified. Optional.
     excludedResources:
     - storageclasses.storage.k8s.io
@@ -74,11 +74,11 @@ spec:
     volumeSnapshotLocations:
       - aws-primary
       - gcp-primary
-    # The amount of time before backups created on this schedule are eligible for garbage collection. If not specified, 
+    # The amount of time before backups created on this schedule are eligible for garbage collection. If not specified,
     # a default value of 30 days will be used. The default can be configured on the velero server
-    # by passing the flag --default-backup-ttl. 
+    # by passing the flag --default-backup-ttl.
     ttl: 24h0m0s
-    # Actions to perform at different times during a backup. The only hook currently supported is
+    # Actions to perform at different times during a backup. The only hook supported is
     # executing a command in a container in a pod using the pod exec API. Optional.
     hooks:
       # Array of hooks that are applicable to specific resources. Optional.
@@ -104,9 +104,9 @@ spec:
             matchLabels:
               app: velero
               component: server
-          # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
+          # An array of hooks to run before executing custom actions. Only "exec" hooks are supported.
           pre:
-            - 
+            -
               # The type of hook. This must be "exec".
               exec:
                 # The name of the container where the command will be executed. If unspecified, the
@@ -122,7 +122,7 @@ spec:
                 # How long to wait for the command to finish executing. Defaults to 30 seconds. Optional.
                 timeout: 10s
           # An array of hooks to run after all custom actions and additional items have been
-          # processed. Currently only "exec" hooks are supported.
+          # processed. Only "exec" hooks are supported.
           post:
             # Same content as pre above.
 status:

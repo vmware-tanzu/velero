@@ -3,7 +3,7 @@ title: "Restic Integration"
 layout: docs
 ---
 
-Velero supports backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality. Please see the list of [limitations](#limitations) to understand if it currently fits your use case.
+Velero supports backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality. Please see the list of [limitations](#limitations) to understand if it fits your use case.
 
 Velero allows you to take snapshots of persistent volumes as part of your backups if you’re using one of
 the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks).
@@ -34,7 +34,7 @@ To install restic, use the `--use-restic` flag in the `velero install` command. 
 velero install --use-restic
 ```
 
-When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
+When using restic on a storage provider that doesn't have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
 ### Configure restic DaemonSet spec
 
@@ -125,7 +125,7 @@ To mount the correct hostpath to pods volumes, run the restic pod in `privileged
     ```
 
 
-If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) in order to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
+If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
 
 By default a userland openshift namespace will not schedule pods on all nodes in the cluster.
 
@@ -330,13 +330,12 @@ Regardless of how volumes are discovered for backup using restic, the process of
 ## Limitations
 
 - `hostPath` volumes are not supported. [Local persistent volumes][4] are supported.
-- Those of you familiar with [restic][1] may know that it encrypts all of its data. We've decided to use a static,
-common encryption key for all restic repositories created by Velero. **This means that anyone who has access to your
+- Those of you familiar with [restic][1] may know that it encrypts all of its data. Velero uses a static,
+common encryption key for all restic repositories it creates. **This means that anyone who has access to your
 bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
-appropriately. We plan to implement full Velero backup encryption, including securing the restic encryption keys, in
-a future release.
+appropriately.
 - An incremental backup chain will be maintained across pod reschedules for PVCs. However, for pod volumes that are *not*
-PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (e.g. by a ReplicaSet/Deployment), the next backup of those
+PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (for example, by a ReplicaSet/Deployment), the next backup of those
 volumes will be full rather than incremental, because the pod volume's lifecycle is assumed to be defined by its pod.
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
@@ -448,7 +447,7 @@ to the container command in the deployment/daemonset pod template spec.
 
 ## How backup and restore work with restic
 
-We introduced three custom resource definitions and associated controllers:
+Velero has three custom resource definitions and associated controllers:
 
 - `ResticRepository` - represents/manages the lifecycle of Velero's [restic repositories][5]. Velero creates
 a restic repository per namespace when the first restic backup for a namespace is requested. The controller
@@ -512,7 +511,7 @@ on to running other init containers/the main containers.
 
 ### Monitor backup annotation
 
-Velero does not currently provide a mechanism to detect persistent volume claims that are missing the restic backup annotation.
+Velero does not provide a mechanism to detect persistent volume claims that are missing the restic backup annotation.
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 

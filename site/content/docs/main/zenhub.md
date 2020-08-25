@@ -11,7 +11,7 @@ While GitHub issues, milestones, and labels generally work pretty well, the Vele
 In our effort to minimize tooling while enabling product management insights, we have decided to use [ZenHub Open-Source](https://www.zenhub.com/blog/open-source/) to overlay product and project tracking on top of GitHub.
 ZenHub is a GitHub application that provides Kanban visualization, Epic tracking, fine-grained prioritization, and more.  It's primary backing storage system is existing GitHub issues along with additional metadata stored in ZenHub's database.
 
-If you are a Velero user or Velero Developer, you do not _need_ to use ZenHub for your regular workflow (e.g to see open bug reports or feature requests, work on pull requests).  However, if you'd like to be able to visualize the high-level project goals and roadmap, you will need to use the free version of ZenHub.
+If you are a Velero user or Velero Developer, you do not _need_ to use ZenHub for your regular workflow (to see open bug reports or feature requests, work on pull requests).  However, if you'd like to be able to visualize the high-level project goals and roadmap, you will need to use the free version of ZenHub.
 
 ## Using ZenHub
 

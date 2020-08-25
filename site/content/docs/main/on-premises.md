@@ -14,9 +14,9 @@ If you do not already have an object storage system, [MinIO][2] is an open-sourc
 
 ### (Optional) Selecting volume snapshot providers
 
-If you need to back up persistent volume data, you must select a volume backup solution. [Supported providers][0] contains information on the supported options. 
+If you need to back up persistent volume data, you must select a volume backup solution. [Supported providers][0] contains information on the supported options.
 
-For example, if you use [Portworx][4] for persistent storage, you can install their Velero plugin to get native Portworx snapshots as part of your Velero backups. 
+For example, if you use [Portworx][4] for persistent storage, you can install their Velero plugin to get native Portworx snapshots as part of your Velero backups.
 
 If there is no native snapshot plugin available for your storage platform, you can use Velero's [restic integration][1], which provides a platform-agnostic file-level backup solution for volume data.
 
@@ -34,7 +34,7 @@ First, download the Velero image, tag it for the your private registry, then upl
 
 ```bash
 PRIVATE_REG=<your private registry>
-VELERO_VERSION=<version of Velero you're targetting, e.g. v1.4.0>
+VELERO_VERSION=<version of Velero you're targeting, for example v1.4.0>
 
 docker pull velero/velero:$VELERO_VERSION
 docker tag velero/velero:$VELERO_VERSION $PRIVATE_REG/velero:$VELERO_VERSION
@@ -47,7 +47,7 @@ Next, repeat these steps for any plugins you may need. This example will use the
 
 ```bash
 PRIVATE_REG=<your private registry>
-PLUGIN_VERSION=<version of plugin you're targetting, e.g. v1.0.2>
+PLUGIN_VERSION=<version of plugin you're targeting, for example v1.0.2>
 
 docker pull velero/velero-plugin-for-aws:$PLUGIN_VERSION
 docker tag velero/velero-plugin-for-aws:$PLUGIN_VERSION $PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION
@@ -60,7 +60,7 @@ If you are using restic, you will also need to upload the restic helper image.
 
 ```bash
 PRIVATE_REG=<your private registry>
-VELERO_VERSION=<version of Velero you're targetting, e.g. v1.4.0>
+VELERO_VERSION=<version of Velero you're targeting, for example v1.4.0>
 
 docker pull velero/velero-restic-restore-helper:$VELERO_VERSION
 docker tag velero/velero-restic-restore-helper:$VELERO_VERSION $PRIVATE_REG/velero-restic-restore-helper:$VELERO_VERSION

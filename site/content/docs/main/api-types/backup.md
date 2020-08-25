@@ -5,7 +5,7 @@ layout: docs
 
 ## Use
 
-The `Backup` API type is used as a request for the Velero server to perform a backup. Once created, the
+Use the `Backup` API type to request the Velero server to perform a backup. Once created, the
 Velero Server immediately starts the backup process.
 
 ## API GroupVersion
@@ -36,11 +36,11 @@ spec:
   # Array of namespaces to exclude from the backup. Optional.
   excludedNamespaces:
   - some-namespace
-  # Array of resources to include in the backup. Resources may be shortcuts (e.g. 'po' for 'pods')
+  # Array of resources to include in the backup. Resources may be shortcuts (for example 'po' for 'pods')
   # or fully-qualified. If unspecified, all resources are included. Optional.
   includedResources:
   - '*'
-  # Array of resources to exclude from the backup. Resources may be shortcuts (e.g. 'po' for 'pods')
+  # Array of resources to exclude from the backup. Resources may be shortcuts (for example 'po' for 'pods')
   # or fully-qualified. Optional.
   excludedResources:
   - storageclasses.storage.k8s.io
@@ -69,13 +69,13 @@ spec:
   volumeSnapshotLocations:
     - aws-primary
     - gcp-primary
-  # The amount of time before this backup is eligible for garbage collection. If not specified, 
+  # The amount of time before this backup is eligible for garbage collection. If not specified,
   # a default value of 30 days will be used. The default can be configured on the velero server
-  # by passing the flag --default-backup-ttl. 
+  # by passing the flag --default-backup-ttl.
   ttl: 24h0m0s
   # Whether restic should be used to take a backup of all pod volumes by default.
   defaultVolumesToRestic: true
-  # Actions to perform at different times during a backup. The only hook currently supported is
+  # Actions to perform at different times during a backup. The only hook supported is
   # executing a command in a container in a pod using the pod exec API. Optional.
   hooks:
     # Array of hooks that are applicable to specific resources. Optional.
@@ -101,9 +101,9 @@ spec:
           matchLabels:
             app: velero
             component: server
-        # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
+        # An array of hooks to run before executing custom actions. Only "exec" hooks are supported.
         pre:
-          - 
+          -
             # The type of hook. This must be "exec".
             exec:
               # The name of the container where the command will be executed. If unspecified, the
@@ -119,12 +119,12 @@ spec:
               # How long to wait for the command to finish executing. Defaults to 30 seconds. Optional.
               timeout: 10s
         # An array of hooks to run after all custom actions and additional items have been
-        # processed. Currently only "exec" hooks are supported.
+        # processed. Only "exec" hooks are supported.
         post:
           # Same content as pre above.
 # Status about the Backup. Users should not set any data here.
 status:
-  # The version of this Backup. The only version currently supported is 1.
+  # The version of this Backup. The only version supported is 1.
   version: 1
   # The date and time when the Backup is eligible for garbage collection.
   expiration: null
@@ -144,5 +144,5 @@ status:
   warnings: 2
   # Number of errors that were logged by the backup.
   errors: 0
-  
+
 ```

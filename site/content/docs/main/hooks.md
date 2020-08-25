@@ -3,7 +3,7 @@ title: "Hooks"
 layout: docs
 ---
 
-Velero currently supports executing commands in containers in pods during a backup.
+Velero supports executing commands in containers in pods during a backup.
 
 ## Backup Hooks
 
@@ -49,10 +49,10 @@ spec.
 
 ## Hook Example with fsfreeze
 
-We are going to walk through using both pre and post hooks for freezing a file system. Freezing the
+This examples walks you through using both pre and post hooks for freezing a file system. Freezing the
 file system is useful to ensure that all pending disk I/O operations have completed prior to taking a snapshot.
 
-We will be using [examples/nginx-app/with-pv.yaml][2] for this example. Follow the [steps for your provider][3] to
+This example uses [examples/nginx-app/with-pv.yaml][2]. Follow the [steps for your provider][3] to
 setup this example.
 
 ### Annotations
