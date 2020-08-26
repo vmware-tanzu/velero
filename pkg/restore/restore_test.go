@@ -1797,20 +1797,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		want                    []*test.APIResource
 	}{
 		{
-			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
+			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster,  it gets restored, without its claim ref",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
 				AddItems("persistentvolumes",
-					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).ClaimRef("ns-1", "pvc-1").Result(),
-				).
-				AddItems("persistentvolumeclaims",
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
-						VolumeName("pv-1").
-						ObjectMeta(
-							builder.WithAnnotations("pv.kubernetes.io/bind-completed", "true", "pv.kubernetes.io/bound-by-controller", "true", "foo", "bar"),
-						).
-						Result(),
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).ClaimRef("ns-1", "pvc-1").Result(),
 				).
 				Done(),
 			apiResources: []*test.APIResource{
@@ -1818,11 +1810,10 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				test.PVCs(),
 			},
 			want: []*test.APIResource{
-				test.PVs(),
-				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						ObjectMeta(
-							builder.WithAnnotations("foo", "bar"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 						).
 						Result(),

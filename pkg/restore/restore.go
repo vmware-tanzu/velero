@@ -901,15 +901,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
 
-		case hasDeleteReclaimPolicy(obj.Object):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
-			ctx.pvsToProvision.Insert(name)
-
-			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
-			return warnings, errs
-
 		default:
-			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
+			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot")
 
 			// we call the pvRestorer here to clear out the PV's claimRef, so it can be re-claimed
 			// when its PVC is restored.
