@@ -214,11 +214,7 @@ document, use the backtick (`` ` ``).
 |Do|Don't|
 |--- |--- |
 |The `kubeadm` tool bootstraps and provisions machines in a cluster.|`kubeadm` tool bootstraps and provisions machines in a cluster.|
-|The kube-scheduler is the default scheduler for|Do|Don't|
-|--- |--- |
-|Set the value of `imagePullPolicy` to `Always`.|Set the value of `imagePullPolicy` to "Always".|
-|Set the value of `image` to `nginx:1.16`.|Set the value of `image` to nginx:1.16.|
-|Set the value of the `replicas` field to `2`.|Set the value of the `replicas` field to 2.| Kubernetes.|kube-scheduler is the default scheduler for Kubernetes.|
+|The kube-scheduler is the default scheduler for Kubernetes.|kube-scheduler is the default scheduler for Kubernetes.|
 {{< /table >}}
 
 ### Use normal style for string and integer field values
