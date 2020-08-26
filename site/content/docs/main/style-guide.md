@@ -92,7 +92,7 @@ Many readers speak English as a second language. Avoid jargon and idioms to help
 |Create a new cluster.|Turn up a new cluster.|
 {{< /table >}}
 
-### Avoid statements statements about the future or that will soon be out of date
+### Avoid statements about the future or that will soon be out of date
 
 Avoid making promises or giving hints about the future. If you need to talk about
 a beta feature, put the text under a heading that identifies it as beta
