@@ -14,16 +14,16 @@ velero restore create RESTORE_NAME \
 ```
 ## What happens when user removes restore objects
 A **restore** object represents the restore operation. There are two types of deletion for restore objects:
-### 1. Deleting with **`velero restore delete`**
+1. Deleting with **`velero restore delete`**
 This command will delete the custom resource representing it, along with its individual log and results files. But, it will not delete any objects that were created by it from your cluster.
-### 2. Deleting with **`kubectl -n velero delete restore`**
+2. Deleting with **`kubectl -n velero delete restore`**
 This command will delete the custom resource representing the restore, but will not delete log/results files from object storage, or any objects that were created during the restore in your cluster.
 
 ## Restore command-line options
 To see all commands for restores, run : `velero restore --help`
 To see all options associated with a specific command, provide the --help flag to that command. For example,  **`velero restore create --help`** shows all options associated with the **create** command.
 
-### To List all options of restore use : **`velero restore --help`**
+To list all options of restore, use **`velero restore --help`**
 
 ```Usage:
   velero restore [command]
