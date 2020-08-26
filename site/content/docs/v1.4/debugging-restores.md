@@ -3,9 +3,6 @@ title: "Debugging Restores"
 layout: docs
 ---
 
-* [Example][0]
-* [Structure][1]
-
 ## Example
 
 When Velero finishes a Restore, its status changes to "Completed" regardless of whether or not there are issues during the process. The number of warnings and errors are indicated in the output columns from `velero restore get`:

@@ -9,7 +9,7 @@ Integrating Container Storage Interface (CSI) snapshot support into Velero enabl
 
 By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available.
 
-# Prerequisites
+## Prerequisites
 
 The following are the prerequisites for using Velero to take Container Storage Interface (CSI) snapshots:
 
@@ -17,7 +17,7 @@ The following are the prerequisites for using Velero to take Container Storage I
  1. The cluster is running a CSI driver capable of support volume snapshots at the [v1beta1 API level](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
  1. When restoring CSI volumesnapshots across clusters, the name of the CSI driver in the destination cluster is the same as that on the source cluster to ensure cross cluster portability of CSI volumesnapshots
 
-# Installing Velero with CSI support
+## Installing Velero with CSI support
 
 Ensure that the Velero server is running with the `EnableCSI` feature flag. See [Enabling Features][1] for more information.
 Also, the Velero [CSI plugin][2] ([Docker Hub][3]) is necessary to integrate with the CSI volume snapshot APIs.
@@ -34,7 +34,7 @@ velero install \
 To include the status of CSI objects associated with a Velero backup in `velero backup describe` output, run `velero client config set features=EnableCSI`.
 See [Enabling Features][1] for more information about managing client-side feature flags.
 
-# Implementation Choices
+## Implementation Choices
 
 This section documents some of the choices made during implementation of the Velero [CSI plugin][2]:
 
@@ -45,12 +45,12 @@ This section documents some of the choices made during implementation of the Vel
 velero.io/csi-volumesnapshot-class: "true"
 ```
 
-# Roadmap
+## Roadmap
 
 Velero's support level for CSI volume snapshotting will follow upstream Kubernetes support for the feature, and will reach general availability sometime
 after volume snapshotting is GA in upstream Kubernetes. Beta support is expected to launch in Velero v1.4.
 
-# How it Works - Overview
+## How it Works - Overview
 
 Velero's CSI support does not rely on the Velero VolumeSnapshotter plugin interface.
 
