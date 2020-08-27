@@ -7,26 +7,31 @@ Velero supports a variety of storage providers for different backup and snapshot
 
 ## Velero supported providers
 
+{{< table caption="Velero supported providers" >}}
+
 | Provider                          | Object Store        | Volume Snapshotter           | Plugin Provider Repo                    | Setup Instructions            |
 |-----------------------------------|---------------------|------------------------------|-----------------------------------------|-------------------------------|
-| [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin for AWS][8]              | [AWS Plugin Setup][35]        |
-| [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             | [GCP Plugin Setup][36]        |
-| [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] | [Azure Plugin Setup][37]      |
-| [VMware vSphere][39]              | 🚫                  | vSphere Volumes              | [VMware vSphere][39]                    | [vSphere Plugin Setup][40]    |
-| [Container Storage Interface (CSI)]| 🚫                 | CSI Volumes                  | [Velero plugin for CSI][44]             | [CSI Plugin Setup][45]        |
+| [Amazon Web Services (AWS)](https://aws.amazon.com)    | AWS S3              | AWS EBS                      | [Velero plugin for AWS](https://github.com/vmware-tanzu/velero-plugin-for-aws)              | [AWS Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-aws#setup)        |
+| [Google Cloud Platform (GCP)](https://cloud.google.com) | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP](https://github.com/vmware-tanzu/velero-plugin-for-gcp)             | [GCP Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup)        |
+| [Microsoft Azure](https://azure.com)              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure) | [Azure Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup)      |
+| [VMware vSphere](https://github.com/vmware-tanzu/velero-plugin-for-vsphere)              | 🚫                  | vSphere Volumes              | [VMware vSphere](https://github.com/vmware-tanzu/velero-plugin-for-vsphere)                    | [vSphere Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-vsphere#installing-the-plugin)    |
+| [Container Storage Interface (CSI)](https://github.com/vmware-tanzu/velero-plugin-for-csi/)| 🚫                 | CSI Volumes                  | [Velero plugin for CSI](https://github.com/vmware-tanzu/velero-plugin-for-csi/)             | [CSI Plugin Setup](website-guidelines.md)        |
+{{< /table >}}
 
-Contact: [#Velero Slack][28], [GitHub Issues][29]
+Contact: [#Velero Slack](https://kubernetes.slack.com/messages/velero), [GitHub Issues](https://github.com/vmware-tanzu/velero/issues)
 
 ## Community supported providers
+{{< table caption="Community supported providers" >}}
 
 | Provider                  | Object Store                 | Volume Snapshotter                 | Plugin Documentation   | Contact                         |
 |---------------------------|------------------------------|------------------------------------|------------------------|---------------------------------|
-| [AlibabaCloud][21]        | Alibaba Cloud OSS            | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
-| [DigitalOcean][15]        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
-| [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
-| [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
-| [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
-| [Storj][41]               | Storj Object Storage         | 🚫                                 | [Storj][42]            | [GitHub Issue][43]              |
+| [AlibabaCloud](https://www.alibabacloud.com/)        | Alibaba Cloud OSS            | Alibaba Cloud                      | [AlibabaCloud](https://github.com/AliyunContainerService/velero-plugin)     | [GitHub Issue](https://github.com/AliyunContainerService/velero-plugin/issues)              |
+| [DigitalOcean](https://www.digitalocean.com/)        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud](https://github.com/StackPointCloud/ark-plugin-digitalocean)  |                                 |
+| [Hewlett Packard](https://www.hpe.com/us/en/storage.html)     | 🚫                           | HPE Storage                        | [Hewlett Packard](https://github.com/hpe-storage/velero-plugin)  | [Slack](https://slack.hpedev.io/), [GitHub Issue](https://github.com/hpe-storage/velero-plugin/issues) |
+| [OpenEBS](https://openebs.io/)             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS](https://github.com/openebs/velero-plugin)          | [Slack](https://openebs-community.slack.com/), [GitHub Issue](https://github.com/openebs/velero-plugin/issues) |
+| [Portworx](https://portworx.com/)            | 🚫                           | Portworx Volume                    | [Portworx](https://docs.portworx.com/scheduler/kubernetes/ark.html)         | [Slack](https://portworx.slack.com/messages/px-k8s), [GitHub Issue](https://github.com/portworx/ark-plugin/issues) |
+| [Storj](https://storj.io)               | Storj Object Storage         | 🚫                                 | [Storj](https://github.com/storj-thirdparty/velero-plugin)            | [GitHub Issue](https://github.com/storj-thirdparty/velero-plugin/issues)              |
+{{< /table >}}
 
 ## S3-Compatible object store providers
 
@@ -56,40 +61,7 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [4]: https://github.com/StackPointCloud/ark-plugin-digitalocean
 [5]: http://www.noobaa.com/
 [6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/backupstoragelocation.md
-[7]: https://aws.amazon.com
-[8]: https://github.com/vmware-tanzu/velero-plugin-for-aws
-[9]: https://azure.com
-[10]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
-[11]: https://cloud.google.com
-[12]: https://github.com/vmware-tanzu/velero-plugin-for-gcp
-[15]: https://www.digitalocean.com/
-[16]: https://github.com/StackPointCloud/ark-plugin-digitalocean
-[17]: https://openebs.io/
-[18]: https://github.com/openebs/velero-plugin
-[19]: https://openebs-community.slack.com/
-[20]: https://github.com/openebs/velero-plugin/issues
-[21]: https://www.alibabacloud.com/
-[22]: https://github.com/AliyunContainerService/velero-plugin
-[23]: https://github.com/AliyunContainerService/velero-plugin/issues
-[24]: https://www.hpe.com/us/en/storage.html
 [25]: https://github.com/hpe-storage/velero-plugin
-[26]: https://slack.hpedev.io/
-[27]: https://github.com/hpe-storage/velero-plugin/issues
-[28]: https://kubernetes.slack.com/messages/velero
-[29]: https://github.com/vmware-tanzu/velero/issues
 [30]: restic.md
-[31]: https://portworx.com/
-[32]: https://docs.portworx.com/scheduler/kubernetes/ark.html
-[33]: https://portworx.slack.com/messages/px-k8s
-[34]: https://github.com/portworx/ark-plugin/issues
-[35]: https://github.com/vmware-tanzu/velero-plugin-for-aws#setup
 [36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
-[37]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup
 [38]: https://www.cloudian.com/
-[39]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere
-[40]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere#installing-the-plugin
-[41]: https://storj.io
-[42]: https://github.com/storj-thirdparty/velero-plugin
-[43]: https://github.com/storj-thirdparty/velero-plugin/issues
-[44]: https://github.com/vmware-tanzu/velero-plugin-for-csi/
-[45]: https://velero.io/docs/v1.4/csi/
