@@ -18,6 +18,8 @@ For information on how to connect with our maintainers and community, join our o
 
 Please browse our list of resources, including a playlist of past online community meetings, blog posts, and other resources to help you get familiar with our project: [Velero resources](https://velero.io/resources/).
 
+If you are thinking about contributing documentation, make sure to review our [documentation style guide](style-guide.md) and [website guidelines](website-guidelines.md).
+
 ### Contributing
 
 If you are ready to jump in and test, add code, or help with documentation, please use the navigation on the left under `Contribute`.
