@@ -33,6 +33,7 @@ The configurable parameters are as follows:
 
 #### Main config parameters
 
+{{< table caption="Main config parameters" >}}
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `provider` | String | Required Field | The name for whichever object storage provider will be used to store the backups. See [your object storage provider's plugin documentation][0] for the appropriate value to use. |
@@ -43,6 +44,6 @@ The configurable parameters are as follows:
 | `config` | map[string]string | None (Optional) | Provider-specific configuration keys/values to be passed to the object store plugin. See [your object storage provider's plugin documentation][0] for details. |
 | `accessMode` | String | `ReadWrite` | How Velero can access the backup storage location. Valid values are `ReadWrite`, `ReadOnly`. |
 | `backupSyncPeriod` | metav1.Duration | Optional Field | How frequently Velero should synchronize backups in object storage. Default is Velero's server backup sync period. Set this to `0s` to disable sync. |
-
+{{</table>}}
 
 [0]: ../supported-providers.md
