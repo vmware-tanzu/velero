@@ -36,8 +36,7 @@ function tag_and_push() {
 
 # Default to a dry-run mode
 publish=FALSE
-if [[ "$1" = "publish" ]];
-then
+if [[ "$1" = "publish" ]]; then
     publish=TRUE
 fi
 
@@ -79,12 +78,12 @@ printf "Based on this, the following assumptions have been made: \n"
 # -z is "string is empty"
 [[ -z $VELERO_PRERELEASE ]] && printf "*\t This is a GA release.\n"
 
-if [[ $publish == "TRUE" ]];
-    then
-        echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
-    else
-        echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and PROCEED WITH THE DRY-RUN."
+if [[ $publish == "TRUE" ]]; then
+    echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
+else
+    echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and PROCEED WITH THE DRY-RUN."
 fi
+
 echo "Otherwise, press ctrl-c to CANCEL the process without making any changes."
 
 read -p "Ready to continue? "
