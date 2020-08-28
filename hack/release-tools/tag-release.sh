@@ -28,8 +28,18 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 function tag_and_push() {
     echo "Tagging and pushing $VELERO_VERSION"
     git tag $VELERO_VERSION
-    git push upstream $VELERO_VERSION
+    
+    if [[ $publish == "TRUE" ]]; then
+        git push upstream $VELERO_VERSION
+    fi
 }
+
+# Default to a dry-run mode
+publish=FALSE
+if [[ "$1" = "publish" ]];
+then
+    publish=TRUE
+fi
 
 # For now, have the person doing the release pass in the VELERO_VERSION variable as an environment variable.
 # In the future, we might be able to inspect git via `git describe --abbrev=0` to get a hint for it.
@@ -69,7 +79,12 @@ printf "Based on this, the following assumptions have been made: \n"
 # -z is "string is empty"
 [[ -z $VELERO_PRERELEASE ]] && printf "*\t This is a GA release.\n"
 
-echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
+if [[ $publish == "TRUE" ]];
+    then
+        echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
+    else
+        echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and PROCEED WITH THE DRY-RUN."
+fi
 echo "Otherwise, press ctrl-c to CANCEL the process without making any changes."
 
 read -p "Ready to continue? "
@@ -99,8 +114,10 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
 
     # TODO can/should we add a way to review the cherry-picked commits before the push?
 
-    echo "Pushing $release_branch_name to upstream remote"
-    git push --set-upstream upstream/$release_branch_name $release_branch_name
+    if [[ $publish == "TRUE" ]]; then
+        echo "Pushing $release_branch_name to upstream remote"
+        git push --set-upstream upstream/$release_branch_name $release_branch_name
+    fi
     
     tag_and_push
 else
@@ -111,8 +128,7 @@ else
 fi
 
 
-
 echo "Invoking Goreleaser to create the GitHub release."
 RELEASE_NOTES_FILE=changelogs/CHANGELOG-$VELERO_MAJOR.$VELERO_MINOR.md \
-    PUBLISH=TRUE \
+    PUBLISH=$publish \
     make release
