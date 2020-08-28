@@ -25,7 +25,7 @@ For more information on how to run the website locally, please see our [Hugo doc
 
 ## Adding a blog post
 
-To add a blog post, create a new markdown (.MD) file in the `/site/content/posts/` folder. A blog poost requires the following front matter.
+To add a blog post, create a new markdown (.MD) file in the `/site/content/posts/` folder. A blog post requires the following front matter.
 
 ```yaml
 title: "Title of the blog"
@@ -42,4 +42,4 @@ tags: ['Velero Team', 'Nolan Brubaker']
 
 Include the `author_name` value in tags field so the page that lists the author's posts will work properly, for example https://velero.io/tags/carlisia-campos/.
 
-Ideally each blog will have a unique image to use on the blog home page, but if you do not include an image, the default Velero logo will be used instead. Use an image that is less than 70KB and add it to the `/site/static/img/posts` folder. 
+Ideally each blog will have a unique image to use on the blog home page, but if you do not include an image, the default Velero logo will be used instead. Use an image that is less than 70KB and add it to the `/site/static/img/posts` folder.

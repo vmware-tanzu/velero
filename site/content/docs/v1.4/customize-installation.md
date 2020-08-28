@@ -93,13 +93,14 @@ velero client config set features=
 
 At installation, Velero sets default resource requests and limits for the Velero pod and the restic pod, if you using the [restic integration](/docs/main/restic/). In Velero versions before 1.4.2, restic pod defaults were not set at install.
 
-<table caption="Velero Customize resource requests and limits defaults" >
-  <tr><th>Setting</th><th>Velero pod defaults</th><th>restic pod defaults (Velero 1.4.2 and later)</th></tr>
-  <tr><td>CPU request</td><td>500m</td><td>500m</td></tr>
-  <tr><td>Memory requests</td><td>128Mi</td><td>512Mi</td></tr>
-  <tr><td>CPU limit</td><td>1000m (1 CPU)</td><td>1000m (1 CPU)</td></tr>
-  <tr><td>Memory limit</td><td>256Mi</td><td>1024Mi</td></tr>
-</table>
+{{< table caption="Velero Customize resource requests and limits defaults" >}}
+|Setting|Velero pod defaults|restic pod defaults|
+|--- |--- |--- |
+|CPU request|500m|500m|
+|Memory requests|128Mi|512Mi|
+|CPU limit|1000m (1 CPU)|1000m (1 CPU)|
+|Memory limit|256Mi|1024Mi|
+{{< /table >}}
 
 ### Install with custom resource requests and limits
 

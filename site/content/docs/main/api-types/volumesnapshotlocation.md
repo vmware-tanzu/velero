@@ -32,10 +32,11 @@ The configurable parameters are as follows:
 
 #### Main config parameters
 
+{{< table caption="Main config parameters" >}}
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `provider` | String | Required Field | The name for whichever storage provider will be used to create/store the volume snapshots. See [your volume snapshot provider's plugin documentation][0] for the appropriate value to use. |
 | `config` | map[string]string | None (Optional) |  Provider-specific configuration keys/values to be passed to the volume snapshotter plugin. See [your volume snapshot provider's plugin documentation][0] for details. |
-
+{{</table>}}
 
 [0]: ../supported-providers.md
