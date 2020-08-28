@@ -5,7 +5,7 @@ layout: docs
 
 After you set up the Velero server, try these examples:
 
-### Basic example (without PersistentVolumes)
+## Basic example (without PersistentVolumes)
 
 1. Start the sample nginx app:
 
@@ -33,7 +33,7 @@ After you set up the Velero server, try these examples:
     velero restore create --from-backup nginx-backup
     ```
 
-### Snapshot example (with PersistentVolumes)
+## Snapshot example (with PersistentVolumes)
 
 > NOTE: For Azure, you must run Kubernetes version 1.7.2 or later to support PV snapshotting of managed disks.
 

@@ -35,7 +35,7 @@ This configuration design enables a number of different use cases, including:
 
 Let's look at some examples of how you can use this configuration mechanism to address some common use cases:
 
-#### Take snapshots of more than one kind of persistent volume in a single Velero backup
+### Take snapshots of more than one kind of persistent volume in a single Velero backup
 
 During server configuration:
 
@@ -62,7 +62,7 @@ Alternately, since in this example there's only one possible volume snapshot loc
 velero backup create full-cluster-backup
 ```
 
-#### Have some Velero backups go to a bucket in an eastern USA region, and others go to a bucket in a western USA region
+### Have some Velero backups go to a bucket in an eastern USA region, and others go to a bucket in a western USA region
 
 During server configuration:
 
@@ -95,7 +95,7 @@ velero backup create full-cluster-alternate-location-backup \
     --storage-location s3-alt-region
 ```
 
-#### For volume providers that support it (like Portworx), have some snapshots be stored locally on the cluster and have others be stored in the cloud
+### For volume providers that support it (like Portworx), have some snapshots be stored locally on the cluster and have others be stored in the cloud
 
 During server configuration:
 
@@ -128,7 +128,7 @@ velero backup create cloud-snapshot-backup \
     --volume-snapshot-locations portworx-cloud
 ```
 
-#### Use a single location
+### Use a single location
 
 If you don't have a use case for more than one location, it's still easy to use Velero. Let's assume you're running on AWS, in the `us-west-1` region:
 

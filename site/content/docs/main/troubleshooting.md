@@ -5,18 +5,6 @@ layout: docs
 
 These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
 
-- [Troubleshooting](#troubleshooting)
-  - [Debug installation/ setup issues](#debug-installation-setup-issues)
-  - [Debug restores](#debug-restores)
-  - [General troubleshooting information](#general-troubleshooting-information)
-    - [Getting velero debug logs](#getting-velero-debug-logs)
-  - [Known issue with restoring LoadBalancer Service](#known-issue-with-restoring-loadbalancer-service)
-  - [Miscellaneous issues](#miscellaneous-issues)
-    - [Velero reports `custom resource not found` errors when starting up.](#velero-reports-custom-resource-not-found-errors-when-starting-up)
-    - [`velero backup logs` returns a `SignatureDoesNotMatch` error](#velero-backup-logs-returns-a-signaturedoesnotmatch-error)
-  - [Velero (or a pod it was backing up) restarted during a backup and the backup is stuck InProgress](#velero-or-a-pod-it-was-backing-up-restarted-during-a-backup-and-the-backup-is-stuck-inprogress)
-  - [Velero is not publishing prometheus metrics](#velero-is-not-publishing-prometheus-metrics)
-
 ## Debug installation/ setup issues
 
 - [Debug installation/setup issues][2]
