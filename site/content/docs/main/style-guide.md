@@ -341,3 +341,4 @@ Parameter | Description | Default
 {{< /table */>}}
 
 ```
+**Note:** This shortcode does not support markdown reference-style links. Use inline-style links in tables. See more information about [markdown link styles](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet#links).
