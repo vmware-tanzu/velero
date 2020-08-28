@@ -101,6 +101,3 @@ Both errors and warnings are structured in the same way:
 * `Cluster`: A list of issues related to the restore of cluster-scoped resources.
 
 * `Namespaces`: A map of namespaces to the list of issues related to the restore of their respective resources.
-
-[0]: #example
-[1]: #structure
