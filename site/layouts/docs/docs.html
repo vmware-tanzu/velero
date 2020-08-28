@@ -50,6 +50,12 @@
             {{ .Render "version-warning" }}
             <div class="documentation-container">
               {{ with .Title }}<h1>{{ . }}</h1>{{ end }}
+              {{ if eq $.Params.toc "true" }}
+                  <aside>
+                  {{ .TableOfContents }}
+                  </aside>
+              {{ end }}
+
               {{ .Content }}
             </div>
           </div>

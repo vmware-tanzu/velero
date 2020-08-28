@@ -14,13 +14,13 @@ See [Set up Velero on your platform][3] for how to configure Velero for a produc
 
 If you encounter issues with installing or configuring, see [Debugging Installation Issues](debugging-install.md).
 
-### Prerequisites
+## Prerequisites
 
 * Access to a Kubernetes cluster, version 1.7 or later.  **Note:** restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. Restic support is not required for this example, but may be of interest later. See [Restic Integration][17].
 * A DNS server on the cluster
 * `kubectl` installed
 
-### Download Velero
+## Download Velero
 
 1. Download the [latest official release's](https://github.com/vmware-tanzu/velero/releases) tarball for your client platform.
 
@@ -38,7 +38,7 @@ of the Velero repository is under active development and is not guaranteed to be
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
-#### MacOS Installation
+### MacOS Installation
 
 On Mac, you can use [HomeBrew](https://brew.sh) to install the `velero` client:
 
@@ -46,7 +46,7 @@ On Mac, you can use [HomeBrew](https://brew.sh) to install the `velero` client:
 brew install velero
 ```
 
-### Set up server
+## Set up server
 
 These instructions start the Velero server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster][31] for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `velero describe` commands.
 
@@ -92,7 +92,7 @@ These instructions start the Velero server and a Minio instance that is accessib
     kubectl get deployments --namespace=nginx-example
     ```
 
-### Back up
+## Back up
 
 1. Create a backup for any object that matches the `app=nginx` label selector:
 
@@ -138,7 +138,7 @@ These instructions start the Velero server and a Minio instance that is accessib
 
     NOTE: You might need to wait for a few minutes for the namespace to be fully cleaned up.
 
-### Restore
+## Restore
 
 1. Run:
 
@@ -171,7 +171,7 @@ velero restore describe <RESTORE_NAME>
 
 For more information, see [the debugging information][18].
 
-### Clean up
+## Clean up
 
 If you want to delete any backups you created, including data in object storage and persistent
 volume snapshots, you can run:

@@ -3,33 +3,6 @@ title: "Customize Velero Install"
 layout: docs
 ---
 
-- [Customize Velero Install](#customize-velero-install)
-  - [Plugins](#plugins)
-  - [Install in any namespace](#install-in-any-namespace)
-  - [Use non-file-based identity mechanisms](#use-non-file-based-identity-mechanisms)
-  - [Enable restic integration](#enable-restic-integration)
-  - [Enable features](#enable-features)
-    - [Enable server side features](#enable-server-side-features)
-    - [Enable client side features](#enable-client-side-features)
-  - [Customize resource requests and limits](#customize-resource-requests-and-limits)
-    - [Install with custom resource requests and limits](#install-with-custom-resource-requests-and-limits)
-    - [Update resource requests and limits after install](#update-resource-requests-and-limits-after-install)
-  - [Configure more than one storage location for backups or volume snapshots](#configure-more-than-one-storage-location-for-backups-or-volume-snapshots)
-  - [Do not configure a backup storage location during install](#do-not-configure-a-backup-storage-location-during-install)
-  - [Install an additional volume snapshot provider](#install-an-additional-volume-snapshot-provider)
-  - [Generate YAML only](#generate-yaml-only)
-  - [Use a storage provider secured by a self-signed certificate](#use-a-storage-provider-secured-by-a-self-signed-certificate)
-  - [Additional options](#additional-options)
-  - [Optional Velero CLI configurations](#optional-velero-cli-configurations)
-    - [Enabling shell autocompletion](#enabling-shell-autocompletion)
-      - [Bash on Linux](#bash-on-linux)
-        - [Install bash-completion](#install-bash-completion)
-        - [Enable Velero CLI autocompletion for Bash on Linux](#enable-velero-cli-autocompletion-for-bash-on-linux)
-      - [Bash on macOS](#bash-on-macos)
-        - [Install bash-completion](#install-bash-completion-1)
-        - [Enable Velero CLI autocompletion for Bash on macOS](#enable-velero-cli-autocompletion-for-bash-on-macos)
-      - [Autocompletion on Zsh](#autocompletion-on-zsh)
-
 ## Plugins
 
 During install, Velero requires that at least one plugin is added (with the `--plugins` flag). Please see the documentation under [Plugins](overview-plugins.md)
