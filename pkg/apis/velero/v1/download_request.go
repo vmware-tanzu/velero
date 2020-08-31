@@ -79,6 +79,10 @@ type DownloadRequestStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="DownloadRequest status such as New/Processed"
+// +kubebuilder:printcolumn:name="Target Name",type="string",JSONPath=".spec.target.name",description="Name of the associated Kubernetes resource"
+// +kubebuilder:printcolumn:name="Target Kind",type="string",JSONPath=".spec.target.kind",description="Type of file to download"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DownloadRequest is a request to download an artifact from backup object storage, such as a backup
 // log file.

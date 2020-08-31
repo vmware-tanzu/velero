@@ -8,6 +8,18 @@ metadata:
   creationTimestamp: null
   name: deletebackuprequests.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Delete Backup Request status such as InProgress/Processed
+    name: Status
+    type: string
+  - JSONPath: .spec.backupName
+    description: Name of backup to be deleted
+    name: Backup Name
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: velero.io
   names:
     kind: DeleteBackupRequest
@@ -16,6 +28,7 @@ spec:
     singular: deletebackuprequest
   preserveUnknownFields: false
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: DeleteBackupRequest is a request to delete one or more backups.

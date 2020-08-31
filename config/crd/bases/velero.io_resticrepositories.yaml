@@ -8,6 +8,15 @@ metadata:
   creationTimestamp: null
   name: resticrepositories.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Restic Repository status such as New/Ready
+    name: Status
+    type: string
+  - JSONPath: .status.lastMaintenanceTime
+    description: Last time maintenance was run
+    name: Last Maintenance
+    type: date
   group: velero.io
   names:
     kind: ResticRepository
@@ -16,6 +25,7 @@ spec:
     singular: resticrepository
   preserveUnknownFields: false
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       properties:

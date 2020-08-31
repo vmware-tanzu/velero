@@ -8,6 +8,11 @@ metadata:
   creationTimestamp: null
   name: serverstatusrequests.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Server Status Request status such as New/Processed
+    name: Status
+    type: string
   group: velero.io
   names:
     kind: ServerStatusRequest

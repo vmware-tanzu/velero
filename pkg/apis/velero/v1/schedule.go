@@ -73,6 +73,11 @@ type ScheduleStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Schedule status such as New/Enabled"
+// +kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description="Cron expression defining when to run the backup"
+// +kubebuilder:printcolumn:name="Backup TTL",type="string",JSONPath=".spec.template.ttl",description="How long the backups should be retained for"
+// +kubebuilder:printcolumn:name="Last Backup",type="date",JSONPath=".status.lastBackup",description="Last time a backup was run for this schedule"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Schedule is a Velero resource that represents a pre-scheduled or
 // periodic Backup that should be run.

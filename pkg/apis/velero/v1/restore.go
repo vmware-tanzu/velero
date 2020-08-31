@@ -251,6 +251,13 @@ type RestoreStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Backup",type="string",JSONPath=".spec.backupName",description="Name of backup to restore from"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Restore status such as InProgress/Completed"
+// +kubebuilder:printcolumn:name="Started",type="date",JSONPath=".status.startTimestamp",description="Time when the restore operation was started"
+// +kubebuilder:printcolumn:name="Completed",type="date",JSONPath=".status.completionTimestamp",description="Time when the restore operation was completed"
+// +kubebuilder:printcolumn:name="Errors",type="integer",JSONPath=".status.errors",description="Count of all errors generated during the restore"
+// +kubebuilder:printcolumn:name="Warnings",type="integer",JSONPath=".status.warnings",description="Count of all warnings generated during the restore"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Restore is a Velero resource that represents the application of
 // resources from a Velero backup to a target Kubernetes cluster.

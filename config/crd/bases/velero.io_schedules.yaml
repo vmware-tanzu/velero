@@ -8,6 +8,26 @@ metadata:
   creationTimestamp: null
   name: schedules.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Schedule status such as New/Enabled
+    name: Status
+    type: string
+  - JSONPath: .spec.schedule
+    description: Cron expression defining when to run the backup
+    name: Schedule
+    type: string
+  - JSONPath: .spec.template.ttl
+    description: How long the backups should be retained for
+    name: Backup TTL
+    type: string
+  - JSONPath: .status.lastBackup
+    description: Last time a backup was run for this schedule
+    name: Last Backup
+    type: date
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: velero.io
   names:
     kind: Schedule
@@ -16,6 +36,7 @@ spec:
     singular: schedule
   preserveUnknownFields: false
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: Schedule is a Velero resource that represents a pre-scheduled or
