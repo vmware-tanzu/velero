@@ -25,11 +25,15 @@
 # Directory in which the script itself resides, so we can use it for calling programs that are in the same directory.
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Parse out the branch we're on so we can switch back to it at the end of a dry-run, where we delete the tag. Requires git v1.8.1+
+original_branch=$(git symbolic-ref --short HEAD)
+
 function tag_and_push() {
-    echo "Tagging and pushing $VELERO_VERSION"
-    git tag $VELERO_VERSION
+    echo "Tagging $VELERO_VERSION"
+    git tag $VELERO_VERSION || true
     
     if [[ $publish == "TRUE" ]]; then
+        echo "Pushing $VELERO_VERSION"
         git push upstream $VELERO_VERSION
     fi
 }
@@ -109,7 +113,11 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
 
     echo "Now you'll need to cherry-pick any relevant git commits into this release branch."
     echo "Either pause this script with ctrl-z, or open a new terminal window and do the cherry-picking."
-    read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO UPSTREAM"
+    if [[ $publish == "TRUE" ]]; then
+        read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO UPSTREAM"
+    else
+        read -p "Press enter when you're done cherry-picking."
+    fi
 
     # TODO can/should we add a way to review the cherry-picked commits before the push?
 
@@ -131,3 +139,12 @@ echo "Invoking Goreleaser to create the GitHub release."
 RELEASE_NOTES_FILE=changelogs/CHANGELOG-$VELERO_MAJOR.$VELERO_MINOR.md \
     PUBLISH=$publish \
     make release
+
+if [[ $publish == "FALSE" ]]; then
+    # Delete the local tag so we don't potentially conflict when it's re-run for real.
+    # This also means we won't have to just ignore existing tags in tag_and_push, which could be a problem if there's an existing tag.
+    echo "Dry run complete. Deleting git tag $VELERO_VERSION"
+    git checkout $original_branch
+    git tag -d $VELERO_VERSION
+fi
+
