@@ -31,8 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
 
 // BackupStorageLocationReconciler reconciles a BackupStorageLocation object
@@ -40,8 +42,11 @@ type BackupStorageLocationReconciler struct {
 	Ctx                       context.Context
 	Client                    client.Client
 	Scheme                    *runtime.Scheme
-	DefaultBackupLocationInfo velero.DefaultBackupLocationInfo
-	BackupStoreManager        velero.BackupStoreManager
+	DefaultBackupLocationInfo storage.DefaultBackupLocationInfo
+	// use variables to refer to these functions so they can be
+	// replaced with fakes for testing.
+	NewPluginManager func(logrus.FieldLogger) clientmgmt.Manager
+	NewBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 
 	Log logrus.FieldLogger
 }
@@ -53,7 +58,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 	log.Info("Checking for existing backup locations ready to be verified; there needs to be at least 1 backup location available")
 
-	locationList, err := velero.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
+	locationList, err := storage.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
 	if err != nil {
 		log.WithError(err).Error("No backup storage locations found, at least one is required")
 		return ctrl.Result{Requeue: true}, err
@@ -66,17 +71,20 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		location := &locationList.Items[i]
 		log := r.Log.WithField("controller", "backupstoragelocation").WithField("backupstoragelocation", location.Name)
 
-		if location.Name == r.DefaultBackupLocationInfo.DefaultStorageLocation {
+		if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
 			defaultFound = true
 		}
 
-		locationStore, err := velero.NewLocationStore(r.BackupStoreManager, r.DefaultBackupLocationInfo, location, r.Log)
+		pluginManager := r.NewPluginManager(log)
+		defer pluginManager.CleanupClients()
+
+		backupStore, err := r.NewBackupStore(location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting a backup store")
 			continue
 		}
 
-		if !locationStore.IsReadyToValidate() {
+		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
 			log.Debug("Backup location not ready to be validated")
 			continue
 		}
@@ -90,12 +98,12 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 		log.Debug("Verifying backup storage location")
 		anyVerified = true
-		if err := locationStore.IsValid(); err != nil {
+		if err := backupStore.IsValid(); err != nil {
 			log.Debug("Backup location verified, not valid")
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
 
-			if location.Name == r.DefaultBackupLocationInfo.DefaultStorageLocation {
-				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", r.DefaultBackupLocationInfo.DefaultStorageLocation)
+			if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
+				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", r.DefaultBackupLocationInfo.StorageLocation)
 			}
 
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
@@ -152,7 +160,7 @@ func (r *BackupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 	}
 
 	if !defaultFound {
-		log.Warnf("The specified default backup location named %q was not found; for convenience, be sure to create one or make another backup location that is available the default", r.DefaultBackupLocationInfo.DefaultStorageLocation)
+		log.Warnf("The specified default backup location named %q was not found; for convenience, be sure to create one or make another backup location that is available the default", r.DefaultBackupLocationInfo.StorageLocation)
 	}
 }
 

@@ -74,8 +74,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
-	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 

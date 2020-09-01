@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -83,16 +83,14 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		r := BackupStorageLocationReconciler{
 			Ctx:    ctx,
 			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			DefaultBackupLocationInfo: velero.DefaultBackupLocationInfo{
-				DefaultStorageLocation:          "default",
-				DefaultStoreValidationFrequency: 0,
+			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+				StorageLocation:          "default",
+				StoreValidationFrequency: 0,
 			},
-			BackupStoreManager: velero.BackupStoreManager{
-				NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-					// this gets populated just below, prior to exercising the method under test
-					return backupStores[loc.Name], nil
-				},
+			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+				// this gets populated just below, prior to exercising the method under test
+				return backupStores[loc.Name], nil
 			},
 			Log: velerotest.NewLogger(),
 		}
@@ -155,16 +153,14 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		r := BackupStorageLocationReconciler{
 			Ctx:    ctx,
 			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			DefaultBackupLocationInfo: velero.DefaultBackupLocationInfo{
-				DefaultStorageLocation:          "default",
-				DefaultStoreValidationFrequency: 0,
+			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+				StorageLocation:          "default",
+				StoreValidationFrequency: 0,
 			},
-			BackupStoreManager: velero.BackupStoreManager{
-				NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-					// this gets populated just below, prior to exercising the method under test
-					return backupStores[loc.Name], nil
-				},
+			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+				// this gets populated just below, prior to exercising the method under test
+				return backupStores[loc.Name], nil
 			},
 			Log: velerotest.NewLogger(),
 		}

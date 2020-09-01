@@ -14,64 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package velero
+package storage
 
 import (
 	"context"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/persistence"
-
-	"github.com/sirupsen/logrus"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
 
 // DefaultBackupLocationInfo holds server default backup storage location information
 type DefaultBackupLocationInfo struct {
-	DefaultStorageLocation          string
-	DefaultStoreValidationFrequency time.Duration
-}
-
-// BackupStoreManager is a utility for connecting with storage
-// for a given backup storage location.
-type BackupStoreManager struct {
-	// use variables to refer to these functions so they can be
-	// replaced with fakes for testing.
-	NewPluginManager func(logrus.FieldLogger) clientmgmt.Manager
-	NewBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
-}
-
-// LocationStore contains data for a backup storage location
-// and its associated store, as well as default backup location values.
-type LocationStore struct {
-	location            *velerov1api.BackupStorageLocation
-	backupStore         persistence.BackupStore
-	defaultLocationInfo DefaultBackupLocationInfo
-	log                 logrus.FieldLogger
-}
-
-// NewLocationStore returns a LocationStore for a given location
-// func NewLocationStore(newPluginManager func(logrus.FieldLogger) clientmgmt.Manager, backupLocation *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (LocationStore, error) {
-func NewLocationStore(mgr BackupStoreManager, defaultLocationInfo DefaultBackupLocationInfo, backupLocation *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (LocationStore, error) {
-	pluginManager := mgr.NewPluginManager(log)
-	defer pluginManager.CleanupClients()
-
-	backupStore, err := mgr.NewBackupStore(backupLocation, pluginManager, log)
-	if err != nil {
-		return LocationStore{}, errors.WithStack(err)
-	}
-
-	return LocationStore{
-		location:            backupLocation,
-		backupStore:         backupStore,
-		defaultLocationInfo: defaultLocationInfo,
-		log:                 log,
-	}, nil
+	StorageLocation          string
+	StoreValidationFrequency time.Duration
 }
 
 // IsReadyToValidate calculates if a given backup storage location is ready to be validated.
@@ -82,24 +42,24 @@ func NewLocationStore(mgr BackupStoreManager, defaultLocationInfo DefaultBackupL
 // This will always return "true" for the first attempt at validating a location, regardless of its validation frequency setting
 // Otherwise, it returns "ready" only when NOW is equal to or after the next validation time
 // (next validation time: last validation time + validation frequency)
-func (l LocationStore) IsReadyToValidate() bool {
-	validationFrequency := l.defaultLocationInfo.DefaultStoreValidationFrequency
+func IsReadyToValidate(bslValidationFrequency *metav1.Duration, lastValidationTime *metav1.Time, defaultLocationInfo DefaultBackupLocationInfo, log logrus.FieldLogger) bool {
+	validationFrequency := defaultLocationInfo.StoreValidationFrequency
 	// If the bsl validation frequency is not specifically set, skip this block and continue, using the server's default
-	if l.location.Spec.ValidationFrequency != nil {
-		validationFrequency = l.location.Spec.ValidationFrequency.Duration
+	if bslValidationFrequency != nil {
+		validationFrequency = bslValidationFrequency.Duration
 	}
 
 	if validationFrequency == 0 {
-		l.log.Debug("Validation period for this backup location is set to 0, skipping validation")
+		log.Debug("Validation period for this backup location is set to 0, skipping validation")
 		return false
 	}
 
 	if validationFrequency < 0 {
-		l.log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, l.defaultLocationInfo.DefaultStoreValidationFrequency)
-		validationFrequency = l.defaultLocationInfo.DefaultStoreValidationFrequency
+		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, defaultLocationInfo.StoreValidationFrequency)
+		validationFrequency = defaultLocationInfo.StoreValidationFrequency
 	}
 
-	lastValidation := l.location.Status.LastValidationTime
+	lastValidation := lastValidationTime
 	if lastValidation != nil { // always ready to validate the first time around, so only even do this check if this has happened before
 		nextValidation := lastValidation.Add(validationFrequency) // next validation time: last validation time + validation frequency
 		if time.Now().UTC().Before(nextValidation) {              // ready only when NOW is equal to or after the next validation time
@@ -108,15 +68,6 @@ func (l LocationStore) IsReadyToValidate() bool {
 	}
 
 	return true
-}
-
-// IsValid verifies if a storage is valid for a given backup storage location.
-func (l LocationStore) IsValid() error {
-	if err := l.backupStore.IsValid(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // ListBackupStorageLocations verifies if there are any backup storage locations.
