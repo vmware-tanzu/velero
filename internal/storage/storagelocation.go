@@ -30,7 +30,9 @@ import (
 
 // DefaultBackupLocationInfo holds server default backup storage location information
 type DefaultBackupLocationInfo struct {
-	StorageLocation          string
+	// StorageLocation is the name of the backup storage location designated as the default
+	StorageLocation string
+	// StoreValidationFrequency is the default validation frequency for any backup storage location
 	StoreValidationFrequency time.Duration
 }
 
