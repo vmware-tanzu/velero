@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -30,9 +31,7 @@ import (
 )
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
-	serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
-		Timeout: 5 * time.Second,
-	}
+	timeout := 5 * time.Second
 
 	c := &cobra.Command{
 		Use:   use,
@@ -41,17 +40,18 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
-				Namespace: f.Namespace(),
-				Timeout:   5 * time.Second,
-			}
-
-			client, err := f.Client()
+			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			veleroClient := client.VeleroV1()
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
 
-			serverStatus, err := serverStatusGetter.GetServerStatus(veleroClient)
+			serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
+				Namespace: f.Namespace(),
+				Context:   ctx,
+			}
+
+			serverStatus, err := serverStatusGetter.GetServerStatus(kbClient)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, "<error getting plugin information: %s>\n", err)
 				return
@@ -62,7 +62,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
-	c.Flags().DurationVar(&serverStatusGetter.Timeout, "timeout", serverStatusGetter.Timeout, "Maximum time to wait for plugin information to be reported.")
+	c.Flags().DurationVar(&timeout, "timeout", timeout, "maximum time to wait for plugin information to be reported. Default is 5 seconds.")
 	output.BindFlagsSimple(c.Flags())
 
 	return c

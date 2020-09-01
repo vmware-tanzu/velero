@@ -16,6 +16,8 @@ spec:
     singular: serverstatusrequest
   preserveUnknownFields: false
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: ServerStatusRequest is a request to access current status information
