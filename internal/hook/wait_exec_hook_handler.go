@@ -29,6 +29,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type WaitExecHookHandler interface {
@@ -76,7 +77,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	// there are no hooks left to be executed return immediately.
 	for containerName := range byContainer {
 		if !podHasContainer(pod, containerName) {
-			log.Warningf("Pod %s/%s does not have container %s: discarding post-restore exec hooks", pod.Namespace, pod.Name, containerName)
+			log.Warningf("Pod %s does not have container %s: discarding post-restore exec hooks", kube.NamespaceAndName(pod), containerName)
 			delete(byContainer, containerName)
 		}
 	}
@@ -111,21 +112,27 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			return
 		}
 
+		podLog := log.WithFields(
+			logrus.Fields{
+				"pod": kube.NamespaceAndName(newPod),
+			},
+		)
+
 		if newPod.Status.Phase == v1.PodSucceeded || newPod.Status.Phase == v1.PodFailed {
-			err := fmt.Errorf("Pod %s/%s entered phase %s before some post-restore exec hooks ran", newPod.Namespace, newPod.Name, newPod.Status.Phase)
-			log.Warning(err)
+			err := fmt.Errorf("Pod entered phase %s before some post-restore exec hooks ran", newPod.Status.Phase)
+			podLog.Warning(err)
 			cancel()
 			return
 		}
 
 		for containerName, hooks := range byContainer {
 			if !isContainerRunning(newPod, containerName) {
-				log.Infof("Container % in pod %s/%s is not running: post-restore hooks will not yet be executed", containerName, newPod.Namespace, newPod.Name)
+				podLog.Infof("Container %s is not running: post-restore hooks will not yet be executed", containerName)
 				continue
 			}
 			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newPod)
 			if err != nil {
-				log.WithError(err).Errorf("error unstructuring pod %s/%s", newPod.Namespace, newPod.Name)
+				podLog.WithError(err).Error("error unstructuring pod")
 				cancel()
 				return
 			}
@@ -139,7 +146,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				// byContainer map.
 				byContainer[containerName][i].executed = true
 
-				hookLog := log.WithFields(
+				hookLog := podLog.WithFields(
 					logrus.Fields{
 						"hookSource": hook.HookSource,
 						"hookType":   "exec",
@@ -148,7 +155,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				)
 				// Check the individual hook's wait timeout is not expired
 				if hook.Hook.WaitTimeout.Duration != 0 && time.Since(waitStart) > hook.Hook.WaitTimeout.Duration {
-					err := fmt.Errorf("Hook %s in container %s in pod %s/%s expired before executing", hook.HookName, hook.Hook.Container, pod.Namespace, pod.Name)
+					err := fmt.Errorf("Hook %s in container %s expired before executing", hook.HookName, hook.Hook.Container)
 					hookLog.Error(err)
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						errors = append(errors, err)
@@ -187,7 +194,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			handler(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			err := fmt.Errorf("Pod %s/%s deleted before all hooks were executed", pod.Namespace, pod.Name)
+			err := fmt.Errorf("Pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
 			log.Error(err)
 			cancel()
 		},
@@ -205,7 +212,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			if hook.executed {
 				continue
 			}
-			err := fmt.Errorf("Hook %s in container %s in pod %s/%s not executed: %v", hook.HookName, hook.Hook.Container, pod.Namespace, pod.Name, ctx.Err())
+			err := fmt.Errorf("Hook %s in container %s in pod %s not executed: %v", hook.HookName, hook.Hook.Container, kube.NamespaceAndName(pod), ctx.Err())
 			hookLog := log.WithFields(
 				logrus.Fields{
 					"hookSource": hook.HookSource,

@@ -62,11 +62,13 @@ func TestWaitExecHandleHooks(t *testing.T) {
 	tests := []struct {
 		name string
 		// Used as argument to HandleHooks and first state added to ListerWatcher
-		initialPod                *v1.Pod
-		groupResource             string
-		byContainer               map[string][]PodExecRestoreHook
-		expectedExecutions        []expectedExecution
-		expectedErrors            []error
+		initialPod         *v1.Pod
+		groupResource      string
+		byContainer        map[string][]PodExecRestoreHook
+		expectedExecutions []expectedExecution
+		expectedErrors     []error
+		// changes represents the states of the pod over time. It can be used to test a container
+		// becoming ready at some point after it is first observed by the controller.
 		changes                   []change
 		sharedHooksContextTimeout time.Duration
 	}{
@@ -710,7 +712,10 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			source := fcache.NewFakeControllerSource()
 			go func() {
+				// This is the state of the pod that will be seen by the AddFunc handler.
 				source.Add(test.initialPod)
+				// Changes holds the versions of the pod over time. Each of these states
+				// will be seen by the UpdateFunc handler.
 				for _, change := range test.changes {
 					time.Sleep(change.wait)
 					source.Modify(change.updated)
@@ -736,7 +741,6 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				ctx, _ = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
 			}
 
-			// TODO get the byContainer map or specify it in the unit tests
 			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer)
 
 			// for i, ee := range test.expectedErrors {
