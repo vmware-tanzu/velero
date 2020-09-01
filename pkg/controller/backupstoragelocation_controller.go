@@ -63,6 +63,9 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{Requeue: true}, err
 	}
 
+	pluginManager := r.NewPluginManager(log)
+	defer pluginManager.CleanupClients()
+
 	var defaultFound bool
 	var unavailableErrors []string
 	var anyVerified bool
@@ -73,9 +76,6 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
 			defaultFound = true
 		}
-
-		pluginManager := r.NewPluginManager(log)
-		defer pluginManager.CleanupClients()
 
 		backupStore, err := r.NewBackupStore(location, pluginManager, log)
 		if err != nil {
@@ -113,7 +113,6 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 		if err := patchHelper.Patch(r.Ctx, location); err != nil {
 			log.WithError(err).Error("Error updating backup location phase")
-			continue
 		}
 	}
 
