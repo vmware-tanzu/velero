@@ -30,7 +30,7 @@ type ServerStatusRequestBuilder struct {
 }
 
 // ForServerStatusRequest is the constructor for for a ServerStatusRequestBuilder.
-func ForServerStatusRequest(ns, name string) *ServerStatusRequestBuilder {
+func ForServerStatusRequest(ns, name, resourceVersion string) *ServerStatusRequestBuilder {
 	return &ServerStatusRequestBuilder{
 		object: &velerov1api.ServerStatusRequest{
 			TypeMeta: metav1.TypeMeta{
@@ -38,8 +38,9 @@ func ForServerStatusRequest(ns, name string) *ServerStatusRequestBuilder {
 				Kind:       "ServerStatusRequest",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
+				Namespace:       ns,
+				Name:            name,
+				ResourceVersion: resourceVersion,
 			},
 		},
 	}

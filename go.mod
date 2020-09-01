@@ -30,7 +30,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
-	google.golang.org/grpc v1.28.0
+	google.golang.org/genproto v0.0.0-20200731012542-8145dea6a485 // indirect
+	google.golang.org/grpc v1.31.0
+	google.golang.org/protobuf v1.25.0 // indirect
 	k8s.io/api v0.18.4
 	k8s.io/apiextensions-apiserver v0.18.4
 	k8s.io/apimachinery v0.18.4

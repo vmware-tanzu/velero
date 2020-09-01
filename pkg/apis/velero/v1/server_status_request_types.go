@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TODO(2.0) After converting all resources to use the runttime-controller client,
+// the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:object:generate=true
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
 
 // ServerStatusRequest is a request to access current status information about
 // the Velero server.
@@ -81,7 +87,12 @@ type ServerStatusRequestStatus struct {
 	Plugins []PluginInfo `json:"plugins,omitempty"`
 }
 
+// TODO(2.0) After converting all resources to use the runttime-controller client,
+// the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests/status,verbs=get;update;patch
 
 // ServerStatusRequestList is a list of ServerStatusRequests.
 type ServerStatusRequestList struct {

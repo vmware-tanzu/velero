@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -777,31 +778,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	serverStatusRequestControllerRunInfo := func() controllerRunInfo {
-		serverStatusRequestController := controller.NewServerStatusRequestController(
-			s.logger,
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
-			s.pluginRegistry,
-		)
-
-		return controllerRunInfo{
-			controller: serverStatusRequestController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	enabledControllers := map[string]func() controllerRunInfo{
-		BackupSyncControllerKey:          backupSyncControllerRunInfo,
-		BackupControllerKey:              backupControllerRunInfo,
-		ScheduleControllerKey:            scheduleControllerRunInfo,
-		GcControllerKey:                  gcControllerRunInfo,
-		BackupDeletionControllerKey:      deletionControllerRunInfo,
-		RestoreControllerKey:             restoreControllerRunInfo,
-		ResticRepoControllerKey:          resticRepoControllerRunInfo,
-		DownloadRequestControllerKey:     downloadrequestControllerRunInfo,
-		ServerStatusRequestControllerKey: serverStatusRequestControllerRunInfo,
+		BackupSyncControllerKey:      backupSyncControllerRunInfo,
+		BackupControllerKey:          backupControllerRunInfo,
+		ScheduleControllerKey:        scheduleControllerRunInfo,
+		GcControllerKey:              gcControllerRunInfo,
+		BackupDeletionControllerKey:  deletionControllerRunInfo,
+		RestoreControllerKey:         restoreControllerRunInfo,
+		ResticRepoControllerKey:      resticRepoControllerRunInfo,
+		DownloadRequestControllerKey: downloadrequestControllerRunInfo,
 	}
+	// Note: all runtime type controllers that can be disabled are grouped separately, below:
+	enabledRuntimeControllers := make(map[string]struct{})
+	enabledRuntimeControllers[ServerStatusRequestControllerKey] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -819,7 +808,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger.Infof("Disabling controller: %s", controllerName)
 			delete(enabledControllers, controllerName)
 		} else {
-			s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
+			// maybe it is a runtime type controllers, so attempt to remove that
+			if _, ok := enabledRuntimeControllers[controllerName]; ok {
+				s.logger.Infof("Disabling controller: %s", controllerName)
+				delete(enabledRuntimeControllers, controllerName)
+			} else {
+				s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
+			}
 		}
 	}
 
@@ -852,20 +847,36 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
-	storageLocationInfo := velero.StorageLocation{
-		Client:                          s.mgr.GetClient(),
-		Ctx:                             s.ctx,
-		DefaultStorageLocation:          s.config.defaultBackupLocation,
-		DefaultStoreValidationFrequency: s.config.storeValidationFrequency,
-		NewPluginManager:                newPluginManager,
-		NewBackupStore:                  persistence.NewObjectBackupStore,
+	bslr := controller.BackupStorageLocationReconciler{
+		Scheme: s.mgr.GetScheme(),
+		StorageLocation: velero.StorageLocation{
+			Client:                          s.mgr.GetClient(),
+			Ctx:                             s.ctx,
+			DefaultStorageLocation:          s.config.defaultBackupLocation,
+			DefaultStoreValidationFrequency: s.config.storeValidationFrequency,
+			NewPluginManager:                newPluginManager,
+			NewBackupStore:                  persistence.NewObjectBackupStore,
+		},
+		Log: s.logger,
 	}
-	if err := (&controller.BackupStorageLocationReconciler{
-		Scheme:          s.mgr.GetScheme(),
-		StorageLocation: storageLocationInfo,
-		Log:             s.logger,
-	}).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", "BackupStorageLocation")
+	if err := bslr.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", "backup-storage-location")
+	}
+
+	if _, ok := enabledRuntimeControllers[ServerStatusRequestControllerKey]; ok {
+		r := controller.ServerStatusRequestReconciler{
+			Scheme: s.mgr.GetScheme(),
+			Client: s.mgr.GetClient(),
+			Ctx:    s.ctx,
+			ServerStatus: velero.ServerStatus{
+				PluginRegistry: s.pluginRegistry,
+				Clock:          clock.RealClock{},
+			},
+			Log: s.logger,
+		}
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", ServerStatusRequestControllerKey)
+		}
 	}
 
 	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
