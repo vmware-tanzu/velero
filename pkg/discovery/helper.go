@@ -156,7 +156,7 @@ func (h *helper) Refresh() error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		h.logger.Info("The '%s' feature flag was specified, using all API group versions.", velerov1api.APIGroupVersionsFeatureFlag)
+		h.logger.Infof("The '%s' feature flag was specified, using all API group versions.", velerov1api.APIGroupVersionsFeatureFlag)
 		serverResources = serverAllResources
 	} else {
 		// ServerPreferredResources() returns only preferred APIGroup - this is the default since no feature flag has been passed
