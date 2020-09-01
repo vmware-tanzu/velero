@@ -912,6 +912,11 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 					return warnings, errs
 				}
 				obj = updatedObj
+
+				// VolumeSnapshotter has modified the PV name, we should rename the PV
+				if oldName != obj.GetName() {
+					shouldRenamePV = true
+				}
 			}
 
 			if shouldRenamePV {
