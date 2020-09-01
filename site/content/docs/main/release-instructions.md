@@ -72,8 +72,8 @@ Once you have done the prep steps, use the steps below to perform a release. Thi
 1.  Merge the changelog + docs PR, so that it's included in the release tag.
 
 1.  Set your GitHub token as an environment variable. `export GITHUB_TOKEN=<your token value>`
-
-1.  Run `/hack/release-tools/tag-release.sh` and follow the instructions.
+1.  Run `/hack/release-tools/tag-release.sh` and follow the instructions for a dry-run, without pushing to GitHub.
+1.  Run `/hack/release-tools/tag-release.sh publish` and follow the instructions when everything looks good to publish to GitHub and create the release.
 
 1.  Navigate to the draft GitHub release, at https://github.com/vmware-tanzu/velero/releases.
 

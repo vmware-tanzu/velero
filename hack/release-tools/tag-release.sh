@@ -25,11 +25,24 @@
 # Directory in which the script itself resides, so we can use it for calling programs that are in the same directory.
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Parse out the branch we're on so we can switch back to it at the end of a dry-run, where we delete the tag. Requires git v1.8.1+
+original_branch=$(git symbolic-ref --short HEAD)
+
 function tag_and_push() {
-    echo "Tagging and pushing $VELERO_VERSION"
-    git tag $VELERO_VERSION
-    git push $VELERO_VERSION
+    echo "Tagging $VELERO_VERSION"
+    git tag $VELERO_VERSION || true
+    
+    if [[ $publish == "TRUE" ]]; then
+        echo "Pushing $VELERO_VERSION"
+        git push upstream $VELERO_VERSION
+    fi
 }
+
+# Default to a dry-run mode
+publish=FALSE
+if [[ "$1" = "publish" ]]; then
+    publish=TRUE
+fi
 
 # For now, have the person doing the release pass in the VELERO_VERSION variable as an environment variable.
 # In the future, we might be able to inspect git via `git describe --abbrev=0` to get a hint for it.
@@ -44,7 +57,7 @@ if [[ -z "$GITHUB_TOKEN" ]]; then
     exit 1
 fi
 
- Ensure that we have a clean working tree before we let any changes happen, especially important for cutting release branches.
+# Ensure that we have a clean working tree before we let any changes happen, especially important for cutting release branches.
 if [[ -n $(git status --short) ]]; then 
     echo "Your git working directory is dirty! Please clean up untracked files and stash any changes before proceeding."
     exit 3
@@ -69,7 +82,12 @@ printf "Based on this, the following assumptions have been made: \n"
 # -z is "string is empty"
 [[ -z $VELERO_PRERELEASE ]] && printf "*\t This is a GA release.\n"
 
-echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
+if [[ $publish == "TRUE" ]]; then
+    echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
+else
+    echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and PROCEED WITH THE DRY-RUN."
+fi
+
 echo "Otherwise, press ctrl-c to CANCEL the process without making any changes."
 
 read -p "Ready to continue? "
@@ -77,7 +95,7 @@ read -p "Ready to continue? "
 echo "Alright, let's go."
 
 echo "Pulling down all git tags and branches before doing any work."
-git fetch upstream --all --tags
+git fetch upstream --tags
 
 # If we've got a patch release, we'll need to create a release branch for it.
 if [[ "$VELERO_PATCH" > 0 ]]; then
@@ -95,12 +113,18 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
 
     echo "Now you'll need to cherry-pick any relevant git commits into this release branch."
     echo "Either pause this script with ctrl-z, or open a new terminal window and do the cherry-picking."
-    read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO UPSTREAM"
+    if [[ $publish == "TRUE" ]]; then
+        read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO UPSTREAM"
+    else
+        read -p "Press enter when you're done cherry-picking."
+    fi
 
     # TODO can/should we add a way to review the cherry-picked commits before the push?
 
-    echo "Pushing $release_branch_name to upstream remote"
-    git push --set-upstream upstream/$release_branch_name $release_branch_name
+    if [[ $publish == "TRUE" ]]; then
+        echo "Pushing $release_branch_name to upstream remote"
+        git push --set-upstream upstream/$release_branch_name $release_branch_name
+    fi
     
     tag_and_push
 else
@@ -111,8 +135,16 @@ else
 fi
 
 
-
 echo "Invoking Goreleaser to create the GitHub release."
 RELEASE_NOTES_FILE=changelogs/CHANGELOG-$VELERO_MAJOR.$VELERO_MINOR.md \
-    PUBLISH=TRUE \
+    PUBLISH=$publish \
     make release
+
+if [[ $publish == "FALSE" ]]; then
+    # Delete the local tag so we don't potentially conflict when it's re-run for real.
+    # This also means we won't have to just ignore existing tags in tag_and_push, which could be a problem if there's an existing tag.
+    echo "Dry run complete. Deleting git tag $VELERO_VERSION"
+    git checkout $original_branch
+    git tag -d $VELERO_VERSION
+fi
+
