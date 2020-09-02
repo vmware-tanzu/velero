@@ -8,7 +8,7 @@
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
   {{ $options := (dict "targetPath" "styles.css" "outputStyle" "compressed" "enableSourceMap" true) }}
   {{ $styles := resources.Get "styles.scss" | toCSS $options | resources.Fingerprint }}
-  <link rel="stylesheet" href="{{ $styles.Permalink | relURL }}" integrity="{{ $styles.Data.Integrity }}">
+  <link rel="stylesheet" href="{{ $styles.RelPermalink }}" integrity="{{ $styles.Data.Integrity }}">
   {{ block "title" . }}<title>{{ .Site.Title }} {{ .Page.Title }}</title>{{ end }}
 </head>
 <body id="{{ .CurrentSection.Params.id }}">

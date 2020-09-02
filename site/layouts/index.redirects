@@ -1,0 +1,5 @@
+{{ $versions := site.Params.versions }}
+{{ $latest   := site.Params.latest }}
+/docs    /docs/{{ $latest }}     301!
+/docs/latest     /docs/{{ $latest }}
+/docs/latest/*     /docs/{{ $latest }}/:splat
