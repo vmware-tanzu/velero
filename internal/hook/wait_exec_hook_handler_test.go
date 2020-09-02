@@ -920,6 +920,25 @@ func TestMaxHookWait(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:   "should return 0 if any hook does not have a wait timeout",
+			expect: 0,
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": {
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							ExecTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{time.Second},
+						},
+					},
+					{
+						Hook: velerov1api.ExecRestoreHook{
+							WaitTimeout: metav1.Duration{0},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

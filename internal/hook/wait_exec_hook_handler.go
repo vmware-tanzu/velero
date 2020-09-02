@@ -257,10 +257,15 @@ func isContainerRunning(pod *v1.Pod, containerName string) bool {
 	return false
 }
 
+// maxHookWait returns 0 to mean wait indefinitely. Any hook without a wait timeout will cause this
+// function to return 0.
 func maxHookWait(byContainer map[string][]PodExecRestoreHook) time.Duration {
 	var maxWait time.Duration
 	for _, hooks := range byContainer {
 		for _, hook := range hooks {
+			if hook.Hook.WaitTimeout.Duration <= 0 {
+				return 0
+			}
 			if hook.Hook.WaitTimeout.Duration > maxWait {
 				maxWait = hook.Hook.WaitTimeout.Duration
 			}
