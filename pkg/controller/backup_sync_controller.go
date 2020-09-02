@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -123,7 +123,7 @@ func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList,
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
-	locationList, err := velero.ListBackupStorageLocations(c.kbClient, context.Background(), c.namespace)
+	locationList, err := storage.ListBackupStorageLocations(context.Background(), c.kbClient, c.namespace)
 	if err != nil {
 		c.logger.WithError(err).Error("No backup storage locations found, at least one is required")
 		return
