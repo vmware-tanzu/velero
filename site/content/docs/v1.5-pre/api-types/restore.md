@@ -38,11 +38,11 @@ spec:
   # Array of namespaces to exclude from the restore. Optional.
   excludedNamespaces:
   - some-namespace
-  # Array of resources to include in the restore. Resources may be shortcuts (e.g. 'po' for 'pods')
+  # Array of resources to include in the restore. Resources may be shortcuts (for example 'po' for 'pods')
   # or fully-qualified. If unspecified, all resources are included. Optional.
   includedResources:
   - '*'
-  # Array of resources to exclude from the restore. Resources may be shortcuts (e.g. 'po' for 'pods')
+  # Array of resources to exclude from the restore. Resources may be shortcuts (for example 'po' for 'pods')
   # or fully-qualified. Optional.
   excludedResources:
   - storageclasses.storage.k8s.io
@@ -73,6 +73,59 @@ spec:
   # to restore from. If specified, and BackupName is empty, Velero will
   # restore from the most recent successful backup created from this schedule.
   scheduleName: my-scheduled-backup-name
+  # Actions to perform during or post restore. The only hook currently supported is
+  # adding an init container to a pod before it can be restored. Optional.
+  hooks:
+    # Array of hooks that are applicable to specific resources. Optional.
+    resources:
+    # Name is the name of this hook.
+    - name: restore-hook-1
+      # Array of namespaces to which this hook applies. If unspecified, the hook applies to all
+      # namespaces. Optional.
+      includedNamespaces:
+      - ns1
+      # Array of namespaces to which this hook does not apply. Optional.
+      excludedNamespaces:
+      - ns3
+      # Array of resources to which this hook applies. The only resource supported at this time is
+      # pods.
+      includedResources:
+      - pods
+      # Array of resources to which this hook does not apply. Optional.
+      excludedResources: []
+      # This hook only applies to objects matching this label selector. Optional.
+      labelSelector:
+        matchLabels:
+          app: velero
+          component: server
+      # An array of hooks to run during or after restores. Currently only "init" hooks are supported.
+      postHooks:
+      # The type of the hook. This must be "init".
+      - init:
+          # An array of container specs to be added as init containers to pods to which this hook applies to.
+          initContainers:
+          - name: restore-hook-init1
+            image: alpine:latest
+            # Mounting volumes from the podSpec to which this hooks applies to.
+            volumeMounts:
+            - mountPath: /restores/pvc1-vm
+              # Volume name from the podSpec
+              name: pvc1-vm
+            command:
+            - /bin/ash
+            - -c
+            - echo -n "FOOBARBAZ" >> /restores/pvc1-vm/foobarbaz
+          - name: restore-hook-init2
+            image: alpine:latest
+            # Mounting volumes from the podSpec to which this hooks applies to.
+            volumeMounts:
+            - mountPath: /restores/pvc2-vm
+              # Volume name from the podSpec
+              name: pvc2-vm
+            command:
+            - /bin/ash
+            - -c
+            - echo -n "DEADFEED" >> /restores/pvc2-vm/deadfeed
 # RestoreStatus captures the current status of a Velero restore. Users should not set any data here.
 status:
   # The current phase. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
