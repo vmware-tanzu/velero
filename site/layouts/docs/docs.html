@@ -14,11 +14,6 @@
   <title>{{ .Site.Title }} Docs - {{ .Title }}</title>
 {{ end }}
 
-{{ if not (isset .CurrentSection.Params "version") }}
-  {{ $latest_url := replace .Permalink "/docs" (printf "/docs/%s" .Site.Params.latest) | relURL }}
-  <meta http-equiv="refresh" content="0; URL={{ $latest_url }}" />
-{{ end }}
-
 <body id="docs">
 <div class="container-fluid site-outer-container">
   <div class="site-container">
