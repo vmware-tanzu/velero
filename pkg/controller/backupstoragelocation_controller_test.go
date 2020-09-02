@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -80,19 +80,19 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-		storageLocationInfo := velero.StorageLocation{
-			Client:                          fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			DefaultStorageLocation:          "default",
-			DefaultStoreValidationFrequency: 0,
-			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+		r := BackupStorageLocationReconciler{
+			Ctx:    ctx,
+			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
+			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+				StorageLocation:          "default",
+				StoreValidationFrequency: 0,
+			},
+			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+				// this gets populated just below, prior to exercising the method under test
 				return backupStores[loc.Name], nil
 			},
-		}
-
-		r := &BackupStorageLocationReconciler{
-			StorageLocation: storageLocationInfo,
-			Log:             velerotest.NewLogger(),
+			Log: velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctrl.Request{
@@ -106,7 +106,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		for i, location := range locations.Items {
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err := r.StorageLocation.Client.Get(ctx, key, instance)
+			err := r.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}
@@ -150,20 +150,19 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-		storageLocationInfo := velero.StorageLocation{
-			Client:                          fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			DefaultStorageLocation:          "default",
-			DefaultStoreValidationFrequency: 0,
-			NewPluginManager:                func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+		r := BackupStorageLocationReconciler{
+			Ctx:    ctx,
+			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
+			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+				StorageLocation:          "default",
+				StoreValidationFrequency: 0,
+			},
+			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
 				// this gets populated just below, prior to exercising the method under test
 				return backupStores[loc.Name], nil
 			},
-		}
-
-		r := &BackupStorageLocationReconciler{
-			StorageLocation: storageLocationInfo,
-			Log:             velerotest.NewLogger(),
+			Log: velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctrl.Request{
@@ -177,7 +176,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		for i, location := range locations.Items {
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err := r.StorageLocation.Client.Get(ctx, key, instance)
+			err := r.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}

@@ -74,6 +74,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -848,16 +849,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	bslr := controller.BackupStorageLocationReconciler{
+		Ctx:    s.ctx,
+		Client: s.mgr.GetClient(),
 		Scheme: s.mgr.GetScheme(),
-		StorageLocation: velero.StorageLocation{
-			Client:                          s.mgr.GetClient(),
-			Ctx:                             s.ctx,
-			DefaultStorageLocation:          s.config.defaultBackupLocation,
-			DefaultStoreValidationFrequency: s.config.storeValidationFrequency,
-			NewPluginManager:                newPluginManager,
-			NewBackupStore:                  persistence.NewObjectBackupStore,
+		DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+			StorageLocation:          s.config.defaultBackupLocation,
+			StoreValidationFrequency: s.config.storeValidationFrequency,
 		},
-		Log: s.logger,
+		NewPluginManager: newPluginManager,
+		NewBackupStore:   persistence.NewObjectBackupStore,
+		Log:              s.logger,
 	}
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", "backup-storage-location")
