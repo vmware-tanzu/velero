@@ -114,7 +114,7 @@ func NewRestoreController(
 	logFormat logging.Format,
 ) Interface {
 	c := &restoreController{
-		genericController:      newGenericController("restore", logger),
+		genericController:      newGenericController(Restore, logger),
 		namespace:              namespace,
 		restoreClient:          restoreClient,
 		podVolumeBackupClient:  podVolumeBackupClient,

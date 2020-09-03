@@ -103,7 +103,7 @@ func NewBackupDeletionController(
 	helper discovery.Helper,
 ) Interface {
 	c := &backupDeletionController{
-		genericController:         newGenericController("backup-deletion", logger),
+		genericController:         newGenericController(BackupDeletion, logger),
 		deleteBackupRequestClient: deleteBackupRequestClient,
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,

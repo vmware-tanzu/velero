@@ -68,7 +68,7 @@ Below is the proposed set of new commands to setup and configure Velero.
         --client-burst int                           maximum number of requests by the server to the Kubernetes API in a short period of time (default 30)
         --client-qps float32                         maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached (default 20)
         --default-backup-ttl duration                how long to wait by default before backups can be garbage collected (default 720h0m0s)
-        --disable-controllers strings                list of controllers to disable on startup. Valid values are backup,backup-sync,schedule,gc,backup-deletion,restore,download-request,restic-repo,server-status-request
+        --disable-controllers strings                list of controllers to disable on startup. Valid values are backup,backup-sync,schedule,gc,backup-deletion,restore,download-request,restic-repository,server-status-request
         --log-format                                 the format for log output. Valid values are text, json. (default text)
         --log-level                                  the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
         --metrics-address string                     the address to expose prometheus metrics (default ":8085")
