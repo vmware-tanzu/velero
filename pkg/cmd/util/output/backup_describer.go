@@ -232,7 +232,8 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
 	status := backup.Status
 
-	d.Printf("Backup Format Version:\t%d\n", status.Version)
+	// Status.Version has been deprecated, use Status.FormatVersion
+	d.Printf("Backup Format Version:\t%s\n", status.FormatVersion)
 
 	d.Println()
 	// "<n/a>" output should only be applicable for backups that failed validation
