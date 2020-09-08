@@ -720,6 +720,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
 			s.logger,
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			s.kubeClient.CoreV1().RESTClient(),
 		)
 		cmd.CheckError(err)
 

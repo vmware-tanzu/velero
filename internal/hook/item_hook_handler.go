@@ -407,3 +407,114 @@ func GetRestoreHooksFromSpec(hooksSpec *velerov1api.RestoreHooks) ([]ResourceRes
 
 	return restoreHooks, nil
 }
+
+// getPodExecRestoreHookFromAnnotations returns an ExecRestoreHook based on restore annotations, as
+// long as the 'command' annotation is present. If it is absent, this returns nil.
+func getPodExecRestoreHookFromAnnotations(annotations map[string]string, log logrus.FieldLogger) *velerov1api.ExecRestoreHook {
+	commandValue := annotations[podRestoreHookCommandAnnotationKey]
+	if commandValue == "" {
+		return nil
+	}
+
+	container := annotations[podRestoreHookContainerAnnotationKey]
+
+	onError := velerov1api.HookErrorMode(annotations[podRestoreHookOnErrorAnnotationKey])
+	if onError != velerov1api.HookErrorModeContinue && onError != velerov1api.HookErrorModeFail {
+		onError = ""
+	}
+
+	var execTimeout time.Duration
+	execTimeoutString := annotations[podRestoreHookTimeoutAnnotationKey]
+	if execTimeoutString != "" {
+		if temp, err := time.ParseDuration(execTimeoutString); err == nil {
+			execTimeout = temp
+		} else {
+			log.Warn(errors.Wrapf(err, "Unable to parse exec timeout %s, ignoring", execTimeoutString))
+		}
+	}
+
+	var waitTimeout time.Duration
+	waitTimeoutString := annotations[podRestoreHookWaitTimeoutAnnotationKey]
+	if waitTimeoutString != "" {
+		if temp, err := time.ParseDuration(waitTimeoutString); err == nil {
+			waitTimeout = temp
+		} else {
+			log.Warn(errors.Wrapf(err, "Unable to parse wait timeout %s, ignoring", waitTimeoutString))
+		}
+	}
+
+	return &velerov1api.ExecRestoreHook{
+		Container:   container,
+		Command:     parseStringToCommand(commandValue),
+		OnError:     onError,
+		ExecTimeout: metav1.Duration{Duration: execTimeout},
+		WaitTimeout: metav1.Duration{Duration: waitTimeout},
+	}
+}
+
+type PodExecRestoreHook struct {
+	HookName   string
+	HookSource string
+	Hook       velerov1api.ExecRestoreHook
+	executed   bool
+}
+
+// GroupRestoreExecHooks returns a list of hooks to be executed in a pod grouped by
+// container name. If an exec hook is defined in annotation that is used, else applicable exec
+// hooks from the restore resource are accumulated.
+func GroupRestoreExecHooks(
+	resourceRestoreHooks []ResourceRestoreHook,
+	pod *corev1api.Pod,
+	log logrus.FieldLogger,
+) (map[string][]PodExecRestoreHook, error) {
+	byContainer := map[string][]PodExecRestoreHook{}
+
+	if pod == nil || len(pod.Spec.Containers) == 0 {
+		return byContainer, nil
+	}
+	metadata, err := meta.Accessor(pod)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	hookFromAnnotation := getPodExecRestoreHookFromAnnotations(metadata.GetAnnotations(), log)
+	if hookFromAnnotation != nil {
+		// default to first container in pod if unset
+		if hookFromAnnotation.Container == "" {
+			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
+		}
+		byContainer[hookFromAnnotation.Container] = []PodExecRestoreHook{
+			{
+				HookName:   "<from-annotation>",
+				HookSource: "annotation",
+				Hook:       *hookFromAnnotation,
+			},
+		}
+		return byContainer, nil
+	}
+
+	// No hook found on pod's annotations so check for applicable hooks from the restore spec
+	labels := metadata.GetLabels()
+	namespace := metadata.GetNamespace()
+	for _, rrh := range resourceRestoreHooks {
+		if !rrh.Selector.applicableTo(kuberesource.Pods, namespace, labels) {
+			continue
+		}
+		for _, rh := range rrh.RestoreHooks {
+			if rh.Exec == nil {
+				continue
+			}
+			named := PodExecRestoreHook{
+				HookName:   rrh.Name,
+				Hook:       *rh.Exec,
+				HookSource: "backupSpec",
+			}
+			// default to first container in pod if unset, without mutating resource restore hook
+			if named.Hook.Container == "" {
+				named.Hook.Container = pod.Spec.Containers[0].Name
+			}
+			byContainer[named.Hook.Container] = append(byContainer[named.Hook.Container], named)
+		}
+	}
+
+	return byContainer, nil
+}
