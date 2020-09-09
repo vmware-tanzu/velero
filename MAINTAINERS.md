@@ -10,6 +10,7 @@
 | Nolan Brubaker | [nrb](https://github.com/nrb) | [VMware](https://www.github.com/vmware/) |
 | Ashish Amarnath | [ashish-amarnath](https://github.com/ashish-amarnath) | [VMware](https://www.github.com/vmware/) |
 | Stephanie Bauman | [stephbman](https://github.com/stephbman) | [VMware](https://www.github.com/vmware/) |
+| Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
