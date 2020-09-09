@@ -7,7 +7,7 @@ Each Velero operation -- on-demand backup, scheduled backup, restore -- is a cus
 
 You can back up or restore all objects in your cluster, or you can filter objects by type, namespace, and/or label.
 
-Velero is ideal for the disaster recovery use case, as well as for snapshotting your application state, prior to performing system operations on your cluster (e.g. upgrades).
+Velero is ideal for the disaster recovery use case, as well as for snapshotting your application state, prior to performing system operations on your cluster, like upgrades.
 
 ## On-demand backups
 
@@ -17,8 +17,8 @@ The **backup** operation:
 
 1. Calls the cloud provider API to make disk snapshots of persistent volumes, if specified.
 
-You can optionally specify hooks to be executed during the backup. For example, you might
-need to tell a database to flush its in-memory buffers to disk before taking a snapshot. [More about hooks][10].
+You can optionally specify backup hooks to be executed during the backup. For example, you might
+need to tell a database to flush its in-memory buffers to disk before taking a snapshot. [More about backup hooks][10].
 
 Note that cluster backups are not strictly atomic. If Kubernetes objects are being created or edited at the time of backup, they might not be included in the backup. The odds of capturing inconsistent information are low, but it is possible.
 
@@ -35,6 +35,8 @@ The **restore** operation allows you to restore all of the objects and persisten
 The default name of a restore is `<BACKUP NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. You can also specify a custom name. A restored object also includes a label with key `velero.io/restore-name` and value `<RESTORE NAME>`.
 
 By default, backup storage locations are created in read-write mode. However, during a restore, you can configure a backup storage location to be in read-only mode, which disables backup creation and deletion for the storage location. This is useful to ensure that no backups are inadvertently created or deleted during a restore scenario.
+
+You can optionally specify restore hooks to be executed during a restore or after resources are restored. For example, you might need to perform a custom database restore operation before the database application containers start. [More about restore hooks][11].
 
 ## Backup workflow
 
@@ -67,7 +69,7 @@ When you create a backup, you can specify a TTL (time to live) by adding the fla
 * All PersistentVolume snapshots
 * All associated Restores
 
-The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied. 
+The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied.
 
 ## Object storage sync
 
@@ -77,9 +79,9 @@ This allows restore functionality to work in a cluster migration scenario, where
 
 Likewise, if a backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
 
-[10]: hooks.md
+[10]: backup-hooks.md
+[11]: restore-hooks.md
 [19]: img/backup-process.png
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
-

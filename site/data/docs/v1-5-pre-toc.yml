@@ -35,12 +35,14 @@ toc:
         url: /resource-filtering
       - page: Backup reference
         url: /backup-reference
+      - page: Backup hooks
+        url: /backup-hooks
       - page: Restore reference
         url: /restore-reference
+      - page: Restore hooks
+        url: /restore-hooks
       - page: Run in any namespace
         url: /namespace
-      - page: Extend with hooks
-        url: /hooks
       - page: CSI Support (beta)
         url: /csi
       - page: Verifying Self-signed Certificates
