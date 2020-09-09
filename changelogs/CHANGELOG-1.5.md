@@ -18,7 +18,7 @@ https://velero.io/docs/v1.5-pre/upgrade-to-1.5/
  * Auto Volume Backup Using Restic with `--default-volumes-to-restic` flag
  * DeleteItemAction plugins
  * Code modernization
- * Sneak preview - restore hooks using init containers
+ * Restore Hooks: InitContianer Restore Hooks and Exec Restore Hooks
 
 ### All Changes
 
@@ -74,8 +74,7 @@ fix make clean to clear go mod cache before removing dirs (for containerized bui
   * implement option to back up all volumes by default with restic  (#2611, @ashish-amarnath)
   * add a CI check for a changelog file (#2613, @ashish-amarnath)
   * Documentation: Update Jekyll to 4.1.0
-
-Switch from redcarpet to kramdown for Markdown renderer (#2625, @tbatard)
+  * Switch from redcarpet to kramdown for Markdown renderer (#2625, @tbatard)
   * Update basic-install.md documentation: Add windows cli installation option via chocolatey (#2629, @adamrushuk)
   * Add a new supported provider for an object storage plugin for Storj (#2635, @jessicagreben)
   * Update basic-install and release-instructions documentation for Windows Chocolatey package (#2638, @adamrushuk)
