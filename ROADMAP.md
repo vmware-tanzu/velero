@@ -7,7 +7,7 @@ This document provides a link to the [Velero Project board](https://app.zenhub.c
 Discussion on the roadmap can take place in threads under [Issues](https://github.com/vmware-tanzu/velero/issues) or in [community meetings](https://velero.io/community/). Please open and comment on an issue if you want to provide suggestions, use cases, and feedback to an item in the roadmap. Please review the roadmap to avoid potential duplicated effort.
 
 ### How to add an item to the roadmap?
-One of the most important aspects in any open source community is the concept of proposals. Large changes to the codebase and / or new features should be preceded by a [proposal](https://github.com/vmware-tanzu/velero/blob/master/GOVERNANCE.md#proposal-process) in our repo. 
+One of the most important aspects in any open source community is the concept of proposals. Large changes to the codebase and / or new features should be preceded by a [proposal](https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#proposal-process) in our repo.
 For smaller enhancements, you can open an issue to track that initiative or feature request.
 We work with and rely on community feedback to focus our efforts to improve Velero and maintain a healthy roadmap.
 
