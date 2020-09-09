@@ -4,4 +4,4 @@ Thanks for trying out Velero! We welcome all feedback, find all the ways to conn
 
 - [Velero Community](https://velero.io/community/)
 
-You can find details on the Velero maintainers' support process [here](https://velero.io/docs/master/support-process/).
+You can find details on the Velero maintainers' support process [here](https://velero.io/docs/main/support-process/).
