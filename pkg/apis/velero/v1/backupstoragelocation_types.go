@@ -86,6 +86,7 @@ type BackupStorageLocationStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=bsl
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status

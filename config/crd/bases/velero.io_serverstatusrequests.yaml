@@ -13,6 +13,8 @@ spec:
     kind: ServerStatusRequest
     listKind: ServerStatusRequestList
     plural: serverstatusrequests
+    shortNames:
+    - ssr
     singular: serverstatusrequest
   preserveUnknownFields: false
   scope: Namespaced
