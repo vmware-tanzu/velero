@@ -73,8 +73,9 @@ spec:
   # to restore from. If specified, and BackupName is empty, Velero will
   # restore from the most recent successful backup created from this schedule.
   scheduleName: my-scheduled-backup-name
-  # Actions to perform during or post restore. The only hook currently supported is
-  # adding an init container to a pod before it can be restored. Optional.
+  # Actions to perform during or post restore. The only hooks currently supported are
+  # adding an init container to a pod before it can be restored and executing a command in a
+  # restored pod's container. Optional.
   hooks:
     # Array of hooks that are applicable to specific resources. Optional.
     resources:
@@ -98,9 +99,10 @@ spec:
         matchLabels:
           app: velero
           component: server
-      # An array of hooks to run during or after restores. Currently only "init" hooks are supported.
+      # An array of hooks to run during or after restores. Currently only "init" and "exec" hooks
+      # are supported.
       postHooks:
-      # The type of the hook. This must be "init".
+      # The type of the hook. This must be "init" or "exec".
       - init:
           # An array of container specs to be added as init containers to pods to which this hook applies to.
           initContainers:
@@ -126,6 +128,27 @@ spec:
             - /bin/ash
             - -c
             - echo -n "DEADFEED" >> /restores/pvc2-vm/deadfeed
+      - exec:
+          # The container name where the hook will be executed. Defaults to the first container.
+          # Optional.
+          container: foo
+          # The command that will be executed in the container. Required.
+          command:
+          - /bin/bash
+          - -c
+          - "psql < /backup/backup.sql"
+          # How long to wait for a container to become ready. This should be long enough for the
+          # container to start plus any preceding hooks in the same container to complete. The wait
+          # timeout begins when the container is restored and may require time for the image to pull
+          # and volumes to mount. If not set the restore will wait indefinitely. Optional.
+          waitTimeout: 5m
+          # How long to wait once execution begins. Defaults to 30 seconds. Optional.
+          execTimeout: 1m
+          # How to handle execution failures. Valid values are `Fail` and `Continue`. Defaults to
+          # `Continue`. With `Continue` mode, execution failures are logged only. With `Fail` mode,
+          # no more restore hooks will be executed in any container in any pod and the status of the
+          # Restore will be `PartiallyFailed`. Optional.
+          onError: Continue
 # RestoreStatus captures the current status of a Velero restore. Users should not set any data here.
 status:
   # The current phase. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
