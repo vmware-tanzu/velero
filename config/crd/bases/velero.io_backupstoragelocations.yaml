@@ -26,6 +26,8 @@ spec:
     kind: BackupStorageLocation
     listKind: BackupStorageLocationList
     plural: backupstoragelocations
+    shortNames:
+    - bsl
     singular: backupstoragelocation
   preserveUnknownFields: false
   scope: Namespaced
