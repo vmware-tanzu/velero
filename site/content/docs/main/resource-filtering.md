@@ -24,7 +24,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 * Restore two namespaces and their objects.
 
   ```bash
-  velero restore create <backup-name> --include-namespaces <namespace1>,<namcespace2>
+  velero restore create <backup-name> --include-namespaces <namespace1>,<namespace2>
   ```
 
 ### --include-resources 
@@ -107,7 +107,7 @@ Wildcard excludes are ignored.
 * Exclude two namespaces during a restore.
 
   ```bash
-  velero restore create <backup-name> --exclude-namespaces <namespace1>,<namcespace2>
+  velero restore create <backup-name> --exclude-namespaces <namespace1>,<namespace2>
   ```
 
 ### --exclude-resources

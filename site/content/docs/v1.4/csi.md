@@ -9,7 +9,7 @@ Integrating Container Storage Interface (CSI) snapshot support into Velero enabl
 
 By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available.
 
-# #Prerequisites
+## Prerequisites
 
 The following are the prerequisites for using Velero to take Container Storage Interface (CSI) snapshots:
 
