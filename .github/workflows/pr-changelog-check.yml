@@ -12,4 +12,4 @@ jobs:
 
     - name: Changelog check
       if: ${{ !(contains(github.event.pull_request.labels.*.name, 'changelog-not-required') || contains(github.event.pull_request.labels.*.name, 'Design') || contains(github.event.pull_request.labels.*.name, 'Website') || contains(github.event.pull_request.labels.*.name, 'Documentation'))}}
-      run: ./hack/changelog-check.sh
+      run: ./hack/release-tools/changelog-check.sh

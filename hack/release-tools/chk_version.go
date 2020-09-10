@@ -22,13 +22,13 @@ import (
 	"regexp"
 )
 
-// This regex should match both our GA format (example: v1.4.3) and pre-release format (v1.2.4-beta.2)
+// This regex should match both our GA format (example: v1.4.3) and pre-release formats (v1.2.4-beta.2, v1.5.0-rc.1)
 // The following sub-capture groups are defined:
 //	major
 //	minor
 //	patch
-//	prerelease (this will be alpha/beta followed by a ".", followed by 1 or more digits (alpha.5)
-var release_regex *regexp.Regexp = regexp.MustCompile("^v(?P<major>[[:digit:]]+)\\.(?P<minor>[[:digit:]]+)\\.(?P<patch>[[:digit:]]+)(-{1}(?P<prerelease>(alpha|beta)\\.[[:digit:]]+))*")
+//	prerelease (this will be alpha/beta/rc followed by a ".", followed by 1 or more digits (alpha.5)
+var release_regex *regexp.Regexp = regexp.MustCompile("^v(?P<major>[[:digit:]]+)\\.(?P<minor>[[:digit:]]+)\\.(?P<patch>[[:digit:]]+)(-{1}(?P<prerelease>(alpha|beta|rc)\\.[[:digit:]]+))*")
 
 // This small program exists because checking the VELERO_VERSION rules in bash is difficult, and difficult to test for correctness.
 // Calling it with --verify will verify whether or not the VELERO_VERSION environment variable is a valid version string, without parsing for its components.
