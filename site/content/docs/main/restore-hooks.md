@@ -8,8 +8,6 @@ Velero supports Restore Hooks, custom actions that can be executed during or aft
 1. InitContainer Restore Hooks: These will add init containers into restored pods to perform any necessary setup before the application containers of the restored pod can start.
 1. Exec Restore Hooks: These can be used to execute custom commands or scripts in containers of a restored Kubernetes pod.
 
-Only InitContainer Restore Hooks is supported and support for Exec Restore Hooks is coming soon.
-
 ## InitContainer Restore Hooks
 
 Use an `InitContainer` hook to add init containers into a pod before it's restored. You can use these init containers to run any setup needed for the pod to resume running from its backed-up state.
