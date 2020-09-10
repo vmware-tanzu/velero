@@ -1,5 +1,5 @@
 ---
-title: "Upgrading to Velero 1.4"
+title: "Upgrading to Velero 1.5"
 layout: docs
 ---
 
