@@ -23,7 +23,7 @@ Maintainers are expected to create releases for the project. We have parts of th
 Maintainers are expected to participate in the community support rotation. We have guidelines for how we handle the [support](support-process).
 
 ## Community engagement
-Maintainers for the Velero project are highly involved with the open source community. All the online community meetings for the project are listed in our [community](http://localhost:1313/community/) page.
+Maintainers for the Velero project are highly involved with the open source community. All the online community meetings for the project are listed in our [community](community) page.
 
 ## How do I become a maintainer?
 The Velero project welcomes contributors of all kinds. We are also always on the look out for a high level of engagement from contributors and opportunities to bring in new maintainers. If this is of interest, take a look at how [adding a maintainer](https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#maintainers) is decided.
