@@ -27,10 +27,10 @@ This page covers the steps to perform when releasing a new version of Velero.
 ### Create release blog post (GA only)
 For each major or minor release, create and publish a blog post to let folks know what's new. Please follow these [instructions](Instructions-to-write-and-release-a-blog-post).
 
+### Changelog and Docs PR
 Troubleshooting:
 - `You don't have enough free space in /var/cache/apt/archives/` when running `make serve-docs`: run `docker system prune`.
 
-### Changelog and Docs PR
 1.  If it doesn't already exist: in a branch, create the file `changelogs/CHANGELOG-<major>.<minor>.md` by copying the most recent one.
 2.  Update the file `changelogs/CHANGELOG-<major>.<minor>.md`
 	- Run `make changelog` to generate a list of all unreleased changes.
