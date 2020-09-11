@@ -9,8 +9,15 @@ layout: docs
 - [Preparing](#preparing)
   - [Create release blog post (GA only)](#create-release-blog-post-ga-only)
   - [Changelog and Docs PR](#changelog-and-docs-pr)
+    - [Troubleshooting](#troubleshooting)
+    - [Steps](#steps)
 - [Velero release](#velero-release)
+    - [Notes](#notes)
+    - [Troubleshooting](#troubleshooting-1)
+    - [Steps](#steps-1)
 - [Homebrew release](#homebrew-release)
+    - [Note](#note)
+    - [Steps](#steps-2)
 - [How to write and release a blog post](#how-to-write-and-release-a-blog-post)
 - [Announce a release](#announce-a-release)
 
@@ -29,9 +36,10 @@ This page covers the steps to perform when releasing a new version of Velero.
 For each major or minor release, create and publish a blog post to let folks know what's new. Please follow these [instructions](Instructions-to-write-and-release-a-blog-post).
 
 ### Changelog and Docs PR
-Troubleshooting:
+#### Troubleshooting
 - `You don't have enough free space in /var/cache/apt/archives/` when running `make serve-docs`: run `docker system prune`.
 
+#### Steps
 1.  If it doesn't already exist: in a branch, create the file `changelogs/CHANGELOG-<major>.<minor>.md` by copying the most recent one.
 2.  Update the file `changelogs/CHANGELOG-<major>.<minor>.md`
 	- Run `make changelog` to generate a list of all unreleased changes.
@@ -63,14 +71,15 @@ Troubleshooting:
 	- Submit a PR containing the changelog and the version-tagged docs.
 
 ## Velero release
-Notes: 
+#### Notes
 	- Pre-requisite: PR with the changelog and docs is merged, so that it's included in the release tag.
 	- This process is the same for both pre-release and GA.
 	- Refer to the [General notes](general-notes) above for instructions.
 
-Troubleshooting:
+#### Troubleshooting
 - If the dry-run fails with random errors, try running it again.
 
+#### Steps
 1.  Create a tagged release in dry-run mode
 	- This won't push anything to GitHub.
 	- Run `VELERO_VERSION=v1.0.0-rc.1 GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh`.
@@ -95,9 +104,12 @@ Troubleshooting:
 	    - Run a backup/restore and ensure it works
 
 ## Homebrew release
-Note: Only for GA releases. Homebrew does not allow pre-releases.
+These are the steps to update the Velero Homebrew version.
 
-Update Homebrew version:
+#### Note 
+- Only for GA releases. Homebrew does not allow pre-releases.
+
+#### Steps
 	- If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
 	- Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 	- Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
