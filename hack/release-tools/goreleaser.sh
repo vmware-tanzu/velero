@@ -39,13 +39,13 @@ fi
 # $PUBLISH must explicitly be set to 'TRUE' for goreleaser
 # to publish the release to GitHub.
 if [[ "${PUBLISH:-}" != "TRUE" ]]; then
-    echo "Getting ready to publish"
+    echo "Not set to publish"
     goreleaser release \
         --rm-dist \
         --release-notes="${RELEASE_NOTES_FILE}" \
         --skip-publish
 else
-    echo "Not set to publish"
+    echo "Getting ready to publish"
     goreleaser release \
         --rm-dist \
         --release-notes="${RELEASE_NOTES_FILE}"

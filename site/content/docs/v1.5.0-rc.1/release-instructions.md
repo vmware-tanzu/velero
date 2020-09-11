@@ -1,24 +1,8 @@
 ---
 title: "Release Instructions"
 layout: docs
+toc: "true"
 ---
-
-- [General notes](#general-notes)
-- [Preparing](#preparing)
-  - [Create release blog post (GA only)](#create-release-blog-post-ga-only)
-  - [Changelog and Docs PR](#changelog-and-docs-pr)
-    - [Troubleshooting](#troubleshooting)
-    - [Steps](#steps)
-- [Velero release](#velero-release)
-    - [Notes](#notes)
-    - [Troubleshooting](#troubleshooting-1)
-    - [Steps](#steps-1)
-- [Homebrew release](#homebrew-release)
-    - [Note](#note)
-    - [Steps](#steps-2)
-- [How to write and release a blog post](#how-to-write-and-release-a-blog-post)
-- [Announce a release](#announce-a-release)
-
 This page covers the steps to perform when releasing a new version of Velero.
 
 ## General notes
@@ -64,7 +48,7 @@ For each major or minor release, create and publish a blog post to let folks kno
     - Remove all references to the pre-release docs from `site/config.yml`.
 7. Create/update the "Upgrade to $major.minor" page.
 8. Review and submit PR
-	- Follow the additional instructions at `site/README-JEKYLL.md` to complete the docs generation process.
+	- Follow the additional instructions at `site/README-HUGO.md` to complete the docs generation process.
 	- Do a review of the diffs, and/or run `make serve-docs` and review the site.
 	- Submit a PR containing the changelog and the version-tagged docs.
 
