@@ -1,10 +1,8 @@
-
 ---
 title: "Release Instructions"
 layout: docs
 ---
 
-- [layout: docs](#layout-docs)
 - [General notes](#general-notes)
 - [Preparing](#preparing)
   - [Create release blog post (GA only)](#create-release-blog-post-ga-only)
