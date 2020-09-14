@@ -41,7 +41,7 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Parse out the branch we're on so we can switch back to it at the end of a dry-run, where we delete the tag. Requires git v1.8.1+
-upstreamal_branch=$(git symbolic-ref --short HEAD)
+upstream_branch=$(git symbolic-ref --short HEAD)
 
 function tag_and_push() {
     echo "Tagging $VELERO_VERSION"
@@ -91,7 +91,7 @@ printf "Based on this, the following assumptions have been made: \n"
 
 [[ "$VELERO_PATCH" != 0 ]] && printf "*\t This is a patch release.\n"
 
-# $VELERO_PRERELEASE gets populated by the chk_version.go scrip that parses and verifies the given version format 
+# $VELERO_PRERELEASE gets populated by the chk_version.go script that parses and verifies the given version format 
 # -n is "string is non-empty"
 [[ -n $VELERO_PRERELEASE ]] && printf "*\t This is a pre-release.\n"
 
@@ -161,7 +161,7 @@ if [[ $publish == "FALSE" ]]; then
     # Delete the local tag so we don't potentially conflict when it's re-run for real.
     # This also means we won't have to just ignore existing tags in tag_and_push, which could be a problem if there's an existing tag.
     echo "Dry run complete. Deleting git tag $VELERO_VERSION"
-    git checkout $upstreamal_branch
+    git checkout $upstream_branch
     git tag -d $VELERO_VERSION
 fi
 
