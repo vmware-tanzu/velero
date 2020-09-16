@@ -1,16 +1,103 @@
 ---
 title: "Release Instructions"
 layout: docs
+toc: "true"
 ---
-
 This page covers the steps to perform when releasing a new version of Velero.
 
-## Preparing for a release
+## General notes
+- Please read the documented variables in each scrip to understand what they are for and how to properly format their values.
+- You will need to have a remote named `origin` pointing to the Velero repository so the scripts can work properly.
+- GA release: major and minor releases only. Example: 1.0 (major), 1.5 (minor).
+- Pre-releases: Any release leading up to a GA. Example: 1.4.0-beta.1, 1.5.0-rc.1
+- RC releases: Release Candidate, contains everything that is supposed to ship with the GA release. This is still a pre-release.
 
-### (GA Only) Create release blog post
+## Preparing
 
-For each major or minor release, create and publish a blog post to let folks know what's new.
+### Create release blog post (GA only)
+For each major or minor release, create and publish a blog post to let folks know what's new. Please follow these [instructions](Instructions-to-write-and-release-a-blog-post).
 
+### Changelog and Docs PR
+#### Troubleshooting
+- `You don't have enough free space in /var/cache/apt/archives/` when running `make serve-docs`: run `docker system prune`.
+
+#### Steps
+1.  If it doesn't already exist: in a branch, create the file `changelogs/CHANGELOG-<major>.<minor>.md` by copying the most recent one.
+2.  Update the file `changelogs/CHANGELOG-<major>.<minor>.md`
+	- Run `make changelog` to generate a list of all unreleased changes.
+    - Copy/paste the output into `CHANGELOG-<major>.<minor>.md`, under the "All Changes" section for the release. 
+	- You *may* choose to tweak formatting on the list of changes by adding code blocks, etc.
+	- 	Update links at the top of the file to point to the new release version
+3.  Update the main `CHANGELOG.md` file to properly reference the release-specific changelog file
+	- Under "Current release": 
+	    - Should contain only the current GA release.
+    - Under "Development release": 
+	    - Should contain only the latest pre-release
+	    - Move any prior pre-release into "Older releases"
+4. GA Only: Remove all changelog files from `changelogs/unreleased`.
+5. Generate new docs
+	- Run `make gen-docs`, passing the appropriate variables. Examples:
+		a) `VELERO_VERSION=v1.5.0-rc.1 NEW_DOCS_VERSION=v1.5.0-rc.1 make gen-docs`.
+		b) `VELERO_VERSION=v1.5.0 NEW_DOCS_VERSION=v1.5 make gen-docs`).
+	- Note: `PREVIOUS_DOCS_VERSION=<doc-version-to-copy-from>` is optional; when not set, it will default to the latest doc version.
+6. Clean up when there is an existing set of pre-release versioned docs for the version you are releasing
+	- Example: `site/content/docs/v1.5.0-beta.1` exists, and you're releasing `v1.5.0-rc.1` or `v1.5`
+    - Remove the directory containing the pre-release docs, i.e. `site/content/docs/<pre-release-version>`.
+    - Delete the pre-release docs table of contents file, i.e. `site/data/<pre-release-version>-toc.yml`.
+    - Remove the pre-release docs table of contents mapping entry from `site/data/toc-mapping.yml`.
+    - Remove all references to the pre-release docs from `site/config.yml`.
+7. Create/update the "Upgrade to $major.minor" page.
+8. Review and submit PR
+	- Follow the additional instructions at `site/README-HUGO.md` to complete the docs generation process.
+	- Do a review of the diffs, and/or run `make serve-docs` and review the site.
+	- Submit a PR containing the changelog and the version-tagged docs.
+
+## Velero release
+#### Notes
+	- Pre-requisite: PR with the changelog and docs is merged, so that it's included in the release tag.
+	- This process is the same for both pre-release and GA.
+	- Refer to the [General notes](general-notes) above for instructions.
+
+#### Troubleshooting
+- If the dry-run fails with random errors, try running it again.
+
+#### Steps
+1.  Create a tagged release in dry-run mode
+	- This won't push anything to GitHub.
+	- Run `VELERO_VERSION=v1.0.0-rc.1 GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh`.
+	- Fix any issue.
+2. Create a tagged release and push it to GitHub
+	- Run `VELERO_VERSION=v1.0.0-rc.1 GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh publish`.
+3. Publish the release
+	- Navigate to the draft GitHub release at https://github.com/vmware-tanzu/velero/releases and edit the release.
+	- If this is a patch release (e.g. `v1.4.1`), note that the full `CHANGELOG-1.4.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
+	- Do a quick review for formatting. 
+	- **Note:** the `goreleaser` process should have detected if it's a pre-release version and, if so, checked the box at the bottom of the GitHub release page appropriately, but it's always worth double-checking.
+	- Verify that GitHub has built and pushed all the images (it takes a while): https://github.com/vmware-tanzu/velero/actions
+	- Verify that the images are on Docker Hub: https://hub.docker.com/r/velero/velero/tags
+	- Verify that the assets were published to the GitHub release
+	- Publish the release.
+4.  Test the release
+	- By now, the Docker images should have been published. 
+	- Perform a smoke-test - for example:
+		- Download the CLI from the GitHub release
+	    - Use it to install Velero into a cluster (or manually update an existing deployment to use the new images)
+	    - Verify that `velero version` shows the expected output
+	    - Run a backup/restore and ensure it works
+
+## Homebrew release
+These are the steps to update the Velero Homebrew version.
+
+#### Note 
+- Only for GA releases. Homebrew does not allow pre-releases.
+
+#### Steps
+	- If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
+	- Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
+	- Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
+	- Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
+
+## How to write and release a blog post
 What to include in a release blog:
 * Thank all contributors for their involvement in the release.
   * Where possible shoutout folks by name or consider spotlighting new maintainers.
@@ -22,97 +109,17 @@ What to include in a release blog:
 Release blog post PR:
 * Prepare a PR containing the release blog post. Read the [website guidelines][2] for more information on creating a blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
 * You also need to update `site/index.html` to have "Latest Release Information" contain a link to the new post.
-* Plan to publish this blog the same day as the release.
-
-### (Pre-Release and GA) Changelog and Docs PR
-
-1. Set a variable with the full Velero version `export VELERO_VERSION=v<MAJOR>.<MINOR>.<PATCH>[-beta.1]`. This will be used throughout the whole process.
-1.  In a branch, create the file `changelogs/CHANGELOG-<major>.<minor>.md` (if it doesn't already exist) by copying the most recent one.
-1.  Run `make changelog` to generate a list of all unreleased changes. Copy/paste the output into `CHANGELOG-<major>.<minor>.md`, under the "All Changes" section for the release.
-    - You *may* choose to tweak formatting on the list of changes by adding code blocks, etc.
-1.  (GA Only) Remove all changelog files from `changelogs/unreleased`.
-1.  Update the main `CHANGELOG.md` file to properly reference the release-specific changelog file:
-    - (Pre-Release) List the release under "Development release"
-    - (GA) List the release  under "Current release", remove any pre-releases from "Development release", and move the previous release into "Older releases".
-1.  If there is an existing set of pre-release versioned docs for the version you are releasing (i.e. `site/docs/v1.4-pre` exists, and you're releasing `v1.4.0-beta.2` or `v1.4.0`):
-    - Remove the directory containing the pre-release docs, i.e. `site/docs/<pre-release-version>`.
-    - Delete the pre-release docs table of contents file, i.e. `site/_data/<pre-release-version>-toc.yml`.
-    - Remove the pre-release docs table of contents mapping entry from `site/_data/toc-mapping.yml`.
-    - Remove all references to the pre-release docs from `site/_config.yml`.
-1.  Run `NEW_DOCS_VERSION=v<major.minor> make gen-docs` (e.g. `NEW_DOCS_VERSION=v1.2 make gen-docs` or `NEW_DOCS_VERSION=v1.2-pre make gen-docs`).
-    - Note that:
-        - **NEW_DOCS_VERSION** defines the version that the docs will be tagged with (i.e. what's in the URL, what shows up in the version dropdown on the site). This should be formatted as either `v1.4` (for a GA release), or `v1.4-pre` (for an alpha/beta/RC).
-        - **VELERO_VERSION** defines the tag of Velero that any `https://github.com/vmware-tanzu/velero/...` links in the docs should redirect to.
-1.  Follow the additional instructions at `site/README-JEKYLL.md` to complete the docs generation process.
-1.  Do a review of the diffs, and/or run `make serve-docs` and review the site.
-1.  Submit a PR containing the changelog and the version-tagged docs.
-
-### (Pre-Release and GA) GitHub Token
-
-To run the `goreleaser` process to generate a GitHub release, you'll need to have a GitHub token. See https://goreleaser.com/environment/ for more details.
-
-You may regenerate the token for every release if you prefer.
-
-#### If you don't already have a token
-1.  Go to https://github.com/settings/tokens/new?scopes=repo.
-1.  Choose a name for your token.
-1.  Click "Generate token".
-1.  Save the token value somewhere - you'll need it during the release, in the `GITHUB_TOKEN` environment variable.
-
-#### If you do already have a token, but need to regenerate it
-1.  Go to https://github.com/settings/tokens.
-1.  Click on the name of the relevant token.
-1.  Click "Regenerate token".
-1.  Save the token value somewhere - you'll need it during the release, in the `GITHUB_TOKEN` environment variable.
-
-## Release steps
-
-Once you have done the prep steps, use the steps below to perform a release. This process is the same for both pre-release and GA, except for the fact that there will not be a blog post PR to merge for pre-release versions.
-
-1.  Merge the changelog + docs PR, so that it's included in the release tag.
-
-1.  Set your GitHub token as an environment variable. `export GITHUB_TOKEN=<your token value>`
-1.  Run `/hack/release-tools/tag-release.sh` and follow the instructions for a dry-run, without pushing to GitHub.
-1.  Run `/hack/release-tools/tag-release.sh publish` and follow the instructions when everything looks good to publish to GitHub and create the release.
-
-1.  Navigate to the draft GitHub release, at https://github.com/vmware-tanzu/velero/releases.
-
-1.  If this is a patch release (e.g. `v1.2.1`), note that the full `CHANGELOG-1.2.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
-
-1.  Do a quick review for formatting. **Note:** the `goreleaser` process should detect if it's a pre-release version, and check that box in the GitHub release appropriately, but it's always worth double-checking.
-
-1.  Publish the release.
-
-1.  By now, the Docker images should have been published. Perform a smoke-test - for example:
-
-    - Download the CLI from the GitHub release
-    - Use it to install Velero into a cluster (or manually update an existing deployment to use the new images)
-    - Verify that `velero version` shows the expected output
-
-    - Run a backup/restore and ensure it works
-
-1.  (GA Only) Merge the blog post PR.
-
-1. Update Homebrew version. From a Mac, you can run `brew bump-formula-pr` to create a new PR with the updated release's information. To make sure it's the most up-to-date:
-
-    1. If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
-
-    1. Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
-
-    1. Run `hack/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
-
-1. Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
+* Plan to publish the blog post the same day as the release.
 
 ## Announce a release
 
-Once you are finished doing the release, let the rest of the world know its available by posting messages in the following places.
-
-1. Velero's Twitter account. Maintainers are encouraged to help spread the word by posting or reposting on social media.
-1. Community Slack channel.
-1. Google group message.
+Once you are finished doing the release, let the rest of the world know it's available by posting messages in the following places.
+1.  GA Only: Merge the blog post PR.
+2. Velero's Twitter account. Maintainers are encouraged to help spread the word by posting or reposting on social media.
+3. Community Slack channel.
+4. Google group message.
 
 What to include:
-
 * Thank all contributors
 * A brief list of highlights in the release
 * Link to the release blog post, release notes, and/or github release page
