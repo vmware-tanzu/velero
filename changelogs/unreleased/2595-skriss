@@ -1,1 +1,0 @@
-log a warning instead of erroring if an additional item returned from a plugin can't be found in the Kubernetes API

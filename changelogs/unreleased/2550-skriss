@@ -1,1 +1,0 @@
-backup/restore: reinstantiate backup store just before uploading artifacts to ensure credentials are up-to-date

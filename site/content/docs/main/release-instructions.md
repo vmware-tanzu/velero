@@ -46,7 +46,7 @@ For each major or minor release, create and publish a blog post to let folks kno
     - Delete the pre-release docs table of contents file, i.e. `site/data/<pre-release-version>-toc.yml`.
     - Remove the pre-release docs table of contents mapping entry from `site/data/toc-mapping.yml`.
     - Remove all references to the pre-release docs from `site/config.yml`.
-1. Create/update the "Upgrade to $major.minor" page (Example: https://velero.io/docs/main/upgrade-to-1.5/). This needs to be done in both the versioned and the `main` folders.
+1. Create/update the "Upgrade to $major.minor" page (Example: https://velero.io/docs/v1.5/upgrade-to-1.5/ ). This needs to be done in both the versioned and the `main` folders.
 1. Review and submit PR
 	- Follow the additional instructions at `site/README-HUGO.md` to complete the docs generation process.
 	- Do a review of the diffs, and/or run `make serve-docs` and review the site.
