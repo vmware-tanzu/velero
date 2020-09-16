@@ -1,10 +1,8 @@
 ## Current release:
-  * [CHANGELOG-1.4.md][14]
-
-## Development release:
-  * [Unreleased Changes][15]
+  * [CHANGELOG-1.5.md][15]
 
 ## Older releases:
+  * [CHANGELOG-1.4.md][14]
   * [CHANGELOG-1.3.md][13]
   * [CHANGELOG-1.2.md][12]
   * [CHANGELOG-1.1.md][11]
