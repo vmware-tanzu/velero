@@ -14,8 +14,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# gen-docs.sh is used for the "make gen-docs" target. See additional
-# documentation in the Makefile.
+# gen-docs.sh is used for the "make gen-docs" target. It generates a new 
+# versioned docs directory under site/content/docs. It follows
+# the following process:
+#   1. Copies the contents of the most recently tagged docs directory into the new
+#      directory, to establish a useful baseline to diff against.
+#   2. Adds all copied content from step 1 to git's staging area via 'git add'.
+#   3. Replaces the contents of the new docs directory with the contents of the
+#      'main' docs directory, updating any version-specific links (e.g. to a
+#      specific branch of the GitHub repository) to use the new version
+#   4. Copies the previous version's ToC file and runs 'git add' to establish
+#      a useful baseline to diff against.
+#   5. Replaces the content of the new ToC file with the main ToC.
+#   6. Update site/config.yaml and site/_data/toc-mapping.yml to include entries
+#      for the new version.
+#
+# The unstaged changes in the working directory can now easily be diff'ed against the
+# staged changes using 'git diff' to review all docs changes made since the previous 
+# tagged version. Once the unstaged changes are ready, they can be added to the
+# staging area using 'git add' and then committed.
+#
+# NEW_DOCS_VERSION defines the version that the docs will be tagged with 
+# (i.e. what’s in the URL, what shows up in the version dropdown on the site). 
+# This should be formatted as either v1.4 (for any GA release, including minor), or v1.5.0-beta.1/v1.5.0-rc.1 (for an alpha/beta/RC).
+
+# To run gen-docs: "VELERO_VERSION=v1.4.0 NEW_DOCS_VERSION=v1.4 PREVIOUS_DOCS_VERSION= make gen-docs"
+# Note: if PREVIOUS_DOCS_VERSION is not set, the script will copy from the 
+# latest version.
+#
+# **NOTE**: there are additional manual steps required to finalize the process of generating
+# a new versioned docs site. The full process is documented in site/README-HUGO.md
 
 set -o errexit
 set -o nounset

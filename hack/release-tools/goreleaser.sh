@@ -36,14 +36,16 @@ else
     export GIT_TREE_STATE=dirty
 fi
 
-# $PUBLISH must explicitly be set to 'true' for goreleaser
+# $PUBLISH must explicitly be set to 'TRUE' for goreleaser
 # to publish the release to GitHub.
-if [[ "${PUBLISH:-}" != "true" ]]; then
+if [[ "${PUBLISH:-}" != "TRUE" ]]; then
+    echo "Not set to publish"
     goreleaser release \
         --rm-dist \
         --release-notes="${RELEASE_NOTES_FILE}" \
         --skip-publish
 else
+    echo "Getting ready to publish"
     goreleaser release \
         --rm-dist \
         --release-notes="${RELEASE_NOTES_FILE}"
