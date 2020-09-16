@@ -9,4 +9,3 @@
 
 [context.deploy-preview.environment]
   HUGO_VERSION = "0.73.0"
-  BASE_URL = "https://deploy-preview-2720--velero.netlify.app"
