@@ -1,12 +1,10 @@
 [build]
   base = "site/"
-  command = "hugo --gc --minify --baseURL $BASE_URL"
+  command = "hugo --gc --minify"
   publish = "site/public"
 
 [context.production.environment]
   HUGO_VERSION = "0.73.0"
-  BASE_URL = "https://velero.io"
 
 [context.deploy-preview.environment]
   HUGO_VERSION = "0.73.0"
-  BASE_URL = "https://deploy-preview-2720--velero.netlify.app"
