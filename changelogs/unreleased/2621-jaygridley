@@ -1,1 +1,0 @@
-restic: add support for setting SecurityContext (runAsUser, runAsGroup) for restore

@@ -1,1 +1,0 @@
-Add a BSL controller to handle validation + update BSL status phase (validation removed from the server and no longer blocks when there's any invalid BSL)

@@ -1,1 +1,0 @@
-Use format version instead of version on `velero backup describe` since version has been deprecated

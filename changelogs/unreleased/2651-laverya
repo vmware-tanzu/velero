@@ -1,1 +1,0 @@
-bump Kubernetes module dependencies to v0.18.4 to fix https://github.com/vmware-tanzu/velero/issues/2540 by adding code compatibility with kubernetes v1.18
