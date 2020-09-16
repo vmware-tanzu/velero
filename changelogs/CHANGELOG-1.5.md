@@ -67,10 +67,10 @@ Displays the Timestamps when issued a print or describe (#2748, @thejasbabu)
   * Update basic-install.md documentation: Add windows cli installation option via chocolatey (#2629, @adamrushuk)
   * Documentation: Update Jekyll to 4.1.0. Switch from redcarpet to kramdown for Markdown renderer (#2625, @tbatard)
   * improve builder image handling so that we don't rebuild each `make shell` (#2620, @mauilion)
-   * first check if there are pending changed on the build-image dockerfile if so build it.
-   * then check if there is an image in the registry if so pull it.
-   * then build an image cause we don't have a cached image. (this handles the backward compat case.)
-   * fix make clean to clear go mod cache before removing dirs (for containerized builds)
+    * first check if there are pending changed on the build-image dockerfile if so build it.
+    * then check if there is an image in the registry if so pull it.
+    * then build an image cause we don't have a cached image. (this handles the backward compat case.)
+    * fix make clean to clear go mod cache before removing dirs (for containerized builds)
   * Add linter checks to Makefile (#2615, @tbatard)
   * add a CI check for a changelog file (#2613, @ashish-amarnath)
   * implement option to back up all volumes by default with restic  (#2611, @ashish-amarnath)
