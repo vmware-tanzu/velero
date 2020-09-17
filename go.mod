@@ -26,7 +26,7 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/afero v1.2.2
-	github.com/spf13/cobra v0.0.6
+	github.com/spf13/cobra v0.0.7
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
