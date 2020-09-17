@@ -1,0 +1,1 @@
+Fix issue where bare `velero` command returned an error code.
