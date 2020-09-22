@@ -310,6 +310,8 @@ type BackupProgress struct {
 	ItemsBackedUp int `json:"itemsBackedUp,omitempty"`
 }
 
+// TODO(2.0) After converting all resources to use the runttime-controller client,
+// the k8s:deepcopy marker will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Backup status such as InProgress/Completed"
@@ -334,7 +336,12 @@ type Backup struct {
 	Status BackupStatus `json:"status,omitempty"`
 }
 
+// TODO(2.0) After converting all resources to use the runttime-controller client,
+// the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:rbac:groups=velero.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=backups/status,verbs=get;update;patch
 
 // BackupList is a list of Backups.
 type BackupList struct {
