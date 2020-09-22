@@ -11,7 +11,6 @@ Read how [we're using ZenHub](https://velero.io/docs/main/zenhub) for project an
 
 If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/main/start-contributing/) documentation for guidance on how to setup Velero for development.
 
-
 You can follow the work we do, see our milestones, and our backlog on our [ZenHub board](https://app.zenhub.com/workspace/o/vmware-tanzu/velero/boards?filterLogic=all&repos=99143276).
 
 * Follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero)
@@ -21,3 +20,4 @@ You can follow the work we do, see our milestones, and our backlog on our [ZenHu
   * Every Tuesday at 12PM ET / 9AM PT ([Convert to your time zone](http://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29)) - [Zoom link](https://vmware.zoom.us/j/551441444)
   * Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
   * See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
+* Have a question about "how do I configure Velero to do X?", or "how can I backup X with Velero?", or "how do I start to contribute to Velero?" and would like to chat with us face to face, come join the [Velero Office Hours](https://hackmd.io/I3u1x0u9T46KhuYZN4LX-A?view) that's held twice per month.
