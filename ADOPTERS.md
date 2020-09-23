@@ -3,16 +3,16 @@
 If you're using Velero and want to add your organization to this list, 
 [follow these directions][1]!
 
-<a href="https://www.bitgo.com" border="0" target="_blank"><img alt="bitgo.com" src="site/img/adopters/BitGo.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://www.nirmata.com" border="0" target="_blank"><img alt="nirmata.com" src="site/img/adopters/nirmata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://kyma-project.io/" border="0" target="_blank"><img alt="kyma-project.io" src="site/img/adopters/kyma.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://redhat.com/" border="0" target="_blank"><img alt="redhat.com" src="site/img/adopters/redhat.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://dellemc.com/" border="0" target="_blank"><img alt="dellemc.com" src="site/img/adopters/DellEMC.png" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://bugsnag.com/" border="0" target="_blank"><img alt="bugsnag.com" src="site/img/adopters/bugsnag.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://okteto.com/" border="0" target="_blank"><img alt="okteto.com" src="site/img/adopters/okteto.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://banzaicloud.com/" border="0" target="_blank"><img alt="banzaicloud.com" src="site/img/adopters/banzaicloud.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
-<a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://www.bitgo.com" border="0" target="_blank"><img alt="bitgo.com" src="site/static/img/adopters/BitGo.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://www.nirmata.com" border="0" target="_blank"><img alt="nirmata.com" src="site/static/img/adopters/nirmata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://kyma-project.io/" border="0" target="_blank"><img alt="kyma-project.io" src="site/static/img/adopters/kyma.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://redhat.com/" border="0" target="_blank"><img alt="redhat.com" src="site/static/img/adopters/redhat.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://dellemc.com/" border="0" target="_blank"><img alt="dellemc.com" src="site/static/img/adopters/DellEMC.png" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://bugsnag.com/" border="0" target="_blank"><img alt="bugsnag.com" src="site/static/img/adopters/bugsnag.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://okteto.com/" border="0" target="_blank"><img alt="okteto.com" src="site/static/img/adopters/okteto.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://banzaicloud.com/" border="0" target="_blank"><img alt="banzaicloud.com" src="site/static/img/adopters/banzaicloud.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/static/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/static/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 
 ## Success Stories
 
@@ -56,7 +56,7 @@ Okteto integrates Velero in [Okteto Cloud][94] and [Okteto Enterprise][95] to pe
 ​
 ## Adding your organization to the list of Velero Adopters
 
-If you are using Velero and would like to be included in the list of `Velero Adopters`, add an SVG version of your logo to the `site/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
+If you are using Velero and would like to be included in the list of `Velero Adopters`, add an SVG version of your logo to the `site/static/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
 
 ### Adding a logo to velero.io
 
