@@ -296,7 +296,7 @@ ci: verify-modules verify all test
 
 
 changelog:
-	hack/changelog.sh
+	hack/release-tools/changelog.sh
 
 # release builds a GitHub release using goreleaser within the build container.
 #

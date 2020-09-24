@@ -43,10 +43,12 @@ For each major or minor release, create and publish a blog post to let folks kno
 1. Clean up when there is an existing set of pre-release versioned docs for the version you are releasing
 	- Example: `site/content/docs/v1.5.0-beta.1` exists, and you're releasing `v1.5.0-rc.1` or `v1.5`
     - Remove the directory containing the pre-release docs, i.e. `site/content/docs/<pre-release-version>`.
-    - Delete the pre-release docs table of contents file, i.e. `site/data/<pre-release-version>-toc.yml`.
+    - Delete the pre-release docs table of contents file, i.e. `site/data/docs/<pre-release-version>-toc.yml`.
     - Remove the pre-release docs table of contents mapping entry from `site/data/toc-mapping.yml`.
     - Remove all references to the pre-release docs from `site/config.yml`.
-1. Create/update the "Upgrade to $major.minor" page (Example: https://velero.io/docs/v1.5/upgrade-to-1.5/ ). This needs to be done in both the versioned and the `main` folders.
+1. Create the "Upgrade to $major.minor" page if it does not already exist ([example](https://velero.io/docs/v1.5/upgrade-to-1.5/)).
+   If it already exists, update any usage of the previous version string within this file to use the new version string instead ([example](https://github.com/vmware-tanzu/velero/pull/2941/files#diff-d594f8fd0901fed79c39aab4b348193d)).
+   This needs to be done in both the versioned and the `main` folders.
 1. Review and submit PR
 	- Follow the additional instructions at `site/README-HUGO.md` to complete the docs generation process.
 	- Do a review of the diffs, and/or run `make serve-docs` and review the site.
