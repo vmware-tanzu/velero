@@ -7,7 +7,9 @@ This page covers the steps to perform when releasing a new version of Velero.
 
 ## General notes
 - Please read the documented variables in each script to understand what they are for and how to properly format their values.
-- You will need to have a remote named `upstream` pointing to the Velero repository so the scripts can work properly.
+- You will need to have an upstream remote configured to use to the [vmware-tanzu/velero](https://github.com/vmware-tanzu/velero) repository.
+  You can check this using `git remote -v`.
+  The release script ([`tag-release.sh`](https://github.com/vmware-tanzu/velero/blob/main/hack/release-tools/tag-release.sh)) will use `upstream` as the default remote name if it is not specified using the environment variable `REMOTE`.
 - GA release: major and minor releases only. Example: 1.0 (major), 1.5 (minor).
 - Pre-releases: Any release leading up to a GA. Example: 1.4.0-beta.1, 1.5.0-rc.1
 - RC releases: Release Candidate, contains everything that is supposed to ship with the GA release. This is still a pre-release.
@@ -66,10 +68,10 @@ For each major or minor release, create and publish a blog post to let folks kno
 #### Steps
 1.  Create a tagged release in dry-run mode
 	- This won't push anything to GitHub.
-	- Run `VELERO_VERSION=v1.0.0-rc.1 GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh`.
+	- Run `VELERO_VERSION=v1.0.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh`.
 	- Fix any issue.
 1. Create a tagged release and push it to GitHub
-	- Run `VELERO_VERSION=v1.0.0-rc.1 GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh publish`.
+	- Run `VELERO_VERSION=v1.0.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh publish`.
 1. Publish the release
 	- Navigate to the draft GitHub release at https://github.com/vmware-tanzu/velero/releases and edit the release.
 	- If this is a patch release (e.g. `v1.4.1`), note that the full `CHANGELOG-1.4.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.

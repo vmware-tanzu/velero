@@ -26,6 +26,7 @@
 
 # - $VELERO_VERSION: defines the tag of Velero that any https://github.com/vmware-tanzu/velero/...
 #   links in the docs should redirect to.
+# - $REMOTE: defines the remote that should be used when pushing tags and branches. Defaults to "upstream"
 # - $publish: TRUE/FALSE value where FALSE (or not including it) will indicate a dry-run, and TRUE, or simply adding 'publish',
 #   will tag the release with the $VELERO_VERSION and push the tag to a remote named 'upstream'.
 # - $GITHUB_TOKEN: Needed to run the goreleaser process to generate a GitHub release. 
@@ -40,6 +41,9 @@
 # Directory in which the script itself resides, so we can use it for calling programs that are in the same directory.
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Default to using upstream as the remote
+remote=${REMOTE:-upstream}
+
 # Parse out the branch we're on so we can switch back to it at the end of a dry-run, where we delete the tag. Requires git v1.8.1+
 upstream_branch=$(git symbolic-ref --short HEAD)
 
@@ -49,7 +53,7 @@ function tag_and_push() {
     
     if [[ $publish == "TRUE" ]]; then
         echo "Pushing $VELERO_VERSION"
-        git push upstream $VELERO_VERSION
+        git push "$remote" $VELERO_VERSION
     fi
 }
 
@@ -111,7 +115,7 @@ read -p "Ready to continue? "
 echo "Alright, let's go."
 
 echo "Pulling down all git tags and branches before doing any work."
-git fetch upstream --tags
+git fetch "$remote" --tags
 
 # $VELERO_PATCH gets populated by the chk_version.go scrip that parses and verifies the given version format 
 # If we've got a patch release, we'll need to create a release branch for it.
@@ -131,7 +135,7 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
     echo "Now you'll need to cherry-pick any relevant git commits into this release branch."
     echo "Either pause this script with ctrl-z, or open a new terminal window and do the cherry-picking."
     if [[ $publish == "TRUE" ]]; then
-        read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO upstream"
+        read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO $remote"
     else
         read -p "Press enter when you're done cherry-picking."
     fi
@@ -139,14 +143,14 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
     # TODO can/should we add a way to review the cherry-picked commits before the push?
 
     if [[ $publish == "TRUE" ]]; then
-        echo "Pushing $release_branch_name to upstream remote"
-        git push --set-upstream upstream/$release_branch_name $release_branch_name
+        echo "Pushing $release_branch_name to \"$remote\" remote"
+        git push --set-upstream "$remote" $release_branch_name
     fi
     
     tag_and_push
 else
-    echo "Checking out upstream/main."
-    git checkout upstream/main
+    echo "Checking out $remote/main."
+    git checkout "$remote"/main
 
     tag_and_push
 fi
