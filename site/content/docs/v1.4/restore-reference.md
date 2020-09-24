@@ -86,7 +86,7 @@ metadata:
     velero.io/plugin-config: ""
     # this label identifies the name and kind of plugin
     # that this ConfigMap is for.
-    velero.io/change-pvc-node-selector: RestoreItemAction
+    velero.io/change-pvc-node: RestoreItemAction
 data:
   # add 1+ key-value pairs here, where the key is the old
   # node name and the value is the new node name.
