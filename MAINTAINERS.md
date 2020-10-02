@@ -9,7 +9,6 @@
 | Carlisia Campos | [carlisia](https://github.com/carlisia) | [VMware](https://www.github.com/vmware/) |
 | Nolan Brubaker | [nrb](https://github.com/nrb) | [VMware](https://www.github.com/vmware/) |
 | Ashish Amarnath | [ashish-amarnath](https://github.com/ashish-amarnath) | [VMware](https://www.github.com/vmware/) |
-| Stephanie Bauman | [stephbman](https://github.com/stephbman) | [VMware](https://www.github.com/vmware/) |
 | Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
 
 ## Emeritus Maintainers
@@ -25,4 +24,4 @@
 | Kubernetes CSI Liaison | Nolan Brubaker (nrb), Ashish Amarnath (ashish-amarnath) |
 | Deployment | Carlisia Campos (carlisia), Carlos Tadeu Panato Junior (cpanato), JenTing Hsiao (jenting) | 
 | Community Management | Jonas Rosland (jonasrosland) |
-| Product Management | Stephanie Bauman (stephbman) |
+| Product Management | Michael Michael (michmike) |
