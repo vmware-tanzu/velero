@@ -1,0 +1,1 @@
+Restore CRD Resource name to fix CRD wait functionality.
