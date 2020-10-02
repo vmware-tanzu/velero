@@ -23,7 +23,7 @@ import (
 var (
 	ClusterRoleBindings       = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}
 	ClusterRoles              = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}
-	CustomResourceDefinitions = schema.GroupResource{Group: "apiextensions.k8s.io", Resource: "CustomResourceDefinition"}
+	CustomResourceDefinitions = schema.GroupResource{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}
 	Jobs                      = schema.GroupResource{Group: "batch", Resource: "jobs"}
 	Namespaces                = schema.GroupResource{Group: "", Resource: "namespaces"}
 	PersistentVolumeClaims    = schema.GroupResource{Group: "", Resource: "persistentvolumeclaims"}
