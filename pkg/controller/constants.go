@@ -22,7 +22,7 @@ const (
 	BackupStorageLocation = "backup-storage-location"
 	BackupSync            = "backup-sync"
 	DownloadRequest       = "download-request"
-	GarbageCollection     = "garbage-collection"
+	GarbageCollection     = "gc"
 	PodVolumeBackup       = "pod-volume-backup"
 	PodVolumeRestore      = "pod-volume-restore"
 	ResticRepo            = "restic-repo"
