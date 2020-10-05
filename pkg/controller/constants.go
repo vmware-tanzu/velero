@@ -25,7 +25,7 @@ const (
 	GarbageCollection     = "garbage-collection"
 	PodVolumeBackup       = "pod-volume-backup"
 	PodVolumeRestore      = "pod-volume-restore"
-	ResticRepo            = "restic-repository"
+	ResticRepo            = "restic-repo"
 	Restore               = "restore"
 	Schedule              = "schedule"
 	ServerStatusRequest   = "server-status-request"
