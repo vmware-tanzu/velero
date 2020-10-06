@@ -76,7 +76,7 @@ func NewBackupSyncController(
 	logger.Infof("Backup sync period is %v", syncPeriod)
 
 	c := &backupSyncController{
-		genericController:       newGenericController("backup-sync", logger),
+		genericController:       newGenericController(BackupSync, logger),
 		backupClient:            backupClient,
 		kbClient:                kbClient,
 		podVolumeBackupClient:   podVolumeBackupClient,

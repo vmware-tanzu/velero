@@ -211,7 +211,7 @@ func TestPVRHandler(t *testing.T) {
 			var (
 				podInformer = cache.NewSharedIndexInformer(nil, new(corev1api.Pod), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 				c           = &podVolumeRestoreController{
-					genericController: newGenericController("pod-volume-restore", velerotest.NewLogger()),
+					genericController: newGenericController(PodVolumeRestore, velerotest.NewLogger()),
 					podLister:         corev1listers.NewPodLister(podInformer.GetIndexer()),
 					nodeName:          controllerNode,
 				}
@@ -394,7 +394,7 @@ func TestPodHandler(t *testing.T) {
 				informers   = veleroinformers.NewSharedInformerFactory(client, 0)
 				pvrInformer = informers.Velero().V1().PodVolumeRestores()
 				c           = &podVolumeRestoreController{
-					genericController:      newGenericController("pod-volume-restore", velerotest.NewLogger()),
+					genericController:      newGenericController(PodVolumeRestore, velerotest.NewLogger()),
 					podVolumeRestoreLister: velerov1listers.NewPodVolumeRestoreLister(pvrInformer.Informer().GetIndexer()),
 					nodeName:               controllerNode,
 				}
