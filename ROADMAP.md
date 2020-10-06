@@ -23,7 +23,8 @@ Please take the timelines & dates as proposals and goals. Priorities and require
 |Extensibility|Add restore hooks for enhanced recovery scenarios|August 2020|
 |CSI|Continue improving the CSI snapshot capabilities and participate in the upstream K8s CSI community|Long running (dependent on CSI working group)|
 |Backup/Restore|Improvements to long-running copy operations from a performance and reliability standpoint|August 2020|
-|UX|Improvements to install and configuration user experience|August 2020|
+|Quality/Reliability| Enable automated end-to-end testing |Dec 2020|
+|UX|Improvements to install and configuration user experience|Dec 2020|
 |Restic Improvements|Improve the use of Restic in Velero and offer stable support|Dec 2020|
 |Perf & Scale|Introduce a scalable model by using a worker pod for each backup/restore operation and improve operations|Dec 2020|
 |Backup/Restore|Better backup and restore semantics for certain Kubernetes resources like stateful sets, operators|Dec 2020|
