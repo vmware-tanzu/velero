@@ -63,7 +63,7 @@ func NewGCController(
 	kbClient client.Client,
 ) Interface {
 	c := &gcController{
-		genericController:         newGenericController("gc-controller", logger),
+		genericController:         newGenericController(GarbageCollection, logger),
 		clock:                     clock.RealClock{},
 		backupLister:              backupInformer.Lister(),
 		deleteBackupRequestLister: deleteBackupRequestLister,

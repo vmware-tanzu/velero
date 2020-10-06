@@ -63,7 +63,7 @@ func NewResticRepositoryController(
 	defaultMaintenanceFrequency time.Duration,
 ) Interface {
 	c := &resticRepositoryController{
-		genericController:           newGenericController("restic-repository", logger),
+		genericController:           newGenericController(ResticRepo, logger),
 		resticRepositoryClient:      resticRepositoryClient,
 		resticRepositoryLister:      resticRepositoryInformer.Lister(),
 		kbClient:                    kbClient,

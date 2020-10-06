@@ -66,7 +66,7 @@ func NewScheduleController(
 	metrics *metrics.ServerMetrics,
 ) *scheduleController {
 	c := &scheduleController{
-		genericController: newGenericController("schedule", logger),
+		genericController: newGenericController(Schedule, logger),
 		namespace:         namespace,
 		schedulesClient:   schedulesClient,
 		backupsClient:     backupsClient,

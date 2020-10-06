@@ -95,34 +95,10 @@ const (
 
 	defaultProfilerAddress = "localhost:6060"
 
-	// keys used to map out available controllers with disable-controllers flag
-	BackupControllerKey              = "backup"
-	BackupSyncControllerKey          = "backup-sync"
-	ScheduleControllerKey            = "schedule"
-	GcControllerKey                  = "gc"
-	BackupDeletionControllerKey      = "backup-deletion"
-	RestoreControllerKey             = "restore"
-	DownloadRequestControllerKey     = "download-request"
-	ResticRepoControllerKey          = "restic-repo"
-	ServerStatusRequestControllerKey = "server-status-request"
-
 	defaultControllerWorkers = 1
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
 )
-
-// list of available controllers for input validation
-var disableControllerList = []string{
-	BackupControllerKey,
-	BackupSyncControllerKey,
-	ScheduleControllerKey,
-	GcControllerKey,
-	BackupDeletionControllerKey,
-	RestoreControllerKey,
-	DownloadRequestControllerKey,
-	ResticRepoControllerKey,
-	ServerStatusRequestControllerKey,
-}
 
 type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
@@ -217,7 +193,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "How often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. This is the default sync period if none is explicitly specified for a backup storage location.")
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "How long backups/restores of pod volumes should be allowed to run before timing out.")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "Run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled. DEPRECATED: this flag will be removed in v2.0. Use read-only backup storage locations instead.")
-	command.Flags().StringSliceVar(&config.disabledControllers, "disable-controllers", config.disabledControllers, fmt.Sprintf("List of controllers to disable on startup. Valid values are %s", strings.Join(disableControllerList, ",")))
+	command.Flags().StringSliceVar(&config.disabledControllers, "disable-controllers", config.disabledControllers, fmt.Sprintf("List of controllers to disable on startup. Valid values are %s", strings.Join(controller.DisableableControllers, ",")))
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "Desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources.")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "Name of the default backup storage location.")
 	command.Flags().DurationVar(&config.storeValidationFrequency, "store-validation-frequency", config.storeValidationFrequency, "How often to verify if the storage is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
@@ -782,26 +758,26 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	enabledControllers := map[string]func() controllerRunInfo{
-		BackupSyncControllerKey:      backupSyncControllerRunInfo,
-		BackupControllerKey:          backupControllerRunInfo,
-		ScheduleControllerKey:        scheduleControllerRunInfo,
-		GcControllerKey:              gcControllerRunInfo,
-		BackupDeletionControllerKey:  deletionControllerRunInfo,
-		RestoreControllerKey:         restoreControllerRunInfo,
-		ResticRepoControllerKey:      resticRepoControllerRunInfo,
-		DownloadRequestControllerKey: downloadrequestControllerRunInfo,
+		controller.BackupSync:        backupSyncControllerRunInfo,
+		controller.Backup:            backupControllerRunInfo,
+		controller.Schedule:          scheduleControllerRunInfo,
+		controller.GarbageCollection: gcControllerRunInfo,
+		controller.BackupDeletion:    deletionControllerRunInfo,
+		controller.Restore:           restoreControllerRunInfo,
+		controller.ResticRepo:        resticRepoControllerRunInfo,
+		controller.DownloadRequest:   downloadrequestControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := make(map[string]struct{})
-	enabledRuntimeControllers[ServerStatusRequestControllerKey] = struct{}{}
+	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 		s.config.disabledControllers = append(s.config.disabledControllers,
-			BackupControllerKey,
-			ScheduleControllerKey,
-			GcControllerKey,
-			BackupDeletionControllerKey,
+			controller.Backup,
+			controller.Schedule,
+			controller.GarbageCollection,
+			controller.BackupDeletion,
 		)
 	}
 
@@ -816,7 +792,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 				s.logger.Infof("Disabling controller: %s", controllerName)
 				delete(enabledRuntimeControllers, controllerName)
 			} else {
-				s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
+				s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(controller.DisableableControllers, ","))
 			}
 		}
 	}
@@ -863,10 +839,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		Log:              s.logger,
 	}
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", "backup-storage-location")
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
 
-	if _, ok := enabledRuntimeControllers[ServerStatusRequestControllerKey]; ok {
+	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
 		r := controller.ServerStatusRequestReconciler{
 			Scheme: s.mgr.GetScheme(),
 			Client: s.mgr.GetClient(),
@@ -878,7 +854,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			Log: s.logger,
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", ServerStatusRequestControllerKey)
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
 		}
 	}
 

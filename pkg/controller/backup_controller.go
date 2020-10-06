@@ -106,7 +106,7 @@ func NewBackupController(
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
 ) Interface {
 	c := &backupController{
-		genericController:           newGenericController("backup", logger),
+		genericController:           newGenericController(Backup, logger),
 		discoveryHelper:             discoveryHelper,
 		backupper:                   backupper,
 		lister:                      backupInformer.Lister(),
@@ -150,7 +150,7 @@ func NewBackupController(
 
 				key, err := cache.MetaNamespaceKeyFunc(backup)
 				if err != nil {
-					c.logger.WithError(err).WithField("backup", backup).Error("Error creating queue key, item not added to queue")
+					c.logger.WithError(err).WithField(Backup, backup).Error("Error creating queue key, item not added to queue")
 					return
 				}
 				c.queue.Add(key)
@@ -509,7 +509,7 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 // causes the backup to be Failed; if no error is returned, the backup's status's Errors
 // field is checked to see if the backup was a partial failure.
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
-	c.logger.WithField("backup", kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
+	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -529,7 +529,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	logCounter := logging.NewLogCounterHook()
 	logger.Hooks.Add(logCounter)
 
-	backupLog := logger.WithField("backup", kubeutil.NamespaceAndName(backup))
+	backupLog := logger.WithField(Backup, kubeutil.NamespaceAndName(backup))
 
 	backupLog.Info("Setting up backup temp file")
 	backupFile, err := ioutil.TempFile("", "")

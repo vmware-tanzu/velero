@@ -65,7 +65,7 @@ func NewDownloadRequestController(
 	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{
-		genericController:     newGenericController("downloadrequest", logger),
+		genericController:     newGenericController(DownloadRequest, logger),
 		downloadRequestClient: downloadRequestClient,
 		downloadRequestLister: downloadRequestInformer.Lister(),
 		restoreLister:         restoreLister,
@@ -89,7 +89,7 @@ func NewDownloadRequestController(
 				if err != nil {
 					downloadRequest := obj.(*velerov1api.DownloadRequest)
 					c.logger.WithError(errors.WithStack(err)).
-						WithField("downloadRequest", downloadRequest.Name).
+						WithField(DownloadRequest, downloadRequest.Name).
 						Error("Error creating queue key, item not added to queue")
 					return
 				}
@@ -213,7 +213,7 @@ func (c *downloadRequestController) resync() {
 	for _, dr := range list {
 		key, err := cache.MetaNamespaceKeyFunc(dr)
 		if err != nil {
-			c.logger.WithError(errors.WithStack(err)).WithField("downloadRequest", dr.Name).Error("error generating key for download request")
+			c.logger.WithError(errors.WithStack(err)).WithField(DownloadRequest, dr.Name).Error("error generating key for download request")
 			continue
 		}
 

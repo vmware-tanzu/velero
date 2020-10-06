@@ -81,7 +81,7 @@ func NewPodVolumeBackupController(
 	nodeName string,
 ) Interface {
 	c := &podVolumeBackupController{
-		genericController:     newGenericController("pod-volume-backup", logger),
+		genericController:     newGenericController(PodVolumeBackup, logger),
 		podVolumeBackupClient: podVolumeBackupClient,
 		podVolumeBackupLister: podVolumeBackupInformer.Lister(),
 		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
