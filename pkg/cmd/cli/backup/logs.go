@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
@@ -52,6 +52,9 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
+			kbClient, err := f.KubebuilderClient()
+			cmd.CheckError(err)
+
 			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), backupName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				cmd.Exit("Backup %q does not exist.", backupName)
@@ -60,14 +63,14 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			}
 
 			switch backup.Status.Phase {
-			case v1.BackupPhaseCompleted, v1.BackupPhasePartiallyFailed, v1.BackupPhaseFailed:
+			case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed:
 				// terminal phases, do nothing.
 			default:
 				cmd.Exit("Logs for backup %q are not available until it's finished processing. Please wait "+
 					"until the backup has a phase of Completed or Failed and try again.", backupName)
 			}
 
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
+			err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), backupName, velerov1api.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
 			cmd.CheckError(err)
 		},
 	}

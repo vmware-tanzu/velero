@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,74 +29,50 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
-
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ErrNotFound is exported for external packages to check for when a file is
 // not found
 var ErrNotFound = errors.New("file not found")
 
-func Stream(client velerov1client.DownloadRequestsGetter, namespace, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration, insecureSkipTLSVerify bool, caCertFile string) error {
-	req := &v1.DownloadRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("%s-%s", name, time.Now().Format("20060102150405")),
-		},
-		Spec: v1.DownloadRequestSpec{
-			Target: v1.DownloadTarget{
-				Kind: kind,
-				Name: name,
-			},
-		},
-	}
+func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name string, kind velerov1api.DownloadTargetKind, w io.Writer, timeout time.Duration, insecureSkipTLSVerify bool, caCertFile string) error {
+	reqName := fmt.Sprintf("%s-%s", name, time.Now().Format("20060102150405"))
+	created := builder.ForDownloadRequest(namespace, reqName).Target(kind, name).Result()
 
-	req, err := client.DownloadRequests(namespace).Create(context.TODO(), req, metav1.CreateOptions{})
-	if err != nil {
+	if err := kbClient.Create(context.Background(), created, &kbclient.CreateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
-	defer client.DownloadRequests(namespace).Delete(context.TODO(), req.Name, metav1.DeleteOptions{})
 
-	listOptions := metav1.ListOptions{
-		FieldSelector:   "metadata.name=" + req.Name,
-		ResourceVersion: req.ResourceVersion,
-	}
-	watcher, err := client.DownloadRequests(namespace).Watch(context.TODO(), listOptions)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer watcher.Stop()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	expired := time.NewTimer(timeout)
-	defer expired.Stop()
+	key := client.ObjectKey{Name: created.Name, Namespace: namespace}
+	checkFunc := func() {
+		updated := &velerov1api.DownloadRequest{}
+		if err := kbClient.Get(ctx, key, updated); err != nil {
+			return
+		}
 
-Loop:
-	for {
-		select {
-		case <-expired.C:
-			return errors.New("timed out waiting for download URL")
-		case e := <-watcher.ResultChan():
-			updated, ok := e.Object.(*v1.DownloadRequest)
-			if !ok {
-				return errors.Errorf("unexpected type %T", e.Object)
-			}
+		// TODO: once the minimum supported Kubernetes version is v1.9.0, remove the following check.
+		// See http://issue.k8s.io/51046 for details.
+		if updated.Name != created.Name {
+			return
+		}
 
-			switch e.Type {
-			case watch.Deleted:
-				errors.New("download request was unexpectedly deleted")
-			case watch.Modified:
-				if updated.Status.DownloadURL != "" {
-					req = updated
-					break Loop
-				}
-			}
+		if updated.Status.DownloadURL != "" {
+			created = updated
+			cancel()
 		}
 	}
 
-	if req.Status.DownloadURL == "" {
+	wait.Until(checkFunc, 25*time.Millisecond, ctx.Done())
+
+	if created.Status.DownloadURL == "" {
 		return ErrNotFound
 	}
 
@@ -134,7 +110,7 @@ Loop:
 		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
 	}
 
-	httpReq, err := http.NewRequest("GET", req.Status.DownloadURL, nil)
+	httpReq, err := http.NewRequest("GET", created.Status.DownloadURL, nil)
 	if err != nil {
 		return err
 	}
@@ -164,7 +140,7 @@ Loop:
 	}
 
 	reader := resp.Body
-	if kind != v1.DownloadTargetKindBackupContents {
+	if kind != velerov1api.DownloadTargetKindBackupContents {
 		// need to decompress logs
 		gzipReader, err := gzip.NewReader(resp.Body)
 		if err != nil {

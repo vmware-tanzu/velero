@@ -18,6 +18,7 @@ package output
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -34,10 +35,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/volume"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // DescribeBackup describes a backup in human-readable format.
 func DescribeBackup(
+	ctx context.Context,
+	kbClient kbclient.Client,
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
@@ -90,7 +94,7 @@ func DescribeBackup(
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+		DescribeBackupStatus(ctx, kbClient, d, backup, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 
 		if len(deleteRequests) > 0 {
 			d.Println()
@@ -241,7 +245,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
+func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
 	status := backup.Status
 
 	// Status.Version has been deprecated, use Status.FormatVersion
@@ -280,7 +284,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	}
 
 	if details {
-		describeBackupResourceList(d, backup, veleroClient, insecureSkipTLSVerify, caCertPath)
+		describeBackupResourceList(ctx, kbClient, d, backup, insecureSkipTLSVerify, caCertPath)
 		d.Println()
 	}
 
@@ -291,7 +295,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 		}
 
 		buf := new(bytes.Buffer)
-		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+		if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
 			d.Printf("Velero-Native Snapshots:\t<error getting snapshot info: %v>\n", err)
 			return
 		}
@@ -312,9 +316,9 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Velero-Native Snapshots: <none included>\n")
 }
 
-func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
+func describeBackupResourceList(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
 	buf := new(bytes.Buffer)
-	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
 		if err == downloadrequest.ErrNotFound {
 			// the backup resource list could be missing if (other reasons may exist as well):
 			//	- the backup was taken prior to v1.1; or

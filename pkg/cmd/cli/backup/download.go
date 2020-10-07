@@ -26,9 +26,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
@@ -85,10 +85,14 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	veleroClient, err := f.Client()
+	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
-	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), o.Name, metav1.GetOptions{}); err != nil {
+	download := &velerov1api.DownloadRequest{}
+	if err := kbClient.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: f.Namespace(),
+		Name:      o.Name,
+	}, download); err != nil {
 		return err
 	}
 
@@ -115,7 +119,7 @@ func (o *DownloadOptions) Complete(args []string) error {
 }
 
 func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
-	veleroClient, err := f.Client()
+	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
 	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
@@ -124,7 +128,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
+	err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

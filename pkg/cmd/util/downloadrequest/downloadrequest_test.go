@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package downloadrequest
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -32,15 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	fakeversioned "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 )
 
 func TestStream(t *testing.T) {
 	tests := []struct {
 		name          string
-		kind          v1.DownloadTargetKind
+		kind          velerov1api.DownloadTargetKind
 		timeout       time.Duration
 		createError   error
 		watchError    error
@@ -56,30 +59,30 @@ func TestStream(t *testing.T) {
 		{
 			name:          "error creating req",
 			createError:   errors.New("foo"),
-			kind:          v1.DownloadTargetKindBackupLog,
+			kind:          velerov1api.DownloadTargetKindBackupLog,
 			expectedError: "foo",
 		},
 		{
 			name:          "error creating watch",
 			watchError:    errors.New("bar"),
-			kind:          v1.DownloadTargetKindBackupLog,
+			kind:          velerov1api.DownloadTargetKindBackupLog,
 			expectedError: "bar",
 		},
 		{
 			name:          "timed out",
-			kind:          v1.DownloadTargetKindBackupLog,
+			kind:          velerov1api.DownloadTargetKindBackupLog,
 			timeout:       time.Millisecond,
 			expectedError: "timed out waiting for download URL",
 		},
 		{
 			name:          "unexpected watch type",
-			kind:          v1.DownloadTargetKindBackupLog,
-			watchAdds:     []runtime.Object{&v1.Backup{}},
+			kind:          velerov1api.DownloadTargetKindBackupLog,
+			watchAdds:     []runtime.Object{&velerov1api.Backup{}},
 			expectedError: "unexpected type *v1.Backup",
 		},
 		{
 			name: "other requests added/updated/deleted first",
-			kind: v1.DownloadTargetKindBackupLog,
+			kind: velerov1api.DownloadTargetKindBackupLog,
 			watchAdds: []runtime.Object{
 				newDownloadRequest("foo").DownloadRequest,
 			},
@@ -95,7 +98,7 @@ func TestStream(t *testing.T) {
 		},
 		{
 			name:          "http error",
-			kind:          v1.DownloadTargetKindBackupLog,
+			kind:          velerov1api.DownloadTargetKindBackupLog,
 			updateWithURL: true,
 			statusCode:    http.StatusInternalServerError,
 			body:          "some error",
@@ -107,12 +110,12 @@ func TestStream(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fakeversioned.NewSimpleClientset()
 
-			created := make(chan *v1.DownloadRequest, 1)
+			created := make(chan *velerov1api.DownloadRequest, 1)
 			client.PrependReactor("create", "downloadrequests", func(action core.Action) (bool, runtime.Object, error) {
 				createAction := action.(core.CreateAction)
-				created <- createAction.GetObject().(*v1.DownloadRequest)
+				created <- createAction.GetObject().(*velerov1api.DownloadRequest)
 				return true, createAction.GetObject(), test.createError
 			})
 
@@ -148,10 +151,11 @@ func TestStream(t *testing.T) {
 				url = server.URL
 			}
 
+			kbClient := fake.NewFakeClientWithScheme(scheme.Scheme)
 			output := new(bytes.Buffer)
 			errCh := make(chan error)
 			go func() {
-				err := Stream(client.VeleroV1(), "namespace", "name", test.kind, output, timeout, false, "")
+				err := Stream(context.TODO(), kbClient, "namespace", "name", test.kind, output, timeout, false, "")
 				errCh <- err
 			}()
 
@@ -210,14 +214,14 @@ func TestStream(t *testing.T) {
 }
 
 type downloadRequest struct {
-	*v1.DownloadRequest
+	*velerov1api.DownloadRequest
 }
 
 func newDownloadRequest(name string) *downloadRequest {
 	return &downloadRequest{
-		DownloadRequest: &v1.DownloadRequest{
+		DownloadRequest: &velerov1api.DownloadRequest{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: v1.DefaultNamespace,
+				Namespace: velerov1api.DefaultNamespace,
 				Name:      name,
 			},
 		},

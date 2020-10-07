@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
@@ -51,9 +51,12 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
-			var restores *api.RestoreList
+			kbClient, err := f.KubebuilderClient()
+			cmd.CheckError(err)
+
+			var restores *velerov1api.RestoreList
 			if len(args) > 0 {
-				restores = new(api.RestoreList)
+				restores = new(velerov1api.RestoreList)
 				for _, name := range args {
 					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
@@ -72,7 +75,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}
 
-				s := output.DescribeRestore(&restore, podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+				s := output.DescribeRestore(context.Background(), kbClient, &restore, podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)

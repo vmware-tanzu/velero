@@ -56,6 +56,9 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
+			kbClient, err := f.KubebuilderClient()
+			cmd.CheckError(err)
+
 			var backups *velerov1api.BackupList
 			if len(args) > 0 {
 				backups = new(velerov1api.BackupList)
@@ -99,7 +102,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					}
 				}
 
-				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+				s := output.DescribeBackup(context.Background(), kbClient, &backup, deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)
