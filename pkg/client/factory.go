@@ -155,6 +155,10 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 		Scheme: scheme,
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	return kubebuilderClient, nil
 }
 
