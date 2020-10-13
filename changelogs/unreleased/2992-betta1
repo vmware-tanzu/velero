@@ -1,0 +1,1 @@
+Fix BSL controller to avoid invoking init() on all BSLs regardless of ValidationFrequency

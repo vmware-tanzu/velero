@@ -77,14 +77,14 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			defaultFound = true
 		}
 
-		backupStore, err := r.NewBackupStore(location, pluginManager, log)
-		if err != nil {
-			log.WithError(err).Error("Error getting a backup store")
+		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
+			log.Debug("Backup location not ready to be validated")
 			continue
 		}
 
-		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
-			log.Debug("Backup location not ready to be validated")
+		backupStore, err := r.NewBackupStore(location, pluginManager, log)
+		if err != nil {
+			log.WithError(err).Error("Error getting a backup store")
 			continue
 		}
 
