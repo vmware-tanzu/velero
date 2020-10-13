@@ -97,6 +97,10 @@ These are the steps to update the Velero Homebrew version.
 - Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 - Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
 - Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
+-
+### Plugins
+
+To release plugins maintained by the core team, follow the [plugin release instructions](plugin-release-instructions.md).
 
 ## How to write and release a blog post
 What to include in a release blog:
