@@ -1,6 +1,6 @@
 module github.com/vmware-tanzu/velero
 
-go 1.14
+go 1.15
 
 require (
 	cloud.google.com/go v0.46.2 // indirect
