@@ -1,0 +1,1 @@
+cli: allow creating multiple instances of Velero across two different namespaces

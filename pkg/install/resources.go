@@ -51,6 +51,7 @@ var (
 	DefaultResticPodMemRequest = "512Mi"
 	DefaultResticPodCPULimit   = "1000m"
 	DefaultResticPodMemLimit   = "1Gi"
+	DefaultVeleroNamespace     = "velero"
 )
 
 func labels() map[string]string {
@@ -105,8 +106,12 @@ func ServiceAccount(namespace string, annotations map[string]string) *corev1.Ser
 }
 
 func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
+	crbName := "velero"
+	if namespace != DefaultVeleroNamespace {
+		crbName = "velero-" + namespace
+	}
 	crb := &rbacv1beta1.ClusterRoleBinding{
-		ObjectMeta: objectMeta("", "velero"),
+		ObjectMeta: objectMeta("", crbName),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
