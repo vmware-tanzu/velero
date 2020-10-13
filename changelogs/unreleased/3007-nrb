@@ -1,0 +1,1 @@
+Ensure that bound PVCs and PVs remaind bound on restore.
