@@ -959,6 +959,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs
 
 		case hasDeleteReclaimPolicy(obj.Object):
+			fmt.Printf("Has a delete policy!")
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
@@ -1073,6 +1074,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			delete(annotations, "pv.kubernetes.io/bind-completed")
 			delete(annotations, "pv.kubernetes.io/bound-by-controller")
 			obj.SetAnnotations(annotations)
+
+			// This is the case for restic volumes, where we need to actually have an empty volume created instead of restoring one.
+			// The assumption is that any PV in pvsToProvision doesn't have an associated snapshot.
+			if ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
+				ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning", namespace, name)
+				unstructured.RemoveNestedField(obj.Object, "spec", "volumeName")
+			}
 		}
 
 		if newName, ok := ctx.renamedPVs[pvc.Spec.VolumeName]; ok {
