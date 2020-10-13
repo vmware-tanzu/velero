@@ -50,6 +50,8 @@ If you're not yet running at least Velero v1.3, see the following:
     velero install --crds-only --dry-run -o yaml | kubectl apply -f -
     ```
 
+    **NOTE:** If you are upgrading Velero in Kubernetes 1.14.x or earlier, you will need to use `kubectl apply`'s `--validate=false` option when applying the CRD configuration above. See [issue 2077][5] and [issue 2311][6] for more context.
+
 1. Confirm that the deployment is up and running with the correct version by running:
 
     ```bash
@@ -72,3 +74,5 @@ If you're not yet running at least Velero v1.3, see the following:
 [2]: https://velero.io/docs/v1.2.0/upgrade-to-1.2/
 [3]: https://velero.io/docs/v1.3.2/upgrade-to-1.3/
 [4]: https://github.com/vmware-tanzu/velero/releases/tag/v1.3.2
+[5]: https://github.com/vmware-tanzu/velero/issues/2077
+[6]: https://github.com/vmware-tanzu/velero/issues/2311
