@@ -23,7 +23,7 @@ import (
 )
 
 func TestResources(t *testing.T) {
-	bsl := BackupStorageLocation("velero", "test", "test", "", make(map[string]string), []byte("test"))
+	bsl := BackupStorageLocation(DefaultVeleroNamespace, "test", "test", "", make(map[string]string), []byte("test"))
 
 	assert.Equal(t, "velero", bsl.ObjectMeta.Namespace)
 	assert.Equal(t, "test", bsl.Spec.Provider)
@@ -31,7 +31,7 @@ func TestResources(t *testing.T) {
 	assert.Equal(t, make(map[string]string), bsl.Spec.Config)
 	assert.Equal(t, []byte("test"), bsl.Spec.ObjectStorage.CACert)
 
-	vsl := VolumeSnapshotLocation("velero", "test", make(map[string]string))
+	vsl := VolumeSnapshotLocation(DefaultVeleroNamespace, "test", make(map[string]string))
 
 	assert.Equal(t, "velero", vsl.ObjectMeta.Namespace)
 	assert.Equal(t, "test", vsl.Spec.Provider)
@@ -41,12 +41,19 @@ func TestResources(t *testing.T) {
 
 	assert.Equal(t, "velero", ns.Name)
 
-	crb := ClusterRoleBinding("velero")
+	crb := ClusterRoleBinding(DefaultVeleroNamespace)
 	// The CRB is a cluster-scoped resource
 	assert.Equal(t, "", crb.ObjectMeta.Namespace)
+	assert.Equal(t, "velero", crb.ObjectMeta.Name)
 	assert.Equal(t, "velero", crb.Subjects[0].Namespace)
 
-	sa := ServiceAccount("velero", map[string]string{"abcd": "cbd"})
+	customNamespaceCRB := ClusterRoleBinding("foo")
+	// The CRB is a cluster-scoped resource
+	assert.Equal(t, "", customNamespaceCRB.ObjectMeta.Namespace)
+	assert.Equal(t, "velero-foo", customNamespaceCRB.ObjectMeta.Name)
+	assert.Equal(t, "foo", customNamespaceCRB.Subjects[0].Namespace)
+
+	sa := ServiceAccount(DefaultVeleroNamespace, map[string]string{"abcd": "cbd"})
 	assert.Equal(t, "velero", sa.ObjectMeta.Namespace)
 	assert.Equal(t, "cbd", sa.ObjectMeta.Annotations["abcd"])
 }
