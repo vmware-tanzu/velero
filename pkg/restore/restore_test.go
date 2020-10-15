@@ -2847,3 +2847,49 @@ func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
 		require.NoError(t, err)
 	}
 }
+
+func Test_resetVolumeBindingInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      *unstructured.Unstructured
+		expected *unstructured.Unstructured
+	}{
+		{
+			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
+			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
+				WithName("pv-1").WithAnnotations(
+				KubeAnnBindCompleted,
+				KubeAnnBoundByController,
+				KubeAnnDynamicallyProvisioned,
+			).WithSpecField("claimRef", map[string]interface{}{
+				"namespace":       "ns-1",
+				"name":            "pvc-1",
+				"uid":             "abc",
+				"resourceVersion": "1"}).Unstructured,
+			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
+				WithName("pv-1").
+				WithAnnotations().
+				WithSpecField("claimRef", map[string]interface{}{
+					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
+		},
+		{
+			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
+			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+				WithName("pvc-1").WithAnnotations(
+				KubeAnnBindCompleted,
+				KubeAnnBoundByController,
+				KubeAnnDynamicallyProvisioned,
+			).WithSpecField("volumeName", "pv-1").Unstructured,
+			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+				WithName("pvc-1").WithAnnotations().
+				WithSpecField("volumeName", "pv-1").Unstructured,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := resetVolumeBindingInfo(tc.obj)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}

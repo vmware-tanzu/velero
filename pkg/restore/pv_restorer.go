@@ -47,10 +47,6 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 		return nil, errors.New("PersistentVolume is missing its name")
 	}
 
-	// Delete only the ClaimRef's UID, as the namespace should be retained for deterministic mapping.
-	// UIDs should be removed for succesful restore as these are assigned by the Kubernetes controllers.
-	unstructured.RemoveNestedField(obj.Object, "spec", "claimRef", "uid")
-
 	if boolptr.IsSetToFalse(r.snapshotVolumes) {
 		// The backup had snapshots disabled, so we can return early
 		return obj, nil

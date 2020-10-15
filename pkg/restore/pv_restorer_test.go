@@ -57,13 +57,6 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:        "ensure spec.claimRef UID is deleted",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("someOtherField").WithSpecField("claimRef", map[string]interface{}{"uid": "a"}).Unstructured,
-			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
-			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).Result(),
-			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").WithSpecField("claimRef", map[string]interface{}{}).Unstructured,
-		},
-		{
 			name:        "ensure spec.storageClassName is retained",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
 			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
