@@ -959,7 +959,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs
 
 		case hasDeleteReclaimPolicy(obj.Object):
-			fmt.Printf("Has a delete policy!")
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
