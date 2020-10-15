@@ -1830,7 +1830,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 		},
 		{
-			name:    "when a PV with a reclaim policy of retain has no snapshot and does not exist in-cluster, it gets restored, without its claim ref",
+			name:    "when a PV with a reclaim policy of retain has no snapshot and does not exist in-cluster, it gets restored, with its claim ref",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
@@ -1849,6 +1849,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						ObjectMeta(
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 						).
+						ClaimRef("ns-1", "pvc-1").
 						Result(),
 				),
 			},
@@ -2096,13 +2097,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			want: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
-					// note that the renamed PV is not expected to have a claimRef in this test; that would be
-					// added after creation by the Kubernetes PV/PVC controller when it does a bind.
 					builder.ForPersistentVolume("renamed-source-pv").
 						ObjectMeta(
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-						).
+						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+						).ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),
 				),
@@ -2161,6 +2161,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						ObjectMeta(
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 						).
+						ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),
 				),
@@ -2221,6 +2222,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 						).
+						ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-pvname").
 						Result(),
 				),
@@ -2340,13 +2342,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			want: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
-					// note that the renamed PV is not expected to have a claimRef in this test; that would be
-					// added after creation by the Kubernetes PV/PVC controller when it does a bind.
 					builder.ForPersistentVolume("volumesnapshotter-renamed-source-pv").
 						ObjectMeta(
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 						).
+						ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),
 				),
@@ -2844,5 +2845,51 @@ func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
 			_, err = h.DynamicClient.Resource(resource.GVR()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
 		}
 		require.NoError(t, err)
+	}
+}
+
+func Test_resetVolumeBindingInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      *unstructured.Unstructured
+		expected *unstructured.Unstructured
+	}{
+		{
+			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
+			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
+				WithName("pv-1").WithAnnotations(
+				KubeAnnBindCompleted,
+				KubeAnnBoundByController,
+				KubeAnnDynamicallyProvisioned,
+			).WithSpecField("claimRef", map[string]interface{}{
+				"namespace":       "ns-1",
+				"name":            "pvc-1",
+				"uid":             "abc",
+				"resourceVersion": "1"}).Unstructured,
+			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
+				WithName("pv-1").
+				WithAnnotations().
+				WithSpecField("claimRef", map[string]interface{}{
+					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
+		},
+		{
+			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
+			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+				WithName("pvc-1").WithAnnotations(
+				KubeAnnBindCompleted,
+				KubeAnnBoundByController,
+				KubeAnnDynamicallyProvisioned,
+			).WithSpecField("volumeName", "pv-1").Unstructured,
+			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+				WithName("pvc-1").WithAnnotations().
+				WithSpecField("volumeName", "pv-1").Unstructured,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := resetVolumeBindingInfo(tc.obj)
+			assert.Equal(t, tc.expected, actual)
+		})
 	}
 }
