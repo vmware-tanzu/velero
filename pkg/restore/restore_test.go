@@ -2807,6 +2807,7 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		APIServer: apiServer,
 		restorer: &kubernetesRestorer{
+			restoreClient:              apiServer.VeleroClient.VeleroV1(),
 			discoveryHelper:            discoveryHelper,
 			dynamicFactory:             client.NewDynamicFactory(apiServer.DynamicClient),
 			namespaceClient:            apiServer.KubeClient.CoreV1().Namespaces(),
