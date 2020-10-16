@@ -220,21 +220,21 @@ func isPodOnNode(pod *corev1api.Pod, node string) bool {
 }
 
 func isResticInitContainerRunning(pod *corev1api.Pod) bool {
-	
-    // Restic wait container can be anywhere in the list of init containers, but must be running.
+
+	// Restic wait container can be anywhere in the list of init containers, but must be running.
 	i := getResticInitContainerIndex(pod)
-	return i >=0 && pod.Status.InitContainerStatuses[i].State.Running != nil
+	return i >= 0 && pod.Status.InitContainerStatuses[i].State.Running != nil
 }
 
 func getResticInitContainerIndex(pod *corev1api.Pod) int {
-	    // Restic wait container can be anywhere in the list of init containers so locate it.
-		for i, initContainer := range pod.Spec.InitContainers {
-			if initContainer.Name == restic.InitContainer {
-				return i
-			}
+	// Restic wait container can be anywhere in the list of init containers so locate it.
+	for i, initContainer := range pod.Spec.InitContainers {
+		if initContainer.Name == restic.InitContainer {
+			return i
 		}
-	
-		return -1
+	}
+
+	return -1
 }
 
 func (c *podVolumeRestoreController) processQueueItem(key string) error {
