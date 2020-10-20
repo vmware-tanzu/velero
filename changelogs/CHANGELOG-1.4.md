@@ -1,3 +1,23 @@
+## v1.4.3
+### 2020-10-20
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.4.3
+
+### Container Image
+`velero/velero:v1.4.3`
+
+### Documentation
+https://velero.io/docs/v1.4/
+
+### Upgrading
+https://velero.io/docs/v1.4/upgrade-to-1.4/
+
+### All Changes
+  * Restore CRD Resource name to fix CRD wait functionality. (#2949, @sseago)
+  * rename the PV if VolumeSnapshotter has modified the PV name (#2835, @pawanpraka1)
+  * Ensure that bound PVCs and PVs remain bound on restore. (#3007, @nrb)
+
 ## v1.4.2
 ### 2020-07-13
 
