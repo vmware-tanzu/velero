@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -110,7 +109,7 @@ func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResour
 	// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
 	// probably has to do with List calls and Dynamic client vs typed client
 	// Set these all the time, since they shouldn't ever be different, anyway
-	betaCRD.Kind = kuberesource.CustomResourceDefinitions.Resource
+	betaCRD.Kind = "CustomResourceDefinition"
 	betaCRD.APIVersion = apiextv1beta1.SchemeGroupVersion.String()
 
 	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
