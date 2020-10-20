@@ -1,3 +1,23 @@
+## v1.5.2
+### 2020-10-20
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.5.2
+
+### Container Image
+`velero/velero:v1.5.2`
+
+### Documentation
+https://velero.io/docs/v1.5/
+
+### Upgrading
+https://velero.io/docs/v1.5/upgrade-to-1.5/
+
+### All Changes
+  * Fix BSL controller to avoid invoking init() on all BSLs regardless of ValidationFrequency (#2992, @betta1)
+  * cli: allow creating multiple instances of Velero across two different namespaces (#2886, @alaypatel07)
+  * Restore CRD Resource name to fix CRD wait functionality. (#2949, @sseago)
+  * Ensure that bound PVCs and PVs remain bound on restore. (#3007, @nrb)
+
 ## v1.5.1
 ### 2020-09-16
 
@@ -80,3 +100,4 @@ Displays the Timestamps when issued a print or describe (#2748, @thejasbabu)
   * when creating new backup from schedule from cli, allow backup name to be automatically generated (#2569, @cblecker)
   * Convert manifests + BSL api client to kubebuilder (#2561, @carlisia)
   * backup/restore: reinstantiate backup store just before uploading artifacts to ensure credentials are up-to-date (#2550, @skriss)
+

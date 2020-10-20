@@ -62,6 +62,14 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
+// These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
+// They cannot be directly importing because they are part of the kubernetes/kubernetes package, and importing that package is unsupported.
+// Their values are well-known and slow changing. They're duplicated here as constants to provide compile-time checking.
+// Originals can be found in kubernetes/kubernetes/pkg/controller/volume/persistentvolume/util/util.go.
+const KubeAnnBindCompleted = "pv.kubernetes.io/bind-completed"
+const KubeAnnBoundByController = "pv.kubernetes.io/bound-by-controller"
+const KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
+
 type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
@@ -882,6 +890,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				return warnings, errs
 			}
 
+			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+			_, err = remapClaimRefNS(ctx, obj)
+			if err != nil {
+				errs.Add(namespace, err)
+				return warnings, errs
+			}
+
 			var shouldRestoreSnapshot bool
 			if !shouldRenamePV {
 				// Check if the PV exists in the cluster before attempting to create
@@ -899,6 +914,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}
 
 			if shouldRestoreSnapshot {
+				// reset the PV's binding status so that Kubernetes can properly associate it with the restored PVC.
+				obj = resetVolumeBindingInfo(obj)
+
 				// even if we're renaming the PV, obj still has the old name here, because the pvRestorer
 				// uses the original name to look up metadata about the snapshot.
 				ctx.log.Infof("Restoring persistent volume from snapshot.")
@@ -958,8 +976,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
-			// we call the pvRestorer here to clear out the PV's claimRef, so it can be re-claimed
-			// when its PVC is restored.
+			obj = resetVolumeBindingInfo(obj)
+			// we call the pvRestorer here to clear out the PV's claimRef.UID, so it can be re-claimed
+			// when its PVC is restored and gets a new UID.
 			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 			if err != nil {
 				errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
@@ -1052,17 +1071,16 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs
 		}
 
-		if pvc.Spec.VolumeName != "" && ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
-			ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning", namespace, name)
+		if pvc.Spec.VolumeName != "" {
+			// This used to only happen with restic volumes, but now always remove this binding metadata
+			obj = resetVolumeBindingInfo(obj)
 
-			// use the unstructured helpers here since we're only deleting and
-			// the unstructured converter will add back (empty) fields for metadata
-			// and status that we removed earlier.
-			unstructured.RemoveNestedField(obj.Object, "spec", "volumeName")
-			annotations := obj.GetAnnotations()
-			delete(annotations, "pv.kubernetes.io/bind-completed")
-			delete(annotations, "pv.kubernetes.io/bound-by-controller")
-			obj.SetAnnotations(annotations)
+			// This is the case for restic volumes, where we need to actually have an empty volume created instead of restoring one.
+			// The assumption is that any PV in pvsToProvision doesn't have an associated snapshot.
+			if ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
+				ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning", namespace, name)
+				unstructured.RemoveNestedField(obj.Object, "spec", "volumeName")
+			}
 		}
 
 		if newName, ok := ctx.renamedPVs[pvc.Spec.VolumeName]; ok {
@@ -1215,6 +1233,40 @@ func shouldRenamePV(ctx *restoreContext, obj *unstructured.Unstructured, client 
 	return true, nil
 }
 
+// remapClaimRefNS remaps a PersistentVolume's claimRef.Namespace based on a restore's NamespaceMappings, if necessary.
+// Returns true if the namespace was remapped, false if it was not required.
+func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool, error) {
+	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
+		ctx.log.Debug("Persistent volume does not need to have the claimRef.namespace remapped because restore is not remapping any namespaces")
+		return false, nil
+	}
+
+	// Conversion to the real type here is more readable than all the error checking involved with reading each field individually.
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pv); err != nil {
+		return false, errors.Wrapf(err, "error converting persistent volume to structured")
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		ctx.log.Debugf("Persistent volume does not need to have the claimRef.namepace remapped because it's not claimed")
+		return false, nil
+	}
+
+	targetNS, ok := ctx.restore.Spec.NamespaceMapping[pv.Spec.ClaimRef.Namespace]
+
+	if !ok {
+		ctx.log.Debugf("Persistent volume does not need to have the claimRef.namespace remapped because it's not claimed by a PVC in a namespace that's being remapped")
+		return false, nil
+	}
+
+	err := unstructured.SetNestedField(obj.Object, targetNS, "spec", "claimRef", "namespace")
+	if err != nil {
+		return false, err
+	}
+	ctx.log.Debug("Persistent volume's namespace was updated")
+	return true, nil
+}
+
 // restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod
 func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstructured, originalNamespace string) {
 	if ctx.resticRestorer == nil {
@@ -1327,6 +1379,29 @@ func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreCont
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
 	policy, _, _ := unstructured.NestedString(obj, "spec", "persistentVolumeReclaimPolicy")
 	return policy == string(v1.PersistentVolumeReclaimDelete)
+}
+
+// resetVolumeBindingInfo clears any necessary metadata out of a PersistentVolume or PersistentVolumeClaim that would make it ineligible to be re-bound by Velero.
+func resetVolumeBindingInfo(obj *unstructured.Unstructured) *unstructured.Unstructured {
+	// Clean out ClaimRef UID and resourceVersion, since this information is highly unique.
+	unstructured.RemoveNestedField(obj.Object, "spec", "claimRef", "uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "claimRef", "resourceVersion")
+
+	// Clear out any annotations used by the Kubernetes PV controllers to track bindings.
+	annotations := obj.GetAnnotations()
+
+	// Upon restore, this new PV will look like a statically provisioned, manually-bound volume rather than one bound by the controller, so remove the annotation that signals that a controller bound it.
+	delete(annotations, KubeAnnBindCompleted)
+	// Remove the annotation that signals that the PV is already bound; we want the PV(C) controller to take the two objects and bind them again.
+	delete(annotations, KubeAnnBoundByController)
+
+	// Remove the provisioned-by annotation which signals that the persistent volume was dynamically provisioned; it is now statically provisioned.
+	delete(annotations, KubeAnnDynamicallyProvisioned)
+
+	// GetAnnotations returns a copy, so we have to set them again
+	obj.SetAnnotations(annotations)
+
+	return obj
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
