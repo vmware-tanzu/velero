@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -491,7 +491,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "pod with running restic init container that's not first should return false",
+			name: "pod with running restic init container that's not first should still work",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -522,7 +522,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 					},
 				},
 			},
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "pod with restic init container as first initContainer that's not running should return false",
@@ -595,6 +595,108 @@ func TestIsResticContainerRunning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.expected, isResticInitContainerRunning(test.pod))
+		})
+	}
+}
+
+func TestGetResticInitContainerIndex(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *corev1api.Pod
+		expected int
+	}{
+		{
+			name: "init container is not present return -1",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+			},
+			expected: -1,
+		},
+		{
+			name: "pod with no restic init container return -1",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						{
+							Name: "non-restic-init",
+						},
+					},
+				},
+			},
+			expected: -1,
+		},
+		{
+			name: "pod with restic container as second initContainern should return 1",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						{
+							Name: "non-restic-init",
+						},
+						{
+							Name: restic.InitContainer,
+						},
+					},
+				},
+			},
+			expected: 1,
+		},
+		{
+			name: "pod with restic init container as first initContainer should return 0",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						{
+							Name: restic.InitContainer,
+						},
+						{
+							Name: "non-restic-init",
+						},
+					},
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "pod with restic init container as first initContainer should return 0",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						{
+							Name: restic.InitContainer,
+						},
+						{
+							Name: "non-restic-init",
+						},
+					},
+				},
+			},
+			expected: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, getResticInitContainerIndex(test.pod))
 		})
 	}
 }

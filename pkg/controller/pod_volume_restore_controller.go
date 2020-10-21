@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -155,6 +155,12 @@ func (c *podVolumeRestoreController) pvrHandler(obj interface{}) {
 		return
 	}
 
+	resticInitContainerIndex := getResticInitContainerIndex(pod)
+	if resticInitContainerIndex > 0 {
+		log.Warnf(`Init containers before the %s container may cause issues
+		          if they interfere with volumes being restored: %s index %d`, restic.InitContainer, restic.InitContainer, resticInitContainerIndex)
+	}
+
 	log.Debug("Enqueueing")
 	c.enqueue(obj)
 }
@@ -172,6 +178,12 @@ func (c *podVolumeRestoreController) podHandler(obj interface{}) {
 	if !isResticInitContainerRunning(pod) {
 		log.Debug("Pod is not running restic-wait init container, not enqueuing restores for pod")
 		return
+	}
+
+	resticInitContainerIndex := getResticInitContainerIndex(pod)
+	if resticInitContainerIndex > 0 {
+		log.Warnf(`Init containers before the %s container may cause issues
+		          if they interfere with volumes being restored: %s index %d`, restic.InitContainer, restic.InitContainer, resticInitContainerIndex)
 	}
 
 	selector := labels.Set(map[string]string{
@@ -208,18 +220,21 @@ func isPodOnNode(pod *corev1api.Pod, node string) bool {
 }
 
 func isResticInitContainerRunning(pod *corev1api.Pod) bool {
-	// no init containers, or the first one is not the velero restic one: return false
-	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
-		return false
+
+	// Restic wait container can be anywhere in the list of init containers, but must be running.
+	i := getResticInitContainerIndex(pod)
+	return i >= 0 && pod.Status.InitContainerStatuses[i].State.Running != nil
+}
+
+func getResticInitContainerIndex(pod *corev1api.Pod) int {
+	// Restic wait container can be anywhere in the list of init containers so locate it.
+	for i, initContainer := range pod.Spec.InitContainers {
+		if initContainer.Name == restic.InitContainer {
+			return i
+		}
 	}
 
-	// status hasn't been created yet, or the first one is not yet running: return false
-	if len(pod.Status.InitContainerStatuses) == 0 || pod.Status.InitContainerStatuses[0].State.Running == nil {
-		return false
-	}
-
-	// else, it's running
-	return true
+	return -1
 }
 
 func (c *podVolumeRestoreController) processQueueItem(key string) error {
