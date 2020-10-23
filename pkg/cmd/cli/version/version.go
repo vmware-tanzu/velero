@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -81,4 +82,15 @@ func printVersion(w io.Writer, clientOnly bool, kbClient kbclient.Client, server
 
 	fmt.Fprintln(w, "Server:")
 	fmt.Fprintf(w, "\tVersion: %s\n", serverStatus.Status.ServerVersion)
+
+	serverSemVer := semver.MajorMinor(serverStatus.Status.ServerVersion)
+	cliSemVer := semver.MajorMinor(buildinfo.Version)
+	if serverSemVer != cliSemVer {
+		upgrade := "client"
+		cmp := semver.Compare(cliSemVer, serverSemVer)
+		if cmp == 1 {
+			upgrade = "server"
+		}
+		fmt.Fprintf(w, "# WARNING: the client version does not match the server version. Please update %s\n", upgrade)
+	}
 }
