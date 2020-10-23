@@ -76,7 +76,7 @@ This allows restore functionality to work in a cluster migration scenario, where
 Likewise, if a backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
 
 [10]: hooks.md
-[19]: img/backup-process.png
+[19]: /docs/v1.2.0/img/backup-process.png
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
