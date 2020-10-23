@@ -38,7 +38,7 @@ When using restic on a storage provider that doesn't have Velero support for sna
 
 ### Configure restic DaemonSet spec
 
-After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure.
+After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
 
 
 **RancherOS**
