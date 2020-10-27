@@ -29,6 +29,7 @@ import (
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Server Status Request status such as New/Processed"
 
 // ServerStatusRequest is a request to access current status information about
 // the Velero server.

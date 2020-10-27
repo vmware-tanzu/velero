@@ -66,6 +66,8 @@ type ResticRepositoryStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Restic Repository status such as New/Ready"
+// +kubebuilder:printcolumn:name="Last Maintenance",type="date",JSONPath=".status.lastMaintenanceTime",description="Last time maintenance was run"
 
 type ResticRepository struct {
 	metav1.TypeMeta `json:",inline"`
