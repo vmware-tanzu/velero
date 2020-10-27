@@ -312,6 +312,12 @@ type BackupProgress struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Backup status such as InProgress/Completed"
+// +kubebuilder:printcolumn:name="Errors",type="integer",JSONPath=".status.errors",description="Count of all error messages that were generated during execution of this backup"
+// +kubebuilder:printcolumn:name="Warnings",type="integer",JSONPath=".status.warnings",description="Count of all warning messages that were generated during execution of this backup"
+// +kubebuilder:printcolumn:name="Created",type="date",JSONPath=".status.startTimestamp",description="Time when this backup was started"
+// +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.storageLocation",description="Name of the Backup Storage Location where this backup should be stored"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Backup is a Velero resource that respresents the capture of Kubernetes
 // cluster state at a point in time (API objects and associated volume state).

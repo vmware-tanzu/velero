@@ -90,8 +90,11 @@ type BackupStorageLocationStatus struct {
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Provider",type="string",JSONPath=".spec.provider",description="Provider of the backup storage"
+// +kubebuilder:printcolumn:name="Bucket",type="string",JSONPath=".spec.objectStorage.bucket",description="Bucket to use for object storage"
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Backup Storage Location status such as Available/Unavailable"
 // +kubebuilder:printcolumn:name="Last Validated",type="date",JSONPath=".status.lastValidationTime",description="LastValidationTime is the last time the backup store location was validated"
+// +kubebuilder:printcolumn:name="Access Mode",type="string",JSONPath=".spec.accessMode",description="Permissions for the backup storage location"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BackupStorageLocation is a location where Velero stores backup objects

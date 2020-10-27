@@ -52,6 +52,9 @@ type DeleteBackupRequestStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Delete Backup Request status such as InProgress/Processed"
+// +kubebuilder:printcolumn:name="Backup Name",type="string",JSONPath=".spec.backupName",description="Name of backup to be deleted"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DeleteBackupRequest is a request to delete one or more backups.
 type DeleteBackupRequest struct {

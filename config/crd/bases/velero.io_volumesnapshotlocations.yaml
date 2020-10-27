@@ -8,6 +8,13 @@ metadata:
   creationTimestamp: null
   name: volumesnapshotlocations.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.provider
+    name: Provider
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: velero.io
   names:
     kind: VolumeSnapshotLocation
@@ -16,6 +23,7 @@ spec:
     singular: volumesnapshotlocation
   preserveUnknownFields: false
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: VolumeSnapshotLocation is a location where Velero stores volume

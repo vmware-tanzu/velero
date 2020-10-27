@@ -8,6 +8,42 @@ metadata:
   creationTimestamp: null
   name: podvolumerestores.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Restore status such as InProgress/Completed
+    name: Status
+    type: string
+  - JSONPath: .spec.pod.namespace
+    description: Namespace of pod containing the volume to be restored
+    name: Namespace
+    type: string
+  - JSONPath: .spec.pod.name
+    description: Name of pod containing the volume to be restored
+    name: Pod
+    type: string
+  - JSONPath: .spec.volume
+    description: Name of volume to restore
+    name: Volume
+    type: string
+  - JSONPath: .status.progress.bytesDone
+    description: Number of bytes restored
+    name: Bytes Done
+    type: string
+  - JSONPath: .status.progress.totalBytes
+    description: Total number of bytes to be restored
+    name: Total Bytes
+    type: string
+  - JSONPath: .status.startTimestamp
+    description: Time when the restore operation was started
+    name: Started
+    type: date
+  - JSONPath: .status.completionTimestamp
+    description: Time when the restore operation was completed
+    name: Completed
+    type: date
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: velero.io
   names:
     kind: PodVolumeRestore
@@ -16,6 +52,7 @@ spec:
     singular: podvolumerestore
   preserveUnknownFields: false
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       properties:

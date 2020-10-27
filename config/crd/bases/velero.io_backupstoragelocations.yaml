@@ -9,6 +9,14 @@ metadata:
   name: backupstoragelocations.velero.io
 spec:
   additionalPrinterColumns:
+  - JSONPath: .spec.provider
+    description: Provider of the backup storage
+    name: Provider
+    type: string
+  - JSONPath: .spec.objectStorage.bucket
+    description: Bucket to use for object storage
+    name: Bucket
+    type: string
   - JSONPath: .status.phase
     description: Backup Storage Location status such as Available/Unavailable
     name: Phase
@@ -18,6 +26,10 @@ spec:
       validated
     name: Last Validated
     type: date
+  - JSONPath: .spec.accessMode
+    description: Permissions for the backup storage location
+    name: Access Mode
+    type: string
   - JSONPath: .metadata.creationTimestamp
     name: Age
     type: date
