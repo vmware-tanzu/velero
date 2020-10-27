@@ -519,7 +519,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
 	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
 	defer gzippedLogFile.Close()
-	defer closeAndRemoveFile(logFile, c.logger)
+	defer closeAndRemoveFile(logFile, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
@@ -608,7 +608,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics)
 
 	if err := gzippedLogFile.Close(); err != nil {
-		c.logger.WithError(err).Error("error closing gzippedLogFile")
+		c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).WithError(err).Error("error closing gzippedLogFile")
 	}
 
 	backup.Status.Warnings = logCounter.GetCount(logrus.WarnLevel)
@@ -635,11 +635,11 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger, volumeSnapshots, volumeSnapshotContents); len(errs) > 0 {
+	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)), volumeSnapshots, volumeSnapshotContents); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
 
-	c.logger.Info("Backup completed")
+	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup completed")
 
 	// if we return a non-nil error, the calling function will update
 	// the backup's phase to Failed.

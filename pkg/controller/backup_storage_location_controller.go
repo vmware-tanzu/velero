@@ -55,7 +55,7 @@ type BackupStorageLocationReconciler struct {
 func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithField("controller", BackupStorageLocation)
 
-	log.Info("Checking for existing backup locations ready to be verified; there needs to be at least 1 backup location available")
+	log.Debug("Validating availablity of backup storage locations.")
 
 	locationList, err := storage.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
 	if err != nil {
@@ -78,7 +78,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		}
 
 		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
-			log.Debug("Backup location not ready to be validated")
+			log.Info("Validation not required, skipping...")
 			continue
 		}
 
@@ -95,10 +95,10 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			continue
 		}
 
-		log.Debug("Verifying backup storage location")
+		log.Info("Validating backup storage location")
 		anyVerified = true
 		if err := backupStore.IsValid(); err != nil {
-			log.Debug("Backup location verified, not valid")
+			log.Info("Backup location is invalid, marking as unavailable")
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
 
 			if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
@@ -107,7 +107,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
 		} else {
-			log.Debug("Backup location verified and it is valid")
+			log.Info("Backup location valid, marking as available")
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
 		}
 		location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
@@ -117,7 +117,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	}
 
 	if !anyVerified {
-		log.Info("No backup locations were ready to be verified")
+		log.Info("No backup locations needed to be validated")
 	}
 
 	r.logReconciledPhase(defaultFound, locationList, unavailableErrors)
