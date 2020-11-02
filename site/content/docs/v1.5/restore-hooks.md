@@ -11,6 +11,10 @@ Velero supports Restore Hooks, custom actions that can be executed during or aft
 ## InitContainer Restore Hooks
 
 Use an `InitContainer` hook to add init containers into a pod before it's restored. You can use these init containers to run any setup needed for the pod to resume running from its backed-up state.
+The InitContainer added by the restore hook will be the first init container in the `podSpec` of the restored pod.
+In the case where the pod had volumes backed up using restic, then, the restore hook InitContainer will be added after the `restic-wait` InitContainer.
+
+NOTE: This ordering can be altered by any mutating webhooks that may be installed in the cluster.
 
 There are two ways to specify `InitContainer` restore hooks:
 1. Specifying restore hooks in annotations
