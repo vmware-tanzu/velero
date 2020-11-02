@@ -75,6 +75,12 @@ func (b *PodVolumeBackupBuilder) PodName(name string) *PodVolumeBackupBuilder {
 	return b
 }
 
+// PodNamespace sets the name of the pod associated with this PodVolumeBackup.
+func (b *PodVolumeBackupBuilder) PodNamespace(ns string) *PodVolumeBackupBuilder {
+	b.object.Spec.Pod.Namespace = ns
+	return b
+}
+
 // Volume sets the name of the volume associated with this PodVolumeBackup.
 func (b *PodVolumeBackupBuilder) Volume(volume string) *PodVolumeBackupBuilder {
 	b.object.Spec.Volume = volume

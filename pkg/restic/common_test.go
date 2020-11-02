@@ -564,6 +564,88 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 	}
 }
 
+func TestIsPVBMatchPod(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pod      metav1.Object
+		pvb      velerov1api.PodVolumeBackup
+		expected bool
+	}{
+		{
+			name: "should match PVB and pod",
+			pod: &metav1.ObjectMeta{
+				Name:      "matching-pod",
+				Namespace: "matching-namespace",
+			},
+			pvb: velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
+					Pod: corev1api.ObjectReference{
+						Name:      "matching-pod",
+						Namespace: "matching-namespace",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "should not match PVB and pod, pod name mismatch",
+			pod: &metav1.ObjectMeta{
+				Name:      "not-matching-pod",
+				Namespace: "matching-namespace",
+			},
+			pvb: velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
+					Pod: corev1api.ObjectReference{
+						Name:      "matching-pod",
+						Namespace: "matching-namespace",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "should not match PVB and pod, pod namespace mismatch",
+			pod: &metav1.ObjectMeta{
+				Name:      "matching-pod",
+				Namespace: "not-matching-namespace",
+			},
+			pvb: velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
+					Pod: corev1api.ObjectReference{
+						Name:      "matching-pod",
+						Namespace: "matching-namespace",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "should not match PVB and pod, pod name and namespace mismatch",
+			pod: &metav1.ObjectMeta{
+				Name:      "not-matching-pod",
+				Namespace: "not-matching-namespace",
+			},
+			pvb: velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
+					Pod: corev1api.ObjectReference{
+						Name:      "matching-pod",
+						Namespace: "matching-namespace",
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := isPVBMatchPod(&tc.pvb, tc.pod)
+			assert.Equal(t, tc.expected, actual)
+		})
+
+	}
+}
+
 func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
 	err := velerov1api.AddToScheme(scheme.Scheme)
 	require.NoError(t, err)

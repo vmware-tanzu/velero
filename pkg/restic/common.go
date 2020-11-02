@@ -95,13 +95,17 @@ func getPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	return res
 }
 
+func isPVBMatchPod(pvb *velerov1api.PodVolumeBackup, pod metav1.Object) bool {
+	return pod.GetName() == pvb.Spec.Pod.Name && pod.GetNamespace() == pvb.Spec.Pod.Namespace
+}
+
 // GetVolumeBackupsForPod returns a map, of volume name -> snapshot id,
 // of the PodVolumeBackups that exist for the provided pod.
 func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod metav1.Object) map[string]string {
 	volumes := make(map[string]string)
 
 	for _, pvb := range podVolumeBackups {
-		if pod.GetName() != pvb.Spec.Pod.Name {
+		if !isPVBMatchPod(pvb, pod) {
 			continue
 		}
 
