@@ -130,7 +130,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExe
 
 func getNewNodeFromConfigMap(client corev1client.ConfigMapInterface, node string) (string, error) {
 	// fetch node mapping from configMap
-	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-pvc-node", client)
+	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-pvc-node-selector", client)
 	if err != nil {
 		return "", err
 	}

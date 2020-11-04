@@ -1,0 +1,1 @@
+Fixed 'velero.io/change-pvc-node-selector' plugin to fetch configmap using label key "velero.io/change-pvc-node-selector" 
