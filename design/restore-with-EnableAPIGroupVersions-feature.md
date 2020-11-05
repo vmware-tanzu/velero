@@ -4,7 +4,7 @@ Status: Draft
 
 ## Abstract
 
-This document proposes a solution to select an API group version to restore from the versions backed up using the feature EnableAPIGroupVersions.
+This document proposes a solution to select an API group version to restore from the versions backed up using the feature flag EnableAPIGroupVersions.
 
 ## Background
 
@@ -28,16 +28,29 @@ During restore, the proposal is that Velero will read the directory names in the
 
 There are four main objectives to achieve the above stated goal:
 
+1. Determine if the APIGroupVersionsFeatureFlag feature flag has been enabled.
 1. List the backed up API group versions.
 1. List the API group versions supported by the target cluster.
-1. Use a priority system to determine which version to back up with the source preferred version as the default.
+1. Use a priority system to determine which version to restore. The source preferred version will be the default if the priorities fail.
 1. Modify the paths to the backup files in the tarball in the resource restore process.
 
-### Objective 1: List the backed up API group versions
+### Objective 1: Determine if the APIGroupVersionsFeatureFlag feature flag has been enabled
+
+For restore to be able to choose from multiple supported backed up versions, the feature flag must have been enabled during both the backup and restore processes. And the check to see if the feature flag is/was enabled must be done for both processes.
+
+The reason for checking for the feature flag during restore is to ensure the user would like to restore a version that is among potentially multiple versions backed up with the feature flag enabled.
+
+The reason for checking to see if the feature flag was enabled during backup is to ensure the changes made by this proposed design is backward compatible. Only with Velero version 1.4 and forward was Format Version 1.0.0 used to structure the backup directories. Format Version 1.0.0 is required for the restore process proposed in this design doc to work. Before v1.4, the backed up files were in a directory structure that will not be recognized by the proposed code changes. Therefore, restore should not attempt to restore from multiple versions as they will not exist.
+
+Checking if the feature flag is enabled during restore is straightforward using `features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag)`.
+
+Checking if the feature flag was enabled during backup can be done indirectly by checking the directory structure and version directory names. For backups generated using Format Version 1.0.0 (required for the changes proposed here), there will always be a version directory with `-preferredversion` in the directory name. Only one resource will need to be checked to determine if the feature flag was enabled during backup.
+
+### Objective 2: List the backed up API group versions
 
 Currently, in `pkg/restore/restore.go`, in the `execute(...)` method, around [line 363](https://github.com/vmware-tanzu/velero/blob/7a103b9eda878769018386ecae78da4e4f8dde83/pkg/restore/restore.go#L363), the resources and their backed up items are saved in a map called `backupResources`.
 
-At this point, the `features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag)` can be checked. If it's true, the `backedupResources` map can be sent to a method (to be created) with the signature `ctx.chooseAPIVersionsToRestore(backupResources)`. Notice that the method is called on `ctx` which has the type `*restore.Context`.
+At this point, it can be checked if the feature flag is/was enabled during restore/backup, respectively (described previously in Objective #1). If it is and was enabled, the `backedupResources` map can be sent to a method (to be created) with the signature `ctx.chooseAPIVersionsToRestore(backupResources)`. Notice that the method is called on `ctx` which has the type `*restore.Context`.
 
 The `chooseAPIVersionsToRestore` method can remain in the `restore` package, but for organizational purposes, it can be moved to a file called `prioritize_group_version.go`.
 
@@ -45,7 +58,7 @@ Inside the `chooseAPIVersionsToRestore` method, we can take advantage of the `ar
 
 The `sourceRGVersions` map's keys will be strings in the format `<resource>.<group>`, e.g. "horizontalpodautoscalers.autoscaling". The values will be APIGroup structs. The API Group struct can be imported from k8s.io/apimachinery/pkg/apis/meta/v1.
 
-### Objective 2: List the API group versions supported by the target cluster
+### Objective 3: List the API group versions supported by the target cluster
 
 Still within the `chooseAPIVersionsToRestore` method, the target cluster's resource group versions can now be obtained.
 
@@ -53,7 +66,7 @@ Still within the `chooseAPIVersionsToRestore` method, the target cluster's resou
 targetGroupVersions := ctx.discoveryHelper.APIGroups()
 ```
 
-### Objective 3: Use a priority system to determine which version to back up, if any
+### Objective 4: Use a priority system to determine which version to back up, if any
 
 Determining the priority will also be done in the `chooseAPIVersionsToRestore` method.
 
@@ -86,7 +99,7 @@ type ChosenGrpVersion struct {
 
 Note that adding a field to `restore.Context` will mean having to make a map for the field during instantiation.
 
-### Objective 4: Modify the paths to the backup files in the tarball
+### Objective 5: Modify the paths to the backup files in the tarball
 
 The method doing the bulk of the restoration work is `ctx.restoreResource(...)`. Inside this method, around [line 714](https://github.com/vmware-tanzu/velero/blob/7a103b9eda878769018386ecae78da4e4f8dde83/pkg/restore/restore.go#L714) in `pkg/restore/restore.go`, the path to backup json file for the item being restored is set.
 
@@ -107,7 +120,7 @@ This proposal will have the path changed to something like
 The `horizontalpodautoscalers.autoscaling` part of the path will be updated to `horizontalpodautoscalers.autoscaling/v2beta2` using
 
 ```go
-resource = groupResource.String() + "/" + ctx.chosenGrpVersToRestore[groupResource.String()].VerDirName
+resource = filepath.Join(groupResource.String(), ctx.chosenGrpVersToRestore[groupResource.String()].VerDirName)
 ```
 
 The restore can now proceed as normal.
