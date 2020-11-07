@@ -545,7 +545,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			sharedHooksContextTimeout: time.Millisecond,
 		},
 		{
-			name:          "shoudl return no error with 2 spec hooks in 2 different containers, 1st container starts running after 10ms, 2nd container after 20ms, both succeed",
+			name:          "should return no error with 2 spec hooks in 2 different containers, 1st container starts running after 10ms, 2nd container after 20ms, both succeed",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{

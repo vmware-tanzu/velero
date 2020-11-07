@@ -29,7 +29,7 @@ Velero version 1.1 provides support to backup applications orchestrated on upstr
 
 ## Download and Deploy Cassandra
 
-For instructions on how to download and deploy a simple Cassandra StatefulSet, please refer to [this blog post](https://cormachogan.com/2019/06/12/kubernetes-storage-on-vsphere-101-statefulset/). This will show you how to deploy a Cassandra StatefulSet which we can use to do our Stateful aplication backup and restore. The manifests [available here](https://github.com/cormachogan/vsphere-storage-101/tree/master/StatefulSets) use an earlier version of Cassandra (v11) that includes the `cqlsh` tool which we will use now to create a database and populate a table with some sample data.
+For instructions on how to download and deploy a simple Cassandra StatefulSet, please refer to [this blog post](https://cormachogan.com/2019/06/12/kubernetes-storage-on-vsphere-101-statefulset/). This will show you how to deploy a Cassandra StatefulSet which we can use to do our Stateful application backup and restore. The manifests [available here](https://github.com/cormachogan/vsphere-storage-101/tree/master/StatefulSets) use an earlier version of Cassandra (v11) that includes the `cqlsh` tool which we will use now to create a database and populate a table with some sample data.
 
 If you follow the instructions above on how to deploy Cassandra on Kubernetes, you should see a similar response if you run the following command against your deployment:
 

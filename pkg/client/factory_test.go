@@ -48,7 +48,7 @@ func TestFactory(t *testing.T) {
 
 	assert.Equal(t, s, f.Namespace())
 
-	// An arugment overrides the env variable if both are set.
+	// An argument overrides the env variable if both are set.
 	os.Setenv("VELERO_NAMESPACE", "env-velero")
 	f = NewFactory("velero", make(map[string]interface{}))
 	flags = new(pflag.FlagSet)

@@ -38,7 +38,7 @@ import (
 )
 
 // kindToResource translates a Kind (mixed case, singular) to a Resource (lowercase, plural) string.
-// This is to accomodate the dynamic client's need for an APIResource, as the Unstructured objects do not have easy helpers for this information.
+// This is to accommodate the dynamic client's need for an APIResource, as the Unstructured objects do not have easy helpers for this information.
 var kindToResource = map[string]string{
 	"CustomResourceDefinition": "customresourcedefinitions",
 	"Namespace":                "namespaces",
@@ -51,7 +51,7 @@ var kindToResource = map[string]string{
 	"VolumeSnapshotLocation":   "volumesnapshotlocations",
 }
 
-// ResourceGroup represents a collection of kubernetes objects with a common ready conditon
+// ResourceGroup represents a collection of kubernetes objects with a common ready condition
 type ResourceGroup struct {
 	CRDResources   []*unstructured.Unstructured
 	OtherResources []*unstructured.Unstructured

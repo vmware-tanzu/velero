@@ -251,7 +251,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		return false, errors.WithStack(err)
 	}
 
-	// backing up the preferred version backup without API Group version on path -  this is for backward compability
+	// backing up the preferred version backup without API Group version on path -  this is for backward compatibility
 
 	log.Debugf("Resource %s/%s, version= %s, preferredVersion=%s", groupResource.String(), name, version, preferredVersion)
 	if version == preferredVersion {

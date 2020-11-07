@@ -72,7 +72,7 @@ The configurable parameters are as follows:
 | `availabilityZone` | string | Required Field | *Example*: "us-east-1a"<br><br>See [AWS documentation][4] for details. |
 | `disableSSL` | bool | `false` | Set this to `true` if you are using Minio (or another local, S3-compatible storage service) and your deployment is not secured. |
 | `s3ForcePathStyle` | bool | `false` | Set this to `true` if you are using a local storage service like Minio. |
-| `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, `availabilityZone`, and `bucket`. This field is primarily for local sotrage services like Minio.|
+| `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, `availabilityZone`, and `bucket`. This field is primarily for local storage services like Minio.|
 
 ### GCP
 | Key | Type | Default | Meaning |
