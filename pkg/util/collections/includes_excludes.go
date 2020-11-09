@@ -201,7 +201,10 @@ func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 		func(item string) string {
 			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
 			if err != nil {
-				return ""
+				// If we can't resolve it, return it as-is. This prevents the generated
+				// includes-excludes list from including *everything*, if none of the includes
+				// can be resolved. ref. https://github.com/vmware-tanzu/velero/issues/2461
+				return item
 			}
 
 			gr := gvr.GroupResource()
