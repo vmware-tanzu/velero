@@ -41,6 +41,6 @@ new backups are created, and no existing backups are deleted or overwritten.
 ## I receive 'custom resource not found' errors when starting up the Ark server
 
 Ark's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `examples/common/00-prereqs.yaml` file to create these defintions, then restart Ark.
+the `examples/common/00-prereqs.yaml` file to create these definitions, then restart Ark.
 
 [1]: config-definition.md#main-config-parameters

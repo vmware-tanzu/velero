@@ -133,7 +133,7 @@ spec:
 ```
 
 For demonstration purposes, instead of relying on the application writing data to the mounted CSI volume, exec into the pod running the stateful application to write data into `/mnt/azuredisk`, where the CSI volume is mounted.
-This is to let us get a consistent checksum value of the data and verify that the data on restore is exacly same as that in the backup.
+This is to let us get a consistent checksum value of the data and verify that the data on restore is exactly same as that in the backup.
 
 ```bash
 $ kubectl -n csi-app exec -ti csi-nginx bash 

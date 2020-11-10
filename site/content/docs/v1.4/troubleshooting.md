@@ -100,7 +100,7 @@ Forwarding from [::1]:8085 -> 8085
 
 Now, visiting http://localhost:8085/metrics on a browser should show the metrics that are being scraped from Velero.
 
-- Confirm that the Velero server pod has the nessary [annotations][8] for prometheus to scrape metrics.
+- Confirm that the Velero server pod has the necessary [annotations][8] for prometheus to scrape metrics.
 - Confirm, from the Prometheus UI, that the Velero pod is one of the targets being scraped from Prometheus.
 
 [1]: debugging-restores.md

@@ -19,7 +19,7 @@ This design seeks to provide the missing extension point.
 
 ## Non Goals
 
-- Specific implementations of hte DeleteItemAction API beyond test cases.
+- Specific implementations of the DeleteItemAction API beyond test cases.
 - Rollback of DeleteItemAction execution.
 
 ## High-Level Design

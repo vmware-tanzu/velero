@@ -45,7 +45,7 @@ Currently, the Velero repository sits under the Heptio GitHub organization. With
 
 ### Notes/How-Tos
 
-#### Transfering the GH repository
+#### Transferring the GH repository
 
 All action items needed for the repo transfer are listed in the Todo list above. For details about what gets moved and other info, this is the GH documentation: https://help.github.com/en/articles/transferring-a-repository
 
@@ -57,7 +57,7 @@ Someone with owner permission on the new repository needs to go to their Travis 
 
 After this, webhook notifications can be added following these instructions: https://docs.travis-ci.com/user/notifications/#configuring-webhook-notifications.
 
-#### Transfering ZenHub
+#### Transferring ZenHub
 
 Pre-requisite: A new Zenhub account must exist for a vmware or vmware-tanzu organization.
 

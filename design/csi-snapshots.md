@@ -176,7 +176,7 @@ This will allow the development to continue on the feature while it's in pre-pro
 [`BackupStore.PutBackup`][9] will receive an additional argument, `volumeSnapshots io.Reader`, that contains the JSON representation of `VolumeSnapshots`.
 This will be written to a file named `csi-snapshots.json.gz`.
 
-[`defaultRestorePriorities`][11] should be rewritten to the following to accomodate proper association between the CSI objects and PVCs. `CustomResourceDefinition`s are moved up because they're necessary for creating the CSI CRDs. The CSI CRDs are created before `PersistentVolume`s and `PersistentVolumeClaim`s so that they may be used as data sources.
+[`defaultRestorePriorities`][11] should be rewritten to the following to accommodate proper association between the CSI objects and PVCs. `CustomResourceDefinition`s are moved up because they're necessary for creating the CSI CRDs. The CSI CRDs are created before `PersistentVolume`s and `PersistentVolumeClaim`s so that they may be used as data sources.
 GitHub issue [1565][17] represents this work.
 
 ```go
@@ -248,7 +248,7 @@ Volumes with any other `PersistentVolumeSource` set will use Velero's current Vo
 ### VolumeSnapshotLocations and VolumeSnapshotClasses
 
 Velero uses its own `VolumeSnapshotLocation` CRDs to specify configuration options for a given storage system.
-In Velero, this often includes topology information such as regions or availibility zones, as well as credential information.
+In Velero, this often includes topology information such as regions or availability zones, as well as credential information.
 
 CSI volume snapshotting has a `VolumeSnapshotClass` CRD which also contains configuration options for a given storage system, but these options are not the same as those that Velero would use.
 Since CSI volume snapshotting is operating within the same storage system that manages the volumes already, it does not need the same topology or credential information that Velero does.
@@ -269,7 +269,7 @@ Additionally, the VolumeSnapshotter plugins and CSI volume snapshot drivers over
 Thus, there's not a logical place to fit the creation of VolumeSnapshot creation in the VolumeSnapshotter interface.
 
 * Implement CSI logic directly in Velero core code.
-The plugins could be packaged separately, but that doesn't necessarily make sense with server and client changes being made to accomodate CSI snapshot lookup.
+The plugins could be packaged separately, but that doesn't necessarily make sense with server and client changes being made to accommodate CSI snapshot lookup.
 
 * Implementing the CSI logic entirely in external plugins.
 As mentioned above, the necessary plugins for `PersistentVolumeClaim`, `VolumeSnapshot`, and `VolumeSnapshotContent` could be hosted out-out-of-tree from Velero.

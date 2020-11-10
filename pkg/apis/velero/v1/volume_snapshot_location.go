@@ -59,7 +59,7 @@ type VolumeSnapshotLocationSpec struct {
 	Config map[string]string `json:"config,omitempty"`
 }
 
-// VolumeSnapshotLocationPhase is the lifecyle phase of a Velero VolumeSnapshotLocation.
+// VolumeSnapshotLocationPhase is the lifecycle phase of a Velero VolumeSnapshotLocation.
 // +kubebuilder:validation:Enum=Available;Unavailable
 type VolumeSnapshotLocationPhase string
 

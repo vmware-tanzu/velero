@@ -55,7 +55,7 @@ type BackupStorageLocationReconciler struct {
 func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithField("controller", BackupStorageLocation)
 
-	log.Debug("Validating availablity of backup storage locations.")
+	log.Debug("Validating availability of backup storage locations.")
 
 	locationList, err := storage.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
 	if err != nil {

@@ -413,7 +413,7 @@ However, it can provide preference over latest supported API.
 If new fields are added without changing API version, it won't cause any problem as these resources are intended to provide information, and, there is no reconciliation on these resources.
 
 ### Compatibility of latest plugin with older version of Velero
-Plugin that supports this CR should handle the situation gracefully when CRDs are not installed. It can handle the errors occured during creation/updation of the CRs.
+Plugin that supports this CR should handle the situation gracefully when CRDs are not installed. It can handle the errors occurred during creation/updation of the CRs.
 
 ## Limitations:
 
@@ -432,7 +432,7 @@ But, this involves good amount of changes and needs a way for backward compatibi
 As volume plugins are mostly K8s native, its fine to go ahead with current limiation.
 
 ### Update Backup CR
-Instead of creating new CRs, plugins can directly update the status of Backup CR. But, this deviates from current approach of having seperate CRs like PodVolumeBackup/PodVolumeRestore to know operations progress.
+Instead of creating new CRs, plugins can directly update the status of Backup CR. But, this deviates from current approach of having separate CRs like PodVolumeBackup/PodVolumeRestore to know operations progress.
 
 ### Restricting on name rather than using labels
 Instead of using labels to identify the CR related to particular backup on a volume, restrictions can be placed on the name of VolumePluginBackup CR to be same as the value returned from CreateSnapshot.

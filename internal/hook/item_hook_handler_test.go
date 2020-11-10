@@ -1655,7 +1655,7 @@ func TestHandleRestoreHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "shoud not apply any restore hook init containers when resource hook selector mismatch",
+			name: "should not apply any restore hook init containers when resource hook selector mismatch",
 			podInput: corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "app1",
@@ -1807,7 +1807,7 @@ func TestHandleRestoreHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "shoud not apply any restore hook init containers when resource hook is nil",
+			name: "should not apply any restore hook init containers when resource hook is nil",
 			podInput: corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "app1",
@@ -1824,7 +1824,7 @@ func TestHandleRestoreHooks(t *testing.T) {
 			restoreHooks: nil,
 		},
 		{
-			name: "shoud not apply any restore hook init containers when resource hook is empty",
+			name: "should not apply any restore hook init containers when resource hook is empty",
 			podInput: corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "app1",

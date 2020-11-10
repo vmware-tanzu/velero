@@ -79,7 +79,7 @@ kubectl get deployments -l component=ark --namespace=heptio-ark
 kubectl get deployments --namespace=nginx-example
 ```
 
-Finally, install the Ark client somehwere in your `$PATH`:
+Finally, install the Ark client somewhere in your `$PATH`:
 * [Download a pre-built release][26], or
 * [Build it from scratch][7]
 

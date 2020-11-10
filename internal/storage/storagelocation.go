@@ -39,7 +39,7 @@ type DefaultBackupLocationInfo struct {
 // IsReadyToValidate calculates if a given backup storage location is ready to be validated.
 //
 // Rules:
-// Users can choose a validation frequency per location. This will overrite the server's default value
+// Users can choose a validation frequency per location. This will override the server's default value
 // To skip/stop validation, set the frequency to zero
 // This will always return "true" for the first attempt at validating a location, regardless of its validation frequency setting
 // Otherwise, it returns "ready" only when NOW is equal to or after the next validation time

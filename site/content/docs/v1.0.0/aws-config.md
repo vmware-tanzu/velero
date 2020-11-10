@@ -32,7 +32,7 @@ of the Velero repository is under active development and is not guaranteed to be
 
 ## Create S3 bucket
 
-Velero requires an object storage bucket to store backups in, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
+Velero requires an object storage bucket to store backups in, preferably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
 
 ```bash
 BUCKET=<YOUR_BUCKET>

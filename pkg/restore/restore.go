@@ -387,7 +387,7 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	// Iterate through an ordered list of resources to restore, checking each one to see if it should be restored.
 	// Note that resources *may* be in this list twice, i.e. once due to being a prioritized resource, and once due
 	// to being in the backup tarball. We can't de-dupe this upfront, because it's possible that items in the prioritized
-	// resources list may not be fully resolved group-resource strings (e.g. may be specfied as "po" instead of "pods"),
+	// resources list may not be fully resolved group-resource strings (e.g. may be specified as "po" instead of "pods"),
 	// and we don't want to fully resolve them via discovery until we reach them in the loop, because it is possible
 	// that the resource/API itself is being restored via a custom resource definition, meaning it's not available via
 	// discovery prior to beginning the restore.
@@ -1248,7 +1248,7 @@ func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool,
 	}
 
 	if pv.Spec.ClaimRef == nil {
-		ctx.log.Debugf("Persistent volume does not need to have the claimRef.namepace remapped because it's not claimed")
+		ctx.log.Debugf("Persistent volume does not need to have the claimRef.namespace remapped because it's not claimed")
 		return false, nil
 	}
 

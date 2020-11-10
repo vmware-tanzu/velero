@@ -104,7 +104,7 @@
 ### Download
   - https://github.com/heptio/ark/releases/tag/v0.9.3
 ### Bug Fixes
-  * Initalize Prometheus metrics when creating a new schedule (#689, @lemaral)
+  * Initialize Prometheus metrics when creating a new schedule (#689, @lemaral)
 
 
 ## v0.9.2

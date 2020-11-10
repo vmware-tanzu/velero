@@ -27,7 +27,7 @@ layout: docs
 
 2. Untar the release in your `/usr/bin` directory:  `tar -xzvf <RELEASE-TARBALL-NAME>.tar.gz` 
 
-   You may choose to rename the directory `velero` for the sake of simplicty: `mv velero-v1.0.0-linux-amd64 velero` 
+   You may choose to rename the directory `velero` for the sake of simplicity: `mv velero-v1.0.0-linux-amd64 velero` 
 
 3. Add it to your PATH: `export PATH=/usr/local/bin/velero:$PATH`
 

@@ -84,7 +84,7 @@ If the metadata file does not exist, this is an older backup and we cannot displ
 
 ### Fetch backup contents archive and walkthrough to list contents
 
-Instead of recording new metadata about what resources have been backed up, we could simply download the backup contents archive and walkthrough it to list the contents everytime `velero backup describe <name> --details` is run.
+Instead of recording new metadata about what resources have been backed up, we could simply download the backup contents archive and walkthrough it to list the contents every time `velero backup describe <name> --details` is run.
 
 The advantage of this approach is that we don't need to change any backup procedures as we already have this content, and we will also be able to list resources for older backups.
 Additionally, if we wanted to expose more information about the backed up resources, we can do so without having to update what we store in the metadata.

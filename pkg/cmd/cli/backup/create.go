@@ -182,7 +182,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
-	// If an explict name is specified, use that name
+	// If an explicit name is specified, use that name
 	if len(args) > 0 {
 		o.Name = args[0]
 	}

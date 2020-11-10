@@ -132,7 +132,7 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 
 	hooksFromAnnotations := getInitRestoreHookFromAnnotation(kube.NamespaceAndName(pod), metadata.GetAnnotations(), log)
 	if hooksFromAnnotations != nil {
-		log.Infof("Handling InitRestoreHooks from pod annotaions")
+		log.Infof("Handling InitRestoreHooks from pod annotations")
 		initContainers = append(initContainers, hooksFromAnnotations.InitContainers...)
 	} else {
 		log.Infof("Handling InitRestoreHooks from RestoreSpec")
@@ -351,7 +351,7 @@ func getInitRestoreHookFromAnnotation(podName string, annotations map[string]str
 		return nil
 	}
 	if command == "" {
-		log.Infof("RestoreHook init contianer for pod %s is using container's default entrypoint", podName, containerImage)
+		log.Infof("RestoreHook init container for pod %s is using container's default entrypoint", podName, containerImage)
 	}
 	if containerName == "" {
 		uid, err := uuid.NewV4()

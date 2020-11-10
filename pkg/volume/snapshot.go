@@ -64,7 +64,7 @@ type SnapshotStatus struct {
 	Phase SnapshotPhase `json:"phase,omitempty"`
 }
 
-// SnapshotPhase is the lifecyle phase of a Velero volume snapshot.
+// SnapshotPhase is the lifecycle phase of a Velero volume snapshot.
 type SnapshotPhase string
 
 const (
