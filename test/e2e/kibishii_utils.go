@@ -13,10 +13,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-func InstallKibishii(ctx context.Context, namespace string) error {
+func InstallKibishii(ctx context.Context, namespace string, cloudPlatform string) error {
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
-		"github.com/vmware-tanzu-labs/distributed-data-generator/kubernetes/yaml/aws")
+		"github.com/vmware-tanzu-labs/distributed-data-generator/kubernetes/yaml/" + cloudPlatform)
 	stdoutPipe, err := kibishiiInstallCmd.StdoutPipe()
 	if err != nil {
 		return err

@@ -2,8 +2,6 @@ package e2e
 
 import (
 	"flag"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,11 +16,14 @@ var (
 	veleroCLI  string
 	namespace  string
 	backupName string
+	restoreName string
+	cloudPlatform string // aws, vsphere, azure
 )
 
 func init() {
 	flag.StringVar(&veleroCLI, "velerocli", "velero", "path to the velero application to use")
 	flag.StringVar(&namespace, "kibishiins", "kibishii", "namespace to use for Kibishii distributed data generator")
+	flag.StringVar(&cloudPlatform, "cloudplatform", "aws", "cloud platform we are deploying on (aws, vsphere, azure)")
 }
 
 var _ = Describe("Backup", func() {
@@ -35,7 +36,8 @@ var _ = Describe("Backup", func() {
 			It("generates data, backups up the namespace, deletes the namespace, restores the namespace and verifies data", func() {
 				backupUUID, err := uuid.NewRandom()
 				Expect(err).NotTo(HaveOccurred())
-				backupName = backupUUID.String()
+				backupName = "backup-"+backupUUID.String()
+				restoreName = "restore-"+backupUUID.String()
 				println("backupName = " + backupName)
 				println("creating namespace " + namespace)
 				timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
@@ -44,7 +46,7 @@ var _ = Describe("Backup", func() {
 
 				println("installing kibishii in namespace " + namespace)
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
-				err = InstallKibishii(timeoutCTX, namespace)
+				err = InstallKibishii(timeoutCTX, namespace, cloudPlatform)
 				Expect(err).NotTo(HaveOccurred())
 
 				println("running kibishii generate")
@@ -55,15 +57,17 @@ var _ = Describe("Backup", func() {
 
 				println("executing backup")
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*30)
-
+				/*
 				backupCmd := exec.CommandContext(timeoutCTX, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
 					"--default-volumes-to-restic", "--wait")
 				fmt.Printf("backup cmd =%v\n", backupCmd)
 				err = backupCmd.Run()
+				*/
+
+				err = BackupNamespace(timeoutCTX, veleroCLI, backupName, namespace)
 				Expect(err).NotTo(HaveOccurred())
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
 				err = CheckBackupPhase(timeoutCTX, veleroCLI, backupName, velerov1.BackupPhaseCompleted)
-				//err := CheckBackupPhase(timeoutCTX, veleroCLI, "01e4f4be-9e24-4a83-8a88-f364b0d929d8", velerov1.BackupPhaseCompleted)
 
 				Expect(err).NotTo(HaveOccurred())
 
@@ -74,9 +78,7 @@ var _ = Describe("Backup", func() {
 
 				println("restoring namespace")
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*30)
-				restoreCmd := exec.CommandContext(timeoutCTX, veleroCLI, "create", "restore", "--from-backup", backupName, "--wait")
-				fmt.Printf("restore cmd =%v\n", restoreCmd)
-				err = restoreCmd.Run()
+				err = RestoreNamespace(timeoutCTX, veleroCLI, restoreName, backupName)
 				Expect(err).NotTo(HaveOccurred())
 				println("Checking that namespace is present")
 				// TODO - check that namespace exists
