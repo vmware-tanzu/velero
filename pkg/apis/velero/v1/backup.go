@@ -90,7 +90,7 @@ type BackupSpec struct {
 	DefaultVolumesToRestic *bool `json:"defaultVolumesToRestic,omitempty"`
 
 	// OrderedResources specifies the backup order of resources of specific Kind.
-	// The map key is the Kind name and value is a list of resource names separeted by commas.
+	// The map key is the Kind name and value is a list of resource names separated by commas.
 	// Each resource name has format "namespace/resourcename".  For cluster resources, simply use "resourcename".
 	// +optional
 	// +nullable

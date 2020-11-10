@@ -164,7 +164,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 				assert.NoError(t, err)
 
 				wantUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.want)
-				fmt.Printf("exptected +%v\n", wantUnstructured)
+				fmt.Printf("expected +%v\n", wantUnstructured)
 				require.NoError(t, err)
 
 				assert.Equal(t, &unstructured.Unstructured{Object: wantUnstructured}, res.UpdatedItem)

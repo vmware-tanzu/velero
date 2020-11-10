@@ -4,7 +4,7 @@
 
 The Vision
 ---
-To create a modern, geometric typeface. Open sourced, and openly available. Influenced by other popular geometric, minimalist sans-serif typefaces of the new millenium. Designed for optimal readability at small point sizes while beautiful at large point sizes.
+To create a modern, geometric typeface. Open sourced, and openly available. Influenced by other popular geometric, minimalist sans-serif typefaces of the new millennium. Designed for optimal readability at small point sizes while beautiful at large point sizes.
 
 December 2017 update
 ---

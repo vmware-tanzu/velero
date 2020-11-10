@@ -45,7 +45,7 @@ kubectl edit deployment/ark -n heptio-ark
 ### Ark reports `custom resource not found` errors when starting up.
 
 Ark's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `examples/common/00-prereqs.yaml` file to create these defintions, then restart Ark.
+the `examples/common/00-prereqs.yaml` file to create these definitions, then restart Ark.
 
 ### `ark backup logs` returns a `SignatureDoesNotMatch` error
 

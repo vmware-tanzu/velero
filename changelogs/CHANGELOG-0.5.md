@@ -8,7 +8,7 @@
 
 ### Bug fixes
   * If a Service is headless, retain ClusterIP = None when backing up and restoring.
-  * Use the specifed --label-selector when listing backups, schedules, and restores.
+  * Use the specified --label-selector when listing backups, schedules, and restores.
   * Restore namespace mapping functionality that was accidentally broken in 0.5.0.
   * Always include namespaces in the backup, regardless of the --include-cluster-resources setting.
 

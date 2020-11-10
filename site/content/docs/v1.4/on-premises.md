@@ -34,7 +34,7 @@ First, download the Velero image, tag it for the your private registry, then upl
 
 ```bash
 PRIVATE_REG=<your private registry>
-VELERO_VERSION=<version of Velero you're targetting, e.g. v1.4.0>
+VELERO_VERSION=<version of Velero you're targeting, e.g. v1.4.0>
 
 docker pull velero/velero:$VELERO_VERSION
 docker tag velero/velero:$VELERO_VERSION $PRIVATE_REG/velero:$VELERO_VERSION
@@ -47,7 +47,7 @@ Next, repeat these steps for any plugins you may need. This example will use the
 
 ```bash
 PRIVATE_REG=<your private registry>
-PLUGIN_VERSION=<version of plugin you're targetting, e.g. v1.0.2>
+PLUGIN_VERSION=<version of plugin you're targeting, e.g. v1.0.2>
 
 docker pull velero/velero-plugin-for-aws:$PLUGIN_VERSION
 docker tag velero/velero-plugin-for-aws:$PLUGIN_VERSION $PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION
@@ -60,7 +60,7 @@ If you are using restic, you will also need to upload the restic helper image.
 
 ```bash
 PRIVATE_REG=<your private registry>
-VELERO_VERSION=<version of Velero you're targetting, e.g. v1.4.0>
+VELERO_VERSION=<version of Velero you're targeting, e.g. v1.4.0>
 
 docker pull velero/velero-restic-restore-helper:$VELERO_VERSION
 docker tag velero/velero-restic-restore-helper:$VELERO_VERSION $PRIVATE_REG/velero-restic-restore-helper:$VELERO_VERSION

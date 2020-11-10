@@ -62,7 +62,7 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 	o.FromSchedule = "test"
 	o.client = fake.NewSimpleClientset()
 
-	t.Run("inexistant schedule", func(t *testing.T) {
+	t.Run("inexistent schedule", func(t *testing.T) {
 		_, err := o.BuildBackup(testNamespace)
 		assert.Error(t, err)
 	})

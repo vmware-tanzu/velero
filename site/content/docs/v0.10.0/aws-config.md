@@ -14,7 +14,7 @@ If you do not have the `aws` CLI locally installed, follow the [user guide][5] t
 
 ## Create S3 bucket
 
-Heptio Ark requires an object storage bucket to store backups in, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
+Heptio Ark requires an object storage bucket to store backups in, preferably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
 
 ```bash
 aws s3api create-bucket \
