@@ -2435,14 +2435,14 @@ func TestRestoreWithRestic(t *testing.T) {
 		want                        map[*test.APIResource][]string
 	}{
 		{
-			name:         "a pod that exists in given backup and contains associated PVBs should have should have RestorePodVolumes called",
+			name:         "a pod that exists in given backup and contains associated PVBs should have RestorePodVolumes called",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
 			apiResources: []*test.APIResource{test.Pods()},
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").SnapshotID("foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").SnapshotID("foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").PodNamespace("ns-1").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").PodNamespace("ns-2").SnapshotID("foo").Result(),
 			},
 			podWithPVBs: []*corev1api.Pod{
 				builder.ForPod("ns-1", "pod-2").
