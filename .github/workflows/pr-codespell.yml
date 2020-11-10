@@ -1,0 +1,19 @@
+name: Pull Request Codespell Check
+on: [pull_request]
+jobs:
+
+  codespell:
+    name: Run Codespell
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out the code
+      uses: actions/checkout@v2
+
+    - name: Codespell
+      uses: codespell-project/actions-codespell@master
+      with:
+        skip: .git,*.png,*.jpg,*.woff,*.ttf,*.gif,*.ico
+        ignore_words_list: iam,aks,ist,bridget,ue
+        check_filenames: true
+        check_hidden: true
