@@ -97,7 +97,7 @@ func TestProcessSchedule(t *testing.T) {
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
 			expectedPhase:        string(velerov1api.SchedulePhaseEnabled),
-			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name"), builder.WithAnnotations()).Result(),
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
@@ -105,7 +105,7 @@ func TestProcessSchedule(t *testing.T) {
 			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@every 5m").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name"), builder.WithAnnotations()).Result(),
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
@@ -113,7 +113,7 @@ func TestProcessSchedule(t *testing.T) {
 			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name"), builder.WithAnnotations()).Result(),
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 	}
@@ -398,13 +398,13 @@ func TestGetBackup(t *testing.T) {
 			name:           "ensure name is formatted correctly (AM time)",
 			schedule:       builder.ForSchedule("foo", "bar").Result(),
 			testClockTime:  "2017-07-25 09:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar"), builder.WithAnnotations()).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).Result(),
 		},
 		{
 			name:           "ensure name is formatted correctly (PM time)",
 			schedule:       builder.ForSchedule("foo", "bar").Result(),
 			testClockTime:  "2017-07-25 14:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar"), builder.WithAnnotations()).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).Result(),
 		},
 		{
 			name: "ensure schedule backup template is copied",
@@ -421,7 +421,7 @@ func TestGetBackup(t *testing.T) {
 				Result(),
 			testClockTime: "2017-07-25 09:15:00",
 			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").
-				ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar"), builder.WithAnnotations()).
+				ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).
 				IncludedNamespaces("ns-1", "ns-2").
 				ExcludedNamespaces("ns-3").
 				IncludedResources("foo", "bar").
@@ -434,7 +434,7 @@ func TestGetBackup(t *testing.T) {
 			name:           "ensure schedule labels are copied",
 			schedule:       builder.ForSchedule("foo", "bar").ObjectMeta(builder.WithLabels("foo", "bar", "bar", "baz")).Result(),
 			testClockTime:  "2017-07-25 14:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar", "bar", "baz", "foo", "bar"), builder.WithAnnotations()).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar", "bar", "baz", "foo", "bar")).Result(),
 		},
 		{
 			name:           "ensure schedule annotations are copied",
