@@ -421,7 +421,7 @@ func TestGetBackup(t *testing.T) {
 				Result(),
 			testClockTime: "2017-07-25 09:15:00",
 			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").
-				ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).
+				ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar"), builder.WithAnnotations()).
 				IncludedNamespaces("ns-1", "ns-2").
 				ExcludedNamespaces("ns-3").
 				IncludedResources("foo", "bar").
