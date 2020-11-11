@@ -84,9 +84,8 @@ func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuil
 	b.object.Spec = schedule.Spec.Template
 	b.ObjectMeta(WithLabelsMap(labels))
 
-	annotations := schedule.Annotations
-	if annotations != nil {
-		b.ObjectMeta(WithAnnotationsMap(annotations))
+	if schedule.Annotations != nil {
+		b.ObjectMeta(WithAnnotationsMap(schedule.Annotations))
 	}
 
 	return b
