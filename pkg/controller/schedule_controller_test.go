@@ -431,10 +431,16 @@ func TestGetBackup(t *testing.T) {
 				Result(),
 		},
 		{
-			name:           "ensure schedule labels is copied",
+			name:           "ensure schedule labels are copied",
 			schedule:       builder.ForSchedule("foo", "bar").ObjectMeta(builder.WithLabels("foo", "bar", "bar", "baz")).Result(),
 			testClockTime:  "2017-07-25 14:15:00",
 			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar", "bar", "baz", "foo", "bar")).Result(),
+		},
+		{
+			name:           "ensure schedule annotations are copied",
+			schedule:       builder.ForSchedule("foo", "bar").ObjectMeta(builder.WithAnnotations("foo", "bar", "bar", "baz")).Result(),
+			testClockTime:  "2017-07-25 14:15:00",
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithAnnotations("bar", "baz", "foo", "bar")).Result(),
 		},
 	}
 
