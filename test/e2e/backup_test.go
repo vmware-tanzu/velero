@@ -36,7 +36,7 @@ var _ = Describe("Backup Restore test using Kibishii to generate/verify data", f
 				Expect(err).NotTo(HaveOccurred())
 
 				println("installing kibishii in namespace " + kibishiNamespace)
-				timeoutCTX, _ = context.WithTimeout(context.Background(), 30*time.Minute)
+				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
 				err = InstallKibishii(timeoutCTX, kibishiNamespace, cloudPlatform)
 				Expect(err).NotTo(HaveOccurred())
 
