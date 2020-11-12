@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	veleroCLI  string
-	namespace  string
-	backupName string
-	restoreName string
+	veleroCLI     string
+	namespace     string
+	backupName    string
+	restoreName   string
 	cloudPlatform string // aws, vsphere, azure
 )
 
@@ -36,8 +36,8 @@ var _ = Describe("Backup", func() {
 			It("generates data, backups up the namespace, deletes the namespace, restores the namespace and verifies data", func() {
 				backupUUID, err := uuid.NewRandom()
 				Expect(err).NotTo(HaveOccurred())
-				backupName = "backup-"+backupUUID.String()
-				restoreName = "restore-"+backupUUID.String()
+				backupName = "backup-" + backupUUID.String()
+				restoreName = "restore-" + backupUUID.String()
 				println("backupName = " + backupName)
 				println("creating namespace " + namespace)
 				timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
@@ -57,12 +57,6 @@ var _ = Describe("Backup", func() {
 
 				println("executing backup")
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*30)
-				/*
-				backupCmd := exec.CommandContext(timeoutCTX, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
-					"--default-volumes-to-restic", "--wait")
-				fmt.Printf("backup cmd =%v\n", backupCmd)
-				err = backupCmd.Run()
-				*/
 
 				err = BackupNamespace(timeoutCTX, veleroCLI, backupName, namespace)
 				Expect(err).NotTo(HaveOccurred())

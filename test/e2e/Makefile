@@ -19,6 +19,15 @@
 
 .DEFAULT_GOAL:=help
 
+# Which architecture to build - see $(ALL_ARCH) for options.
+# if the 'local' rule is being run, detect the ARCH from 'go env'
+# if it wasn't specified by the caller.
+local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
+ARCH ?= linux-amd64
+platform_temp = $(subst -, ,$(ARCH))
+GOOS = $(word 1, $(platform_temp))
+GOARCH = $(word 2, $(platform_temp))
+
 GOPROXY := $(shell go env GOPROXY)
 ifeq ($(GOPROXY),)
 GOPROXY := https://proxy.golang.org
@@ -39,12 +48,18 @@ BIN_DIR := bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
 GINKGO := $(TOOLS_BIN_DIR)/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
+OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 
 .PHONY:ginkgo
 ginkgo: # Build ginkgo from tools folder.
 	rm -f $(GINKGO)
+	mkdir -p $(TOOLS_DIR)
 	cd $(TOOLS_DIR) && go build -tags=tools -o $(GINKGO) github.com/onsi/ginkgo/ginkgo
 
 .PHONY: run
 run: ginkgo
-	$(GINKGO) . -- -velerocli=/usr/bin/velero
+	$(GINKGO) . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero
+
+build: ginkgo
+	mkdir -p $(OUTPUT_DIR)
+	$(GINKGO) build . 
