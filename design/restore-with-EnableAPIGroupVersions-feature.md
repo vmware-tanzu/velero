@@ -33,7 +33,7 @@ The proposed code starts with creating three lists for each backed up resource. 
 
   The three lists will be used to create a map of chosen versions to restore. If there is a user-defined list of priority versions, the versions will be checked against the lists of target and source supported versions. The highest user-defined priority version that is/was supported by both target and source clusters will be the chosen version for that resource.
 
-  Without a user-defined prioritization of versions, the following version priority will be followed: target cluster preferred version, source cluster preferred version, and a common supported version. Should there be multiple common supported versions, the one that will be chosen will be based on the [Kubernetes version priorities](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority%E2%80%8B).
+  Without a user-defined prioritization of versions, the following version priority will be followed: target cluster preferred version, source cluster preferred version, and a common supported version. Should there be multiple common supported versions, the one that will be chosen will be based on the [Kubernetes version priorities](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority).
   
   Once the version to restore is chosen, the file path to the backed up resource in the tarball will be modified such that it points to the resources' chosen API group version. If no version is found in common between the source and target clusters, the chosen version will default to the source cluster's preferred version (the version being restored currently without the changes proposal here). Restore will be allowed to continue as before.
 
@@ -134,7 +134,7 @@ Here is another way to list the priority versions described above:
   - source preferred version == target supported version
 - **Priority 3**. A common supported version can be used. This means
   - target supported version == source supported version
-  - if multiple support versions intersect, choose the version using the [Kubernetes’ version prioritization system](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority%E2%80%8B)
+  - if multiple support versions intersect, choose the version using the [Kubernetes’ version prioritization system](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
 
 If there is no common supported version between target and source clusters, then the default `ChosenGRVersion` will be the source preferred version. This is the version that would have been restored before the changes proposed here.
 
