@@ -40,7 +40,11 @@ TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
 GINKGO := $(TOOLS_BIN_DIR)/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 
-$(GINKGO): # Build ginkgo from tools folder.
-	cd $(TOOLS_DIR) && go build -tags=tools -o $(BIN_DIR)/ginkgo github.com/onsi/ginkgo/ginkgo
+.PHONY:ginkgo
+ginkgo: # Build ginkgo from tools folder.
+	rm -f $(GINKGO)
+	cd $(TOOLS_DIR) && go build -tags=tools -o $(GINKGO) github.com/onsi/ginkgo/ginkgo
 
-run: $(GINKGO)
+.PHONY: run
+run: ginkgo
+	$(GINKGO) . -- -velerocli=/usr/bin/velero
