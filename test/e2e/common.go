@@ -6,6 +6,10 @@ import (
 	"golang.org/x/net/context"
 )
 
+func EnsureClusterExists(ctx context.Context) error {
+	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
+}
+
 func CreateNamespace(ctx context.Context, namespace string) error {
 	// TODO - should we talk directly to the API server?
 	err := exec.CommandContext(ctx, "kubectl", "create", "namespace", namespace).Run()

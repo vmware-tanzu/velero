@@ -49,6 +49,7 @@ TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
 GINKGO := $(TOOLS_BIN_DIR)/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
+GINKGO_FOCUS ?=
 
 .PHONY:ginkgo
 ginkgo: # Build ginkgo from tools folder.
@@ -58,7 +59,7 @@ ginkgo: # Build ginkgo from tools folder.
 
 .PHONY: run
 run: ginkgo
-	$(GINKGO) . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero
+	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)
