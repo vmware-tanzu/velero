@@ -48,12 +48,6 @@ var _ = Describe("Backup_aws", func() {
 
 				println("executing backup")
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*30)
-				/*
-					backupCmd := exec.CommandContext(timeoutCTX, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
-						"--default-volumes-to-restic", "--wait")
-					fmt.Printf("backup cmd =%v\n", backupCmd)
-					err = backupCmd.Run()
-				*/
 
 				err = BackupNamespace(timeoutCTX, veleroCLI, backupName, kibishiNamespace)
 				Expect(err).NotTo(HaveOccurred())
