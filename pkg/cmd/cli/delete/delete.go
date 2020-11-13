@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backuplocation"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restore"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/schedule"
 )
@@ -32,6 +33,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long:  "Delete velero resources",
 	}
 
+	backuplocationCommand := backuplocation.NewDeleteCommand(f, "backup-location")
+	backuplocationCommand.Aliases = []string{"backup-locations"}
+
 	backupCommand := backup.NewDeleteCommand(f, "backup")
 	backupCommand.Aliases = []string{"backups"}
 
@@ -42,6 +46,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	scheduleCommand.Aliases = []string{"schedules"}
 
 	c.AddCommand(
+		backuplocationCommand,
 		backupCommand,
 		restoreCommand,
 		scheduleCommand,
