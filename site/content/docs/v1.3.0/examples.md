@@ -3,7 +3,11 @@ title: "Examples"
 layout: docs
 ---
 
-After you set up the Velero server, try these examples:
+After you set up the Velero server, you can clone the examples used in the following sections by running the following:
+```
+git clone https://github.com/vmware-tanzu/velero.git
+cd velero
+```
 
 ### Basic example (without PersistentVolumes)
 
