@@ -12,4 +12,4 @@ jobs:
         with:
           project: "Velero Support Triage Board"
           column: "Needs Triage"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.GH_TOKEN }}
