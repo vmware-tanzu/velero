@@ -70,12 +70,16 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	var unavailableErrors []string
 	var anyVerified bool
 	for i := range locationList.Items {
+		var isDefault bool
 		location := &locationList.Items[i]
 		log := r.Log.WithField("controller", BackupStorageLocation).WithField(BackupStorageLocation, location.Name)
 
-		if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
-			defaultFound = true
+		if location.Spec.Default {
+			isDefault = true
+		} else if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
+			isDefault = true
 		}
+		defaultFound = defaultFound || isDefault
 
 		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
 			log.Debug("Validation not required, skipping...")
@@ -95,22 +99,21 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			continue
 		}
 
+		// updates the default backup location
+		location.Spec.Default = isDefault
+
 		log.Info("Validating backup storage location")
 		anyVerified = true
 		if err := backupStore.IsValid(); err != nil {
 			log.Info("Backup location is invalid, marking as unavailable")
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
-
-			if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
-				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", r.DefaultBackupLocationInfo.StorageLocation)
-			}
-
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
 		} else {
 			log.Info("Backup location valid, marking as available")
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
 		}
 		location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
+
 		if err := patchHelper.Patch(r.Ctx, location); err != nil {
 			log.WithError(err).Error("Error updating backup location phase")
 		}
