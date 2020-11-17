@@ -125,3 +125,50 @@ func Run(o *cli.DeleteOptions) error {
 
 	return kubeerrs.NewAggregate(errs)
 }
+
+func DeleteBackup()error{
+	o := cli.NewDeleteOptions("backup")
+	var (
+		backups []*velerov1api.Backup
+		errs    []error
+	)
+	switch {
+	case len(o.Names) > 0:
+		for _, name := range o.Names {
+			backu, err := o.Client.VeleroV1().Backups(o.Namespace).Get(context.Background(), name, metav1.GetOptions{})
+			if err != nil {
+				errs = append(errs, errors.WithStack(err))
+				continue
+			}
+
+			backups = append(backups, backu)
+		}
+	default:
+		selector := labels.Everything().String()
+		if o.Selector.LabelSelector != nil {
+			selector = o.Selector.String()
+		}
+
+		res, err := o.Client.VeleroV1().Backups(o.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for i := range res.Items {
+			backups = append(backups, &res.Items[i])
+		}
+	}
+	// create a backup deletion request for each
+	for _, b := range backups {
+		deleteRequest := backup.NewDeleteBackupRequest(b.Name, string(b.UID))
+
+		if _, err := o.Client.VeleroV1().DeleteBackupRequests(o.Namespace).Create(context.Background(), deleteRequest, metav1.CreateOptions{}); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		fmt.Printf("Request to delete backup %q submitted successfully.\nThe backup will be fully deleted after all associated data (disk snapshots, backup files, restores) are removed.\n", b.Name)
+	}
+
+	return kubeerrs.NewAggregate(errs)
+}
+

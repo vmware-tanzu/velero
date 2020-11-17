@@ -112,6 +112,18 @@ func NewCreateOptions() *CreateOptions {
 	}
 }
 
+func NewRCCreateOptions(includeNS string) *CreateOptions {
+	enableResticBackup := true
+	return &CreateOptions{
+		TTL:                     DefaultBackupTTL,
+		IncludeNamespaces:       flag.NewStringArray(includeNS),
+		Labels:                  flag.NewMap(),
+		SnapshotVolumes:         flag.NewOptionalBool(nil),
+		IncludeClusterResources: flag.NewOptionalBool(nil),
+		DefaultVolumesToRestic: flag.NewOptionalBool(&enableResticBackup),
+	}
+}
+
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.TTL, "ttl", o.TTL, "How long before the backup can be garbage collected.")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the backup (use '*' for all namespaces).")
@@ -350,4 +362,84 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 
 	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
 	return backup, nil
+}
+
+
+func CreateBackup(f client.Factory, o *CreateOptions, result chan *velerov1api.Backup)error{
+	backup, err := o.BuildBackup(f.Namespace())
+	if err != nil {
+		return err
+	}
+
+	var backupInformer cache.SharedIndexInformer
+	var updates chan *velerov1api.Backup
+	if o.Wait {
+		stop := make(chan struct{})
+		defer close(stop)
+
+		updates = make(chan *velerov1api.Backup)
+
+		backupInformer = v1.NewBackupInformer(o.client, f.Namespace(), 0, nil)
+
+		backupInformer.AddEventHandler(
+			cache.FilteringResourceEventHandler{
+				FilterFunc: func(obj interface{}) bool {
+					backup, ok := obj.(*velerov1api.Backup)
+					if !ok {
+						return false
+					}
+					return backup.Name == o.Name
+				},
+				Handler: cache.ResourceEventHandlerFuncs{
+					UpdateFunc: func(_, obj interface{}) {
+						backup, ok := obj.(*velerov1api.Backup)
+						if !ok {
+							return
+						}
+						updates <- backup
+					},
+					DeleteFunc: func(obj interface{}) {
+						backup, ok := obj.(*velerov1api.Backup)
+						if !ok {
+							return
+						}
+						updates <- backup
+					},
+				},
+			},
+		)
+		go backupInformer.Run(stop)
+	}
+
+	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	if o.Wait {
+		fmt.Println("Waiting for backup to complete. You may safely press ctrl-c to stop waiting - your backup will continue in the background.")
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Print(".")
+			case backup, ok := <-updates:
+				if !ok {
+					fmt.Println("\nError waiting: unable to watch backups.")
+					return nil
+				}
+
+				if backup.Status.Phase != velerov1api.BackupPhaseNew && backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
+					result <- backup
+					return nil
+				}
+			}
+		}
+	}
+
+	fmt.Printf("Run `velero backup describe %s` or `velero backup logs %s` for more details.\n", backup.Name, backup.Name)
+	return nil
 }

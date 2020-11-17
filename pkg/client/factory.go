@@ -97,6 +97,29 @@ func NewFactory(baseName string, config VeleroConfig) Factory {
 	return f
 }
 
+
+func NewSDKFactory(baseName string, kubeconfig string, kubeContext string, veleroconfig VeleroConfig, namespace string) Factory {
+	f := &factory{
+		baseName: baseName,
+	}
+
+	if namespace != "" {
+		f.namespace = namespace
+	} else if veleroconfig.Namespace() != "" {
+		f.namespace = veleroconfig.Namespace()
+	} else if os.Getenv("VELERO_NAMESPACE") != "" {
+		f.namespace = os.Getenv("VELERO_NAMESPACE")
+	} else {
+		f.namespace = velerov1api.DefaultNamespace
+	}
+	//Pass it as file path
+	f.kubeconfig = kubeconfig
+	f.kubecontext = kubeContext
+
+	return f
+}
+
+
 func (f *factory) BindFlags(flags *pflag.FlagSet) {
 	flags.AddFlagSet(f.flags)
 }

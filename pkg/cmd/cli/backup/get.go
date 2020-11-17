@@ -18,6 +18,7 @@ package backup
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,3 +66,26 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 
 	return c
 }
+
+func GetBackupFunction(f client.Factory, args []string, listOptions metav1.ListOptions){
+	veleroClient, err := f.Client()
+	var backups *api.BackupList
+	if len(args) > 0 {
+		backups = new(api.BackupList)
+		for _, name := range args {
+			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.Background(), name, metav1.GetOptions{})
+			cmd.CheckError(err)
+			backups.Items = append(backups.Items, *backup)
+		}
+	} else {
+		backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(context.Background(), listOptions)
+		cmd.CheckError(err)
+	}
+
+	for _, v := range backups.Items{
+		status := v.Status
+		fmt.Println(status.Phase)
+	}
+	cmd.CheckError(err)
+}
+

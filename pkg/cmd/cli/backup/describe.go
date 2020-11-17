@@ -117,3 +117,64 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 	return c
 }
+
+
+func DescribeFunction(f client.Factory, args []string, listOptions metav1.ListOptions, details bool, insecureSkipTLSVerify bool, caCertFile string){
+
+	veleroClient, err := f.Client()
+	cmd.CheckError(err)
+
+	var backups *velerov1api.BackupList
+	if len(args) > 0 {
+		backups = new(velerov1api.BackupList)
+		for _, name := range args {
+			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.Background(), name, metav1.GetOptions{})
+			cmd.CheckError(err)
+			backups.Items = append(backups.Items, *backup)
+		}
+	} else {
+		backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(context.Background(), listOptions)
+		cmd.CheckError(err)
+	}
+
+	first := true
+	for _, backup := range backups.Items {
+		deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
+		deleteRequestList, err := veleroClient.VeleroV1().DeleteBackupRequests(f.Namespace()).List(context.Background(), deleteRequestListOptions)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
+		}
+
+		opts := label.NewListOptionsForBackup(backup.Name)
+		podVolumeBackupList, err := veleroClient.VeleroV1().PodVolumeBackups(f.Namespace()).List(context.Background(), opts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
+		}
+
+		var csiClient *snapshotv1beta1client.Clientset
+		// declare vscList up here since it may be empty and we'll pass the empty Items field into DescribeBackup
+		vscList := new(snapshotv1beta1api.VolumeSnapshotContentList)
+		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+			clientConfig, err := f.ClientConfig()
+			cmd.CheckError(err)
+
+			csiClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
+			cmd.CheckError(err)
+
+			vscList, err = csiClient.SnapshotV1beta1().VolumeSnapshotContents().List(context.Background(), opts)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error getting VolumeSnapshotContent objects for backup %s: %v\n", backup.Name, err)
+			}
+		}
+
+		s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+		if first {
+			first = false
+			fmt.Print(s)
+		} else {
+			fmt.Printf("\n\n%s", s)
+		}
+	}
+	cmd.CheckError(err)
+
+}

@@ -18,6 +18,7 @@ package backup
 
 import (
 	"context"
+	"github.com/vmware-tanzu/velero/pkg/client"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -119,3 +120,24 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 	assert.Equal(t, orderedResources, expectedMixedResources)
 
 }
+
+
+func Test_Backup(t *testing.T){
+	o := NewCreateOptions()
+	f := client.NewSDKFactory("backup", "/Users/singaravelannandakumar/.kube/config1", "", nil, "velero")
+	//f := client.NewFactory("backup", nil)
+	fclient, err := f.Client()
+	if err != nil{
+
+	}
+	o.client = fclient
+	o.IncludeNamespaces = []string{"nginx-example"}
+	o.Name = "rcvelannewbackup12"
+	res := make(chan *velerov1api.Backup)
+	err = CreateBackup(f, o,res)
+	if err != nil{
+
+	}
+
+}
+
