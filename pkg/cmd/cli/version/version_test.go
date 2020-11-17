@@ -27,10 +27,10 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
+	velerov1 "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/builder"
+	"github.com/reynencourt/velero/pkg/buildinfo"
+	"github.com/reynencourt/velero/pkg/generated/clientset/versioned/scheme"
 )
 
 func TestPrintVersion(t *testing.T) {

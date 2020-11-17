@@ -23,10 +23,10 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	v1 "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/client"
+	"github.com/reynencourt/velero/pkg/cmd"
+	"github.com/reynencourt/velero/pkg/cmd/util/output"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {

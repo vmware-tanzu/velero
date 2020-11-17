@@ -24,9 +24,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/reynencourt/velero/internal/util/managercontroller"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/metrics"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -42,16 +42,16 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
-	"github.com/vmware-tanzu/velero/pkg/controller"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	"github.com/vmware-tanzu/velero/pkg/restic"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/reynencourt/velero/pkg/buildinfo"
+	"github.com/reynencourt/velero/pkg/client"
+	"github.com/reynencourt/velero/pkg/cmd"
+	"github.com/reynencourt/velero/pkg/cmd/util/signals"
+	"github.com/reynencourt/velero/pkg/controller"
+	clientset "github.com/reynencourt/velero/pkg/generated/clientset/versioned"
+	informers "github.com/reynencourt/velero/pkg/generated/informers/externalversions"
+	"github.com/reynencourt/velero/pkg/restic"
+	"github.com/reynencourt/velero/pkg/util/filesystem"
+	"github.com/reynencourt/velero/pkg/util/logging"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"

@@ -22,8 +22,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/reynencourt/velero/pkg/plugin/framework"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
 )
 
 // restartableObjectStore is an object store for a given implementation (such as "aws"). It is associated with

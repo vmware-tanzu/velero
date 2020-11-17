@@ -69,11 +69,11 @@ For each major or minor release, create and publish a blog post to let folks kno
 1. Create a tagged release and push it to GitHub
 	- Run `VELERO_VERSION=v1.0.0-rc.1 GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh publish`.
 1. Publish the release
-	- Navigate to the draft GitHub release at https://github.com/vmware-tanzu/velero/releases and edit the release.
+	- Navigate to the draft GitHub release at https://github.com/reynencourt/velero/releases and edit the release.
 	- If this is a patch release (e.g. `v1.4.1`), note that the full `CHANGELOG-1.4.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
 	- Do a quick review for formatting. 
 	- **Note:** the `goreleaser` process should have detected if it's a pre-release version and, if so, checked the box at the bottom of the GitHub release page appropriately, but it's always worth double-checking.
-	- Verify that GitHub has built and pushed all the images (it takes a while): https://github.com/vmware-tanzu/velero/actions
+	- Verify that GitHub has built and pushed all the images (it takes a while): https://github.com/reynencourt/velero/actions
 	- Verify that the images are on Docker Hub: https://hub.docker.com/r/velero/velero/tags
 	- Verify that the assets were published to the GitHub release
 	- Publish the release.

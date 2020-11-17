@@ -24,7 +24,7 @@
 
 # The following variables are needed:
 
-# - $VELERO_VERSION: defines the tag of Velero that any https://github.com/vmware-tanzu/velero/...
+# - $VELERO_VERSION: defines the tag of Velero that any https://github.com/reynencourt/velero/...
 #   links in the docs should redirect to.
 # - $publish: TRUE/FALSE value where FALSE (or not including it) will indicate a dry-run, and TRUE, or simply adding 'publish',
 #   will tag the release with the $VELERO_VERSION and push the tag to a remote named 'upstream'.

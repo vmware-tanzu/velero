@@ -38,16 +38,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	"github.com/vmware-tanzu/velero/internal/hook"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/reynencourt/velero/internal/hook"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/client"
+	"github.com/reynencourt/velero/pkg/discovery"
+	velerov1client "github.com/reynencourt/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	"github.com/reynencourt/velero/pkg/kuberesource"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
+	"github.com/reynencourt/velero/pkg/podexec"
+	"github.com/reynencourt/velero/pkg/restic"
+	"github.com/reynencourt/velero/pkg/util/collections"
 )
 
 // BackupVersion is the current backup major version for Velero.
@@ -162,7 +162,7 @@ func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 			if err != nil {
 				// If we can't resolve it, return it as-is. This prevents the generated
 				// includes-excludes list from including *everything*, if none of the includes
-				// can be resolved. ref. https://github.com/vmware-tanzu/velero/issues/2461
+				// can be resolved. ref. https://github.com/reynencourt/velero/issues/2461
 				return item
 			}
 

@@ -73,5 +73,5 @@ When the Velero backup expires, the VolumeSnapshot objects will be deleted and t
 For more details on how each plugin works, see the [CSI plugin repo][2]'s documentation.
 
 [1]: customize-installation.md#enable-server-side-features
-[2]: https://github.com/vmware-tanzu/velero-plugin-for-csi/
+[2]: https://github.com/reynencourt/velero-plugin-for-csi/
 [3]: https://hub.docker.com/repository/docker/velero/velero-plugin-for-csi

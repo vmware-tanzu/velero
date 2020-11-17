@@ -32,8 +32,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	v1 "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/reynencourt/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
 
 // ErrNotFound is exported for external packages to check for when a file is

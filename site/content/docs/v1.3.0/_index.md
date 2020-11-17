@@ -39,8 +39,8 @@ See [the list of releases][6] to find out about feature changes.
 [1]: https://travis-ci.org/vmware-tanzu/velero.svg?branch=main
 [2]: https://travis-ci.org/vmware-tanzu/velero
 
-[4]: https://github.com/vmware-tanzu/velero/issues
-[6]: https://github.com/vmware-tanzu/velero/releases
+[4]: https://github.com/reynencourt/velero/issues
+[6]: https://github.com/reynencourt/velero/releases
 
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos

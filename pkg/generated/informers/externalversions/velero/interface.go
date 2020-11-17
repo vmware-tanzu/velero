@@ -19,8 +19,8 @@ limitations under the License.
 package velero
 
 import (
-	internalinterfaces "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	internalinterfaces "github.com/reynencourt/velero/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/reynencourt/velero/pkg/generated/informers/externalversions/velero/v1"
 )
 
 // Interface provides access to each of this group's versions.

@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/reynencourt/velero/pkg/client"
+	"github.com/reynencourt/velero/pkg/discovery"
+	"github.com/reynencourt/velero/pkg/kuberesource"
+	"github.com/reynencourt/velero/pkg/util/collections"
 )
 
 // itemCollector collects items from the Kubernetes API according to

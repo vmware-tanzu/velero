@@ -34,7 +34,7 @@ params:
     - v0.5.0
     - v0.4.0
     - v0.3.0
-  gh_repo: https://github.com/vmware-tanzu/velero
+  gh_repo: https://github.com/reynencourt/velero
   footer:
     title: Getting Started
     content: To help you get started, see the documentation.
@@ -57,7 +57,7 @@ params:
       url: blog/index.xml
     - title: GitHub
       fa_icon: fab fa-github
-      url: https://github.com/vmware-tanzu/velero
+      url: https://github.com/reynencourt/velero
 minify:
   disableCSS: false
   disableHTML: false

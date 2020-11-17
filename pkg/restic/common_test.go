@@ -34,11 +34,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/builder"
+	"github.com/reynencourt/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/reynencourt/velero/pkg/generated/informers/externalversions"
+	velerotest "github.com/reynencourt/velero/pkg/test"
 )
 
 func TestGetVolumeBackupsForPod(t *testing.T) {

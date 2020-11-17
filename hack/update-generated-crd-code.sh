@@ -37,8 +37,8 @@ fi
 
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
-  github.com/vmware-tanzu/velero/pkg/generated \
-  github.com/vmware-tanzu/velero/pkg/apis \
+  github.com/reynencourt/velero/pkg/generated \
+  github.com/reynencourt/velero/pkg/apis \
   "velero:v1" \
   --go-header-file ./hack/boilerplate.go.txt \
   --output-base ../../.. \

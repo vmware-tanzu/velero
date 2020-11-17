@@ -25,12 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/archive"
-	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/archive"
+	"github.com/reynencourt/velero/pkg/discovery"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
+	"github.com/reynencourt/velero/pkg/util/collections"
+	"github.com/reynencourt/velero/pkg/util/filesystem"
 )
 
 // Context provides the necessary environment to run DeleteItemAction plugins

@@ -2,7 +2,7 @@
 ### 2020-04-03
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.3.2
+https://github.com/reynencourt/velero/releases/tag/v1.3.2
 
 ### Container Image
 `velero/velero:v1.3.2`
@@ -21,7 +21,7 @@ https://velero.io/docs/v1.3.2/upgrade-to-1.3/
 ### 2020-03-10
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.3.1
+https://github.com/reynencourt/velero/releases/tag/v1.3.1
 
 ### Container Image
 `velero/velero:v1.3.1`
@@ -44,7 +44,7 @@ Fixed a bug that caused failures when backing up CustomResourceDefinitions with 
 #### 2020-03-02
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.3.0
+https://github.com/reynencourt/velero/releases/tag/v1.3.0
 
 ### Container Image
 `velero/velero:v1.3.0`
@@ -83,10 +83,10 @@ For more information on manifest lists, see [Docker’s documentation](https://d
 
 We fixed a large number of bugs and made some smaller usability improvements in this release. Here are a few highlights:
 
-- Support private registries with custom ports for the restic restore helper image ([PR #1999](https://github.com/vmware-tanzu/velero/pull/1999), [@cognoz](https://github.com/cognoz))
-- Use AWS profile from BackupStorageLocation when invoking restic ([PR #2096](https://github.com/vmware-tanzu/velero/pull/2096), [@dinesh](https://github.com/dinesh))
-- Allow restores from schedules in other clusters ([PR #2218](https://github.com/vmware-tanzu/velero/pull/2218), [@cpanato](https://github.com/cpanato))
-- Fix memory leak & race condition in restore code ([PR #2201](https://github.com/vmware-tanzu/velero/pull/2201), [@skriss](https://github.com/skriss))
+- Support private registries with custom ports for the restic restore helper image ([PR #1999](https://github.com/reynencourt/velero/pull/1999), [@cognoz](https://github.com/cognoz))
+- Use AWS profile from BackupStorageLocation when invoking restic ([PR #2096](https://github.com/reynencourt/velero/pull/2096), [@dinesh](https://github.com/dinesh))
+- Allow restores from schedules in other clusters ([PR #2218](https://github.com/reynencourt/velero/pull/2218), [@cpanato](https://github.com/cpanato))
+- Fix memory leak & race condition in restore code ([PR #2201](https://github.com/reynencourt/velero/pull/2201), [@skriss](https://github.com/skriss))
 
 
 ### All Changes

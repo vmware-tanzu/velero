@@ -29,12 +29,12 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerofake "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	veleroinformers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/restic"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	velerofake "github.com/reynencourt/velero/pkg/generated/clientset/versioned/fake"
+	veleroinformers "github.com/reynencourt/velero/pkg/generated/informers/externalversions"
+	velerov1listers "github.com/reynencourt/velero/pkg/generated/listers/velero/v1"
+	"github.com/reynencourt/velero/pkg/restic"
+	velerotest "github.com/reynencourt/velero/pkg/test"
 )
 
 func TestPVRHandler(t *testing.T) {

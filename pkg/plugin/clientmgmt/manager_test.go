@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/reynencourt/velero/pkg/plugin/framework"
+	"github.com/reynencourt/velero/pkg/test"
 )
 
 type mockRegistry struct {

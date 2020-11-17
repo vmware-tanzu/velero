@@ -18,7 +18,7 @@
 BIN ?= velero
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/vmware-tanzu/velero
+PKG := github.com/reynencourt/velero
 
 # Where to push the docker image.
 REGISTRY ?= velero
@@ -139,7 +139,7 @@ TTY := $(shell tty -s && echo "-t")
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-env
-	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
+	@# bind-mount the Velero root dir in at /github.com/reynencourt/velero
 	@# because the Kubernetes code-generator tools require the project to
 	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
 	@# under $GOPATH).
@@ -148,14 +148,14 @@ shell: build-dirs build-env
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
+		-v "$$(pwd):/github.com/reynencourt/velero:delegated" \
 		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
 		-v "$$(pwd)/.go/golangci-lint:/.cache/golangci-lint:delegated" \
-		-w /github.com/vmware-tanzu/velero \
+		-w /github.com/reynencourt/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
@@ -307,7 +307,7 @@ changelog:
 #		PUBLISH=false \
 #		make release
 #
-# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero 
+# To run the release, which will publish a *DRAFT* GitHub release in github.com/reynencourt/velero
 # (you still need to review/publish the GitHub release manually):
 #		GITHUB_TOKEN=your-github-token \ 
 #		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \

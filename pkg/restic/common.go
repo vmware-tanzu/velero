@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	velerov1listers "github.com/reynencourt/velero/pkg/generated/listers/velero/v1"
+	"github.com/reynencourt/velero/pkg/label"
+	"github.com/reynencourt/velero/pkg/util/filesystem"
 )
 
 const (

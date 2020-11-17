@@ -24,9 +24,9 @@ ENV CGO_ENABLED=0 \
     GOPROXY=${GOPROXY} \
     LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"
 
-WORKDIR /go/src/github.com/vmware-tanzu/velero
+WORKDIR /go/src/github.com/reynencourt/velero
 
-COPY . /go/src/github.com/vmware-tanzu/velero
+COPY . /go/src/github.com/reynencourt/velero
 
 RUN apt-get update && apt-get install -y bzip2
 

@@ -26,10 +26,10 @@ import (
 	"github.com/spf13/cobra"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/serverstatus"
+	"github.com/reynencourt/velero/pkg/buildinfo"
+	"github.com/reynencourt/velero/pkg/client"
+	"github.com/reynencourt/velero/pkg/cmd"
+	"github.com/reynencourt/velero/pkg/cmd/cli/serverstatus"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {

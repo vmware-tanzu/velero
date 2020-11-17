@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/reynencourt/velero/pkg/discovery"
 )
 
 type globStringSet struct {

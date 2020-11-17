@@ -26,8 +26,8 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	storagev1client "k8s.io/client-go/kubernetes/typed/storage/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/reynencourt/velero/pkg/plugin/framework"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
 )
 
 // ChangeStorageClassAction updates a PV or PVC's storage class name

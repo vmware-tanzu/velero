@@ -25,8 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	velerotest "github.com/reynencourt/velero/pkg/test"
+	"github.com/reynencourt/velero/pkg/util/logging"
 )
 
 func TestSortResources(t *testing.T) {

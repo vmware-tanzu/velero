@@ -2,7 +2,7 @@
 ### 2020-07-13
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
+https://github.com/reynencourt/velero/releases/tag/v1.4.2
 
 ### Container Image
 `velero/velero:v1.4.2`
@@ -27,7 +27,7 @@ This tag was created in code, but has no associated docker image due to misconfi
 ### 2020-05-26
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.4.0
+https://github.com/reynencourt/velero/releases/tag/v1.4.0
 
 ### Container Image
 `velero/velero:v1.4.0`

@@ -24,10 +24,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/restore/mocks"
+	v1 "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/plugin/framework"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
+	"github.com/reynencourt/velero/pkg/restore/mocks"
 )
 
 func TestRestartableGetRestoreItemAction(t *testing.T) {

@@ -30,12 +30,12 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/reynencourt/velero/internal/velero"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/builder"
+	"github.com/reynencourt/velero/pkg/buildinfo"
+	"github.com/reynencourt/velero/pkg/plugin/framework"
+	velerotest "github.com/reynencourt/velero/pkg/test"
 )
 
 func statusRequestBuilder(resourceVersion string) *builder.ServerStatusRequestBuilder {

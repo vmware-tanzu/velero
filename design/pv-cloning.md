@@ -32,11 +32,11 @@ It will also update the `spec.volumeName` of the related persistent volume claim
 
 ## Detailed Design
 
-In `pkg/restore/restore.go`, around [line 872](https://github.com/vmware-tanzu/velero/blob/main/pkg/restore/restore.go#L872), Velero has special-case code for persistent volumes.
+In `pkg/restore/restore.go`, around [line 872](https://github.com/reynencourt/velero/blob/main/pkg/restore/restore.go#L872), Velero has special-case code for persistent volumes.
 This code will be updated to check for the two preconditions described in the previous section.
 If the preconditions are met, the object will be given a new name.
 The persistent volume will also be annotated with the original name, e.g. `velero.io/original-pv-name=NAME`.
-Importantly, the name change will occur **before** [line 890](https://github.com/vmware-tanzu/velero/blob/main/pkg/restore/restore.go#L890), where Velero checks to see if it should restore the persistent volume.
+Importantly, the name change will occur **before** [line 890](https://github.com/reynencourt/velero/blob/main/pkg/restore/restore.go#L890), where Velero checks to see if it should restore the persistent volume.
 Additionally, the old and new persistent volume names will be recorded in a new field that will be added to the `context` struct, `renamedPVs map[string]string`.
 
 In the special-case code for persistent volume claims starting on [line 987](https://github.com/heptio/velero/blob/main/pkg/restore/restore.go#L987), Velero will check to see if the claimed persistent volume has been renamed by looking in `ctx.renamedPVs`.

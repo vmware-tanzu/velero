@@ -32,11 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/reynencourt/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1informers "github.com/reynencourt/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/reynencourt/velero/pkg/generated/listers/velero/v1"
+	"github.com/reynencourt/velero/pkg/restic"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

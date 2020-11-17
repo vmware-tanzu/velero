@@ -19,8 +19,8 @@ package clientmgmt
 import (
 	"github.com/pkg/errors"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/reynencourt/velero/pkg/plugin/framework"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
 )
 
 // restartableRestoreItemAction is a restore item action for a given implementation (such as "pod"). It is associated with

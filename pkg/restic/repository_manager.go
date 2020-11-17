@@ -31,13 +31,13 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	clientset "github.com/reynencourt/velero/pkg/generated/clientset/versioned"
+	velerov1client "github.com/reynencourt/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1informers "github.com/reynencourt/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/reynencourt/velero/pkg/generated/listers/velero/v1"
+	veleroexec "github.com/reynencourt/velero/pkg/util/exec"
+	"github.com/reynencourt/velero/pkg/util/filesystem"
 )
 
 // RepositoryManager executes commands against restic repositories.

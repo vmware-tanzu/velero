@@ -24,7 +24,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/reynencourt/velero/pkg/generated/clientset/versioned/fake"
 )
 
 // APIServer contains in-memory fakes for all of the relevant

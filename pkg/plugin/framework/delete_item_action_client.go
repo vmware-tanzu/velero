@@ -23,8 +23,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	proto "github.com/reynencourt/velero/pkg/plugin/generated"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
 )
 
 var _ velero.DeleteItemAction = &DeleteItemActionGRPCClient{}

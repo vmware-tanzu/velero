@@ -23,8 +23,8 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	proto "github.com/reynencourt/velero/pkg/plugin/generated"
+	"github.com/reynencourt/velero/pkg/plugin/velero"
 )
 
 // VolumeSnapshotterGRPCServer implements the proto-generated VolumeSnapshotterServer interface, and accepts

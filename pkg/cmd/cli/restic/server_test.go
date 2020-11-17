@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/reynencourt/velero/pkg/builder"
+	testutil "github.com/reynencourt/velero/pkg/test"
 )
 
 func Test_validatePodVolumesHostPath(t *testing.T) {

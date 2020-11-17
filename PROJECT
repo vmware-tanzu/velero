@@ -1,5 +1,5 @@
 domain: io
-repo: github.com/vmware-tanzu/velero
+repo: github.com/reynencourt/velero
 resources:
 - group: velero
   kind: BackupStorageLocation

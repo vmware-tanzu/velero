@@ -69,8 +69,8 @@ carefully to ensure a successful upgrade!**
 - The `Config` CRD has been replaced by `BackupStorageLocation` and `VolumeSnapshotLocation` CRDs. 
 - The interface for external plugins (object/block stores, backup/restore item actions) has changed. If you have authored any custom plugins, they'll 
 need to be updated for v0.10.
-    - The [`ObjectStore.ListCommonPrefixes`](https://github.com/vmware-tanzu/velero/blob/main/pkg/cloudprovider/object_store.go#L50) signature has changed to add a `prefix` parameter.
-    - Registering plugins has changed. Create a new plugin server with the `NewServer` function, and register plugins with the appropriate functions. See the [`Server`](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/server.go#L37) interface for details.
+    - The [`ObjectStore.ListCommonPrefixes`](https://github.com/reynencourt/velero/blob/main/pkg/cloudprovider/object_store.go#L50) signature has changed to add a `prefix` parameter.
+    - Registering plugins has changed. Create a new plugin server with the `NewServer` function, and register plugins with the appropriate functions. See the [`Server`](https://github.com/reynencourt/velero/blob/main/pkg/plugin/server.go#L37) interface for details.
 - The organization of Ark data in object storage has changed. Existing data will need to be moved around to conform to the new layout.
 
 ### All Changes

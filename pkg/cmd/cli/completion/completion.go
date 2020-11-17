@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kubectlcmd "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd"
+	kubectlcmd "github.com/reynencourt/velero/third_party/kubernetes/pkg/kubectl/cmd"
 )
 
 func NewCommand() *cobra.Command {

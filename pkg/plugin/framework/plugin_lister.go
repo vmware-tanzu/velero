@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	proto "github.com/reynencourt/velero/pkg/plugin/generated"
 )
 
 // PluginIdentifier uniquely identifies a plugin by command, kind, and name.

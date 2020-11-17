@@ -22,8 +22,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	proto "github.com/reynencourt/velero/pkg/plugin/generated"
+	"github.com/reynencourt/velero/pkg/util/logging"
 )
 
 // newGRPCErrorWithCode wraps err in a gRPC status error with the error's stack trace

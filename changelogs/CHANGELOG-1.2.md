@@ -2,7 +2,7 @@
 #### 2019-11-07
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.2.0
+https://github.com/reynencourt/velero/releases/tag/v1.2.0
 
 ### Container Image
 `velero/velero:v1.2.0`

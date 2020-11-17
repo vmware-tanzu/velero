@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/reynencourt/velero/pkg/test"
 )
 
 func TestParse(t *testing.T) {

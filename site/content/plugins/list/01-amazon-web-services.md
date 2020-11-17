@@ -1,6 +1,6 @@
 ---
 title: Amazon Web Services (AWS)
-link: https://github.com/vmware-tanzu/velero-plugin-for-aws
+link: https://github.com/reynencourt/velero-plugin-for-aws
 objectStorage: true
 volumesnapshotter: true
 supportedByVeleroTeam: true

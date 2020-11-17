@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
 )
 
 func TestGetRepoIdentifier(t *testing.T) {

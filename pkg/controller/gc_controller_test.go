@@ -34,12 +34,12 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerov1api "github.com/reynencourt/velero/pkg/apis/velero/v1"
+	"github.com/reynencourt/velero/pkg/builder"
+	"github.com/reynencourt/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/reynencourt/velero/pkg/generated/informers/externalversions"
+	velerotest "github.com/reynencourt/velero/pkg/test"
+	"github.com/reynencourt/velero/pkg/util/kube"
 )
 
 func TestGCControllerEnqueueAllBackups(t *testing.T) {

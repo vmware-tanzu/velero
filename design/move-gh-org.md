@@ -17,7 +17,7 @@ Currently, the Velero repository sits under the Heptio GitHub organization. With
 #### Pre move
 
 - [ ] PR: Blog post communicating the move. https://github.com/heptio/velero/issues/1841. Who: TBD.
-- [ ] PR: Find/replace in all Go, script, yaml, documentation, and website files: `github.com/heptio/velero -> github.com/vmware-tanzu/velero`. Who: a Velero developer; TBD
+- [ ] PR: Find/replace in all Go, script, yaml, documentation, and website files: `github.com/heptio/velero -> github.com/reynencourt/velero`. Who: a Velero developer; TBD
 - [ ] PR: Update website with the correct GH links. Who: a Velero developer; TBD
 - [ ] PR: Change deployment and grpc-push scripts with the new location path. Who: a Velero developer; TBD
 - [ ] Delete branches not to be carried over (https://github.com/heptio/velero/branches/all). Who: Any of the current repo owners; TBD
