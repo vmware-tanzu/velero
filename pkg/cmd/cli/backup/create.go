@@ -112,11 +112,11 @@ func NewCreateOptions() *CreateOptions {
 	}
 }
 
-func NewRCCreateOptions(includeNS string) *CreateOptions {
+func NewRCCreateOptions() *CreateOptions {
 	enableResticBackup := true
 	return &CreateOptions{
 		TTL:                     DefaultBackupTTL,
-		IncludeNamespaces:       flag.NewStringArray(includeNS),
+		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
 		IncludeClusterResources: flag.NewOptionalBool(nil),
