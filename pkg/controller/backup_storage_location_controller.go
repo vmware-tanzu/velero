@@ -78,7 +78,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		}
 
 		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
-			log.Info("Validation not required, skipping...")
+			log.Debug("Validation not required, skipping...")
 			continue
 		}
 
