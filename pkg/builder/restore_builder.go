@@ -136,6 +136,12 @@ func (b *RestoreBuilder) RestorePVs(val bool) *RestoreBuilder {
 	return b
 }
 
+// PreserveNodePorts sets the Restore's preserved NodePorts.
+func (b *RestoreBuilder) PreserveNodePorts(val bool) *RestoreBuilder {
+	b.object.Spec.PreserveNodePorts = &val
+	return b
+}
+
 // StartTimestamp sets the Restore's start timestamp.
 func (b *RestoreBuilder) StartTimestamp(val time.Time) *RestoreBuilder {
 	b.object.Status.StartTimestamp = &metav1.Time{Time: val}

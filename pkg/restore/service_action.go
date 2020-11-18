@@ -55,8 +55,15 @@ func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*v
 		service.Spec.ClusterIP = ""
 	}
 
-	if err := deleteNodePorts(service); err != nil {
-		return nil, err
+	/* Do not delete NodePorts if restore triggered with "--preserve-nodeports" flag */
+	if input.Restore != nil &&
+		input.Restore.Spec.PreserveNodePorts != nil &&
+		*(input.Restore.Spec.PreserveNodePorts) == true {
+		a.log.Info("Restoring Services with original NodePort(s)")
+	} else {
+		if err := deleteNodePorts(service); err != nil {
+			return nil, err
+		}
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(service)
