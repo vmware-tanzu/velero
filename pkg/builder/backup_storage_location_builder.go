@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,6 +80,12 @@ func (b *BackupStorageLocationBuilder) Prefix(val string) *BackupStorageLocation
 		b.object.Spec.StorageType.ObjectStorage = new(velerov1api.ObjectStorageLocation)
 	}
 	b.object.Spec.ObjectStorage.Prefix = val
+	return b
+}
+
+// Default sets the BackupStorageLocation's is default or not
+func (b *BackupStorageLocationBuilder) Default(isDefault bool) *BackupStorageLocationBuilder {
+	b.object.Spec.Default = isDefault
 	return b
 }
 
