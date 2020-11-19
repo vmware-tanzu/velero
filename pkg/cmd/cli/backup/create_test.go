@@ -68,7 +68,7 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 	})
 
 	expectedBackupSpec := builder.ForBackup("test", testNamespace).IncludedNamespaces("test").Result().Spec
-	schedule := builder.ForSchedule(testNamespace, "test").Template(expectedBackupSpec).ObjectMeta(builder.WithLabels("velero.io/test", "true")).Result()
+	schedule := builder.ForSchedule(testNamespace, "test").Template(expectedBackupSpec).ObjectMeta(builder.WithLabels("velero.io/test", "true"), builder.WithAnnotations("velero.io/test", "true")).Result()
 	o.client.VeleroV1().Schedules(testNamespace).Create(context.TODO(), schedule, metav1.CreateOptions{})
 
 	t.Run("existing schedule", func(t *testing.T) {
@@ -80,6 +80,9 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 			"velero.io/test":              "true",
 			velerov1api.ScheduleNameLabel: "test",
 		}, backup.GetLabels())
+		assert.Equal(t, map[string]string{
+			"velero.io/test": "true",
+		}, backup.GetAnnotations())
 	})
 
 	t.Run("command line labels take precedence over schedule labels", func(t *testing.T) {

@@ -76,6 +76,24 @@ func WithAnnotations(vals ...string) func(obj metav1.Object) {
 	}
 }
 
+// WithAnnotationsMap is a functional option that applies the specified annotations map to
+// an object.
+func WithAnnotationsMap(annotations map[string]string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		objAnnotations := obj.GetAnnotations()
+		if objAnnotations == nil {
+			objAnnotations = make(map[string]string)
+		}
+
+		// If the label already exists in the object, it will be overwritten
+		for k, v := range annotations {
+			objAnnotations[k] = v
+		}
+
+		obj.SetAnnotations(objAnnotations)
+	}
+}
+
 func setMapEntries(m map[string]string, vals ...string) map[string]string {
 	if m == nil {
 		m = make(map[string]string)
