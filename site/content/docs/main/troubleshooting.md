@@ -103,8 +103,74 @@ Now, visiting http://localhost:8085/metrics on a browser should show the metrics
 - Confirm that the Velero server pod has the necessary [annotations][8] for prometheus to scrape metrics.
 - Confirm, from the Prometheus UI, that the Velero pod is one of the targets being scraped from Prometheus.
 
+
+## Is Velero using the correct cloud credentials?
+
+Cloud provider credentials are given to Velero to store and retrieve backups from the object store and to perform volume snapshotting operations. These credentials are passed to Velero at install time either using:
+1. `--secret-file` flag to the `velero install` command.  OR
+1. `--set-file credentials.secretContents.cloud` flag to the `helm install` command.
+
+The supplied credentials are stored in the cluster as a Kubernetes secret named `cloud-credentials` in the same namespace in which Velero is installed. 
+
+Follow the below troubleshooting steps to confirm that Velero is using the correct credentials:
+1. Confirm that the `cloud-credentials` secret exists and has the correct content.
+    ```bash
+    $ kubectl -n velero get secrets cloud-credentials
+    NAME                TYPE     DATA   AGE
+    cloud-credentials   Opaque   1      11h
+    $ kubectl -n velero get secrets cloud-credentials -ojsonpath={.data.cloud} | base64 --decode
+    <Output should be your credentials>
+    ```
+
+1. Confirm that velero deployment is mounting the `cloud-credentials` secret.
+    ```bash
+    $ kubectl -n velero get deploy velero -ojson | jq .spec.template.spec.containers[0].volumeMounts
+      [
+      {
+          "mountPath": "/plugins",
+          "name": "plugins"
+      },
+      {
+          "mountPath": "/scratch",
+          "name": "scratch"
+      },
+      {
+          "mountPath": "/credentials",
+          "name": "cloud-credentials"
+      }
+      ]
+    ```
+
+    If [restic-integration][3] is enabled, then, confirm that the restic daemonset is also mounting the `cloud-credentials` secret.
+    ```bash
+    $ kubectl -n velero get ds restic -ojson |jq .spec.template.spec.containers[0].volumeMounts
+    [
+      {
+        "mountPath": "/host_pods",
+        "mountPropagation": "HostToContainer",
+        "name": "host-pods"
+      },
+      {
+        "mountPath": "/scratch",
+        "name": "scratch"
+      },
+      {
+        "mountPath": "/credentials",
+        "name": "cloud-credentials"
+      }
+    ]
+    ```
+
+1. Confirm if the correct credentials are mounted into the Velero pod.
+    ```bash
+    $ kubectl -n velero exec -ti deploy/velero -- bash
+    nobody@velero-69f9c874c-l8mqp:/$ cat /credentials/cloud
+    <Output should be your credentials>
+    ```
+
 [1]: debugging-restores.md
 [2]: debugging-install.md
+[3]: restic.md
 [4]: https://github.com/vmware-tanzu/velero/issues
 [5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
 [6]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero
