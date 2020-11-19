@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
@@ -56,9 +57,7 @@ func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*v
 	}
 
 	/* Do not delete NodePorts if restore triggered with "--preserve-nodeports" flag */
-	if input.Restore != nil &&
-		input.Restore.Spec.PreserveNodePorts != nil &&
-		*(input.Restore.Spec.PreserveNodePorts) == true {
+	if boolptr.IsSetToTrue(input.Restore.Spec.PreserveNodePorts) {
 		a.log.Info("Restoring Services with original NodePort(s)")
 	} else {
 		if err := deleteNodePorts(service); err != nil {
