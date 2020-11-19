@@ -1,0 +1,2 @@
+Pass annotations from schedule to backup it creates the same way it is done for labels
+Add WithannotationsMap function to builder to be able to pass map instead of key/val list
