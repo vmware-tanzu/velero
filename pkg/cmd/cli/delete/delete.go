@@ -33,11 +33,11 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long:  "Delete velero resources",
 	}
 
-	backuplocationCommand := backuplocation.NewDeleteCommand(f, "backup-location")
-	backuplocationCommand.Aliases = []string{"backup-locations"}
-
 	backupCommand := backup.NewDeleteCommand(f, "backup")
 	backupCommand.Aliases = []string{"backups"}
+
+	backuplocationCommand := backuplocation.NewDeleteCommand(f, "backup-location")
+	backuplocationCommand.Aliases = []string{"backup-locations"}
 
 	restoreCommand := restore.NewDeleteCommand(f, "restore")
 	restoreCommand.Aliases = []string{"restores"}
@@ -46,8 +46,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 	scheduleCommand.Aliases = []string{"schedules"}
 
 	c.AddCommand(
-		backuplocationCommand,
 		backupCommand,
+		backuplocationCommand,
 		restoreCommand,
 		scheduleCommand,
 	)
