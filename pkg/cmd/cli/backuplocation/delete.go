@@ -113,7 +113,7 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 		return nil
 	}
 
-	// create a backup-location deletion request for each
+	// Create a backup-location deletion request for each
 	for _, location := range locations.Items {
 		if err := kbClient.Delete(context.Background(), &location, &kbclient.DeleteOptions{}); err != nil {
 			errs = append(errs, errors.WithStack(err))
