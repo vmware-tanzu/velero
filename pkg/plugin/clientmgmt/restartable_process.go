@@ -106,7 +106,7 @@ func (p *restartableProcess) reset() error {
 // Callers of resetLH *must* acquire the lock before calling it.
 func (p *restartableProcess) resetLH() error {
 	if p.resetFailures > 10 {
-		return errors.Errorf("unable to restart plugin process: execeeded maximum number of reset failures")
+		return errors.Errorf("unable to restart plugin process: exceeded maximum number of reset failures")
 	}
 
 	process, err := newProcess(p.command, p.logger, p.logLevel)

@@ -38,7 +38,7 @@ When using restic on a storage provider that doesn't have Velero support for sna
 
 ### Configure restic DaemonSet spec
 
-After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Micrsoft Azure.
+After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
 
 
 **RancherOS**
@@ -340,6 +340,7 @@ volumes will be full rather than incremental, because the pod volume's lifecycle
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
 - If you plan to use the Velero restic integration to backup 100GB of data or more, you may need to [customize the resource limits](/docs/main/customize-installation/#customize-resource-requests-and-limits) to make sure backups complete successfully.
+- Velero's restic integration backs up data from volumes by accessing the node's filesystem, on which the pod is running. For this reason, restic integration can only backup volumes that are mounted by a pod and not directly from the PVC.
 
 ## Customize Restore Helper Container
 

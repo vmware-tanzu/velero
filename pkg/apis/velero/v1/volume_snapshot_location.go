@@ -20,6 +20,8 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Provider",type="string",JSONPath=".spec.provider"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // VolumeSnapshotLocation is a location where Velero stores volume snapshots.
 type VolumeSnapshotLocation struct {
@@ -57,7 +59,7 @@ type VolumeSnapshotLocationSpec struct {
 	Config map[string]string `json:"config,omitempty"`
 }
 
-// VolumeSnapshotLocationPhase is the lifecyle phase of a Velero VolumeSnapshotLocation.
+// VolumeSnapshotLocationPhase is the lifecycle phase of a Velero VolumeSnapshotLocation.
 // +kubebuilder:validation:Enum=Available;Unavailable
 type VolumeSnapshotLocationPhase string
 

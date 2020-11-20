@@ -155,7 +155,7 @@ func TestPVBHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := &podVolumeBackupController{
-				genericController: newGenericController("pod-volume-backup", velerotest.NewLogger()),
+				genericController: newGenericController(PodVolumeBackup, velerotest.NewLogger()),
 				nodeName:          controllerNode,
 				metrics:           metrics.NewResticServerMetrics(),
 			}

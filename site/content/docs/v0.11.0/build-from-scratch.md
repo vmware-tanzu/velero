@@ -123,7 +123,7 @@ To provision a cluster on AWS using Amazon’s official CloudFormation templates
 Running the Velero server locally can speed up iterative development. This eliminates the need to rebuild the Velero server
 image and redeploy it to the cluster with each change.
 
-#### 1. Set enviroment variables
+#### 1. Set environment variables
 
 Set the appropriate environment variable for your cloud provider:
 

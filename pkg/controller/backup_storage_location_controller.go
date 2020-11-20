@@ -53,9 +53,9 @@ type BackupStorageLocationReconciler struct {
 // +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations/status,verbs=get;update;patch
 func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithField("controller", "backupstoragelocation")
+	log := r.Log.WithField("controller", BackupStorageLocation)
 
-	log.Info("Checking for existing backup locations ready to be verified; there needs to be at least 1 backup location available")
+	log.Debug("Validating availability of backup storage locations.")
 
 	locationList, err := storage.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
 	if err != nil {
@@ -71,20 +71,20 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	var anyVerified bool
 	for i := range locationList.Items {
 		location := &locationList.Items[i]
-		log := r.Log.WithField("controller", "backupstoragelocation").WithField("backupstoragelocation", location.Name)
+		log := r.Log.WithField("controller", BackupStorageLocation).WithField(BackupStorageLocation, location.Name)
 
 		if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
 			defaultFound = true
 		}
 
-		backupStore, err := r.NewBackupStore(location, pluginManager, log)
-		if err != nil {
-			log.WithError(err).Error("Error getting a backup store")
+		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
+			log.Info("Validation not required, skipping...")
 			continue
 		}
 
-		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
-			log.Debug("Backup location not ready to be validated")
+		backupStore, err := r.NewBackupStore(location, pluginManager, log)
+		if err != nil {
+			log.WithError(err).Error("Error getting a backup store")
 			continue
 		}
 
@@ -95,10 +95,10 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			continue
 		}
 
-		log.Debug("Verifying backup storage location")
+		log.Info("Validating backup storage location")
 		anyVerified = true
 		if err := backupStore.IsValid(); err != nil {
-			log.Debug("Backup location verified, not valid")
+			log.Info("Backup location is invalid, marking as unavailable")
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
 
 			if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
@@ -107,7 +107,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
 		} else {
-			log.Debug("Backup location verified and it is valid")
+			log.Info("Backup location valid, marking as available")
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
 		}
 		location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
@@ -117,7 +117,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	}
 
 	if !anyVerified {
-		log.Info("No backup locations were ready to be verified")
+		log.Info("No backup locations needed to be validated")
 	}
 
 	r.logReconciledPhase(defaultFound, locationList, unavailableErrors)
@@ -129,7 +129,7 @@ func (r *BackupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 	var availableBSLs []*velerov1api.BackupStorageLocation
 	var unAvailableBSLs []*velerov1api.BackupStorageLocation
 	var unknownBSLs []*velerov1api.BackupStorageLocation
-	log := r.Log.WithField("controller", "backupstoragelocation")
+	log := r.Log.WithField("controller", BackupStorageLocation)
 
 	for i, location := range locationList.Items {
 		phase := location.Status.Phase

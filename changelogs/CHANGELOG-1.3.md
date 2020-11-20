@@ -109,7 +109,7 @@ We fixed a large number of bugs and made some smaller usability improvements in 
   * bug fix: only prioritize restoring `replicasets.apps`, not `replicasets.extensions` (#2157, @skriss)
   * bug fix: restore both `replicasets.apps` *and* `replicasets.extensions` before `deployments` (#2120, @skriss)
   * bug fix: don't restore cluster-scoped resources when restoring specific namespaces and IncludeClusterResources is nil (#2118, @skriss)
-  * Enableing Velero to switch credentials (`AWS_PROFILE`) if multiple s3-compatible backupLocations are present (#2096, @dinesh)
+  * Enabling Velero to switch credentials (`AWS_PROFILE`) if multiple s3-compatible backupLocations are present (#2096, @dinesh)
   * bug fix: deep-copy backup's labels when constructing snapshot tags, so the PV name isn't added as a label to the backup (#2075, @skriss)
   * remove the `fsfreeze-pause` image being published from this repo; replace it with `ubuntu:bionic` in the nginx example app (#2068, @skriss)
   * add support for a private registry with a custom port in a restic-helper image (#1999, @cognoz)

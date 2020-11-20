@@ -70,8 +70,7 @@ These instructions start the Velero server and a Minio instance that is accessib
         --bucket velero \
         --secret-file ./credentials-velero \
         --use-volume-snapshots=false \
-        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000 \
-        --snapshot-location-config region="default"
+        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000 
     ```
 
     This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no `VolumeSnapshotLocation` is created (`--use-volume-snapshots=false`).

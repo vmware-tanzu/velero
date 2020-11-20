@@ -57,7 +57,7 @@ type ServerStatusRequestReconciler struct {
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests/status,verbs=get;update;patch
 func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithFields(logrus.Fields{
-		"controller":          "serverstatusrequest",
+		"controller":          ServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
 	})
 
@@ -76,7 +76,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	}
 
 	log = r.Log.WithFields(logrus.Fields{
-		"controller":          "serverstatusrequest",
+		"controller":          ServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
 		"phase":               statusRequest.Status.Phase,
 	})

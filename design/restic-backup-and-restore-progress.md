@@ -63,7 +63,7 @@ With the `--json` flag, `restic backup` outputs single lines of JSON reporting t
 The [command factory for backup](https://github.com/heptio/velero/blob/af4b9373fc73047f843cd4bc3648603d780c8b74/pkg/restic/command_factory.go#L37) will be updated to include the `--json` flag.
 The code to run the `restic backup` command (https://github.com/heptio/velero/blob/af4b9373fc73047f843cd4bc3648603d780c8b74/pkg/controller/pod_volume_backup_controller.go#L241) will be changed to include a Goroutine that reads from the command's stdout stream.
 The implementation of this will largely follow [@jmontleon's PoC](https://github.com/fusor/velero/pull/4/files) of this.
-The Goroutine will periodically read the stream (every 10 seconds) and get the last printed status line, which will be convered to JSON.
+The Goroutine will periodically read the stream (every 10 seconds) and get the last printed status line, which will be converted to JSON.
 If `bytes_done` is empty, restic has not finished scanning the volume and hasn't calculated the `total_bytes`.
 In this case, we will not update the PodVolumeBackup and instead will wait for the next iteration.
 Once we get a non-zero value for `bytes_done`, the `bytes_done` and `total_bytes` properties will be read and the PodVolumeBackup will be patched to update `status.Progress.BytesDone` and `status.Progress.TotalBytes` respectively.

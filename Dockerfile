@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM --platform=$BUILDPLATFORM golang:1.14 as builder-env
+FROM --platform=$BUILDPLATFORM golang:1.15 as builder-env
 
 ARG GOPROXY
 ARG PKG
@@ -53,7 +53,7 @@ FROM ubuntu:focal
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -qq -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /output /
 

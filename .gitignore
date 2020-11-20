@@ -24,6 +24,7 @@ _testmain.go
 *.test
 *.prof
 ginkgo
+hack/tools/bin
 
 debug
 

@@ -121,15 +121,29 @@ git fetch "$remote" --tags
 # If we've got a patch release, we'll need to create a release branch for it.
 if [[ "$VELERO_PATCH" > 0 ]]; then
     release_branch_name=release-$VELERO_MAJOR.$VELERO_MINOR
-  
-    # Check if the branch exists, creating it if not.
-    # The fetch command above should have gotten all the upstream branches, so we can safely assume this check is local & upstream branches.
-    if [[ -z $(git branch | grep $release_branch_name) ]]; then
-        git checkout -b $release_branch_name
-        echo "Release branch made."
+    remote_release_branch_name="$remote/$release_branch_name"
+
+    # Determine whether the local and remote release branches already exist
+    local_branch=$(git branch | grep "$release_branch_name")
+    remote_branch=$(git branch -r | grep "$remote_release_branch_name")
+
+    if [[ -n $remote_branch ]]; then
+      if [[ -z $local_branch ]]; then
+        # Remote branch exists, but does not exist locally. Checkout and track the remote branch.
+        git checkout --track "$remote_release_branch_name"
+      else
+        # Checkout the local release branch and ensure it is up to date with the remote
+        git checkout "$release_branch_name"
+        git pull --set-upstream "$remote" "$release_branch_name"
+      fi
     else
-        echo "Release branch $release_branch_name exists already."
+      if [[ -z $local_branch ]]; then
+        # Neither the remote or local release branch exists, create it
+        git checkout -b $release_branch_name
+      else
+        # The local branch exists so check it out.
         git checkout $release_branch_name
+      fi
     fi
 
     echo "Now you'll need to cherry-pick any relevant git commits into this release branch."
@@ -146,7 +160,7 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
         echo "Pushing $release_branch_name to \"$remote\" remote"
         git push --set-upstream "$remote" $release_branch_name
     fi
-    
+
     tag_and_push
 else
     echo "Checking out $remote/main."
