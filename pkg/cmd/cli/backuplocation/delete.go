@@ -22,9 +22,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -56,7 +58,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
-			cmd.CheckError(Run(o))
+			cmd.CheckError(Run(f, o))
 		},
 	}
 
@@ -65,26 +67,31 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 }
 
 // Run performs the delete backup-location operation.
-func Run(o *cli.DeleteOptions) error {
+func Run(f client.Factory, o *cli.DeleteOptions) error {
 	if !o.Confirm && !cli.GetConfirmation() {
 		// Don't do anything unless we get confirmation
 		return nil
 	}
 
-	var (
-		backupLocations []*velerov1api.BackupStorageLocation
-		errs            []error
-	)
+	kbClient, err := f.KubebuilderClient()
+	cmd.CheckError(err)
+
+	locations := new(velerov1api.BackupStorageLocationList)
+	var errs []error
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			backupLocation, err := o.Client.VeleroV1().BackupStorageLocations(o.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			location := &velerov1api.BackupStorageLocation{}
+			err = kbClient.Get(context.Background(), kbclient.ObjectKey{
+				Namespace: f.Namespace(),
+				Name:      name,
+			}, location)
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
 			}
 
-			backupLocations = append(backupLocations, backupLocation)
+			locations.Items = append(locations.Items, *location)
 		}
 	default:
 		selector := labels.Everything().String()
@@ -92,30 +99,27 @@ func Run(o *cli.DeleteOptions) error {
 			selector = o.Selector.String()
 		}
 
-		res, err := o.Client.VeleroV1().BackupStorageLocations(o.Namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: selector,
+		err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{
+			Namespace: f.Namespace(),
+			Raw:       &metav1.ListOptions{LabelSelector: selector},
 		})
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		for i := range res.Items {
-			backupLocations = append(backupLocations, &res.Items[i])
-		}
 	}
 
-	if len(backupLocations) == 0 {
+	if len(locations.Items) == 0 {
 		fmt.Println("No backup-locations found")
 		return nil
 	}
 
 	// create a backup-location deletion request for each
-	for _, bl := range backupLocations {
-		err := o.Client.VeleroV1().BackupStorageLocations(bl.Namespace).Delete(context.TODO(), bl.Name, metav1.DeleteOptions{})
-		if err != nil {
+	for _, location := range locations.Items {
+		if err := kbClient.Delete(context.Background(), &location, &kbclient.DeleteOptions{}); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}
-		fmt.Printf("Backup storage location %q deleted successfully.\n", bl.Name)
+		fmt.Printf("Backup storage location %q deleted successfully.\n", location.Name)
 	}
 
 	return kubeerrs.NewAggregate(errs)
