@@ -8,7 +8,7 @@ This document proposes a solution to select an API group version to restore from
 
 ## Background
 
-It is possible that between the time a backup has been made and a restore occurs that the target Kubernetes version has incremented more than one version. In such a case where at least a versions of Kubernetes was skipped, the preferred source cluster's API group versions for resources may no longer be supported by the target cluster. With PR #2373, all supported API group versions were backed up if the EnableAPIGroupVersions feature flag was set for Velero. The next step (outlined by this design proposal) will be to see if any of the backed up versions are supported in the target cluster and if so, choose one to restore for each backed up resource.
+It is possible that between the time a backup has been made and a restore occurs that the target Kubernetes version has incremented more than one version. In such a case where at least a versions of Kubernetes was skipped, the preferred source cluster's API group versions for resources may no longer be supported by the target cluster. With [PR#2373](https://github.com/vmware-tanzu/velero/pull/2373), all supported API group versions were backed up if the EnableAPIGroupVersions feature flag was set for Velero. The next step (outlined by this design proposal) will be to see if any of the backed up versions are supported in the target cluster and if so, choose one to restore for each backed up resource.
 
 ## Goals
 
@@ -18,9 +18,9 @@ It is possible that between the time a backup has been made and a restore occurs
 ## Non Goals
 
 - Allow users to restore onto a cluster that is running a Kubernetes version older than the source cluster. The changes proposed here only allow for skipping ahead to a newer Kubernetes version, but not going backward.
-- Allow restoring from backups created using Velero version 1.3 or older. This proposal will only work on backups created using Velero 1.4+ where the EnableAPIGroupVersions was enabled.
+- Allow restoring from backups created using Velero version 1.3 or older. This proposal will only work on backups created using Velero 1.4+.
 - Modifying the compressed backup tarball files. We don't want to risk corrupting the backups.
-- Using plugins to restore a resource when the target supports non of the source cluster's API group versions. The ability to use plugins will hopefully be something added in the future, but not at this time.
+- Using plugins to restore a resource when the target supports none of the source cluster's API group versions. The ability to use plugins will hopefully be something added in the future, but not at this time.
 
 ## High-Level Design
 
@@ -31,7 +31,7 @@ The proposed code starts with creating three lists for each backed up resource. 
   (2) looking at the target cluster and determining which API group versions are supported, and
   (3) getting config maps from the target cluster in order to get user-defined prioritization of versions.
 
-  The three lists will be used to create a map of chosen versions for each resource to restore. If there is a user-defined list of priority versions, the versions will be checked against the supported versions lists. The highest user-defined priority version that is/was supported by both target and source clusters will be the chosen version for that resource.
+  The three lists will be used to create a map of chosen versions for each resource to restore. If there is a user-defined list of priority versions, the versions will be checked against the supported versions lists. The highest user-defined priority version that is/was supported by both target and source clusters will be the chosen version for that resource. If no user specified version are not supported by both target and source, the versions will be logged and the restore will continue with other prioritizations.
 
   Without a user-defined prioritization of versions, the following version prioritization will be followed, starting from the highest priority: target cluster preferred version, source cluster preferred version, and a common supported version. Should there be multiple common supported versions, the one that will be chosen will be based on the [Kubernetes version priorities](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority).
   
@@ -41,36 +41,46 @@ The proposed code starts with creating three lists for each backed up resource. 
 
 There are six objectives to achieve the above stated goals:
 
-1. Determine if the APIGroupVersionsFeatureFlag feature flag has been enabled.
+1. Determine if the APIGroupVersionsFeatureFlag feature flag is enabled and Backup Objects use Status.FormatVersion 1.1.0.
 1. List the backed up API group versions.
 1. List the API group versions supported by the target cluster.
 1. Get the user-defined version priorities.
 1. Use a priority system to determine which version to restore. The source preferred version will be the default if the priorities fail.
 1. Modify the paths to the backup files in the tarball in the resource restore process.
 
-### Objective 1: Determine if the APIGroupVersionsFeatureFlag feature flag has been enabled
+### Objective 1: Determine if the APIGroupVersionsFeatureFlag feature flag is enabled and Backup Objects use Status.FormatVersion 1.1.0
 
-For restore to be able to choose from multiple supported backed up versions, the feature flag must have been enabled during both the backup and restore processes. The check to see if the feature flag is/was enabled must be done for both processes.
+For restore to be able to choose from multiple supported backed up versions, the feature flag must have been enabled during the restore processes. Backup objects must also have [Status.FormatVersion == "1.1.0"](https://github.com/vmware-tanzu/velero/blob/a1e182e723a8c5f6d4175d8db2361233a94d2502/pkg/backup/backup.go#L58).
 
 The reason for checking for the feature flag during restore is to ensure the user would like to restore a version that might not be the source cluster preferred version.
 
-The reason for checking to see if the feature flag was enabled during backup is to ensure the changes made by this proposed design is backward compatible. Only with Velero version 1.4 and forward was Format Version 1.0.0 used to structure the backup directories. Format Version 1.0.0 is required for the restore process proposed in this design doc to work. Before v1.4, the backed up files were in a directory structure that will not be recognized by the proposed code changes. In this case, restore should not attempt to restore from multiple versions as they will not exist.
+The reason for checking `Status.FormatVersion` is to ensure the changes made by this proposed design is backward compatible. Only with Velero version 1.4 and forward was Format Version 1.1.0 used to structure the backup directories. Format Version 1.1.0 is required for the restore process proposed in this design doc to work. Before v1.4, the backed up files were in a directory structure that will not be recognized by the proposed code changes. In this case, restore should not attempt to restore from multiple versions as they will not exist.
 
 Checking if the feature flag is enabled during restore is straightforward using `features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag)`.
 
-Checking if the feature flag was enabled during backup can be done indirectly by checking the directory structure and version directory names. For backups generated using Format Version 1.0.0 (required for the changes proposed here), there will always be a version directory with `-preferredversion` in the directory name. Only one resource will need to be checked to determine if the feature flag was enabled during backup.
+Checking the `Status.FormatVersion` can be done indirectly by checking the directory structure and version directory names. For backups generated using Format Version 1.1.0, there will always be a version directory with `-preferredversion` in the directory name. Only one resource will need to be checked to determine if the feature flag was enabled during backup.
+
+To help with the format version check, a new parser object can be created using the construction function `NewParser(...)` and we can take advantage of the `archive` package's `Parser` type. A method for the parser object will be created that has the signature `UsedFormatVersion(dir string) (bool, error)`. The method will loop through the version directories inside one of the resource.group directories and determine if a directory with `-preferredversion` was found.
+
+The above two checks can be done by creating a method on the `*restoreContext` object with the method signature `meetsAPIGVRestoreReqs(backupDir string) (bool, error)`. This method can remain in the `restore` package, but for organizational purposes, it can be moved to a file called `prioritize_group_version.go`.
 
 ### Objective 2: List the backed up API group versions
 
 Currently, in `pkg/restore/restore.go`, in the `execute(...)` method, around [line 363](https://github.com/vmware-tanzu/velero/blob/7a103b9eda878769018386ecae78da4e4f8dde83/pkg/restore/restore.go#L363), the resources and their backed up items are saved in a map called `backupResources`.
 
-At this point, it can be checked if the feature flag is/was enabled during restore/backup, respectively (described previously in Objective #1). If it is and was enabled, the `backedupResources` map can be sent to a method (to be created) with the signature `ctx.chooseAPIVersionsToRestore(backupResources)`. Notice that the method is called on `ctx` which has the type `*restore.Context`.
+At this point, the feature flag and format versions can be checked (described previously in Objective #1). If the minimum requirements are met, the `backedupResources` map can be sent to a method (to be created) with the signature `ctx.chooseAPIVersionsToRestore(backupResources)`. The `ctx` object has the type `*restore.Context`.
 
 The `chooseAPIVersionsToRestore` method can remain in the `restore` package, but for organizational purposes, it can be moved to a file called `prioritize_group_version.go`.
 
-Inside the `chooseAPIVersionsToRestore` method, we can take advantage of the `archive` package's `Parser` type. A new parser object can be created using the construction function `NewParser(...)`. A method for the parser object will be created that has the signature `ParseGroupVersions(backupDir string) (map[string]metav1.APIGroup, error)`. The `ParseGroupVerisons(...)` method will loop through the `resources`, `resource.group`, and group version directories to populate a map called `sourceRGVersions`.
+Inside the `chooseAPIVersionsToRestore` method, we can take advantage of the `archive` package's `Parser` type.  `ParseGroupVersions(backupDir string) (map[string]metav1.APIGroup, error)`. The `ParseGroupVersions(...)` method will loop through the `resources`, `resource.group`, and group version directories to populate a map called `sourceRGVersions`.
 
-The `sourceRGVersions` map's keys will be strings in the format `<resource>.<group>`, e.g. "horizontalpodautoscalers.autoscaling". The values will be APIGroup structs. The API Group struct can be imported from k8s.io/apimachinery/pkg/apis/meta/v1. Order the APIGroup.Versions slices using a kubernetes/apimachinery method called `PrioritizedVersionsForGroup` in the [runtime package](https://github.com/kubernetes/apimachinery/blob/b63a0c883fbfc313249150449400788e5589ef23/pkg/runtime/scheme.go#L614).
+The `sourceRGVersions` map's keys will be strings in the format `<resource>.<group>`, e.g. "horizontalpodautoscalers.autoscaling". The values will be APIGroup structs. The API Group struct can be imported from k8s.io/apimachinery/pkg/apis/meta/v1. Order the APIGroup.Versions slices using a sort function copied from `k8s.io/apimachinery/pkg/version`.
+
+```go
+sort.SliceStable(gvs, func(i, j int) bool {
+    return version.CompareKubeAwareVersionStrings(gvs[i].Version, gvs[j].Version) > 0
+})
+```
 
 ### Objective 3: List the API group versions supported by the target cluster
 
@@ -80,7 +90,13 @@ Still within the `chooseAPIVersionsToRestore` method, the target cluster's resou
 targetRGVersions := ctx.discoveryHelper.APIGroups()
 ```
 
-Order the APIGroup.Versions slices using a kubernetes/apimachinery method called `PrioritizedVersionsForGroup` in the [runtime package](https://github.com/kubernetes/apimachinery/blob/b63a0c883fbfc313249150449400788e5589ef23/pkg/runtime/scheme.go#L614).
+Order the APIGroup.Versions slices using a sort function copied from `k8s.io/apimachinery/pkg/version`.
+
+```go
+sort.SliceStable(gvs, func(i, j int) bool {
+    return version.CompareKubeAwareVersionStrings(gvs[i].Version, gvs[j].Version) > 0
+})
+```
 
 ### Objective 4: Get the user-defined version priorities
 
@@ -93,7 +109,7 @@ metadata:
   name: enableapigroupversions
   namespace: velero
 data:
-  restoreResourcesVersionPriority: |
+  restoreResourcesVersionPriority: | -
     rockbands.music.example.io=v2beta1,v2beta2
     orchestras.music.example.io=v2,v3alpha1
     subscriptions.operators.coreos.com=v2,v1
@@ -101,37 +117,39 @@ data:
 
 In the config map, the resources and groups and the user-defined version priorities will be listed in the `data.restoreResourcesVersionPriority` field following the following general format: `<group>.<resource>=<version 1>[, <version n> ...]`.
 
-A `userGRVersions` map will be created to store the user-defined priority versions. The map's keys will be strings in the format `<resource>.<group>`. The values will be APIGroup structs that will be imported from k8s.io/apimachinery/pkg/apis/meta/v1. Within the APIGroup structs will be versions in the order that the user provides in the config map. The PreferredVersion field in APIGroup struct will be left empty.
+A map will be created to store the user-defined priority versions. The map's keys will be strings in the format `<resource>.<group>`. The values will be APIGroup structs that will be imported from `k8s.io/apimachinery/pkg/apis/meta/v1`. Within the APIGroup structs will be versions in the order that the user provides in the config map. The PreferredVersion field in APIGroup struct will be left empty.
 
 ### Objective 5: Use a priority system to determine which version to restore. The source preferred version will be the default if the priorities fail
 
-Determining the priority will also be done in the `chooseAPIVersionsToRestore` method. Once a version is chosen, it will be stored in a new map of the form `map[string]ChosenGRVersion` where the key is the `<resource>.<group>` and the values are of the `ChosenGRVersion` struct type (shown below). The map will be saved to the `restore.Context` object in a field called `chosenGRVsToRestore`.
+Determining the priority will also be done in the `chooseAPIVersionsToRestore` method. Once a version is chosen, it will be stored in a new map of the form `map[string]ChosenGRVersion` where the key is the `<resource>.<group>` and the values are of the `ChosenGrpVersion` struct type (shown below). The map will be saved to the `restore.Context` object in a field called `chosenGrpVersToRestore`.
 
 ```go
-type ChosenGRVersion struct {
-    Group      string
-    Version    string
-    VerDirName string
+type ChosenGrpVersion struct {
+    Group   string
+    Version string
+    Dir     string
 }
 ```
 
-An attempt will first be made to use the `userGRVersions` map. Loop through the resource.groups in the `userGRVersions` map. For each resource.group, loop through the versions. Loop through the corresponding versions in `targetRGVersions`. Then, loop through the corresponding versions in `sourceRGVersions`. If a three-way match is made between the three version lists, then the `ChosenGRVersion` map can be populated. If no match is found for any of a resource's versions, send a warning message that none of the user-defined priority version list exists in both the source and target cluster supported lists for that resource.
+The first method called will be `ctx.gatherSTUVersions()` and it will gather the source cluster group resource and versions (`sgvs`), target cluster group versions (`tgvs`), and custom user resource and group versions (`ugvs`).
 
-At this point of the code, the `ChosenGRVersion` map may be empty (if no config map was found or if user versions had zero matches) or partially filled. Remember that versions in APIGroups.Versions for source and target cluster resources have been ordered using Kubernetes' version prioritization. Loop through the `backupResources` map located around pkg/restore/restore.go:381. Find a resource for which `ChosenGRVersion` is empty. For that resource, do these checks:
+Loop through the source cluster resource and group versions (`sgvs`). Find the versions for the group in the target cluster.
 
-- does the first target version (the preferred version) in its APIGroups.Versions slice match any of the source supported versions? If so, it will be put into the `ChosenGRVersion` map (see Priority 1 below).
-- does the first source version (the preferred version) in its APIGroups.Versions slice match any of the target supported versions? If so, it will be put into the `ChosenGRVersion` map (see Priority 2 below).
-- loop through the remaining target versions. Inside that loop, loop through the remaining source versions. The first version to match will populate the `ChosenGRVersion` values for the resource being looked at (see Priority 3 below).
-- if none of the previous checks produce a chosen version, the source preferred version will be the default and the restore process will continue.
+An attempt will first be made to `findSupportedUserVersion`. Loop through the resource.groups in the custom user resource and group versions (`ugvs`) map. If a version is supported by both `tgvs` and `sgvs`, that will be set as the chosen version for the corresponding resource in `ctx.chosenGrpVersToRestore`
+
+If no three-way match can be made between the versions in `ugvs`, `tgvs`, and `sgvs`, move on to attempting to use the target cluster preferred version. Loop through the `sgvs` versions for the resource and see if any of them match the first item in the `tgvs` version list. Because the versions in `tgvs` have been ordered, the first version in the version slide will be the preferred version.
+
+If target preferred version cannot be used, attempt to choose the source cluster preferred version. Loop through the target versions and see if any of them match the first item in the source version slice, which will be the preferred version due to Kubernetes version ordering.
+
+If neither clusters' preferred version can be used, look through remaining versions in the target version list and see if there is a match with the remaining versions in the source versions list.
+
+If none of the previous checks produce a chosen version, the source preferred version will be the default and the restore process will continue.
 
 Here is another way to list the priority versions described above:
 
 - **Priority 0** ((User override). Users determine restore version priority using a config map
-- **Priority 1**. Target preferred version can be used. This means one of two things:
-  - (A) target preferred version == source preferred version OR
-  - (B) target preferred version == source supported version
-- **Priority 2**. Source preferred version can be used. This means
-  - source preferred version == target supported version
+- **Priority 1**. Target preferred version can be used.
+- **Priority 2**. Source preferred version can be used.
 - **Priority 3**. A common supported version can be used. This means
   - target supported version == source supported version
   - if multiple support versions intersect, choose the version using the [Kubernetes’ version prioritization system](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority)
@@ -182,7 +200,7 @@ I can't think of any additional risks in terms of Velero security here.
 
 ## Compatibility
 
-I have made it such that the changes in code will only affect Velero installations that have `APIGroupVersionsFeatureFlag` enabled during restore and had been enabled during the backup process. If it is/was not enabled, the changes will have no affect on the restore process, making the changes here entirely backward compatible.
+I have made it such that the changes in code will only affect Velero installations that have `APIGroupVersionsFeatureFlag` enabled during restore and Format Version 1.1.0 was used during backup. If both these requirements are not met, the changes will have no affect on the restore process, making the changes here entirely backward compatible.
 
 ## Implementation
 
