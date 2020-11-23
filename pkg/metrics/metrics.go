@@ -387,8 +387,8 @@ func (m *ServerMetrics) RegisterPodVolumeBackupDequeue(node string) {
 	}
 }
 
-// ObserveRestiOpLatency records the number of seconds a restic operation took.
-func (m *ServerMetrics) ObserveRestiOpLatency(node, pvbName, opName, backupName string, seconds float64) {
+// ObserveResticOpLatency records the number of seconds a restic operation took.
+func (m *ServerMetrics) ObserveResticOpLatency(node, pvbName, opName, backupName string, seconds float64) {
 	if h, ok := m.metrics[resticOperationLatencySeconds].(*prometheus.HistogramVec); ok {
 		h.WithLabelValues(node, opName, backupName, pvbName).Observe(seconds)
 	}
