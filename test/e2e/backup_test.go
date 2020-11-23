@@ -8,6 +8,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -18,9 +20,23 @@ var (
 )
 
 var _ = Describe("Backup Restore test using Kibishii to generate/verify data", func() {
-
+	var client *kubernetes.Clientset
 	BeforeEach(func() {
 		flag.Parse()
+		ctx := context.TODO()
+		err := EnsureClusterExists(ctx)
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure kubernetes cluster exists")
+		client, err = GetClusterClient()
+		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client")
+		println("Installing Velero")
+		err = InstallVeleroServer(ctx, veleroCLI, veleroImage, cloudPlatform, cloudCredentialsFile)
+		Expect(err).NotTo(HaveOccurred(), "Failed to install Velero in the cluster")
+	})
+	AfterEach(func() {
+		println("Uninstalling Velero")
+		timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
+		err := client.CoreV1().Namespaces().Delete(timeoutCTX, "velero", metav1.DeleteOptions{})
+		Expect(err).NotTo(HaveOccurred())
 	})
 	Describe("backing up and restoring namespace with data", func() {
 		Context("when the backup is successful", func() {
@@ -32,7 +48,7 @@ var _ = Describe("Backup Restore test using Kibishii to generate/verify data", f
 				println("backupName = " + backupName)
 				println("creating namespace " + kibishiNamespace)
 				timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-				err = CreateNamespace(timeoutCTX, kibishiNamespace)
+				err = CreateNamespace(timeoutCTX, client, kibishiNamespace)
 				Expect(err).NotTo(HaveOccurred())
 
 				println("installing kibishii in namespace " + kibishiNamespace)
@@ -58,7 +74,7 @@ var _ = Describe("Backup Restore test using Kibishii to generate/verify data", f
 
 				println("removing namespace " + kibishiNamespace)
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
-				err = RemoveNamespace(timeoutCTX, kibishiNamespace)
+				err = client.CoreV1().Namespaces().Delete(timeoutCTX, kibishiNamespace, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				println("restoring namespace")
@@ -75,7 +91,7 @@ var _ = Describe("Backup Restore test using Kibishii to generate/verify data", f
 
 				println("removing namespace " + kibishiNamespace)
 				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
-				err = RemoveNamespace(timeoutCTX, kibishiNamespace)
+				err = client.CoreV1().Namespaces().Delete(timeoutCTX, kibishiNamespace, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})

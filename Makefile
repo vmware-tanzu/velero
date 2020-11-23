@@ -333,5 +333,5 @@ gen-docs:
 	@hack/release-tools/gen-docs.sh
 
 .PHONY: test-e2e
-test-e2e:
-	$(MAKE) -C test/e2e run
+test-e2e: local
+	VELERO_BINARY=$$(pwd)/_output/bin/$(shell go env GOOS)/$(shell go env GOARCH)/$(BIN) $(MAKE) -C test/e2e run

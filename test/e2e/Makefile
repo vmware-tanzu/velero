@@ -47,6 +47,9 @@ KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
 CLOUD_PLATFORM ?= kind
+VELERO_BINARY ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
+VELERO_IMAGE ?= velero/velero:e2e-test
+CREDS_FILE ?= /Users/ashisham/bin/velero-dev/aws-creds
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -54,7 +57,10 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 
 .PHONY: run
 run: ginkgo
-	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero -cloudplatform=$(CLOUD_PLATFORM)
+	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_BINARY) \
+		-cloudplatform=$(CLOUD_PLATFORM) \
+		-velero-image=$(VELERO_IMAGE) \
+		-credentials-file=$(CREDS_FILE)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)
