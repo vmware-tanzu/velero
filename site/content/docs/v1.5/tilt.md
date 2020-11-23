@@ -1,0 +1,173 @@
+---
+title: "Rapid iterative Velero development with Tilt "
+layout: docs
+---
+
+## Overview
+This document describes how to use [Tilt](https://tilt.dev) with any cluster for a simplified
+workflow that offers easy deployments and rapid iterative builds.
+
+This setup allows for continuing deployment of the Velero server and, if specified, any provider plugin or the restic daemonset.
+It does this work by:
+
+1. Deploying the necessary Kubernetes resources, such as the Velero CRDs and Velero deployment
+2. Building a local binary for Velero and (if specified) provider plugins as a `local_resource`
+3. Invoking `docker_build` to live update any binary into the container/init container and trigger a re-start
+
+Tilt will look for configuration files under `velero/tilt-resources`. Most of the
+files in this directory are gitignored so you may configure your setup according to your needs.
+
+## Prerequisites
+1. [Docker](https://docs.docker.com/install/) v19.03 or newer
+1. A Kubernetes cluster (does not have to be Kind)
+1. [Tilt](https://docs.tilt.dev/install.html) v0.12.0 or newer
+1. Clone the [Velero project](https://github.com/vmware-tanzu/velero) repository
+   locally
+2. Clone any [provider plugin(s)](https://velero.io/plugins/) you want to make changes to and deploy (optional, must be configured to be deployed by the Velero Tilt's setup, [more info below](#provider-plugins))
+
+## Getting started
+
+### tl;dr
+- Copy all sample files under `velero/tilt-resources/examples` into `velero/tilt-resources`. 
+- Configure the `backupstoragelocations.yaml` file, and the `cloud` file for the storage credentials/secret.
+
+- Run `tilt-up`.
+
+### Create a Tilt settings file
+Create a configuration file named `tilt-settings.json` and place it in your local copy of `velero/tilt-resources`. Alternatively, 
+you may copy and paste the sample file found in  `velero/tilt-resources/examples`.
+
+Here is an example:
+
+```json
+{
+    "default_registry": "",
+    "provider_repos": [
+        "../velero-plugin-for-aws",
+        "../velero-plugin-for-gcp",
+        "../velero-plugin-for-microsoft-azure",
+    ],
+    "enable_providers": [
+        "aws",
+        "gcp",
+        "azure"
+    ],
+    "allowed_contexts": [
+        "development"
+    ],
+    "enable_restic": false,
+    "create_backup_locations": true,
+    "setup-minio": false
+}
+```
+
+#### tilt-settings.json fields
+**default_registry** (String, default=""): The image registry to use if you need to push images. See the [Tilt
+*documentation](https://docs.tilt.dev/api.html#api.default_registry) for more details.
+
+**provider_repos** (Array[]String, default=[]): A list of paths to all the provider plugins you want to make changes to. Each provider must have a
+`tilt-provider.json` file describing how to build the provider. 
+
+**enable_providers** (Array[]String, default=[]): A list of the provider plugins to enable. See [provider plugins](#provider-plugins)
+for more details. Note: when not making changes to a plugin, it is not necessary to load them into
+Tilt: an existing image and version might be specified in the Velero deployment instead, and Tilt will load that. 
+
+**allowed_contexts** (Array, default=[]): A list of kubeconfig contexts Tilt is allowed to use. See the Tilt documentation on
+*[allow_k8s_contexts](https://docs.tilt.dev/api.html#api.allow_k8s_contexts) for more details. Note: Kind is automatically allowed.
+
+**enable_restic** (Bool, default=false): Indicate whether to deploy the restic Daemonset. If set to `true`, Tilt will look for a `velero/tilt-resources/restic.yaml`  file
+containing the configuration of the Velero restic DaemonSet.
+
+**create_backup_locations** (Bool, default=false): Indicate whether to create one or more backup storage locations. If set to `true`, Tilt will look for a `velero/tilt-resources/backupstoragelocations.yaml` file
+containing at least one configuration for a Velero backup storage location.
+
+**setup-minio** (Bool, default=false): Configure this to  `true` if you want to configure backup storage locations in a Minio instance running inside your cluster. 
+
+### Create Kubernetes resource files to deploy
+All needed Kubernetes resource files are provided as ready to use samples in the `velero/tilt-resources/examples` directory. You only have to move them to the `velero/tilt-resources` level. 
+
+Because the Velero Kubernetes deployment as well as the restic DaemonSet contain the configuration
+for any plugin to be used, files for these resources are expected to be provided by the user so you may choose
+which provider plugin to load as a init container. Currently, the sample files provided are configured with all the
+plugins supported by Velero, feel free to remove any of them as needed.
+
+For Velero to operate fully, it also needs at least one backup
+storage location. A sample file is provided that needs to be modified with the specific
+configuration for your object storage. See the next sub-section for more details on this.
+
+### Configure a backup storage location
+You will have to configure the `backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](https://velero.io/plugins/)
+to learn what field/value pairs are required for your particular provider's backup storage location configuration.
+
+Below are some ways to configure a backup storage location for Velero.
+#### As a storage with a service provider
+Follow the provider documentation to provision the storage. We have a [list of all known object storage providers](https://velero.io/docs/v1.5/supported-providers/) with corresponding plugins for Velero.
+
+#### Using MinIO as an object storage
+Note: to use MinIO as an object storage, you will need to use the [`AWS` plugin](https://github.com/vmware-tanzu/velero-plugin-for-aws), and configure the storage location with the `spec.provider` set to `aws` and the `spec.config.region` set to `minio`. Example:
+```
+spec:
+  config:
+    region: minio
+    s3ForcePathStyle: "true"
+    s3Url: http://<YOUR LOCAL IP ADDRESS>:9000
+  objectStorage:
+    bucket: velero
+  provider: aws
+```
+
+Here are two ways to use MinIO as the storage:
+
+1) As a MinIO instance running inside your cluster
+
+    In the `tilt-settings.json` file, set `"setup-minio": true`. This will configure a Kubernetes deployment containing a running
+instance of Minio inside your cluster. There are [extra steps](https://velero.io/docs/main/contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
+necessary to expose Minio outside the cluster. Note: with this setup, when your cluster is terminated so is the storage and any backup/restore in it.
+
+1) As a standalone MinIO instance running locally in a Docker container
+
+    See [these intructions](https://github.com/vmware-tanzu/velero/wiki/Contributing-FAQ#minio) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
+
+Please see our [locations documentation](https://velero.io/docs/main/locations/) to learn more how backup locations work.
+
+### Configure the provider credentials (secret)
+Whatever object storage provider you use, configure the credentials for in the `velero/tilt-resources/cloud` file. Read the [plugin documentation](https://velero.io/plugins/)
+to learn what field/value pairs are required for your provider's credentials. The Tilt file will invoke Kustomize to create the secret under the hard-coded key `secret.cloud-credentials.data.cloud` in the Velero namespace.
+
+There is a sample credentials file properly formatted for a MinIO storage credentials in `velero/tilt-resources/examples/cloud`.
+
+### Run Tilt!
+To launch your development environment, run:
+
+``` bash
+tilt up
+```
+
+This will output the address to a web browser interface where you can monitor Tilt's status and the logs for each Tilt resource. After a brief amount of time, you should have a running development environment, and you should now be able to
+create backups/restores and fully operate Velero. 
+
+Please see the documentation for [how Velero works](https://velero.io/docs/main/how-velero-works/).
+
+## Provider plugins
+A provider must supply a `tilt-provider.json` file describing how to build it. Here is an example:
+
+```json
+{
+  "name": "aws",
+  "config": {
+    "context": ".",
+    "image": "velero/velero-plugin-for-aws",
+    "live_reload_deps": [
+      "velero-plugin-for-aws"
+    ],
+    "go_main": "./velero-plugin-for-aws"
+  }
+}
+```
+
+## Live updates
+Each provider plugin configured to be deployed by Velero's Tilt setup has a `live_reload_deps` list. This defines the files and/or directories that Tilt
+should monitor for changes. When a dependency is modified, Tilt rebuilds the provider's binary **on your local
+machine**, copies the binary to the init container, and triggers a restart of the Velero container. This is significantly faster
+than rebuilding the container image for each change. It also helps keep the size of each development image as small as
+possible (the container images do not need the entire go toolchain, source code, module dependencies, etc.).
