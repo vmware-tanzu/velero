@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -109,7 +109,6 @@ func NewRestoreController(
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
-	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 	logFormat logging.Format,
 ) Interface {
@@ -124,7 +123,6 @@ func NewRestoreController(
 		kbClient:               kbClient,
 		snapshotLocationLister: snapshotLocationLister,
 		restoreLogLevel:        restoreLogLevel,
-		defaultBackupLocation:  defaultBackupLocation,
 		metrics:                metrics,
 		logFormat:              logFormat,
 		clock:                  &clock.RealClock{},
