@@ -326,7 +326,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	latencyDuration := req.Status.CompletionTimestamp.Time.Sub(req.Status.StartTimestamp.Time)
 	latencySeconds := float64(latencyDuration / time.Second)
 	backupName := getOwningBackup(req)
-	c.metrics.ObserveRestiOpLatency(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
+	c.metrics.ObserveResticOpLatency(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
 	c.metrics.RegisterResticOpLatencyGauge(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
 	c.metrics.RegisterPodVolumeBackupDequeue(c.nodeName)
 	log.Info("Backup completed")
