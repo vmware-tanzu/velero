@@ -11,5 +11,5 @@ jobs:
       - uses: alex-page/github-project-automation-plus@v0.3.0
         with:
           project: "Velero Support Triage Board"
-          column: "Needs Triage"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          column: "Needs triage"
+          repo-token: ${{ secrets.GH_TOKEN }}
