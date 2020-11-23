@@ -46,16 +46,14 @@ help:  ## Display this help
 TOOLS_DIR := $(REPO_ROOT)/hack/tools
 BIN_DIR := bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
-GINKGO := $(TOOLS_BIN_DIR)/ginkgo
+GINKGO := $(GOPATH)/bin/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
 
 .PHONY:ginkgo
-ginkgo: # Build ginkgo from tools folder.
-	rm -f $(GINKGO)
-	mkdir -p $(TOOLS_DIR)
-	cd $(TOOLS_DIR) && go build -tags=tools -o $(GINKGO) github.com/onsi/ginkgo/ginkgo
+ginkgo: # Make sure ginkgo is in $GOPATH/bin
+	go get github.com/onsi/ginkgo/ginkgo
 
 .PHONY: run
 run: ginkgo
