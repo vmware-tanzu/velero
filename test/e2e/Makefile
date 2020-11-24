@@ -19,11 +19,7 @@
 
 .DEFAULT_GOAL:=help
 
-# Which architecture to build - see $(ALL_ARCH) for options.
-# if the 'local' rule is being run, detect the ARCH from 'go env'
-# if it wasn't specified by the caller.
-local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
-ARCH ?= linux-amd64
+ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
