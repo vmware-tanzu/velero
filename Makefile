@@ -331,3 +331,7 @@ serve-docs: build-image-hugo
 # Please read the documentation in the script for instructions on how to use it.
 gen-docs:
 	@hack/release-tools/gen-docs.sh
+
+.PHONY: test-e2e
+test-e2e:
+	$(MAKE) -C test/e2e run
