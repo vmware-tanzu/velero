@@ -50,6 +50,7 @@ GINKGO := $(GOPATH)/bin/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
+CLOUD_PLATFORM ?= kind
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -57,7 +58,7 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 
 .PHONY: run
 run: ginkgo
-	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero
+	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero -cloudplatform=$(CLOUD_PLATFORM)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

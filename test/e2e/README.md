@@ -30,17 +30,17 @@ cloudplatform - the cloud platform the tests will be run against (aws, vsphere, 
 1. Running Velero E2E tests on KinD
 
     ```
-    GINKGO_FOCUS=kind make test-e2e
+    CLOUD_PLATFORM=kind make test-e2e
     ```
 
 1. Running Velero E2E tests on AWS
 
     ```
-    GINKGO_FOCUS=aws make test-e2e
+    CLOUD_PLATFORM=aws make test-e2e
     ```
 
 1. Running Velero E2E tests on Azure
 
     ```
-    GINKGO_FOCUS=azure make test-e2e
+    CLOUD_PLATFORM=azure make test-e2e
     ```

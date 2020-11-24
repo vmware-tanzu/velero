@@ -23,8 +23,6 @@ _testmain.go
 *.exe
 *.test
 *.prof
-ginkgo
-hack/tools/bin
 
 debug
 
