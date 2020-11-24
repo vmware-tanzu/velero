@@ -117,7 +117,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	}
 
 	if !anyVerified {
-		log.Info("No backup locations needed to be validated")
+		log.Debug("No backup locations needed to be validated")
 	}
 
 	r.logReconciledPhase(defaultFound, locationList, unavailableErrors)
