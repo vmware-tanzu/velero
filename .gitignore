@@ -23,7 +23,6 @@ _testmain.go
 *.exe
 *.test
 *.prof
-ginkgo
 
 debug
 
