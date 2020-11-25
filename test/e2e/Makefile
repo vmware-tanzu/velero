@@ -48,8 +48,8 @@ OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
 CLOUD_PLATFORM ?= kind
 VELERO_BINARY ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
-VELERO_IMAGE ?= velero/velero:e2e-test
-CREDS_FILE ?= /Users/ashisham/bin/velero-dev/aws-creds
+VELERO_IMAGE ?= velero/velero:main
+CREDS_FILE ?=
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -57,6 +57,8 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 
 .PHONY: run
 run: ginkgo
+		@[ "${CREDS_FILE}" ] && echo "Using credentials from ${CREDS_FILE}" || \
+			( echo "A credentials file is required to run e2e tests, please re-run the make target with CREDS_FILE=<PathToCredentialsFile>"; exit 1 )
 	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_BINARY) \
 		-cloudplatform=$(CLOUD_PLATFORM) \
 		-velero-image=$(VELERO_IMAGE) \
