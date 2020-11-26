@@ -60,7 +60,6 @@ run: ginkgo
 		@[ "${CREDS_FILE}" ] && echo "Using credentials from ${CREDS_FILE}" || \
 			( echo "A credentials file is required to run e2e tests, please re-run the make target with CREDS_FILE=<PathToCredentialsFile>"; exit 1 )
 	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_BINARY) \
-		-cloudplatform=$(CLOUD_PLATFORM) \
 		-velero-image=$(VELERO_IMAGE) \
 		-credentials-file=$(CREDS_FILE)
 
