@@ -80,3 +80,5 @@ Displays the Timestamps when issued a print or describe (#2748, @thejasbabu)
   * when creating new backup from schedule from cli, allow backup name to be automatically generated (#2569, @cblecker)
   * Convert manifests + BSL api client to kubebuilder (#2561, @carlisia)
   * backup/restore: reinstantiate backup store just before uploading artifacts to ensure credentials are up-to-date (#2550, @skriss)
+  * Add Tencent Cloud S3-Compatible object store providers Support Docs. (#3115, @imjokey)
+

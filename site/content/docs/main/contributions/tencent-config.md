@@ -92,7 +92,7 @@ After executing the installation commands above, the installation process looks 
 
 After the installation command is complete, wait for the velero and restic workloads to be ready to see if the configured storage location is available.
 
-Executing the 'velero backup-location get' command to view the storage location status and display "Avaliable" indicates that access to Tencent Cloud COS is OK, as shown in the following image:
+Executing the 'velero backup-location get' command to view the storage location status and display "Available" indicates that access to Tencent Cloud COS is OK, as shown in the following image:
 
 {{< figure src="https://main.qcloudimg.com/raw/69194157ccd5e377d1e7d914fd8c0336.png" width="100%">}}
 
