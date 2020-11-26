@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// TODO: allocate a bucket to use
 	awsE2EBSLConfig     = "region=us-west-2"
 	awsE2EBSLBucketName = ""
 	awsE2EBSLPrefix     = ""
