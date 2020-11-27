@@ -37,8 +37,8 @@ var _ = Describe("[AWS] [Kind] Velero tests on Kind cluster using AWS provider f
 		Expect(err).NotTo(HaveOccurred())
 		backupName = "backup-" + uuidgen.String()
 		restoreName = "restore-" + uuidgen.String()
-		io, err := GetProviderVeleroInstallOptions(providerName, cloudCredentialsFile)
-		Expect(err).NotTo(HaveOccurred(), "Failed to get Velero InstallOptions for provider %s", providerName)
+		io, err := GetProviderVeleroInstallOptions("aws", cloudCredentialsFile)
+		Expect(err).NotTo(HaveOccurred(), "Failed to get Velero InstallOptions for provider %aws")
 		io.UseRestic = true
 		Expect(InstallVeleroServer(ctx, io)).NotTo(HaveOccurred(), "Failed to install Velero on kind cluster")
 	})
@@ -53,21 +53,6 @@ var _ = Describe("[AWS] [Kind] Velero tests on Kind cluster using AWS provider f
 				// Even though we are using Velero's AWS plugin for object storage, the kubernetes cluster is running on
 				// KinD. So use the kind installation for Kibishii.
 				Expect(RunKibishiiTests(client, "kind", veleroCLI, backupName, restoreName)).NotTo(HaveOccurred(), "Failed to successfully backup and restore Kibishii namespace")
-			})
-		})
-	})
-})
-
-var _ = Describe("[AWS] Testing Velero on an aws cluster", func() {
-	BeforeEach(func() {
-		flag.Parse()
-		ctx := context.TODO()
-		err := EnsureClusterExists(ctx)
-		Expect(err).NotTo(HaveOccurred())
-	})
-	Describe("", func() {
-		Context("Dummy test", func() {
-			It("is a dummy test", func() {
 			})
 		})
 	})
