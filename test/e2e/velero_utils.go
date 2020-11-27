@@ -39,7 +39,7 @@ func GetProviderVeleroInstallOptions(providerName, credentialsFile string) (*cli
 	case "aws":
 		return getVeleroInstallOptions("aws", credentialsFile, awsE2EBSLBucketName, awsE2EBSLPrefix, awsE2EBSLConfig, awsE2EVSLConfig, getProviderPlugins("aws"))
 	case "azure":
-		return getVeleroInstallOptions("azure", credentialsFile, awsE2EBSLBucketName, awsE2EBSLPrefix, awsE2EBSLConfig, awsE2EVSLConfig, getProviderPlugins("azure"))
+		return getVeleroInstallOptions("azure", credentialsFile, azureE2EBSLBucketName, azureE2EBSLPrefix, azureE2EBSLConfig, azureE2EVSLConfig, getProviderPlugins("azure"))
 	default:
 		return nil, errors.Errorf("Unknown provider %s", providerName)
 	}
