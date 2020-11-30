@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	c.AddCommand(
 		NewCreateCommand(f, "create"),
+		NewDeleteCommand(f, "delete"),
 		NewGetCommand(f, "get"),
 	)
 

@@ -53,23 +53,23 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
-		Example: `	# Create a backup containing all resources.
-	velero backup create backup1
+		Example: `  # Create a backup containing all resources.
+  velero backup create backup1
 
-	# Create a backup including only the nginx namespace.
-	velero backup create nginx-backup --include-namespaces nginx
+  # Create a backup including only the nginx namespace.
+  velero backup create nginx-backup --include-namespaces nginx
 
-	# Create a backup excluding the velero and default namespaces.
-	velero backup create backup2 --exclude-namespaces velero,default
+  # Create a backup excluding the velero and default namespaces.
+  velero backup create backup2 --exclude-namespaces velero,default
 
-	# Create a backup based on a schedule named daily-backup.
-	velero backup create --from-schedule daily-backup
+  # Create a backup based on a schedule named daily-backup.
+  velero backup create --from-schedule daily-backup
 
-	# View the YAML for a backup that doesn't snapshot volumes, without sending it to the server.
-	velero backup create backup3 --snapshot-volumes=false -o yaml
+  # View the YAML for a backup that doesn't snapshot volumes, without sending it to the server.
+  velero backup create backup3 --snapshot-volumes=false -o yaml
 
-	# Wait for a backup to complete before returning from the command.
-	velero backup create backup4 --wait`,
+  # Wait for a backup to complete before returning from the command.
+  velero backup create backup4 --wait`,
 	}
 
 	o.BindFlags(c.Flags())

@@ -20,8 +20,8 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -57,6 +57,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			} else {
 				err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{
 					Namespace: f.Namespace(),
+					Raw:       &listOptions,
 				})
 				cmd.CheckError(err)
 			}
