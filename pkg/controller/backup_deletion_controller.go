@@ -295,13 +295,6 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		errs = append(errs, err.Error())
 	}
 
-	// Download the tarball
-	backupFile, err := downloadToTempFile(backup.Name, backupStore, log)
-	if err != nil {
-		return errors.Wrap(err, "error downloading backup")
-	}
-	defer closeAndRemoveFile(backupFile, c.logger)
-
 	actions, err := pluginManager.GetDeleteItemActions()
 	log.Debugf("%d actions before invoking actions", len(actions))
 	if err != nil {
@@ -309,20 +302,30 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	}
 	// don't defer CleanupClients here, since it was already called above.
 
-	ctx := &delete.Context{
-		Backup:          backup,
-		BackupReader:    backupFile,
-		Actions:         actions,
-		Log:             c.logger,
-		DiscoveryHelper: c.helper,
-		Filesystem:      filesystem.NewFileSystem(),
-	}
+	if len(actions) > 0 {
+		// Download the tarball
+		backupFile, err := downloadToTempFile(backup.Name, backupStore, log)
+		defer closeAndRemoveFile(backupFile, c.logger)
 
-	// Optimization: wrap in a gofunc? Would be useful for large backups with lots of objects.
-	// but what do we do with the error returned? We can't just swallow it as that may lead to dangling resources.
-	err = delete.InvokeDeleteActions(ctx)
-	if err != nil {
-		return errors.Wrap(err, "error invoking delete item actions")
+		if err != nil {
+			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
+		} else {
+			ctx := &delete.Context{
+				Backup:          backup,
+				BackupReader:    backupFile,
+				Actions:         actions,
+				Log:             c.logger,
+				DiscoveryHelper: c.helper,
+				Filesystem:      filesystem.NewFileSystem(),
+			}
+
+			// Optimization: wrap in a gofunc? Would be useful for large backups with lots of objects.
+			// but what do we do with the error returned? We can't just swallow it as that may lead to dangling resources.
+			err = delete.InvokeDeleteActions(ctx)
+			if err != nil {
+				return errors.Wrap(err, "error invoking delete item actions")
+			}
+		}
 	}
 
 	if backupStore != nil {
