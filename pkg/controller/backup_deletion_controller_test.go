@@ -49,6 +49,8 @@ import (
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -714,6 +716,265 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				velerov1api.SchemeGroupVersion.WithResource("restores"),
 				td.req.Namespace,
 				"restore-2",
+			),
+			core.NewDeleteAction(
+				velerov1api.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"status":{"phase":"Processed"}}`),
+			),
+			core.NewDeleteCollectionAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				pkgbackup.NewDeleteBackupRequestListOptions(td.req.Spec.BackupName, "uid"),
+			),
+		}
+
+		velerotest.CompareActions(t, expectedActions, td.client.Actions())
+
+		// Make sure snapshot was deleted
+		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
+	})
+
+	t.Run("backup is not downloaded when there are no DeleteItemAction plugins", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").Result()
+		backup.UID = "uid"
+		backup.Spec.StorageLocation = "primary"
+
+		td := setupBackupDeletionControllerTest(t, backup)
+
+		location := &velerov1api.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Spec.StorageLocation,
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "objStoreProvider",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "bucket",
+					},
+				},
+			},
+		}
+
+		require.NoError(t, td.fakeClient.Create(context.Background(), location))
+
+		snapshotLocation := &velerov1api.VolumeSnapshotLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      "vsl-1",
+			},
+			Spec: velerov1api.VolumeSnapshotLocationSpec{
+				Provider: "provider-1",
+			},
+		}
+		require.NoError(t, td.sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(snapshotLocation))
+
+		// Clear out req labels to make sure the controller adds them and does not
+		// panic when encountering a nil Labels map
+		// (https://github.com/vmware-tanzu/velero/issues/1546)
+		td.req.Labels = nil
+
+		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, backup, nil
+		})
+		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
+
+		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
+			return true, td.req, nil
+		})
+
+		td.client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, backup, nil
+		})
+
+		snapshots := []*volume.Snapshot{
+			{
+				Spec: volume.SnapshotSpec{
+					Location: "vsl-1",
+				},
+				Status: volume.SnapshotStatus{
+					ProviderSnapshotID: "snap-1",
+				},
+			},
+		}
+
+		pluginManager := &pluginmocks.Manager{}
+		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
+		pluginManager.On("GetDeleteItemActions").Return([]velero.DeleteItemAction{}, nil)
+		pluginManager.On("CleanupClients")
+		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
+
+		td.backupStore.On("GetBackupVolumeSnapshots", td.req.Spec.BackupName).Return(snapshots, nil)
+		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		td.backupStore.AssertNotCalled(t, "GetBackupContents", td.req.Spec.BackupName)
+
+		expectedActions := []core.Action{
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"metadata":{"labels":{"velero.io/backup-name":"foo"}},"status":{"phase":"InProgress"}}`),
+			),
+			core.NewGetAction(
+				velerov1api.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"metadata":{"labels":{"velero.io/backup-uid":"uid"}}}`),
+			),
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+				types.MergePatchType,
+				[]byte(`{"status":{"phase":"Deleting"}}`),
+			),
+			core.NewDeleteAction(
+				velerov1api.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"status":{"phase":"Processed"}}`),
+			),
+			core.NewDeleteCollectionAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				pkgbackup.NewDeleteBackupRequestListOptions(td.req.Spec.BackupName, "uid"),
+			),
+		}
+
+		velerotest.CompareActions(t, expectedActions, td.client.Actions())
+
+		// Make sure snapshot was deleted
+		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
+	})
+
+	t.Run("backup is still deleted if downloading tarball fails for DeleteItemAction plugins", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").Result()
+		backup.UID = "uid"
+		backup.Spec.StorageLocation = "primary"
+
+		td := setupBackupDeletionControllerTest(t, backup)
+
+		location := &velerov1api.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Spec.StorageLocation,
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "objStoreProvider",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "bucket",
+					},
+				},
+			},
+		}
+
+		require.NoError(t, td.fakeClient.Create(context.Background(), location))
+
+		snapshotLocation := &velerov1api.VolumeSnapshotLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      "vsl-1",
+			},
+			Spec: velerov1api.VolumeSnapshotLocationSpec{
+				Provider: "provider-1",
+			},
+		}
+		require.NoError(t, td.sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(snapshotLocation))
+
+		// Clear out req labels to make sure the controller adds them and does not
+		// panic when encountering a nil Labels map
+		// (https://github.com/vmware-tanzu/velero/issues/1546)
+		td.req.Labels = nil
+
+		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, backup, nil
+		})
+		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
+
+		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
+			return true, td.req, nil
+		})
+
+		td.client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, backup, nil
+		})
+
+		snapshots := []*volume.Snapshot{
+			{
+				Spec: volume.SnapshotSpec{
+					Location: "vsl-1",
+				},
+				Status: volume.SnapshotStatus{
+					ProviderSnapshotID: "snap-1",
+				},
+			},
+		}
+
+		pluginManager := &pluginmocks.Manager{}
+		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
+		pluginManager.On("GetDeleteItemActions").Return([]velero.DeleteItemAction{new(mocks.DeleteItemAction)}, nil)
+		pluginManager.On("CleanupClients")
+		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
+
+		td.backupStore.On("GetBackupVolumeSnapshots", td.req.Spec.BackupName).Return(snapshots, nil)
+		td.backupStore.On("GetBackupContents", td.req.Spec.BackupName).Return(nil, fmt.Errorf("error downloading tarball"))
+		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"metadata":{"labels":{"velero.io/backup-name":"foo"}},"status":{"phase":"InProgress"}}`),
+			),
+			core.NewGetAction(
+				velerov1api.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"metadata":{"labels":{"velero.io/backup-uid":"uid"}}}`),
+			),
+			core.NewPatchAction(
+				velerov1api.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+				types.MergePatchType,
+				[]byte(`{"status":{"phase":"Deleting"}}`),
 			),
 			core.NewDeleteAction(
 				velerov1api.SchemeGroupVersion.WithResource("backups"),

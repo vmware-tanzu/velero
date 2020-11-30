@@ -734,6 +734,10 @@ func persistBackup(backup *pkgbackup.Request,
 }
 
 func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
+	if file == nil {
+		log.Debug("Skipping removal of file due to nil file pointer")
+		return
+	}
 	if err := file.Close(); err != nil {
 		log.WithError(err).WithField("file", file.Name()).Error("error closing file")
 	}
