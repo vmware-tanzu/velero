@@ -10,7 +10,7 @@ spec:
   config:
     region: minio
     s3ForcePathStyle: "true"
-    s3Url: http://minio.velero.svc:9000
+    s3Url: http://<YOUR LOCAL IP ADDRESS>:9000
   objectStorage:
     bucket: velero
   provider: aws

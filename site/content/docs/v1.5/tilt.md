@@ -29,7 +29,8 @@ files in this directory are gitignored so you may configure your setup according
 
 ### tl;dr
 - Copy all sample files under `velero/tilt-resources/examples` into `velero/tilt-resources`. 
-- Configure the `backupstoragelocations.yaml` file, and the `cloud` file for the storage credentials/secret.
+- Copy the `config/samples/velero_v1_backupstoragelocation.yaml` file into `velero/tilt-resources`.
+- Configure the `velero_v1_backupstoragelocation.yaml` file, and the `cloud` file for the storage credentials/secret.
 
 - Run `tilt-up`.
 

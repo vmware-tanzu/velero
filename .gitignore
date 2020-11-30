@@ -46,7 +46,7 @@ site/resources
 # these are files for local Tilt development:
 .tiltbuild/velero
 tilt-resources/tilt-settings.json
-tilt-resources/backupstoragelocations.yaml
+tilt-resources/velero_v1_backupstoragelocation.yaml
 tilt-resources/deployment.yaml
 tilt-resources/restic.yaml
 tilt-resources/cloud
