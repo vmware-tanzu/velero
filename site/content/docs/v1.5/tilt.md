@@ -126,7 +126,7 @@ necessary to expose Minio outside the cluster. Note: with this setup, when your 
 
 1) As a standalone MinIO instance running locally in a Docker container
 
-    See [these intructions](https://github.com/vmware-tanzu/velero/wiki/Contributing-FAQ#minio) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
+    See [these instructions](https://github.com/vmware-tanzu/velero/wiki/Contributing-FAQ#minio) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
 
 Please see our [locations documentation](https://velero.io/docs/main/locations/) to learn more how backup locations work.
 
