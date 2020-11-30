@@ -41,13 +41,8 @@ jobs:
       run: make test
 
     # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
-    - name: Login to DockerHub
-      if: github.repository == 'vmware-tanzu/velero'
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKERHUB_USER }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
     - name: Publish container image
       if: github.repository == 'vmware-tanzu/velero'
-      run: ./hack/docker-push.sh
+      run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+        ./hack/docker-push.sh
