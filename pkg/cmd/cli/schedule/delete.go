@@ -39,21 +39,20 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete schedules",
-		Example: `	# Delete a schedule named "schedule-1."
-		velero schedule delete schedule-1
-	
-		# Delete a schedule named "schedule-1" without prompting for confirmation.
-		velero schedule delete schedule-1 --confirm
-	
-		# Delete schedules named "schedule-1" and "schedule-2."
-		velero schedule delete schedule-1 schedule-2
-	
-		# Delete all schedules labelled with foo=bar."
-		velero schedule delete --selector foo=bar
-		
-		# Delete all schedules.
-		velero schedule delete --all`,
+		Example: `  # Delete a schedule named "schedule-1".
+  velero schedule delete schedule-1
 
+  # Delete a schedule named "schedule-1" without prompting for confirmation.
+  velero schedule delete schedule-1 --confirm
+
+  # Delete schedules named "schedule-1" and "schedule-2".
+  velero schedule delete schedule-1 schedule-2
+
+  # Delete all schedules labelled with "foo=bar".
+  velero schedule delete --selector foo=bar
+
+  # Delete all schedules.
+  velero schedule delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))

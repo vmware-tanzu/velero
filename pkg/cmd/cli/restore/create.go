@@ -44,21 +44,20 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule SCHEDULE_NAME]",
 		Short: "Create a restore",
-		Example: `  # Create a restore named "restore-1" from backup "backup-1."
+		Example: `  # Create a restore named "restore-1" from backup "backup-1".
   velero restore create restore-1 --from-backup backup-1
 
-  # Create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1."
+  # Create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1".
   velero restore create --from-backup backup-1
  
-  # Create a restore from the latest successful backup triggered by schedule "schedule-1."
+  # Create a restore from the latest successful backup triggered by schedule "schedule-1".
   velero restore create --from-schedule schedule-1
 
-  # Create a restore from the latest successful OR partially-failed backup triggered by schedule "schedule-1."
+  # Create a restore from the latest successful OR partially-failed backup triggered by schedule "schedule-1".
   velero restore create --from-schedule schedule-1 --allow-partially-failed
 
   # Create a restore for only persistentvolumeclaims and persistentvolumes within a backup.
-  velero restore create --from-backup backup-2 --include-resources persistentvolumeclaims,persistentvolumes
-  `,
+  velero restore create --from-backup backup-2 --include-resources persistentvolumeclaims,persistentvolumes`,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))

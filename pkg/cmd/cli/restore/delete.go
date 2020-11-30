@@ -39,21 +39,20 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete restores",
-		Example: `	# Delete a restore named "restore-1."
-	velero restore delete restore-1
+		Example: `  # Delete a restore named "restore-1".
+  velero restore delete restore-1
 
-	# Delete a restore named "restore-1" without prompting for confirmation.
-	velero restore delete restore-1 --confirm
+  # Delete a restore named "restore-1" without prompting for confirmation.
+  velero restore delete restore-1 --confirm
 
-	# Delete restores named "restore-1" and "restore-2."
-	velero restore delete restore-1 restore-2
+  # Delete restores named "restore-1" and "restore-2".
+  velero restore delete restore-1 restore-2
 
-	# Delete all restores labelled with foo=bar."
-	velero restore delete --selector foo=bar
+  # Delete all restores labelled with "foo=bar".
+  velero restore delete --selector foo=bar
 	
-	# Delete all restores.
-	velero restore delete --all`,
-
+  # Delete all restores.
+  velero restore delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))

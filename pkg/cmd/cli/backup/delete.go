@@ -40,21 +40,20 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete backups",
-		Example: `  # Delete a backup named "backup-1."
+		Example: `  # Delete a backup named "backup-1".
   velero backup delete backup-1
 
   # Delete a backup named "backup-1" without prompting for confirmation.
   velero backup delete backup-1 --confirm
 
-  # Delete backups named "backup-1" and "backup-2."
+  # Delete backups named "backup-1" and "backup-2".
   velero backup delete backup-1 backup-2
 
-  # Delete all backups triggered by schedule "schedule-1."
+  # Delete all backups triggered by schedule "schedule-1".
   velero backup delete --selector velero.io/schedule-name=schedule-1
  
   # Delete all backups.
-  velero backup delete --all
-  `,
+  velero backup delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
