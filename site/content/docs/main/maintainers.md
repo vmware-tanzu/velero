@@ -16,6 +16,12 @@ Please be sure to also go through the guidance under the entire [Contribute](sta
 - There is no need to manually request reviewers: after the PR is created, all maintainers will be automatically added to the list (note: feel free to remove people if they are on PTO, etc).
 - Be familiar with the [lazy consensus](https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#lazy-consensus) policy for the project.
 
+Some tips for doing reviews:
+- There are some [code standards and general guidelines](https://velero.io/docs/main/code-standards) we aim for
+- We have [guidelines for writing and reviewing documentation](https://velero.io/docs/main/style-guide/)
+- When reviewing a design document, ensure it follows [our format and guidelines]( https://github.com/vmware-tanzu/velero/blob/main/design/_template.md). Also, when reviewing a PR that implements a previously accepted design, ensure the associated design doc is moved to the [design/implemented](https://github.com/vmware-tanzu/velero/tree/main/design/implemented) folder.
+
+
 ## Creating a release
 Maintainers are expected to create releases for the project. We have parts of the process automated, and full [instructions](release-instructions).
 
