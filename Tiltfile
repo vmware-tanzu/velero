@@ -33,7 +33,7 @@ k8s_yaml('tilt-resources/deployment.yaml')
 if settings.get("enable_restic"):
     k8s_yaml('tilt-resources/restic.yaml')
 if settings.get("create_backup_locations"):
-    k8s_yaml('tilt-resources/backupstoragelocations.yaml')
+    k8s_yaml('tilt-resources/velero_v1_backupstoragelocation.yaml')
 if settings.get("setup-minio"):
     k8s_yaml('examples/minio/00-minio-deployment.yaml', allow_duplicates=True)
 

@@ -147,6 +147,8 @@ tilt up
 This will output the address to a web browser interface where you can monitor Tilt's status and the logs for each Tilt resource. After a brief amount of time, you should have a running development environment, and you should now be able to
 create backups/restores and fully operate Velero. 
 
+Note: Running `tilt down` after exiting out of Tilt [will delete all resources](https://docs.tilt.dev/cli/tilt_down.html) specified in the Tiltfile.
+
 Please see the documentation for [how Velero works](https://velero.io/docs/main/how-velero-works/).
 
 ## Provider plugins
