@@ -32,7 +32,7 @@ type BackupStorageLocationSpec struct {
 
 	StorageType `json:",inline"`
 
-	// Default indicates this location is the default backup location.
+	// Default indicates this location is the default backup storage location.
 	// +optional
 	Default bool `json:"default,omitempty"`
 

@@ -50,8 +50,8 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type SetOptions struct {
-	Name                  string
-	DefaultBackupLocation bool
+	Name                         string
+	DefaultBackupStorageLocation bool
 }
 
 func NewSetOptions() *SetOptions {
@@ -59,7 +59,7 @@ func NewSetOptions() *SetOptions {
 }
 
 func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.DefaultBackupLocation, "default", o.DefaultBackupLocation, "Sets this new location to be the new default backup location. Optional.")
+	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 }
 
 func (o *SetOptions) Complete(args []string, f client.Factory) error {
@@ -82,9 +82,9 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 		return errors.WithStack(err)
 	}
 
-	if o.DefaultBackupLocation {
-		// there is one and only one default backup location
-		// disable the origin default backup location
+	if o.DefaultBackupStorageLocation {
+		// There is one and only one default backup storage location.
+		// Disable the origin default backup storage location.
 		locations := new(velerov1api.BackupStorageLocationList)
 		if err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
 			return errors.WithStack(err)
@@ -105,7 +105,7 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 		}
 	}
 
-	location.Spec.Default = o.DefaultBackupLocation
+	location.Spec.Default = o.DefaultBackupStorageLocation
 	if err := kbClient.Update(context.Background(), location, &kbclient.UpdateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
