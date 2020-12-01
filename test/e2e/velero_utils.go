@@ -34,21 +34,15 @@ func getProviderPlugins(providerName string) []string {
 }
 
 // GetProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
-func GetProviderVeleroInstallOptions(providerName, credentialsFile string) (*cliinstall.InstallOptions, error) {
-	switch providerName {
-	case "aws":
-		return getVeleroInstallOptions("aws", credentialsFile, awsE2EBSLBucketName, awsE2EBSLPrefix, awsE2EBSLConfig, awsE2EVSLConfig, getProviderPlugins("aws"))
-	case "azure":
-		return getVeleroInstallOptions("azure", credentialsFile, azureE2EBSLBucketName, azureE2EBSLPrefix, azureE2EBSLConfig, azureE2EVSLConfig, getProviderPlugins("azure"))
-	default:
-		return nil, errors.Errorf("Unknown provider %s", providerName)
-	}
-}
-
-func getVeleroInstallOptions(providerName, credentialsFile, objectStoreBucket, objectStorePrefix string,
+func GetProviderVeleroInstallOptions(providerName, credentialsFile, objectStoreBucket, objectStorePrefix string,
 	bslConfig, vslConfig string,
 	plugins []string,
 ) (*cliinstall.InstallOptions, error) {
+
+	if credentialsFile == "" {
+		return nil, errors.Errorf("No credentials were supplied to use for E2E tests")
+	}
+
 	realPath, err := filepath.Abs(credentialsFile)
 	if err != nil {
 		return nil, err

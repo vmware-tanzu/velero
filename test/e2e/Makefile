@@ -50,6 +50,10 @@ CLOUD_PLATFORM ?= kind
 VELERO_BINARY ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 CREDS_FILE ?=
+BSL_BUCKET ?=
+BSL_PREFIX ?=
+BSL_CONFIG ?=
+VSL_CONFIG ?=
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -58,10 +62,16 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 .PHONY: run
 run: ginkgo
 		@[ "${CREDS_FILE}" ] && echo "Using credentials from ${CREDS_FILE}" || \
-			( echo "A credentials file is required to run e2e tests, please re-run the make target with CREDS_FILE=<PathToCredentialsFile>"; exit 1 )
+			( echo "A credentials file is required to run E2E tests, please re-run the make target with CREDS_FILE=<PathToCredentialsFile>"; exit 1 )
+		@[ "${BSL_BUCKET}" ] && echo "Using bucket ${BSL_BUCKET} to store backups from E2E tests" || \
+			(echo "Bucket to store the backups from E2E tests is required, please re-run with BUCKET=<BucketName>"; exit 1 )
 	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_BINARY) \
 		-velero-image=$(VELERO_IMAGE) \
-		-credentials-file=$(CREDS_FILE)
+		-credentials-file=$(CREDS_FILE) \
+		-bucket=$(BSL_BUCKET) \
+		-prefix=$(BSL_PREFIX) \
+		-bsl-config=$(BSL_CONFIG) \
+		-vsl-config=$(VSL_CONFIG)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

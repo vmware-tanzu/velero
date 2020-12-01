@@ -13,20 +13,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-const (
-	// TODO: allocate a bucket to use
-	awsE2EBSLConfig     = "region=us-west-2"
-	awsE2EBSLBucketName = ""
-	awsE2EBSLPrefix     = ""
-	awsE2EVSLConfig     = "region=us-west-2"
-
-	// TODO: fill in values
-	azureE2EBSLConfig     = "resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID"
-	azureE2EBSLBucketName = ""
-	azureE2EBSLPrefix     = ""
-	azureE2EVSLConfig     = ""
-)
-
 // EnsureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
 func EnsureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()

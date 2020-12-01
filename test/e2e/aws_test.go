@@ -18,7 +18,7 @@ var (
 )
 
 // Test backup and restore of Kibishi using restic
-var _ = Describe("[AWS] [Kind] Velero tests on Kind cluster using AWS provider for object storage", func() {
+var _ = Describe("[AWS] [Kind] [Restic] Velero tests on Kind cluster using AWS provider for object storage", func() {
 	var (
 		client      *kubernetes.Clientset
 		uuidgen     uuid.UUID
@@ -37,8 +37,8 @@ var _ = Describe("[AWS] [Kind] Velero tests on Kind cluster using AWS provider f
 		Expect(err).NotTo(HaveOccurred())
 		backupName = "backup-" + uuidgen.String()
 		restoreName = "restore-" + uuidgen.String()
-		io, err := GetProviderVeleroInstallOptions("aws", cloudCredentialsFile)
-		Expect(err).NotTo(HaveOccurred(), "Failed to get Velero InstallOptions for provider %aws")
+		io, err := GetProviderVeleroInstallOptions("aws", cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, getProviderPlugins("aws"))
+		Expect(err).NotTo(HaveOccurred(), "Failed to get Velero InstallOptions for provider aws")
 		io.UseRestic = true
 		Expect(InstallVeleroServer(ctx, io)).NotTo(HaveOccurred(), "Failed to install Velero on kind cluster")
 	})
