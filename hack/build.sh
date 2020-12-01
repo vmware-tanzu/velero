@@ -41,11 +41,6 @@ if [[ -z "${VERSION}" ]]; then
     exit 1
 fi
 
-if [[ -z "${GIT_SHA}" ]]; then
-    echo "GIT_SHA must be set"
-    exit 1
-fi
-
 if [[ -z "${GIT_TREE_STATE}" ]]; then
     echo "GIT_TREE_STATE must be set"
     exit 1
@@ -54,7 +49,9 @@ fi
 export CGO_ENABLED=0
 
 LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION}"
-LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA}"
+if [[ -n "${GIT_SHA-}" ]]; then
+    LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA}"
+fi
 LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"
 
 if [[ -z "${OUTPUT_DIR:-}" ]]; then
