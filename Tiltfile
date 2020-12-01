@@ -67,7 +67,7 @@ COPY --from=tilt-helper /go/kubernetes/client/bin/kubectl /usr/bin/kubectl
 # Set up a local_resource build of the Velero binary. The binary is written to .tiltbuild/velero.
 local_resource(
     "velero_manager",
-    cmd = "cd " + "." + ';mkdir -p .tiltbuild;CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags \'-extldflags "-static"\' -o .tiltbuild/velero ' + './cmd/velero',
+    cmd = "cd " + "." + ';mkdir -p .tiltbuild;PKG=github.com/vmware-tanzu/velero BIN=velero GOOS=linux GOARCH=amd64 VERSION=main GIT_SHA=aa4730970037ce29 GIT_TREE_STATE=dirty OUTPUT_DIR=.tiltbuild ./hack/build.sh',
     deps = ["cmd", "internal", "pkg"],
 )
 
