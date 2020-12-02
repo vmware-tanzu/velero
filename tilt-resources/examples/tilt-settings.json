@@ -15,6 +15,5 @@
     ],
     "enable_restic": false,
     "create_backup_locations": true,
-    "setup-minio": true,
-    "local_goos": "darwin"
+    "setup-minio": true
 }

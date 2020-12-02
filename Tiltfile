@@ -20,7 +20,6 @@ settings = {
    "enable_restic": False,
    "create_backup_locations": False, 
    "setup-minio": False, 
-   "local_goos": "darwin",
 }
 
 # global settings
@@ -41,7 +40,7 @@ if settings.get("setup-minio"):
 # By default, Tilt automatically allows Minikube, Docker for Desktop, Microk8s, Red Hat CodeReady Containers, Kind, K3D, and Krucible.
 allow_k8s_contexts(settings.get("allowed_contexts"))
 default_registry(settings.get("default_registry"))
-local_goos = settings.get("local_goos", )
+local_goos = str(local("go env GOOS", quiet=True, echo_off=True)).strip()
 
 tilt_helper_dockerfile_header = """
 # Tilt image
