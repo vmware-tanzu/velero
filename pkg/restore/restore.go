@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -231,6 +232,7 @@ func (kr *kubernetesRestorer) Restore(
 		restore:                    req.Restore,
 		resourceIncludesExcludes:   resourceIncludesExcludes,
 		namespaceIncludesExcludes:  namespaceIncludesExcludes,
+		chosenGrpVersToRestore:     make(map[string]ChosenGroupVersion),
 		selector:                   selector,
 		log:                        req.Log,
 		dynamicFactory:             kr.dynamicFactory,
@@ -308,6 +310,7 @@ type restoreContext struct {
 	restoreDir                 string
 	resourceIncludesExcludes   *collections.IncludesExcludes
 	namespaceIncludesExcludes  *collections.IncludesExcludes
+	chosenGrpVersToRestore     map[string]ChosenGroupVersion
 	selector                   labels.Selector
 	log                        logrus.FieldLogger
 	dynamicFactory             client.DynamicFactory
@@ -382,6 +385,13 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
+	}
+
+	if ctx.meetsAPIGVRestoreReqs() {
+		if err := ctx.chooseAPIVersionsToRestore(); err != nil {
+			errs.AddVeleroError(errors.Wrap(err, "choosing API version to restore"))
+			return warnings, errs
+		}
 	}
 
 	// Iterate through an ordered list of resources to restore, checking each one to see if it should be restored.
@@ -731,6 +741,15 @@ func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNa
 	}
 
 	groupResource := schema.ParseGroupResource(resource)
+
+	// Modify `resource` so that it has the priority version to restore in its
+	// path. For example, for group resource "horizontalpodautoscalers.autoscaling",
+	// "/v2beta1" will be appended to the end. Different versions would only
+	// have been stored if the APIGroupVersionsFeatureFlag was enabled during backup.
+	cgv, ok := ctx.chosenGrpVersToRestore[groupResource.String()]
+	if ok {
+		resource = filepath.Join(groupResource.String(), cgv.Dir)
+	}
 
 	for _, item := range items {
 		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)

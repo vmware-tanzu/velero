@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@ limitations under the License.
 package archive
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -164,4 +166,103 @@ func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string) ([]string,
 	}
 
 	return items, nil
+}
+
+// CheckAndReadDir is a wrapper around fs.DirExists and fs.ReadDir that does checks
+// and returns errors if directory cannot be read.
+func (p *Parser) CheckAndReadDir(dir string) ([]os.FileInfo, error) {
+	exists, err := p.fs.DirExists(dir)
+	if err != nil {
+		return []os.FileInfo{}, errors.Wrapf(err, "finding %q", dir)
+	}
+	if !exists {
+		return []os.FileInfo{}, errors.Errorf("%q not found", dir)
+	}
+
+	contents, err := p.fs.ReadDir(dir)
+	if err != nil {
+		return []os.FileInfo{}, errors.Wrapf(err, "reading contents of %q", dir)
+	}
+
+	return contents, nil
+}
+
+// ParseGroupVersions extracts the versions for each API Group from the backup
+// directory names and stores them in a metav1 APIGroup object.
+func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, error) {
+	resourcesDir := filepath.Join(dir, velerov1api.ResourcesDir)
+
+	// Get the subdirectories inside the "resources" directory. The subdirectories
+	// will have resource.group names like "horizontalpodautoscalers.autoscaling".
+	rgDirs, err := p.CheckAndReadDir(resourcesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceAGs := make(map[string]metav1.APIGroup)
+
+	// Loop through the resource.group directory names.
+	for _, rgd := range rgDirs {
+		group := metav1.APIGroup{
+			Name: extractGroupName(rgd.Name()),
+		}
+
+		rgdPath := filepath.Join(resourcesDir, rgd.Name())
+
+		// Inside each of the resource.group directories are directories whose
+		// names are API Group versions like "v1" or "v1-preferredversion"
+		gvDirs, err := p.CheckAndReadDir(rgdPath)
+		if err != nil {
+			return nil, err
+		}
+
+		var supportedVersions []metav1.GroupVersionForDiscovery
+
+		for _, gvd := range gvDirs {
+			gvdName := gvd.Name()
+
+			// Don't save the namespaces or clusters directories in list of
+			// supported API Group Versions.
+			if gvdName == "namespaces" || gvdName == "cluster" {
+				continue
+			}
+
+			version := metav1.GroupVersionForDiscovery{
+				GroupVersion: strings.TrimPrefix(group.Name+"/"+gvdName, "/"),
+				Version:      gvdName,
+			}
+
+			if strings.Contains(gvdName, "-preferredversion") {
+				gvdName = strings.TrimSuffix(gvdName, "-preferredversion")
+
+				// Update version and group version to be without suffix.
+				version.Version = gvdName
+				version.GroupVersion = strings.TrimPrefix(group.Name+"/"+gvdName, "/")
+
+				group.PreferredVersion = version
+			}
+
+			supportedVersions = append(supportedVersions, version)
+		}
+
+		group.Versions = supportedVersions
+
+		resourceAGs[rgd.Name()] = group
+	}
+
+	return resourceAGs, nil
+}
+
+// extractGroupName will take a concatenated resource.group and extract the group,
+// if there is one. Resources like "pods" which has no group and will return an
+// empty string.
+func extractGroupName(resourceGroupDir string) string {
+	parts := strings.SplitN(resourceGroupDir, ".", 2)
+	var group string
+
+	if len(parts) == 2 {
+		group = parts[1]
+	}
+
+	return group
 }
