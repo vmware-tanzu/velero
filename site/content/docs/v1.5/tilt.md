@@ -58,7 +58,8 @@ Here is an example:
     ],
     "enable_restic": false,
     "create_backup_locations": true,
-    "setup-minio": false
+    "setup-minio": false,
+    "local_goos": "darwin"
 }
 ```
 
@@ -148,6 +149,8 @@ This will output the address to a web browser interface where you can monitor Ti
 create backups/restores and fully operate Velero. 
 
 Note: Running `tilt down` after exiting out of Tilt [will delete all resources](https://docs.tilt.dev/cli/tilt_down.html) specified in the Tiltfile.
+
+Tip: Create an alias to `velero/_tuiltbuild/local/velero` and you won't have to run `make local` to get a refreshed version of the Velero CLI, just use the alias.
 
 Please see the documentation for [how Velero works](https://velero.io/docs/main/how-velero-works/).
 

@@ -58,7 +58,8 @@ Here is an example:
     ],
     "enable_restic": false,
     "create_backup_locations": true,
-    "setup-minio": false
+    "setup-minio": false,
+    "local_goos": "darwin"
 }
 ```
 
@@ -149,6 +150,8 @@ create backups/restores and fully operate Velero.
 
 Note: Running `tilt down` after exiting out of Tilt [will delete all resources](https://docs.tilt.dev/cli/tilt_down.html) specified in the Tiltfile.
 
+Tip: Create an alias to `velero/_tuiltbuild/local/velero` and you won't have to run `make local` to get a refreshed version of the Velero CLI, just use the alias.
+
 Please see the documentation for [how Velero works](https://velero.io/docs/main/how-velero-works/).
 
 ## Provider plugins
@@ -158,6 +161,7 @@ A provider must supply a `tilt-provider.json` file describing how to build it. H
 {
   "name": "aws",
   "config": {
+    "plugin_name": "velero-plugin-for-aws", 
     "context": ".",
     "image": "velero/velero-plugin-for-aws",
     "live_reload_deps": [
