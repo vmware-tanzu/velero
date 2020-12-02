@@ -46,8 +46,7 @@ GINKGO := $(GOPATH)/bin/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
-CLOUD_PLATFORM ?= kind
-VELERO_BINARY ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
+VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 CREDS_FILE ?=
 BSL_BUCKET ?=
@@ -65,7 +64,7 @@ run: ginkgo
 			( echo "A credentials file is required to run E2E tests, please re-run the make target with CREDS_FILE=<PathToCredentialsFile>"; exit 1 )
 		@[ "${BSL_BUCKET}" ] && echo "Using bucket ${BSL_BUCKET} to store backups from E2E tests" || \
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BUCKET=<BucketName>"; exit 1 )
-	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_BINARY) \
+	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-credentials-file=$(CREDS_FILE) \
 		-bucket=$(BSL_BUCKET) \

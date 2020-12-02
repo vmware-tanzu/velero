@@ -334,4 +334,4 @@ gen-docs:
 
 .PHONY: test-e2e
 test-e2e: local
-	VELERO_BINARY=$$(pwd)/_output/bin/$(shell go env GOOS)/$(shell go env GOARCH)/$(BIN) $(MAKE) -C test/e2e run
+	$(MAKE) -C test/e2e run
