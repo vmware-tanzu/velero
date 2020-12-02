@@ -43,16 +43,16 @@ Here is an example:
 ```json
 {
     "default_registry": "",
-    "provider_repos": [
-        "../velero-plugin-for-aws",
-        "../velero-plugin-for-gcp",
-        "../velero-plugin-for-microsoft-azure",
-    ],
     "enable_providers": [
         "aws",
         "gcp",
         "azure"
     ],
+    "providers": { 
+        "aws": "../velero-plugin-for-aws",
+        "gcp": "../velero-plugin-for-gcp",
+        "azure": "../velero-plugin-for-microsoft-azure"
+    },
     "allowed_contexts": [
         "development"
     ],
@@ -158,16 +158,13 @@ A provider must supply a `tilt-provider.json` file describing how to build it. H
 
 ```json
 {
-  "name": "aws",
-  "config": {
-    "plugin_name": "velero-plugin-for-aws", 
-    "context": ".",
-    "image": "velero/velero-plugin-for-aws",
-    "live_reload_deps": [
-      "velero-plugin-for-aws"
-    ],
-    "go_main": "./velero-plugin-for-aws"
-  }
+  "plugin_name": "velero-plugin-for-aws",
+  "context": ".",
+  "image": "velero/velero-plugin-for-aws",
+  "live_reload_deps": [
+    "velero-plugin-for-aws"
+  ],
+  "go_main": "./velero-plugin-for-aws"
 }
 ```
 

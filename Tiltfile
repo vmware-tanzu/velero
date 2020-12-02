@@ -114,28 +114,33 @@ docker_build(
 providers = {}
 
 def load_provider_tiltfiles():
-    provider_repos = settings.get("provider_repos", [])
+    all_providers = settings.get("providers", []) 
+    enable_providers = settings.get("enable_providers", [])
 
-    for repo in provider_repos:
+    ## Load settings only for providers to enable
+    for name in enable_providers:
+        repo = all_providers[name] 
         file = repo + "/tilt-provider.json"
+        if not os.path.exists(file):
+            print("Provider settings not found for %s:", name)
+            print("Please ensure this plugin repository has a tilt-provider.json file included.")
+            continue
         provider_details = read_json(file, default = {})
         if type(provider_details) != type([]):
-            provider_details = [provider_details]
-        for item in provider_details:
-            provider_name = item["name"]
-            provider_config = item["config"]
-            if "context" in provider_config:
-                provider_config["context"] = repo + "/" + provider_config["context"]
+            if "context" in provider_details:
+                provider_details["context"] = repo + "/" + provider_details["context"]
             else:
-                provider_config["context"] = repo
-            if "go_main" not in provider_config:
-                provider_config["go_main"] = "main.go"
-            providers[provider_name] = provider_config
+                provider_details["context"] = repo
+            if "go_main" not in provider_details:
+                provider_details["go_main"] = "main.go"
+            providers[name] = provider_details
 
-# Enable only provider plugins listed in 'enable_providers' in tilt-settings.json (by provider's name)
+# Enable each provider
 def enable_providers():
-    user_enable_providers = settings.get("enable_providers", [])
-    for name in user_enable_providers:
+    if not providers:
+        print("No providers to enable.")
+        return
+    for name in providers:
         enable_provider(name)
 
 # Configures a provider by doing the following:
@@ -161,8 +166,6 @@ def enable_provider(name):
         tilt_dockerfile_header,
         additional_docker_build_commands,
     ])
-
-    
 
     context = p.get("context")
     go_main = p.get("go_main", "main.go")

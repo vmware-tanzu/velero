@@ -1,15 +1,15 @@
 {
     "default_registry": "",
-    "provider_repos": [
-        "../velero-plugin-for-aws",
-        "../velero-plugin-for-gcp",
-        "../velero-plugin-for-microsoft-azure"
-    ],
     "enable_providers": [
         "aws",
         "gcp",
         "azure"
     ],
+    "providers": { 
+        "aws": "../velero-plugin-for-aws",
+        "gcp": "../velero-plugin-for-gcp",
+        "azure": "../velero-plugin-for-microsoft-azure"
+    },
     "allowed_contexts": [
         "development"
     ],
