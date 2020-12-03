@@ -36,14 +36,20 @@ func TestIsReadyToValidate(t *testing.T) {
 		bslValidationFrequency *metav1.Duration
 		lastValidationTime     *metav1.Time
 		defaultLocationInfo    DefaultBackupLocationInfo
-
-		// serverDefaultValidationFrequency time.Duration
-		// backupLocation                   *velerov1api.BackupStorageLocation
-		ready bool
+		ready                  bool
 	}{
 		{
-			name:                   "don't validate, since frequency is set to zero",
+			name:                   "validate when true when validation frequency is zero and lastValidationTime is nil",
 			bslValidationFrequency: &metav1.Duration{Duration: 0},
+			defaultLocationInfo: DefaultBackupLocationInfo{
+				StoreValidationFrequency: 0,
+			},
+			ready: true,
+		},
+		{
+			name:                   "don't validate when false when validation is disabled and lastValidationTime is not nil",
+			bslValidationFrequency: &metav1.Duration{Duration: 0},
+			lastValidationTime:     &metav1.Time{Time: time.Now()},
 			defaultLocationInfo: DefaultBackupLocationInfo{
 				StoreValidationFrequency: 0,
 			},
@@ -63,7 +69,8 @@ func TestIsReadyToValidate(t *testing.T) {
 			defaultLocationInfo: DefaultBackupLocationInfo{
 				StoreValidationFrequency: 1,
 			},
-			ready: false,
+			lastValidationTime: &metav1.Time{Time: time.Now()},
+			ready:              false,
 		},
 		{
 			name: "validate as per default setting when location setting is not set",
@@ -77,7 +84,8 @@ func TestIsReadyToValidate(t *testing.T) {
 			defaultLocationInfo: DefaultBackupLocationInfo{
 				StoreValidationFrequency: 0,
 			},
-			ready: false,
+			lastValidationTime: &metav1.Time{Time: time.Now()},
+			ready:              false,
 		},
 		{
 			name:                   "don't validate when now is before the NEXT validation time (validation frequency + last validation time)",
@@ -112,8 +120,8 @@ func TestIsReadyToValidate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 			log := velerotest.NewLogger()
-
-			g.Expect(IsReadyToValidate(tt.bslValidationFrequency, tt.lastValidationTime, tt.defaultLocationInfo, log)).To(BeIdenticalTo(tt.ready))
+			actual := IsReadyToValidate(tt.bslValidationFrequency, tt.lastValidationTime, tt.defaultLocationInfo, log)
+			g.Expect(actual).To(BeIdenticalTo(tt.ready))
 		})
 	}
 }

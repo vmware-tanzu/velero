@@ -51,24 +51,28 @@ func IsReadyToValidate(bslValidationFrequency *metav1.Duration, lastValidationTi
 		validationFrequency = bslValidationFrequency.Duration
 	}
 
-	if validationFrequency == 0 {
-		log.Debug("Validation period for this backup location is set to 0, skipping validation")
-		return false
-	}
-
 	if validationFrequency < 0 {
 		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, defaultLocationInfo.StoreValidationFrequency)
 		validationFrequency = defaultLocationInfo.StoreValidationFrequency
 	}
 
 	lastValidation := lastValidationTime
-	if lastValidation != nil { // always ready to validate the first time around, so only even do this check if this has happened before
-		nextValidation := lastValidation.Add(validationFrequency) // next validation time: last validation time + validation frequency
-		if time.Now().UTC().Before(nextValidation) {              // ready only when NOW is equal to or after the next validation time
-			return false
-		}
+	if lastValidation == nil {
+		// Regardless of validation frequency, we want to validate all BSLs at least once.
+		return true
 	}
 
+	if validationFrequency == 0 {
+		// Validation was disabled so return false.
+		log.Debug("Validation period for this backup location is set to 0, skipping validation")
+		return false
+	}
+
+	// We want to validate BSL only if the set validation frequency/ interval has elapsed.
+	nextValidation := lastValidation.Add(validationFrequency) // next validation time: last validation time + validation frequency
+	if time.Now().UTC().Before(nextValidation) {              // ready only when NOW is equal to or after the next validation time
+		return false
+	}
 	return true
 }
 
