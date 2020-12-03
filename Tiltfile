@@ -114,7 +114,7 @@ docker_build(
 def load_provider_tiltfiles():
     all_providers = settings.get("providers", {}) 
     enable_providers = settings.get("enable_providers", [])
-    providers = {}
+    providers = [] 
 
     ## Load settings only for providers to enable
     for name in enable_providers:
@@ -128,13 +128,14 @@ def load_provider_tiltfiles():
             continue
         provider_details = read_json(file, default = {})
         if type(provider_details) == "dict":
+            provider_details["name"] = name
             if "context" in provider_details:
                 provider_details["context"] = os.path.join(repo, "/", provider_details["context"])
             else:
                 provider_details["context"] = repo
             if "go_main" not in provider_details:
                 provider_details["go_main"] = "main.go"
-            providers[name] = provider_details
+            providers.append(provider_details)
 
     return providers
 
@@ -143,16 +144,16 @@ def enable_providers(providers):
     if not providers:
         print("No providers to enable.")
         return
-    for name in providers:
-        enable_provider(name)
+    for p in providers:
+        enable_provider(p)
 
 # Configures a provider by doing the following:
 #
 # 1. Enables a local_resource go build of the provider's local binary
 # 2. Configures a docker build for the provider, with live updating of the local binary
-def enable_provider(name):
-    p = providers.get(name)
-    plugin_name = p.get("plugin_name")
+def enable_provider(provider):
+    name = provider.get("name")
+    plugin_name = provider.get("plugin_name")
 
     # Note: we need a distro other than base:debug to get a shell to do a copy of the plugin binary
     tilt_dockerfile_header = """
@@ -170,11 +171,11 @@ def enable_provider(name):
         additional_docker_build_commands,
     ])
 
-    context = p.get("context")
-    go_main = p.get("go_main", "main.go")
+    context = provider.get("context")
+    go_main = provider.get("go_main", "main.go")
 
     live_reload_deps = []
-    for d in p.get("live_reload_deps", []):
+    for d in provider.get("live_reload_deps", []):
         live_reload_deps.append(os.path.join(context, "/", d))
 
     # Set up a local_resource build of the plugin binary. The main.go path must be provided via go_main option. The binary is written to _tiltbuild/<NAME>.
@@ -187,7 +188,7 @@ def enable_provider(name):
     # Set up an image build for the plugin. The live update configuration syncs the output from the local_resource
     # build into the init container, and that restarts the Velero container.
     docker_build(
-        ref = p.get("image"),
+        ref = provider.get("image"),
         context = os.path.join(context, "/_tiltbuild/"),
         dockerfile_contents = dockerfile_contents,
         target = "tilt",
@@ -201,6 +202,4 @@ def enable_provider(name):
 # Start
 #############################
 
-providers = load_provider_tiltfiles()
-
-enable_providers(providers)
+enable_providers(load_provider_tiltfiles())
