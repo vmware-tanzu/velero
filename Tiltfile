@@ -111,32 +111,35 @@ docker_build(
 # Setup plugins
 ##############################
 
-providers = {}
-
 def load_provider_tiltfiles():
-    all_providers = settings.get("providers", []) 
+    all_providers = settings.get("providers", {}) 
     enable_providers = settings.get("enable_providers", [])
+    providers = {}
 
     ## Load settings only for providers to enable
     for name in enable_providers:
-        repo = all_providers[name] 
+        repo = all_providers.get(name)
+        if not repo:
+           print("Enabled provider '{}' does not exist in list of supported providers".format(name))
+           continue
         file = repo + "/tilt-provider.json"
         if not os.path.exists(file):
-            print("Provider settings not found for %s:", name)
-            print("Please ensure this plugin repository has a tilt-provider.json file included.")
+            print("Provider settings not found for \"{}\". Please ensure this plugin repository has a tilt-provider.json file included.".format(name))
             continue
         provider_details = read_json(file, default = {})
-        if type(provider_details) != type([]):
+        if type(provider_details) == "dict":
             if "context" in provider_details:
-                provider_details["context"] = repo + "/" + provider_details["context"]
+                provider_details["context"] = os.path.join(repo, "/", provider_details["context"])
             else:
                 provider_details["context"] = repo
             if "go_main" not in provider_details:
                 provider_details["go_main"] = "main.go"
             providers[name] = provider_details
 
+    return providers
+
 # Enable each provider
-def enable_providers():
+def enable_providers(providers):
     if not providers:
         print("No providers to enable.")
         return
@@ -172,7 +175,7 @@ def enable_provider(name):
 
     live_reload_deps = []
     for d in p.get("live_reload_deps", []):
-        live_reload_deps.append(context + "/" + d)
+        live_reload_deps.append(os.path.join(context, "/", d))
 
     # Set up a local_resource build of the plugin binary. The main.go path must be provided via go_main option. The binary is written to _tiltbuild/<NAME>.
     local_resource(
@@ -185,12 +188,12 @@ def enable_provider(name):
     # build into the init container, and that restarts the Velero container.
     docker_build(
         ref = p.get("image"),
-        context = context + "/_tiltbuild/",
+        context = os.path.join(context, "/_tiltbuild/"),
         dockerfile_contents = dockerfile_contents,
         target = "tilt",
         entrypoint=["/bin/bash", "-c", "cp /" + plugin_name + " /target/."],
         live_update=[
-            sync(context + "/_tiltbuild/" + plugin_name, "/" + plugin_name),
+            sync(os.path.join(context, "/_tiltbuild/", plugin_name), os.path.join("/", plugin_name))
         ]
     )
 
@@ -198,6 +201,6 @@ def enable_provider(name):
 # Start
 #############################
 
-load_provider_tiltfiles()
+providers = load_provider_tiltfiles()
 
-enable_providers()
+enable_providers(providers)
