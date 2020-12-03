@@ -61,6 +61,11 @@ spec:
               description: Schedule is a Cron expression defining when to run the
                 Backup.
               type: string
+            useOwnerReferencesInBackup:
+              description: UseOwnerReferencesBackup specifies whether to use
+                OwnerReferences on backups created by this Schedule.
+              nullable: false
+              type: boolean
             template:
               description: Template is the definition of the Backup to be run on the
                 provided schedule
