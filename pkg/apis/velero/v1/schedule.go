@@ -32,6 +32,12 @@ type ScheduleSpec struct {
 	// Schedule is a Cron expression defining when to run
 	// the Backup.
 	Schedule string `json:"schedule"`
+
+	// UseOwnerReferencesBackup specifies whether to use
+	// OwnerReferences on backups created by this Schedule.
+	// +optional
+	// +nullable
+	UseOwnerReferencesInBackup *bool `json:"useOwnerReferencesInBackup,omitempty"`
 }
 
 // SchedulePhase is a string representation of the lifecycle phase
