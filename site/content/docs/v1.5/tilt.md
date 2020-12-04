@@ -107,7 +107,7 @@ to learn what field/value pairs are required for your particular provider's back
 
 Below are some ways to configure a backup storage location for Velero.
 #### As a storage with a service provider
-Follow the provider documentation to provision the storage. We have a [list of all known object storage providers](https://velero.io/docs/main/supported-providers/) with corresponding plugins for Velero.
+Follow the provider documentation to provision the storage. We have a [list of all known object storage providers](supported-providers/) with corresponding plugins for Velero.
 
 #### Using MinIO as an object storage
 Note: to use MinIO as an object storage, you will need to use the [`AWS` plugin](https://github.com/vmware-tanzu/velero-plugin-for-aws), and configure the storage location with the `spec.provider` set to `aws` and the `spec.config.region` set to `minio`. Example:
@@ -127,14 +127,14 @@ Here are two ways to use MinIO as the storage:
 1) As a MinIO instance running inside your cluster
 
     In the `tilt-settings.json` file, set `"setup-minio": true`. This will configure a Kubernetes deployment containing a running
-instance of Minio inside your cluster. There are [extra steps](https://velero.io/docs/main/contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
+instance of Minio inside your cluster. There are [extra steps](contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
 necessary to expose Minio outside the cluster. Note: with this setup, when your cluster is terminated so is the storage and any backup/restore in it.
 
 2) As a standalone MinIO instance running locally in a Docker container
 
     See [these instructions](https://github.com/vmware-tanzu/velero/wiki/Contributing-FAQ#minio) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
 
-Please see our [locations documentation](https://velero.io/docs/main/locations/) to learn more how backup locations work.
+Please see our [locations documentation](locations/) to learn more how backup locations work.
 
 ### Configure the provider credentials (secret)
 Whatever object storage provider you use, configure the credentials for in the `velero/tilt-resources/cloud` file. Read the [plugin documentation](https://velero.io/plugins/)
@@ -156,7 +156,7 @@ Note: Running `tilt down` after exiting out of Tilt [will delete all resources](
 
 Tip: Create an alias to `velero/_tuiltbuild/local/velero` and you won't have to run `make local` to get a refreshed version of the Velero CLI, just use the alias.
 
-Please see the documentation for [how Velero works](https://velero.io/docs/main/how-velero-works/).
+Please see the documentation for [how Velero works](how-velero-works/).
 
 ## Provider plugins
 A provider must supply a `tilt-provider.json` file describing how to build it. Here is an example:
