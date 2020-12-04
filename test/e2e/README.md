@@ -60,11 +60,11 @@ For example, E2E tests can be run from Velero repository roots using the below c
 
 1. Run Velero tests using AWS as the storage provider:
     ```bash
-    BSL_PREFIX=<PREFIX_UNDER_BUCKET> BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds GINKGO_FOCUS="AWS" make test-e2e
+    BSL_PREFIX=<PREFIX_UNDER_BUCKET> BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds PLUGIN_PROVIDER=aws make test-e2e
     ```
 1. Run Velero tests using Microsoft Azure as the storage provider:
     ```bash
-    BSL_CONFIG="resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID" BSL_BUCKET=velero CREDS_FILE=~/bin/velero-dev/aks-creds GINKGO_FOCUS="Azure" make test-e2e
+    BSL_CONFIG="resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID" BSL_BUCKET=velero CREDS_FILE=~/bin/velero-dev/aks-creds PLUGIN_PROVIDER=azure make test-e2e
     ```
     Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
 
@@ -72,4 +72,4 @@ For example, E2E tests can be run from Velero repository roots using the below c
 
 Velero E2E tests uses [Ginkgo](https://onsi.github.io/ginkgo/) testing framework which allows a subset of the tests to be run using the [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) flags to ginkgo.
 
-The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. This can be used to focus on tests for a particular storage provider. For example, using `GINKGO_FOCUS="AWS"` will skip all tests except the ones whose test description matches the supplied regex `AWS`.
+The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. This can be used to focus on specific tests.

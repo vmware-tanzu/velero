@@ -67,7 +67,7 @@ run: ginkgo
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
 		@[ "${PLUGIN_PROVIDER}" ] && echo "Using plugin provider ${PLUGIN_PROVIDER} for object storage and volume snaphotting" || \
 			(echo "Plugin provider  to store the backups from E2E tests is required, please re-run with PLUGIN_PROVIDER=<pluginProviderName>"; exit 1 )
-	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
+	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-credentials-file=$(CREDS_FILE) \
 		-bucket=$(BSL_BUCKET) \

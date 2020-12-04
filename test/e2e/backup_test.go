@@ -17,16 +17,13 @@ import (
 
 var (
 	uuidgen              uuid.UUID
-	err                  error
-	backupName           string
-	restoreName          string
 	veleroInstallOptions *install.InstallOptions
 )
 
 func veleroInstall(cloudProvider string, useRestic bool) {
+	var err error
 	flag.Parse()
 	Expect(EnsureClusterExists(context.TODO())).To(Succeed(), "Failed to ensure kubernetes cluster exists")
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	uuidgen, err = uuid.NewRandom()
 	Expect(err).To(Succeed())
 	veleroInstallOptions, err = GetProviderVeleroInstallOptions(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, getProviderPlugins(cloudProvider))
@@ -36,15 +33,17 @@ func veleroInstall(cloudProvider string, useRestic bool) {
 }
 
 // Test backup and restore of Kibishi using restic
-var _ = Describe("Velero tests on Kind cluster using cloudProvider for object storage and Restic for volume backups", func() {
+var _ = Describe("[Restic] Velero tests on Kind cluster using cloudProvider for object storage and Restic for volume backups", func() {
 	var (
-		client *kubernetes.Clientset
-		err    error
+		client      *kubernetes.Clientset
+		backupName  string
+		restoreName string
 	)
 	BeforeEach(func() {
+		var err error
 		veleroInstall(pluginProvider, true)
 		client, err = GetClusterClient()
-		Expect(err).To(Succeed())
+		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	})
 	AfterEach(func() {
 		timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
