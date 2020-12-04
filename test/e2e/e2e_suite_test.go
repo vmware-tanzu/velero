@@ -16,14 +16,16 @@ var (
 	bslBucket            string
 	bslPrefix            string
 	vslConfig            string
+	pluginProvider       string
 )
 
 func init() {
-	flag.StringVar(&veleroCLI, "velerocli", "velero", "path to the velero application to use")
-	flag.StringVar(&veleroImage, "velero-image", "velero/velero:main", "image for the velero server to be tested")
-	flag.StringVar(&cloudCredentialsFile, "credentials-file", "", "file containing credentials for backup and volume provider.")
+	flag.StringVar(&pluginProvider, "plugin-provider", "", "Provider of object store and volume snapshotter plugins. Required.")
+	flag.StringVar(&bslBucket, "bucket", "", "name of the object storage bucket where backups from e2e tests should be stored. Required.")
+	flag.StringVar(&cloudCredentialsFile, "credentials-file", "", "file containing credentials for backup and volume provider. Required.")
+	flag.StringVar(&veleroCLI, "velerocli", "velero", "path to the velero application to use.")
+	flag.StringVar(&veleroImage, "velero-image", "velero/velero:main", "image for the velero server to be tested.")
 	flag.StringVar(&bslConfig, "bsl-config", "", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
-	flag.StringVar(&bslBucket, "bucket", "", "name of the object storage bucket where backups from e2e tests should be stored")
 	flag.StringVar(&bslPrefix, "prefix", "", "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flag.StringVar(&vslConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 }

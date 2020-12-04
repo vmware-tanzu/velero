@@ -26,8 +26,7 @@ func getProviderPlugins(providerName string) []string {
 	case "azure":
 		return []string{"velero/velero-plugin-for-microsoft-azure:v1.1.1"}
 	case "vsphere":
-		// TODO: find correct image tag
-		return []string{"velero/velero-plugin-for-vsphere:v1.1.1"}
+		return []string{"velero/velero-plugin-for-aws:v1.1.0", "velero/velero-plugin-for-vsphere:v1.0.2"}
 	default:
 		return []string{""}
 	}
@@ -68,7 +67,7 @@ func GetProviderVeleroInstallOptions(providerName, credentialsFile, objectStoreB
 }
 
 // InstallVeleroServer installs velero in the cluster using `velero install command`
-func InstallVeleroServer(ctx context.Context, io *cliinstall.InstallOptions) error {
+func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 	config, err := client.LoadConfig()
 	if err != nil {
 		return err

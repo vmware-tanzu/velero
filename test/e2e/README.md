@@ -4,7 +4,7 @@ Document for running Velero end-to-end test suite.
 
 The E2E tests are validating end-to-end behavior of Velero including install, backup and restore operations. These tests take longer to complete and is not expected to be part of day-to-day developer workflow. It is for this reason that they are disabled when running unit tests. This is accomplished by running unit tests in [`short`](https://golang.org/pkg/testing/#Short) mode using the `-short` flag to `go test`.
 
-If you previously ran unit tests using the `go test ./...` command or any of its variations, then you will now run the same command with the  `-short` flag to `go test` to accomplish the same behavior. Alternatively, you can use the [`hack/test.sh`](https://github.com/vmware-tanzu/velero/blob/main/hack/test.sh) script to run unit tests.
+If you previously ran unit tests using the `go test ./...` command or any of its variations, then you will now run the same command with the  `-short` flag to `go test` to accomplish the same behavior. Alternatively, you can use the `make test` command to run unit tests.
 
 ## Prerequisites
 
@@ -31,11 +31,14 @@ These configuration parameters are expected as values to the following command l
 
 1. `-credentials-file`: File containing credentials for backup and volume provider. Required.
 1. `-bucket`: Name of the object storage bucket where backups from e2e tests should be stored. Required.
+1. `-plugin-provider`: Provider of object store and volume snapshotter plugins. Required.
 1. `-velerocli`: Path to the velero application to use. Optional, by default uses `velero` in the `$PATH`
 1. `-velero-image`: Image for the velero server to be tested. Optional, by default uses `velero/velero:main`
 1. `-bsl-config`: Configuration to use for the backup storage location. Format is key1=value1,key2=value2. Optional.
 1. `-prefix`: Prefix in the `bucket`, under which all Velero data should be stored within the bucket. Optional.
 1. `-vsl-config`: Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2. Optional.
+
+These configurations or parameters are used to generate install options for Velero for each test suite.
 
 ## Running tests locally
 
@@ -44,13 +47,14 @@ These configuration parameters are expected as values to the following command l
 E2E tests can be run from the Velero repository root by running `make test-e2e`. While running E2E tests using `make` the E2E test configuration values are passed using `make` variables.
 
 Below is a mapping between `make` variables to E2E configuration flags.
-1. `CREDS_FILE`: Corresponds to `-credentials-file`. Required.
-1. `BSL_BUCKET`: Corresponds to `-bucket`. Required.
-1. `VELERO_CLI`: Corresponds to the `-velerocli`. Optional.
-1. `VELERO_IMAGE`: Corresponds to the `-velero-image`. Optional.
-1. `BSL_PREFIX`: Corresponds to `-prefix`. Optional.
-1. `BSL_CONFIG`: Corresponds to `-bsl-config`. Optional.
-1. `VSL_CONFIG`: Corresponds to `-vsl-config`. Optional.
+1. `CREDS_FILE`: `-credentials-file`. Required.
+1. `BSL_BUCKET`: `-bucket`. Required.
+1. `PLUGIN_PROVIDER`: `-plugin-provider`. Required.
+1. `VELERO_CLI`: the `-velerocli`. Optional.
+1. `VELERO_IMAGE`: the `-velero-image`. Optional.
+1. `BSL_PREFIX`: `-prefix`. Optional.
+1. `BSL_CONFIG`: `-bsl-config`. Optional.
+1. `VSL_CONFIG`: `-vsl-config`. Optional.
 
 For example, E2E tests can be run from Velero repository roots using the below command:
 
