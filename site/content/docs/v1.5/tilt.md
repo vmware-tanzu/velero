@@ -19,11 +19,14 @@ files in this directory are gitignored so you may configure your setup according
 
 ## Prerequisites
 1. [Docker](https://docs.docker.com/install/) v19.03 or newer
-1. A Kubernetes cluster (does not have to be Kind)
+1. A Kubernetes cluster v1.10 or greater (does not have to be Kind)
 1. [Tilt](https://docs.tilt.dev/install.html) v0.12.0 or newer
 1. Clone the [Velero project](https://github.com/vmware-tanzu/velero) repository
    locally
+1. Access to an S3 object storage
 1. Clone any [provider plugin(s)](https://velero.io/plugins/) you want to make changes to and deploy (optional, must be configured to be deployed by the Velero Tilt's setup, [more info below](#provider-plugins))
+
+Note: To properly configure any plugin you use, please follow the plugin's documentation.
 
 ## Getting started
 
@@ -46,12 +49,14 @@ Here is an example:
     "enable_providers": [
         "aws",
         "gcp",
-        "azure"
+        "azure",
+        "csi"
     ],
     "providers": { 
         "aws": "../velero-plugin-for-aws",
         "gcp": "../velero-plugin-for-gcp",
-        "azure": "../velero-plugin-for-microsoft-azure"
+        "azure": "../velero-plugin-for-microsoft-azure",
+        "csi": "../velero-plugin-for-csi"
     },
     "allowed_contexts": [
         "development"

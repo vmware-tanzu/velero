@@ -41,6 +41,8 @@ if settings.get("setup-minio"):
 allow_k8s_contexts(settings.get("allowed_contexts"))
 default_registry(settings.get("default_registry"))
 local_goos = str(local("go env GOOS", quiet=True, echo_off=True)).strip()
+git_sha = str(local("git rev-parse HEAD", quiet=True, echo_off=True)).strip()
+
 
 tilt_helper_dockerfile_header = """
 # Tilt image
@@ -68,14 +70,14 @@ COPY --from=tilt-helper /go/kubernetes/client/bin/kubectl /usr/bin/kubectl
 # Set up a local_resource build of the Velero binary. The binary is written to _tiltbuild/velero.
 local_resource(
     "velero_server_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild;PKG=. BIN=velero GOOS=linux GOARCH=amd64 VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild ./hack/build.sh',
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild;PKG=. BIN=velero GOOS=linux GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild ./hack/build.sh',
     deps = ["cmd", "internal", "pkg"],
     ignore = ["pkg/cmd"],
 )
 
 local_resource(
     "velero_local_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/local;PKG=. BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild/local ./hack/build.sh',
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/local;PKG=. BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild/local ./hack/build.sh',
     deps = ["internal", "pkg/cmd"],
 )
 
