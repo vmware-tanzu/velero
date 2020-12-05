@@ -140,7 +140,7 @@ func TestParseGroupVersions(t *testing.T) {
 			want:  map[string]metav1.APIGroup{},
 		},
 		{
-			name:  "when there is a mix of cluster-scoped and namespaced items for resources with preferred or mulitple API groups, all group versions are correctly returned",
+			name:  "when there is a mix of cluster-scoped and namespaced items for resources with preferred or multiple API groups, all group versions are correctly returned",
 			buDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
 			files: []string{
 				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/clusterroles.rbac.authorization.k8s.io/v1-preferredversion/cluster/system/controller/attachdetach-controller.json",
