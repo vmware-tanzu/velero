@@ -66,7 +66,7 @@ func GetProviderVeleroInstallOptions(providerName, credentialsFile, objectStoreB
 	return io, nil
 }
 
-// InstallVeleroServer installs velero in the cluster using `velero install command`
+// InstallVeleroServer installs velero in the cluster.
 func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 	config, err := client.LoadConfig()
 	if err != nil {
@@ -109,6 +109,7 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 	return nil
 }
 
+// CheckBackupPhase uses veleroCLI to inspect the phase of a Velero backup.
 func CheckBackupPhase(ctx context.Context, veleroCLI string, backupName string, expectedPhase velerov1api.BackupPhase) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "backup", "get", "-o", "json", backupName)
 	fmt.Printf("get backup cmd =%v\n", checkCMD)
@@ -149,6 +150,7 @@ func CheckBackupPhase(ctx context.Context, veleroCLI string, backupName string, 
 	return nil
 }
 
+// CheckRestorePhase uses veleroCLI to inspect the phase of a Velero restore.
 func CheckRestorePhase(ctx context.Context, veleroCLI string, restoreName string, expectedPhase velerov1api.RestorePhase) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "restore", "get", "-o", "json", restoreName)
 	fmt.Printf("get restore cmd =%v\n", checkCMD)
@@ -189,7 +191,8 @@ func CheckRestorePhase(ctx context.Context, veleroCLI string, restoreName string
 	return nil
 }
 
-func BackupNamespace(ctx context.Context, veleroCLI string, backupName string, namespace string) error {
+// VeleroBackupNamespace uses the veleroCLI to backup a namespace.
+func VeleroBackupNamespace(ctx context.Context, veleroCLI string, backupName string, namespace string) error {
 	backupCmd := exec.CommandContext(ctx, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
 		"--default-volumes-to-restic", "--wait")
 	fmt.Printf("backup cmd =%v\n", backupCmd)
@@ -200,7 +203,8 @@ func BackupNamespace(ctx context.Context, veleroCLI string, backupName string, n
 	return CheckBackupPhase(ctx, veleroCLI, backupName, velerov1api.BackupPhaseCompleted)
 }
 
-func RestoreNamespace(ctx context.Context, veleroCLI string, restoreName string, backupName string) error {
+// VeleroRestore uses the veleroCLI to restore from a Velero backup.
+func VeleroRestore(ctx context.Context, veleroCLI string, restoreName string, backupName string) error {
 	restoreCmd := exec.CommandContext(ctx, veleroCLI, "create", "restore", restoreName, "--from-backup", backupName, "--wait")
 	fmt.Printf("restore cmd =%v\n", restoreCmd)
 	err := restoreCmd.Run()

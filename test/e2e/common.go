@@ -44,7 +44,3 @@ func CreateNamespace(ctx context.Context, client *kubernetes.Clientset, namespac
 	}
 	return err
 }
-
-func NamespaceExists(ctx context.Context, namespace string) (bool, error) {
-	return false, nil
-}

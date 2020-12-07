@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,20 +21,20 @@ var (
 	veleroInstallOptions *install.InstallOptions
 )
 
-func veleroInstall(cloudProvider string, useRestic bool) {
+func veleroInstall(pluginProvider string, useRestic bool) {
 	var err error
 	flag.Parse()
 	Expect(EnsureClusterExists(context.TODO())).To(Succeed(), "Failed to ensure kubernetes cluster exists")
 	uuidgen, err = uuid.NewRandom()
 	Expect(err).To(Succeed())
-	veleroInstallOptions, err = GetProviderVeleroInstallOptions(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, getProviderPlugins(cloudProvider))
-	Expect(err).To(Succeed(), "Failed to get Velero InstallOptions for provider azure")
+	veleroInstallOptions, err = GetProviderVeleroInstallOptions(pluginProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, getProviderPlugins(pluginProvider))
+	Expect(err).To(Succeed(), fmt.Sprintf("Failed to get Velero InstallOptions for plugin provider %s", pluginProvider))
 	veleroInstallOptions.UseRestic = useRestic
-	Expect(InstallVeleroServer(veleroInstallOptions)).To(Succeed(), "Failed to install Velero on kind cluster")
+	Expect(InstallVeleroServer(veleroInstallOptions)).To(Succeed(), "Failed to install Velero on KinD cluster")
 }
 
 // Test backup and restore of Kibishi using restic
-var _ = Describe("[Restic] Velero tests on Kind cluster using cloudProvider for object storage and Restic for volume backups", func() {
+var _ = Describe("[Restic] [KinD] Velero tests on KinD cluster using the plugin provider for object storage and Restic for volume backups", func() {
 	var (
 		client      *kubernetes.Clientset
 		backupName  string

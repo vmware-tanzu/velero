@@ -169,7 +169,7 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, bac
 		return errors.Wrap(err, "Failed to generate data")
 	}
 
-	if err := BackupNamespace(oneHourTimeout, veleroCLI, backupName, kibishiiNamespace); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, backupName, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
 
@@ -178,7 +178,7 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, bac
 		return errors.Wrap(err, "Failed to simulate a disaster")
 	}
 
-	if err := RestoreNamespace(oneHourTimeout, veleroCLI, restoreName, backupName); err != nil {
+	if err := VeleroRestore(oneHourTimeout, veleroCLI, restoreName, backupName); err != nil {
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
 

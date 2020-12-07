@@ -9,14 +9,7 @@ import (
 )
 
 var (
-	veleroCLI            string
-	veleroImage          string
-	cloudCredentialsFile string
-	bslConfig            string
-	bslBucket            string
-	bslPrefix            string
-	vslConfig            string
-	pluginProvider       string
+	veleroCLI, veleroImage, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, pluginProvider string
 )
 
 func init() {
