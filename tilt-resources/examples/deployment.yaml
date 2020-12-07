@@ -49,6 +49,8 @@ spec:
           ports:
             - containerPort: 8085
               name: metrics
+            - containerPort: 2345
+              name: delve
           resources:
             limits:
               cpu: "1"
