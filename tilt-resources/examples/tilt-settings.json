@@ -17,5 +17,7 @@
     ],
     "enable_restic": false,
     "create_backup_locations": true,
-    "setup-minio": true
+    "setup-minio": true,
+    "enable_debug": false,
+    "debug_continue_on_start": true
 }
