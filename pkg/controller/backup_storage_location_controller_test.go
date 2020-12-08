@@ -193,14 +193,14 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			wantErr           bool
 		}{
 			{
-				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(0).Result(),
+				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(0).LastValidationTime(time.Now()).Result(),
 				isValidError:      nil,
 				expectedIsDefault: false,
 				expectedPhase:     "",
 				wantErr:           false,
 			},
 			{
-				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-2").ValidationFrequency(0).Result(),
+				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-2").ValidationFrequency(0).LastValidationTime(time.Now()).Result(),
 				isValidError:      nil,
 				expectedIsDefault: false,
 				expectedPhase:     "",
