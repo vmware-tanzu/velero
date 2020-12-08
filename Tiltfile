@@ -81,8 +81,9 @@ local_resource(
     deps = ["internal", "pkg/cmd"],
 )
 
+# Note: we need a distro with a bash shell to exec into the Velero container
 tilt_dockerfile_header = """
-FROM gcr.io/distroless/base:debug as tilt
+FROM ubuntu:focal as tilt
 WORKDIR /
 COPY --from=tilt-helper /start.sh .
 COPY --from=tilt-helper /restart.sh .
@@ -157,7 +158,7 @@ def enable_provider(provider):
     name = provider.get("name")
     plugin_name = provider.get("plugin_name")
 
-    # Note: we need a distro other than base:debug to get a shell to do a copy of the plugin binary
+    # Note: we need a distro with a shell to do a copy of the plugin binary
     tilt_dockerfile_header = """
     FROM ubuntu:focal as tilt
     WORKDIR /
