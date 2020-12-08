@@ -28,7 +28,6 @@ debug
 
 /velero
 .idea/
-Tiltfile
 
 .container-*
 .vimrc
@@ -43,3 +42,11 @@ site/public
 site/resources
 
 .vs
+
+# these are files for local Tilt development:
+_tiltbuild
+tilt-resources/tilt-settings.json
+tilt-resources/velero_v1_backupstoragelocation.yaml
+tilt-resources/deployment.yaml
+tilt-resources/restic.yaml
+tilt-resources/cloud
