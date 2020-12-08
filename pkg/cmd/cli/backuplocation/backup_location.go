@@ -33,6 +33,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		NewCreateCommand(f, "create"),
 		NewDeleteCommand(f, "delete"),
 		NewGetCommand(f, "get"),
+		NewSetCommand(f, "set"),
 	)
 
 	return c

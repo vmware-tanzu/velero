@@ -32,6 +32,7 @@ import (
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
 	var listOptions metav1.ListOptions
+	var showDefaultOnly bool
 
 	c := &cobra.Command{
 		Use:   use,
@@ -45,14 +46,21 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 
 			locations := new(velerov1api.BackupStorageLocationList)
 			if len(args) > 0 {
-				location := &velerov1api.BackupStorageLocation{}
 				for _, name := range args {
+					location := &velerov1api.BackupStorageLocation{}
 					err = kbClient.Get(context.Background(), kbclient.ObjectKey{
 						Namespace: f.Namespace(),
 						Name:      name,
 					}, location)
 					cmd.CheckError(err)
-					locations.Items = append(locations.Items, *location)
+
+					if showDefaultOnly {
+						if location.Spec.Default {
+							locations.Items = append(locations.Items, *location)
+						}
+					} else {
+						locations.Items = append(locations.Items, *location)
+					}
 				}
 			} else {
 				err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{
@@ -60,6 +68,19 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					Raw:       &listOptions,
 				})
 				cmd.CheckError(err)
+
+				if showDefaultOnly {
+					for i := 0; i < len(locations.Items); i++ {
+						if locations.Items[i].Spec.Default {
+							continue
+						}
+						if i != len(locations.Items)-1 {
+							copy(locations.Items[i:], locations.Items[i+1:])
+							i = i - 1
+						}
+						locations.Items = locations.Items[:len(locations.Items)-1]
+					}
+				}
 			}
 
 			_, err = output.PrintWithFormat(c, locations)
@@ -67,6 +88,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
+	c.Flags().BoolVar(&showDefaultOnly, "default", false, "Displays the current default backup storage location.")
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "Only show items matching this label selector.")
 
 	output.BindFlags(c.Flags())

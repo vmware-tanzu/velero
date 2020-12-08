@@ -63,6 +63,7 @@ type CreateOptions struct {
 	Name                                  string
 	Provider                              string
 	Bucket                                string
+	DefaultBackupStorageLocation          bool
 	Prefix                                string
 	BackupSyncPeriod, ValidationFrequency time.Duration
 	Config                                flag.Map
@@ -85,6 +86,7 @@ func NewCreateOptions() *CreateOptions {
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the backup storage provider (e.g. aws, azure, gcp).")
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "Name of the object storage bucket where backups should be stored.")
+	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "How often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
 	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "How often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
@@ -162,6 +164,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				},
 			},
 			Config:              o.Config.Data(),
+			Default:             o.DefaultBackupStorageLocation,
 			AccessMode:          velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
 			BackupSyncPeriod:    backupSyncPeriod,
 			ValidationFrequency: validationFrequency,
@@ -175,6 +178,25 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err
+	}
+
+	if o.DefaultBackupStorageLocation {
+		// There is one and only one default backup storage location.
+		// Disable the origin default backup storage location.
+		locations := new(velerov1api.BackupStorageLocationList)
+		if err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
+			return errors.WithStack(err)
+		}
+		for _, location := range locations.Items {
+			if !location.Spec.Default {
+				continue
+			}
+			location.Spec.Default = false
+			if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil {
+				return errors.WithStack(err)
+			}
+			break
+		}
 	}
 
 	if err := kbClient.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {

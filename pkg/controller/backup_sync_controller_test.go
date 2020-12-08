@@ -55,6 +55,7 @@ func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation
 						Bucket: "bucket-1",
 					},
 				},
+				Default: true,
 			},
 		},
 		{

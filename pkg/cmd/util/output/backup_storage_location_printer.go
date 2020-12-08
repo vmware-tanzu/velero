@@ -33,6 +33,7 @@ var (
 		{Name: "Phase"},
 		{Name: "Last Validated"},
 		{Name: "Access Mode"},
+		{Name: "Default"},
 	}
 )
 
@@ -48,6 +49,11 @@ func printBackupStorageLocationList(list *velerov1api.BackupStorageLocationList)
 func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: location},
+	}
+
+	isDefault := ""
+	if location.Spec.Default {
+		isDefault = "true"
 	}
 
 	bucketAndPrefix := location.Spec.ObjectStorage.Bucket
@@ -78,6 +84,7 @@ func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []m
 		status,
 		LastValidatedStr,
 		accessMode,
+		isDefault,
 	)
 
 	return []metav1.TableRow{row}

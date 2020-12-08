@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -129,7 +129,13 @@ func (c *backupSyncController) run() {
 		return
 	}
 
-	// sync the default location first, if it exists
+	// sync the default backup storage location first, if it exists
+	for _, location := range locationList.Items {
+		if location.Spec.Default {
+			c.defaultBackupLocation = location.Name
+			break
+		}
+	}
 	locations := orderedBackupLocations(&locationList, c.defaultBackupLocation)
 
 	pluginManager := c.newPluginManager(c.logger)

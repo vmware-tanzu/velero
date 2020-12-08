@@ -41,6 +41,7 @@ import (
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -345,6 +346,16 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// default storage location if not specified
 	if request.Spec.StorageLocation == "" {
 		request.Spec.StorageLocation = c.defaultBackupLocation
+
+		locationList, err := storage.ListBackupStorageLocations(context.Background(), c.kbClient, request.Namespace)
+		if err == nil {
+			for _, location := range locationList.Items {
+				if location.Spec.Default {
+					request.Spec.StorageLocation = location.Name
+					break
+				}
+			}
+		}
 	}
 
 	if request.Spec.DefaultVolumesToRestic == nil {

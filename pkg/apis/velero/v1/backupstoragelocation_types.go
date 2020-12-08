@@ -32,6 +32,10 @@ type BackupStorageLocationSpec struct {
 
 	StorageType `json:",inline"`
 
+	// Default indicates this location is the default backup storage location.
+	// +optional
+	Default bool `json:"default,omitempty"`
+
 	// AccessMode defines the permissions for the backup storage location.
 	// +optional
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
@@ -96,6 +100,7 @@ type BackupStorageLocationStatus struct {
 // +kubebuilder:printcolumn:name="Last Validated",type="date",JSONPath=".status.lastValidationTime",description="LastValidationTime is the last time the backup store location was validated"
 // +kubebuilder:printcolumn:name="Access Mode",type="string",JSONPath=".spec.accessMode",description="Permissions for the backup storage location"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Default",type="boolean",JSONPath=".spec.default",description="Default backup storage location"
 
 // BackupStorageLocation is a location where Velero stores backup objects
 type BackupStorageLocation struct {

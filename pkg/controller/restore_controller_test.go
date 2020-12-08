@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,7 +117,6 @@ func TestFetchBackupInfo(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				"default",
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
@@ -213,7 +212,6 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				nil,
-				"default",
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
@@ -440,7 +438,6 @@ func TestProcessQueueItem(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				"default",
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
@@ -673,7 +670,6 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		logger,
 		logrus.DebugLevel,
 		nil,
-		"default",
 		nil,
 		formatFlag,
 	).(*restoreController)
