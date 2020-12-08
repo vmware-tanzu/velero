@@ -71,6 +71,8 @@ toc:
         url: /start-contributing
       - page: Development
         url: /development
+      - page: Rapid development with Tilt
+        url: /tilt
       - page: Build from source
         url: /build-from-source
       - page: Run locally
