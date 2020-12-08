@@ -67,13 +67,25 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 	defer pluginManager.CleanupClients()
 
 	var defaultFound bool
+	for _, location := range locationList.Items {
+		if location.Spec.Default {
+			defaultFound = true
+			break
+		}
+	}
+
 	var unavailableErrors []string
 	var anyVerified bool
 	for i := range locationList.Items {
 		location := &locationList.Items[i]
+		isDefault := location.Spec.Default
 		log := r.Log.WithField("controller", BackupStorageLocation).WithField(BackupStorageLocation, location.Name)
 
-		if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
+		if !defaultFound && location.Name == r.DefaultBackupLocationInfo.StorageLocation {
+			// For backward-compatible, to configure the backup storage location as the default if
+			// none of the BSLs be marked as the default and the BSL name matches against the
+			// "velero server --default-backup-storage-location".
+			isDefault = true
 			defaultFound = true
 		}
 
@@ -95,29 +107,28 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			continue
 		}
 
+		// updates the default backup location
+		location.Spec.Default = isDefault
+
 		log.Info("Validating backup storage location")
 		anyVerified = true
 		if err := backupStore.IsValid(); err != nil {
-			log.Info("Backup location is invalid, marking as unavailable")
-			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup location %q is unavailable", location.Name).Error())
-
-			if location.Name == r.DefaultBackupLocationInfo.StorageLocation {
-				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", r.DefaultBackupLocationInfo.StorageLocation)
-			}
-
+			log.Info("Backup storage location is invalid, marking as unavailable")
+			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup storage location %q is unavailable", location.Name).Error())
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
 		} else {
-			log.Info("Backup location valid, marking as available")
+			log.Info("Backup storage location valid, marking as available")
 			location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
 		}
 		location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
+
 		if err := patchHelper.Patch(r.Ctx, location); err != nil {
-			log.WithError(err).Error("Error updating backup location phase")
+			log.WithError(err).Error("Error updating backup storage location phase")
 		}
 	}
 
 	if !anyVerified {
-		log.Debug("No backup locations needed to be validated")
+		log.Debug("No backup storage locations needed to be validated")
 	}
 
 	r.logReconciledPhase(defaultFound, locationList, unavailableErrors)
@@ -154,11 +165,11 @@ func (r *BackupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 			log.Errorf("Current backup storage locations available/unavailable/unknown: %v/%v/%v)", numAvailable, numUnavailable, numUnknown)
 		}
 	} else if numUnavailable > 0 { // some but not all BSL unavailable
-		log.Warnf("Invalid backup locations detected: available/unavailable/unknown: %v/%v/%v, %s)", numAvailable, numUnavailable, numUnknown, strings.Join(errs, "; "))
+		log.Warnf("Invalid backup storage locations detected: available/unavailable/unknown: %v/%v/%v, %s)", numAvailable, numUnavailable, numUnknown, strings.Join(errs, "; "))
 	}
 
 	if !defaultFound {
-		log.Warnf("The specified default backup location named %q was not found; for convenience, be sure to create one or make another backup location that is available the default", r.DefaultBackupLocationInfo.StorageLocation)
+		log.Warn("The default backup storage location was not found; for convenience, be sure to create one or make another backup location that is designated as the default")
 	}
 }
 

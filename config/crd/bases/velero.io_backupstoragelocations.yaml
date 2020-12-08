@@ -33,6 +33,10 @@ spec:
   - JSONPath: .metadata.creationTimestamp
     name: Age
     type: date
+  - JSONPath: .spec.default
+    description: Default backup storage location
+    name: Default
+    type: boolean
   group: velero.io
   names:
     kind: BackupStorageLocation
@@ -83,6 +87,10 @@ spec:
                 type: string
               description: Config is for provider-specific configuration fields.
               type: object
+            default:
+              description: Default indicates this location is the default backup storage
+                location.
+              type: boolean
             objectStorage:
               description: ObjectStorageLocation specifies the settings necessary
                 to connect to a provider's object storage.
