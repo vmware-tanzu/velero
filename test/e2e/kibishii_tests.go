@@ -1,13 +1,9 @@
 package e2e
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/kubernetes"
+
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 const (
@@ -25,37 +23,22 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform string
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
 		"github.com/vmware-tanzu-labs/distributed-data-generator/kubernetes/yaml/"+cloudPlatform)
-	stdoutPipe, err := kibishiiInstallCmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	err = kibishiiInstallCmd.Start()
-	if err != nil {
-		return err
-	}
 
-	defer stdoutPipe.Close()
-	// copy the data written to the PipeReader via the cmd to stdout
-	_, err = io.Copy(os.Stdout, stdoutPipe)
-
+	_, _, err := veleroexec.RunCommand(kibishiiInstallCmd)
 	if err != nil {
-		return err
-	}
-	err = kibishiiInstallCmd.Wait()
-	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to install kibishii")
 	}
 
 	kibishiiSetWaitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
 		"-n", namespace, "-w", "--timeout=30m")
-	err = kibishiiSetWaitCmd.Run()
+	_, _, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
 
 	if err != nil {
 		return err
 	}
 
 	jumpPadWaitCmd := exec.CommandContext(ctx, "kubectl", "wait", "--for=condition=ready", "-n", namespace, "pod/jump-pad")
-	err = jumpPadWaitCmd.Run()
+	_, _, err = veleroexec.RunCommand(jumpPadWaitCmd)
 
 	return err
 }
@@ -66,44 +49,13 @@ func generateData(ctx context.Context, namespace string, levels int, filesPerLev
 		"/usr/local/bin/generate.sh", strconv.Itoa(levels), strconv.Itoa(filesPerLevel), strconv.Itoa(dirsPerLevel), strconv.Itoa(fileSize),
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
-	stdoutPipe, err := kibishiiGenerateCmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	err = kibishiiGenerateCmd.Start()
-	if err != nil {
-		return err
-	}
-	defer stdoutPipe.Close()
 
-	stdoutReader := bufio.NewReader(stdoutPipe)
-	var readErr error
-	for true {
-		buf, isPrefix, err := stdoutReader.ReadLine()
-		if err != nil {
-			readErr = err
-			break
-		} else {
-			if isPrefix {
-				readErr = errors.New("line returned exceeded max length")
-				break
-			}
-			line := strings.TrimSpace(string(buf))
-			if line == "success" {
-				break
-			}
-			if line == "failed" {
-				readErr = errors.New("generate failed")
-				break
-			}
-			fmt.Println(line)
-		}
+	_, _, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate")
 	}
-	err = kibishiiGenerateCmd.Wait()
-	if readErr != nil {
-		err = readErr // Squash the Wait err, the read error is probably more interesting
-	}
-	return err
+
+	return nil
 }
 
 func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel int, dirsPerLevel int, fileSize int,
@@ -112,44 +64,12 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 		"/usr/local/bin/verify.sh", strconv.Itoa(levels), strconv.Itoa(filesPerLevel), strconv.Itoa(dirsPerLevel), strconv.Itoa(fileSize),
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
-	stdoutPipe, err := kibishiiVerifyCmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	err = kibishiiVerifyCmd.Start()
-	if err != nil {
-		return err
-	}
-	defer stdoutPipe.Close()
 
-	stdoutReader := bufio.NewReader(stdoutPipe)
-	var readErr error
-	for true {
-		buf, isPrefix, err := stdoutReader.ReadLine()
-		if err != nil {
-			readErr = err
-			break
-		} else {
-			if isPrefix {
-				readErr = errors.New("line returned exceeded max length")
-				break
-			}
-			line := strings.TrimSpace(string(buf))
-			if line == "success" {
-				break
-			}
-			if line == "failed" {
-				readErr = errors.New("generate failed")
-				break
-			}
-			fmt.Println(line)
-		}
+	_, _, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+	if err != nil {
+		return errors.Wrap(err, "failed to verify")
 	}
-	err = kibishiiVerifyCmd.Wait()
-	if readErr != nil {
-		err = readErr // Squash the Wait err, the read error is probably more interesting
-	}
-	return err
+	return nil
 }
 
 // RunKibishiiTests runs kibishii tests on the provider.
