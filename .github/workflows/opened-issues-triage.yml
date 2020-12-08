@@ -10,6 +10,6 @@ jobs:
     steps:
       - uses: alex-page/github-project-automation-plus@v0.3.0
         with:
-          project: "Velero Support Triage Board"
-          column: "Needs triage"
-          repo-token: ${{ secrets.GH_TOKEN }}
+          project: "Velero Support Board"
+          column: "New"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
