@@ -1574,6 +1574,11 @@ spec:
                 target namespace names to restore into. Any source namespaces not
                 included in the map will be restored into namespaces of the same name.
               type: object
+            preserveNodePorts:
+              description: PreserveNodePorts specifies whether to restore old nodePorts
+                from backup.
+              nullable: true
+              type: boolean
             restorePVs:
               description: RestorePVs specifies whether to restore all included PVs
                 from snapshot (via the cloudprovider).

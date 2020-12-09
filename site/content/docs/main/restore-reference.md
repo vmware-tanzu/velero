@@ -36,6 +36,56 @@ Available Commands:
   logs        Get restore logs
 ```
 
+## What happens to NodePorts when restoring Services
+
+**Auto assigned** NodePorts **deleted** by default and Services get new **auto assigned** nodePorts after restore.
+
+**Explicitly specified** NodePorts auto detected using **`last-applied-config`** annotation and **preserved** after restore.  NodePorts can be explicitly specified as .spec.ports[*].nodePort field on Service definition.
+
+#### Always Preserve NodePorts
+
+It is not always possible to set nodePorts explicitly on some big clusters because of operation complexity. Official Kubernetes documents states that preventing port collisions is responsibility of the user when explicitly specifying nodePorts:
+
+```
+If you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.
+
+https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
+```
+
+The clusters which are not explicitly specifying nodePorts still may need to restore original NodePorts in case of disaster. Auto assigned nodePorts most probably defined on Load Balancers which located front side of cluster.  Changing all these nodePorts on Load Balancers is another operation complexity after disaster if nodePorts are changed.
+
+Velero has a flag to let user deciding the preservation of nodePorts. **`velero restore create`** sub command has  **`--preserve-nodeports`** flag to **preserve** Service nodePorts **always** regardless of nodePorts **explicitly specified** or **not**. This flag used for preserving the original nodePorts from backup and can be used as **`--preserve-nodeports`** or **`--preserve-nodeports=true`**
+
+If this flag given and/or set to true, Velero does not remove the nodePorts when restoring Service and tries to use the nodePorts which written on backup.
+
+Trying to preserve nodePorts may cause **port conflicts** when restoring on situations below:
+
+- If the nodePort from the backup already allocated on the target cluster then Velero prints error log as shown below and continue to restore operation.
+
+  ```
+  time="2020-11-23T12:58:31+03:00" level=info msg="Executing item action for services" logSource="pkg/restore/restore.go:1002" restore=velero/test-with-3-svc-20201123125825
+
+  time="2020-11-23T12:58:31+03:00" level=info msg="Restoring Services with original NodePort(s)" cmd=_output/bin/linux/amd64/velero logSource="pkg/restore/service_action.go:61" pluginName=velero restore=velero/test-with-3-svc-20201123125825
+
+  time="2020-11-23T12:58:31+03:00" level=info msg="Attempting to restore Service: hello-service" logSource="pkg/restore/restore.go:1107" restore=velero/test-with-3-svc-20201123125825
+
+  time="2020-11-23T12:58:31+03:00" level=error msg="error restoring hello-service: Service \"hello-service\" is invalid: spec.ports[0].nodePort: Invalid value: 31536: provided port is already allocated" logSource="pkg/restore/restore.go:1170" restore=velero/test-with-3-svc-20201123125825
+  ```
+
+
+
+- If the nodePort from the backup is not in the nodePort range of target cluster then Velero prints error log as below and continue to restore operation. Kubernetes default nodePort range is 30000-32767 but on the example cluster nodePort range is 20000-22767 and tried to restore Service with nodePort 31536
+
+  ```
+  time="2020-11-23T13:09:17+03:00" level=info msg="Executing item action for services" logSource="pkg/restore/restore.go:1002" restore=velero/test-with-3-svc-20201123130915
+
+  time="2020-11-23T13:09:17+03:00" level=info msg="Restoring Services with original NodePort(s)" cmd=_output/bin/linux/amd64/velero logSource="pkg/restore/service_action.go:61" pluginName=velero restore=velero/test-with-3-svc-20201123130915
+
+  time="2020-11-23T13:09:17+03:00" level=info msg="Attempting to restore Service: hello-service" logSource="pkg/restore/restore.go:1107" restore=velero/test-with-3-svc-20201123130915
+
+  time="2020-11-23T13:09:17+03:00" level=error msg="error restoring hello-service: Service \"hello-service\" is invalid: spec.ports[0].nodePort: Invalid value: 31536: provided port is not in the valid range. The range of valid ports is 20000-22767" logSource="pkg/restore/restore.go:1170" restore=velero/test-with-3-svc-20201123130915
+  ```
+
 ## Changing PV/PVC Storage Classes
 
 Velero can change the storage class of persistent volumes and persistent volume claims during restores. To configure a storage class mapping, create a config map in the Velero namespace like the following:

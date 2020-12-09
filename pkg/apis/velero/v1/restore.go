@@ -77,6 +77,11 @@ type RestoreSpec struct {
 	// +nullable
 	RestorePVs *bool `json:"restorePVs,omitempty"`
 
+	// PreserveNodePorts specifies whether to restore old nodePorts from backup.
+	// +optional
+	// +nullable
+	PreserveNodePorts *bool `json:"preserveNodePorts,omitempty"`
+
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the restore. If null, defaults
 	// to true.

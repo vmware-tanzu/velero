@@ -1272,6 +1272,11 @@ func (in *RestoreSpec) DeepCopyInto(out *RestoreSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PreserveNodePorts != nil {
+		in, out := &in.PreserveNodePorts, &out.PreserveNodePorts
+		*out = new(bool)
+		**out = **in
+	}
 	if in.IncludeClusterResources != nil {
 		in, out := &in.IncludeClusterResources, &out.IncludeClusterResources
 		*out = new(bool)

@@ -679,6 +679,10 @@ spec:
                 PVs from snapshot (via the cloudprovider).
               nullable: true
               type: boolean
+            preserveNodePorts:
+              description: PreserveNodePorts specifies whether to restore old nodePorts from backup.
+              nullable: true
+              type: boolean
             scheduleName:
               description: ScheduleName is the unique name of the Velero schedule
                 to restore from. If specified, and BackupName is empty, Velero will
