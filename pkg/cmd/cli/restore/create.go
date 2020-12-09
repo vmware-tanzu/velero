@@ -78,6 +78,7 @@ type CreateOptions struct {
 	ScheduleName            string
 	RestoreName             string
 	RestoreVolumes          flag.OptionalBool
+	PreserveNodePorts       flag.OptionalBool
 	Labels                  flag.Map
 	IncludeNamespaces       flag.StringArray
 	ExcludeNamespaces       flag.StringArray
@@ -98,6 +99,7 @@ func NewCreateOptions() *CreateOptions {
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
 		RestoreVolumes:          flag.NewOptionalBool(nil),
+		PreserveNodePorts:       flag.NewOptionalBool(nil),
 		IncludeClusterResources: flag.NewOptionalBool(nil),
 	}
 }
@@ -114,6 +116,11 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
+	// like a normal bool flag
+	f.NoOptDefVal = "true"
+
+	f = flags.VarPF(&o.PreserveNodePorts, "preserve-nodeports", "", "Whether to preserve nodeports of Services when restoring.")
+	// this allows the user to just specify "--preserve-nodeports" as shorthand for "--preserve-nodeports=true"
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
 
@@ -260,6 +267,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			NamespaceMapping:        o.NamespaceMappings.Data(),
 			LabelSelector:           o.Selector.LabelSelector,
 			RestorePVs:              o.RestoreVolumes.Value,
+			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
 	}

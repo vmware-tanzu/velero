@@ -62,29 +62,34 @@ Alternately, since in this example there's only one possible volume snapshot loc
 velero backup create full-cluster-backup
 ```
 
-### Have some Velero backups go to a bucket in an eastern USA region, and others go to a bucket in a western USA region
+### Have some Velero backups go to a bucket in an eastern USA region (default), and others go to a bucket in a western USA region
 
 During server configuration:
 
 ```shell
-velero backup-location create default \
+velero backup-location create backups-primary \
     --provider aws \
     --bucket velero-backups \
-    --config region=us-east-1
+    --config region=us-east-1 \
+    --default
 
-velero backup-location create s3-alt-region \
+velero backup-location create backups-secondary \
     --provider aws \
-    --bucket velero-backups-alt \
+    --bucket velero-backups \
     --config region=us-west-1
 ```
+
+You can alter which backup storage location as default by setting the `--default` flag under the
+`velero backup-location set` command to configure another location to be the default backup storage location.
+```shell
+velero backup-location set backups-secondary --default
+```
+
+Once the defaulted backup storage location existed under `velero backup-location get --default`, then changes the default backup storage location name by `velero server --default-backup-storage-location` takes no effects anymore because the velero backup storage location controller prefers to use velero client-side setting. However, if there is no defaulted backup storage location under `velero backup-location get --default`, then changes the default backup storage location name by `velero server --default-backup-storage-location` would work.
 
 During backup creation:
 
 ```shell
-# The Velero server will automatically store backups in the backup storage location named "default" if
-# one is not specified when creating the backup. You can alter which backup storage location is used
-# by default by setting the --default-backup-storage-location flag on the `velero server` command (run
-# by the Velero deployment) to the name of a different backup storage location.
 velero backup create full-cluster-backup
 ```
 
@@ -92,7 +97,7 @@ Or:
 
 ```shell
 velero backup create full-cluster-alternate-location-backup \
-    --storage-location s3-alt-region
+    --storage-location backups-secondary
 ```
 
 ### For volume providers that support it (like Portworx), have some snapshots be stored locally on the cluster and have others be stored in the cloud
@@ -135,10 +140,11 @@ If you don't have a use case for more than one location, it's still easy to use 
 During server configuration:
 
 ```shell
-velero backup-location create default \
+velero backup-location create backups-primary \
     --provider aws \
     --bucket velero-backups \
-    --config region=us-west-1
+    --config region=us-west-1 \
+    --default
 
 velero snapshot-location create ebs-us-west-1 \
     --provider aws \

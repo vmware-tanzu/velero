@@ -46,6 +46,8 @@ Label selector:  <none>
 
 Restore PVs:  auto
 
+Preserve Service NodePorts:  auto
+
 Phase:  Completed
 
 Validation errors:  <none>
