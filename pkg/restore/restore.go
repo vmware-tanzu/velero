@@ -1167,7 +1167,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// Error was something other than an AlreadyExists
 	if restoreErr != nil {
-		ctx.log.Infof("error restoring %s: %v", name, restoreErr)
+		ctx.log.Errorf("error restoring %s: %+v", name, restoreErr)
 		errs.Add(namespace, fmt.Errorf("error restoring %s: %v", resourceID, restoreErr))
 		return warnings, errs
 	}

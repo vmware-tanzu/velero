@@ -127,6 +127,10 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 			d.Println()
 			describePodVolumeRestores(d, podVolumeRestores, details)
 		}
+
+		d.Println()
+		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
+
 	})
 }
 
