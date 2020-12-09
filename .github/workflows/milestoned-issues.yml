@@ -14,5 +14,5 @@ jobs:
           if: ${{ !github.event.issue.pull_request }}
           project: "${{ github.event.issue.milestone.title }}"
           column: "To Do"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.GH_TOKEN }}
 
