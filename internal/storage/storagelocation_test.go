@@ -42,7 +42,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			name:                   "validate when true when validation frequency is zero and lastValidationTime is nil",
 			bslValidationFrequency: &metav1.Duration{Duration: 0},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			ready: true,
 		},
@@ -51,7 +51,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			bslValidationFrequency: &metav1.Duration{Duration: 0},
 			lastValidationTime:     &metav1.Time{Time: time.Now()},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			ready: false,
 		},
@@ -59,7 +59,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			name:                   "validate as per location setting, as that takes precedence, and always if it has never been validated before regardless of the frequency setting",
 			bslValidationFrequency: &metav1.Duration{Duration: 1 * time.Hour},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			ready: true,
 		},
@@ -67,7 +67,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			name:                   "don't validate as per location setting, as it is set to zero and that takes precedence",
 			bslValidationFrequency: &metav1.Duration{Duration: 0},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 1,
+				ServerValidationFrequency: 1,
 			},
 			lastValidationTime: &metav1.Time{Time: time.Now()},
 			ready:              false,
@@ -75,14 +75,14 @@ func TestIsReadyToValidate(t *testing.T) {
 		{
 			name: "validate as per default setting when location setting is not set",
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 1,
+				ServerValidationFrequency: 1,
 			},
 			ready: true,
 		},
 		{
 			name: "don't validate when default setting is set to zero and the location setting is not set",
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			lastValidationTime: &metav1.Time{Time: time.Now()},
 			ready:              false,
@@ -92,7 +92,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			bslValidationFrequency: &metav1.Duration{Duration: 1 * time.Second},
 			lastValidationTime:     &metav1.Time{Time: time.Now()},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			ready: false,
 		},
@@ -101,7 +101,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			bslValidationFrequency: &metav1.Duration{Duration: 1 * time.Second},
 			lastValidationTime:     &metav1.Time{Time: time.Now().Add(-1 * time.Second)},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			ready: true,
 		},
@@ -110,7 +110,7 @@ func TestIsReadyToValidate(t *testing.T) {
 			bslValidationFrequency: &metav1.Duration{Duration: 1 * time.Second},
 			lastValidationTime:     &metav1.Time{Time: time.Now().Add(-2 * time.Second)},
 			defaultLocationInfo: DefaultBackupLocationInfo{
-				StoreValidationFrequency: 0,
+				ServerValidationFrequency: 0,
 			},
 			ready: true,
 		},
@@ -120,7 +120,7 @@ func TestIsReadyToValidate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 			log := velerotest.NewLogger()
-			actual := IsReadyToValidate(tt.bslValidationFrequency, tt.lastValidationTime, tt.defaultLocationInfo, log)
+			actual := IsReadyToValidate(tt.bslValidationFrequency, tt.lastValidationTime, tt.defaultLocationInfo.ServerValidationFrequency, log)
 			g.Expect(actual).To(BeIdenticalTo(tt.ready))
 		})
 	}

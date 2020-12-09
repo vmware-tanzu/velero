@@ -156,7 +156,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:         "non-existent backup location fails validation",
 			backup:       defaultBackup().StorageLocation("nonexistent").Result(),
-			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
+			expectedErrs: []string{"an existing backup storage location wasn't specified at backup creation time and the default 'nonexistent' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
 		},
 		{
 			name:           "backup for read-only backup location fails validation",

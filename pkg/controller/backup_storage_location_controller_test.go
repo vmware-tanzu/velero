@@ -87,8 +87,8 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Ctx:    ctx,
 			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
 			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
-				StorageLocation:          "location-1",
-				StoreValidationFrequency: 0,
+				StorageLocation:           "location-1",
+				ServerValidationFrequency: 0,
 			},
 			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
@@ -156,8 +156,8 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Ctx:    ctx,
 			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
 			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
-				StorageLocation:          "default",
-				StoreValidationFrequency: 0,
+				StorageLocation:           "default",
+				ServerValidationFrequency: 0,
 			},
 			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
@@ -229,8 +229,8 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Ctx:    ctx,
 			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
 			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
-				StorageLocation:          "default",
-				StoreValidationFrequency: 0,
+				StorageLocation:           "default",
+				ServerValidationFrequency: 0,
 			},
 			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
