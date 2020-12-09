@@ -71,7 +71,11 @@ If you're not yet running at least Velero v1.5, see the following:
         Version: v1.6.0
     ```
 
-1. We've deprecated the way to indicate the default backup storage location according to the backup storage location name on the velero server-side `velero server --default-backup-storage-location`, but instead configure the default backup storage location at the velero client-side, please refer to the [About locations][9] on how to indicate which backup storage location is the default one. Moreover, during the velero upgrading process, the velero backup storage location controller helps you configure which backup storage location name matches against the backup storage location name on the velero server-side `velero server --default-backup-storage-location`, then sets the BackupStorageLocation custom resource `.spec.default` to `true`.
+## Notes
+### Default backup storage location
+We have deprecated the way to indicate the default backup storage location. Previously, that was indicated according to the backup storage location name set on the velero server-side via the flag `velero server --default-backup-storage-location`. Now we configure the default backup storage location on the velero client-side. Please refer to the [About locations][9] on how to indicate which backup storage location is the default one. 
+
+After upgrading, if there is a previously created backup storage location with the name that matches what was defined on the server side as the default, it will be automatically set as the `default`.
 
 [0]: basic-install.md#install-the-cli
 [1]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/

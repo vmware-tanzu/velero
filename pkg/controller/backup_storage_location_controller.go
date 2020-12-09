@@ -81,6 +81,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 		isDefault := location.Spec.Default
 		log := r.Log.WithField("controller", BackupStorageLocation).WithField(BackupStorageLocation, location.Name)
 
+		// TODO(2.0) remove this check since the server default will be deprecated
 		if !defaultFound && location.Name == r.DefaultBackupLocationInfo.StorageLocation {
 			// For backward-compatible, to configure the backup storage location as the default if
 			// none of the BSLs be marked as the default and the BSL name matches against the
@@ -89,7 +90,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			defaultFound = true
 		}
 
-		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo, log) {
+		if !storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.DefaultBackupLocationInfo.ServerValidationFrequency, log) {
 			log.Debug("Validation not required, skipping...")
 			continue
 		}
@@ -165,11 +166,11 @@ func (r *BackupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 			log.Errorf("Current backup storage locations available/unavailable/unknown: %v/%v/%v)", numAvailable, numUnavailable, numUnknown)
 		}
 	} else if numUnavailable > 0 { // some but not all BSL unavailable
-		log.Warnf("Invalid backup storage locations detected: available/unavailable/unknown: %v/%v/%v, %s)", numAvailable, numUnavailable, numUnknown, strings.Join(errs, "; "))
+		log.Warnf("Unavailable backup storage locations detected: available/unavailable/unknown: %v/%v/%v, %s)", numAvailable, numUnavailable, numUnknown, strings.Join(errs, "; "))
 	}
 
 	if !defaultFound {
-		log.Warn("The default backup storage location was not found; for convenience, be sure to create one or make another backup location that is designated as the default")
+		log.Warn("There is no existing backup storage location set as default. Please see `velero backup-location -h` for options.")
 	}
 }
 

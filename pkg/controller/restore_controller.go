@@ -88,7 +88,6 @@ type restoreController struct {
 	kbClient               client.Client
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister
 	restoreLogLevel        logrus.Level
-	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
 	logFormat              logging.Format
 	clock                  clock.Clock

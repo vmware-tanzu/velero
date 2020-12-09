@@ -57,6 +57,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					if showDefaultOnly {
 						if location.Spec.Default {
 							locations.Items = append(locations.Items, *location)
+							break
 						}
 					} else {
 						locations.Items = append(locations.Items, *location)

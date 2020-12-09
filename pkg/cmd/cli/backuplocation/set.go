@@ -36,7 +36,7 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   use + " NAME",
-		Short: "Set a backup storage location",
+		Short: "Set specific features for a backup storage location",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
