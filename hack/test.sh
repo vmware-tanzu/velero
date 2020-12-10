@@ -25,17 +25,18 @@ TARGETS=(
   ./cmd/...
   ./pkg/...
   ./internal/...
+  ./test/...
 )
 
 if [[ ${#@} -ne 0 ]]; then
   TARGETS=("$@")
 fi
 
-echo "Running tests:" "${TARGETS[@]}"
+echo "Running all short tests in:" "${TARGETS[@]}"
 
 if [[ -n "${GOFLAGS:-}" ]]; then
   echo "GOFLAGS: ${GOFLAGS}"
 fi
 
-go test -installsuffix "static" -timeout 60s "${TARGETS[@]}"
+go test -installsuffix "static" -short -timeout 60s "${TARGETS[@]}" 
 echo "Success!"

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,75 +10,54 @@ import (
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/context"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 )
 
 var (
-	backupName  string
-	restoreName string
+	uuidgen              uuid.UUID
+	veleroInstallOptions *install.InstallOptions
 )
 
-var _ = Describe("Backup Restore test using Kibishii to generate/verify data", func() {
+func veleroInstall(pluginProvider string, useRestic bool) {
+	var err error
+	flag.Parse()
+	Expect(EnsureClusterExists(context.TODO())).To(Succeed(), "Failed to ensure kubernetes cluster exists")
+	uuidgen, err = uuid.NewRandom()
+	Expect(err).To(Succeed())
+	veleroInstallOptions, err = GetProviderVeleroInstallOptions(pluginProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, getProviderPlugins(pluginProvider))
+	Expect(err).To(Succeed(), fmt.Sprintf("Failed to get Velero InstallOptions for plugin provider %s", pluginProvider))
+	veleroInstallOptions.UseRestic = useRestic
+	Expect(InstallVeleroServer(veleroInstallOptions)).To(Succeed(), "Failed to install Velero on KinD cluster")
+}
 
+// Test backup and restore of Kibishi using restic
+var _ = Describe("[Restic] [KinD] Velero tests on KinD cluster using the plugin provider for object storage and Restic for volume backups", func() {
+	var (
+		client      *kubernetes.Clientset
+		backupName  string
+		restoreName string
+	)
 	BeforeEach(func() {
-		flag.Parse()
+		var err error
+		veleroInstall(pluginProvider, true)
+		client, err = GetClusterClient()
+		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	})
-	Describe("backing up and restoring namespace with data", func() {
-		Context("when the backup is successful", func() {
-			It("generates data, backups up the namespace, deletes the namespace, restores the namespace and verifies data", func() {
-				backupUUID, err := uuid.NewRandom()
-				Expect(err).NotTo(HaveOccurred())
-				backupName = "backup-" + backupUUID.String()
-				restoreName = "restore-" + backupUUID.String()
-				println("backupName = " + backupName)
-				println("creating namespace " + kibishiNamespace)
-				timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-				err = CreateNamespace(timeoutCTX, kibishiNamespace)
-				Expect(err).NotTo(HaveOccurred())
-
-				println("installing kibishii in namespace " + kibishiNamespace)
-				timeoutCTX, _ = context.WithTimeout(context.Background(), 30*time.Minute)
-				err = InstallKibishii(timeoutCTX, kibishiNamespace, cloudPlatform)
-				Expect(err).NotTo(HaveOccurred())
-
-				println("running kibishii generate")
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*60)
-
-				err = GenerateData(timeoutCTX, kibishiNamespace, 2, 10, 10, 1024, 1024, 0, 2)
-				Expect(err).NotTo(HaveOccurred())
-
-				println("executing backup")
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*30)
-
-				err = BackupNamespace(timeoutCTX, veleroCLI, backupName, kibishiNamespace)
-				Expect(err).NotTo(HaveOccurred())
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
-				err = CheckBackupPhase(timeoutCTX, veleroCLI, backupName, velerov1.BackupPhaseCompleted)
-
-				Expect(err).NotTo(HaveOccurred())
-
-				println("removing namespace " + kibishiNamespace)
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
-				err = RemoveNamespace(timeoutCTX, kibishiNamespace)
-				Expect(err).NotTo(HaveOccurred())
-
-				println("restoring namespace")
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*30)
-				err = RestoreNamespace(timeoutCTX, veleroCLI, restoreName, backupName)
-				Expect(err).NotTo(HaveOccurred())
-				println("Checking that namespace is present")
-				// TODO - check that namespace exists
-				println("running kibishii verify")
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute*60)
-
-				err = VerifyData(timeoutCTX, kibishiNamespace, 2, 10, 10, 1024, 1024, 0, 2)
-				Expect(err).NotTo(HaveOccurred())
-
-				println("removing namespace " + kibishiNamespace)
-				timeoutCTX, _ = context.WithTimeout(context.Background(), time.Minute)
-				err = RemoveNamespace(timeoutCTX, kibishiNamespace)
-				Expect(err).NotTo(HaveOccurred())
-			})
+	AfterEach(func() {
+		timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
+		err := client.CoreV1().Namespaces().Delete(timeoutCTX, veleroInstallOptions.Namespace, metav1.DeleteOptions{})
+		Expect(err).To(Succeed())
+	})
+	Context("When kibishii is the sample workload", func() {
+		It("should be successfully backed up and restored", func() {
+			backupName = "backup-" + uuidgen.String()
+			restoreName = "restore-" + uuidgen.String()
+			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
+			// KinD. So use the kind installation for Kibishii.
+			Expect(RunKibishiiTests(client, "kind", veleroCLI, backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore Kibishii namespace")
 		})
 	})
 })

@@ -333,5 +333,5 @@ gen-docs:
 	@hack/release-tools/gen-docs.sh
 
 .PHONY: test-e2e
-test-e2e:
+test-e2e: local
 	$(MAKE) -C test/e2e run
