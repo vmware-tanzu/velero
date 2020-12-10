@@ -13,7 +13,7 @@ var _ = Describe("Testing Velero on a kind cluster", func() {
 		flag.Parse()
 		ctx := context.TODO()
 		err := EnsureClusterExists(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(Succeed())
 	})
 	Describe("Dummy test", func() {
 		Context("Dummy test", func() {

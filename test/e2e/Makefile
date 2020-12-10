@@ -46,7 +46,14 @@ GINKGO := $(GOPATH)/bin/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
-CLOUD_PLATFORM ?= kind
+VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
+VELERO_IMAGE ?= velero/velero:main
+CREDS_FILE ?=
+BSL_BUCKET ?=
+BSL_PREFIX ?=
+BSL_CONFIG ?=
+VSL_CONFIG ?=
+PLUGIN_PROVIDER ?=
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -54,7 +61,20 @@ ginkgo: # Make sure ginkgo is in $GOPATH/bin
 
 .PHONY: run
 run: ginkgo
-	$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=../../_output/bin/$(GOOS)/$(GOARCH)/velero -cloudplatform=$(CLOUD_PLATFORM)
+		@[ "${CREDS_FILE}" ] && echo "Using credentials from ${CREDS_FILE}" || \
+			( echo "A credentials file is required to run E2E tests, please re-run the make target with CREDS_FILE=<PathToCredentialsFile>"; exit 1 )
+		@[ "${BSL_BUCKET}" ] && echo "Using bucket ${BSL_BUCKET} to store backups from E2E tests" || \
+			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
+		@[ "${PLUGIN_PROVIDER}" ] && echo "Using plugin provider ${PLUGIN_PROVIDER} for object storage and volume snaphotting" || \
+			(echo "Plugin provider  to store the backups from E2E tests is required, please re-run with PLUGIN_PROVIDER=<pluginProviderName>"; exit 1 )
+	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
+		-velero-image=$(VELERO_IMAGE) \
+		-credentials-file=$(CREDS_FILE) \
+		-bucket=$(BSL_BUCKET) \
+		-prefix=$(BSL_PREFIX) \
+		-bsl-config=$(BSL_CONFIG) \
+		-vsl-config=$(VSL_CONFIG) \
+		-plugin-provider=$(PLUGIN_PROVIDER)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)
