@@ -31,7 +31,6 @@ Note: To properly configure any plugin you use, please follow the plugin's docum
 
 ### tl;dr
 - Copy all sample files under `velero/tilt-resources/examples` into `velero/tilt-resources`. 
-- Copy the `config/samples/velero_v1_backupstoragelocation.yaml` file into `velero/tilt-resources`.
 - Configure the `velero_v1_backupstoragelocation.yaml` file, and the `cloud` file for the storage credentials/secret.
 
 - Run `tilt up`.
@@ -101,7 +100,7 @@ storage location. A sample file is provided that needs to be modified with the s
 configuration for your object storage. See the next sub-section for more details on this.
 
 ### Configure a backup storage location
-You will have to configure the `backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](https://velero.io/plugins/)
+You will have to configure the `velero/tilt-resources/velero_v1_backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](https://velero.io/plugins/)
 to learn what field/value pairs are required for your particular provider's backup storage location configuration.
 
 Below are some ways to configure a backup storage location for Velero.
