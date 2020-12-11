@@ -44,6 +44,7 @@ _Note that these storage providers are not regularly tested by the Velero team._
  * [Minio][3]
  * [DigitalOcean][4]
  * [NooBaa][5]
+ * [Tencent Cloud][7]
  * Ceph RADOS v12.2.7
  * Quobyte
  * [Cloudian HyperStore][38]
@@ -61,6 +62,7 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [4]: https://github.com/StackPointCloud/ark-plugin-digitalocean
 [5]: http://www.noobaa.com/
 [6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/backupstoragelocation.md
+[7]: contributions/tencent-config.md
 [25]: https://github.com/hpe-storage/velero-plugin
 [30]: restic.md
 [36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
