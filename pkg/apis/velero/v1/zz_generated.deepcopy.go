@@ -1390,6 +1390,11 @@ func (in *ScheduleList) DeepCopyObject() runtime.Object {
 func (in *ScheduleSpec) DeepCopyInto(out *ScheduleSpec) {
 	*out = *in
 	in.Template.DeepCopyInto(&out.Template)
+	if in.UseOwnerReferencesInBackup != nil {
+		in, out := &in.UseOwnerReferencesInBackup, &out.UseOwnerReferencesInBackup
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

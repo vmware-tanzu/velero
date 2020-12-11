@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 /*
@@ -86,6 +88,18 @@ func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuil
 
 	if schedule.Annotations != nil {
 		b.ObjectMeta(WithAnnotationsMap(schedule.Annotations))
+	}
+
+	if boolptr.IsSetToTrue(schedule.Spec.UseOwnerReferencesInBackup) {
+		b.object.SetOwnerReferences([]metav1.OwnerReference{
+			{
+				APIVersion: velerov1api.SchemeGroupVersion.String(),
+				Kind:       "Schedule",
+				Name:       schedule.Name,
+				UID:        schedule.UID,
+				Controller: boolptr.True(),
+			},
+		})
 	}
 
 	return b

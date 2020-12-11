@@ -369,6 +369,11 @@ spec:
                     type: string
                   type: array
               type: object
+            useOwnerReferencesInBackup:
+              description: UseOwnerReferencesBackup specifies whether to use OwnerReferences
+                on backups created by this Schedule.
+              nullable: true
+              type: boolean
           required:
           - schedule
           - template
