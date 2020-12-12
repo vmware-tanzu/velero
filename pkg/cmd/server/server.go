@@ -76,7 +76,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
-	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -843,14 +842,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
 		r := controller.ServerStatusRequestReconciler{
-			Scheme: s.mgr.GetScheme(),
-			Client: s.mgr.GetClient(),
-			Ctx:    s.ctx,
-			ServerStatus: velero.ServerStatus{
-				PluginRegistry: s.pluginRegistry,
-				Clock:          clock.RealClock{},
-			},
-			Log: s.logger,
+			Scheme:         s.mgr.GetScheme(),
+			Client:         s.mgr.GetClient(),
+			Ctx:            s.ctx,
+			PluginRegistry: s.pluginRegistry,
+			Clock:          clock.RealClock{},
+			Log:            s.logger,
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)

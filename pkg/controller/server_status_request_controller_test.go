@@ -30,7 +30,6 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -214,15 +213,12 @@ var _ = Describe("Server Status Request Reconciler", func() {
 		for _, test := range tests {
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-			serverStatusInfo := velero.ServerStatus{
+			r := ServerStatusRequestReconciler{
+				Client:         fake.NewFakeClientWithScheme(scheme.Scheme, test.req),
+				Ctx:            context.Background(),
 				PluginRegistry: test.reqPluginLister,
 				Clock:          clock.NewFakeClock(now),
-			}
-			r := ServerStatusRequestReconciler{
-				Client:       fake.NewFakeClientWithScheme(scheme.Scheme, test.req),
-				ServerStatus: serverStatusInfo,
-				Ctx:          context.Background(),
-				Log:          velerotest.NewLogger(),
+				Log:            velerotest.NewLogger(),
 			}
 
 			actualResult, err := r.Reconcile(ctrl.Request{
