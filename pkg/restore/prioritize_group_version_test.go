@@ -17,7 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -28,7 +27,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
@@ -349,28 +347,6 @@ subscriptions.operators.coreos.com=v2,v1`,
 			},
 		},
 		{
-			name: "expect empty map if config map is in wrong namespace",
-			cm: builder.
-				ForConfigMap("default", "enableapigroupversions").
-				Data(
-					"restoreResourcesVersionPriority",
-					`rockbands.music.example.io=v2beta1,v2beta2`,
-				).
-				Result(),
-			want: nil,
-		},
-		{
-			name: "expect empty map if config map has wrong name",
-			cm: builder.
-				ForConfigMap("velero", "disableapigroupversions").
-				Data(
-					"restoreResourcesVersionPriority",
-					`rockbands.music.example.io=v2beta1,v2beta2`,
-				).
-				Result(),
-			want: nil,
-		},
-		{
 			name: "incorrect data format returns no user version priorities",
 			cm: builder.
 				ForConfigMap("velero", "enableapigroupversions").
@@ -404,39 +380,14 @@ o=v2beta2
 		},
 	}
 
-	cfg, err := client.LoadConfig()
-	require.NoError(t, err)
-
-	fc := client.NewFactory("APIGroupVersionsRestore_UnitTest", cfg)
-
-	kc, err := fc.KubeClient()
-	require.NoError(t, err)
-
 	fakeCtx := &restoreContext{
 		log: test.NewLogger(),
 	}
 
 	for _, tc := range tests {
-		// Test preparation
-		_, _ = kc.CoreV1().ConfigMaps(tc.cm.Namespace).Create(
-			context.Background(),
-			tc.cm,
-			metav1.CreateOptions{},
-		)
-
-		// Run tests
 		t.Log(tc.name)
-		m, err := userResourceGroupVersionPriorities(fakeCtx)
-		require.NoError(t, err)
-		assert.Equal(t, tc.want, m)
-
-		// Test clean up
-		err = kc.CoreV1().ConfigMaps(tc.cm.Namespace).Delete(
-			context.Background(),
-			tc.cm.Name,
-			metav1.DeleteOptions{},
-		)
-		require.NoError(t, err)
+		priorities := userResourceGroupVersionPriorities(fakeCtx, tc.cm)
+		assert.Equal(t, tc.want, priorities)
 	}
 }
 

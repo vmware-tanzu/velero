@@ -154,23 +154,26 @@ func (ctx *restoreContext) gatherSTUVersions() (
 		return nil, nil, nil, errors.Wrap(err, "parsing versions from directory names")
 	}
 
-	// sort the versions in the APIGroups in sourceRGVersions map values.
+	// Sort the versions in the APIGroups in sourceRGVersions map values.
 	for _, src := range sourceRGVersions {
 		k8sPrioritySort(src.Versions)
 	}
 
 	targetGroupVersions := ctx.discoveryHelper.APIGroups()
 
-	// sort the versions in the APIGroups slice in targetGroupVersions.
+	// Sort the versions in the APIGroups slice in targetGroupVersions.
 	for _, tar := range targetGroupVersions {
 		k8sPrioritySort(tar.Versions)
 	}
 
-	// get the user-generated config map.
-	userRGVPriorities, err := userResourceGroupVersionPriorities(ctx)
+	// Get the user-provided enableapigroupversion config map.
+	cm, err := userPriorityConfigMap()
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "reading user priorities from config map")
+		return nil, nil, nil, errors.Wrap(err, "retrieving enableapigroupversion config map")
 	}
+
+	// Read user-defined version priorities from config map.
+	userRGVPriorities := userResourceGroupVersionPriorities(ctx, cm)
 
 	return sourceRGVersions, targetGroupVersions, userRGVPriorities, nil
 }
@@ -184,24 +187,19 @@ func k8sPrioritySort(gvs []metav1.GroupVersionForDiscovery) {
 
 // userResourceGroupVersionPriorities retrieves a user-provided config map and
 // extracts the user priority versions for each resource.
-func userResourceGroupVersionPriorities(ctx *restoreContext) (map[string]metav1.APIGroup, error) {
-	cm, err := userPriorityConfigMap()
-	if err != nil {
-		return nil, err
-	}
-
+func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMap) map[string]metav1.APIGroup {
 	if cm == nil {
-		ctx.log.Debugf("No enableapigroupversion config map found in velero namespace")
-		return nil, nil
+		ctx.log.Debugf("No enableapigroupversion config map found in velero namespace. Using pre-defined priorities.")
+		return nil
 	}
 
 	priorities := parseUserPriorities(cm.Data["restoreResourcesVersionPriority"])
 	if len(priorities) == 0 {
-		ctx.log.Debugf("No valid user version priorities found in enableapigroupversion config map")
-		return nil, nil
+		ctx.log.Debugf("No valid user version priorities found in enableapigroupversion config map. Using pre-defined priorities.")
+		return nil
 	}
 
-	return priorities, nil
+	return priorities
 }
 
 func userPriorityConfigMap() (*corev1.ConfigMap, error) {
