@@ -79,8 +79,9 @@ example: "@every 2h30m".`,
 }
 
 type CreateOptions struct {
-	BackupOptions *backup.CreateOptions
-	Schedule      string
+	BackupOptions              *backup.CreateOptions
+	Schedule                   string
+	UseOwnerReferencesInBackup bool
 
 	labelSelector *metav1.LabelSelector
 }
@@ -94,6 +95,7 @@ func NewCreateOptions() *CreateOptions {
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	o.BackupOptions.BindFlags(flags)
 	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "a cron expression specifying a recurring schedule for this backup to run")
+	flags.BoolVar(&o.UseOwnerReferencesInBackup, "use-owner-references-in-backup", o.UseOwnerReferencesInBackup, "specifies whether to use OwnerReferences on backups created by this Schedule")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -134,7 +136,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				VolumeSnapshotLocations: o.BackupOptions.SnapshotLocations,
 				DefaultVolumesToRestic:  o.BackupOptions.DefaultVolumesToRestic.Value,
 			},
-			Schedule: o.Schedule,
+			Schedule:                   o.Schedule,
+			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,
 		},
 	}
 
