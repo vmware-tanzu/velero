@@ -143,6 +143,13 @@ func TestRemoveControllers(t *testing.T) {
 
 				totalNumEnabledControllers := len(enabledControllers) + len(enabledRuntimeControllers)
 				assert.Equal(t, totalNumEnabledControllers, totalNumOriginalControllers-len(tt.disabledControllers))
+
+				for _, disabled := range tt.disabledControllers {
+					_, ok := enabledControllers[disabled]
+					assert.False(t, ok)
+					_, ok = enabledRuntimeControllers[disabled]
+					assert.False(t, ok)
+				}
 			}
 		})
 	}
