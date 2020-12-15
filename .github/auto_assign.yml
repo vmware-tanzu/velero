@@ -2,7 +2,7 @@ addReviewers: true
 addAssignees: author
 
 # Set this to the length of the reviewers list because the default was not including everyone
-numberOfReviewers: 5
+numberOfReviewers: 6
 
 reviewers:
   - nrb
@@ -10,3 +10,4 @@ reviewers:
   - carlisia
   - zubron
   - dsu-igeek
+  - jenting
