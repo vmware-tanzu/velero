@@ -23,12 +23,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1api "k8s.io/api/core/v1"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 )
 
 func NewSetCommand(f client.Factory, use string) *cobra.Command {
@@ -51,14 +53,18 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 
 type SetOptions struct {
 	Name                         string
+	Credential                   flag.Map
 	DefaultBackupStorageLocation bool
 }
 
 func NewSetOptions() *SetOptions {
-	return &SetOptions{}
+	return &SetOptions{
+		Credential: flag.NewMap(),
+	}
 }
 
 func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
+	flags.Var(&o.Credential, "credential", "Sets the one credential to be used by this location in key-value pair, where key is the secret name, and value is the secret key name. Optional.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 }
 
@@ -106,6 +112,17 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	location.Spec.Default = o.DefaultBackupStorageLocation
+
+	for k, v := range o.Credential.Data() {
+		location.Spec.Credential = &corev1api.SecretKeySelector{
+			LocalObjectReference: corev1api.LocalObjectReference{
+				Name: k,
+			},
+			Key: v,
+		}
+		break
+	}
+
 	if err := kbClient.Update(context.Background(), location, &kbclient.UpdateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
