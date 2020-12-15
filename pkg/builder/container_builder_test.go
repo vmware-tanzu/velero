@@ -52,6 +52,31 @@ func TestGetName(t *testing.T) {
 			image:    "mycustomregistry.io:8080/my-repo/my-image:latest",
 			expected: "my-repo-my-image",
 		},
+		{
+			name:     "image name with no / in it",
+			image:    "my-image",
+			expected: "my-image",
+		},
+		{
+			name:     "image name starting with / in it",
+			image:    "/my-image",
+			expected: "my-image",
+		},
+		{
+			name:     "image name with repo starting with a / as first char",
+			image:    "/my-repo/my-image",
+			expected: "my-repo-my-image",
+		},
+		{
+			name:     "image name with registry hostname, etoomany slashes, without tag",
+			image:    "gcr.io/my-repo/mystery/another/my-image",
+			expected: "my-repo-mystery-another-my-image",
+		},
+		{
+			name:     "image name with registry hostname starting with a / will include the registry name ¯\\_(ツ)_/¯",
+			image:    "/gcr.io/my-repo/mystery/another/my-image",
+			expected: "gcr.io-my-repo-mystery-another-my-image",
+		},
 	}
 
 	for _, test := range tests {
