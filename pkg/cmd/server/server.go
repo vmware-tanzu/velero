@@ -780,7 +780,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 	}
 
-	// Remove disabled controllers so they are not initialized. If a match is not found we want 
+	// Remove disabled controllers so they are not initialized. If a match is not found we want
 	// to hault the system so the user knows this operation was not possible.
 	if err := removeControllers(s.config.disabledControllers, enabledControllers, enabledRuntimeControllers, s.logger); err != nil {
 		log.Fatal(err, "unable to disable a controller")
