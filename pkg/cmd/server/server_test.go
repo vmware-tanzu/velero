@@ -110,9 +110,9 @@ func TestRemoveControllers(t *testing.T) {
 			errorExpected: true,
 		},
 		{
-			name: "Remove with a misspelled controller name",
+			name: "Remove with a misspelled/inexisting controller name",
 			disabledControllers: []string{
-				"bakup",
+				"go",
 			},
 			errorExpected: true,
 		},
