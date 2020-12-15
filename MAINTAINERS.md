@@ -11,6 +11,7 @@
 | Ashish Amarnath | [ashish-amarnath](https://github.com/ashish-amarnath) | [VMware](https://www.github.com/vmware/) |
 | Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
 | Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [VMware](https://www.github.com/vmware/) |
+| JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/) 
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
