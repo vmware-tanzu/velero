@@ -167,21 +167,15 @@ func (c *backupSyncController) run() {
 			}
 		}
 
-		log.Debug("Checking backup location for backups to sync into cluster")
-
-		backupStore, err := c.newBackupStore(&location, pluginManager, log)
-		if err != nil {
-			log.WithError(err).Error("Error getting backup store for this location")
+		log.Debug("Checking if this location is available")
+		if location.Status.Phase != velerov1api.BackupStorageLocationPhaseAvailable {
+			log.Debug("backup location not available, can't sync at this time")
 			continue
 		}
 
-		// get a list of all the backups that are stored in the backup storage location
-		res, err := backupStore.ListBackups()
-		if err != nil {
-			log.WithError(err).Error("Error listing backups in backup store")
-			continue
-		}
-		backupStoreBackups := sets.NewString(res...)
+		// `location.Soec.BackupList` would be a new field, to be populated with names of all backups
+		// in this BSL at the time of the BSL validation in the BSL controller
+		backupStoreBackups := sets.NewString(location.Spec.BackupList...)
 		log.WithField("backupCount", len(backupStoreBackups)).Debug("Got backups from backup store")
 
 		// get a list of all the backups that exist as custom resources in the cluster
@@ -199,8 +193,16 @@ func (c *backupSyncController) run() {
 		}
 		backupsToSync := backupStoreBackups.Difference(clusterBackupsSet)
 
+		var backupStore persistence.BackupStore
 		if count := backupsToSync.Len(); count > 0 {
 			log.Infof("Found %v backups in the backup location that do not exist in the cluster and need to be synced", count)
+
+			var err error
+			backupStore, err = c.newBackupStore(&location, pluginManager, log)
+			if err != nil {
+				log.WithError(err).Error("Error getting backup store for this location")
+				continue
+			}
 		} else {
 			log.Debug("No backups found in the backup location that need to be synced into the cluster")
 		}
