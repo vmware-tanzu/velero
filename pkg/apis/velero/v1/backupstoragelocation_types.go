@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -29,6 +30,10 @@ type BackupStorageLocationSpec struct {
 	// Config is for provider-specific configuration fields.
 	// +optional
 	Config map[string]string `json:"config,omitempty"`
+
+	// Credential contain the credential information intended to be used with this location
+	// +optional
+	Credential *corev1api.SecretKeySelector `json:"credential"`
 
 	StorageType `json:",inline"`
 
