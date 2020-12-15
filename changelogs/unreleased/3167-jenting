@@ -1,1 +1,1 @@
-feat: support sets BackupStorageLocation CA certificate by `velero backup-location set --cacert`
+feat: support setting BackupStorageLocation CA certificate via `velero backup-location set --cacert`
