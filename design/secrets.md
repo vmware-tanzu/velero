@@ -62,12 +62,18 @@ To continue to provide the credentials via the environment, plugins will need to
 Currently, there is a single secret, which is mounted into every pod deployed by Velero (the Velero Deployment and the Restic DaemonSet) at the path `/credentials/cloud`.
 This path is made known to all plugins through provider specific environment variables and all possible provider environment variables are set to this path.
 
-Instead of setting the environment variables for all the pods, we can modify plugin processes are created (`restartableProcess`) so that the environment variables are set on a per plugin process basis.
+Instead of setting the environment variables for all the pods, we can modify plugin processes are created so that the environment variables are set on a per plugin process basis.
 Prior to using any secret for a BSL or VSL, it will need to be serialized to disk.
 Using the details in the `Credential` field in the BSL/VSL, the contents of the Secret will be read and serialized to a file.
 Each plugin process would still have the same set of environment variables set, however the value used for each of these variables would instead be the path to the serialized secret.
 
+To set the environment variables for a plugin process, the plugin manager must be modified so that when creating an ObjectStore or VolumeSnapshotter, we pass in the entire BSL/VSL object, rather than [just the provider](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L132-L158).
+The plugin manager currently stores a map of [plugin executables to an associated `RestartableProcess`](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L59-L70).
+New restartable processes are created only [with the exectuable that the process would run](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L122).
+This could be modified to also take the necessary environment variables so that when [underlying go-plugin process is created](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/client_builder.go#L78), these environment variables could be provided and would be set on the plugin process.
+
 Taking this approach would not require any changes from plugins as the credentials information would be made available to them in the same way.
+However, it is quite a significant change in how we initialize and invoke plugins.
 
 We would also need to ensure that the restic controllers are updated in the same way so that correct credentials are used (when creating a `ResticRepository` or processing `PodVolumeBackup`/`PodVolumeRestore`).
 This could be achieved by modifying the existing function to [run a restic command](https://github.com/vmware-tanzu/velero/blob/main/pkg/restic/repository_manager.go#L237-L290).
@@ -80,7 +86,6 @@ There is some overlap with the previous approach in that it will involve retriev
 Instead of setting the necessary environment variable for the plugin process, the `config` map for the BSL/VSL will be modified to include an addiitional entry with the path to the credentials file.
 This will be passed through when [initializing the BSL/VSL](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/velero/object_store.go#L27-L30) and it will be the responsibility of the plugin to use the passed credentials when starting a session.
 For an example of how this would affect the AWS plugin, see [this PR](https://github.com/vmware-tanzu/velero-plugin-for-aws/pull/69).
-
 
 #### Include the details of the secret in `config` map passed to a plugin
 
