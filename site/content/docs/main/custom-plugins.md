@@ -11,11 +11,33 @@ A fully-functional [sample plugin repository][1] is provided to serve as a conve
 
 ## Plugin Naming
 
-When naming your plugin, keep in mind that the name needs to conform to these rules:
-- have two parts separated by '/'
+A plugin is identified by a prefix + name. 
+
+**Note: Please don't use `velero.io` as the prefix for a plugin not supported by the Velero team.** The prefix should help users identify the entity developing the plugin, so please use a prefix that identify yourself. 
+
+Whenever you define a Backup Storage Location or Volume Snapshot Location, this full name will be the value for the `provider` specification.
+
+For example: `oracle.io/oracle`.
+
+```
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+spec:
+  provider: oracle.io/oracle
+```
+
+```
+apiVersion: velero.io/v1
+kind: VolumeSnapshotLocation
+spec:
+  provider: oracle.io/oracle
+```
+
+When naming your plugin, keep in mind that the full name needs to conform to these rules:
+- have two parts, prefix + name, separated by '/'
 - none of the above parts can be empty
 - the prefix is a valid DNS subdomain name
-- a plugin with the same name cannot not already exist
+- a plugin with the same prefix + name cannot not already exist
 
 ### Some examples:
 
@@ -25,7 +47,7 @@ When naming your plugin, keep in mind that the name needs to conform to these ru
 - example-with-dash.io/azure
 ```
 
-You will need to give your plugin(s) a name when registering them by calling the appropriate `RegisterX` function: <https://github.com/vmware-tanzu/velero/blob/0e0f357cef7cf15d4c1d291d3caafff2eeb69c1e/pkg/plugin/framework/server.go#L42-L60>
+You will need to give your plugin(s) the full name when registering them by calling the appropriate `RegisterX` function: <https://github.com/vmware-tanzu/velero/blob/0e0f357cef7cf15d4c1d291d3caafff2eeb69c1e/pkg/plugin/framework/server.go#L42-L60>
 
 ## Plugin Kinds
 

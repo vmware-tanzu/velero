@@ -574,3 +574,37 @@ func TestGetDeleteItemActions(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeName(t *testing.T) {
+	tests := []struct {
+		name, pluginName, expectedName string
+	}{
+		{
+			name:         "Legacy, non-namespaced plugin",
+			pluginName:   "aws",
+			expectedName: "velero.io/aws",
+		},
+		{
+			name:         "A Velero plugin",
+			pluginName:   "velero.io/aws",
+			expectedName: "velero.io/aws",
+		},
+		{
+			name:         "A non-Velero plugin with a Velero namespace",
+			pluginName:   "velero.io/plugin-for-velero",
+			expectedName: "velero.io/plugin-for-velero",
+		},
+		{
+			name:         "A non-Velero plugin with a non-Velero namespace",
+			pluginName:   "digitalocean.com/velero",
+			expectedName: "digitalocean.com/velero",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sanitizedName := sanitizeName(tc.pluginName)
+			assert.Equal(t, sanitizedName, tc.expectedName)
+		})
+	}
+}
