@@ -7,12 +7,12 @@ This makes it so switching from one plugin to another necessitates overriding th
 ## Goals
 
 - To allow Velero to create and store multiple secrets for provider credentials, even multiple credentials for the same provider
-- To improve the UX for configuring the velero deployment with multiple plugins/providers, and corresponding IAM secrets.
+- To improve the UX for configuring the velero deployment with multiple plugins/providers.
 
 ## Non Goals
 
 - To make any change except what's necessary to handle multiple credentials
-- To allow multiple credentials for node-based authentication (e.g. AWS IAM, GCP Workload Identity, Azure AAD Pod Identity).
+- To allow multiple credentials for or change the UX for node-based authentication (e.g. AWS IAM, GCP Workload Identity, Azure AAD Pod Identity).
 
 ## Design overview
 
