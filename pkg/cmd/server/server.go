@@ -101,6 +101,7 @@ const (
 )
 
 type serverConfig struct {
+	// TODO(2.0) Deprecate defaultBackupLocation
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
 	defaultBackupTTL, storeValidationFrequency                              time.Duration
@@ -830,8 +831,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		Client: s.mgr.GetClient(),
 		Scheme: s.mgr.GetScheme(),
 		DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
-			StorageLocation:          s.config.defaultBackupLocation,
-			StoreValidationFrequency: s.config.storeValidationFrequency,
+			StorageLocation:           s.config.defaultBackupLocation,
+			ServerValidationFrequency: s.config.storeValidationFrequency,
 		},
 		NewPluginManager: newPluginManager,
 		NewBackupStore:   persistence.NewObjectBackupStore,

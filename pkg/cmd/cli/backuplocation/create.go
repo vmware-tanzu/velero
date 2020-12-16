@@ -182,20 +182,19 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	if o.DefaultBackupStorageLocation {
 		// There is one and only one default backup storage location.
-		// Disable the origin default backup storage location.
+		// Disable any existing default backup storage location.
 		locations := new(velerov1api.BackupStorageLocationList)
 		if err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
 			return errors.WithStack(err)
 		}
 		for _, location := range locations.Items {
-			if !location.Spec.Default {
-				continue
+			if location.Spec.Default {
+				location.Spec.Default = false
+				if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil {
+					return errors.WithStack(err)
+				}
+				break
 			}
-			location.Spec.Default = false
-			if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil {
-				return errors.WithStack(err)
-			}
-			break
 		}
 	}
 

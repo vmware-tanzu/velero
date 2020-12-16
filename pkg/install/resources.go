@@ -159,7 +159,8 @@ func BackupStorageLocation(namespace, provider, bucket, prefix string, config ma
 					CACert: caCert,
 				},
 			},
-			Config: config,
+			Config:  config,
+			Default: true,
 		},
 	}
 }

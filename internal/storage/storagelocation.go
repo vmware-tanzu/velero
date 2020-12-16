@@ -30,10 +30,11 @@ import (
 
 // DefaultBackupLocationInfo holds server default backup storage location information
 type DefaultBackupLocationInfo struct {
-	// StorageLocation is the name of the backup storage location designated as the default
+	// StorageLocation is the name of the backup storage location designated as the default on the server side.
+	// Deprecated TODO(2.0)
 	StorageLocation string
-	// StoreValidationFrequency is the default validation frequency for any backup storage location
-	StoreValidationFrequency time.Duration
+	// ServerValidationFrequency is the server default validation frequency for all backup storage locations
+	ServerValidationFrequency time.Duration
 }
 
 // IsReadyToValidate calculates if a given backup storage location is ready to be validated.
@@ -44,16 +45,16 @@ type DefaultBackupLocationInfo struct {
 // This will always return "true" for the first attempt at validating a location, regardless of its validation frequency setting
 // Otherwise, it returns "ready" only when NOW is equal to or after the next validation time
 // (next validation time: last validation time + validation frequency)
-func IsReadyToValidate(bslValidationFrequency *metav1.Duration, lastValidationTime *metav1.Time, defaultLocationInfo DefaultBackupLocationInfo, log logrus.FieldLogger) bool {
-	validationFrequency := defaultLocationInfo.StoreValidationFrequency
+func IsReadyToValidate(bslValidationFrequency *metav1.Duration, lastValidationTime *metav1.Time, serverValidationFrequency time.Duration, log logrus.FieldLogger) bool {
+	validationFrequency := serverValidationFrequency
 	// If the bsl validation frequency is not specifically set, skip this block and continue, using the server's default
 	if bslValidationFrequency != nil {
 		validationFrequency = bslValidationFrequency.Duration
 	}
 
 	if validationFrequency < 0 {
-		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, defaultLocationInfo.StoreValidationFrequency)
-		validationFrequency = defaultLocationInfo.StoreValidationFrequency
+		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, validationFrequency)
+		validationFrequency = serverValidationFrequency
 	}
 
 	lastValidation := lastValidationTime

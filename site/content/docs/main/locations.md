@@ -79,13 +79,18 @@ velero backup-location create backups-secondary \
     --config region=us-west-1
 ```
 
-You can alter which backup storage location as default by setting the `--default` flag under the
-`velero backup-location set` command to configure another location to be the default backup storage location.
+A "default" backup storage location (BSL) is where backups get saved to when no BSL is specified at backup creation time.
+
+You can change the default backup storage location at any time by setting the `--default` flag using the
+`velero backup-location set` command and configure a different location to be the default.
+
+Examples:
+
 ```shell
 velero backup-location set backups-secondary --default
 ```
 
-Once the defaulted backup storage location existed under `velero backup-location get --default`, then changes the default backup storage location name by `velero server --default-backup-storage-location` takes no effects anymore because the velero backup storage location controller prefers to use velero client-side setting. However, if there is no defaulted backup storage location under `velero backup-location get --default`, then changes the default backup storage location name by `velero server --default-backup-storage-location` would work.
+
 
 During backup creation:
 

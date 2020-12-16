@@ -343,8 +343,15 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// calculate expiration
 	request.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(request.Spec.TTL.Duration)}
 
-	// default storage location if not specified
+	if request.Spec.DefaultVolumesToRestic == nil {
+		request.Spec.DefaultVolumesToRestic = &c.defaultVolumesToRestic
+	}
+
+	// find which storage location to use
+	var serverSpecified bool
 	if request.Spec.StorageLocation == "" {
+		// when the user doesn't specify a location, use the server default unless there is an existing BSL marked as default
+		// TODO(2.0) c.defaultBackupLocation will be deprecated
 		request.Spec.StorageLocation = c.defaultBackupLocation
 
 		locationList, err := storage.ListBackupStorageLocations(context.Background(), c.kbClient, request.Namespace)
@@ -356,10 +363,32 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 				}
 			}
 		}
+		serverSpecified = true
 	}
 
-	if request.Spec.DefaultVolumesToRestic == nil {
-		request.Spec.DefaultVolumesToRestic = &c.defaultVolumesToRestic
+	// get the storage location, and store the BackupStorageLocation API obj on the request
+	storageLocation := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: request.Namespace,
+		Name:      request.Spec.StorageLocation,
+	}, storageLocation); err != nil {
+		if apierrors.IsNotFound(err) {
+			if serverSpecified {
+				// TODO(2.0) remove this. For now, without mentioning "server default" it could be confusing trying to grasp where the default came from.
+				request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("an existing backup storage location wasn't specified at backup creation time and the server default '%s' doesn't exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: %v", request.Spec.StorageLocation, err))
+			} else {
+				request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("an existing backup storage location wasn't specified at backup creation time and the default '%s' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: %v", request.Spec.StorageLocation, err))
+			}
+		} else {
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting backup storage location: %v", err))
+		}
+	} else {
+		request.StorageLocation = storageLocation
+
+		if request.StorageLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
+				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
+		}
 	}
 
 	// add the storage location as a label for easy filtering later.
@@ -367,6 +396,18 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Labels = make(map[string]string)
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
+
+	// validate and get the backup's VolumeSnapshotLocations, and store the
+	// VolumeSnapshotLocation API objs on the request
+	if locs, errs := c.validateAndGetSnapshotLocations(request.Backup); len(errs) > 0 {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, errs...)
+	} else {
+		request.Spec.VolumeSnapshotLocations = nil
+		for _, loc := range locs {
+			request.Spec.VolumeSnapshotLocations = append(request.Spec.VolumeSnapshotLocations, loc.Name)
+			request.SnapshotLocations = append(request.SnapshotLocations, loc)
+		}
+	}
 
 	// Getting all information of cluster version - useful for future skip-level migration
 	if request.Annotations == nil {
@@ -384,37 +425,6 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// validate the included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
-	}
-
-	// validate the storage location, and store the BackupStorageLocation API obj on the request
-	storageLocation := &velerov1api.BackupStorageLocation{}
-	if err := c.kbClient.Get(context.Background(), kbclient.ObjectKey{
-		Namespace: request.Namespace,
-		Name:      request.Spec.StorageLocation,
-	}, storageLocation); err != nil {
-		if apierrors.IsNotFound(err) {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: %v", err))
-		} else {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting backup storage location: %v", err))
-		}
-	} else {
-		request.StorageLocation = storageLocation
-
-		if request.StorageLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
-				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
-		}
-	}
-	// validate and get the backup's VolumeSnapshotLocations, and store the
-	// VolumeSnapshotLocation API objs on the request
-	if locs, errs := c.validateAndGetSnapshotLocations(request.Backup); len(errs) > 0 {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, errs...)
-	} else {
-		request.Spec.VolumeSnapshotLocations = nil
-		for _, loc := range locs {
-			request.Spec.VolumeSnapshotLocations = append(request.Spec.VolumeSnapshotLocations, loc.Name)
-			request.SnapshotLocations = append(request.SnapshotLocations, loc)
-		}
 	}
 
 	return request
