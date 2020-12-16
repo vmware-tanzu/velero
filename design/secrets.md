@@ -12,70 +12,93 @@ This makes it so switching from one plugin to another necessitates overriding th
 ## Non Goals
 
 - To make any change except what's necessary to handle multiple credentials
+- To allow multiple credentials for node-based authentication (e.g. AWS IAM, GCP Workload Identity, Azure AAD Pod Identity).
 
 ## Design overview
 
-- Instead of one credential per Velero deployment, multiple credentials can be added and will be associated with plugins.
-  Credentials can be added when plugins are added or can be set later.
+Instead of one credential per Velero deployment, multiple credentials can be added and used with different BSLs VSLs.
   
-- When new credentials are added, the `cloud-credentials` secret will be updated with a new entry containing the new credentials value.
-  We will add keys to the existing secret, rather than creating new ones, due to the fact that it is not possible to modify volume mounts in a running pod or container.
-  Changes to secrets (such as adding new data keys) are automatically updated within the volume mount.
-  This means that any update to the `cloud-credentials` secret would automatically be available to the pods where that secret is mounted.
-  This allows us to work around the restriction of modifying volume mounts to instead still use a single secret, but add more keys to it for new sets of credentials.
- 
-- BSLs and VSLs will be updated to contain a reference to a particular credential name, which will be a key in the `cloud-credentials` secret.
-  When a new BSL or VSL is created, a specific set of credentials can be selected for use.
-  The set of credentials associated with a BSL or VSL will be used when running the plugin processes needed for that storage location.
+There are two aspects to handling multiple credentials:
 
-## Detailed Design
+- Modifying how credentials are configured and specified by the user
+- Modifying how credentials are provided to the plugin processes
 
-- The name of the flag changes from `secret-file` to `--credentials-file`.
+Each of these aspects will be discussed in turn.
 
-- The arguments to `velero plugin (add|set) --credentials-file` will be a map of the credentials name as a key, and the path to the file as a value.
-  This way, we can have multiple credential secrets and each secret per provider/plugin will be unique.
-  There are two ways in which we can choose to name the keys stored in the `cloud-credentials` secret:
-    1. Combine the name of the provider (extracted from the plugin name) and the given credentials name.
-       For example, if the user were to add a plugin using: `velero plugin add velero-plugin-for-aws --credentials-file project-1:/path/to/credentials`, an additional key `aws-project-1` would be added to the `cloud-credentials` secret with the encoded contents of `/path/to/credentials`.
-       In the case where the plugin is not a Velero provided plugin, we would use the full name of the plugin but adapt the name to be valid for use as a key, for example, `myproject.io/cloud-provider` could become `myproject_io_cloud-provider`, and would be combined with the given name of the credential.
-    1. Do not include the provider name in the resulting credentials key, and instead leave it up to the user to give a unique and identifying name for a credential.
-       For example, a user adding a plugin with `velero plugin add velero-plugin-for-aws --credentials-file aws-project-1:/path/to/credentials` would result in the key `aws-project-1` being added to the `cloud-credentials` secret.
+### Credential configuration
 
-    Bridget: My preference is for the second of the two options above.
-    Plugin names are provided by the plugins themselves, and there is special handling in the codebase for using plugins provided by the Velero team vs plugins provided by the community.
-    Plugins provided by Velero such as `aws`, `azure`, or `gcp` could be included in the key names for secrets easily, however the [rules that we enforce for plugin naming](https://velero.io/docs/v1.5/custom-plugins/#plugin-naming) result in plugin names that are not valid as key names in secrets.
-    This means that we will need to convert them into a valid form where only alphanumeric characters, `-`, `_` or `.` are used.
-    By having the user name the secrets directly, it will be explicit and clearer for the user to understand how credentials are added and stored, and make it easier for them to understand and edit their own deployments.
+Currently, Velero creates a secret (`cloud-credentials`) during install with a single entry that contains the contents of the credentials file passed by the user.
 
-- See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for the two items below.
-    - The `velero backup-location (create|set)` will have a new flag to set the credentials based on the option selected above. If the first option, the new flag will be `--credentials mapStringString` which sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name.
-      If the second option, the new flag will be `--credentials string` where the argument will be the name of the credential set when adding a plugin.
-    - The `velero snapshot-location (create|set)` will have a new flag to set the credentials based on the option selected above. If the first option, the new flag will be `--credentials mapStringString` which sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name.
-      If the second option, the new flag will be `--credentials string` where the argument will be the name of the credential set when adding a plugin.
+Instead of adding new CLI options to Velero to create and manage credentials, users will create their own Kubernetes secrets within the Velero namespace and reference these.
+This approach is being chosen as it allows users to directly manage Kubernetes secrets objects as they wish and it removes the need for wrapper functions to be created within Velero to manage the creation of secrets.
+An initial approach to this problem included modifying the existing `cloud-credentials` secret to add a new entry with each new set of credentials.
+It is likely that this approach would encounter problems as users added more credentials as the maximum size of Secret in Kubernetes is 1MB.
+By allowing users to create Secrets as they need to, we remove these potential limitations.
 
-  Note that for this logic to work we must have a controller loop checking for when a corresponding secret is present before marking the BSL/VSL as ready.
+To enable the use of existing Kubernetes secrets, BSLs and VSLs will be modified to have a new field `Credential`.
+This field will be a [`SecretKeySelector`](https://godoc.org/k8s.io/api/core/v1#SecretKeySelector) which will enable the user to specify which key within a particular secret the BSL/VSL should use.
 
-- The spec for BSLs and VSLs will updated to contain a new field `Credentials`. The value in this field will be the name of the key in the `cloud-credentials` secret to use for authenticating with the storage provider.
+The CLI for managing BSLs and VSLs will be modified to allow the user to set these credentials.
+Both `velero backup-location (create|set)` and `velero snapshot-location (create|set)` will have a new flag (`--credential`) to specify the secret and key within the secret to use.
+This flag will take a key-value pair in the format `<secret-name>=<key-in-secret>`.
+The arguments will be validated to ensure that the secret exists in the Velero namespace.
 
-- Plugins will need to be invoked differently so that the correct credential is used.
-  Currently, there is a single secret, which is mounted into every pod deployed by Velero (the Velero Deployment and the Restic DaemonSet).
-  This secret contains a single data key (`cloud`) which is accessible within the pods at the path `/credentials/cloud`.
-  This path is made known to all plugins through provider specific environment variables.
-  All possible provider environment variables are set to this path.
-  Instead of setting the environment within all the pods, we can modify `restartableProcess` to set the environment variables before running a plugin process.
-  Each plugin process would still have the same set of environment variables set, however the value used for each of these variables would instead be a different path within the `/credentials` directory, formed from the credential selected for a particular BSL/VSL.
-  Taking this approach would not require any changes from plugins as the credentials information would be made available to them in the same way.
-  We will also need to ensure that the restic controllers are updated in the same way so that correct credentials are used (when creating a `ResticRepository` or processing `PodVolumeBackup`/`PodVolumeRestore`).
+### Making credentials available to plugins
 
-## Alternatives Considered
+There are three different approaches that can be taken to provide credentials to plugin processes:
 
-Instead of associating credentials with plugins, credentials will exist as standalone entities which can be queried using a new command `velero credentials`.
-This will be a wrapper around Kubernetes API calls to query the secret used by Velero.
-Credentials can be listed using `velero credentials get`, which will list the names of the keys within the `cloud-credentials` secret.
-Credentials can be added or removed using `velero credentials add|delete`.
+1. Providing the path to the credentials file as an environment variable per plugin. This is how credentials are currently passed.
+1. Include the path to the credentials file in the `config` map passed to a plugin.
+1. Include the details of the secret in the `config` map passed to a plugin.
 
-The rest of the workflow of how to use these credentials would still apply, such as specifying the name of the credential to use for a particular BSL/VSL.
+The last two options require changes to the plugin as the plugin will need to instantiate a client using the provided credentials.
+The client libraries used by the plugins will not be able to rely on the credentials details being available in the environment as they currently do.
+
+Each of the approaches will be discussed in turn.
+
+#### Providing the credentials via environment variables
+
+To continue to provide the credentials via the environment, plugins will need to be invoked differently so that the correct credential is used.
+Currently, there is a single secret, which is mounted into every pod deployed by Velero (the Velero Deployment and the Restic DaemonSet) at the path `/credentials/cloud`.
+This path is made known to all plugins through provider specific environment variables and all possible provider environment variables are set to this path.
+
+Instead of setting the environment variables for all the pods, we can modify plugin processes are created (`restartableProcess`) so that the environment variables are set on a per plugin process basis.
+Prior to using any secret for a BSL or VSL, it will need to be serialized to disk.
+Using the details in the `Credential` field in the BSL/VSL, the contents of the Secret will be read and serialized to a file.
+Each plugin process would still have the same set of environment variables set, however the value used for each of these variables would instead be the path to the serialized secret.
+
+Taking this approach would not require any changes from plugins as the credentials information would be made available to them in the same way.
+
+We would also need to ensure that the restic controllers are updated in the same way so that correct credentials are used (when creating a `ResticRepository` or processing `PodVolumeBackup`/`PodVolumeRestore`).
+This could be achieved by modifying the existing function to [run a restic command](https://github.com/vmware-tanzu/velero/blob/main/pkg/restic/repository_manager.go#L237-L290).
+This function already sets environment variables for the restic process depending on which storage provider is being used.
+
+
+#### Including the credentials file path in the `config` map
+
+There is some overlap with the previous approach in that it will involve retrieving the secret for the BSL/VSL being used and serializing it to disk.
+Instead of setting the necessary environment variable for the plugin process, the `config` map for the BSL/VSL will be modified to include an addiitional entry with the path to the credentials file.
+This will be passed through when [initializing the BSL/VSL](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/velero/object_store.go#L27-L30) and it will be the responsibility of the plugin to use the passed credentials when starting a session.
+For an example of how this would affect the AWS plugin, see [this PR](https://github.com/vmware-tanzu/velero-plugin-for-aws/pull/69).
+
+
+#### Include the details of the secret in `config` map passed to a plugin
+
+This approach is like the previous one, however instead of the Velero process being responsible for serializing the file to disk prior to invoking the plugin, the `Credential SecretKeySelector` details will be passed through to the plugin.
+It will be the responsibility of the plugin to fetch the secret from the Kubernetes API and perform the necessary steps to make it available for use when creating a session, for example, serializing the contents to disk, or evaluating the contents and adding to the process environment.
+
+This approach has an additional burden on the plugin author over the previous approach as it requires the author to create a client to communicate with the Kubernetes API to retrieve the secret.
+
+## Backwards compatibility
+
+For now, regardless of the approaches used above, we will still support the existing workflow.
+
+Users will be able to set credentials during install and a secret will be created for them.
+This secret will still be mounted into the Velero pods and the appropriate environment variables set.
+This will allow users to use versions of plugins which haven't yet been updated to use credentials directly, such as with many community created plugins.
+
+Multiple credential handling will only be used in the case where a particular BSL/VSL has been modified to use an existing secret.
 
 ## Security Considerations
 
-N/A
+Although the handling of secrets will be similar to how credentials are currently managed within Velero, care must be taken to ensure that any new code does not leak the contents of secrets, for example, including them within logs.
