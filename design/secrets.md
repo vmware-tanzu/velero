@@ -69,7 +69,7 @@ Each plugin process would still have the same set of environment variables set, 
 
 To set the environment variables for a plugin process, the plugin manager must be modified so that when creating an ObjectStore or VolumeSnapshotter, we pass in the entire BSL/VSL object, rather than [just the provider](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L132-L158).
 The plugin manager currently stores a map of [plugin executables to an associated `RestartableProcess`](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L59-L70).
-New restartable processes are created only [with the exectuable that the process would run](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L122).
+New restartable processes are created only [with the executable that the process would run](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/manager.go#L122).
 This could be modified to also take the necessary environment variables so that when [underlying go-plugin process is created](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/clientmgmt/client_builder.go#L78), these environment variables could be provided and would be set on the plugin process.
 
 Taking this approach would not require any changes from plugins as the credentials information would be made available to them in the same way.
