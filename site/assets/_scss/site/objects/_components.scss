@@ -1,0 +1,65 @@
+@mixin breakpoint($point) {
+	$small: 767px;
+    @if $point == small {
+		@media only screen and (max-width: $small) { @content; }
+    }
+}
+
+.grid.three {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    row-gap: 20px;
+    column-gap: 20px;
+    @include breakpoint(small) {
+        grid-template-columns: 1fr;
+    }
+}
+.sub-page {
+    background-color: #fff;
+    h3 {
+        font-size: 22px;
+        margin: 1.5rem 0;
+    }
+    .section-header {
+        margin-top: 1rem;
+        font-weight: 600;
+        font-size: 20px;
+    }
+    .grid {
+        .col {
+            border: 1px solid #F2F2F2;
+            padding: 0px;
+            .icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 140px;
+                img {
+                    max-width:100%;
+                }
+            }
+            h3 {
+                margin-top: 0px;
+                text-align: center;
+                font-size: 16px;
+            }
+            .content {
+                padding: 0px 20px 20px 20px;
+                p {
+                    font-size: 1rem;
+                    color: #777;
+                }
+                ul {
+                    padding-left: 20px;
+                    li {
+                        margin-bottom: 10px;
+                        color: #777;
+                        font-size: 1rem;
+                        line-height: 1.6em;
+                        list-style-image: url(/img/arrow.svg);
+                    }
+                }
+            }
+        }
+    }
+}
