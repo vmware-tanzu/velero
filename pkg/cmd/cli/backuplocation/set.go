@@ -64,7 +64,7 @@ func NewSetOptions() *SetOptions {
 }
 
 func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.Var(&o.Credential, "credential", "Sets the one credential to be used by this location in key-value pair, where key is the secret name, and value is the secret key name. Optional.")
+	flags.Var(&o.Credential, "credential", "Sets the credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 }
 
