@@ -27,26 +27,26 @@ settings = {
 # global settings
 settings.update(read_json(
     "tilt-resources/tilt-settings.json",
-    default={},
+    default = {},
 ))
 
 k8s_yaml(kustomize('tilt-resources'))
 k8s_yaml('tilt-resources/deployment.yaml')
 if settings.get("enable_debug"):
-    k8s_resource('velero', port_forwards='2345')
+    k8s_resource('velero', port_forwards = '2345')
     # TODO: Need to figure out how to apply port forwards for all restic pods
 if settings.get("enable_restic"):
     k8s_yaml('tilt-resources/restic.yaml')
 if settings.get("create_backup_locations"):
     k8s_yaml('tilt-resources/velero_v1_backupstoragelocation.yaml')
 if settings.get("setup-minio"):
-    k8s_yaml('examples/minio/00-minio-deployment.yaml', allow_duplicates=True)
+    k8s_yaml('examples/minio/00-minio-deployment.yaml', allow_duplicates = True)
 
 # By default, Tilt automatically allows Minikube, Docker for Desktop, Microk8s, Red Hat CodeReady Containers, Kind, K3D, and Krucible.
 allow_k8s_contexts(settings.get("allowed_contexts"))
 default_registry(settings.get("default_registry"))
-local_goos = str(local("go env GOOS", quiet=True, echo_off=True)).strip()
-git_sha = str(local("git rev-parse HEAD", quiet=True, echo_off=True)).strip()
+local_goos = str(local("go env GOOS", quiet = True, echo_off = True)).strip()
+git_sha = str(local("git rev-parse HEAD", quiet = True, echo_off = True)).strip()
 
 tilt_helper_dockerfile_header = """
 # Tilt image
@@ -92,15 +92,15 @@ def get_debug_flag():
 # Set up a local_resource build of the Velero binary. The binary is written to _tiltbuild/velero.
 local_resource(
     "velero_server_binary",
-    cmd='cd ' + '.' + ';mkdir -p _tiltbuild;PKG=. BIN=velero GOOS=linux GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild ' + get_debug_flag() + ' ./hack/build.sh',
-    deps=["cmd", "internal", "pkg"],
-    ignore=["pkg/cmd"],
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild;PKG=. BIN=velero GOOS=linux GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild ' + get_debug_flag() + ' ./hack/build.sh',
+    deps = ["cmd", "internal", "pkg"],
+    ignore = ["pkg/cmd"],
 )
 
 local_resource(
     "velero_local_binary",
-    cmd='cd ' + '.' + ';mkdir -p _tiltbuild/local;PKG=. BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild/local ./hack/build.sh',
-    deps=["internal", "pkg/cmd"],
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/local;PKG=. BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild/local ' + get_debug_flag() + ' ./hack/build.sh',
+    deps = ["internal", "pkg/cmd"],
 )
 
 # Note: we need a distro with a bash shell to exec into the Velero container
@@ -147,12 +147,12 @@ def get_velero_entrypoint():
 # Set up an image build for Velero. The live update configuration syncs the output from the local_resource
 # build into the container.
 docker_build(
-    ref="velero/velero",
-    context="_tiltbuild/",
-    dockerfile_contents=dockerfile_contents,
-    target="tilt",
-    entrypoint=get_velero_entrypoint(),
-    live_update=[
+    ref = "velero/velero",
+    context = "_tiltbuild/",
+    dockerfile_contents = dockerfile_contents,
+    target = "tilt",
+    entrypoint = get_velero_entrypoint(),
+    live_update = [
         sync("./_tiltbuild/velero", "/velero"),
         run("sh /restart.sh"),
     ])
@@ -175,11 +175,9 @@ def load_provider_tiltfiles():
             continue
         file = repo + "/tilt-provider.json"
         if not os.path.exists(file):
-            print(
-                "Provider settings not found for \"{}\". Please ensure this plugin repository has a tilt-provider.json file included.".format(
-                    name))
+            print("Provider settings not found for \"{}\". Please ensure this plugin repository has a tilt-provider.json file included.".format(name))
             continue
-        provider_details = read_json(file, default={})
+        provider_details = read_json(file, default = {})
         if type(provider_details) == "dict":
             provider_details["name"] = name
             if "context" in provider_details:
@@ -236,19 +234,19 @@ def enable_provider(provider):
     # Set up a local_resource build of the plugin binary. The main.go path must be provided via go_main option. The binary is written to _tiltbuild/<NAME>.
     local_resource(
         name + "_plugin",
-        cmd='cd ' + context + ';mkdir -p _tiltbuild;PKG=' + context + ' BIN=' + go_main + ' GOOS=linux GOARCH=amd64 OUTPUT_DIR=_tiltbuild ./hack/build.sh',
-        deps=live_reload_deps,
+        cmd = 'cd ' + context + ';mkdir -p _tiltbuild;PKG=' + context + ' BIN=' + go_main + ' GOOS=linux GOARCH=amd64 OUTPUT_DIR=_tiltbuild ./hack/build.sh',
+        deps = live_reload_deps,
     )
 
     # Set up an image build for the plugin. The live update configuration syncs the output from the local_resource
     # build into the init container, and that restarts the Velero container.
     docker_build(
-        ref=provider.get("image"),
-        context=os.path.join(context, "/_tiltbuild/"),
-        dockerfile_contents=dockerfile_contents,
-        target="tilt",
-        entrypoint=["/bin/bash", "-c", "cp /" + plugin_name + " /target/."],
-        live_update=[
+        ref = provider.get("image"),
+        context = os.path.join(context, "/_tiltbuild/"),
+        dockerfile_contents = dockerfile_contents,
+        target = "tilt",
+        entrypoint = ["/bin/bash", "-c", "cp /" + plugin_name + " /target/."],
+        live_update = [
             sync(os.path.join(context, "/_tiltbuild/", plugin_name), os.path.join("/", plugin_name))
         ]
     )
