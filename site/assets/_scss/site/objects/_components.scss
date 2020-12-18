@@ -36,6 +36,12 @@
                 min-height: 140px;
                 img {
                     max-width:100%;
+                    &.podcast {
+                        max-height: 100px;
+                    }
+                }
+                &.twitter svg {
+                    margin-left: -25px;
                 }
             }
             h3 {
