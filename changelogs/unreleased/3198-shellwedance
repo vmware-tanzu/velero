@@ -1,0 +1,1 @@
+Add restic initContainer length check in pod volume restore to prevent restic plugin container disappear in runtime

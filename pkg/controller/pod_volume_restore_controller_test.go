@@ -590,6 +590,26 @@ func TestIsResticContainerRunning(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "pod with restic init container with empty InitContainerStatuses should return 0",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						{
+							Name: restic.InitContainer,
+						},
+					},
+				},
+				Status: corev1api.PodStatus{
+					InitContainerStatuses: []corev1api.ContainerStatus{},
+				},
+			},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
