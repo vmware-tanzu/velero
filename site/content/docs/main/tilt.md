@@ -154,6 +154,7 @@ This will enable you to debug the process using [Delve](https://github.com/go-de
 By enabling debug mode, the Velero executable will be built in debug mode (using the flags `-gcflags="-N -l"` which disables optimizations and inlining), and the process will be started in the Velero deployment using [`dlv exec`](https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv_exec.md).
 
 The debug server will accept connections on port 2345 and Tilt is configured to forward this port to the local machine.
+Once Tilt is [running](#run-tilt) and the Velero resource is ready, you can connect to the debug server to begin debugging.
 To connect to the session, you can use the Delve CLI locally by running `dlv connect 127.0.0.1:2345`. See the [Delve CLI documentation](https://github.com/go-delve/delve/tree/master/Documentation/cli) for more guidance on how to use Delve.
 Delve can also be used within a number of [editors and IDEs](https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md).
 
