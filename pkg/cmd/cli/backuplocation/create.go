@@ -89,7 +89,7 @@ func NewCreateOptions() *CreateOptions {
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the backup storage provider (e.g. aws, azure, gcp).")
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "Name of the object storage bucket where backups should be stored.")
-	flags.Var(&o.Credential, "credential", "The one credential to be used by this location in key-value pair, where key is the secret name, and value is the secret key name. Optional.")
+	flags.Var(&o.Credential, "credential", "The credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "How often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
@@ -152,6 +152,9 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		validationFrequency = &metav1.Duration{Duration: o.ValidationFrequency}
 	}
 
+	if len(o.Credential.Data()) > 1 {
+		return errors.New("--credential can only contain 1 key/value pair")
+	}
 	var secretName, secretKey string
 	for k, v := range o.Credential.Data() {
 		secretName = k

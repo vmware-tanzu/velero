@@ -33,7 +33,7 @@ type BackupStorageLocationSpec struct {
 
 	// Credential contains the credential information intended to be used with this location
 	// +optional
-	Credential *corev1api.SecretKeySelector `json:"credential"`
+	Credential *corev1api.SecretKeySelector `json:"credential,omitempty"`
 
 	StorageType `json:",inline"`
 
