@@ -220,10 +220,13 @@ func isPodOnNode(pod *corev1api.Pod, node string) bool {
 }
 
 func isResticInitContainerRunning(pod *corev1api.Pod) bool {
-
 	// Restic wait container can be anywhere in the list of init containers, but must be running.
 	i := getResticInitContainerIndex(pod)
-	return i >= 0 && pod.Status.InitContainerStatuses[i].State.Running != nil
+	if i >= 0 {
+		return pod.Status.InitContainerStatuses[i].State.Running != nil
+	}
+
+	return false
 }
 
 func getResticInitContainerIndex(pod *corev1api.Pod) int {
