@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
