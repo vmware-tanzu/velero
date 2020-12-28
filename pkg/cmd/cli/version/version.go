@@ -59,8 +59,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 		},
 	}
 
-	c.Flags().DurationVar(&timeout, "timeout", timeout, "maximum time to wait for server version to be reported. Default is 5 seconds.")
-	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "only get velero client version, not server version")
+	c.Flags().DurationVar(&timeout, "timeout", timeout, "Maximum time to wait for server version to be reported. Default is 5 seconds.")
+	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "Only get velero client version, not server version")
 
 	return c
 }

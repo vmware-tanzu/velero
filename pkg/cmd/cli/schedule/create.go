@@ -94,8 +94,8 @@ func NewCreateOptions() *CreateOptions {
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	o.BackupOptions.BindFlags(flags)
-	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "a cron expression specifying a recurring schedule for this backup to run")
-	flags.BoolVar(&o.UseOwnerReferencesInBackup, "use-owner-references-in-backup", o.UseOwnerReferencesInBackup, "specifies whether to use OwnerReferences on backups created by this Schedule")
+	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "A cron expression specifying a recurring schedule for this backup to run")
+	flags.BoolVar(&o.UseOwnerReferencesInBackup, "use-owner-references-in-backup", o.UseOwnerReferencesInBackup, "Specifies whether to use OwnerReferences on backups created by this Schedule")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {

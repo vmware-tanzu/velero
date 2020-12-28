@@ -59,7 +59,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
-	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
+	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "Only show items matching this label selector")
 
 	output.BindFlags(c.Flags())
 
