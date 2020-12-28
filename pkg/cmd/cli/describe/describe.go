@@ -27,9 +27,10 @@ import (
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "describe",
-		Short: "Describe velero resources",
-		Long:  "Describe velero resources",
+		Use:    "describe",
+		Short:  "Describe velero resources",
+		Long:   "Describe velero resources",
+		Hidden: true,
 	}
 
 	backupCommand := backup.NewDescribeCommand(f, "backups")

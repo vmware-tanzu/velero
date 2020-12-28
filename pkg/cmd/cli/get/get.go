@@ -30,9 +30,10 @@ import (
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "get",
-		Short: "Get velero resources",
-		Long:  "Get velero resources",
+		Use:    "get",
+		Short:  "Get velero resources",
+		Long:   "Get velero resources",
+		Hidden: true,
 	}
 
 	backupCommand := backup.NewGetCommand(f, "backups")

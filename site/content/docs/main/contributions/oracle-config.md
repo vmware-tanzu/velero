@@ -40,8 +40,7 @@ cluster resources. It provides a simple, configurable, and operationally robust
 way to back up your application state and associated data.
 
 If you're familiar with kubectl, Velero supports a similar model, allowing you to
-execute commands such as 'velero get backup' and 'velero create schedule'. The same
-operations can also be performed as 'velero backup get' and 'velero schedule create'.
+execute commands such as 'velero backup get' and 'velero schedule create'.
 
 Usage:
   velero [command]

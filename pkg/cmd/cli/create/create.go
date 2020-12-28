@@ -29,9 +29,10 @@ import (
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "create",
-		Short: "Create velero resources",
-		Long:  "Create velero resources",
+		Use:    "create",
+		Short:  "Create velero resources",
+		Long:   "Create velero resources",
+		Hidden: true,
 	}
 
 	c.AddCommand(

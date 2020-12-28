@@ -28,9 +28,10 @@ import (
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete velero resources",
-		Long:  "Delete velero resources",
+		Use:    "delete",
+		Short:  "Delete velero resources",
+		Long:   "Delete velero resources",
+		Hidden: true,
 	}
 
 	backupCommand := backup.NewDeleteCommand(f, "backup")
