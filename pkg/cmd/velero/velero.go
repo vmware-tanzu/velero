@@ -63,11 +63,7 @@ func NewCommand(name string) *cobra.Command {
 		Short: "Back up and restore Kubernetes cluster resources.",
 		Long: `Velero is a tool for managing disaster recovery, specifically for Kubernetes
 cluster resources. It provides a simple, configurable, and operationally robust
-way to back up your application state and associated data.
-
-If you're familiar with kubectl, Velero supports a similar model, allowing you to
-execute commands such as 'velero get backup' and 'velero create schedule'. The same
-operations can also be performed as 'velero backup get' and 'velero schedule create'.`,
+way to back up your application state and associated data.`,
 		// PersistentPreRun will run before all subcommands EXCEPT in the following conditions:
 		//  - a subcommand defines its own PersistentPreRun function
 		//  - the command is run without arguments or with --help and only prints the usage info
