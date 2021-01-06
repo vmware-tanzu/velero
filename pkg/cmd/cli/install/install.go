@@ -75,36 +75,36 @@ type InstallOptions struct {
 
 // BindFlags adds command line values to the options struct.
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
-	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
-	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
-	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
-	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
-	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
-	flags.Var(&o.PodAnnotations, "pod-annotations", "annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
-	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
+	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "Provider name for backup and volume storage")
+	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "Name of the object storage bucket where backups should be stored")
+	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "File containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
+	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "Flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
+	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
+	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and restic server pods. Optional.")
+	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
+	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "Annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
 	flags.StringVar(&o.VeleroPodCPURequest, "velero-pod-cpu-request", o.VeleroPodCPURequest, `CPU request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, `memory request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, `Memory request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodCPULimit, "velero-pod-cpu-limit", o.VeleroPodCPULimit, `CPU limit for Velero pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.VeleroPodMemLimit, "velero-pod-mem-limit", o.VeleroPodMemLimit, `memory limit for Velero pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.VeleroPodMemLimit, "velero-pod-mem-limit", o.VeleroPodMemLimit, `Memory limit for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.ResticPodCPURequest, "restic-pod-cpu-request", o.ResticPodCPURequest, `CPU request for restic pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.ResticPodMemRequest, "restic-pod-mem-request", o.ResticPodMemRequest, `memory request for restic pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.ResticPodMemRequest, "restic-pod-mem-request", o.ResticPodMemRequest, `Memory request for restic pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.ResticPodCPULimit, "restic-pod-cpu-limit", o.ResticPodCPULimit, `CPU limit for restic pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.ResticPodMemLimit, "restic-pod-mem-limit", o.ResticPodMemLimit, `memory limit for restic pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
-	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
-	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
-	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode. Optional.")
-	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "generate resources, but don't send them to the cluster. Use with -o. Optional.")
-	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic daemonset. Optional.")
-	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
-	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
+	flags.StringVar(&o.ResticPodMemLimit, "restic-pod-mem-limit", o.ResticPodMemLimit, `Memory limit for restic pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.Var(&o.BackupStorageConfig, "backup-location-config", "Configuration to use for the backup storage location. Format is key1=value1,key2=value2")
+	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
+	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
+	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "Run the server in restore-only mode. Optional.")
+	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "Generate resources, but don't send them to the cluster. Use with -o. Optional.")
+	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "Create restic daemonset. Optional.")
+	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
+	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default. Optional.")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
-	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
-	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "file containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
-	flags.StringVar(&o.Features, "features", o.Features, "comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
-	flags.BoolVar(&o.DefaultVolumesToRestic, "default-volumes-to-restic", o.DefaultVolumesToRestic, "bool flag to configure Velero server to use restic by default to backup all pod volumes on all backups. Optional.")
+	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "Only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
+	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
+	flags.BoolVar(&o.DefaultVolumesToRestic, "default-volumes-to-restic", o.DefaultVolumesToRestic, "Bool flag to configure Velero server to use restic by default to backup all pod volumes on all backups. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -196,8 +196,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "install",
 		Short: "Install Velero",
-		Long: `
-Install Velero onto a Kubernetes cluster using the supplied provider information, such as
+		Long: `Install Velero onto a Kubernetes cluster using the supplied provider information, such as
 the provider's name, a bucket name, and a file containing the credentials to access that bucket.
 A prefix within the bucket and configuration for the backup store location may also be supplied.
 Additionally, volume snapshot information for the same provider may be supplied.

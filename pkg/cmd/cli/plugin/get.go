@@ -62,7 +62,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
-	c.Flags().DurationVar(&timeout, "timeout", timeout, "maximum time to wait for plugin information to be reported. Default is 5 seconds.")
+	c.Flags().DurationVar(&timeout, "timeout", timeout, "Maximum time to wait for plugin information to be reported. Default is 5 seconds.")
 	output.BindFlagsSimple(c.Flags())
 
 	return c
