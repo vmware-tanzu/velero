@@ -1,17 +1,10 @@
-@mixin breakpoint($point) {
-	$small: 767px;
-    @if $point == small {
-		@media only screen and (max-width: $small) { @content; }
-    }
-}
-
 .grid.three {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr;
     row-gap: 20px;
     column-gap: 20px;
-    @include breakpoint(small) {
-        grid-template-columns: 1fr;
+    @include media-breakpoint-up(md) {
+        grid-template-columns: 1fr 1fr 1fr;
     }
 }
 .sub-page {
