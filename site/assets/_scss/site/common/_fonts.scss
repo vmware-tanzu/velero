@@ -8,10 +8,9 @@
 }
 
 @font-face {
-  font-family: "Metropolis";
+  font-family: "Metropolis-Light";
   src: local("Metropolis Light"), local("Metropolis-Light"),
     url("#{$path-fonts}/Metropolis/Metropolis-Light.woff") format("woff");
-  font-weight: $font-weight-light;
 }
 
 @font-face {
