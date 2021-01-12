@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
-	kubectlcmd "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd"
 )
 
 func NewCommand() *cobra.Command {
@@ -50,7 +48,7 @@ source <(velero completion fish)
 			case "bash":
 				cmd.Root().GenBashCompletion(os.Stdout)
 			case "zsh":
-				kubectlcmd.GenZshCompletion(os.Stdout, cmd.Root())
+				cmd.Root().GenZshCompletion(os.Stdout)
 			case "fish":
 				cmd.Root().GenFishCompletion(os.Stdout, true)
 			default:
