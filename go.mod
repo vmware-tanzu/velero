@@ -3,7 +3,6 @@ module github.com/vmware-tanzu/velero
 go 1.15
 
 require (
-	cloud.google.com/go v0.46.2 // indirect
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.6
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
@@ -86,3 +85,5 @@ replace k8s.io/metrics => k8s.io/metrics v0.18.4
 replace k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.4
 
 replace k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.18.4
+
+replace github.com/spf13/cobra v0.0.7 => github.com/spf13/cobra v1.1.1

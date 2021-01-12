@@ -28,19 +28,22 @@ import (
 func NewCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "completion SHELL",
-		Short: "Output shell completion code for the specified shell (bash or zsh).",
+		Short: "Output shell completion code for the specified shell [bash|zsh|fish].",
 		Long: `Generate shell completion code.
 
-Auto completion supports both bash and zsh. Output is to STDOUT.
+Auto completion supports bash, zsh, or fish. Output is to STDOUT.
 
 Load the velero completion code for bash into the current shell -
 source <(velero completion bash)
 
 Load the velero completion code for zsh into the current shell -
 source <(velero completion zsh)
+
+Load the velero completion code for fish into the current shell -
+source <(velero completion fish)
 `,
 		Args:      cobra.ExactArgs(1),
-		ValidArgs: []string{"bash", "zsh"},
+		ValidArgs: []string{"bash", "zsh", "fish"},
 		Run: func(cmd *cobra.Command, args []string) {
 			shell := args[0]
 			switch shell {
@@ -48,8 +51,10 @@ source <(velero completion zsh)
 				cmd.Root().GenBashCompletion(os.Stdout)
 			case "zsh":
 				kubectlcmd.GenZshCompletion(os.Stdout, cmd.Root())
+			case "fish":
+				cmd.Root().GenFishCompletion(os.Stdout, true)
 			default:
-				fmt.Printf("Invalid shell specified, specify bash or zsh\n")
+				fmt.Printf("Invalid shell specified, specify bash, zsh, or fish\n")
 				os.Exit(1)
 			}
 		},
