@@ -46,7 +46,7 @@ var (
 	DefaultVeleroPodCPURequest = "500m"
 	DefaultVeleroPodMemRequest = "128Mi"
 	DefaultVeleroPodCPULimit   = "1000m"
-	DefaultVeleroPodMemLimit   = "256Mi"
+	DefaultVeleroPodMemLimit   = "512Mi"
 	DefaultResticPodCPURequest = "500m"
 	DefaultResticPodMemRequest = "512Mi"
 	DefaultResticPodCPULimit   = "1000m"
