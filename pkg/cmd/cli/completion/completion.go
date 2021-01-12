@@ -25,20 +25,38 @@ import (
 
 func NewCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "completion SHELL",
-		Short: "Output shell completion code for the specified shell [bash|zsh|fish].",
-		Long: `Generate shell completion code.
+		Use:   "completion [bash|zsh|fish]",
+		Short: "Generate completion script",
+		Long: `To load completions:
 
-Auto completion supports bash, zsh, or fish. Output is to STDOUT.
+Bash:
 
-Load the velero completion code for bash into the current shell -
-source <(velero completion bash)
+$ source <(velero completion bash)
 
-Load the velero completion code for zsh into the current shell -
-source <(velero completion zsh)
+# To load completions for each session, execute once:
+Linux:
+	$ velero completion bash > /etc/bash_completion.d/velero
+MacOS:
+	$ velero completion bash > /usr/local/etc/bash_completion.d/velero
 
-Load the velero completion code for fish into the current shell -
-source <(velero completion fish)
+Zsh:
+
+# If shell completion is not already enabled in your environment you will need
+# to enable it.  You can execute the following once:
+
+$ echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# To load completions for each session, execute once:
+$ velero completion zsh > "${fpath[1]}/_yourprogram"
+
+# You will need to start a new shell for this setup to take effect.
+
+Fish:
+
+$ velero completion fish | source
+
+# To load completions for each session, execute once:
+$ velero completion fish > ~/.config/fish/completions/velero.fish
 `,
 		Args:      cobra.ExactArgs(1),
 		ValidArgs: []string{"bash", "zsh", "fish"},
