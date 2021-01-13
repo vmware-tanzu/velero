@@ -305,11 +305,11 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	if len(actions) > 0 {
 		// Download the tarball
 		backupFile, err := downloadToTempFile(backup.Name, backupStore, log)
-		defer closeAndRemoveFile(backupFile, c.logger)
 
 		if err != nil {
 			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
 		} else {
+			defer closeAndRemoveFile(backupFile, c.logger)
 			ctx := &delete.Context{
 				Backup:          backup,
 				BackupReader:    backupFile,
