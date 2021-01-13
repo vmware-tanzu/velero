@@ -80,7 +80,7 @@ At installation, Velero sets default resource requests and limits for the Velero
 |CPU request|500m|500m|
 |Memory requests|128Mi|512Mi|
 |CPU limit|1000m (1 CPU)|1000m (1 CPU)|
-|Memory limit|256Mi|1024Mi|
+|Memory limit|512Mi|1024Mi|
 {{< /table >}}
 
 ### Install with custom resource requests and limits
@@ -111,7 +111,7 @@ Update the `spec.template.spec.containers.resources.limits` and `spec.template.s
 
 ```bash
 kubectl patch deployment velero -n velero --patch \
-'{"spec":{"template":{"spec":{"containers":[{"name": "velero", "resources": {"limits":{"cpu": "1", "memory": "256Mi"}, "requests": {"cpu": "1", "memory": "128Mi"}}}]}}}}'
+'{"spec":{"template":{"spec":{"containers":[{"name": "velero", "resources": {"limits":{"cpu": "1", "memory": "512Mi"}, "requests": {"cpu": "1", "memory": "128Mi"}}}]}}}}'
 ```
 
 **restic pod**
