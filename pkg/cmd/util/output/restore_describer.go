@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/fatih/color"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
@@ -40,13 +41,20 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		if phase == "" {
 			phase = v1.RestorePhaseNew
 		}
+		phaseString := string(phase)
+		switch phase {
+		case v1.RestorePhaseCompleted:
+			phaseString = color.GreenString(phaseString)
+		case v1.RestorePhaseFailedValidation, v1.RestorePhasePartiallyFailed, v1.RestorePhaseFailed:
+			phaseString = color.RedString(phaseString)
+		}
 
 		resultsNote := ""
 		if phase == v1.RestorePhaseFailed || phase == v1.RestorePhasePartiallyFailed {
 			resultsNote = fmt.Sprintf(" (run 'velero restore logs %s' for more information)", restore.Name)
 		}
 
-		d.Printf("Phase:\t%s%s\n", restore.Status.Phase, resultsNote)
+		d.Printf("Phase:\t%s%s\n", phaseString, resultsNote)
 
 		d.Println()
 		// "<n/a>" output should only be applicable for restore that failed validation
@@ -66,7 +74,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 			d.Println()
 			d.Printf("Validation errors:")
 			for _, ve := range restore.Status.ValidationErrors {
-				d.Printf("\t%s\n", ve)
+				d.Printf("\t%s\n", color.RedString(ve))
 			}
 		}
 

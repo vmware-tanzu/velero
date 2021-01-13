@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
@@ -54,9 +55,10 @@ func NewCommand(name string) *cobra.Command {
 		fmt.Fprintf(os.Stderr, "WARNING: Error reading config file: %v\n", err)
 	}
 
-	// Declare cmdFeatures here so we can access them in the PreRun hooks
+	// Declare cmdFeatures and cmdColorzied here so we can access them in the PreRun hooks
 	// without doing a chain of calls into the command's FlagSet
 	var cmdFeatures veleroflag.StringArray
+	var cmdColorzied veleroflag.OptionalBool
 
 	c := &cobra.Command{
 		Use:   name,
@@ -74,6 +76,10 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			features.Enable(config.Features()...)
 			features.Enable(cmdFeatures...)
+
+			if cmdColorzied.Value != nil && !*cmdColorzied.Value {
+				color.NoColor = true
+			}
 		},
 	}
 
@@ -82,6 +88,9 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 
 	// Bind features directly to the root command so it's available to all callers.
 	c.PersistentFlags().Var(&cmdFeatures, "features", "Comma-separated list of features to enable for this Velero process. Combines with values from $HOME/.config/velero/config.json if present")
+
+	// Color will be enabled or disabled for all subcommands
+	c.PersistentFlags().Var(&cmdColorzied, "colorized", "Show colored output in TTY")
 
 	c.AddCommand(
 		backup.NewCommand(f),

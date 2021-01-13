@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
 
+	"github.com/fatih/color"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -53,20 +54,30 @@ func DescribeBackup(
 		if phase == "" {
 			phase = velerov1api.BackupPhaseNew
 		}
+		phaseString := string(phase)
+		switch phase {
+		case velerov1api.BackupPhaseFailedValidation, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed:
+			phaseString = color.RedString(phaseString)
+		case velerov1api.BackupPhaseCompleted:
+			phaseString = color.GreenString(phaseString)
+		case velerov1api.BackupPhaseDeleting:
+		case velerov1api.BackupPhaseInProgress:
+		case velerov1api.BackupPhaseNew:
+		}
 
 		logsNote := ""
 		if backup.Status.Phase == velerov1api.BackupPhaseFailed || backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed {
 			logsNote = fmt.Sprintf(" (run `velero backup logs %s` for more information)", backup.Name)
 		}
 
-		d.Printf("Phase:\t%s%s\n", phase, logsNote)
+		d.Printf("Phase:\t%s%s\n", phaseString, logsNote)
 
 		status := backup.Status
 		if len(status.ValidationErrors) > 0 {
 			d.Println()
 			d.Printf("Validation errors:")
 			for _, ve := range status.ValidationErrors {
-				d.Printf("\t%s\n", ve)
+				d.Printf("\t%s\n", color.RedString(ve))
 			}
 		}
 
