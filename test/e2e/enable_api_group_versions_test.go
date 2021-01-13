@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -23,13 +25,14 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
-var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API group versions", func() {
+var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
 	var (
-		resource, group string
-		certMgrCRD      map[string]string
-		client          *kubernetes.Clientset
-		err             error
-		ctx             = context.Background()
+		resource, group  string
+		certMgrCRD       map[string]string
+		client           *kubernetes.Clientset
+		extensionsClient *apiextensionsclient.Clientset
+		err              error
+		ctx              = context.Background()
 	)
 
 	BeforeEach(func() {
@@ -40,7 +43,7 @@ var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API grou
 			"namespace": "cert-manager",
 		}
 
-		client, err = GetClusterClient()
+		client, extensionsClient, err = GetClusterClient() // Currently we ignore the API extensions client
 		Expect(err).NotTo(HaveOccurred())
 
 		err = InstallCRD(ctx, certMgrCRD["url"], certMgrCRD["namespace"])
@@ -58,15 +61,6 @@ var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API grou
 		_, _, _ = veleroexec.RunCommand(cmd)
 
 		_ = DeleteCRD(ctx, certMgrCRD["url"], certMgrCRD["namespace"])
-
-		// Uninstall Velero.
-		if client != nil {
-			_ = client.CoreV1().Namespaces().Delete(
-				context.Background(),
-				"velero",
-				metav1.DeleteOptions{},
-			)
-		}
 	})
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
@@ -76,12 +70,14 @@ var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API grou
 				resource,
 				group,
 				client,
+				extensionsClient,
 			)).To(Succeed(), "Failed to successfully backup and restore multiple API Groups")
 		})
 	})
 })
 
-func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string, client *kubernetes.Clientset) error {
+func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string, client *kubernetes.Clientset,
+	extensionsClient *apiextensionsclient.Clientset) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -181,7 +177,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 				"namespace": "music-system",
 			},
 			tgtVer: "v2beta1",
-			cm: builder.ForConfigMap("velero", "enableapigroupversions").Data(
+			cm: builder.ForConfigMap(veleroNamespace, "enableapigroupversions").Data(
 				"restoreResourcesVersionPriority",
 				`rockbands.music.example.io=v2beta1,v2beta2,v2`,
 			).Result(),
@@ -220,17 +216,22 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 			tc.namespaces = append(tc.namespaces, ns)
 		}
 
-		if err := installVeleroForAPIGroups(ctx); err != nil {
-			return errors.Wrap(err, "install velero")
+		// TODO - Velero needs to be installed AFTER CRDs are installed because of https://github.com/vmware-tanzu/velero/issues/3471
+		// Once that issue is fixed, we should install Velero once for the test suite
+		if installVelero {
+			VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig,
+				"EnableAPIGroupVersions" /* TODO - remove this when the feature flag is removed */)
+			fmt.Println("Sleep 20s to wait for Velero to stabilize after install.")
+			time.Sleep(time.Second * 20)
 		}
-		fmt.Println("Sleep 20s to wait for Velero to stabilize after install.")
-		time.Sleep(time.Second * 20)
 
 		backup := "backup-rockbands-" + uuidgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
 
-		err = VeleroBackupNamespace(ctx, veleroCLI, backup, namespacesStr)
+		err = VeleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr)
 		if err != nil {
+			VeleroBackupLogs(ctx, veleroCLI, veleroNamespace, backup)
 			return errors.Wrapf(err, "backing up %s namespaces on source cluster", namespacesStr)
 		}
 
@@ -256,14 +257,14 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 
 		// Apply config map if there is one.
 		if tc.cm != nil {
-			_, err := client.CoreV1().ConfigMaps("velero").Create(ctx, tc.cm, metav1.CreateOptions{})
+			_, err := client.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
 			if err != nil {
 				return errors.Wrap(err, "creating config map with user version priorities")
 			}
 		}
 
 		// Reset Velero to recognize music-system CRD.
-		if err := RestartPods(ctx, "velero"); err != nil {
+		if err := RestartPods(ctx, veleroNamespace); err != nil {
 			return errors.Wrapf(err, "restarting Velero pods")
 		}
 		fmt.Println("Sleep 20s to wait for Velero to stabilize after restart.")
@@ -273,7 +274,8 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		restore := "restore-rockbands-" + uuidgen.String() + "-" + strconv.Itoa(i)
 
 		if tc.want != nil {
-			if err := VeleroRestore(ctx, veleroCLI, restore, backup); err != nil {
+			if err := VeleroRestore(ctx, veleroCLI, veleroNamespace, restore, backup); err != nil {
+				VeleroRestoreLogs(ctx, veleroCLI, veleroNamespace, restore)
 				return errors.Wrapf(err, "restoring %s namespaces on target cluster", namespacesStr)
 			}
 
@@ -310,7 +312,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		} else {
 			// No custom resource should have been restored. Expect "no resource found"
 			// error during restore.
-			err := VeleroRestore(ctx, veleroCLI, restore, backup)
+			err := VeleroRestore(ctx, veleroCLI, veleroNamespace, restore, backup)
 
 			if err.Error() != "Unexpected restore phase got PartiallyFailed, expecting Completed" {
 				return errors.New("expected error but not none")
@@ -338,9 +340,13 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 			tc.srcCRD["namespace"],
 		)
 
-		// Delete Velero namespace
-		_ = client.CoreV1().Namespaces().Delete(ctx, "velero", metav1.DeleteOptions{})
-		_ = WaitNamespaceDelete(ctx, "velero")
+		// Uninstall Velero
+		if installVelero {
+			err = VeleroUninstall(ctx, client, extensionsClient, veleroNamespace)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -353,13 +359,14 @@ func installVeleroForAPIGroups(ctx context.Context) error {
 
 	// Pass global variables to option parameters.
 	options, err := GetProviderVeleroInstallOptions(
-		pluginProvider,
+		cloudProvider,
 		cloudCredentialsFile,
 		bslBucket,
 		bslPrefix,
 		bslConfig,
 		vslConfig,
-		getProviderPlugins(pluginProvider),
+		getProviderPlugins(cloudProvider),
+		"EnableAPIGroupVersions",
 	)
 	if err != nil {
 		return errors.Wrap(err, "get velero install options")
@@ -428,7 +435,7 @@ func WaitForPodContainers(ctx context.Context, ns string) error {
 
 func DeleteCRD(ctx context.Context, crdFile, ns string) error {
 	fmt.Println("Delete CRD", crdFile)
-	cmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", crdFile)
+	cmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", crdFile, "--wait")
 
 	_, stderr, err := veleroexec.RunCommand(cmd)
 	if strings.Contains(stderr, "not found") {
@@ -454,7 +461,6 @@ func DeleteCRD(ctx context.Context, crdFile, ns string) error {
 		re := regexp.MustCompile(ns)
 		return re.MatchString(stdout), nil
 	})
-
 	return err
 }
 

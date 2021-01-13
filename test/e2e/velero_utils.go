@@ -9,7 +9,13 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -34,13 +40,14 @@ func getProviderPlugins(providerName string) []string {
 
 // GetProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
 func GetProviderVeleroInstallOptions(
-	providerName,
+	pluginProvider,
 	credentialsFile,
 	objectStoreBucket,
 	objectStorePrefix string,
 	bslConfig,
 	vslConfig string,
 	plugins []string,
+	features string,
 ) (*cliinstall.InstallOptions, error) {
 
 	if credentialsFile == "" {
@@ -55,7 +62,7 @@ func GetProviderVeleroInstallOptions(
 	io := cliinstall.NewInstallOptions()
 	// always wait for velero and restic pods to be running.
 	io.Wait = true
-	io.ProviderName = providerName
+	io.ProviderName = pluginProvider
 	io.SecretFile = credentialsFile
 
 	io.BucketName = objectStoreBucket
@@ -68,6 +75,7 @@ func GetProviderVeleroInstallOptions(
 
 	io.SecretFile = realPath
 	io.Plugins = flag.NewStringArray(plugins...)
+	io.Features = features
 	return io, nil
 }
 
@@ -101,7 +109,7 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 	}
 
 	fmt.Println("Waiting for Velero deployment to be ready.")
-	if _, err = install.DeploymentIsReady(factory, "velero"); err != nil {
+	if _, err = install.DeploymentIsReady(factory, io.Namespace); err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
 
@@ -116,8 +124,11 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 }
 
 // CheckBackupPhase uses veleroCLI to inspect the phase of a Velero backup.
-func CheckBackupPhase(ctx context.Context, veleroCLI string, backupName string, expectedPhase velerov1api.BackupPhase) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "backup", "get", "-o", "json", backupName)
+func CheckBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string,
+	expectedPhase velerov1api.BackupPhase) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "get", "-o", "json",
+		backupName)
+
 	fmt.Printf("get backup cmd =%v\n", checkCMD)
 	stdoutPipe, err := checkCMD.StdoutPipe()
 	if err != nil {
@@ -157,8 +168,11 @@ func CheckBackupPhase(ctx context.Context, veleroCLI string, backupName string, 
 }
 
 // CheckRestorePhase uses veleroCLI to inspect the phase of a Velero restore.
-func CheckRestorePhase(ctx context.Context, veleroCLI string, restoreName string, expectedPhase velerov1api.RestorePhase) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "restore", "get", "-o", "json", restoreName)
+func CheckRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string,
+	expectedPhase velerov1api.RestorePhase) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "get", "-o", "json",
+		restoreName)
+
 	fmt.Printf("get restore cmd =%v\n", checkCMD)
 	stdoutPipe, err := checkCMD.StdoutPipe()
 	if err != nil {
@@ -198,23 +212,135 @@ func CheckRestorePhase(ctx context.Context, veleroCLI string, restoreName string
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
-func VeleroBackupNamespace(ctx context.Context, veleroCLI string, backupName string, namespace string) error {
-	backupCmd := exec.CommandContext(ctx, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
+func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string) error {
+	backupCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "backup", backupName,
+		"--include-namespaces", namespace,
 		"--default-volumes-to-restic", "--wait")
+
+	backupCmd.Stdout = os.Stdout
+	backupCmd.Stderr = os.Stderr
+	fmt.Printf("backup cmd =%v\n", backupCmd)
 	err := backupCmd.Run()
 	if err != nil {
 		return err
 	}
-	return CheckBackupPhase(ctx, veleroCLI, backupName, velerov1api.BackupPhaseCompleted)
+	err = CheckBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
+
+	return err
 }
 
 // VeleroRestore uses the veleroCLI to restore from a Velero backup.
-func VeleroRestore(ctx context.Context, veleroCLI string, restoreName string, backupName string) error {
-	restoreCmd := exec.CommandContext(ctx, veleroCLI, "create", "restore", restoreName, "--from-backup", backupName, "--wait")
+func VeleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string, backupName string) error {
+	restoreCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "restore", restoreName,
+		"--from-backup", backupName, "--wait")
+
+	restoreCmd.Stdout = os.Stdout
+	restoreCmd.Stderr = os.Stderr
 	fmt.Printf("restore cmd =%v\n", restoreCmd)
 	err := restoreCmd.Run()
 	if err != nil {
 		return err
 	}
-	return CheckRestorePhase(ctx, veleroCLI, restoreName, velerov1api.RestorePhaseCompleted)
+	return CheckRestorePhase(ctx, veleroCLI, veleroNamespace, restoreName, velerov1api.RestorePhaseCompleted)
+}
+
+func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace string, cloudProvider string, objectStoreProvider string, useVolumeSnapshots bool,
+	cloudCredentialsFile string, bslBucket string, bslPrefix string, bslConfig string, vslConfig string,
+	features string) error {
+
+	if cloudProvider != "kind" {
+		if objectStoreProvider != "" {
+			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
+		}
+		objectStoreProvider = cloudProvider
+	} else {
+		if objectStoreProvider == "" {
+			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
+		}
+	}
+	err := EnsureClusterExists(ctx)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to ensure kubernetes cluster exists")
+	}
+	veleroInstallOptions, err := GetProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
+		bslPrefix, bslConfig, vslConfig, getProviderPlugins(objectStoreProvider), features)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", objectStoreProvider)
+	}
+	veleroInstallOptions.UseRestic = !useVolumeSnapshots
+	veleroInstallOptions.Image = veleroImage
+	veleroInstallOptions.Namespace = veleroNamespace
+	err = InstallVeleroServer(veleroInstallOptions)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to install Velero in cluster")
+	}
+	return nil
+}
+
+func VeleroUninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclient.Clientset,
+	veleroNamespace string) error {
+	// TODO - replace with invocation of "velero uninstall" when that becomes available
+	err := DeleteNamespace(ctx, client, veleroNamespace)
+	if err != nil {
+		return errors.WithMessagef(err, "Uninstall failed removing Velero namespace %s", veleroNamespace)
+	}
+
+	return err
+	rolebinding := install.ClusterRoleBinding(veleroNamespace)
+
+	err = client.RbacV1().ClusterRoleBindings().Delete(ctx, rolebinding.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.WithMessagef(err, "Uninstall failed removing Velero cluster role binding %s", rolebinding)
+	}
+	veleroLabels := labels.FormatLabels(install.Labels())
+
+	crds, err := extensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{
+		LabelSelector: veleroLabels,
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "Uninstall failed listing Velero crds")
+	}
+	for _, removeCRD := range crds.Items {
+		err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, removeCRD.ObjectMeta.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return errors.WithMessagef(err, "Uninstall failed removing CRD %s", removeCRD.ObjectMeta.Name)
+		}
+	}
+	return nil
+}
+
+func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "describe", backupName)
+	describeCmd.Stdout = os.Stdout
+	describeCmd.Stderr = os.Stderr
+	err := describeCmd.Run()
+	if err != nil {
+		return err
+	}
+	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "logs", backupName)
+	logCmd.Stdout = os.Stdout
+	logCmd.Stderr = os.Stderr
+	err = logCmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func VeleroRestoreLogs(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string) error {
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "describe", restoreName)
+	describeCmd.Stdout = os.Stdout
+	describeCmd.Stderr = os.Stderr
+	err := describeCmd.Run()
+	if err != nil {
+		return err
+	}
+	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "logs", restoreName)
+	logCmd.Stdout = os.Stdout
+	logCmd.Stderr = os.Stderr
+	err = logCmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }
