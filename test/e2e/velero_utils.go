@@ -251,6 +251,24 @@ func veleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespac
 	return err
 }
 
+// veleroBackupExcludeNamespaces uses the veleroCLI to backup a namespace.
+func veleroBackupExcludeNamespaces(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, excludeNamespaces []string) error {
+	namespaces := strings.Join(excludeNamespaces, ",")
+	backupCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "backup", backupName,
+		"--exclude-namespaces", namespaces,
+		"--default-volumes-to-restic", "--wait")
+	backupCmd.Stdout = os.Stdout
+	backupCmd.Stderr = os.Stderr
+	fmt.Printf("backup cmd =%v\n", backupCmd)
+	err := backupCmd.Run()
+	if err != nil {
+		return err
+	}
+	err = checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
+
+	return err
+}
+
 // veleroRestore uses the veleroCLI to restore from a Velero backup.
 func veleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string, backupName string) error {
 	restoreCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "restore", restoreName,
