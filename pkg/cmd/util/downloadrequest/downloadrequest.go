@@ -30,7 +30,6 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -52,7 +51,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	key := client.ObjectKey{Name: created.Name, Namespace: namespace}
+	key := kbclient.ObjectKey{Name: created.Name, Namespace: namespace}
 	checkFunc := func() {
 		updated := &velerov1api.DownloadRequest{}
 		if err := kbClient.Get(ctx, key, updated); err != nil {
