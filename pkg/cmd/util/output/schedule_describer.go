@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
+
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
