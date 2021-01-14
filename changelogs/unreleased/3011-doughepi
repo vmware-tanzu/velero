@@ -1,2 +1,0 @@
-Allows the restic-wait container to exist in any order in the pod being restored. 
-Prints a warning message in the case where the restic-wait container isn't the first container in the list of initialization containers.

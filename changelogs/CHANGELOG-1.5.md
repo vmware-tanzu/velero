@@ -1,3 +1,25 @@
+## v1.5.3
+### 2021-01-14
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.5.3
+
+### Container Image
+`velero/velero:v1.5.3`
+
+### Documentation
+https://velero.io/docs/v1.5/
+
+### Upgrading
+https://velero.io/docs/v1.5/upgrade-to-1.5/
+
+### All Changes
+  * Increased default Velero pod memory limit to 512Mi (#3234, @dsmithuchida)
+  * 🐛 BSLs with validation disabled should be validated at least once (#3084, @ashish-amarnath)
+  * Fixed an issue where the deletion of a backup would fail if the backup tarball couldn't be downloaded from object storage. Now the tarball is only downloaded if there are associated DeleteItemAction plugins and if downloading the tarball fails, the plugins are skipped. (#2993, @zubron)
+  * 🐛  ItemAction plugins for unresolvable types should not be run for all types (#3059, @ashish-amarnath)
+  * 🐛  Use namespace and name to match PVB to Pod restore (#3051, @ashish-amarnath)
+  * Allows the restic-wait container to exist in any order in the pod being restored. Prints a warning message in the case where the restic-wait container isn't the first container in the list of initialization containers. (#3011, @doughepi)
+
 ## v1.5.2
 ### 2020-10-20
 ### Download
