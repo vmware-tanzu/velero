@@ -92,6 +92,7 @@ type CreateOptions struct {
 	ExcludeResources        flag.StringArray
 	Labels                  flag.Map
 	Selector                flag.LabelSelector
+	Selectors               []string
 	IncludeClusterResources flag.OptionalBool
 	Wait                    bool
 	StorageLocation         string
@@ -121,7 +122,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
-	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
+	// flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
+	flags.StringArrayVarP(&o.Selectors, "selector", "l", nil, "Only back up resources matching this label selector.")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
@@ -174,6 +176,12 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	for _, loc := range o.SnapshotLocations {
 		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(context.TODO(), loc, metav1.GetOptions{}); err != nil {
+			return err
+		}
+	}
+
+	for _, s := range o.Selectors {
+		if _, err := metav1.ParseToLabelSelector(s); err != nil {
 			return err
 		}
 	}
@@ -325,7 +333,6 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			ExcludedNamespaces(o.ExcludeNamespaces...).
 			IncludedResources(o.IncludeResources...).
 			ExcludedResources(o.ExcludeResources...).
-			LabelSelector(o.Selector.LabelSelector).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...)
@@ -335,6 +342,13 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 				return nil, err
 			}
 			backupBuilder.OrderedResources(orders)
+		}
+		for _, s := range o.Selectors {
+			labelSelector, err := metav1.ParseToLabelSelector(s)
+			if err != nil {
+				return nil, err
+			}
+			backupBuilder = backupBuilder.LabelSelector(labelSelector)
 		}
 
 		if o.SnapshotVolumes.Value != nil {

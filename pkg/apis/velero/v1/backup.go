@@ -53,6 +53,14 @@ type BackupSpec struct {
 	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
+	// LabelSelectors is a list of metav1.LabelSelector to filter with
+	// when adding individual objects to the backup. If empty
+	// or nil, all objects are included. Optional. If multiple provided they
+	// will be joined with OR operator
+	// +optional
+	// +nullable
+	LabelSelectors []*metav1.LabelSelector `json:"labelSelectors,omitempty"`
+
 	// SnapshotVolumes specifies whether to take cloud snapshots
 	// of any PV's referenced in the set of objects included
 	// in the Backup.

@@ -135,9 +135,9 @@ func (b *BackupBuilder) IncludeClusterResources(val bool) *BackupBuilder {
 	return b
 }
 
-// LabelSelector sets the Backup's label selector.
+// LabelSelector appends to the Backup's label selectors.
 func (b *BackupBuilder) LabelSelector(selector *metav1.LabelSelector) *BackupBuilder {
-	b.object.Spec.LabelSelector = selector
+	b.object.Spec.LabelSelectors = append(b.object.Spec.LabelSelectors, selector)
 	return b
 }
 

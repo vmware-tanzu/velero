@@ -230,6 +230,17 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.LabelSelectors != nil {
+		in, out := &in.LabelSelectors, &out.LabelSelectors
+		*out = make([]*metav1.LabelSelector, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(metav1.LabelSelector)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
 	if in.SnapshotVolumes != nil {
 		in, out := &in.SnapshotVolumes, &out.SnapshotVolumes
 		*out = new(bool)

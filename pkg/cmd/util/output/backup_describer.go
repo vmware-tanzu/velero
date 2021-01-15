@@ -138,7 +138,15 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	if spec.LabelSelector != nil {
 		s = metav1.FormatLabelSelector(spec.LabelSelector)
 	}
-	d.Printf("Label selector:\t%s\n", s)
+	for i, selector := range spec.LabelSelectors {
+		if i == 0 {
+			s = ""
+		} else {
+			s += "\n\t"
+		}
+		s += metav1.FormatLabelSelector(selector)
+	}
+	d.Printf("Label selectors:\t%s\n", s)
 
 	d.Println()
 	d.Printf("Storage Location:\t%s\n", spec.StorageLocation)

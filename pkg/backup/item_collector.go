@@ -283,41 +283,55 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			continue
 		}
 
-		var labelSelector string
+		var labelSelectors []string
+		// legacy behavior with a single label selector
 		if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
-			labelSelector = metav1.FormatLabelSelector(selector)
+			labelSelectors = []string{metav1.FormatLabelSelector(selector)}
+		} else if selectors := r.backupRequest.Spec.LabelSelectors; len(selectors) > 0 {
+			for _, s := range selectors {
+				labelSelectors = append(labelSelectors, metav1.FormatLabelSelector(s))
+			}
+		} else { // if no selectors supplied will select all items
+			labelSelectors = []string{""}
 		}
 
-		log.Info("Listing items")
-		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: labelSelector})
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("Error listing items")
-			continue
+		var unstructuredLists []*unstructured.UnstructuredList
+		for _, labelSelector := range labelSelectors {
+			log.Info("Listing items")
+
+			unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: labelSelector})
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error listing items")
+				continue
+			}
+			log.Infof("Retrieved %d items", len(unstructuredList.Items))
+			unstructuredLists = append(unstructuredLists, unstructuredList)
 		}
-		log.Infof("Retrieved %d items", len(unstructuredList.Items))
 
 		// collect the items
-		for i := range unstructuredList.Items {
-			item := &unstructuredList.Items[i]
+		for _, unstructuredList := range unstructuredLists {
+			for i := range unstructuredList.Items {
+				item := &unstructuredList.Items[i]
 
-			if gr == kuberesource.Namespaces && !r.backupRequest.NamespaceIncludesExcludes.ShouldInclude(item.GetName()) {
-				log.WithField("name", item.GetName()).Info("Skipping namespace because it's excluded")
-				continue
+				if gr == kuberesource.Namespaces && !r.backupRequest.NamespaceIncludesExcludes.ShouldInclude(item.GetName()) {
+					log.WithField("name", item.GetName()).Info("Skipping namespace because it's excluded")
+					continue
+				}
+
+				path, err := r.writeToFile(item)
+				if err != nil {
+					log.WithError(err).Error("Error writing item to file")
+					continue
+				}
+
+				items = append(items, &kubernetesResource{
+					groupResource: gr,
+					preferredGVR:  preferredGVR,
+					namespace:     item.GetNamespace(),
+					name:          item.GetName(),
+					path:          path,
+				})
 			}
-
-			path, err := r.writeToFile(item)
-			if err != nil {
-				log.WithError(err).Error("Error writing item to file")
-				continue
-			}
-
-			items = append(items, &kubernetesResource{
-				groupResource: gr,
-				preferredGVR:  preferredGVR,
-				namespace:     item.GetNamespace(),
-				name:          item.GetName(),
-				path:          path,
-			})
 		}
 	}
 	if len(orders) > 0 {
