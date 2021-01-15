@@ -43,7 +43,7 @@
           </div>
           <div class="col-md-8">
             {{ .Render "version-warning" }}
-            <div class="documentation-container">
+            <div class="documentation-container {{ if not .Site.Params.docs_right_sidebar }}full{{ end }}">
               {{ with .Title }}<h1>{{ . }}</h1>{{ end }}
               {{ if eq $.Params.toc "true" }}
                   <aside>
@@ -53,6 +53,7 @@
 
               {{ .Content }}
             </div>
+            {{ partial "docs-right-bar.html" . }}
           </div>
         </div>
       </div>

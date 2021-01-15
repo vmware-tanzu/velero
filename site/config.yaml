@@ -12,6 +12,7 @@ params:
   hero:
     backgroundColor: med-blue
   versioning: true
+  docs_right_sidebar: true
   latest: v1.5
   versions:
     - main

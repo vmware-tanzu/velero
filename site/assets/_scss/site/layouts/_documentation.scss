@@ -24,9 +24,73 @@
     }
   }
   .documentation-container {
+    float: left;
+    max-width: 75%;
     @include media-breakpoint-down(lg) {
       max-width: 100%;
       overflow-x: scroll;
+    }
+    &.full {
+      max-width: 100%;
+    }
+  }
+  .right-nav {
+    width: 25%;
+    float: right;
+    background-color: #EFEFEF;
+    margin: -24px -30px 0px 0px;
+    padding: 30px 30px 0px 0px;
+    height: calc(100% + 24px);
+    .right-nav-content {
+        padding-left: 20px;
+        margin-right: -20px;
+        position: sticky;
+        top: 0;
+    }
+    .buttons {
+        margin-top: 0px;
+        li {
+            margin-bottom: 0px;
+            padding: 8px 0px;
+            display: inline-block;
+            &:first-of-type {
+                border-right: 1px solid #ddd;
+                padding-right: 5px;
+            }
+            a {
+                text-transform: uppercase;
+                font-size: 14px;
+                img {
+                    vertical-align: middle;
+                    width: 22px;
+                }
+            }
+        }
+    }
+    h4 {
+        font-size: 16px;
+    }
+    ul {
+        padding-left: 0px;
+        margin-bottom: 0px;
+        li {
+            display: block;
+            padding-right: 0px;
+            margin-bottom: 15px;
+            a {
+                font-size: 14px;
+            }
+            ul {
+                margin-top: 15px;
+            }
+        }
+    }
+    .sticky {
+        position: fixed;
+        top: 0;
+    }
+    @include media-breakpoint-down(lg) {
+        display: none;
     }
   }
 }
