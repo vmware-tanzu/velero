@@ -33,8 +33,13 @@ func getProviderPlugins(providerName string) []string {
 }
 
 // GetProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
-func GetProviderVeleroInstallOptions(providerName, credentialsFile, objectStoreBucket, objectStorePrefix string,
-	bslConfig, vslConfig string,
+func GetProviderVeleroInstallOptions(
+	providerName,
+	credentialsFile,
+	objectStoreBucket,
+	objectStorePrefix string,
+	bslConfig,
+	vslConfig string,
 	plugins []string,
 ) (*cliinstall.InstallOptions, error) {
 
@@ -100,10 +105,11 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 		return errors.Wrap(err, errorMsg)
 	}
 
-	// restic enabled by default
-	fmt.Println("Waiting for Velero restic daemonset to be ready.")
-	if _, err = install.DaemonSetIsReady(factory, "velero"); err != nil {
-		return errors.Wrap(err, errorMsg)
+	if io.UseRestic {
+		fmt.Println("Waiting for Velero restic daemonset to be ready.")
+		if _, err = install.DaemonSetIsReady(factory, "velero"); err != nil {
+			return errors.Wrap(err, errorMsg)
+		}
 	}
 
 	return nil
@@ -193,8 +199,7 @@ func CheckRestorePhase(ctx context.Context, veleroCLI string, restoreName string
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
 func VeleroBackupNamespace(ctx context.Context, veleroCLI string, backupName string, namespace string) error {
-	backupCmd := exec.CommandContext(ctx, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
-		"--default-volumes-to-restic", "--wait")
+	backupCmd := exec.CommandContext(ctx, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace, "--wait")
 	fmt.Printf("backup cmd =%v\n", backupCmd)
 	err := backupCmd.Run()
 	if err != nil {
