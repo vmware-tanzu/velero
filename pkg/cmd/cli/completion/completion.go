@@ -47,7 +47,7 @@ Zsh:
 $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
 # To load completions for each session, execute once:
-$ velero completion zsh > "${fpath[1]}/_yourprogram"
+$ velero completion zsh > "${fpath[1]}/_velero"
 
 # You will need to start a new shell for this setup to take effect.
 
@@ -70,7 +70,7 @@ $ velero completion fish > ~/.config/fish/completions/velero.fish
 			case "fish":
 				cmd.Root().GenFishCompletion(os.Stdout, true)
 			default:
-				fmt.Printf("Invalid shell specified, specify bash, zsh, or fish\n")
+				fmt.Println("Invalid shell specified, specify bash, zsh, or fish")
 				os.Exit(1)
 			}
 		},
