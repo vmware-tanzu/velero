@@ -26,7 +26,7 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/afero v1.2.2
-	github.com/spf13/cobra v0.0.7
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/mod v0.1.0
@@ -85,5 +85,3 @@ replace k8s.io/metrics => k8s.io/metrics v0.18.4
 replace k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.4
 
 replace k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.18.4
-
-replace github.com/spf13/cobra v0.0.7 => github.com/spf13/cobra v1.1.1
