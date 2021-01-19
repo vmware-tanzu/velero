@@ -31,6 +31,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -54,7 +55,8 @@ type backupSyncController struct {
 	defaultBackupLocation   string
 	defaultBackupSyncPeriod time.Duration
 	newPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore          func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore          func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, credentials.Getter, logrus.FieldLogger) (persistence.BackupStore, error)
+	credentialsGetter       credentials.Getter
 }
 
 func NewBackupSyncController(
@@ -68,6 +70,7 @@ func NewBackupSyncController(
 	kubeClient kubernetes.Interface,
 	defaultBackupLocation string,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	credentialsGetter credentials.Getter,
 	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod <= 0 {
@@ -86,6 +89,7 @@ func NewBackupSyncController(
 		backupLister:            backupLister,
 		csiSnapshotClient:       csiSnapshotClient,
 		kubeClient:              kubeClient,
+		credentialsGetter:       credentialsGetter,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -169,7 +173,7 @@ func (c *backupSyncController) run() {
 
 		log.Debug("Checking backup location for backups to sync into cluster")
 
-		backupStore, err := c.newBackupStore(&location, pluginManager, log)
+		backupStore, err := c.newBackupStore(&location, pluginManager, c.credentialsGetter, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting backup store for this location")
 			continue

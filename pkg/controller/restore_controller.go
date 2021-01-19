@@ -40,6 +40,7 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -91,9 +92,10 @@ type restoreController struct {
 	metrics                *metrics.ServerMetrics
 	logFormat              logging.Format
 	clock                  clock.Clock
+	credentialsGetter      credentials.Getter
 
 	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, credentials.Getter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewRestoreController(
@@ -110,6 +112,7 @@ func NewRestoreController(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
 	logFormat logging.Format,
+	credentialsGetter credentials.Getter,
 ) Interface {
 	c := &restoreController{
 		genericController:      newGenericController(Restore, logger),
@@ -125,6 +128,7 @@ func NewRestoreController(
 		metrics:                metrics,
 		logFormat:              logFormat,
 		clock:                  &clock.RealClock{},
+		credentialsGetter:      credentialsGetter,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -410,7 +414,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 		return backupInfo{}, errors.WithStack(err)
 	}
 
-	backupStore, err := c.newBackupStore(location, pluginManager, c.logger)
+	backupStore, err := c.newBackupStore(location, pluginManager, c.credentialsGetter, c.logger)
 	if err != nil {
 		return backupInfo{}, err
 	}
@@ -480,7 +484,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 
 	// re-instantiate the backup store because credentials could have changed since the original
 	// instantiation, if this was a long-running restore
-	info.backupStore, err = c.newBackupStore(info.location, pluginManager, c.logger)
+	info.backupStore, err = c.newBackupStore(info.location, pluginManager, c.credentialsGetter, c.logger)
 	if err != nil {
 		return errors.Wrap(err, "error setting up backup store to persist log and results files")
 	}

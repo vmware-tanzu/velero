@@ -56,6 +56,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
@@ -567,6 +568,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
 
+	credentialsGetter := credentials.NewCredentialsGetter(s.kubeClient, s.namespace)
+
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
 			s.veleroClient.VeleroV1(),
@@ -579,6 +582,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.kubeClient,
 			s.config.defaultBackupLocation,
 			newPluginManager,
+			credentialsGetter,
 			s.logger,
 		)
 
@@ -621,6 +625,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.formatFlag.Parse(),
 			csiVSLister,
 			csiVSCLister,
+			credentialsGetter,
 		)
 
 		return controllerRunInfo{
@@ -679,6 +684,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			newPluginManager,
 			s.metrics,
 			s.discoveryHelper,
+			credentialsGetter,
 		)
 
 		return controllerRunInfo{
@@ -716,6 +722,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			newPluginManager,
 			s.metrics,
 			s.config.formatFlag.Parse(),
+			credentialsGetter,
 		)
 
 		return controllerRunInfo{
@@ -748,6 +755,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			newPluginManager,
+			credentialsGetter,
 			s.logger,
 		)
 
@@ -834,9 +842,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			StorageLocation:           s.config.defaultBackupLocation,
 			ServerValidationFrequency: s.config.storeValidationFrequency,
 		},
-		NewPluginManager: newPluginManager,
-		NewBackupStore:   persistence.NewObjectBackupStore,
-		Log:              s.logger,
+		NewPluginManager:  newPluginManager,
+		NewBackupStore:    persistence.NewObjectBackupStore,
+		Log:               s.logger,
+		CredentialsGetter: credentialsGetter,
 	}
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)

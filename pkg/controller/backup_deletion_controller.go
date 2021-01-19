@@ -39,6 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/delete"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -77,9 +78,10 @@ type backupDeletionController struct {
 	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore            func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore            func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, credentials.Getter, logrus.FieldLogger) (persistence.BackupStore, error)
 	metrics                   *metrics.ServerMetrics
 	helper                    discovery.Helper
+	credentialsGetter         credentials.Getter
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -101,6 +103,7 @@ func NewBackupDeletionController(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
 	helper discovery.Helper,
+	credentialsGetter credentials.Getter,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController(BackupDeletion, logger),
@@ -119,6 +122,7 @@ func NewBackupDeletionController(
 		csiSnapshotClient:         csiSnapshotClient,
 		metrics:                   metrics,
 		helper:                    helper,
+		credentialsGetter:         credentialsGetter,
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
@@ -290,7 +294,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, err := c.newBackupStore(location, pluginManager, log)
+	backupStore, err := c.newBackupStore(location, pluginManager, c.credentialsGetter, log)
 	if err != nil {
 		errs = append(errs, err.Error())
 	}

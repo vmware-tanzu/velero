@@ -32,6 +32,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
@@ -42,10 +43,12 @@ type BackupStorageLocationReconciler struct {
 	Client                    client.Client
 	Scheme                    *runtime.Scheme
 	DefaultBackupLocationInfo storage.DefaultBackupLocationInfo
+	CredentialsGetter         credentials.Getter
+
 	// use variables to refer to these functions so they can be
 	// replaced with fakes for testing.
 	NewPluginManager func(logrus.FieldLogger) clientmgmt.Manager
-	NewBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	NewBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, credentials.Getter, logrus.FieldLogger) (persistence.BackupStore, error)
 
 	Log logrus.FieldLogger
 }
@@ -95,7 +98,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(req ctrl.Request) (ctrl.Resu
 			continue
 		}
 
-		backupStore, err := r.NewBackupStore(location, pluginManager, log)
+		backupStore, err := r.NewBackupStore(location, pluginManager, r.CredentialsGetter, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting a backup store")
 			continue

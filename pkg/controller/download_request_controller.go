@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -50,8 +51,9 @@ type downloadRequestController struct {
 	clock                 clock.Clock
 	kbClient              client.Client
 	backupLister          velerov1listers.BackupLister
+	credentialsGetter     credentials.Getter
 	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore        func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore        func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, credentials.Getter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -62,6 +64,7 @@ func NewDownloadRequestController(
 	kbClient client.Client,
 	backupLister velerov1listers.BackupLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	credentialsGetter credentials.Getter,
 	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{
@@ -71,6 +74,7 @@ func NewDownloadRequestController(
 		restoreLister:         restoreLister,
 		kbClient:              kbClient,
 		backupLister:          backupLister,
+		credentialsGetter:     credentialsGetter,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -172,7 +176,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *velero
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, err := c.newBackupStore(backupLocation, pluginManager, log)
+	backupStore, err := c.newBackupStore(backupLocation, pluginManager, c.credentialsGetter, log)
 	if err != nil {
 		return errors.WithStack(err)
 	}

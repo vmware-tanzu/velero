@@ -27,12 +27,12 @@ import (
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	kerrors "k8s.io/apimachinery/pkg/util/errors"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/volume"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type BackupInfo struct {
@@ -90,7 +90,7 @@ type ObjectStoreGetter interface {
 	GetObjectStore(provider string) (velero.ObjectStore, error)
 }
 
-func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
+func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, credentialsGetter credentials.Getter, logger logrus.FieldLogger) (BackupStore, error) {
 	if location.Spec.ObjectStorage == nil {
 		return nil, errors.New("backup storage location does not use object storage")
 	}
@@ -123,6 +123,19 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 		if location.Spec.ObjectStorage.CACert != nil {
 			location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
 		}
+	}
+
+	if location.Spec.Credential != nil {
+		if location.Spec.Config == nil {
+			location.Spec.Config = make(map[string]string)
+		}
+
+		credsFile, err := credentialsGetter.GetAsFile(location.Spec.Credential)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to get credentials")
+		}
+
+		location.Spec.Config["credentialsFile"] = credsFile
 	}
 
 	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)

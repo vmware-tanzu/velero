@@ -44,6 +44,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -80,10 +81,11 @@ type backupController struct {
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
-	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, credentials.Getter, logrus.FieldLogger) (persistence.BackupStore, error)
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1beta1listers.VolumeSnapshotLister
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
+	credentialsGetter           credentials.Getter
 }
 
 func NewBackupController(
@@ -105,6 +107,7 @@ func NewBackupController(
 	formatFlag logging.Format,
 	volumeSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
+	credentialsGetter credentials.Getter,
 ) Interface {
 	c := &backupController{
 		genericController:           newGenericController(Backup, logger),
@@ -126,6 +129,7 @@ func NewBackupController(
 		formatFlag:                  formatFlag,
 		volumeSnapshotLister:        volumeSnapshotLister,
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
+		credentialsGetter:           credentialsGetter,
 		newBackupStore:              persistence.NewObjectBackupStore,
 	}
 
@@ -570,7 +574,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	backupLog.Info("Setting up backup store to check for backup existence")
-	backupStore, err := c.newBackupStore(backup.StorageLocation, pluginManager, backupLog)
+	backupStore, err := c.newBackupStore(backup.StorageLocation, pluginManager, c.credentialsGetter, backupLog)
 	if err != nil {
 		return err
 	}
@@ -651,7 +655,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// re-instantiate the backup store because credentials could have changed since the original
 	// instantiation, if this was a long-running backup
 	backupLog.Info("Setting up backup store to persist the backup")
-	backupStore, err = c.newBackupStore(backup.StorageLocation, pluginManager, backupLog)
+	backupStore, err = c.newBackupStore(backup.StorageLocation, pluginManager, c.credentialsGetter, backupLog)
 	if err != nil {
 		return err
 	}
