@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/persistence"
-
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -573,7 +571,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				nil, // kubeClient
 				"",
 				nil, // new plugin manager func
-				persistence.NewObjectBackupStoreGetter(),
+				nil, // backupStoreGetter
 				velerotest.NewLogger(),
 			).(*backupSyncController)
 
@@ -667,7 +665,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 				nil, // kubeClient
 				"",
 				nil, // new plugin manager func
-				persistence.NewObjectBackupStoreGetter(),
+				nil, // backupStoreGetter
 				velerotest.NewLogger(),
 			).(*backupSyncController)
 

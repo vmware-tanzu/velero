@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ type Interface interface {
 	TempDir(dir, prefix string) (string, error)
 	MkdirAll(path string, perm os.FileMode) error
 	Create(name string) (io.WriteCloser, error)
+	OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
 	RemoveAll(path string) error
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	ReadFile(filename string) ([]byte, error)
@@ -58,6 +59,10 @@ func (fs *osFileSystem) MkdirAll(path string, perm os.FileMode) error {
 
 func (fs *osFileSystem) Create(name string) (io.WriteCloser, error) {
 	return os.Create(name)
+}
+
+func (fs *osFileSystem) OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+	return os.OpenFile(name, flag, perm)
 }
 
 func (fs *osFileSystem) RemoveAll(path string) error {

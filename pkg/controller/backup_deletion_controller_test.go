@@ -45,7 +45,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
@@ -75,7 +74,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		nil, // csiSnapshotContentLister
 		nil, // csiSnapshotClient
 		nil, // new plugin manager func
-		persistence.NewObjectBackupStoreGetter(),
+		nil, // backupStoreGetter
 		metrics.NewServerMetrics(),
 		nil, // discovery helper
 	).(*backupDeletionController)
@@ -1131,7 +1130,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				nil, // csiSnapshotContentLister
 				nil, // csiSnapshotClient
 				nil, // new plugin manager func
-				persistence.NewObjectBackupStoreGetter(),
+				nil, // backupStoreGetter
 				metrics.NewServerMetrics(),
 				nil, // discovery helper,
 			).(*backupDeletionController)

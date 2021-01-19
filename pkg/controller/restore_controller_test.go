@@ -42,7 +42,6 @@ import (
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
@@ -209,7 +208,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				nil,
-				persistence.NewObjectBackupStoreGetter(),
+				nil, // backupStoreGetter
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
@@ -666,7 +665,7 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		logger,
 		logrus.DebugLevel,
 		nil,
-		persistence.NewObjectBackupStoreGetter(),
+		nil, // backupStoreGetter
 		nil,
 		formatFlag,
 	).(*restoreController)

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,14 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/vmware-tanzu/velero/pkg/credentials"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -612,24 +615,37 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 		name              string
 		location          *velerov1api.BackupStorageLocation
 		objectStoreGetter objectStoreGetter
+		credFileStore     credentials.FileStore
+		fileStoreErr      error
 		wantBucket        string
 		wantPrefix        string
 		wantErr           string
 	}{
 		{
-			name:     "location with no ObjectStorage field results in an error",
-			location: new(velerov1api.BackupStorageLocation),
-			wantErr:  "backup storage location does not use object storage",
+			name:          "location with no ObjectStorage field results in an error",
+			location:      new(velerov1api.BackupStorageLocation),
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
+			wantErr:       "backup storage location does not use object storage",
 		},
 		{
-			name:     "location with no Provider field results in an error",
-			location: builder.ForBackupStorageLocation("", "").Bucket("").Result(),
-			wantErr:  "object storage provider name must not be empty",
+			name:          "location with no Provider field results in an error",
+			location:      builder.ForBackupStorageLocation("", "").Bucket("").Result(),
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
+			wantErr:       "object storage provider name must not be empty",
 		},
 		{
-			name:     "location with a Bucket field with a '/' in the middle results in an error",
-			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("invalid/bucket").Result(),
-			wantErr:  "backup storage location's bucket name \"invalid/bucket\" must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)",
+			name:          "location with a Bucket field with a '/' in the middle results in an error",
+			location:      builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("invalid/bucket").Result(),
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
+			wantErr:       "backup storage location's bucket name \"invalid/bucket\" must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)",
+		},
+		{
+			name: "location with invalid credential selector results in an error",
+			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Credential(
+				builder.ForSecretKeySelector("does-not-exist", "does-not-exist").Result(),
+			).Result(),
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", fmt.Errorf("secret does not exist")),
+			wantErr:       "unable to get credentials: secret does not exist",
 		},
 		{
 			name:     "when Bucket has a leading and trailing slash, they are both stripped",
@@ -637,7 +653,8 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 			objectStoreGetter: objectStoreGetter{
 				"provider-1": newInMemoryObjectStore("bucket"),
 			},
-			wantBucket: "bucket",
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
+			wantBucket:    "bucket",
 		},
 		{
 			name:     "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
@@ -645,8 +662,9 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 			objectStoreGetter: objectStoreGetter{
 				"provider-1": newInMemoryObjectStore("bucket"),
 			},
-			wantBucket: "bucket",
-			wantPrefix: "prefix/",
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
+			wantBucket:    "bucket",
+			wantPrefix:    "prefix/",
 		},
 		{
 			name:     "when Prefix has no leading or trailing slash, a trailing slash is added",
@@ -654,17 +672,18 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 			objectStoreGetter: objectStoreGetter{
 				"provider-1": newInMemoryObjectStore("bucket"),
 			},
-			wantBucket: "bucket",
-			wantPrefix: "prefix/",
+			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
+			wantBucket:    "bucket",
+			wantPrefix:    "prefix/",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			getter := NewObjectBackupStoreGetter()
+			getter := NewObjectBackupStoreGetter(tc.credFileStore)
 			res, err := getter.Get(tc.location, tc.objectStoreGetter, velerotest.NewLogger())
 			if tc.wantErr != "" {
-				require.Equal(t, tc.wantErr, err.Error())
+				require.EqualError(t, err, tc.wantErr)
 			} else {
 				require.Nil(t, err)
 
@@ -674,6 +693,73 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 				assert.Equal(t, tc.wantBucket, store.bucket)
 				assert.Equal(t, tc.wantPrefix, store.layout.rootPrefix)
 			}
+		})
+	}
+}
+
+// TestNewObjectBackupStoreGetterConfig runs the NewObjectBackupStoreGetter constructor and ensures
+// that it initializes the ObjectBackupStore with the correct config.
+func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
+	provider := "provider"
+	bucket := "bucket"
+
+	tests := []struct {
+		name           string
+		location       *velerov1api.BackupStorageLocation
+		getter         ObjectBackupStoreGetter
+		credentialPath string
+		wantConfig     map[string]string
+	}{
+		{
+			name:     "location with bucket but no prefix has config initialized with bucket and empty prefix",
+			location: builder.ForBackupStorageLocation("", "").Provider(provider).Bucket(bucket).Result(),
+			getter:   NewObjectBackupStoreGetter(velerotest.NewFakeCredentialsFileStore("", nil)),
+			wantConfig: map[string]string{
+				"bucket": "bucket",
+				"prefix": "",
+			},
+		},
+		{
+			name:     "location with bucket and prefix has config initialized with bucket and prefix",
+			location: builder.ForBackupStorageLocation("", "").Provider(provider).Bucket(bucket).Prefix("prefix").Result(),
+			getter:   NewObjectBackupStoreGetter(velerotest.NewFakeCredentialsFileStore("", nil)),
+			wantConfig: map[string]string{
+				"bucket": "bucket",
+				"prefix": "prefix",
+			},
+		},
+		{
+			name:     "location with CACert is initialized with caCert",
+			location: builder.ForBackupStorageLocation("", "").Provider(provider).Bucket(bucket).CACert([]byte("cacert-data")).Result(),
+			getter:   NewObjectBackupStoreGetter(velerotest.NewFakeCredentialsFileStore("", nil)),
+			wantConfig: map[string]string{
+				"bucket": "bucket",
+				"prefix": "",
+				"caCert": "cacert-data",
+			},
+		},
+		{
+			name: "location with Credential is initialized with path of serialized secret",
+			location: builder.ForBackupStorageLocation("", "").Provider(provider).Bucket(bucket).Credential(
+				builder.ForSecretKeySelector("does-not-exist", "does-not-exist").Result(),
+			).Result(),
+			getter: NewObjectBackupStoreGetter(velerotest.NewFakeCredentialsFileStore("/tmp/credentials/secret-file", nil)),
+			wantConfig: map[string]string{
+				"bucket":          "bucket",
+				"prefix":          "",
+				"credentialsFile": "/tmp/credentials/secret-file",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			objStore := newInMemoryObjectStore(bucket)
+			objStoreGetter := &objectStoreGetter{provider: objStore}
+
+			_, err := tc.getter.Get(tc.location, objStoreGetter, velerotest.NewLogger())
+			require.NoError(t, err)
+			require.Equal(t, tc.wantConfig, objStore.Config)
 		})
 	}
 }

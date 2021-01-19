@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,6 +46,10 @@ func (fs *FakeFileSystem) MkdirAll(path string, perm os.FileMode) error {
 
 func (fs *FakeFileSystem) Create(name string) (io.WriteCloser, error) {
 	return fs.fs.Create(name)
+}
+
+func (fs *FakeFileSystem) OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+	return fs.fs.OpenFile(name, flag, perm)
 }
 
 func (fs *FakeFileSystem) RemoveAll(path string) error {

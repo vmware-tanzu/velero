@@ -374,14 +374,14 @@ func TestTempCredentialsFile(t *testing.T) {
 	)
 
 	// secret not in server: expect an error
-	fileName, err := TempCredentialsFile(fakeClient, "velero", "default", fs)
+	fileName, err := TempCredentialsFile(fakeClient, "velero", fs)
 	assert.Error(t, err)
 
 	// now add secret
 	require.NoError(t, fakeClient.Create(context.Background(), secret))
 
 	// secret in server: expect temp file to be created with password
-	fileName, err = TempCredentialsFile(fakeClient, "velero", "default", fs)
+	fileName, err = TempCredentialsFile(fakeClient, "velero", fs)
 	require.NoError(t, err)
 
 	contents, err := fs.ReadFile(fileName)
