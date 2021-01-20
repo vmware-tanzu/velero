@@ -7,7 +7,7 @@ layout: docs
 
 Velero has two custom resources, `BackupStorageLocation` and `VolumeSnapshotLocation`, that are used to configure where Velero backups and their associated persistent volume snapshots are stored.
 
-A `BackupStorageLocation` is defined as a bucket or a prefix within that bucket under which all Velero data is stored, and a set of additional provider-specific fields (AWS region, Azure storage account, etc.). The bucket or prefix you use must be dedicated to only Velero's use. Velero assumes it has control over the location you provide, either the entire bucket or the folder. If you provide a prefix, then the bucket is safe for multiple uses. The [API documentation][1] captures the configurable parameters for each in-tree provider.
+A `BackupStorageLocation` is defined as a bucket or a prefix within a bucket under which all Velero data is stored and a set of additional provider-specific fields (AWS region, Azure storage account, etc.). Velero assumes it has control over the location you provide so you should use a dedicated bucket or prefix. If you provide a prefix, then the rest of the bucket is safe to use for multiple purposes. The [API documentation][1] captures the configurable parameters for each in-tree provider.
 
 A `VolumeSnapshotLocation` is defined entirely by provider-specific fields (AWS region, Azure resource group, Portworx snapshot type, etc.) The [API documentation][2] captures the configurable parameters for each in-tree provider.
 
