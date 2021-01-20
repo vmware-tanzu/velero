@@ -41,9 +41,6 @@ import (
 )
 
 var _ = Describe("Backup Storage Location Reconciler", func() {
-	BeforeEach(func() {})
-	AfterEach(func() {})
-
 	It("Should successfully patch a backup storage location object status phase according to whether its storage is valid or not", func() {
 		tests := []struct {
 			backupLocation    *velerov1api.BackupStorageLocation

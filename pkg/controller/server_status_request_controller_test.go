@@ -44,9 +44,6 @@ func statusRequestBuilder(resourceVersion string) *builder.ServerStatusRequestBu
 }
 
 var _ = Describe("Server Status Request Reconciler", func() {
-	BeforeEach(func() {})
-	AfterEach(func() {})
-
 	type request struct {
 		req             *velerov1api.ServerStatusRequest
 		reqPluginLister *fakePluginLister
