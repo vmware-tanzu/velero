@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/controller"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -68,4 +69,88 @@ func TestVeleroResourcesExist(t *testing.T) {
 	// Velero API group contains some but not all custom resources: should error
 	veleroAPIResourceList.APIResources = veleroAPIResourceList.APIResources[:3]
 	assert.Error(t, server.veleroResourcesExist())
+}
+
+func TestRemoveControllers(t *testing.T) {
+	logger := velerotest.NewLogger()
+
+	tests := []struct {
+		name                string
+		disabledControllers []string
+		errorExpected       bool
+	}{
+		{
+			name: "Remove one disabable controller",
+			disabledControllers: []string{
+				controller.Backup,
+			},
+			errorExpected: false,
+		},
+		{
+			name: "Remove all disabable controllers",
+			disabledControllers: []string{
+				controller.Backup,
+				controller.BackupDeletion,
+				controller.BackupSync,
+				controller.DownloadRequest,
+				controller.GarbageCollection,
+				controller.ResticRepo,
+				controller.Restore,
+				controller.Schedule,
+				controller.ServerStatusRequest,
+			},
+			errorExpected: false,
+		},
+		{
+			name: "Remove with a non-disabable controller included",
+			disabledControllers: []string{
+				controller.Backup,
+				controller.BackupStorageLocation,
+			},
+			errorExpected: true,
+		},
+		{
+			name: "Remove with a misspelled/inexisting controller name",
+			disabledControllers: []string{
+				"go",
+			},
+			errorExpected: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			enabledControllers := map[string]func() controllerRunInfo{
+				controller.BackupSync:        func() controllerRunInfo { return controllerRunInfo{} },
+				controller.Backup:            func() controllerRunInfo { return controllerRunInfo{} },
+				controller.Schedule:          func() controllerRunInfo { return controllerRunInfo{} },
+				controller.GarbageCollection: func() controllerRunInfo { return controllerRunInfo{} },
+				controller.BackupDeletion:    func() controllerRunInfo { return controllerRunInfo{} },
+				controller.Restore:           func() controllerRunInfo { return controllerRunInfo{} },
+				controller.ResticRepo:        func() controllerRunInfo { return controllerRunInfo{} },
+				controller.DownloadRequest:   func() controllerRunInfo { return controllerRunInfo{} },
+			}
+
+			enabledRuntimeControllers := map[string]struct{}{
+				controller.ServerStatusRequest: {},
+			}
+
+			totalNumOriginalControllers := len(enabledControllers) + len(enabledRuntimeControllers)
+
+			if tt.errorExpected {
+				assert.Error(t, removeControllers(tt.disabledControllers, enabledControllers, enabledRuntimeControllers, logger))
+			} else {
+				assert.NoError(t, removeControllers(tt.disabledControllers, enabledControllers, enabledRuntimeControllers, logger))
+
+				totalNumEnabledControllers := len(enabledControllers) + len(enabledRuntimeControllers)
+				assert.Equal(t, totalNumEnabledControllers, totalNumOriginalControllers-len(tt.disabledControllers))
+
+				for _, disabled := range tt.disabledControllers {
+					_, ok := enabledControllers[disabled]
+					assert.False(t, ok)
+					_, ok = enabledRuntimeControllers[disabled]
+					assert.False(t, ok)
+				}
+			}
+		})
+	}
 }

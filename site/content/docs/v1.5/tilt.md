@@ -27,12 +27,10 @@ files in this directory are gitignored so you may configure your setup according
 1. Clone any [provider plugin(s)](https://velero.io/plugins/) you want to make changes to and deploy (optional, must be configured to be deployed by the Velero Tilt's setup, [more info below](#provider-plugins))
 
 Note: To properly configure any plugin you use, please follow the plugin's documentation.
-
 ## Getting started
 
 ### tl;dr
 - Copy all sample files under `velero/tilt-resources/examples` into `velero/tilt-resources`. 
-- Copy the `config/samples/velero_v1_backupstoragelocation.yaml` file into `velero/tilt-resources`.
 - Configure the `velero_v1_backupstoragelocation.yaml` file, and the `cloud` file for the storage credentials/secret.
 
 - Run `tilt up`.
@@ -74,7 +72,7 @@ Here is an example:
 **provider_repos** (Array[]String, default=[]): A list of paths to all the provider plugins you want to make changes to. Each provider must have a
 `tilt-provider.json` file describing how to build the provider. 
 
-**enable_providers** (Array[]String, default=[]): A list of the provider plugins to enable. See [provider plugins](#provider-plugins)
+**enable_providers** (Array[]String, default=[]): A list of the provider plugins to enable. See [provider plugins](provider-plugins)
 for more details. Note: when not making changes to a plugin, it is not necessary to load them into
 Tilt: an existing image and version might be specified in the Velero deployment instead, and Tilt will load that. 
 
@@ -102,7 +100,7 @@ storage location. A sample file is provided that needs to be modified with the s
 configuration for your object storage. See the next sub-section for more details on this.
 
 ### Configure a backup storage location
-You will have to configure the `backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](https://velero.io/plugins/)
+You will have to configure the `velero/tilt-resources/velero_v1_backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](https://velero.io/plugins/)
 to learn what field/value pairs are required for your particular provider's backup storage location configuration.
 
 Below are some ways to configure a backup storage location for Velero.
