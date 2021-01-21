@@ -63,6 +63,15 @@ COPY --from=tilt-helper /usr/bin/docker /usr/bin/docker
 COPY --from=tilt-helper /go/kubernetes/client/bin/kubectl /usr/bin/kubectl
 """
 
+docker_build_download_restic_commands = """
+COPY ./hack/download-restic.sh /
+RUN apt update && apt install -y wget
+RUN mkdir -p /output/usr/bin && \
+    BIN=velero GOOS=linux GOARCH=amd64 RESTIC_VERSION=0.9.6 /download-restic.sh && \
+    mv /output/usr/bin/restic /usr/bin/restic && \
+    rm -rf /output/usr/bin
+"""
+
 ##############################
 # Setup Velero
 ##############################
@@ -87,7 +96,7 @@ FROM ubuntu:focal as tilt
 WORKDIR /
 COPY --from=tilt-helper /start.sh .
 COPY --from=tilt-helper /restart.sh .
-COPY velero .
+COPY _tiltbuild/velero .
 """
 
 dockerfile_contents = "\n".join([
@@ -95,13 +104,14 @@ dockerfile_contents = "\n".join([
     additional_docker_helper_commands,
     tilt_dockerfile_header,
     additional_docker_build_commands,
+    docker_build_download_restic_commands,
 ])
 
  # Set up an image build for Velero. The live update configuration syncs the output from the local_resource
  # build into the container.
 docker_build(
     ref = "velero/velero",
-    context = "_tiltbuild/",
+    context = ".",
     dockerfile_contents = dockerfile_contents,
     target = "tilt",
     entrypoint=["sh", "/start.sh", "/velero"],
