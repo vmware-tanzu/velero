@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
@@ -102,7 +101,6 @@ type resticServer struct {
 	veleroInformerFactory informers.SharedInformerFactory
 	kubeInformerFactory   kubeinformers.SharedInformerFactory
 	podInformer           cache.SharedIndexInformer
-	secretInformer        cache.SharedIndexInformer
 	logger                logrus.FieldLogger
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
@@ -136,22 +134,6 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 		},
 	)
 
-	// use a stand-alone secrets informer so we can filter to only the restic credentials
-	// secret(s) within the velero namespace
-	//
-	// note: using an informer to access the single secret for all velero-managed
-	// restic repositories is overkill for now, but will be useful when we move
-	// to fully-encrypted backups and have unique keys per repository.
-	secretInformer := corev1informers.NewFilteredSecretInformer(
-		kubeClient,
-		factory.Namespace(),
-		0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(opts *metav1.ListOptions) {
-			opts.FieldSelector = fmt.Sprintf("metadata.name=%s", restic.CredentialsSecretName)
-		},
-	)
-
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	clientConfig, err := factory.ClientConfig()
@@ -160,7 +142,9 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+
 	velerov1api.AddToScheme(scheme)
+	v1.AddToScheme(scheme)
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme: scheme,
 	})
@@ -174,7 +158,6 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 		veleroInformerFactory: informers.NewFilteredSharedInformerFactory(veleroClient, 0, factory.Namespace(), nil),
 		kubeInformerFactory:   kubeinformers.NewSharedInformerFactory(kubeClient, 0),
 		podInformer:           podInformer,
-		secretInformer:        secretInformer,
 		logger:                logger,
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
@@ -212,7 +195,6 @@ func (s *resticServer) run() {
 		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
 		s.veleroClient.VeleroV1(),
 		s.podInformer,
-		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		s.metrics,
@@ -225,7 +207,6 @@ func (s *resticServer) run() {
 		s.veleroInformerFactory.Velero().V1().PodVolumeRestores(),
 		s.veleroClient.VeleroV1(),
 		s.podInformer,
-		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		s.mgr.GetClient(),
@@ -235,7 +216,6 @@ func (s *resticServer) run() {
 	go s.veleroInformerFactory.Start(s.ctx.Done())
 	go s.kubeInformerFactory.Start(s.ctx.Done())
 	go s.podInformer.Run(s.ctx.Done())
-	go s.secretInformer.Run(s.ctx.Done())
 
 	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
 	// by v2.0, the block from this line and including the `s.mgr.Start() will be

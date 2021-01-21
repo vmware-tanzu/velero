@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,12 +29,12 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	corev1listers "k8s.io/client-go/listers/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -241,14 +241,17 @@ func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister vele
 // encryption key for the given repo and returns its path. The
 // caller should generally call os.Remove() to remove the file
 // when done with it.
-func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespace, repoName string, fs filesystem.Interface) (string, error) {
-	secretGetter := NewListerSecretGetter(secretLister)
-
+func TempCredentialsFile(client kbclient.Client, veleroNamespace, repoName string, fs filesystem.Interface) (string, error) {
 	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
 	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
-	// (all within the Velero server's namespace) so GetRepositoryKey will need to take the repo
-	// name as an argument as well.
-	repoKey, err := GetRepositoryKey(secretGetter, veleroNamespace)
+	// (all within the Velero server's namespace) so repoKeySelector will need to select the key
+	// for that repo.
+	repoKeySelector := &corev1api.SecretKeySelector{
+		LocalObjectReference: corev1api.LocalObjectReference{Name: CredentialsSecretName},
+		Key:                  CredentialsKey,
+	}
+
+	repoKey, err := kube.GetSecretKey(client, veleroNamespace, repoKeySelector)
 	if err != nil {
 		return "", err
 	}
@@ -261,7 +264,7 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespac
 	if _, err := file.Write(repoKey); err != nil {
 		// nothing we can do about an error closing the file here, and we're
 		// already returning an error about the write failing.
-		file.Close()
+		_ = file.Close()
 		return "", errors.WithStack(err)
 	}
 

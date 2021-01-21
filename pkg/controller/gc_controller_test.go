@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -251,9 +251,9 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 
 			var fakeClient kbclient.Client
 			if test.backupLocation != nil {
-				fakeClient = newFakeClient(t, test.backupLocation)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation)
 			} else {
-				fakeClient = newFakeClient(t)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
 			controller := NewGCController(

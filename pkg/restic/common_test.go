@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,17 +22,10 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -352,10 +345,9 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 
 func TestTempCredentialsFile(t *testing.T) {
 	var (
-		secretInformer = cache.NewSharedIndexInformer(nil, new(corev1api.Secret), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		secretLister   = corev1listers.NewSecretLister(secretInformer.GetIndexer())
-		fs             = velerotest.NewFakeFileSystem()
-		secret         = &corev1api.Secret{
+		fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
+		fs         = velerotest.NewFakeFileSystem()
+		secret     = &corev1api.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "velero",
 				Name:      CredentialsSecretName,
@@ -366,15 +358,15 @@ func TestTempCredentialsFile(t *testing.T) {
 		}
 	)
 
-	// secret not in lister: expect an error
-	fileName, err := TempCredentialsFile(secretLister, "velero", "default", fs)
+	// secret not in server: expect an error
+	fileName, err := TempCredentialsFile(fakeClient, "velero", "default", fs)
 	assert.Error(t, err)
 
-	// now add secret to lister
-	require.NoError(t, secretInformer.GetStore().Add(secret))
+	// now add secret
+	require.NoError(t, fakeClient.Create(context.Background(), secret))
 
-	// secret in lister: expect temp file to be created with password
-	fileName, err = TempCredentialsFile(secretLister, "velero", "default", fs)
+	// secret in server: expect temp file to be created with password
+	fileName, err = TempCredentialsFile(fakeClient, "velero", "default", fs)
 	require.NoError(t, err)
 
 	contents, err := fs.ReadFile(fileName)
@@ -400,7 +392,7 @@ func TestTempCACertFile(t *testing.T) {
 		}
 	)
 
-	fakeClient := newFakeClient(t)
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
 	fakeClient.Create(context.Background(), bsl)
 
 	// expect temp file to be created with cacert value
@@ -644,10 +636,4 @@ func TestIsPVBMatchPod(t *testing.T) {
 		})
 
 	}
-}
-
-func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
-	err := velerov1api.AddToScheme(scheme.Scheme)
-	require.NoError(t, err)
-	return k8sfake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -144,7 +144,7 @@ func setupBackupDeletionControllerTest(t *testing.T, objects ...runtime.Object) 
 
 	var (
 		client            = fake.NewSimpleClientset(append(objects, req)...)
-		fakeClient        = newFakeClient(t, objects...)
+		fakeClient        = velerotest.NewFakeControllerRuntimeClient(t, objects...)
 		sharedInformers   = informers.NewSharedInformerFactory(client, 0)
 		volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{SnapshotsTaken: sets.NewString()}
 		pluginManager     = &pluginmocks.Manager{}
@@ -1112,7 +1112,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			fakeClient := newFakeClient(t)
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
 			sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
 			controller := NewBackupDeletionController(

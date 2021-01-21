@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,16 +27,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/stretchr/testify/require"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
@@ -98,6 +94,7 @@ type testEnvironment struct {
 // This function should be called only once for each package you're running tests within,
 // usually the environment is initialized in a suite_test.go file within a `BeforeSuite` ginkgo block.
 func newTestEnvironment() *testEnvironment {
+	// scheme.Scheme is initialized with all native Kubernetes types
 	err := velerov1api.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -131,12 +128,6 @@ func (t *testEnvironment) startManager() error {
 func (t *testEnvironment) stop() error {
 	cancel()
 	return env.Stop()
-}
-
-func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
-	err := velerov1api.AddToScheme(scheme.Scheme)
-	require.NoError(t, err)
-	return fake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }
 
 type fakeSingleObjectBackupStoreGetter struct {

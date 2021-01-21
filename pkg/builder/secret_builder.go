@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,5 +53,11 @@ func (b *SecretBuilder) ObjectMeta(opts ...ObjectMetaOpt) *SecretBuilder {
 		opt(b.object)
 	}
 
+	return b
+}
+
+// Data sets the Secret data.
+func (b *SecretBuilder) Data(data map[string][]byte) *SecretBuilder {
+	b.object.Data = data
 	return b
 }

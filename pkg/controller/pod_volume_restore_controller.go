@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,7 +56,6 @@ type podVolumeRestoreController struct {
 	podVolumeRestoreClient velerov1client.PodVolumeRestoresGetter
 	podVolumeRestoreLister listers.PodVolumeRestoreLister
 	podLister              corev1listers.PodLister
-	secretLister           corev1listers.SecretLister
 	pvcLister              corev1listers.PersistentVolumeClaimLister
 	pvLister               corev1listers.PersistentVolumeLister
 	backupLocationInformer k8scache.Informer
@@ -74,7 +73,6 @@ func NewPodVolumeRestoreController(
 	podVolumeRestoreInformer informers.PodVolumeRestoreInformer,
 	podVolumeRestoreClient velerov1client.PodVolumeRestoresGetter,
 	podInformer cache.SharedIndexInformer,
-	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
 	kbClient client.Client,
@@ -85,7 +83,6 @@ func NewPodVolumeRestoreController(
 		podVolumeRestoreClient: podVolumeRestoreClient,
 		podVolumeRestoreLister: podVolumeRestoreInformer.Lister(),
 		podLister:              corev1listers.NewPodLister(podInformer.GetIndexer()),
-		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
 		pvLister:               pvInformer.Lister(),
 		kbClient:               kbClient,
@@ -100,7 +97,6 @@ func NewPodVolumeRestoreController(
 		c.cacheSyncWaiters,
 		podVolumeRestoreInformer.Informer().HasSynced,
 		podInformer.HasSynced,
-		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
 	)
 	c.processRestoreFunc = c.processRestore
@@ -304,7 +300,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	credsFile, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
+	credsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
