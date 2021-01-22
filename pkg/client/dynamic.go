@@ -82,6 +82,13 @@ type Patcher interface {
 	Patch(name string, data []byte) (*unstructured.Unstructured, error)
 }
 
+// Deletor deletes an object.
+type Deletor interface {
+	//Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
+
+	Delete(name string, opts metav1.DeleteOptions) error
+}
+
 // Dynamic contains client methods that Velero needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
@@ -89,6 +96,7 @@ type Dynamic interface {
 	Watcher
 	Getter
 	Patcher
+	Deletor
 }
 
 // dynamicResourceClient implements Dynamic.
@@ -116,4 +124,8 @@ func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstr
 
 func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
 	return d.resourceClient.Patch(context.TODO(), name, types.MergePatchType, data, metav1.PatchOptions{})
+}
+
+func (d *dynamicResourceClient) Delete(name string, opts metav1.DeleteOptions) error {
+	return d.resourceClient.Delete(context.TODO(), name, opts)
 }

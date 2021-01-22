@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-type podTemplateOption func(*podTemplateConfig)
+type PodTemplateOption func(*podTemplateConfig)
 
 type podTemplateConfig struct {
 	image                             string
@@ -43,19 +43,19 @@ type podTemplateConfig struct {
 	defaultVolumesToRestic            bool
 }
 
-func WithImage(image string) podTemplateOption {
+func WithImage(image string) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.image = image
 	}
 }
 
-func WithAnnotations(annotations map[string]string) podTemplateOption {
+func WithAnnotations(annotations map[string]string) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.annotations = annotations
 	}
 }
 
-func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
+func WithEnvFromSecretKey(varName, secret, key string) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.envVars = append(c.envVars, corev1.EnvVar{
 			Name: varName,
@@ -71,50 +71,50 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 	}
 }
 
-func WithSecret(secretPresent bool) podTemplateOption {
+func WithSecret(secretPresent bool) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.withSecret = secretPresent
 
 	}
 }
 
-func WithRestoreOnly() podTemplateOption {
+func WithRestoreOnly() PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.restoreOnly = true
 	}
 }
 
-func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
+func WithResources(resources corev1.ResourceRequirements) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.resources = resources
 	}
 }
 
-func WithDefaultResticMaintenanceFrequency(val time.Duration) podTemplateOption {
+func WithDefaultResticMaintenanceFrequency(val time.Duration) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultResticMaintenanceFrequency = val
 	}
 }
 
-func WithPlugins(plugins []string) podTemplateOption {
+func WithPlugins(plugins []string) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.plugins = plugins
 	}
 }
 
-func WithFeatures(features []string) podTemplateOption {
+func WithFeatures(features []string) PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.features = features
 	}
 }
 
-func WithDefaultVolumesToRestic() podTemplateOption {
+func WithDefaultVolumesToRestic() PodTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultVolumesToRestic = true
 	}
 }
 
-func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
+func Deployment(namespace string, opts ...PodTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
 		image: DefaultImage,

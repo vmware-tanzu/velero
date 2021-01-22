@@ -236,16 +236,9 @@ func createResource(r *unstructured.Unstructured, factory client.DynamicFactory,
 	}
 	log("attempting to create resource")
 
-	gvk := schema.FromAPIVersionAndKind(r.GetAPIVersion(), r.GetKind())
-
-	apiResource := metav1.APIResource{
-		Name:       kindToResource[r.GetKind()],
-		Namespaced: (r.GetNamespace() != ""),
-	}
-
-	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, r.GetNamespace())
+	c, err := CreateClient(r, factory, w)
 	if err != nil {
-		return errors.Wrapf(err, "Error creating client for resource %s", id)
+		return err
 	}
 
 	if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
@@ -256,6 +249,32 @@ func createResource(r *unstructured.Unstructured, factory client.DynamicFactory,
 
 	log("created")
 	return nil
+}
+
+// CreateClient creates a client for an unstructured resource
+func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer) (client.Dynamic, error) {
+	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
+
+	// Helper to reduce boilerplate message about the same object
+	log := func(f string, a ...interface{}) {
+		format := strings.Join([]string{id, ": ", f, "\n"}, "")
+		fmt.Fprintf(w, format, a...)
+	}
+	log("attempting to create resource client")
+
+	gvk := schema.FromAPIVersionAndKind(r.GetAPIVersion(), r.GetKind())
+
+	apiResource := metav1.APIResource{
+		Name:       kindToResource[r.GetKind()],
+		Namespaced: (r.GetNamespace() != ""),
+	}
+
+	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, r.GetNamespace())
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error creating client for resource %s", id)
+	}
+
+	return c, nil
 }
 
 // Install creates resources on the Kubernetes cluster.
