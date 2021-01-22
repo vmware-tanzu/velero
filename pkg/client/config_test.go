@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,4 +30,5 @@ func TestVeleroConfig(t *testing.T) {
 
 	assert.Equal(t, "foo", c.Namespace())
 	assert.Equal(t, []string{"feature1", "feature2"}, c.Features())
+	assert.Equal(t, true, c.Colorized())
 }

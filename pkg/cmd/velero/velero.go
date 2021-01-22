@@ -77,8 +77,11 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 			features.Enable(config.Features()...)
 			features.Enable(cmdFeatures...)
 
-			if cmdColorzied.Value != nil && !*cmdColorzied.Value {
-				color.NoColor = true
+			switch {
+			case cmdColorzied.Value != nil:
+				color.NoColor = !*cmdColorzied.Value
+			default:
+				color.NoColor = !config.Colorized()
 			}
 		},
 	}
@@ -90,7 +93,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 	c.PersistentFlags().Var(&cmdFeatures, "features", "Comma-separated list of features to enable for this Velero process. Combines with values from $HOME/.config/velero/config.json if present")
 
 	// Color will be enabled or disabled for all subcommands
-	c.PersistentFlags().Var(&cmdColorzied, "colorized", "Show colored output in TTY")
+	c.PersistentFlags().Var(&cmdColorzied, "colorized", "Show colored output in TTY. Overrides 'colorized' value from $HOME/.config/velero/config.json if present. Enabled by default")
 
 	c.AddCommand(
 		backup.NewCommand(f),
