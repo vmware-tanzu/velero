@@ -61,7 +61,9 @@ Here is an example:
     ],
     "enable_restic": false,
     "create_backup_locations": true,
-    "setup-minio": true
+    "setup-minio": true,
+    "enable_debug": false,
+    "debug_continue_on_start": true
 }
 ```
 
@@ -85,7 +87,11 @@ containing the configuration of the Velero restic DaemonSet.
 **create_backup_locations** (Bool, default=false): Indicate whether to create one or more backup storage locations. If set to `true`, Tilt will look for a `velero/tilt-resources/velero_v1_backupstoragelocation.yaml` file
 containing at least one configuration for a Velero backup storage location.
 
-**setup-minio** (Bool, default=false): Configure this to  `true` if you want to configure backup storage locations in a Minio instance running inside your cluster. 
+**setup-minio** (Bool, default=false): Configure this to  `true` if you want to configure backup storage locations in a Minio instance running inside your cluster.
+
+**enable_debug** (Bool, default=false): Configure this to  `true` if you want to debug the velero process using [Delve](https://github.com/go-delve/delve).
+
+**debug_continue_on_start** (Bool, default=true): Configure this to  `true` if you want the velero process to continue on start when in debug mode. See [Delve CLI documentation](https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv.md).
 
 ### Create Kubernetes resource files to deploy
 All needed Kubernetes resource files are provided as ready to use samples in the `velero/tilt-resources/examples` directory. You only have to move them to the `velero/tilt-resources` level. 
@@ -139,6 +145,26 @@ Whatever object storage provider you use, configure the credentials for in the `
 to learn what field/value pairs are required for your provider's credentials. The Tilt file will invoke Kustomize to create the secret under the hard-coded key `secret.cloud-credentials.data.cloud` in the Velero namespace.
 
 There is a sample credentials file properly formatted for a MinIO storage credentials in `velero/tilt-resources/examples/cloud`.
+
+### Configure debugging with Delve
+If you would like to debug the Velero process, you can enable debug mode by setting the field `enable_debug` to `true` in your `tilt-resources/tile-settings.json` file.
+This will enable you to debug the process using [Delve](https://github.com/go-delve/delve).
+By enabling debug mode, the Velero executable will be built in debug mode (using the flags `-gcflags="-N -l"` which disables optimizations and inlining), and the process will be started in the Velero deployment using [`dlv exec`](https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv_exec.md).
+
+The debug server will accept connections on port 2345 and Tilt is configured to forward this port to the local machine.
+Once Tilt is [running](#run-tilt) and the Velero resource is ready, you can connect to the debug server to begin debugging.
+To connect to the session, you can use the Delve CLI locally by running `dlv connect 127.0.0.1:2345`. See the [Delve CLI documentation](https://github.com/go-delve/delve/tree/master/Documentation/cli) for more guidance on how to use Delve.
+Delve can also be used within a number of [editors and IDEs](https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md).
+
+By default, the Velero process will continue on start when in debug mode.
+This means that the process will run until a breakpoint is set.
+You can disable this by setting the field `debug_continue_on_start` to `false` in your `tilt-resources/tile-settings.json` file.
+When this setting is disabled, the Velero process will not continue to run until a `continue` instruction is issued through your Delve session.
+
+When exiting your debug session, the CLI and editor integrations will typically ask if the remote process should be stopped.
+It is important to leave the remote process running and just disconnect from the debugging session.
+By stopping the remote process, that will cause the Velero container to stop and the pod to restart.
+If backups are in progress, these will be left in a stale state as they are not resumed when the Velero pod restarts.
 
 ### Run Tilt!
 To launch your development environment, run:
