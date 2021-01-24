@@ -18,6 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Use /output/usr/bin/ as the default output directory as this
+# is the path expected by the Velero Dockerfile.
+output_dir=${OUTPUT_DIR:-/output/usr/bin}
+restic_bin=${output_dir}/restic
+
 if [[ -z "${BIN}" ]]; then
     echo "BIN must be set"
     exit 1
@@ -44,11 +49,11 @@ fi
 # TODO: when the new restic version is released, make ppc64le to be also downloaded from their github releases.
 #  This has been merged and will be applied to next release: https://github.com/restic/restic/pull/2342
 if [[ "${GOARCH}" = "ppc64le" ]]; then
-    wget --timeout=1 --tries=5 --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-${RESTIC_VERSION} -O /output/usr/bin/restic
+    wget --timeout=1 --tries=5 --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-${RESTIC_VERSION} -O ${restic_bin}
 else
     wget --quiet https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2
     bunzip2 restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2
-    mv restic_${RESTIC_VERSION}_${GOOS}_${GOARCH} /output/usr/bin/restic
+    mv restic_${RESTIC_VERSION}_${GOOS}_${GOARCH} ${restic_bin}
 fi
 
-chmod +x /output/usr/bin/restic
+chmod +x ${restic_bin}
