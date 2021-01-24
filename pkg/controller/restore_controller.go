@@ -92,8 +92,8 @@ type restoreController struct {
 	logFormat              logging.Format
 	clock                  clock.Clock
 
-	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
+	backupStoreGetter persistence.ObjectBackupStoreGetter
 }
 
 func NewRestoreController(
@@ -108,6 +108,7 @@ func NewRestoreController(
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
 	logFormat logging.Format,
 ) Interface {
@@ -128,8 +129,8 @@ func NewRestoreController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		newPluginManager: newPluginManager,
-		newBackupStore:   persistence.NewObjectBackupStore,
+		newPluginManager:  newPluginManager,
+		backupStoreGetter: backupStoreGetter,
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -410,7 +411,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 		return backupInfo{}, errors.WithStack(err)
 	}
 
-	backupStore, err := c.newBackupStore(location, pluginManager, c.logger)
+	backupStore, err := c.backupStoreGetter.Get(location, pluginManager, c.logger)
 	if err != nil {
 		return backupInfo{}, err
 	}
@@ -480,7 +481,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 
 	// re-instantiate the backup store because credentials could have changed since the original
 	// instantiation, if this was a long-running restore
-	info.backupStore, err = c.newBackupStore(info.location, pluginManager, c.logger)
+	info.backupStore, err = c.backupStoreGetter.Get(info.location, pluginManager, c.logger)
 	if err != nil {
 		return errors.Wrap(err, "error setting up backup store to persist log and results files")
 	}

@@ -90,7 +90,21 @@ type ObjectStoreGetter interface {
 	GetObjectStore(provider string) (velero.ObjectStore, error)
 }
 
-func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
+// ObjectBackupStoreGetter is a type that can get a velero.BackupStore for a
+// given BackupStorageLocation and ObjectStore.
+type ObjectBackupStoreGetter interface {
+	Get(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error)
+}
+
+type objectBackupStoreGetter struct{}
+
+// NewObjectBackupStoreGetter returns a ObjectBackupStoreGetter that can get a
+// default velero.BackupStore.
+func NewObjectBackupStoreGetter() ObjectBackupStoreGetter {
+	return &objectBackupStoreGetter{}
+}
+
+func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
 	if location.Spec.ObjectStorage == nil {
 		return nil, errors.New("backup storage location does not use object storage")
 	}

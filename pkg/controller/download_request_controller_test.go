@@ -34,7 +34,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
@@ -64,6 +63,7 @@ func newDownloadRequestTestHarness(t *testing.T, fakeClient client.Client) *down
 			fakeClient,
 			informerFactory.Velero().V1().Backups().Lister(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			NewFakeSingleObjectBackupStoreGetter(backupStore),
 			velerotest.NewLogger(),
 		).(*downloadRequestController)
 	)
@@ -71,10 +71,6 @@ func newDownloadRequestTestHarness(t *testing.T, fakeClient client.Client) *down
 	clockTime, err := time.Parse(time.RFC1123, time.RFC1123)
 	require.NoError(t, err)
 	controller.clock = clock.NewFakeClock(clockTime)
-
-	controller.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
-		return backupStore, nil
-	}
 
 	pluginManager.On("CleanupClients").Return()
 

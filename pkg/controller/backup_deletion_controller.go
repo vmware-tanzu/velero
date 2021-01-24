@@ -77,7 +77,7 @@ type backupDeletionController struct {
 	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore            func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	backupStoreGetter         persistence.ObjectBackupStoreGetter
 	metrics                   *metrics.ServerMetrics
 	helper                    discovery.Helper
 }
@@ -99,6 +99,7 @@ func NewBackupDeletionController(
 	csiSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
 	csiSnapshotClient *snapshotterClientSet.Clientset,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
 	helper discovery.Helper,
 ) Interface {
@@ -121,8 +122,8 @@ func NewBackupDeletionController(
 		helper:                    helper,
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		newPluginManager: newPluginManager,
-		newBackupStore:   persistence.NewObjectBackupStore,
+		newPluginManager:  newPluginManager,
+		backupStoreGetter: backupStoreGetter,
 
 		clock: &clock.RealClock{},
 	}
@@ -290,7 +291,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, err := c.newBackupStore(location, pluginManager, log)
+	backupStore, err := c.backupStoreGetter.Get(location, pluginManager, log)
 	if err != nil {
 		errs = append(errs, err.Error())
 	}

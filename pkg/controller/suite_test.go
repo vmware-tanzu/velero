@@ -22,6 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -131,4 +136,32 @@ func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
 	err := velerov1api.AddToScheme(scheme.Scheme)
 	require.NoError(t, err)
 	return fake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
+}
+
+type fakeSingleObjectBackupStoreGetter struct {
+	store persistence.BackupStore
+}
+
+func (f *fakeSingleObjectBackupStoreGetter) Get(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	return f.store, nil
+}
+
+// NewFakeSingleObjectBackupStoreGetter returns an ObjectBackupStoreGetter
+// that will return only the given BackupStore.
+func NewFakeSingleObjectBackupStoreGetter(store persistence.BackupStore) persistence.ObjectBackupStoreGetter {
+	return &fakeSingleObjectBackupStoreGetter{store: store}
+}
+
+type fakeObjectBackupStoreGetter struct {
+	stores map[string]*persistencemocks.BackupStore
+}
+
+func (f *fakeObjectBackupStoreGetter) Get(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+	return f.stores[loc.Name], nil
+}
+
+// NewFakeObjectBackupStoreGetter returns an ObjectBackupStoreGetter that will
+// return the BackupStore for a given BackupStorageLocation name.
+func NewFakeObjectBackupStoreGetter(stores map[string]*persistencemocks.BackupStore) persistence.ObjectBackupStoreGetter {
+	return &fakeObjectBackupStoreGetter{stores: stores}
 }

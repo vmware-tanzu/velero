@@ -117,13 +117,10 @@ func TestFetchBackupInfo(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
-
-			c.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
-				return backupStore, nil
-			}
 
 			if test.backupStoreError == nil {
 				for _, itm := range test.informerLocations {
@@ -212,6 +209,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				nil,
+				persistence.NewObjectBackupStoreGetter(),
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
@@ -438,13 +436,11 @@ func TestProcessQueueItem(t *testing.T) {
 				logger,
 				logrus.InfoLevel,
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
 			).(*restoreController)
 
-			c.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
-				return backupStore, nil
-			}
 			c.clock = clock.NewFakeClock(now)
 			if test.location != nil {
 				require.NoError(t, fakeClient.Create(context.Background(), test.location))
@@ -670,6 +666,7 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		logger,
 		logrus.DebugLevel,
 		nil,
+		persistence.NewObjectBackupStoreGetter(),
 		nil,
 		formatFlag,
 	).(*restoreController)

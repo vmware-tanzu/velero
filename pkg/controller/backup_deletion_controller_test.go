@@ -75,6 +75,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		nil, // csiSnapshotContentLister
 		nil, // csiSnapshotClient
 		nil, // new plugin manager func
+		persistence.NewObjectBackupStoreGetter(),
 		metrics.NewServerMetrics(),
 		nil, // discovery helper
 	).(*backupDeletionController)
@@ -172,15 +173,12 @@ func setupBackupDeletionControllerTest(t *testing.T, objects ...runtime.Object) 
 			nil, // csiSnapshotContentLister
 			nil, // csiSnapshotClient
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			NewFakeSingleObjectBackupStoreGetter(backupStore),
 			metrics.NewServerMetrics(),
 			nil, // discovery helper
 		).(*backupDeletionController),
 
 		req: req,
-	}
-
-	data.controller.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
-		return backupStore, nil
 	}
 
 	pluginManager.On("CleanupClients").Return(nil)
@@ -1133,6 +1131,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				nil, // csiSnapshotContentLister
 				nil, // csiSnapshotClient
 				nil, // new plugin manager func
+				persistence.NewObjectBackupStoreGetter(),
 				metrics.NewServerMetrics(),
 				nil, // discovery helper,
 			).(*backupDeletionController)

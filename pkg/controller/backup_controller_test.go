@@ -818,11 +818,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				metrics:                metrics.NewServerMetrics(),
 				clock:                  clock.NewFakeClock(now),
 				newPluginManager:       func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				newBackupStore: func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
-					return backupStore, nil
-				},
-				backupper:  backupper,
-				formatFlag: formatFlag,
+				backupStoreGetter:      NewFakeSingleObjectBackupStoreGetter(backupStore),
+				backupper:              backupper,
+				formatFlag:             formatFlag,
 			}
 
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)

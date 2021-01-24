@@ -578,6 +578,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.kubeClient,
 			s.config.defaultBackupLocation,
 			newPluginManager,
+			persistence.NewObjectBackupStoreGetter(),
 			s.logger,
 		)
 
@@ -620,6 +621,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.formatFlag.Parse(),
 			csiVSLister,
 			csiVSCLister,
+			persistence.NewObjectBackupStoreGetter(),
 		)
 
 		return controllerRunInfo{
@@ -676,6 +678,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			csiVSCLister,
 			s.csiSnapshotClient,
 			newPluginManager,
+			persistence.NewObjectBackupStoreGetter(),
 			s.metrics,
 			s.discoveryHelper,
 		)
@@ -713,6 +716,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.logLevel,
 			newPluginManager,
+			persistence.NewObjectBackupStoreGetter(),
 			s.metrics,
 			s.config.formatFlag.Parse(),
 		)
@@ -747,6 +751,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			newPluginManager,
+			persistence.NewObjectBackupStoreGetter(),
 			s.logger,
 		)
 
@@ -824,9 +829,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			StorageLocation:           s.config.defaultBackupLocation,
 			ServerValidationFrequency: s.config.storeValidationFrequency,
 		},
-		NewPluginManager: newPluginManager,
-		NewBackupStore:   persistence.NewObjectBackupStore,
-		Log:              s.logger,
+		NewPluginManager:  newPluginManager,
+		BackupStoreGetter: persistence.NewObjectBackupStoreGetter(),
+		Log:               s.logger,
 	}
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
