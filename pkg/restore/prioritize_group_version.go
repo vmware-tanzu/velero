@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import (
 // enabled and the backup objects use Status.FormatVersion 1.1.0.
 func (ctx *restoreContext) meetsAPIGVRestoreReqs() bool {
 	return features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) &&
-		ctx.backup.Status.FormatVersion == "1.1.0"
+		ctx.backup.Status.FormatVersion >= "1.1.0"
 }
 
 // ChosenGroupVersion is the API Group version that was selected to restore
@@ -117,7 +117,7 @@ OUTER:
 			continue
 		}
 
-		// Priority 3: Kubernetes Prioritized Common Supported Version
+		// Priority 3: The Common Supported Version with the Highest Kubernetes Version Priority
 		for _, tv := range tg.Versions[1:] {
 			if versionsContain(sg.Versions[1:], tv.Version) {
 				ctx.SetChosenGVToRestore(cgv, rg, sg.PreferredVersion.Version, tv.Version)
@@ -327,29 +327,6 @@ func versionsContain(list []metav1.GroupVersionForDiscovery, version string) boo
 	}
 
 	return false
-}
-
-// latestCommon will find the versions that are in common between the source and
-// target clusters. It will return the latest of the common versions.
-func latestCommon(sgvs, tgvs []metav1.GroupVersionForDiscovery) string {
-	// Sort target and source versions each in descending lexicographical order.
-	// The first matching versions will be the latest.
-	sort.SliceStable(sgvs, func(i, j int) bool {
-		return strings.Compare(sgvs[i].Version, sgvs[j].Version) > 0
-	})
-	sort.SliceStable(tgvs, func(i, j int) bool {
-		return strings.Compare(tgvs[i].Version, tgvs[j].Version) > 0
-	})
-
-	for _, s := range sgvs {
-		for _, t := range tgvs {
-			if s.Version == t.Version {
-				return s.Version
-			}
-		}
-	}
-
-	return ""
 }
 
 func (ctx *restoreContext) SetChosenGVToRestore(cgv ChosenGroupVersion, rg, srcPreferred, chosen string) {

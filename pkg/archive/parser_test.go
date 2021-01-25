@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -122,26 +122,26 @@ func TestParse(t *testing.T) {
 
 func TestParseGroupVersions(t *testing.T) {
 	tests := []struct {
-		name    string
-		files   []string
-		buDir   string
-		wantErr error
-		want    map[string]metav1.APIGroup
+		name      string
+		files     []string
+		backupDir string
+		wantErr   error
+		want      map[string]metav1.APIGroup
 	}{
 		{
-			name:    "when there is no top-level resources directory, an error is returned",
-			buDir:   "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
-			wantErr: errors.New("\"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources\" not found"),
+			name:      "when there is no top-level resources directory, an error is returned",
+			backupDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
+			wantErr:   errors.New("\"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources\" not found"),
 		},
 		{
-			name:  "when there are no directories under the resources directory, an empty map is returned",
-			buDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
-			files: []string{"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/"},
-			want:  map[string]metav1.APIGroup{},
+			name:      "when there are no directories under the resources directory, an empty map is returned",
+			backupDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
+			files:     []string{"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/"},
+			want:      map[string]metav1.APIGroup{},
 		},
 		{
-			name:  "when there is a mix of cluster-scoped and namespaced items for resources with preferred or multiple API groups, all group versions are correctly returned",
-			buDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
+			name:      "when there is a mix of cluster-scoped and namespaced items for resources with preferred or multiple API groups, all group versions are correctly returned",
+			backupDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
 			files: []string{
 				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/clusterroles.rbac.authorization.k8s.io/v1-preferredversion/cluster/system/controller/attachdetach-controller.json",
 
@@ -222,7 +222,7 @@ func TestParseGroupVersions(t *testing.T) {
 				}
 			}
 
-			res, err := p.ParseGroupVersions(tc.buDir)
+			res, err := p.ParseGroupVersions(tc.backupDir)
 			if tc.wantErr != nil {
 				assert.Equal(t, tc.wantErr.Error(), err.Error())
 			} else {

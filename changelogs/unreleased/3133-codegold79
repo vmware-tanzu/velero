@@ -1,1 +1,2 @@
 Restore API group version by priority
+Increase timeout to 3 minutes in DeploymentIsReady(...) function in the install package

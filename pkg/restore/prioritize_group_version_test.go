@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -230,7 +230,7 @@ func TestFindTargetGroup(t *testing.T) {
 					PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
 				},
 				{
-					Name: "velero.vmware.com",
+					Name: "velero.io",
 					Versions: []metav1.GroupVersionForDiscovery{
 						{Version: "v2beta1"},
 						{Version: "v2beta2"},
@@ -239,9 +239,9 @@ func TestFindTargetGroup(t *testing.T) {
 					PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2"},
 				},
 			},
-			grpName: "velero.vmware.com",
+			grpName: "velero.io",
 			want: metav1.APIGroup{
-				Name: "velero.vmware.com",
+				Name: "velero.io",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v2beta1"},
 					{Version: "v2beta2"},
@@ -268,7 +268,7 @@ func TestFindTargetGroup(t *testing.T) {
 					PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
 				},
 				{
-					Name: "velero.vmware.com",
+					Name: "velero.io",
 					Versions: []metav1.GroupVersionForDiscovery{
 						{Version: "v2beta1"},
 						{Version: "v2beta2"},
@@ -420,46 +420,5 @@ func TestVersionsContain(t *testing.T) {
 
 	for _, tc := range tests {
 		assert.Equal(t, tc.want, versionsContain(tc.GVs, tc.ver))
-	}
-}
-
-func TestLatestCommon(t *testing.T) {
-	tests := []struct {
-		name       string
-		tGVs, sGVs []metav1.GroupVersionForDiscovery
-		want       string
-	}{
-		{
-			name: "choose the latest when there are three versions in common",
-			tGVs: []metav1.GroupVersionForDiscovery{
-				{Version: "v2"},
-				{Version: "v2alpha1"},
-				{Version: "v2beta1"},
-			},
-			sGVs: []metav1.GroupVersionForDiscovery{
-				{Version: "v2beta1"},
-				{Version: "v2"},
-				{Version: "v2alpha1"},
-			},
-			want: "v2beta1",
-		},
-		{
-			name: "return empty string when no version is in common",
-			tGVs: []metav1.GroupVersionForDiscovery{
-				{Version: "v2"},
-				{Version: "v2alpha1"},
-				{Version: "v2beta1"},
-			},
-			sGVs: []metav1.GroupVersionForDiscovery{
-				{Version: "v1"},
-				{Version: "v1alpha1"},
-				{Version: "v1beta1"},
-			},
-			want: "",
-		},
-	}
-
-	for _, tc := range tests {
-		assert.Equal(t, tc.want, latestCommon(tc.sGVs, tc.tGVs))
 	}
 }
