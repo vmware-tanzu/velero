@@ -5,7 +5,7 @@ Adding context object to the functions of the Velero plugin to allow plugin impl
 ## Goals
 
 - Enhance Velero plugin interface with context object to implement timeout in the plugin code.
-- Ensure backward compatibile to previous version of the plugin to avoid forcing all plugin vendors upgrade their code in lockstep.
+- Ensure backward compatible to previous version of the plugin to avoid forcing all plugin vendors upgrade their code in lockstep.
 - Enhance all Velero plugin interfaces: BackupActionItem, DeleteActionItem, ObjectStore, RestoreItemAction, VolumeSnapshotter.
 
 ## Non Goals
