@@ -30,15 +30,15 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/mod v0.3.0
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	google.golang.org/genproto v0.0.0-20200731012542-8145dea6a485 // indirect
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0 // indirect
-	k8s.io/api v0.19.2
-	k8s.io/apiextensions-apiserver v0.19.2
-	k8s.io/apimachinery v0.19.2
-	k8s.io/cli-runtime v0.19.2
-	k8s.io/client-go v0.19.2
+	k8s.io/api v0.19.7
+	k8s.io/apiextensions-apiserver v0.19.7
+	k8s.io/apimachinery v0.19.7
+	k8s.io/cli-runtime v0.19.7
+	k8s.io/client-go v0.19.7
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/cluster-api v0.3.11-0.20210106212952-b6c1b5b3db3d
 	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
