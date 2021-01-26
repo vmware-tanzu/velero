@@ -3,7 +3,6 @@ package e2etestify
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +10,6 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/test/e2e"
 )
 
@@ -125,13 +123,8 @@ func (suite *RestorePriorityAPIGVTests) TestCases() {
 		}
 
 		suite.Require().NoError(installVelero(ctx), "install velero")
-
-		// Reset Velero to recognize music-system CRD.
-		cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "--all", "-n", "velero")
-		_, _, _ = veleroexec.RunCommand(cmd)
-
-		fmt.Println("Sleep 40s to wait for Velero install to stabilize.")
-		time.Sleep(time.Second * 40)
+		fmt.Println("Sleep 20s to wait for Velero to stabilize after install.")
+		time.Sleep(time.Second * 20)
 
 		backup := "backup-rockbands-" + suite.uuidgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
@@ -162,10 +155,10 @@ func (suite *RestorePriorityAPIGVTests) TestCases() {
 		}
 
 		// Reset Velero to recognize music-system CRD.
-		cmd = exec.CommandContext(ctx, "kubectl", "delete", "pod", "--all", "-n", "velero")
-		_, _, _ = veleroexec.RunCommand(cmd)
-
-		fmt.Println("Sleep 20s to wait for Velero install to stabilize.")
+		if err := RestartPods(ctx, "velero"); err != nil {
+			suite.Require().NoError(err, "restarting Velero pods")
+		}
+		fmt.Println("Sleep 20s to wait for Velero to stabilize after restart.")
 		time.Sleep(time.Second * 20)
 
 		// Restore rockbands namespace.
@@ -201,7 +194,7 @@ func (suite *RestorePriorityAPIGVTests) TestCases() {
 			// No custom resource should have been restored. Expect "no resource found"
 			// error during restore.
 			err := e2e.VeleroRestore(ctx, *veleroCLI, restore, backup)
-			// TODO: fill expected error
+
 			suite.Assert().EqualError(err, "Unexpected restore phase got PartiallyFailed, expecting Completed")
 		}
 
@@ -225,5 +218,9 @@ func (suite *RestorePriorityAPIGVTests) TestCases() {
 			tc.tgtCRD["url"],
 			tc.srcCRD["namespace"],
 		)
+
+		// Delete Velero namespace
+		_ = suite.client.CoreV1().Namespaces().Delete(ctx, "velero", metav1.DeleteOptions{})
+		_ = WaitNamespaceDelete(ctx, "velero")
 	}
 }

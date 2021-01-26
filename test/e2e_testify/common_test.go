@@ -40,8 +40,6 @@ func installVelero(ctx context.Context) error {
 	options.Image = *veleroImage
 
 	if err := e2e.InstallVeleroServer(options); err != nil {
-		// TODO pkg/install timeout has been increased from 1 to 3 mins. Is there a way
-		// to configure that without hardcoding?
 		return errors.Wrap(err, "install velero server")
 	}
 
@@ -78,6 +76,22 @@ func InstallCRD(ctx context.Context, crdFile, ns string) error {
 	return err
 }
 
+func RestartPods(ctx context.Context, ns string) error {
+	fmt.Printf("Restart pods in %s namespace.\n", ns)
+
+	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "--all", "-n", ns)
+	_, _, err := veleroexec.RunCommand(cmd)
+
+	if err == nil {
+		fmt.Println("Wait for pods to be ready.")
+		if err := WaitForPodContainers(ctx, ns); err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
 // PodContainersReady will get the pods and container status in a namespace.
 // If the ratio of the number of containers running to total in a pod is not 1,
 // it is not ready. Otherwise, if all container ratios are 1, the pod is running.
@@ -104,7 +118,7 @@ func WaitForPodContainers(ctx context.Context, ns string) error {
 	})
 
 	if err == nil {
-		fmt.Println("CRD installation successful. Sleep for 20s for cluster to stabilize.")
+		fmt.Println("Sleep for 20s for cluster to stabilize.")
 		time.Sleep(time.Second * 20)
 	}
 
@@ -116,7 +130,6 @@ func InstallCR(ctx context.Context, crFile, ns string) error {
 	var stderr string
 	var err error
 
-	// Using retries as "kubectl wait" depends on Condition, which not all CRs have.
 	for i := 0; i < retries; i++ {
 		fmt.Printf("Attempt %d: Install custom resource %s\n", i+1, crFile)
 		cmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", ns, "-f", crFile)
