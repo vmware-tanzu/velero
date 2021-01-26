@@ -55,7 +55,7 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 	if ok {
 		updatedItem, additionalItems, err = implv2.ExecuteWithContext(ctx, &item, &backup)
 	} else {
-		updatedItem, additionalItems, err = implv2.Execute(&item, &backup)
+		updatedItem, additionalItems, err = impl.Execute(&item, &backup)
 	}
 	...
 }
