@@ -859,7 +859,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	s.logger.Info("Server starting...")
 
-	if err := s.mgr.Start(s.ctx.Done()); err != nil {
+	if err := s.mgr.Start(s.ctx); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
 
