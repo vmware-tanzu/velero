@@ -335,3 +335,7 @@ gen-docs:
 .PHONY: test-e2e
 test-e2e: local
 	$(MAKE) -C test/e2e run
+
+.PHONY: test-e2e-testify
+test-e2e-testify: local
+	$(MAKE) -C test/e2e_testify run
