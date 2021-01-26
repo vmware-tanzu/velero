@@ -49,9 +49,9 @@ const (
 )
 
 var (
-	env     *envtest.Environment
-	testEnv *testEnvironment
-	ctx     = context.Background()
+	env         *envtest.Environment
+	testEnv     *testEnvironment
+	ctx, cancel = context.WithCancel(context.Background())
 )
 
 func TestAPIs(t *testing.T) {
@@ -84,7 +84,8 @@ type testEnvironment struct {
 	client.Client
 	Config *rest.Config
 
-	doneMgr chan struct{}
+	doneMgr context.Context
+	cancel  context.CancelFunc
 }
 
 // newTestEnvironment creates a new environment spinning up a local api-server.
@@ -114,7 +115,7 @@ func newTestEnvironment() *testEnvironment {
 		Manager: mgr,
 		Client:  mgr.GetClient(),
 		Config:  mgr.GetConfig(),
-		doneMgr: make(chan struct{}),
+		doneMgr: ctx,
 	}
 }
 
@@ -123,7 +124,7 @@ func (t *testEnvironment) startManager() error {
 }
 
 func (t *testEnvironment) stop() error {
-	t.doneMgr <- struct{}{}
+	cancel()
 	return env.Stop()
 }
 
