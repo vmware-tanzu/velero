@@ -60,7 +60,7 @@ type ServerStatusRequestReconciler struct {
 
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests/status,verbs=get;update;patch
-func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithFields(logrus.Fields{
 		"controller":          ServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,

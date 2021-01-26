@@ -310,10 +310,10 @@ spec:
                                                 fieldRef:
                                                   description: 'Selects a field of
                                                     the pod: supports metadata.name,
-                                                    metadata.namespace, metadata.labels,
-                                                    metadata.annotations, spec.nodeName,
-                                                    spec.serviceAccountName, status.hostIP,
-                                                    status.podIP, status.podIPs.'
+                                                    metadata.namespace, `metadata.labels[''<KEY>'']`,
+                                                    `metadata.annotations[''<KEY>'']`,
+                                                    spec.nodeName, spec.serviceAccountName,
+                                                    status.hostIP, status.podIP, status.podIPs.'
                                                   properties:
                                                     apiVersion:
                                                       description: Version of the
@@ -1174,6 +1174,36 @@ spec:
                                                 description: User is a SELinux user
                                                   label that applies to the container.
                                                 type: string
+                                            type: object
+                                          seccompProfile:
+                                            description: The seccomp options to use
+                                              by this container. If seccomp options
+                                              are provided at both the pod & container
+                                              level, the container options override
+                                              the pod options.
+                                            properties:
+                                              localhostProfile:
+                                                description: localhostProfile indicates
+                                                  a profile defined in a file on the
+                                                  node should be used. The profile
+                                                  must be preconfigured on the node
+                                                  to work. Must be a descending path,
+                                                  relative to the kubelet's configured
+                                                  seccomp profile location. Must only
+                                                  be set if type is "Localhost".
+                                                type: string
+                                              type:
+                                                description: "type indicates which
+                                                  kind of seccomp profile will be
+                                                  applied. Valid options are: \n Localhost
+                                                  - a profile defined in a file on
+                                                  the node should be used. RuntimeDefault
+                                                  - the container runtime default
+                                                  profile should be used. Unconfined
+                                                  - no profile should be applied."
+                                                type: string
+                                            required:
+                                            - type
                                             type: object
                                           windowsOptions:
                                             description: The Windows specific settings

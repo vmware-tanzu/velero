@@ -95,7 +95,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log: velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctrl.Request{
+		actualResult, err := r.Reconcile(ctx, ctrl.Request{
 			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 		})
 
@@ -164,7 +164,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log: velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctrl.Request{
+		actualResult, err := r.Reconcile(ctx, ctrl.Request{
 			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 		})
 
@@ -237,7 +237,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log: velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctrl.Request{
+		actualResult, err := r.Reconcile(ctx, ctrl.Request{
 			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 		})
 

@@ -70,7 +70,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 				Log:            velerotest.NewLogger(),
 			}
 
-			actualResult, err := r.Reconcile(ctrl.Request{
+			actualResult, err := r.Reconcile(r.Ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      test.req.Name,
