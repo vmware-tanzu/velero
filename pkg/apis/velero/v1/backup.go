@@ -319,7 +319,7 @@ type BackupProgress struct {
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.storageLocation",description="Name of the Backup Storage Location where this backup should be stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Backup is a Velero resource that respresents the capture of Kubernetes
+// Backup is a Velero resource that represents the capture of Kubernetes
 // cluster state at a point in time (API objects and associated volume state).
 type Backup struct {
 	metav1.TypeMeta `json:",inline"`
