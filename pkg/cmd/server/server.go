@@ -824,7 +824,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		r := controller.DownloadRequestReconciler{
 			Scheme:           s.mgr.GetScheme(),
 			Client:           s.mgr.GetClient(),
-			Ctx:              s.ctx,
 			Clock:            clock.RealClock{},
 			NewPluginManager: newPluginManager,
 			NewBackupStore:   persistence.NewObjectBackupStore,
