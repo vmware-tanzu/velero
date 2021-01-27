@@ -1,7 +1,7 @@
 ## Velero Roadmap
 
 ### About this document
-This document provides a link to the [Velero Project board](https://app.zenhub.com/workspaces/velero-5c59c15e39d47b774b5864e3/board?repos=99143276,112385197,190224441,214524700,214524630,213946861) that serves as the up to date description of items that are in the release pipeline. The board has separate swim lanes based on prioritization. Most items are gathered from the community or include a feedback loop with the community. This should serve as a reference point for Velero users and contributors to understand where the project is heading, and help determine if a contribution could be conflicting with a longer term plan. You will need the ZenHub plugin to view the board.
+This document provides a link to the [Velero Project boards](https://github.com/vmware-tanzu/velero/projects) that serves as the up to date description of items that are in the release pipeline. The release boards have separate swim lanes based on prioritization. Most items are gathered from the community or include a feedback loop with the community. This should serve as a reference point for Velero users and contributors to understand where the project is heading, and help determine if a contribution could be conflicting with a longer term plan. 
 
 ### How to help?
 Discussion on the roadmap can take place in threads under [Issues](https://github.com/vmware-tanzu/velero/issues) or in [community meetings](https://velero.io/community/). Please open and comment on an issue if you want to provide suggestions, use cases, and feedback to an item in the roadmap. Please review the roadmap to avoid potential duplicated effort.
