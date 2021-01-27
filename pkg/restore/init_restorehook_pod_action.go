@@ -37,7 +37,7 @@ func NewInitRestoreHookPodAction(logger logrus.FieldLogger) *InitRestoreHookPodA
 	return &InitRestoreHookPodAction{logger: logger}
 }
 
-// AppliesTo implements the RestoreItemAction plugin intrface method.
+// AppliesTo implements the RestoreItemAction plugin interface method.
 func (a *InitRestoreHookPodAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
