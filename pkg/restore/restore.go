@@ -50,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -387,10 +388,13 @@ func (ctx *restoreContext) execute() (Result, Result) {
 		return warnings, errs
 	}
 
-	if ctx.meetsAPIGVRestoreReqs() {
-		if err := ctx.chooseAPIVersionsToRestore(); err != nil {
-			errs.AddVeleroError(errors.Wrap(err, "choosing API version to restore"))
-			return warnings, errs
+	// TODO: Remove outer feature flag check to make this feature a default in Velero.
+	if features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
+		if ctx.backup.Status.FormatVersion >= "1.1.0" {
+			if err := ctx.chooseAPIVersionsToRestore(); err != nil {
+				errs.AddVeleroError(errors.Wrap(err, "choosing API version to restore"))
+				return warnings, errs
+			}
 		}
 	}
 
@@ -746,6 +750,8 @@ func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNa
 	// path. For example, for group resource "horizontalpodautoscalers.autoscaling",
 	// "/v2beta1" will be appended to the end. Different versions would only
 	// have been stored if the APIGroupVersionsFeatureFlag was enabled during backup.
+	// The chosenGrpVersToRestore map would only be populated if APIGroupVersionsFeatureFlag
+	// was enabled for restore and the minimum required backup format version has been met.
 	cgv, ok := ctx.chosenGrpVersToRestore[groupResource.String()]
 	if ok {
 		resource = filepath.Join(groupResource.String(), cgv.Dir)

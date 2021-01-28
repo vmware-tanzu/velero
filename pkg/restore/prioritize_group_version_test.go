@@ -23,66 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
-
-func TestMeetsAPIGVRestoreReqs(t *testing.T) {
-	tests := []struct {
-		name   string
-		flag   string
-		fmtVer string
-		want   bool
-	}{
-		{
-			name:   "returns false if feature flag not enabled and Format Version 1.1.0 not used",
-			flag:   "",
-			fmtVer: "",
-			want:   false,
-		},
-		{
-			name:   "returns false if feature flag not enabled and Format Version 1.1.0 used",
-			flag:   "",
-			fmtVer: "1.1.0",
-			want:   false,
-		},
-		{
-			name:   "returns false if feature flag enabled and Format Version 1.1.0 not used",
-			flag:   velerov1api.APIGroupVersionsFeatureFlag,
-			fmtVer: "",
-			want:   false,
-		},
-		{
-			name:   "returns true if feature flag enabled and Format Version 1.1.0 used",
-			flag:   velerov1api.APIGroupVersionsFeatureFlag,
-			fmtVer: "1.1.0",
-			want:   true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			fakeCtx := &restoreContext{
-				backup: &velerov1api.Backup{
-					Status: velerov1api.BackupStatus{
-						FormatVersion: tc.fmtVer,
-					},
-				},
-			}
-
-			features.NewFeatureFlagSet(tc.flag)
-
-			met := fakeCtx.meetsAPIGVRestoreReqs()
-
-			assert.Equal(t, tc.want, met)
-		})
-
-		// Test clean up
-		features.NewFeatureFlagSet()
-	}
-}
 
 func TestK8sPrioritySort(t *testing.T) {
 	tests := []struct {
@@ -208,13 +151,13 @@ o=v2beta2
 func TestFindTargetGroup(t *testing.T) {
 	tests := []struct {
 		name    string
-		tGrps   []metav1.APIGroup
+		targetGrps   []metav1.APIGroup
 		grpName string
 		want    metav1.APIGroup
 	}{
 		{
 			name: "return the API Group in target list matching group string",
-			tGrps: []metav1.APIGroup{
+			targetGrps: []metav1.APIGroup{
 				{
 					Name: "rbac.authorization.k8s.io",
 					Versions: []metav1.GroupVersionForDiscovery{
@@ -252,7 +195,7 @@ func TestFindTargetGroup(t *testing.T) {
 		},
 		{
 			name: "return empty API Group if no match in target list",
-			tGrps: []metav1.APIGroup{
+			targetGrps: []metav1.APIGroup{
 				{
 					Name: "rbac.authorization.k8s.io",
 					Versions: []metav1.GroupVersionForDiscovery{
@@ -283,7 +226,7 @@ func TestFindTargetGroup(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		grp := findTargetGroup(tc.tGrps, tc.grpName)
+		grp := findAPIGroup(tc.targetGrps, tc.grpName)
 
 		assert.Equal(t, tc.want, grp)
 	}
@@ -291,26 +234,26 @@ func TestFindTargetGroup(t *testing.T) {
 
 func TestFindSupportedUserVersion(t *testing.T) {
 	tests := []struct {
-		name string
-		ugvs []metav1.GroupVersionForDiscovery
-		tgvs []metav1.GroupVersionForDiscovery
-		sgvs []metav1.GroupVersionForDiscovery
-		want string
+		name      string
+		userGVs   []metav1.GroupVersionForDiscovery
+		targetGVs []metav1.GroupVersionForDiscovery
+		sourceGVs []metav1.GroupVersionForDiscovery
+		want      string
 	}{
 		{
 			name: "return the single user group version that has a match in both source and target clusters",
-			ugvs: []metav1.GroupVersionForDiscovery{
+			userGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "foo"},
 				{Version: "v10alpha2"},
 				{Version: "v3"},
 			},
-			tgvs: []metav1.GroupVersionForDiscovery{
+			targetGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v9"},
 				{Version: "v10beta1"},
 				{Version: "v10alpha2"},
 				{Version: "v10alpha3"},
 			},
-			sgvs: []metav1.GroupVersionForDiscovery{
+			sourceGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v10alpha2"},
 				{Version: "v9beta1"},
 			},
@@ -318,15 +261,15 @@ func TestFindSupportedUserVersion(t *testing.T) {
 		},
 		{
 			name: "return the first user group version that has a match in both source and target clusters",
-			ugvs: []metav1.GroupVersionForDiscovery{
+			userGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v2beta1"},
 				{Version: "v2beta2"},
 			},
-			tgvs: []metav1.GroupVersionForDiscovery{
+			targetGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v2beta2"},
 				{Version: "v2beta1"},
 			},
-			sgvs: []metav1.GroupVersionForDiscovery{
+			sourceGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v1"},
 				{Version: "v2beta2"},
 				{Version: "v2beta1"},
@@ -335,28 +278,28 @@ func TestFindSupportedUserVersion(t *testing.T) {
 		},
 		{
 			name: "return empty string if there's only matches in the source cluster, but not target",
-			ugvs: []metav1.GroupVersionForDiscovery{
+			userGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v1"},
 			},
-			tgvs: []metav1.GroupVersionForDiscovery{
+			targetGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v2"},
 			},
-			sgvs: []metav1.GroupVersionForDiscovery{
+			sourceGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v1"},
 			},
 			want: "",
 		},
 		{
 			name: "return empty string if there's only matches in the target cluster, but not source",
-			ugvs: []metav1.GroupVersionForDiscovery{
+			userGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v3"},
 				{Version: "v1"},
 			},
-			tgvs: []metav1.GroupVersionForDiscovery{
+			targetGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v3"},
 				{Version: "v3beta2"},
 			},
-			sgvs: []metav1.GroupVersionForDiscovery{
+			sourceGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v2"},
 				{Version: "v2beta1"},
 			},
@@ -364,17 +307,17 @@ func TestFindSupportedUserVersion(t *testing.T) {
 		},
 		{
 			name: "return empty string if there is no match with either target and source clusters",
-			ugvs: []metav1.GroupVersionForDiscovery{
+			userGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v2beta2"},
 				{Version: "v2beta1"},
 				{Version: "v2beta3"},
 			},
-			tgvs: []metav1.GroupVersionForDiscovery{
+			targetGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v2"},
 				{Version: "v1"},
 				{Version: "v2alpha1"},
 			},
-			sgvs: []metav1.GroupVersionForDiscovery{
+			sourceGVs: []metav1.GroupVersionForDiscovery{
 				{Version: "v1"},
 				{Version: "v2alpha1"},
 			},
@@ -383,7 +326,7 @@ func TestFindSupportedUserVersion(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		uv := findSupportedUserVersion(tc.ugvs, tc.tgvs, tc.sgvs)
+		uv := findSupportedUserVersion(tc.userGVs, tc.targetGVs, tc.sourceGVs)
 
 		assert.Equal(t, tc.want, uv)
 	}

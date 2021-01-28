@@ -232,8 +232,8 @@ func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, err
 				Version:      gvdName,
 			}
 
-			if strings.Contains(gvdName, "-preferredversion") {
-				gvdName = strings.TrimSuffix(gvdName, "-preferredversion")
+			if strings.Contains(gvdName, velerov1api.PreferredVersionDir) {
+				gvdName = strings.TrimSuffix(gvdName, velerov1api.PreferredVersionDir)
 
 				// Update version and group version to be without suffix.
 				version.Version = gvdName

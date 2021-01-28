@@ -30,15 +30,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/features"
 )
-
-// meetsAPIGVRestoreReqs determines if the feature flag has been
-// enabled and the backup objects use Status.FormatVersion 1.1.0.
-func (ctx *restoreContext) meetsAPIGVRestoreReqs() bool {
-	return features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) &&
-		ctx.backup.Status.FormatVersion >= "1.1.0"
-}
 
 // ChosenGroupVersion is the API Group version that was selected to restore
 // from potentially multiple backed up version enabled by the feature flag
@@ -52,30 +44,30 @@ type ChosenGroupVersion struct {
 // chooseAPIVersionsToRestore will choose a version to restore based on a user-
 // provided config map prioritization or our version prioritization.
 func (ctx *restoreContext) chooseAPIVersionsToRestore() error {
-	sgvs, tgvs, ugvs, err := ctx.gatherSTUVersions()
+	sourceGVs, targetGVs, userGVs, err := ctx.gatherSourceTargetUserGroupVersions()
 	if err != nil {
 		return err
 	}
 
 OUTER:
-	for rg, sg := range sgvs {
+	for rg, sg := range sourceGVs {
 		// Default to the source preferred version if no other common version
 		// can be found.
 		cgv := ChosenGroupVersion{
 			Group:   sg.Name,
 			Version: sg.PreferredVersion.Version,
-			Dir:     sg.PreferredVersion.Version + "-preferredversion",
+			Dir:     sg.PreferredVersion.Version + velerov1api.PreferredVersionDir,
 		}
 
-		tg := findTargetGroup(tgvs, sg.Name)
+		tg := findAPIGroup(targetGVs, sg.Name)
 		if len(tg.Versions) == 0 {
 			ctx.SetChosenGVToRestore(cgv, rg, "", "")
 			continue
 		}
 
 		// Priority 0: User Priority Version
-		if ugvs != nil {
-			uv := findSupportedUserVersion(ugvs[rg].Versions, tg.Versions, sg.Versions)
+		if userGVs != nil {
+			uv := findSupportedUserVersion(userGVs[rg].Versions, tg.Versions, sg.Versions)
 			if uv != "" {
 				ctx.SetChosenGVToRestore(cgv, rg, sg.PreferredVersion.Version, uv)
 				ctx.log.Debugf("APIGroupVersionsFeatureFlag Priority 0: User defined API group version %s chosen for %s", uv, rg)
@@ -142,8 +134,8 @@ OUTER:
 	return nil
 }
 
-// gatherSTUVersions collects the source, target, and user priority versions.
-func (ctx *restoreContext) gatherSTUVersions() (
+// gatherSourceTargetUserGroupVersions collects the source, target, and user priority versions.
+func (ctx *restoreContext) gatherSourceTargetUserGroupVersions() (
 	map[string]metav1.APIGroup,
 	[]metav1.APIGroup,
 	map[string]metav1.APIGroup,
@@ -162,8 +154,8 @@ func (ctx *restoreContext) gatherSTUVersions() (
 	targetGroupVersions := ctx.discoveryHelper.APIGroups()
 
 	// Sort the versions in the APIGroups slice in targetGroupVersions.
-	for _, tar := range targetGroupVersions {
-		k8sPrioritySort(tar.Versions)
+	for _, target := range targetGroupVersions {
+		k8sPrioritySort(target.Versions)
 	}
 
 	// Get the user-provided enableapigroupversion config map.
@@ -241,12 +233,12 @@ func parseUserPriorities(prioritiesData string) map[string]metav1.APIGroup {
 
 	lines := strings.Split(prioritiesData, "\n")
 
-	for _, l := range lines {
-		if !isUserPriorityValid(l) {
+	for _, line := range lines {
+		if !isUserPriorityValid(line) {
 			continue
 		}
 
-		rgvs := strings.SplitN(l, "=", 2)
+		rgvs := strings.SplitN(line, "=", 2)
 		rg := rgvs[0]   // rockbands.music.example.io
 		vers := rgvs[1] // v2beta1,v2beta2
 
@@ -294,12 +286,11 @@ func versionsToGroupVersionForDiscovery(vs []string) []metav1.GroupVersionForDis
 	return gvs
 }
 
-// findTargetGroup looks for a particular group in from a list of groups in the
-// target cluster.
-func findTargetGroup(tgvs []metav1.APIGroup, group string) metav1.APIGroup {
-	for _, tg := range tgvs {
-		if tg.Name == group {
-			return tg
+// findAPIGroup looks for an API Group by a group name.
+func findAPIGroup(groups []metav1.APIGroup, name string) metav1.APIGroup {
+	for _, g := range groups {
+		if g.Name == name {
+			return g
 		}
 	}
 
@@ -308,9 +299,9 @@ func findTargetGroup(tgvs []metav1.APIGroup, group string) metav1.APIGroup {
 
 // findSupportedUserVersion finds the first user priority version that both source
 // and target support.
-func findSupportedUserVersion(ugvs, tgvs, sgvs []metav1.GroupVersionForDiscovery) string {
-	for _, ug := range ugvs {
-		if versionsContain(tgvs, ug.Version) && versionsContain(sgvs, ug.Version) {
+func findSupportedUserVersion(userGVs, targetGVs, sourceGVs []metav1.GroupVersionForDiscovery) string {
+	for _, ug := range userGVs {
+		if versionsContain(targetGVs, ug.Version) && versionsContain(sourceGVs, ug.Version) {
 			return ug.Version
 		}
 	}
@@ -336,7 +327,7 @@ func (ctx *restoreContext) SetChosenGVToRestore(cgv ChosenGroupVersion, rg, srcP
 
 		cgv.Dir = cgv.Version
 		if chosen == srcPreferred {
-			cgv.Dir = chosen + "-preferredversion"
+			cgv.Dir = chosen + velerov1api.PreferredVersionDir
 		}
 	}
 
