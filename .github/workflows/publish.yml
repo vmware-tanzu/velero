@@ -1,0 +1,61 @@
+name: Publish Images
+
+on:
+  push:
+    branches:
+    - konveyor-dev
+    - 'release-*.*.*'
+    - 'sprint-*'
+    tags:
+    - 'release-*.*.*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: quay.io
+  IMAGE_NAME: konveyor/velero
+  HELPER_IMAGE_NAME: konveyor/velero-restore-helper
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+
+      - name: Build container image
+        run: docker build . --file Dockerfile.ubi --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}
+
+      - name: Build helper image
+        run: docker build . --file Dockerfile-velero-restore-helper.ubi --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}
+
+      - name: Log into registry
+        run: echo "${{ secrets.QUAY_PUBLISH_TOKEN }}" | docker login quay.io -u ${{ secrets.QUAY_PUBLISH_ROBOT }} --password-stdin
+
+      - name: Push container image
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}
+
+      - name: Push helper image
+        run: docker push ${{ env.REGISTRY }}/${{ env.HELPER_IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}
+
+      - name: Retag container image
+        run: docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        if: ${{ github.ref == 'refs/heads/konveyor-dev' }}
+
+      - name: Retag helper image
+        run: docker tag ${{ env.REGISTRY }}/${{ env.HELPER_IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }} ${{ env.REGISTRY }}/${{ env.HELPER_IMAGE_NAME }}:latest
+        if: ${{ github.ref == 'refs/heads/konveyor-dev' }}
+
+      - name: push retagged container image
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        if: ${{ github.ref == 'refs/heads/konveyor-dev' }}
+
+      - name: push retagged helper image
+        run: docker push ${{ env.REGISTRY }}/${{ env.HELPER_IMAGE_NAME }}:latest
+        if: ${{ github.ref == 'refs/heads/konveyor-dev' }}
