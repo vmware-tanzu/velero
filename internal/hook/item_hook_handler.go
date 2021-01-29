@@ -123,7 +123,7 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 	// If this pod had pod volumes backed up using restic, then we want to the pod volumes restored prior to
 	// running the restore hook init containers. This allows the restore hook init containers to prepare the
 	// restored data to be consumed by the application container(s).
-	// So if there is a "resitc-wait" init container already on the pod at index 0, we'll preserve that and run
+	// So if there is a "restic-wait" init container already on the pod at index 0, we'll preserve that and run
 	// it before running any other init container.
 	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == restic.InitContainer {
 		initContainers = append(initContainers, pod.Spec.InitContainers[0])
