@@ -199,8 +199,8 @@ func CheckRestorePhase(ctx context.Context, veleroCLI string, restoreName string
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
 func VeleroBackupNamespace(ctx context.Context, veleroCLI string, backupName string, namespace string) error {
-	backupCmd := exec.CommandContext(ctx, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace, "--wait")
-	fmt.Printf("backup cmd =%v\n", backupCmd)
+	backupCmd := exec.CommandContext(ctx, veleroCLI, "create", "backup", backupName, "--include-namespaces", namespace,
+		"--default-volumes-to-restic", "--wait")
 	err := backupCmd.Run()
 	if err != nil {
 		return err
