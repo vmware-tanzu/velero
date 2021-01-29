@@ -76,12 +76,15 @@
         li {
             display: block;
             padding-right: 0px;
-            margin-bottom: 15px;
+            line-height: 1;
+            margin-bottom: 7px;
             a {
                 font-size: 14px;
             }
             ul {
-                margin-top: 15px;
+                margin-top: 7px;
+                padding-inline-start: 14px;
+
             }
         }
     }
