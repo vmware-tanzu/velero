@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -118,12 +119,18 @@ func (c VeleroConfig) Colorized() bool {
 		return true
 	}
 
-	colorized, ok := val.(bool)
+	valString, ok := val.(string)
 	if !ok {
 		return true
 	}
 
+	colorized, err := strconv.ParseBool(valString)
+	if err != nil {
+		return true
+	}
+
 	return colorized
+
 }
 
 func (c VeleroConfig) CACertFile() string {
