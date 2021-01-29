@@ -1,0 +1,1 @@
+Updated the docs to specify that the --plugin-dir flag should be set to a directory that has the binary present locally present.
