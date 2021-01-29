@@ -42,6 +42,7 @@ After you use the `velero install` command to install Velero into your cluster, 
   * `--kubeconfig`: set the path to the kubeconfig file the Velero server uses to talk to the Kubernetes apiserver (default `$KUBECONFIG`)
   * `--namespace`: the set namespace where the Velero server should look for backups, schedules, restores (default `velero`)
   * `--plugin-dir`: set the directory where the Velero server looks for plugins (default `/plugins`)
+      * The `--plugin-dir` flag requires the plugin binary to be present locally, and should be set to the directory containing this built binary.
   * `--metrics-address`: set the bind address and port where Prometheus metrics are exposed (default `:8085`)
 
 [15]: https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file
