@@ -17,7 +17,6 @@ limitations under the License.
 package archive
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
@@ -30,16 +29,16 @@ import (
 
 func TestParse(t *testing.T) {
 	tests := []struct {
-		name    string
-		files   []string
-		dir     string
-		wantErr error
-		want    map[string]*ResourceItems
+		name       string
+		files      []string
+		dir        string
+		wantErrMsg string
+		want       map[string]*ResourceItems
 	}{
 		{
-			name:    "when there is no top-level resources directory, an error is returned",
-			dir:     "root-dir",
-			wantErr: errors.New("directory \"resources\" does not exist"),
+			name:       "when there is no top-level resources directory, an error is returned",
+			dir:        "root-dir",
+			wantErrMsg: "directory \"resources\" does not exist",
 		},
 		{
 			name:  "when there are no directories under the resources directory, an empty map is returned",
@@ -110,8 +109,8 @@ func TestParse(t *testing.T) {
 			}
 
 			res, err := p.Parse(tc.dir)
-			if tc.wantErr != nil {
-				assert.Equal(t, tc.wantErr.Error(), err.Error())
+			if tc.wantErrMsg != "" {
+				assert.EqualError(t, err, tc.wantErrMsg)
 			} else {
 				assert.Nil(t, err)
 				assert.Equal(t, tc.want, res)
@@ -122,36 +121,37 @@ func TestParse(t *testing.T) {
 
 func TestParseGroupVersions(t *testing.T) {
 	tests := []struct {
-		name      string
-		files     []string
-		backupDir string
-		wantErr   error
-		want      map[string]metav1.APIGroup
+		name       string
+		files      []string
+		backupDir  string
+		wantErrMsg string
+		want       map[string]metav1.APIGroup
 	}{
 		{
-			name:      "when there is no top-level resources directory, an error is returned",
-			backupDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
-			wantErr:   errors.New("\"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources\" not found"),
+			name:       "when there is no top-level resources directory, an error is returned",
+			backupDir:  "/var/folders",
+			wantErrMsg: "\"/var/folders/resources\" not found",
 		},
 		{
 			name:      "when there are no directories under the resources directory, an empty map is returned",
-			backupDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
-			files:     []string{"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/"},
+			backupDir: "/var/folders",
+			files:     []string{"/var/folders/resources/"},
 			want:      map[string]metav1.APIGroup{},
 		},
 		{
 			name:      "when there is a mix of cluster-scoped and namespaced items for resources with preferred or multiple API groups, all group versions are correctly returned",
-			backupDir: "/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697",
+			backupDir: "/var/folders",
 			files: []string{
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/clusterroles.rbac.authorization.k8s.io/v1-preferredversion/cluster/system/controller/attachdetach-controller.json",
+				"/var/folders/resources/clusterroles.rbac.authorization.k8s.io/v1-preferredversion/cluster/system/controller/attachdetach-controller.json",
+				"/var/folders/resources/clusterroles.rbac.authorization.k8s.io/cluster/system/controller/attachdetach-controller.json",
 
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/horizontalpodautoscalers.autoscaling/namespaces/myexample/php-apache-autoscaler.json",
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/horizontalpodautoscalers.autoscaling/v1-preferredversion/namespaces/myexample/php-apache-autoscaler.json",
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/horizontalpodautoscalers.autoscaling/v2beta1/namespaces/myexample/php-apache-autoscaler.json",
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/horizontalpodautoscalers.autoscaling/v2beta2/namespaces/myexample/php-apache-autoscaler.json",
+				"/var/folders/resources/horizontalpodautoscalers.autoscaling/namespaces/myexample/php-apache-autoscaler.json",
+				"/var/folders/resources/horizontalpodautoscalers.autoscaling/v1-preferredversion/namespaces/myexample/php-apache-autoscaler.json",
+				"/var/folders/resources/horizontalpodautoscalers.autoscaling/v2beta1/namespaces/myexample/php-apache-autoscaler.json",
+				"/var/folders/resources/horizontalpodautoscalers.autoscaling/v2beta2/namespaces/myexample/php-apache-autoscaler.json",
 
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/pods/namespaces/nginx-example/nginx-deployment-57d5dcb68-wrqsc.json",
-				"/var/folders/zj/vc4ln5h14djg9svz7x_t1d0r0000gq/T/620385697/resources/pods/v1-preferredversion/namespaces/nginx-example/nginx-deployment-57d5dcb68-wrqsc.json",
+				"/var/folders/resources/pods/namespaces/nginx-example/nginx-deployment-57d5dcb68-wrqsc.json",
+				"/var/folders/resources/pods/v1-preferredversion/namespaces/nginx-example/nginx-deployment-57d5dcb68-wrqsc.json",
 			},
 			want: map[string]metav1.APIGroup{
 				"clusterroles.rbac.authorization.k8s.io": {
@@ -223,8 +223,8 @@ func TestParseGroupVersions(t *testing.T) {
 			}
 
 			res, err := p.ParseGroupVersions(tc.backupDir)
-			if tc.wantErr != nil {
-				assert.Equal(t, tc.wantErr.Error(), err.Error())
+			if tc.wantErrMsg != "" {
+				assert.EqualError(t, err, tc.wantErrMsg)
 			} else {
 				assert.Nil(t, err)
 				assert.Equal(t, tc.want, res)

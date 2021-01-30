@@ -73,9 +73,10 @@ func TestK8sPrioritySort(t *testing.T) {
 
 func TestUserResourceGroupVersionPriorities(t *testing.T) {
 	tests := []struct {
-		name string
-		cm   *corev1.ConfigMap
-		want map[string]metav1.APIGroup
+		name       string
+		cm         *corev1.ConfigMap
+		want       map[string]metav1.APIGroup
+		wantErrMsg string
 	}{
 		{
 			name: "retrieve version priority data from config map",
@@ -104,7 +105,7 @@ subscriptions.operators.coreos.com=v2,v1`,
 			},
 		},
 		{
-			name: "incorrect data format returns no user version priorities",
+			name: "incorrect data format returns an error",
 			cm: builder.
 				ForConfigMap("velero", "enableapigroupversions").
 				Data(
@@ -112,28 +113,22 @@ subscriptions.operators.coreos.com=v2,v1`,
 					`rockbands.music.example.io=v2beta1,v2beta2\n orchestras.music.example.io=v2,v3alpha1`,
 				).
 				Result(),
-			want: nil,
+			want:       nil,
+			wantErrMsg: "parsing user priorities: validating user priority: line must have one and only one equal sign",
 		},
 		{
-			name: "incorrect and correct data format returns some user version priorities",
+			name: "a mix of incorrect and correct data format returns an error",
 			cm: builder.
 				ForConfigMap("velero", "enableapigroupversions").
 				Data(
 					"restoreResourcesVersionPriority",
-					`rb=foo,foo2
-o=v2beta2
-\n`,
+					`pods=v2,v1beta2
+horizontalpodautoscalers.autoscaling = v2beta2
+jobs.batch=v3`,
 				).
 				Result(),
-			want: map[string]metav1.APIGroup{
-				"rb": {Versions: []metav1.GroupVersionForDiscovery{
-					{Version: "foo"},
-					{Version: "foo2"},
-				}},
-				"o": {Versions: []metav1.GroupVersionForDiscovery{
-					{Version: "v2beta2"},
-				}},
-			},
+			want:       nil,
+			wantErrMsg: "parsing user priorities: validating user priority: line must not contain any spaces",
 		},
 	}
 
@@ -143,17 +138,23 @@ o=v2beta2
 
 	for _, tc := range tests {
 		t.Log(tc.name)
-		priorities := userResourceGroupVersionPriorities(fakeCtx, tc.cm)
+		priorities, err := userResourceGroupVersionPriorities(fakeCtx, tc.cm)
 		assert.Equal(t, tc.want, priorities)
+
+		if tc.wantErrMsg == "" {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, tc.wantErrMsg)
+		}
 	}
 }
 
-func TestFindTargetGroup(t *testing.T) {
+func TestFindAPIGroup(t *testing.T) {
 	tests := []struct {
-		name    string
-		targetGrps   []metav1.APIGroup
-		grpName string
-		want    metav1.APIGroup
+		name       string
+		targetGrps []metav1.APIGroup
+		grpName    string
+		want       metav1.APIGroup
 	}{
 		{
 			name: "return the API Group in target list matching group string",

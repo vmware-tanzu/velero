@@ -61,7 +61,8 @@ OUTER:
 
 		tg := findAPIGroup(targetGVs, sg.Name)
 		if len(tg.Versions) == 0 {
-			ctx.SetChosenGVToRestore(cgv, rg, "", "")
+			ctx.chosenGrpVersToRestore[rg] = cgv
+			ctx.log.Debugf("Chose %s/%s API group version to restore", cgv.Group, cgv.Version)
 			continue
 		}
 
@@ -69,7 +70,14 @@ OUTER:
 		if userGVs != nil {
 			uv := findSupportedUserVersion(userGVs[rg].Versions, tg.Versions, sg.Versions)
 			if uv != "" {
-				ctx.SetChosenGVToRestore(cgv, rg, sg.PreferredVersion.Version, uv)
+				cgv.Version = uv
+				cgv.Dir = uv
+
+				if uv == sg.PreferredVersion.Version {
+					cgv.Dir += velerov1api.PreferredVersionDir
+				}
+
+				ctx.chosenGrpVersToRestore[rg] = cgv
 				ctx.log.Debugf("APIGroupVersionsFeatureFlag Priority 0: User defined API group version %s chosen for %s", uv, rg)
 				continue
 			}
@@ -79,12 +87,14 @@ OUTER:
 
 		// Priority 1: Target Cluster Preferred Version
 		if versionsContain(sg.Versions, tg.PreferredVersion.Version) {
-			ctx.SetChosenGVToRestore(
-				cgv,
-				rg,
-				sg.PreferredVersion.Version,
-				tg.PreferredVersion.Version,
-			)
+			cgv.Version = tg.PreferredVersion.Version
+			cgv.Dir = tg.PreferredVersion.Version
+
+			if tg.PreferredVersion.Version == sg.PreferredVersion.Version {
+				cgv.Dir += velerov1api.PreferredVersionDir
+			}
+
+			ctx.chosenGrpVersToRestore[rg] = cgv
 			ctx.log.Debugf(
 				"APIGroupVersionsFeatureFlag Priority 1: Cluster preferred API group version %s found in backup for %s",
 				tg.PreferredVersion.Version,
@@ -95,12 +105,10 @@ OUTER:
 
 		// Priority 2: Source Cluster Preferred Version
 		if versionsContain(tg.Versions, sg.PreferredVersion.Version) {
-			ctx.SetChosenGVToRestore(
-				cgv,
-				rg,
-				sg.PreferredVersion.Version,
-				sg.PreferredVersion.Version,
-			)
+			cgv.Version = sg.PreferredVersion.Version
+			cgv.Dir = cgv.Version + velerov1api.PreferredVersionDir
+
+			ctx.chosenGrpVersToRestore[rg] = cgv
 			ctx.log.Debugf(
 				"APIGroupVersionsFeatureFlag Priority 2: Cluster preferred API group version not found in backup. Using backup preferred version %s for %s",
 				sg.PreferredVersion.Version,
@@ -112,18 +120,21 @@ OUTER:
 		// Priority 3: The Common Supported Version with the Highest Kubernetes Version Priority
 		for _, tv := range tg.Versions[1:] {
 			if versionsContain(sg.Versions[1:], tv.Version) {
-				ctx.SetChosenGVToRestore(cgv, rg, sg.PreferredVersion.Version, tv.Version)
+				cgv.Version = tv.Version
+				cgv.Dir = tv.Version
+
+				ctx.chosenGrpVersToRestore[rg] = cgv
+				ctx.log.Debugf(
+					"APIGroupVersionsFeatureFlag Priority 3: Common supported but not preferred API group version %s chosen for %s",
+					tv.Version,
+					rg,
+				)
 				continue OUTER
 			}
-			ctx.log.Debugf(
-				"APIGroupVersionsFeatureFlag Priority 3: Common supported but not preferred API group version %s chosen for %s",
-				tv.Version,
-				rg,
-			)
 		}
 
 		// Use default group version.
-		ctx.SetChosenGVToRestore(cgv, rg, "", "")
+		ctx.chosenGrpVersToRestore[rg] = cgv
 		ctx.log.Debugf(
 			"APIGroupVersionsFeatureFlag: Unable to find supported priority API group version. Using backup preferred version %s for %s (default behavior without feature flag).",
 			tg.PreferredVersion.Version,
@@ -165,7 +176,10 @@ func (ctx *restoreContext) gatherSourceTargetUserGroupVersions() (
 	}
 
 	// Read user-defined version priorities from config map.
-	userRGVPriorities := userResourceGroupVersionPriorities(ctx, cm)
+	userRGVPriorities, err := userResourceGroupVersionPriorities(ctx, cm)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "reading enableapigroupversion config map")
+	}
 
 	return sourceRGVersions, targetGroupVersions, userRGVPriorities, nil
 }
@@ -179,19 +193,23 @@ func k8sPrioritySort(gvs []metav1.GroupVersionForDiscovery) {
 
 // userResourceGroupVersionPriorities retrieves a user-provided config map and
 // extracts the user priority versions for each resource.
-func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMap) map[string]metav1.APIGroup {
+func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMap) (map[string]metav1.APIGroup, error) {
 	if cm == nil {
 		ctx.log.Debugf("No enableapigroupversion config map found in velero namespace. Using pre-defined priorities.")
-		return nil
+		return nil, nil
 	}
 
-	priorities := parseUserPriorities(cm.Data["restoreResourcesVersionPriority"])
+	priorities, err := parseUserPriorities(cm.Data["restoreResourcesVersionPriority"])
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing user priorities")
+	}
+
 	if len(priorities) == 0 {
 		ctx.log.Debugf("No valid user version priorities found in enableapigroupversion config map. Using pre-defined priorities.")
-		return nil
+		return nil, nil
 	}
 
-	return priorities
+	return priorities, nil
 }
 
 func userPriorityConfigMap() (*corev1.ConfigMap, error) {
@@ -223,7 +241,7 @@ func userPriorityConfigMap() (*corev1.ConfigMap, error) {
 	return cm, nil
 }
 
-func parseUserPriorities(prioritiesData string) map[string]metav1.APIGroup {
+func parseUserPriorities(prioritiesData string) (map[string]metav1.APIGroup, error) {
 	ups := make(map[string]metav1.APIGroup)
 
 	// The user priorities will be in a string of the form
@@ -234,8 +252,8 @@ func parseUserPriorities(prioritiesData string) map[string]metav1.APIGroup {
 	lines := strings.Split(prioritiesData, "\n")
 
 	for _, line := range lines {
-		if !isUserPriorityValid(line) {
-			continue
+		if err := validateUserPriority(line); err != nil {
+			return nil, errors.Wrap(err, "validating user priority")
 		}
 
 		rgvs := strings.SplitN(line, "=", 2)
@@ -249,27 +267,25 @@ func parseUserPriorities(prioritiesData string) map[string]metav1.APIGroup {
 		}
 	}
 
-	return ups
+	return ups, nil
 }
 
-func isUserPriorityValid(line string) bool {
-	// Line must have one and only one equal sign
+func validateUserPriority(line string) error {
 	if strings.Count(line, "=") != 1 {
-		return false
+		return errors.New("line must have one and only one equal sign")
 	}
 
-	// Line must contain at least one character before and after equal sign
 	pair := strings.Split(line, "=")
 	if len(pair[0]) < 1 || len(pair[1]) < 1 {
-		return false
+		return errors.New("line must contain at least one character before and after equal sign")
 	}
 
 	// Line must not contain any spaces
 	if strings.Count(line, " ") > 0 {
-		return false
+		return errors.New("line must not contain any spaces")
 	}
 
-	return true
+	return nil
 }
 
 // versionsToGroupVersionForDiscovery converts version strings into a Kubernetes format
@@ -318,20 +334,4 @@ func versionsContain(list []metav1.GroupVersionForDiscovery, version string) boo
 	}
 
 	return false
-}
-
-func (ctx *restoreContext) SetChosenGVToRestore(cgv ChosenGroupVersion, rg, srcPreferred, chosen string) {
-	// If the chosen version isn't empty, update the default.
-	if chosen != "" {
-		cgv.Version = chosen
-
-		cgv.Dir = cgv.Version
-		if chosen == srcPreferred {
-			cgv.Dir = chosen + velerov1api.PreferredVersionDir
-		}
-	}
-
-	ctx.chosenGrpVersToRestore[rg] = cgv
-
-	ctx.log.Debugf("Chose %s/%s API group version to restore", cgv.Group, cgv.Version)
 }
