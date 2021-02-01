@@ -91,9 +91,7 @@ toc:
         url: /api-types
       - page: FAQ
         url: /faq
-      - page: ZenHub
-        url: /zenhub
       - page: Support process
         url: /support-process
-      - page: For maintainers 
+      - page: For maintainers
         url: /maintainers

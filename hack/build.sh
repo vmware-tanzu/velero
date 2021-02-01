@@ -51,6 +51,11 @@ if [[ -z "${GIT_TREE_STATE}" ]]; then
     exit 1
 fi
 
+GCFLAGS=""
+if [[ ${DEBUG:-} = "1" ]]; then
+    GCFLAGS="all=-N -l"
+fi
+
 export CGO_ENABLED=0
 
 LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION}"
@@ -67,6 +72,7 @@ fi
 
 go build \
     -o ${OUTPUT} \
+    -gcflags "${GCFLAGS}" \
     -installsuffix "static" \
     -ldflags "${LDFLAGS}" \
     ${PKG}/cmd/${BIN}

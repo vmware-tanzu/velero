@@ -35,10 +35,10 @@ Generally speaking, new GitHub issues will fall into one of several categories. 
     - If you resolve the issue with the user, close it out
     - If the issue ends up being a feature request or a bug, update the title and follow the appropriate process for it
     - If the reporter becomes unresponsive after multiple pings, close out the issue due to inactivity and comment that the user can always reach out again as needed
-    
+
 ## End of Week
 
 We ensure all GitHub issues worked on during the week on are labeled with `Investigating` and `Needs Info` (if appropriate), and have updated comments so the next person can pick them up.
 
-[0]: https://app.zenhub.com/workspaces/velero-5c59c15e39d47b774b5864e3/board?repos=99143276,112385197,213946861,190224441,214524700,214524630
+[0]: https://github.com/vmware-tanzu?q=velero&type=&language=
 [1]: https://groups.google.com/forum/#!forum/projectvelero

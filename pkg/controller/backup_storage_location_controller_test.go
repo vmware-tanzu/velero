@@ -41,9 +41,6 @@ import (
 )
 
 var _ = Describe("Backup Storage Location Reconciler", func() {
-	BeforeEach(func() {})
-	AfterEach(func() {})
-
 	It("Should successfully patch a backup storage location object status phase according to whether its storage is valid or not", func() {
 		tests := []struct {
 			backupLocation    *velerov1api.BackupStorageLocation
@@ -98,7 +95,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log: velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctrl.Request{
+		actualResult, err := r.Reconcile(ctx, ctrl.Request{
 			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 		})
 
@@ -167,7 +164,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log: velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctrl.Request{
+		actualResult, err := r.Reconcile(ctx, ctrl.Request{
 			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 		})
 
@@ -240,7 +237,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log: velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctrl.Request{
+		actualResult, err := r.Reconcile(ctx, ctrl.Request{
 			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 		})
 

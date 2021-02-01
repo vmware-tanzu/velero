@@ -23,13 +23,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
@@ -45,17 +49,18 @@ type PluginLister interface {
 
 // ServerStatusRequestReconciler reconciles a ServerStatusRequest object
 type ServerStatusRequestReconciler struct {
-	Scheme       *runtime.Scheme
-	Client       client.Client
-	Ctx          context.Context
-	ServerStatus velero.ServerStatus
+	Scheme         *runtime.Scheme
+	Client         client.Client
+	Ctx            context.Context
+	PluginRegistry PluginLister
+	Clock          clock.Clock
 
 	Log logrus.FieldLogger
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests/status,verbs=get;update;patch
-func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithFields(logrus.Fields{
 		"controller":          ServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
@@ -85,14 +90,26 @@ func (r *ServerStatusRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing new ServerStatusRequest")
 
-		if err := r.ServerStatus.PatchStatusProcessed(r.Client, statusRequest, r.Ctx); err != nil {
-			log.WithError(err).Error("Unable to update the request")
+		// Initialize the patch helper.
+		patchHelper, err := patch.NewHelper(statusRequest, r.Client)
+		if err != nil {
+			log.WithError(err).Error("Error getting a patch helper to update this resource")
+			return ctrl.Result{}, err
+		}
+
+		statusRequest.Status.ServerVersion = buildinfo.Version
+		statusRequest.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
+		statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		statusRequest.Status.Plugins = velero.GetInstalledPluginInfo(r.PluginRegistry)
+
+		if err := patchHelper.Patch(r.Ctx, statusRequest); err != nil {
+			log.WithError(err).Error("Error updating ServerStatusRequest status")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
 		}
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
 		expiration := statusRequest.Status.ProcessedTimestamp.Add(ttl)
-		if expiration.After(r.ServerStatus.Clock.Now()) {
+		if expiration.After(r.Clock.Now()) {
 			log.Debug("ServerStatusRequest has not expired")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
 		}

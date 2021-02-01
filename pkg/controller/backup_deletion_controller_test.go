@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
-	snapshotFake "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/fake"
-	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
+	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

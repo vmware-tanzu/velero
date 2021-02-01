@@ -45,7 +45,7 @@ spec:
   subresources: {}
   validation:
     openAPIV3Schema:
-      description: Backup is a Velero resource that respresents the capture of Kubernetes
+      description: Backup is a Velero resource that represents the capture of Kubernetes
         cluster state at a point in time (API objects and associated volume state).
       properties:
         apiVersion:

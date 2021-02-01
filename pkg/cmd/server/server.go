@@ -45,10 +45,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
-	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
-	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
-	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
+	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
 
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -76,7 +76,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
-	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -768,8 +767,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.DownloadRequest:   downloadrequestControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
-	enabledRuntimeControllers := make(map[string]struct{})
-	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
+	enabledRuntimeControllers := map[string]struct{}{
+		controller.ServerStatusRequest: {},
+	}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -781,20 +781,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 	}
 
-	// remove disabled controllers
-	for _, controllerName := range s.config.disabledControllers {
-		if _, ok := enabledControllers[controllerName]; ok {
-			s.logger.Infof("Disabling controller: %s", controllerName)
-			delete(enabledControllers, controllerName)
-		} else {
-			// maybe it is a runtime type controllers, so attempt to remove that
-			if _, ok := enabledRuntimeControllers[controllerName]; ok {
-				s.logger.Infof("Disabling controller: %s", controllerName)
-				delete(enabledRuntimeControllers, controllerName)
-			} else {
-				s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(controller.DisableableControllers, ","))
-			}
-		}
+	// Remove disabled controllers so they are not initialized. If a match is not found we want
+	// to hault the system so the user knows this operation was not possible.
+	if err := removeControllers(s.config.disabledControllers, enabledControllers, enabledRuntimeControllers, s.logger); err != nil {
+		log.Fatal(err, "unable to disable a controller")
 	}
 
 	// Instantiate the enabled controllers. This needs to be done *before*
@@ -844,14 +834,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
 		r := controller.ServerStatusRequestReconciler{
-			Scheme: s.mgr.GetScheme(),
-			Client: s.mgr.GetClient(),
-			Ctx:    s.ctx,
-			ServerStatus: velero.ServerStatus{
-				PluginRegistry: s.pluginRegistry,
-				Clock:          clock.RealClock{},
-			},
-			Log: s.logger,
+			Scheme:         s.mgr.GetScheme(),
+			Client:         s.mgr.GetClient(),
+			Ctx:            s.ctx,
+			PluginRegistry: s.pluginRegistry,
+			Clock:          clock.RealClock{},
+			Log:            s.logger,
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
@@ -871,10 +859,33 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	s.logger.Info("Server starting...")
 
-	if err := s.mgr.Start(s.ctx.Done()); err != nil {
+	if err := s.mgr.Start(s.ctx); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
 
+	return nil
+}
+
+// removeControllers will remove any controller listed to be disabled from the list
+// of controllers to be initialized.  First it will check the legacy list of controllers,
+// then it will check the new runtime controllers. If both checks fail a match
+// wasn't found and it returns an error.
+func removeControllers(disabledControllers []string, enabledControllers map[string]func() controllerRunInfo, enabledRuntimeControllers map[string]struct{}, logger logrus.FieldLogger) error {
+	for _, controllerName := range disabledControllers {
+		if _, ok := enabledControllers[controllerName]; ok {
+			logger.Infof("Disabling controller: %s", controllerName)
+			delete(enabledControllers, controllerName)
+		} else {
+			// maybe it is a runtime type controllers, so attempt to remove that
+			if _, ok := enabledRuntimeControllers[controllerName]; ok {
+				logger.Infof("Disabling controller: %s", controllerName)
+				delete(enabledRuntimeControllers, controllerName)
+			} else {
+				msg := fmt.Sprintf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(controller.DisableableControllers, ","))
+				return errors.New(msg)
+			}
+		}
+	}
 	return nil
 }
 

@@ -677,7 +677,7 @@ func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (
 	})
 
 	if err == wait.ErrWaitTimeout {
-		pvLogger.Debug("timeout reached waiting for persistent volume to delete")
+		pvLogger.Warn("timeout reached waiting for persistent volume to delete")
 	}
 
 	return shouldRestore, err
