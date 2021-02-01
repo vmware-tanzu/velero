@@ -31,6 +31,8 @@ toc:
         url: /disaster-case
       - page: Cluster migration
         url: /migration-case
+      - page: Enable API group versions
+        url: /enable-api-group-versions-feature
       - page: Resource filtering
         url: /resource-filtering
       - page: Backup reference
