@@ -70,6 +70,21 @@ All client side feature flags may be disabled using the below command
 velero client config set features=
 ```
 
+### Colored CLI output
+
+Velero CLI uses colored output for some commands, such as `velero desribe`. If
+the environment in which Velero is run doesn't support colored output, the
+colored output will be automatically disabled. However, you can manually disable
+colors with config file:
+
+```bash
+velero client config set colorized=false
+```
+
+Note, that if you specify `--colorized=true` as a CLI option it will override
+the config file setting.
+
+
 ## Customize resource requests and limits
 
 At installation, Velero sets default resource requests and limits for the Velero pod and the restic pod, if you using the [restic integration](/docs/main/restic/).
