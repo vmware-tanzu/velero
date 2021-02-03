@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
@@ -70,7 +71,7 @@ var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API grou
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Should back up API group version and restore by version priority", func() {
-			Expect(RunAPIGroupVersionsTests(
+			Expect(RunEnableAPIGroupVersionsTests(
 				ctx,
 				resource,
 				group,
@@ -80,7 +81,7 @@ var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API grou
 	})
 })
 
-func RunAPIGroupVersionsTests(ctx context.Context, resource, group string, client *kubernetes.Clientset) error {
+func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string, client *kubernetes.Clientset) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -164,6 +165,37 @@ func RunAPIGroupVersionsTests(ctx context.Context, resource, group string, clien
 			cm:     nil,
 			want:   nil,
 		},
+		{
+			name: "User config map overrides Priority 3, Case D and restores v2beta1",
+			srcCRD: map[string]string{
+				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/case-b-source-manually-added-mutations.yaml",
+				"namespace": "music-system",
+			},
+			srcCRs: map[string]string{
+				"v2beta2": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v2beta2_rockband.yaml",
+				"v2beta1": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v2beta1_rockband.yaml",
+				"v1":      "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v1_rockband.yaml",
+			},
+			tgtCRD: map[string]string{
+				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-d/target/case-d-target-manually-added-mutations.yaml",
+				"namespace": "music-system",
+			},
+			tgtVer: "v2beta1",
+			cm: builder.ForConfigMap("velero", "enableapigroupversions").Data(
+				"restoreResourcesVersionPriority",
+				`rockbands.music.example.io=v2beta1,v2beta2,v2`,
+			).Result(),
+			want: map[string]map[string]string{
+				"annotations": {
+					"rockbands.music.example.io/originalVersion": "v2beta1",
+				},
+				"specs": {
+					"leadSinger": "John Lennon",
+					"leadGuitar": "George Harrison",
+					"genre":      "60s rock",
+				},
+			},
+		},
 	}
 
 	for i, tc := range tests {
@@ -220,6 +252,14 @@ func RunAPIGroupVersionsTests(ctx context.Context, resource, group string, clien
 		// Install music-system CRD for target cluster.
 		if err := InstallCRD(ctx, tc.tgtCRD["url"], tc.tgtCRD["namespace"]); err != nil {
 			return errors.Wrapf(err, "installing music-system CRD for target cluster")
+		}
+
+		// Apply config map if there is one.
+		if tc.cm != nil {
+			_, err := client.CoreV1().ConfigMaps("velero").Create(ctx, tc.cm, metav1.CreateOptions{})
+			if err != nil {
+				return errors.Wrap(err, "creating config map with user version priorities")
+			}
 		}
 
 		// Reset Velero to recognize music-system CRD.
