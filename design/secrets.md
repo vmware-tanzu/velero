@@ -1,6 +1,6 @@
 # Support for multiple provider credentials
 
-Currently, Velero only supports a single AIM access credential secret per location provider/plugin. Velero creates and stores the plugin credential secret under the hard-coded key `secret.cloud-credentials.data.cloud`.
+Currently, Velero only supports a single credential secret per location provider/plugin. Velero creates and stores the plugin credential secret under the hard-coded key `secret.cloud-credentials.data.cloud`.
 
 This makes it so switching from one plugin to another necessitates overriding the existing credential secret with the appropriate one for the new plugin.
 
