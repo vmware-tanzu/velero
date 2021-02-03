@@ -10,8 +10,10 @@
                 <li><a href="{{ $.Site.Params.gh_repo }}/edit/main/site/content/{{ with .File }}{{ .Path }}{{ end }}?{{ $editQuery | safeURL }}" target="_blank"><img src="/img/github-blue.svg" /> Edit</a></li>
             {{ end }}
         </ul>
-        <h4 class="strong">On this page:</h4>
-        {{ .TableOfContents }}
+        {{ if ne .TableOfContents "<nav id=\"TableOfContents\"></nav>" }}
+            <h4 class="strong">On this page:</h4>
+            {{ .TableOfContents }}
+        {{ end }}
     </div>
 </div>
 {{ end }}
