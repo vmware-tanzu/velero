@@ -168,9 +168,9 @@ func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string) ([]string,
 	return items, nil
 }
 
-// CheckAndReadDir is a wrapper around fs.DirExists and fs.ReadDir that does checks
+// checkAndReadDir is a wrapper around fs.DirExists and fs.ReadDir that does checks
 // and returns errors if directory cannot be read.
-func (p *Parser) CheckAndReadDir(dir string) ([]os.FileInfo, error) {
+func (p *Parser) checkAndReadDir(dir string) ([]os.FileInfo, error) {
 	exists, err := p.fs.DirExists(dir)
 	if err != nil {
 		return []os.FileInfo{}, errors.Wrapf(err, "finding %q", dir)
@@ -194,7 +194,7 @@ func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, err
 
 	// Get the subdirectories inside the "resources" directory. The subdirectories
 	// will have resource.group names like "horizontalpodautoscalers.autoscaling".
-	rgDirs, err := p.CheckAndReadDir(resourcesDir)
+	rgDirs, err := p.checkAndReadDir(resourcesDir)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (p *Parser) ParseGroupVersions(dir string) (map[string]metav1.APIGroup, err
 
 		// Inside each of the resource.group directories are directories whose
 		// names are API Group versions like "v1" or "v1-preferredversion"
-		gvDirs, err := p.CheckAndReadDir(rgdPath)
+		gvDirs, err := p.checkAndReadDir(rgdPath)
 		if err != nil {
 			return nil, err
 		}

@@ -102,6 +102,7 @@ OUTER:
 			)
 			continue
 		}
+		ctx.log.Infof("Cannot find cluster preferred API group version in backup. Ignoring version %s for %s", tg.PreferredVersion.Version, rg)
 
 		// Priority 2: Source Cluster Preferred Version
 		if versionsContain(tg.Versions, sg.PreferredVersion.Version) {
@@ -116,6 +117,7 @@ OUTER:
 			)
 			continue
 		}
+		ctx.log.Infof("Cannot find backup preferred API group version in cluster. Ignoring version %s for %s", sg.PreferredVersion.Version, rg)
 
 		// Priority 3: The Common Supported Version with the Highest Kubernetes Version Priority
 		for _, tv := range tg.Versions[1:] {
@@ -132,6 +134,7 @@ OUTER:
 				continue OUTER
 			}
 		}
+		ctx.log.Infof("Cannot find non-preferred a common supported API group version. Using %s (default behavior without feature flag) for %s", sg.PreferredVersion.Version, rg)
 
 		// Use default group version.
 		ctx.chosenGrpVersToRestore[rg] = cgv
