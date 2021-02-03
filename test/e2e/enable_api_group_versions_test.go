@@ -36,7 +36,7 @@ var _ = Describe("[KinD] Velero tests on KinD clusters with various CRD API grou
 		resource = "rockbands"
 		group = "music.example.io"
 		certMgrCRD = map[string]string{
-			"url":       "https://github.com/jetstack/cert-manager/releases/download/v1.0.3/cert-manager.yaml",
+			"url":       "testdata/enable_api_group_versions/cert-manager.yaml",
 			"namespace": "cert-manager",
 		}
 
@@ -96,15 +96,15 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		{
 			name: "Target and source cluster preferred versions match; Preferred version v1 is restored (Priority 1, Case A).",
 			srcCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/source/case-a-source.yaml",
+				"url":       "testdata/enable_api_group_versions/case-a-source.yaml",
 				"namespace": "music-system",
 			},
 			srcCRs: map[string]string{
-				"v1":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/source/music/config/samples/music_v1_rockband.yaml",
-				"v1alpha1": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/source/music/config/samples/music_v1alpha1_rockband.yaml",
+				"v1":       "testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v1alpha1": "testdata/enable_api_group_versions/music_v1alpha1_rockband.yaml",
 			},
 			tgtCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/target/case-a-target.yaml",
+				"url":       "testdata/enable_api_group_versions/case-a-target.yaml",
 				"namespace": "music-system",
 			},
 			tgtVer: "v1",
@@ -122,16 +122,16 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		{
 			name: "Latest common non-preferred supported version v2beta2 is restored (Priority 3, Case D).",
 			srcCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/case-b-source-manually-added-mutations.yaml",
+				"url":       "testdata/enable_api_group_versions/case-b-source-manually-added-mutations.yaml",
 				"namespace": "music-system",
 			},
 			srcCRs: map[string]string{
-				"v2beta2": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v2beta2_rockband.yaml",
-				"v2beta1": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v2beta1_rockband.yaml",
-				"v1":      "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v1_rockband.yaml",
+				"v2beta2": "testdata/enable_api_group_versions/music_v2beta2_rockband.yaml",
+				"v2beta1": "testdata/enable_api_group_versions/music_v2beta1_rockband.yaml",
+				"v1":      "testdata/enable_api_group_versions/music_v1_rockband.yaml",
 			},
 			tgtCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-d/target/case-d-target-manually-added-mutations.yaml",
+				"url":       "testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
 				"namespace": "music-system",
 			},
 			tgtVer: "v2beta2",
@@ -150,15 +150,15 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		{
 			name: "No common supported versions means no rockbands custom resource is restored.",
 			srcCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/source/case-a-source.yaml",
+				"url":       "testdata/enable_api_group_versions/case-a-source.yaml",
 				"namespace": "music-system",
 			},
 			srcCRs: map[string]string{
-				"v1":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/source/music/config/samples/music_v1_rockband.yaml",
-				"v1alpha1": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-a/source/music/config/samples/music_v1alpha1_rockband.yaml",
+				"v1":       "testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v1alpha1": "testdata/enable_api_group_versions/music_v1alpha1_rockband.yaml",
 			},
 			tgtCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/target/case-b-target-manually-added-mutations.yaml",
+				"url":       "testdata/enable_api_group_versions/case-b-target-manually-added-mutations.yaml",
 				"namespace": "music-system",
 			},
 			tgtVer: "",
@@ -168,16 +168,16 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		{
 			name: "User config map overrides Priority 3, Case D and restores v2beta1",
 			srcCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/case-b-source-manually-added-mutations.yaml",
+				"url":       "testdata/enable_api_group_versions/case-b-source-manually-added-mutations.yaml",
 				"namespace": "music-system",
 			},
 			srcCRs: map[string]string{
-				"v2beta2": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v2beta2_rockband.yaml",
-				"v2beta1": "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v2beta1_rockband.yaml",
-				"v1":      "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-b/source/music/config/samples/music_v1_rockband.yaml",
+				"v2beta2": "testdata/enable_api_group_versions/music_v2beta2_rockband.yaml",
+				"v2beta1": "testdata/enable_api_group_versions/music_v2beta1_rockband.yaml",
+				"v1":      "testdata/enable_api_group_versions/music_v1_rockband.yaml",
 			},
 			tgtCRD: map[string]string{
-				"url":       "https://raw.githubusercontent.com/brito-rafa/k8s-webhooks/master/examples-for-projectvelero/case-d/target/case-d-target-manually-added-mutations.yaml",
+				"url":       "testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
 				"namespace": "music-system",
 			},
 			tgtVer: "v2beta1",
