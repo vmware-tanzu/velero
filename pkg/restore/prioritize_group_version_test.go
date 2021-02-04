@@ -117,18 +117,29 @@ subscriptions.operators.coreos.com=v2,v1`,
 			wantErrMsg: "parsing user priorities: validating user priority: line must have one and only one equal sign",
 		},
 		{
-			name: "a mix of incorrect and correct data format returns an error",
+			name: "spaces and empty lines are removed before storing user version priorities",
 			cm: builder.
 				ForConfigMap("velero", "enableapigroupversions").
 				Data(
 					"restoreResourcesVersionPriority",
-					`pods=v2,v1beta2
+					`     pods=v2,v1beta2
 horizontalpodautoscalers.autoscaling = v2beta2
-jobs.batch=v3`,
+jobs.batch=v3    
+  `,
 				).
 				Result(),
-			want:       nil,
-			wantErrMsg: "parsing user priorities: validating user priority: line must not contain any spaces",
+			want: map[string]metav1.APIGroup{
+				"pods": {Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v2"},
+					{Version: "v1beta2"},
+				}},
+				"horizontalpodautoscalers.autoscaling": {Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v2beta2"},
+				}},
+				"jobs.batch": {Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v3"},
+				}},
+			},
 		},
 	}
 
@@ -138,14 +149,9 @@ jobs.batch=v3`,
 
 	for _, tc := range tests {
 		t.Log(tc.name)
-		priorities, err := userResourceGroupVersionPriorities(fakeCtx, tc.cm)
-		assert.Equal(t, tc.want, priorities)
+		priorities := userResourceGroupVersionPriorities(fakeCtx, tc.cm)
 
-		if tc.wantErrMsg == "" {
-			assert.NoError(t, err)
-		} else {
-			assert.EqualError(t, err, tc.wantErrMsg)
-		}
+		assert.Equal(t, tc.want, priorities)
 	}
 }
 

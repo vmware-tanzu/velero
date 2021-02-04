@@ -179,10 +179,7 @@ func (ctx *restoreContext) gatherSourceTargetUserGroupVersions() (
 	}
 
 	// Read user-defined version priorities from config map.
-	userRGVPriorities, err := userResourceGroupVersionPriorities(ctx, cm)
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "reading enableapigroupversion config map")
-	}
+	userRGVPriorities := userResourceGroupVersionPriorities(ctx, cm)
 
 	return sourceRGVersions, targetGroupVersions, userRGVPriorities, nil
 }
@@ -196,23 +193,19 @@ func k8sPrioritySort(gvs []metav1.GroupVersionForDiscovery) {
 
 // userResourceGroupVersionPriorities retrieves a user-provided config map and
 // extracts the user priority versions for each resource.
-func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMap) (map[string]metav1.APIGroup, error) {
+func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMap) map[string]metav1.APIGroup {
 	if cm == nil {
 		ctx.log.Debugf("No enableapigroupversion config map found in velero namespace. Using pre-defined priorities.")
-		return nil, nil
+		return nil
 	}
 
-	priorities, err := parseUserPriorities(cm.Data["restoreResourcesVersionPriority"])
-	if err != nil {
-		return nil, errors.Wrap(err, "parsing user priorities")
-	}
-
+	priorities := parseUserPriorities(ctx, cm.Data["restoreResourcesVersionPriority"])
 	if len(priorities) == 0 {
 		ctx.log.Debugf("No valid user version priorities found in enableapigroupversion config map. Using pre-defined priorities.")
-		return nil, nil
+		return nil
 	}
 
-	return priorities, nil
+	return priorities
 }
 
 func userPriorityConfigMap() (*corev1.ConfigMap, error) {
@@ -244,8 +237,8 @@ func userPriorityConfigMap() (*corev1.ConfigMap, error) {
 	return cm, nil
 }
 
-func parseUserPriorities(prioritiesData string) (map[string]metav1.APIGroup, error) {
-	ups := make(map[string]metav1.APIGroup)
+func parseUserPriorities(ctx *restoreContext, prioritiesData string) map[string]metav1.APIGroup {
+	userPriorities := make(map[string]metav1.APIGroup)
 
 	// The user priorities will be in a string of the form
 	// rockbands.music.example.io=v2beta1,v2beta2\n
@@ -253,24 +246,42 @@ func parseUserPriorities(prioritiesData string) (map[string]metav1.APIGroup, err
 	// subscriptions.operators.coreos.com=v2,v1
 
 	lines := strings.Split(prioritiesData, "\n")
+	lines = formatUserPriorities(lines)
 
 	for _, line := range lines {
-		if err := validateUserPriority(line); err != nil {
-			return nil, errors.Wrap(err, "validating user priority")
-		}
+		err := validateUserPriority(line)
 
-		rgvs := strings.SplitN(line, "=", 2)
-		rg := rgvs[0]   // rockbands.music.example.io
-		vers := rgvs[1] // v2beta1,v2beta2
+		if err == nil {
+			rgvs := strings.SplitN(line, "=", 2)
+			rg := rgvs[0]       // rockbands.music.example.io
+			versions := rgvs[1] // v2beta1,v2beta2
 
-		vs := strings.Split(vers, ",")
+			vers := strings.Split(versions, ",")
 
-		ups[rg] = metav1.APIGroup{
-			Versions: versionsToGroupVersionForDiscovery(vs),
+			userPriorities[rg] = metav1.APIGroup{
+				Versions: versionsToGroupVersionForDiscovery(vers),
+			}
+		} else {
+			ctx.log.Debugf("Unable to validate user priority versions %q due to %v", line, err)
 		}
 	}
 
-	return ups, nil
+	return userPriorities
+}
+
+// formatUserPriorities removes extra white spaces that cause validation to fail.
+func formatUserPriorities(lines []string) []string {
+	trimmed := []string{}
+
+	for _, line := range lines {
+		temp := strings.ReplaceAll(line, " ", "")
+
+		if len(temp) > 0 {
+			trimmed = append(trimmed, temp)
+		}
+	}
+
+	return trimmed
 }
 
 func validateUserPriority(line string) error {
