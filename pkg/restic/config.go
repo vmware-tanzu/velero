@@ -55,16 +55,13 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 		prefix = layout.GetResticDir()
 	}
 
-	var provider = location.Spec.Provider
-	if !strings.Contains(provider, "/") {
-		provider = "velero.io/" + provider
-	}
+	backendType := getBackendType(location.Spec.Provider)
 
 	if repoPrefix := location.Spec.Config["resticRepoPrefix"]; repoPrefix != "" {
 		return repoPrefix, nil
 	}
 
-	switch BackendType(provider) {
+	switch backendType {
 	case AWSBackend:
 		var url string
 		switch {
@@ -89,6 +86,14 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 	}
 
 	return "", errors.New("restic repository prefix (resticRepoPrefix) not specified in backup storage location's config")
+}
+
+func getBackendType(provider string) BackendType {
+	if !strings.Contains(provider, "/") {
+		provider = "velero.io/" + provider
+	}
+
+	return BackendType(provider)
 }
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in

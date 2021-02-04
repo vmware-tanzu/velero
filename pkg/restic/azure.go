@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,8 +50,9 @@ func getSubscriptionID(config map[string]string) string {
 }
 
 func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
-	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
-	if err := loadEnv(); err != nil {
+	credentialsFile := selectCredentialsFile(config)
+
+	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
 		return "", nil, err
 	}
 
@@ -149,14 +150,30 @@ func getAzureResticEnvVars(config map[string]string) (map[string]string, error) 
 	}, nil
 }
 
-func loadEnv() error {
-	envFile := os.Getenv("AZURE_CREDENTIALS_FILE")
-	if envFile == "" {
+// credentialsFileFromEnv retrieves the Azure credentials file from the environment.
+func credentialsFileFromEnv() string {
+	return os.Getenv("AZURE_CREDENTIALS_FILE")
+}
+
+// selectCredentialsFile selects the Azure credentials file to use, retrieving it
+// from the given config or falling back to retrieving it from the environment.
+func selectCredentialsFile(config map[string]string) string {
+	if credentialsFile, ok := config[credentialsFileKey]; ok {
+		return credentialsFile
+	}
+
+	return credentialsFileFromEnv()
+}
+
+// loadCredentialsIntoEnv loads the variables in the given credentials
+// file into the current environment.
+func loadCredentialsIntoEnv(credentialsFile string) error {
+	if credentialsFile == "" {
 		return nil
 	}
 
-	if err := godotenv.Overload(envFile); err != nil {
-		return errors.Wrapf(err, "error loading environment from AZURE_CREDENTIALS_FILE (%s)", envFile)
+	if err := godotenv.Overload(credentialsFile); err != nil {
+		return errors.Wrapf(err, "error loading environment from credentials file (%s)", credentialsFile)
 	}
 
 	return nil

@@ -1,0 +1,1 @@
+Add support for restic to use per-BSL credentials. Velero will now serialize the secret referenced by the `Credential` field in the BSL and use this path when setting provider specific environment variables for restic commands. 

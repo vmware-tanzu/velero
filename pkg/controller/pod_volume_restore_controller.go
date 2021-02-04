@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -40,6 +39,7 @@ import (
 	k8scache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -61,6 +61,7 @@ type podVolumeRestoreController struct {
 	backupLocationInformer k8scache.Informer
 	kbClient               client.Client
 	nodeName               string
+	credentialsFileStore   credentials.FileStore
 
 	processRestoreFunc func(*velerov1api.PodVolumeRestore) error
 	fileSystem         filesystem.Interface
@@ -77,6 +78,7 @@ func NewPodVolumeRestoreController(
 	pvInformer corev1informers.PersistentVolumeInformer,
 	kbClient client.Client,
 	nodeName string,
+	credentialsFileStore credentials.FileStore,
 ) Interface {
 	c := &podVolumeRestoreController{
 		genericController:      newGenericController(PodVolumeRestore, logger),
@@ -87,6 +89,7 @@ func NewPodVolumeRestoreController(
 		pvLister:               pvInformer.Lister(),
 		kbClient:               kbClient,
 		nodeName:               nodeName,
+		credentialsFileStore:   credentialsFileStore,
 
 		fileSystem: filesystem.NewFileSystem(),
 		clock:      &clock.RealClock{},
@@ -300,32 +303,8 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	credsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, c.fileSystem)
-	if err != nil {
-		log.WithError(err).Error("Error creating temp restic credentials file")
-		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
-	}
-	// ignore error since there's nothing we can do and it's a temp file.
-	defer os.Remove(credsFile)
-
-	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
-	if err != nil {
-		log.WithError(err).Error("Error getting caCert")
-	}
-
-	var caCertFile string
-	if caCert != nil {
-		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
-		if err != nil {
-			log.WithError(err).Error("Error creating temp cacert file")
-		}
-		// ignore error since there's nothing we can do and it's a temp file.
-		defer os.Remove(caCertFile)
-	}
-
 	// execute the restore process
-	if err := c.restorePodVolume(req, credsFile, caCertFile, volumeDir, log); err != nil {
+	if err := c.restorePodVolume(req, volumeDir, log); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -344,7 +323,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -352,29 +331,46 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 		return errors.Wrap(err, "error identifying path of volume")
 	}
 
+	credsFile, err := c.credentialsFileStore.Path(restic.RepoKeySelector())
+	if err != nil {
+		log.WithError(err).Error("Error creating temp restic credentials file")
+		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
+	}
+	// ignore error since there's nothing we can do and it's a temp file.
+	defer os.Remove(credsFile)
+
 	resticCmd := restic.RestoreCommand(
 		req.Spec.RepoIdentifier,
 		credsFile,
 		req.Spec.SnapshotID,
 		volumePath,
 	)
+
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, backupLocation); err != nil {
+		return c.failRestore(req, errors.Wrap(err, "error getting backup storage location").Error(), log)
+	}
+
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	var caCertFile string
+	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
+		caCertFile, err = restic.TempCACertFile(backupLocation.Spec.ObjectStorage.CACert, req.Spec.BackupStorageLocation, c.fileSystem)
+		if err != nil {
+			log.WithError(err).Error("Error creating temp cacert file")
+		}
+		// ignore error since there's nothing we can do and it's a temp file.
+		defer os.Remove(caCertFile)
+	}
 	resticCmd.CACertFile = caCertFile
 
-	// Running restic command might need additional provider specific environment variables. Based on the provider, we
-	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
-	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
-		env, err := restic.AzureCmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
-		if err != nil {
-			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
-		}
-		resticCmd.Env = env
-	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		env, err := restic.S3CmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
-		if err != nil {
-			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
-		}
-		resticCmd.Env = env
+	env, err := restic.CmdEnv(backupLocation, c.credentialsFileStore)
+	if err != nil {
+		return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 	}
+	resticCmd.Env = env
 
 	var stdout, stderr string
 

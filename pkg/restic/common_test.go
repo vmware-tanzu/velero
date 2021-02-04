@@ -17,7 +17,6 @@ limitations under the License.
 package restic
 
 import (
-	"context"
 	"os"
 	"sort"
 	"testing"
@@ -358,69 +357,19 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 	}
 }
 
-func TestTempCredentialsFile(t *testing.T) {
-	var (
-		fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
-		fs         = velerotest.NewFakeFileSystem()
-		secret     = &corev1api.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "velero",
-				Name:      CredentialsSecretName,
-			},
-			Data: map[string][]byte{
-				CredentialsKey: []byte("passw0rd"),
-			},
-		}
-	)
-
-	// secret not in server: expect an error
-	fileName, err := TempCredentialsFile(fakeClient, "velero", fs)
-	assert.Error(t, err)
-
-	// now add secret
-	require.NoError(t, fakeClient.Create(context.Background(), secret))
-
-	// secret in server: expect temp file to be created with password
-	fileName, err = TempCredentialsFile(fakeClient, "velero", fs)
-	require.NoError(t, err)
-
-	contents, err := fs.ReadFile(fileName)
-	require.NoError(t, err)
-
-	assert.Equal(t, "passw0rd", string(contents))
-}
-
 func TestTempCACertFile(t *testing.T) {
 	var (
-		fs  = velerotest.NewFakeFileSystem()
-		bsl = &velerov1api.BackupStorageLocation{
-			TypeMeta: metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "velero",
-				Name:      "default",
-			},
-			Spec: velerov1api.BackupStorageLocationSpec{
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{CACert: []byte("cacert")},
-				},
-			},
-		}
+		fs         = velerotest.NewFakeFileSystem()
+		caCertData = []byte("cacert")
 	)
 
-	fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
-	fakeClient.Create(context.Background(), bsl)
-
-	// expect temp file to be created with cacert value
-	caCert, err := GetCACert(fakeClient, bsl.Namespace, bsl.Name)
-	require.NoError(t, err)
-
-	fileName, err := TempCACertFile(caCert, "default", fs)
+	fileName, err := TempCACertFile(caCertData, "default", fs)
 	require.NoError(t, err)
 
 	contents, err := fs.ReadFile(fileName)
 	require.NoError(t, err)
 
-	assert.Equal(t, "cacert", string(contents))
+	assert.Equal(t, string(caCertData), string(contents))
 
 	os.Remove(fileName)
 }
