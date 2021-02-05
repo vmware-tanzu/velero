@@ -56,6 +56,15 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		}
 
 		d.Printf("Phase:\t%s%s\n", phaseString, resultsNote)
+		if restore.Status.Progress != nil {
+			if restore.Status.Phase == v1.RestorePhaseInProgress {
+				d.Printf("Estimated total items to be restored:\t%d\n", restore.Status.Progress.TotalItems)
+				d.Printf("Items restored so far:\t%d\n", restore.Status.Progress.ItemsRestored)
+			} else {
+				d.Printf("Total items to be restored:\t%d\n", restore.Status.Progress.TotalItems)
+				d.Printf("Items restored:\t%d\n", restore.Status.Progress.ItemsRestored)
+			}
+		}
 
 		d.Println()
 		// "<n/a>" output should only be applicable for restore that failed validation
