@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -57,6 +60,10 @@ type VolumeSnapshotLocationSpec struct {
 	// Config is for provider-specific configuration fields.
 	// +optional
 	Config map[string]string `json:"config,omitempty"`
+
+	// Credential contains the credential information intended to be used with this location
+	// +optional
+	Credential *corev1api.SecretKeySelector `json:"credential,omitempty"`
 }
 
 // VolumeSnapshotLocationPhase is the lifecycle phase of a Velero VolumeSnapshotLocation.
