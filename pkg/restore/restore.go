@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -434,6 +433,7 @@ func (ctx *restoreContext) execute() (Result, Result) {
 		}
 	}()
 
+	// i: iteration counter, totalItems: previously discovered items,
 	totalItems, i, existingNamespaces := 0, 0, sets.NewString()
 
 	for _, selectedResource := range selectedResourceCollection {
@@ -451,11 +451,20 @@ func (ctx *restoreContext) execute() (Result, Result) {
 				if namespace != "" && !existingNamespaces.Has(selectedItem.targetNamespace) {
 					logger := ctx.log.WithField("namespace", namespace)
 					ns := getNamespace(logger, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", namespace), selectedItem.targetNamespace)
-					if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+					if _, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 						errs.AddVeleroError(err)
 						continue
+					} else {
+						// add the newly created namespace to the list of restored items
+						if nsCreated {
+							itemKey := velero.ResourceIdentifier{
+								GroupResource: kuberesource.Namespaces,
+								Namespace:     ns.Namespace,
+								Name:          ns.Name,
+							}
+							ctx.restoredItems[itemKey] = struct{}{}
+						}
 					}
-
 					// keep track of namespaces that we know exist so we don't
 					// have to try to create them multiple times
 					existingNamespaces.Insert(selectedItem.targetNamespace)
@@ -466,8 +475,13 @@ func (ctx *restoreContext) execute() (Result, Result) {
 					continue
 				}
 				w, e := ctx.restoreItem(obj, groupResource, selectedItem.targetNamespace)
-				actualTotalItems := len(ctx.restoredItems) + (totalItems - (i + 1))
 				i++
+				// totalItems keeps the count of items previously known
+				// there may be additional items restored by plugins
+				// we want to include the additional items by looking at restoredItems
+				// at the same time, we don't want previously known items counted twice
+				// as they are present in both restoredItems and totalItems
+				actualTotalItems := len(ctx.restoredItems) + (totalItems - i)
 				update <- progressUpdate{
 					totalItems:    actualTotalItems,
 					itemsRestored: len(ctx.restoredItems),
@@ -721,65 +735,6 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 	return available, err
 }
 
-// restoreResource restores the specified cluster or namespace scoped resource. If namespace is
-// empty we are restoring a cluster level resource, otherwise into the specified namespace.
-func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNamespace string, items []string) (Result, Result) {
-	warnings, errs := Result{}, Result{}
-
-	if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
-		ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
-		return warnings, errs
-	}
-
-	if targetNamespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
-		ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
-		return warnings, errs
-	}
-
-	if targetNamespace != "" {
-		ctx.log.Infof("Restoring resource '%s' into namespace '%s'", resource, targetNamespace)
-	} else {
-		ctx.log.Infof("Restoring cluster level resource '%s'", resource)
-	}
-
-	if len(items) == 0 {
-		return warnings, errs
-	}
-
-	groupResource := schema.ParseGroupResource(resource)
-
-	// Modify `resource` so that it has the priority version to restore in its
-	// path. For example, for group resource "horizontalpodautoscalers.autoscaling",
-	// "/v2beta1" will be appended to the end. Different versions would only
-	// have been stored if the APIGroupVersionsFeatureFlag was enabled during backup.
-	// The chosenGrpVersToRestore map would only be populated if APIGroupVersionsFeatureFlag
-	// was enabled for restore and the minimum required backup format version has been met.
-	cgv, ok := ctx.chosenGrpVersToRestore[groupResource.String()]
-	if ok {
-		resource = filepath.Join(groupResource.String(), cgv.Dir)
-	}
-
-	for _, item := range items {
-		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
-
-		obj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
-		if err != nil {
-			errs.Add(targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
-			continue
-		}
-
-		if !ctx.selector.Matches(labels.Set(obj.GetLabels())) {
-			continue
-		}
-
-		w, e := ctx.restoreItem(obj, groupResource, targetNamespace)
-		warnings.Merge(&w)
-		errs.Merge(&e)
-	}
-
-	return warnings, errs
-}
-
 func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (client.Dynamic, error) {
 	key := resourceClientKey{
 		resource:  groupResource.WithVersion(obj.GroupVersionKind().Version),
@@ -852,9 +807,19 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// which the resource is being restored into exists.
 		// This is the *remapped* namespace that we are ensuring exists.
 		nsToEnsure := getNamespace(ctx.log, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
-		if _, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+		if _, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 			errs.AddVeleroError(err)
 			return warnings, errs
+		} else {
+			// add the newly created namespace to the list of restored items
+			if nsCreated {
+				itemKey := velero.ResourceIdentifier{
+					GroupResource: kuberesource.Namespaces,
+					Namespace:     nsToEnsure.Namespace,
+					Name:          nsToEnsure.Name,
+				}
+				ctx.restoredItems[itemKey] = struct{}{}
+			}
 		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
@@ -1496,20 +1461,28 @@ func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResou
 	return false, nil
 }
 
+// restoreableResource represents map of individual items of
+// each resource identifier grouped by their original namespaces
 type restoreableResource struct {
 	resource                 string
 	selectedItemsByNamespace map[string][]restoreableItem
 	totalItems               int
 }
 
+// restoreableItem represents an item by its target namespace
+// contains enough information required to restore the item
 type restoreableItem struct {
 	path            string
 	targetNamespace string
 	name            string
 }
 
-func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[string]*archive.ResourceItems) (restoreResourceCollection []restoreableResource, warnings Result, errs Result) {
+// getOrderedResourceCollection iterates over list of ordered resource idenitifiers, applies resource include/exclude criteria,
+// and Kubernetes selectors to make a list of resources to be actually restored preserving the original order
+func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[string]*archive.ResourceItems) ([]restoreableResource, Result, Result) {
+	var warnings, errs Result
 	processedResources := sets.NewString()
+	restoreResourceCollection := make([]restoreableResource, 0)
 	// Iterate through an ordered list of resources to restore, checking each one to see if it should be restored.
 	// Note that resources *may* be in this list twice, i.e. once due to being a prioritized resource, and once due
 	// to being in the backup tarball. We can't de-dupe this upfront, because it's possible that items in the prioritized
@@ -1557,7 +1530,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[stri
 		}
 
 		// iterate through each namespace that contains instances of the resource and
-		// restore them
+		// append to the list of to-be restored resources
 		for namespace, items := range resourceList.ItemsByNamespace {
 			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
 				ctx.log.Infof("Skipping namespace %s", namespace)
@@ -1571,6 +1544,16 @@ func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[stri
 				targetNamespace = target
 			}
 
+			if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
+				ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
+				continue
+			}
+
+			if targetNamespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
+				ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
+				continue
+			}
+
 			res, w, e := ctx.getSelectedRestoreableItems(groupResource.String(), targetNamespace, namespace, items)
 			restoreResourceCollection = append(restoreResourceCollection, res)
 
@@ -1581,32 +1564,23 @@ func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[stri
 		// record that we've restored the resource
 		processedResources.Insert(groupResource.String())
 	}
-	return
+	return restoreResourceCollection, warnings, errs
 }
 
-func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (res restoreableResource, warnings Result, errs Result) {
+// getSelectedRestoreableItems applies Kubernetes selectors on individual items of each resource type to create
+// a list of items which will be actually restored
+func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, Result, Result) {
+	var res restoreableResource
+	warnings, errs := Result{}, Result{}
 	res.resource = resource
 	if res.selectedItemsByNamespace == nil {
 		res.selectedItemsByNamespace = make(map[string][]restoreableItem)
-	}
-	if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
-		ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
-		return
-	}
-
-	if targetNamespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
-		ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
-		return
 	}
 
 	if targetNamespace != "" {
 		ctx.log.Infof("Resource '%s' will be restored into namespace '%s'", resource, targetNamespace)
 	} else {
 		ctx.log.Infof("Resource '%s' will be restored at cluster scope", resource)
-	}
-
-	if len(items) == 0 {
-		return
 	}
 
 	for _, item := range items {
@@ -1630,5 +1604,5 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 		res.selectedItemsByNamespace[originalNamespace] = append(res.selectedItemsByNamespace[originalNamespace], selectedItem)
 		res.totalItems++
 	}
-	return
+	return res, warnings, errs
 }
