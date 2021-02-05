@@ -23,6 +23,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -54,15 +56,19 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name     string
-	Provider string
-	Config   flag.Map
-	Labels   flag.Map
+	Name       string
+	Provider   string
+	Config     flag.Map
+	Labels     flag.Map
+	Credential flag.Map
+	secretName string
+	secretKey  string
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		Config: flag.NewMap(),
+		Config:     flag.NewMap(),
+		Credential: flag.NewMap(),
 	}
 }
 
@@ -70,6 +76,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the volume snapshot provider (e.g. aws, azure, gcp).")
 	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the volume snapshot location.")
+	flags.Var(&o.Credential, "credential", "The credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -81,6 +88,15 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return errors.New("--provider is required")
 	}
 
+	if len(o.Credential.Data()) > 1 {
+		return errors.New("--credential can only contain 1 key/value pair")
+	}
+
+	for k, v := range o.Credential.Data() {
+		o.secretName = k
+		o.secretKey = v
+		break
+	}
 	return nil
 }
 
@@ -99,6 +115,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		Spec: api.VolumeSnapshotLocationSpec{
 			Provider: o.Provider,
 			Config:   o.Config.Data(),
+			Credential: &corev1api.SecretKeySelector{
+				LocalObjectReference: corev1api.LocalObjectReference{
+					Name: o.secretName,
+				},
+				Key: o.secretKey,
+			},
 		},
 	}
 
