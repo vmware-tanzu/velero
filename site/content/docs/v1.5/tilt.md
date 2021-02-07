@@ -30,13 +30,13 @@ Note: To properly configure any plugin you use, please follow the plugin's docum
 ## Getting started
 
 ### tl;dr
-- Copy all sample files under `velero/tilt-resources/examples` into `velero/tilt-resources`. 
+- Copy all sample files under `velero/tilt-resources/examples` into `velero/tilt-resources`.
 - Configure the `velero_v1_backupstoragelocation.yaml` file, and the `cloud` file for the storage credentials/secret.
 
 - Run `tilt up`.
 
 ### Create a Tilt settings file
-Create a configuration file named `tilt-settings.json` and place it in your local copy of `velero/tilt-resources`. Alternatively, 
+Create a configuration file named `tilt-settings.json` and place it in your local copy of `velero/tilt-resources`. Alternatively,
 you may copy and paste the sample file found in  `velero/tilt-resources/examples`.
 
 Here is an example:
@@ -50,7 +50,7 @@ Here is an example:
         "azure",
         "csi"
     ],
-    "providers": { 
+    "providers": {
         "aws": "../velero-plugin-for-aws",
         "gcp": "../velero-plugin-for-gcp",
         "azure": "../velero-plugin-for-microsoft-azure",
@@ -72,11 +72,11 @@ Here is an example:
 *documentation](https://docs.tilt.dev/api.html#api.default_registry) for more details.
 
 **provider_repos** (Array[]String, default=[]): A list of paths to all the provider plugins you want to make changes to. Each provider must have a
-`tilt-provider.json` file describing how to build the provider. 
+`tilt-provider.json` file describing how to build the provider.
 
 **enable_providers** (Array[]String, default=[]): A list of the provider plugins to enable. See [provider plugins](provider-plugins)
 for more details. Note: when not making changes to a plugin, it is not necessary to load them into
-Tilt: an existing image and version might be specified in the Velero deployment instead, and Tilt will load that. 
+Tilt: an existing image and version might be specified in the Velero deployment instead, and Tilt will load that.
 
 **allowed_contexts** (Array, default=[]): A list of kubeconfig contexts Tilt is allowed to use. See the Tilt documentation on
 *[allow_k8s_contexts](https://docs.tilt.dev/api.html#api.allow_k8s_contexts) for more details. Note: Kind is automatically allowed.
@@ -94,7 +94,7 @@ containing at least one configuration for a Velero backup storage location.
 **debug_continue_on_start** (Bool, default=true): Configure this to  `true` if you want the velero process to continue on start when in debug mode. See [Delve CLI documentation](https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv.md).
 
 ### Create Kubernetes resource files to deploy
-All needed Kubernetes resource files are provided as ready to use samples in the `velero/tilt-resources/examples` directory. You only have to move them to the `velero/tilt-resources` level. 
+All needed Kubernetes resource files are provided as ready to use samples in the `velero/tilt-resources/examples` directory. You only have to move them to the `velero/tilt-resources` level.
 
 Because the Velero Kubernetes deployment as well as the restic DaemonSet contain the configuration
 for any plugin to be used, files for these resources are expected to be provided by the user so you may choose
@@ -136,7 +136,7 @@ necessary to expose Minio outside the cluster. Note: with this setup, when your 
 
 2) As a standalone MinIO instance running locally in a Docker container
 
-    See [these instructions](https://github.com/vmware-tanzu/velero/wiki/Contributing-FAQ#minio) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
+    See [these instructions](https://github.com/vmware-tanzu/velero/discussions/3381) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
 
 Please see our [locations documentation](locations/) to learn more how backup locations work.
 
@@ -174,7 +174,7 @@ tilt up
 ```
 
 This will output the address to a web browser interface where you can monitor Tilt's status and the logs for each Tilt resource. After a brief amount of time, you should have a running development environment, and you should now be able to
-create backups/restores and fully operate Velero. 
+create backups/restores and fully operate Velero.
 
 Note: Running `tilt down` after exiting out of Tilt [will delete all resources](https://docs.tilt.dev/cli/tilt_down.html) specified in the Tiltfile.
 
