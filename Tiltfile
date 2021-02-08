@@ -72,15 +72,6 @@ COPY --from=tilt-helper /usr/bin/docker /usr/bin/docker
 COPY --from=tilt-helper /go/kubernetes/client/bin/kubectl /usr/bin/kubectl
 """
 
-docker_build_download_restic_commands = """
-COPY ./hack/download-restic.sh /
-RUN apt update && apt install -y wget
-RUN mkdir -p /output/usr/bin && \
-    BIN=velero GOOS=linux GOARCH=amd64 RESTIC_VERSION=0.9.6 /download-restic.sh && \
-    mv /output/usr/bin/restic /usr/bin/restic && \
-    rm -rf /output/usr/bin
-"""
-
 ##############################
 # Setup Velero
 ##############################
@@ -110,13 +101,19 @@ local_resource(
     deps = ["internal", "pkg/cmd"],
 )
 
+local_resource(
+    "restic_binary",
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/restic; BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 RESTIC_VERSION=0.9.6 OUTPUT_DIR=_tiltbuild/restic ./hack/download-restic.sh',
+)
+
 # Note: we need a distro with a bash shell to exec into the Velero container
 tilt_dockerfile_header = """
 FROM ubuntu:focal as tilt
 WORKDIR /
 COPY --from=tilt-helper /start.sh .
 COPY --from=tilt-helper /restart.sh .
-COPY _tiltbuild/velero .
+COPY velero .
+COPY restic/restic /usr/bin/restic
 """
 
 dockerfile_contents = "\n".join([
@@ -124,9 +121,7 @@ dockerfile_contents = "\n".join([
     additional_docker_helper_commands,
     tilt_dockerfile_header,
     additional_docker_build_commands,
-    docker_build_download_restic_commands,
 ])
-
 
 def get_velero_entrypoint():
     """
@@ -156,7 +151,7 @@ def get_velero_entrypoint():
 # build into the container.
 docker_build(
     ref = "velero/velero",
-    context = ".",
+    context = "_tiltbuild",
     dockerfile_contents = dockerfile_contents,
     target = "tilt",
     entrypoint = get_velero_entrypoint(),
