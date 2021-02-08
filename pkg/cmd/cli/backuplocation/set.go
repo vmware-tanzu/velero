@@ -19,6 +19,8 @@ package backuplocation
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -51,6 +53,7 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 
 type SetOptions struct {
 	Name                         string
+	CACertFile                   string
 	DefaultBackupStorageLocation bool
 }
 
@@ -59,6 +62,7 @@ func NewSetOptions() *SetOptions {
 }
 
 func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 }
 
@@ -80,6 +84,18 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 	}, location)
 	if err != nil {
 		return errors.WithStack(err)
+	}
+
+	var caCertData []byte
+	if o.CACertFile != "" {
+		realPath, err := filepath.Abs(o.CACertFile)
+		if err != nil {
+			return err
+		}
+		caCertData, err = ioutil.ReadFile(realPath)
+		if err != nil {
+			return err
+		}
 	}
 
 	if o.DefaultBackupStorageLocation {
@@ -106,6 +122,7 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	location.Spec.Default = o.DefaultBackupStorageLocation
+	location.Spec.StorageType.ObjectStorage.CACert = caCertData
 	if err := kbClient.Update(context.Background(), location, &kbclient.UpdateOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
