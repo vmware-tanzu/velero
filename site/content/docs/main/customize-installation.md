@@ -81,7 +81,7 @@ colors with config file:
 velero client config set colorized=false
 ```
 
-Note, that if you specify `--colorized=true` as a CLI option it will override
+Note that if you specify `--colorized=true` as a CLI option it will override
 the config file setting.
 
 
