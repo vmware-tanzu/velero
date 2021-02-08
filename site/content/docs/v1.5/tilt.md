@@ -135,7 +135,7 @@ Here are two ways to use MinIO as the storage:
 instance of MinIO inside your cluster. There are [extra steps](contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
 necessary to expose Minio outside the cluster. 
 
-    To access this storage, you will need to expose MinIO outside the cluster by forwarding the MinIO port to the local machine using kubectl port-forward -n <velero-namespace> svc/minio 9000. Update the BSL configuration to use that as its "public URL" by adding `publicUrl: http://localhost:9000` to the BSL config. This is necessary to do things like donwload a backup file.
+    To access this storage, you will need to expose MinIO outside the cluster by forwarding the MinIO port to the local machine using kubectl port-forward -n <velero-namespace> svc/minio 9000. Update the BSL configuration to use that as its "public URL" by adding `publicUrl: http://localhost:9000` to the BSL config. This is necessary to do things like download a backup file.
 
     Note: with this setup, when your cluster is terminated so is the storage and any backup/restore in it.
 
