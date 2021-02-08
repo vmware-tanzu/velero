@@ -58,7 +58,9 @@ type SetOptions struct {
 }
 
 func NewSetOptions() *SetOptions {
-	return &SetOptions{}
+	return &SetOptions{
+		Credential: flag.NewMap(),
+	}
 }
 
 func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
