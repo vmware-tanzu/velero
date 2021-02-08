@@ -1,0 +1,19 @@
+# Adds support for prow-like commands
+# Uses .github/labels.yaml to define areas and kinds
+name: "Prow github actions"
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: jpmcb/prow-github-actions@v1
+        with:
+          # Only support /kind command for now.
+          prow-commands: "/area
+            /kind
+            /cc
+            /uncc"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
