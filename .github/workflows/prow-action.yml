@@ -12,6 +12,7 @@ jobs:
       - uses: jpmcb/prow-github-actions@v1
         with:
           # Only support /kind command for now.
+          # TODO: before allowing the /lgtm command, see if we can block merging if changelog labels are missing.
           prow-commands: "/area
             /kind
             /cc
