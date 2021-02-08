@@ -822,12 +822,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
 		r := controller.DownloadRequestReconciler{
-			Scheme:           s.mgr.GetScheme(),
-			Client:           s.mgr.GetClient(),
-			Clock:            clock.RealClock{},
-			NewPluginManager: newPluginManager,
-			NewBackupStore:   persistence.NewObjectBackupStore,
-			Log:              s.logger,
+			Scheme:            s.mgr.GetScheme(),
+			Client:            s.mgr.GetClient(),
+			Clock:             clock.RealClock{},
+			NewPluginManager:  newPluginManager,
+			BackupStoreGetter: persistence.NewObjectBackupStoreGetter(),
+			Log:               s.logger,
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
