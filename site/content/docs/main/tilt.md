@@ -129,13 +129,17 @@ spec:
 
 Here are two ways to use MinIO as the storage:
 
-1) As a MinIO instance running inside your cluster
+1) As a MinIO instance running inside your cluster (don't do this for production!)
 
     In the `tilt-settings.json` file, set `"setup-minio": true`. This will configure a Kubernetes deployment containing a running
-instance of Minio inside your cluster. There are [extra steps](contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
-necessary to expose Minio outside the cluster. Note: with this setup, when your cluster is terminated so is the storage and any backup/restore in it.
+instance of MinIO inside your cluster. There are [extra steps](contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
+necessary to expose Minio outside the cluster. 
 
-2) As a standalone MinIO instance running locally in a Docker container
+    To access this storage, you will need to expose MinIO outside the cluster by forwarding the MinIO port to the local machine using kubectl port-forward -n <velero-namespace> svc/minio 9000. Update the BSL configuration to use that as its "public URL" by adding `publicUrl: http://localhost:9000` to the BSL config. This is necessary to do things like donwload a backup file.
+
+    Note: with this setup, when your cluster is terminated so is the storage and any backup/restore in it.
+
+1) As a standalone MinIO instance running locally in a Docker container
 
     See [these instructions](https://github.com/vmware-tanzu/velero/discussions/3381) to run MinIO locally on your computer, as a standalone as opposed to running it on a Pod.
 
