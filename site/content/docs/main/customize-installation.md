@@ -72,7 +72,7 @@ velero client config set features=
 
 ### Colored CLI output
 
-Velero CLI uses colored output for some commands, such as `velero desribe`. If
+Velero CLI uses colored output for some commands, such as `velero describe`. If
 the environment in which Velero is run doesn't support colored output, the
 colored output will be automatically disabled. However, you can manually disable
 colors with config file:
