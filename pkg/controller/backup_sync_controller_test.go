@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
@@ -351,13 +352,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				nil, // kubeClient
 				"",
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				NewFakeObjectBackupStoreGetter(backupStores),
 				velerotest.NewLogger(),
 			).(*backupSyncController)
-
-			c.newBackupStore = func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-				// this gets populated just below, prior to exercising the method under test
-				return backupStores[loc.Name], nil
-			}
 
 			pluginManager.On("CleanupClients").Return(nil)
 
@@ -576,6 +573,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				nil, // kubeClient
 				"",
 				nil, // new plugin manager func
+				persistence.NewObjectBackupStoreGetter(),
 				velerotest.NewLogger(),
 			).(*backupSyncController)
 
@@ -669,6 +667,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 				nil, // kubeClient
 				"",
 				nil, // new plugin manager func
+				persistence.NewObjectBackupStoreGetter(),
 				velerotest.NewLogger(),
 			).(*backupSyncController)
 

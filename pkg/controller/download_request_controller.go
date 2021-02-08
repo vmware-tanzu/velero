@@ -51,7 +51,7 @@ type downloadRequestController struct {
 	kbClient              client.Client
 	backupLister          velerov1listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore        func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	backupStoreGetter     persistence.ObjectBackupStoreGetter
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -62,6 +62,7 @@ func NewDownloadRequestController(
 	kbClient client.Client,
 	backupLister velerov1listers.BackupLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{
@@ -74,8 +75,8 @@ func NewDownloadRequestController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		newPluginManager: newPluginManager,
-		newBackupStore:   persistence.NewObjectBackupStore,
+		newPluginManager:  newPluginManager,
+		backupStoreGetter: backupStoreGetter,
 
 		clock: &clock.RealClock{},
 	}
@@ -172,7 +173,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *velero
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, err := c.newBackupStore(backupLocation, pluginManager, log)
+	backupStore, err := c.backupStoreGetter.Get(backupLocation, pluginManager, log)
 	if err != nil {
 		return errors.WithStack(err)
 	}

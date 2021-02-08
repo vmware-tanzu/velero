@@ -54,7 +54,7 @@ type backupSyncController struct {
 	defaultBackupLocation   string
 	defaultBackupSyncPeriod time.Duration
 	newPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore          func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	backupStoreGetter       persistence.ObjectBackupStoreGetter
 }
 
 func NewBackupSyncController(
@@ -68,6 +68,7 @@ func NewBackupSyncController(
 	kubeClient kubernetes.Interface,
 	defaultBackupLocation string,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod <= 0 {
@@ -89,8 +90,8 @@ func NewBackupSyncController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		newPluginManager: newPluginManager,
-		newBackupStore:   persistence.NewObjectBackupStore,
+		newPluginManager:  newPluginManager,
+		backupStoreGetter: backupStoreGetter,
 	}
 
 	c.resyncFunc = c.run
@@ -169,7 +170,7 @@ func (c *backupSyncController) run() {
 
 		log.Debug("Checking backup location for backups to sync into cluster")
 
-		backupStore, err := c.newBackupStore(&location, pluginManager, log)
+		backupStore, err := c.backupStoreGetter.Get(&location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting backup store for this location")
 			continue

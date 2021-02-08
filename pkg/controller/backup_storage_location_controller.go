@@ -44,8 +44,8 @@ type BackupStorageLocationReconciler struct {
 	DefaultBackupLocationInfo storage.DefaultBackupLocationInfo
 	// use variables to refer to these functions so they can be
 	// replaced with fakes for testing.
-	NewPluginManager func(logrus.FieldLogger) clientmgmt.Manager
-	NewBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	NewPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
+	BackupStoreGetter persistence.ObjectBackupStoreGetter
 
 	Log logrus.FieldLogger
 }
@@ -95,7 +95,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 			continue
 		}
 
-		backupStore, err := r.NewBackupStore(location, pluginManager, log)
+		backupStore, err := r.BackupStoreGetter.Get(location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting a backup store")
 			continue

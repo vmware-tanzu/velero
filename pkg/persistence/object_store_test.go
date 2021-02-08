@@ -604,10 +604,10 @@ func (osg objectStoreGetter) GetObjectStore(provider string) (velero.ObjectStore
 	return res, nil
 }
 
-// TestNewObjectBackupStore runs the NewObjectBackupStore constructor and ensures
-// that an ObjectBackupStore is constructed correctly or an appropriate error is
-// returned.
-func TestNewObjectBackupStore(t *testing.T) {
+// TestNewObjectBackupStore runs the NewObjectBackupStoreGetter constructor and ensures
+// that it provides a BackupStore with a correctly constructed ObjectBackupStore or
+// that an appropriate error is returned.
+func TestNewObjectBackupStoreGetter(t *testing.T) {
 	tests := []struct {
 		name              string
 		location          *velerov1api.BackupStorageLocation
@@ -661,7 +661,8 @@ func TestNewObjectBackupStore(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := NewObjectBackupStore(tc.location, tc.objectStoreGetter, velerotest.NewLogger())
+			getter := NewObjectBackupStoreGetter()
+			res, err := getter.Get(tc.location, tc.objectStoreGetter, velerotest.NewLogger())
 			if tc.wantErr != "" {
 				require.Equal(t, tc.wantErr, err.Error())
 			} else {

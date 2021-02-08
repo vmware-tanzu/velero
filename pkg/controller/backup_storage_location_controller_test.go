@@ -33,7 +33,6 @@ import (
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
@@ -87,12 +86,9 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				StorageLocation:           "location-1",
 				ServerValidationFrequency: 0,
 			},
-			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-				// this gets populated just below, prior to exercising the method under test
-				return backupStores[loc.Name], nil
-			},
-			Log: velerotest.NewLogger(),
+			NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			Log:               velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctx, ctrl.Request{
@@ -156,12 +152,9 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				StorageLocation:           "default",
 				ServerValidationFrequency: 0,
 			},
-			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-				// this gets populated just below, prior to exercising the method under test
-				return backupStores[loc.Name], nil
-			},
-			Log: velerotest.NewLogger(),
+			NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			Log:               velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctx, ctrl.Request{
@@ -229,12 +222,9 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				StorageLocation:           "default",
 				ServerValidationFrequency: 0,
 			},
-			NewPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-			NewBackupStore: func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
-				// this gets populated just below, prior to exercising the method under test
-				return backupStores[loc.Name], nil
-			},
-			Log: velerotest.NewLogger(),
+			NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			Log:               velerotest.NewLogger(),
 		}
 
 		actualResult, err := r.Reconcile(ctx, ctrl.Request{
