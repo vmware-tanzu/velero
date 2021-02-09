@@ -1,14 +1,17 @@
 name: Pull Request CI Check
-on: [pull_request]
+on:
+  pull_request:
+    # Do not run when the change only includes these directories.
+    paths-ignore:
+      - "site/**"
+      - ".github/**"
 jobs:
-
   build:
     name: Run CI
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v2
 
-    - name: Check out the code
-      uses: actions/checkout@v2
-
-    - name: Make ci
-      run: make ci
+      - name: Make ci
+        run: make ci
