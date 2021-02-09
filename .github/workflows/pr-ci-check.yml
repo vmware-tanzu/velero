@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - "site/**"
       - ".github/**"
+      - "design/**"
 jobs:
   build:
     name: Run CI
