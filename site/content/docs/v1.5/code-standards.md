@@ -6,17 +6,7 @@ toc: "true"
 
 ## Opening PRs
 
-Some PRs do not require a CI build. Those will be changes to documentation, to the website, and any other change that doesn't involve code, such as releases, typo fixes.
-
-To bypass the CI build, use anyone of these labels (any one of them will do the job):
-- Design: any design document
-- Website: any change to the website that is not documentation
-- Documentation: documentation for releases or any markdown file in the repo 
-- changelog-not-required: use only when the PR is not addressing any of the above cases. This is for changes in the code that is not introducing any change in behavior for the software. 
-
-There is no need to use more than one label.
-
-Please add the label BEFORE creating the PR/draft. This will make the CI check pass. If you forget, it's ok: adding it after will make the CI fail, but it will still let us merge. The only minor downside is that it will have a red checkmark for failure.
+When opening a pull request, please fill out the checklist supplied the template. This will help others properly categorize and review your pull request.
 
 ## Adding a changelog
 
