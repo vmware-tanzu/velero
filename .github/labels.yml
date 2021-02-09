@@ -2,17 +2,18 @@ area:
   - "Cloud/AWS"
   - "Cloud/GCP"
   - "Cloud/Azure"
+  - "Design"
   - "Plugins"
 
 # Labels that can be applied to PRs with the /kind command
 kind:
   - "changelog-not-required"
-  - "Tech debt"
+  - "tech-debt"
 
 # Works with https://github.com/actions/labeler/
 # Below this line, the keys are labels to be applied, and the values are the file globs to match against.
 # Anything in the `design` directory gets the `Design` label.
-Design:
+Area/Design:
   - design/*
 
 # Anything in the site directory gets the website label *EXCEPT* docs
@@ -27,7 +28,7 @@ Dependencies:
 
 # Anything that has plugin infra will be labeled.
 # Individual plugins don't necessarily live here, though
-Plugins:
+Area/Plugins:
   - "pkg/plugins/**/*"
 
 has-unit-tests:
