@@ -22,6 +22,7 @@ Adding context object to the functions of the Velero plugin.  This context objec
 
 ## Detailed Design
 
+### Sample enhancement
 Below is the sample for BackupItemAction interface.  Similar enhancement will be done for other plugin interfaces.
 
 ```go
@@ -60,6 +61,21 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 	...
 }
 ```
+
+### List of all interface functions to added
+- BackupItemAction.ExecuteWithContext
+- DeleteItemAction.ExecuteWithContext
+- ObjectStore.PutObjectWithContext
+- ObjectStore.ObjectExistsWithContext
+- ObjectStore.GetObjectWithContext
+- ObjectStore.ListCommonPrefixesWithContext
+- ObjectStore.ListObjectsWithContext
+- ObjectStore.DeleteObjectWithContext
+- RestoreItemAction.ExecuteWithContext
+- VolumeSnapshotter.CreateVolumeFromSnapshotWithContext
+- VolumeSnapshotter.GetVolumeInfoWithContext
+- VolumeSnapshotter.CreateSnapshotWithContext
+- VolumeSnapshotter.DeleteSnapshotWithContext
 
 ## Compatibility
 
