@@ -121,6 +121,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return errors.New("--backup-sync-period must be non-negative")
 	}
 
+	if len(o.Credential.Data()) > 1 {
+		return errors.New("--credential can only contain 1 key/value pair")
+	}
+
 	return nil
 }
 
@@ -152,9 +156,6 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		validationFrequency = &metav1.Duration{Duration: o.ValidationFrequency}
 	}
 
-	if len(o.Credential.Data()) > 1 {
-		return errors.New("--credential can only contain 1 key/value pair")
-	}
 	var secretName, secretKey string
 	for k, v := range o.Credential.Data() {
 		secretName = k

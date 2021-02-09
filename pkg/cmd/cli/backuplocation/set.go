@@ -44,6 +44,7 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -70,6 +71,14 @@ func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.Var(&o.Credential, "credential", "Sets the credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
+}
+
+func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	if len(o.Credential.Data()) > 1 {
+		return errors.New("--credential can only contain 1 key/value pair")
+	}
+
+	return nil
 }
 
 func (o *SetOptions) Complete(args []string, f client.Factory) error {
