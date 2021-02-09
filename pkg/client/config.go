@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -29,6 +30,7 @@ const (
 	ConfigKeyNamespace = "namespace"
 	ConfigKeyFeatures  = "features"
 	ConfigKeyCACert    = "cacert"
+	ConfigKeyColorized = "colorized"
 )
 
 // VeleroConfig is a map of strings to interface{} for deserializing Velero client config options.
@@ -109,6 +111,26 @@ func (c VeleroConfig) Features() []string {
 	}
 
 	return strings.Split(features, ",")
+}
+
+func (c VeleroConfig) Colorized() bool {
+	val, ok := c[ConfigKeyColorized]
+	if !ok {
+		return true
+	}
+
+	valString, ok := val.(string)
+	if !ok {
+		return true
+	}
+
+	colorized, err := strconv.ParseBool(valString)
+	if err != nil {
+		return true
+	}
+
+	return colorized
+
 }
 
 func (c VeleroConfig) CACertFile() string {

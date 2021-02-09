@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/fatih/color"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,7 +58,7 @@ func (d *Describer) Println(args ...interface{}) {
 
 // DescribeMetadata describes standard object metadata in a consistent manner.
 func (d *Describer) DescribeMetadata(metadata metav1.ObjectMeta) {
-	d.Printf("Name:\t%s\n", metadata.Name)
+	d.Printf("Name:\t%s\n", color.New(color.Bold).SprintFunc()(metadata.Name))
 	d.Printf("Namespace:\t%s\n", metadata.Namespace)
 	d.DescribeMap("Labels", metadata.Labels)
 	d.DescribeMap("Annotations", metadata.Annotations)

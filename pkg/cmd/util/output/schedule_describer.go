@@ -19,6 +19,8 @@ package output
 import (
 	"fmt"
 
+	"github.com/fatih/color"
+
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -28,17 +30,25 @@ func DescribeSchedule(schedule *v1.Schedule) string {
 
 		d.Println()
 		phase := schedule.Status.Phase
+
 		if phase == "" {
 			phase = v1.SchedulePhaseNew
 		}
-		d.Printf("Phase:\t%s\n", phase)
+		phaseString := string(phase)
+		switch phase {
+		case v1.SchedulePhaseEnabled:
+			phaseString = color.GreenString(phaseString)
+		case v1.SchedulePhaseFailedValidation:
+			phaseString = color.RedString(phaseString)
+		}
+		d.Printf("Phase:\t%s\n", phaseString)
 
 		status := schedule.Status
 		if len(status.ValidationErrors) > 0 {
 			d.Println()
 			d.Printf("Validation errors:")
 			for _, ve := range status.ValidationErrors {
-				d.Printf("\t%s\n", ve)
+				d.Printf("\t%s\n", color.RedString(ve))
 			}
 		}
 
