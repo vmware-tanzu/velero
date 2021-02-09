@@ -9,7 +9,7 @@ jobs:
   execute:
     runs-on: ubuntu-latest
     steps:
-      - uses: jpmcb/prow-github-actions@v1
+      - uses: jpmcb/prow-github-actions@v1.1.2
         with:
           # Only support /kind command for now.
           # TODO: before allowing the /lgtm command, see if we can block merging if changelog labels are missing.
