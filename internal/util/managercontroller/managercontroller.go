@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO(2.0) After converting all controllers to runttime-controller,
+// TODO(2.0) After converting all controllers to runtime-controller,
 // the functions in this file will no longer be needed and should be removed.
 package managercontroller
 

@@ -54,7 +54,7 @@ func (b *DownloadRequestBuilder) Phase(phase velerov1api.DownloadRequestPhase) *
 	return b
 }
 
-// Phase sets the DownloadRequest's status phase.
+// Target sets the DownloadRequest's target kind and target name.
 func (b *DownloadRequestBuilder) Target(targetKind velerov1api.DownloadTargetKind, targetName string) *DownloadRequestBuilder {
 	b.object.Spec.Target.Kind = targetKind
 	b.object.Spec.Target.Name = targetName

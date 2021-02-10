@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO(2.0) After converting all resources to use the runttime-controller client,
+// TODO(2.0) After converting all resources to use the runtime-controller client,
 // the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -89,7 +89,7 @@ type ServerStatusRequestStatus struct {
 	Plugins []PluginInfo `json:"plugins,omitempty"`
 }
 
-// TODO(2.0) After converting all resources to use the runttime-controller client,
+// TODO(2.0) After converting all resources to use the runtime-controller client,
 // the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true

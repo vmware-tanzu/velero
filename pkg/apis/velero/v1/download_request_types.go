@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ type DownloadRequestStatus struct {
 	Expiration *metav1.Time `json:"expiration,omitempty"`
 }
 
-// TODO(2.0) After converting all resources to use the runttime-controller client,
+// TODO(2.0) After converting all resources to use the runtime-controller client,
 // the k8s:deepcopy marker will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -105,7 +105,7 @@ type DownloadRequest struct {
 	Status DownloadRequestStatus `json:"status,omitempty"`
 }
 
-// TODO(2.0) After converting all resources to use the runttime-controller client,
+// TODO(2.0) After converting all resources to use the runtime-controller client,
 // the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true

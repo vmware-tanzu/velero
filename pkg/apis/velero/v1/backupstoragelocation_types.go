@@ -90,7 +90,7 @@ type BackupStorageLocationStatus struct {
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }
 
-// TODO(2.0) After converting all resources to use the runttime-controller client,
+// TODO(2.0) After converting all resources to use the runtime-controller client,
 // the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -116,7 +116,7 @@ type BackupStorageLocation struct {
 	Status BackupStorageLocationStatus `json:"status,omitempty"`
 }
 
-// TODO(2.0) After converting all resources to use the runttime-controller client,
+// TODO(2.0) After converting all resources to use the runtime-controller client,
 // the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
