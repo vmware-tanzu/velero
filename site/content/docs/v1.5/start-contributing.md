@@ -8,6 +8,12 @@ layout: docs
 * Please familiarize yourself with the [Code of Conduct][1] before contributing.
 * Also, see [CONTRIBUTING.md][2] for instructions on the developer certificate of origin that we require.
 
+## Creating a design doc
+
+Having a high level design document with the proposed change and the impacts helps the maintainers evaluate if a major change should be incorporated.
+
+To make a design pull request, you can copy the template found in the `design/_template.md` file into a new Markdown file.
+
 ## Finding your way around
 
 You may join the Velero community and contribute in many different ways, including helping us design or test new features. For any significant feature we consider adding, we start with a design document. You may find a list of in progress new designs here: https://github.com/vmware-tanzu/velero/pulls?q=is%3Aopen+is%3Apr+label%3ADesign. Feel free to review and help us with your input.
@@ -22,7 +28,7 @@ Please browse our list of resources, including a playlist of past online communi
 
 If you are ready to jump in and test, add code, or help with documentation, please use the navigation on the left under `Contribute`.
 
-[1]: https://github.com/vmware-tanzu/velero/blob/v1.5.1/CODE_OF_CONDUCT.md
-[2]: https://github.com/vmware-tanzu/velero/blob/v1.5.1/CONTRIBUTING.md
-[3]: https://github.com/vmware-tanzu/velero/blob/v1.5.1/.github/ISSUE_TEMPLATE/feature-enhancement-request.md
-[4]: https://github.com/vmware-tanzu/velero/blob/v1.5.1/.github/ISSUE_TEMPLATE/bug_report.md
+[1]: https://github.com/vmware-tanzu/velero/blob/main/CODE_OF_CONDUCT.md
+[2]: https://github.com/vmware-tanzu/velero/blob/main/CONTRIBUTING.md
+[3]: https://github.com/vmware-tanzu/velero/blob/main/.github/ISSUE_TEMPLATE/feature-enhancement-request.md
+[4]: https://github.com/vmware-tanzu/velero/blob/main/.github/ISSUE_TEMPLATE/bug_report.md
