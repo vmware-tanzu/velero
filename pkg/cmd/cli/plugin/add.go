@@ -38,7 +38,6 @@ import (
 const (
 	pluginsVolumeName = "plugins"
 	veleroContainer   = "velero"
-	veleroLabel = "component=velero"
 )
 
 func NewAddCommand(f client.Factory) *cobra.Command {

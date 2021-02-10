@@ -25,6 +25,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const veleroLabel = "component=velero"
+
 // veleroDeployment returns a Velero deployment object, selected using a label.
 func veleroDeployment(ctx context.Context, kubeClient kubernetes.Interface, namespace string) (*appsv1api.Deployment, error) {
 	deployList, err := kubeClient.
