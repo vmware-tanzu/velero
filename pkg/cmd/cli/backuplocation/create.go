@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,6 +64,7 @@ type CreateOptions struct {
 	Name                                  string
 	Provider                              string
 	Bucket                                string
+	Credential                            flag.Map
 	DefaultBackupStorageLocation          bool
 	Prefix                                string
 	BackupSyncPeriod, ValidationFrequency time.Duration
@@ -74,7 +76,8 @@ type CreateOptions struct {
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		Config: flag.NewMap(),
+		Credential: flag.NewMap(),
+		Config:     flag.NewMap(),
 		AccessMode: flag.NewEnum(
 			string(velerov1api.BackupStorageLocationAccessModeReadWrite),
 			string(velerov1api.BackupStorageLocationAccessModeReadWrite),
@@ -86,6 +89,7 @@ func NewCreateOptions() *CreateOptions {
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the backup storage provider (e.g. aws, azure, gcp).")
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "Name of the object storage bucket where backups should be stored.")
+	flags.Var(&o.Credential, "credential", "The credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "How often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
@@ -115,6 +119,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.BackupSyncPeriod < 0 {
 		return errors.New("--backup-sync-period must be non-negative")
+	}
+
+	if len(o.Credential.Data()) > 1 {
+		return errors.New("--credential can only contain 1 key/value pair")
 	}
 
 	return nil
@@ -148,6 +156,13 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		validationFrequency = &metav1.Duration{Duration: o.ValidationFrequency}
 	}
 
+	var secretName, secretKey string
+	for k, v := range o.Credential.Data() {
+		secretName = k
+		secretKey = v
+		break
+	}
+
 	backupStorageLocation := &velerov1api.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
@@ -163,7 +178,13 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					CACert: caCertData,
 				},
 			},
-			Config:              o.Config.Data(),
+			Config: o.Config.Data(),
+			Credential: &corev1api.SecretKeySelector{
+				LocalObjectReference: corev1api.LocalObjectReference{
+					Name: secretName,
+				},
+				Key: secretKey,
+			},
 			Default:             o.DefaultBackupStorageLocation,
 			AccessMode:          velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
 			BackupSyncPeriod:    backupSyncPeriod,
