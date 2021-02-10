@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Latest k8s versions. There's no series-based tag, nor is there a lastest tag.
+        # Latest k8s versions. There's no series-based tag, nor is there a latest tag.
         k8s:
           - 1.15.12
           - 1.16.15
