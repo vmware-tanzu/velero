@@ -37,8 +37,8 @@ import (
 
 const (
 	pluginsVolumeName = "plugins"
-	veleroDeployment  = "velero"
 	veleroContainer   = "velero"
+	veleroLabel = "component=velero"
 )
 
 func NewAddCommand(f client.Factory) *cobra.Command {
@@ -57,7 +57,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			veleroDeploy, err := kubeClient.AppsV1().Deployments(f.Namespace()).Get(context.TODO(), veleroDeployment, metav1.GetOptions{})
+			veleroDeploy, err := veleroDeployment(context.TODO(), kubeClient, f.Namespace())
 			if err != nil {
 				cmd.CheckError(err)
 			}
