@@ -3,7 +3,7 @@ title: "Cluster migration"
 layout: docs
 ---
 
-*Using Backups and Restores*
+## Using Backups and Restores
 
 Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. This scenario assumes that your clusters are hosted by the same cloud provider. **Note that Velero does not natively  support the migration of persistent volumes snapshots across cloud providers.** If you would like to migrate volume data between cloud platforms, please enable [restic][2], which will backup volume contents at the filesystem level.
 
@@ -32,7 +32,7 @@ Velero can help you port your resources from one cluster to another, as long as 
     velero restore create --from-backup <BACKUP-NAME>
     ```
 
-## Verify both clusters
+## Verify Both Clusters
 
 Check that the second cluster is behaving as expected:
 
@@ -49,6 +49,10 @@ Check that the second cluster is behaving as expected:
     ```
 
 If you encounter issues, make sure that Velero is running in the same namespace in both clusters.
+
+## Migrating Workloads Across Different Kubernetes Versions
+
+Migration across clusters that are not running the same version of Kubernetes is possible with Velero. For more information, look at the [EnableAPIGroupVersions](enable-api-group-versions-feature.md) feature.
 
 [1]: how-velero-works.md#set-a-backup-to-expire
 [2]: restic.md

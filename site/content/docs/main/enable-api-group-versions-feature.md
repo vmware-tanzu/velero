@@ -67,7 +67,7 @@ Here are the steps for creating a config map that allows users to override the d
 
 1. Create a file called `restoreResourcesVersionPriority`. The file name will become a key in the `data` field of the config map.
     - In the file, write a line for each resource group you'd like to override. Make sure each line follows the format `<resource>.<group>=<highest user priority version>,<next highest>`
-    - Note that the resource group and versions are separated by a single equal (=) sign. Each version is listed in order of user's priority separated by commas. Do not include spaces.
+    - Note that the resource group and versions are separated by a single equal (=) sign. Each version is listed in order of user's priority separated by commas.
     - Here is an example of the contents of a config map file:
 
     ```cm
@@ -76,8 +76,19 @@ Here are the steps for creating a config map that allows users to override the d
     subscriptions.operators.coreos.com=v2,v1
     ```
 
-2. Apply config map with `kubectl create configmap enableapigroupversions --from-file=<absolute path>/restoreResourcesVersionPriority -n velero`
-3. Get the config map with `kubectl describe configmap enableapigroupversions -n velero`. The config map should look something like
+2. Apply config map with
+
+    ```bash
+    kubectl create configmap enableapigroupversions --from-file=<absolute path>/restoreResourcesVersionPriority -n velero
+    ```
+
+3. See the config map with
+
+    ```bash
+    kubectl describe configmap enableapigroupversions -n velero
+    ```
+
+    The config map should look something like
 
     ```bash
     Name:         enableapigroupversions
