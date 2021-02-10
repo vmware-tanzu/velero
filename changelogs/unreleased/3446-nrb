@@ -1,0 +1,1 @@
+Add CAPI Cluster and ClusterResourceSets to default restore priorities so that the capi-controller-manager does not panic on restores.
