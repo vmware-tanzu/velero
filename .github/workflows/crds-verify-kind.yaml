@@ -1,0 +1,32 @@
+name: "Verify Velero CRDs across k8s versions"
+on: [pull_request]
+
+jobs:
+  crd-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Latest k8s versions. There's no series-based tag, nor is there a lastest tag.
+        k8s:
+          - 1.15.12
+          - 1.16.15
+          - 1.17.17
+          - 1.18.15
+          - 1.19.7
+          - 1.20.2
+    # All steps run in parallel unless otherwise specified.
+    # See https://docs.github.com/en/actions/learn-github-actions/managing-complex-workflows#creating-dependent-jobs
+    steps:
+      - uses: actions/checkout@master
+      - uses: engineerd/setup-kind@v0.5.0
+        with:
+          image: "kindest/node:v${{ matrix.k8s }}"
+      - name: Install CRDs
+        run: |
+          kubectl cluster-info
+          kubectl get pods -n kube-system
+          kubectl version
+          echo "current-context:" $(kubectl config current-context)
+          echo "environment-kubeconfig:" ${KUBECONFIG}
+          make local
+          ./_output/bin/linux/amd64/velero install --crds-only --dry-run -oyaml | kubectl apply -f -
