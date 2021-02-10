@@ -1,5 +1,10 @@
 name: "Verify Velero CRDs across k8s versions"
-on: [pull_request]
+on:
+  pull_request:
+    # Do not run when the change only includes these directories.
+    paths-ignore:
+      - "site/**"
+      - "design/**"
 
 jobs:
   crd-check:
