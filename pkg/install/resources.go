@@ -54,7 +54,7 @@ var (
 	DefaultVeleroNamespace     = "velero"
 )
 
-func labels() map[string]string {
+func Labels() map[string]string {
 	return map[string]string{
 		"component": "velero",
 	}
@@ -89,7 +89,7 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
 		Namespace: namespace,
-		Labels:    labels(),
+		Labels:    Labels(),
 	}
 }
 
@@ -236,7 +236,7 @@ func AllCRDs() *unstructured.UnstructuredList {
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
 	for _, crd := range crds.CRDs {
-		crd.SetLabels(labels())
+		crd.SetLabels(Labels())
 		appendUnstructured(resources, crd)
 	}
 
