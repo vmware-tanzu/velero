@@ -20,10 +20,10 @@ jobs:
         with:
           path: ./_output/bin/linux/amd64/velero
           # The cache key a combination of the current PR number, and a SHA256 hash of the Velero binary
-          key: velero-${{ pull_request.number }}-${{ hashFiles(./_output/bin/linux/amd64/velero) }}
+          key: velero-${{ github.event.pull_request.number }}-${{ hashFiles(./_output/bin/linux/amd64/velero) }}
           # This key controls the prefixes that we'll look at in the cache to restore from
           restore-keys: |
-            velero-${{ pull_request.number }}-
+            velero-${{ github.event.pull_request.number }}-
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
         if: steps.cache.outputs.cache-hit != 'true'
