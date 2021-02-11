@@ -61,6 +61,18 @@ jobs:
     # All steps run in parallel unless otherwise specified.
     # See https://docs.github.com/en/actions/learn-github-actions/managing-complex-workflows#creating-dependent-jobs
     steps:
+      - name: Fetch built CLI
+        id: cache
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-velero-cli
+        with:
+          path: ./_output/bin/linux/amd64/velero
+          # The cache key a combination of the current PR number, and a SHA256 hash of the Velero binary
+          key: velero-${{ github.event.pull_request.number }}-${{ hashFiles('./_output/bin/linux/amd64/velero') }}
+          # This key controls the prefixes that we'll look at in the cache to restore from
+          restore-keys: |
+            velero-${{ github.event.pull_request.number }}-
       - uses: engineerd/setup-kind@v0.5.0
         with:
           image: "kindest/node:v${{ matrix.k8s }}"
