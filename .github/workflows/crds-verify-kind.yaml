@@ -25,17 +25,21 @@ jobs:
           restore-keys: |
             velero-${{ github.event.pull_request.number }}-
 
-      - name: Cache go modules
+      - name: Fetch cached go modules
         uses: actions/cache@v2
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Check out the code
+        uses: actions/checkout@v2
+        if: steps.cache.outputs.cache-hit != 'true'
+
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
-        uses: actions/checkout@master
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           make local
