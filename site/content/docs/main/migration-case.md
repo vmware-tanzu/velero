@@ -52,7 +52,7 @@ If you encounter issues, make sure that Velero is running in the same namespace 
 
 ## Migrating Workloads Across Different Kubernetes Versions
 
-Migration across clusters that are not running the same version of Kubernetes is possible with Velero. For more information, look at the [EnableAPIGroupVersions](enable-api-group-versions-feature.md) feature.
+Migration across clusters that are not running the same version of Kubernetes might be possible, but some factors need to be considered: compatibility of API groups between clusters for each custom resource, and if a Kubernetes version upgrade breaks the compatibility of core/native API groups. For more information about API group versions, please see [EnableAPIGroupVersions](enable-api-group-versions-feature.md).
 
 [1]: how-velero-works.md#set-a-backup-to-expire
 [2]: restic.md
