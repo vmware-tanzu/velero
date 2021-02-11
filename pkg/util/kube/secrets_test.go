@@ -43,13 +43,8 @@ func TestGetSecretKey(t *testing.T) {
 					"key1": []byte("ns1-secretdata1"),
 				}).Result(),
 			},
-			namespace: "ns-1",
-			selector: &corev1api.SecretKeySelector{
-				LocalObjectReference: corev1api.LocalObjectReference{
-					Name: "non-existent-secret",
-				},
-				Key: "key2",
-			},
+			namespace:   "ns-1",
+			selector:    builder.ForSecretKeySelector("non-existent-secret", "key2").Result(),
 			expectedErr: "secrets \"non-existent-secret\" not found",
 		},
 		{
@@ -59,13 +54,8 @@ func TestGetSecretKey(t *testing.T) {
 					"key1": []byte("ns1-secretdata1"),
 				}).Result(),
 			},
-			namespace: "ns-1",
-			selector: &corev1api.SecretKeySelector{
-				LocalObjectReference: corev1api.LocalObjectReference{
-					Name: "secret1",
-				},
-				Key: "non-existent-key",
-			},
+			namespace:   "ns-1",
+			selector:    builder.ForSecretKeySelector("secret1", "non-existent-key").Result(),
 			expectedErr: "\"secret1\" secret is missing data for key \"non-existent-key\"",
 		},
 		{
@@ -80,13 +70,8 @@ func TestGetSecretKey(t *testing.T) {
 					"key2": []byte("ns2-secretdata2"),
 				}).Result(),
 			},
-			namespace: "ns-2",
-			selector: &corev1api.SecretKeySelector{
-				LocalObjectReference: corev1api.LocalObjectReference{
-					Name: "secret1",
-				},
-				Key: "key2",
-			},
+			namespace:    "ns-2",
+			selector:     builder.ForSecretKeySelector("secret1", "key2").Result(),
 			expectedData: "ns2-secretdata2",
 		},
 	}

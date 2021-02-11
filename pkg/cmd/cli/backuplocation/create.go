@@ -27,12 +27,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -178,13 +178,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					CACert: caCertData,
 				},
 			},
-			Config: o.Config.Data(),
-			Credential: &corev1api.SecretKeySelector{
-				LocalObjectReference: corev1api.LocalObjectReference{
-					Name: secretName,
-				},
-				Key: secretKey,
-			},
+			Config:              o.Config.Data(),
+			Credential:          builder.ForSecretKeySelector(secretName, secretKey).Result(),
 			Default:             o.DefaultBackupStorageLocation,
 			AccessMode:          velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
 			BackupSyncPeriod:    backupSyncPeriod,

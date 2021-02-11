@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -246,10 +247,7 @@ func TempCredentialsFile(client kbclient.Client, veleroNamespace, repoName strin
 	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
 	// (all within the Velero server's namespace) so repoKeySelector will need to select the key
 	// for that repo.
-	repoKeySelector := &corev1api.SecretKeySelector{
-		LocalObjectReference: corev1api.LocalObjectReference{Name: CredentialsSecretName},
-		Key:                  CredentialsKey,
-	}
+	repoKeySelector := builder.ForSecretKeySelector(CredentialsSecretName, CredentialsKey).Result()
 
 	repoKey, err := kube.GetSecretKey(client, veleroNamespace, repoKeySelector)
 	if err != nil {
