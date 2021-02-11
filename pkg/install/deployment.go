@@ -140,7 +140,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, "--default-volumes-to-restic=true")
 	}
 
-	containerLabels := labels()
+	containerLabels := Labels()
 	containerLabels["deploy"] = "velero"
 
 	deployment := &appsv1.Deployment{

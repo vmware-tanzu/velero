@@ -22,18 +22,21 @@ import (
 	"github.com/pkg/errors"
 	appsv1api "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-)
 
-const veleroLabel = "component=velero"
+	"github.com/vmware-tanzu/velero/pkg/install"
+)
 
 // veleroDeployment returns a Velero deployment object, selected using a label.
 func veleroDeployment(ctx context.Context, kubeClient kubernetes.Interface, namespace string) (*appsv1api.Deployment, error) {
+	veleroLabels := labels.FormatLabels(install.Labels())
+
 	deployList, err := kubeClient.
 		AppsV1().
 		Deployments(namespace).
 		List(ctx, metav1.ListOptions{
-			LabelSelector: veleroLabel,
+			LabelSelector: veleroLabels,
 		})
 	if err != nil {
 		return nil, err
