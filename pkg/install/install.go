@@ -132,7 +132,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	// declare this variable out of scope so we can return it
 	var isReady bool
 	var readyObservations int32
-	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+	err = wait.PollImmediate(time.Second, 3*time.Minute, func() (bool, error) {
 		unstructuredDeployment, err := c.Get("velero", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil

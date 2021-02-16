@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -231,6 +233,7 @@ func (kr *kubernetesRestorer) Restore(
 		restore:                    req.Restore,
 		resourceIncludesExcludes:   resourceIncludesExcludes,
 		namespaceIncludesExcludes:  namespaceIncludesExcludes,
+		chosenGrpVersToRestore:     make(map[string]ChosenGroupVersion),
 		selector:                   selector,
 		log:                        req.Log,
 		dynamicFactory:             kr.dynamicFactory,
@@ -308,6 +311,7 @@ type restoreContext struct {
 	restoreDir                 string
 	resourceIncludesExcludes   *collections.IncludesExcludes
 	namespaceIncludesExcludes  *collections.IncludesExcludes
+	chosenGrpVersToRestore     map[string]ChosenGroupVersion
 	selector                   labels.Selector
 	log                        logrus.FieldLogger
 	dynamicFactory             client.DynamicFactory
@@ -382,6 +386,16 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
+	}
+
+	// TODO: Remove outer feature flag check to make this feature a default in Velero.
+	if features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
+		if ctx.backup.Status.FormatVersion >= "1.1.0" {
+			if err := ctx.chooseAPIVersionsToRestore(); err != nil {
+				errs.AddVeleroError(errors.Wrap(err, "choosing API version to restore"))
+				return warnings, errs
+			}
+		}
 	}
 
 	// Iterate through an ordered list of resources to restore, checking each one to see if it should be restored.
@@ -731,6 +745,17 @@ func (ctx *restoreContext) restoreResource(resource, targetNamespace, originalNa
 	}
 
 	groupResource := schema.ParseGroupResource(resource)
+
+	// Modify `resource` so that it has the priority version to restore in its
+	// path. For example, for group resource "horizontalpodautoscalers.autoscaling",
+	// "/v2beta1" will be appended to the end. Different versions would only
+	// have been stored if the APIGroupVersionsFeatureFlag was enabled during backup.
+	// The chosenGrpVersToRestore map would only be populated if APIGroupVersionsFeatureFlag
+	// was enabled for restore and the minimum required backup format version has been met.
+	cgv, ok := ctx.chosenGrpVersToRestore[groupResource.String()]
+	if ok {
+		resource = filepath.Join(groupResource.String(), cgv.Dir)
+	}
 
 	for _, item := range items {
 		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)

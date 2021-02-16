@@ -67,6 +67,10 @@ For example, E2E tests can be run from Velero repository roots using the below c
     BSL_CONFIG="resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID" BSL_BUCKET=velero CREDS_FILE=~/bin/velero-dev/aks-creds PLUGIN_PROVIDER=azure make test-e2e
     ```
     Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
+1. Run Ginko-focused Restore Multi-API Groups tests using an image built for PR #3133 and Minio as the backup storage location: 
+   ```bash
+   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=http://192.168.1.124:9000" BSL_PREFIX=veldat BSL_BUCKET=velero CREDS_FILE=~/go/src/github.com/vmware-tanzu/velero/frankie-secrets/credentials-minio PLUGIN_PROVIDER=aws VELERO_IMAGE=projects.registry.vmware.com/tanzu_migrator/velero-pr3133:0.0.5 GINKGO_FOCUS="API group versions" make test-e2e
+   ```
 
 ## Filtering tests
 

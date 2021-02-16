@@ -78,10 +78,9 @@ However, a major version release of Velero does not necessarily mean that the ba
 
 ### File Format Version: 1.1 (Current)
 
-Version 1.1 added support of API groups versions as part of the backup (previously, only the preferred version of each API Groups was backed up). Each resource has one or more sub-directories, one sub-directory for each supported version of the API group. The preferred version API Group of each resource has the suffix "-preferredversion" as part of the sub-directory name. For backward compatibility, we kept the classic directory structure without the API Group version, which sits on the same level as the API Group sub-directory versions.
-By default, only the preferred API group of each resource is backed up.
-To take a backup of all API group versions, you need to run the Velero server with `--features=EnableAPIGroupVersions` feature flag. This is an experimental flag and the restore logic to handle multiple API Group Versions will be added in the future.
+Version 1.1 added support of API groups versions as part of the backup. Previously, only the preferred version of each API groups was backed up. Each resource has one or more sub-directories: one sub-directory for each supported version of the API group. The preferred version API Group of each resource has the suffix "-preferredversion" as part of the sub-directory name. For backward compatibility, we kept the classic directory structure without the API group version, which sits on the same level as the API group sub-directory versions.
 
+By default, only the preferred API group of each resource is backed up. To take a backup of all API group versions, you need to run the Velero server with the `--features=EnableAPIGroupVersions` feature flag. This is an experimental flag and the restore logic to handle multiple API group versions is documented at [EnableAPIGroupVersions](enable-api-group-versions-feature.md).
 
 When unzipped, a typical backup directory (`backup1234.tar.gz`) taken with this file format version looks like the following (with the feature flag):
 

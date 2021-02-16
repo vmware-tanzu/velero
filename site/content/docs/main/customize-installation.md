@@ -43,6 +43,8 @@ Features on the Velero server can be enabled using the `--features` flag to the 
 velero install --features=EnableCSI
 ```
 
+Another example is enabling the support of multiple API group versions, as documented at [- -features=EnableAPIGroupVersions](enable-api-group-versions-feature.md).
+
 Feature flags, passed to `velero install` will be passed to the Velero deployment and also to the `restic` daemon set, if `--use-restic` flag is used.
 
 Similarly, features may be disabled by removing the corresponding feature flags from the `--features` flag.
