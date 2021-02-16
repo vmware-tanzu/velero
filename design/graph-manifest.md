@@ -129,7 +129,7 @@ type Item struct {
 }
 ```
 
-In addition to the new types, the following Go interfaces would be provided for convience.
+In addition to the new types, the following Go interfaces would be provided for convenience.
 
 ```golang
 type Itermer interface {
