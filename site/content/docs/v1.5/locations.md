@@ -31,6 +31,8 @@ This configuration design enables a number of different use cases, including:
 
 - Restic data is stored under a prefix/subdirectory of the main Velero bucket, and will go into the bucket corresponding to the `BackupStorageLocation` selected by the user at backup creation time.
 
+- Velero's backups are split into 2 pieces - the metadata stored in object storage, and snapshots/backups of the persistent volume data. Right now, Velero *itself* does not encrypt either of them, instead it relies on the native mechanisms in the object and snapshot systems. A special case is restic, which backs up the persistent volume data at the filesystem level and send it to Velero's object storage.
+
 ## Examples
 
 Let's look at some examples of how you can use this configuration mechanism to address some common use cases:
