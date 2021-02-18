@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	corev1listers "k8s.io/client-go/listers/core/v1"
 )
 
 const (
@@ -61,54 +60,4 @@ func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespac
 	}
 
 	return nil
-}
-
-type SecretGetter interface {
-	GetSecret(namespace, name string) (*corev1api.Secret, error)
-}
-
-type clientSecretGetter struct {
-	client corev1client.SecretsGetter
-}
-
-func NewClientSecretGetter(client corev1client.SecretsGetter) SecretGetter {
-	return &clientSecretGetter{client: client}
-}
-
-func (c *clientSecretGetter) GetSecret(namespace, name string) (*corev1api.Secret, error) {
-	secret, err := c.client.Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	return secret, nil
-}
-
-type listerSecretGetter struct {
-	lister corev1listers.SecretLister
-}
-
-func NewListerSecretGetter(lister corev1listers.SecretLister) SecretGetter {
-	return &listerSecretGetter{lister: lister}
-}
-
-func (l *listerSecretGetter) GetSecret(namespace, name string) (*corev1api.Secret, error) {
-	secret, err := l.lister.Secrets(namespace).Get(name)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	return secret, nil
-}
-
-func GetRepositoryKey(secretGetter SecretGetter, namespace string) ([]byte, error) {
-	secret, err := secretGetter.GetSecret(namespace, CredentialsSecretName)
-	if err != nil {
-		return nil, err
-	}
-
-	key, found := secret.Data[CredentialsKey]
-	if !found {
-		return nil, errors.Errorf("%q secret is missing data for key %q", CredentialsSecretName, CredentialsKey)
-	}
-
-	return key, nil
 }

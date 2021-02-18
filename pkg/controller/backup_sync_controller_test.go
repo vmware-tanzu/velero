@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -335,7 +335,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(t)
+				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				pluginManager   = &pluginmocks.Manager{}
 				backupStores    = make(map[string]*persistencemocks.BackupStore)
@@ -558,7 +558,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(t)
+				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
@@ -652,7 +652,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(t)
+				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,7 +82,6 @@ type RestorerFactory interface {
 type repositoryManager struct {
 	namespace          string
 	veleroClient       clientset.Interface
-	secretsLister      corev1listers.SecretLister
 	repoLister         velerov1listers.ResticRepositoryLister
 	repoInformerSynced cache.InformerSynced
 	kbClient           kbclient.Client
@@ -101,7 +99,6 @@ func NewRepositoryManager(
 	ctx context.Context,
 	namespace string,
 	veleroClient clientset.Interface,
-	secretsInformer cache.SharedIndexInformer,
 	repoInformer velerov1informers.ResticRepositoryInformer,
 	repoClient velerov1client.ResticRepositoriesGetter,
 	kbClient kbclient.Client,
@@ -112,7 +109,6 @@ func NewRepositoryManager(
 	rm := &repositoryManager{
 		namespace:          namespace,
 		veleroClient:       veleroClient,
-		secretsLister:      corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
 		repoLister:         repoInformer.Lister(),
 		repoInformerSynced: repoInformer.Informer().HasSynced,
 		kbClient:           kbClient,
@@ -124,10 +120,6 @@ func NewRepositoryManager(
 		repoLocker:  newRepoLocker(),
 		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
 		fileSystem:  filesystem.NewFileSystem(),
-	}
-
-	if !cache.WaitForCacheSync(ctx.Done(), secretsInformer.HasSynced) {
-		return nil, errors.New("timed out waiting for cache to sync")
 	}
 
 	return rm, nil
@@ -235,7 +227,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 }
 
 func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
-	file, err := TempCredentialsFile(rm.secretsLister, rm.namespace, cmd.RepoName(), rm.fileSystem)
+	file, err := TempCredentialsFile(rm.kbClient, rm.namespace, cmd.RepoName(), rm.fileSystem)
 	if err != nil {
 		return err
 	}

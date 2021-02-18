@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(t)
+				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = velerotest.NewLogger()
@@ -409,7 +409,7 @@ func TestProcessQueueItem(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(t)
+				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = velerotest.NewLogger()

@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -181,9 +181,9 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			var fakeClient kbclient.Client
 			if test.backupLocation != nil {
-				fakeClient = newFakeClient(t, test.backupLocation)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation)
 			} else {
-				fakeClient = newFakeClient(t)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
 			c := &backupController{
@@ -246,7 +246,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				fakeClient      = newFakeClient(t)
+				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 			)
 
 			apiServer := velerotest.NewAPIServer(t)
@@ -306,7 +306,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 		formatFlag := logging.FormatText
 		var (
 			clientset       = fake.NewSimpleClientset(test.backup)
-			fakeClient      = newFakeClient(t)
+			fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
 			logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 		)
@@ -783,9 +783,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 			var fakeClient kbclient.Client
 			// add the test's backup storage location if it's different than the default
 			if test.backupLocation != nil && test.backupLocation != defaultBackupLocation {
-				fakeClient = newFakeClient(t, test.backupLocation)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation)
 			} else {
-				fakeClient = newFakeClient(t)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
 			apiServer := velerotest.NewAPIServer(t)

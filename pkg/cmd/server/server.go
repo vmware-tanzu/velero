@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,10 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
 	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
@@ -286,6 +285,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
+
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme: scheme,
 	})
@@ -483,28 +484,10 @@ func (s *server) initRestic() error {
 		return err
 	}
 
-	// use a stand-alone secrets informer so we can filter to only the restic credentials
-	// secret(s) within the velero namespace
-	//
-	// note: using an informer to access the single secret for all velero-managed
-	// restic repositories is overkill for now, but will be useful when we move
-	// to fully-encrypted backups and have unique keys per repository.
-	secretsInformer := corev1informers.NewFilteredSecretInformer(
-		s.kubeClient,
-		s.namespace,
-		0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(opts *metav1.ListOptions) {
-			opts.FieldSelector = fmt.Sprintf("metadata.name=%s", restic.CredentialsSecretName)
-		},
-	)
-	go secretsInformer.Run(s.ctx.Done())
-
 	res, err := restic.NewRepositoryManager(
 		s.ctx,
 		s.namespace,
 		s.veleroClient,
-		secretsInformer,
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
 		s.mgr.GetClient(),

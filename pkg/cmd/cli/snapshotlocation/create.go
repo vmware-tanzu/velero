@@ -24,10 +24,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -113,14 +113,9 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Labels:    o.Labels.Data(),
 		},
 		Spec: api.VolumeSnapshotLocationSpec{
-			Provider: o.Provider,
-			Config:   o.Config.Data(),
-			Credential: &corev1api.SecretKeySelector{
-				LocalObjectReference: corev1api.LocalObjectReference{
-					Name: o.secretName,
-				},
-				Key: o.secretKey,
-			},
+			Provider:   o.Provider,
+			Config:     o.Config.Data(),
+			Credential: builder.ForSecretKeySelector(o.secretName, o.secretKey).Result(),
 		},
 	}
 

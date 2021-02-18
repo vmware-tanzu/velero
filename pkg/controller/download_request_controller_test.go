@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -246,9 +246,9 @@ func TestProcessDownloadRequest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var fakeClient client.Client
 			if tc.backupLocation != nil {
-				fakeClient = newFakeClient(t, tc.backupLocation)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, tc.backupLocation)
 			} else {
-				fakeClient = newFakeClient(t)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
 			harness := newDownloadRequestTestHarness(t, fakeClient)
