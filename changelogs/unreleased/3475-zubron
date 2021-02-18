@@ -1,0 +1,1 @@
+Fixed a bug where restic volumes would not be restored when using a namespace mapping.
