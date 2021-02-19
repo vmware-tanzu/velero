@@ -19,6 +19,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -124,6 +125,10 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	pvc, err := pvcLister.PersistentVolumeClaims(pod.Namespace).Get(volume.VolumeSource.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		return "", errors.WithStack(err)
+	}
+
+	if os.Getenv("ONLY_CSI") == "True" {
+		return pvc.Spec.VolumeName + "/mount", nil
 	}
 
 	pv, err := pvLister.Get(pvc.Spec.VolumeName)

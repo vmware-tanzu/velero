@@ -72,6 +72,10 @@ When the Velero backup expires, the VolumeSnapshot objects will be deleted and t
 
 For more details on how each plugin works, see the [CSI plugin repo][2]'s documentation.
 
+## Bypass the volumes type check when using only CSI volumes in a multi-tenant environment
+
+In a multi-tenant environment, the use of class pvLister can cause some permission issues. If using only CSI volumes, defining the environment variable ONLY_CSI=True in the docker-compose.yml file using Velero's image will allow to bypass the call to pvLister.
+
 [1]: customize-installation.md#enable-server-side-features
 [2]: https://github.com/vmware-tanzu/velero-plugin-for-csi/
 [3]: https://hub.docker.com/repository/docker/velero/velero-plugin-for-csi
