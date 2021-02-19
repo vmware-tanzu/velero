@@ -19,4 +19,8 @@ velero client config set namespace=<NAMESPACE_VALUE>
 
 Alternatively, you may use the global `--namespace` flag with any operational command to tell Velero where to run.
 
+## Customize the targeted namespace
+
+In the YAML deployment file using Velero's image, define the environment variable NAMESPACE_NAME to specify the namespace in which you want Velero to backup resources.
+
 [0]: basic-install.md#install-the-cli

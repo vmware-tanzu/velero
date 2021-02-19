@@ -126,7 +126,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 	// filter to only pods scheduled on this node.
 	podInformer := corev1informers.NewFilteredPodInformer(
 		kubeClient,
-		metav1.NamespaceAll,
+		os.Getenv("NAMESPACE_NAME"),
 		0,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
@@ -250,7 +250,7 @@ func (s *resticServer) validatePodVolumesHostPath() error {
 		}
 	}
 
-	pods, err := s.kubeClient.CoreV1().Pods("").List(s.ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", os.Getenv("NODE_NAME"))})
+	pods, err := s.kubeClient.CoreV1().Pods(os.Getenv("NAMESPACE_NAME")).List(s.ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", os.Getenv("NODE_NAME"))})
 	if err != nil {
 		return errors.WithStack(err)
 	}
