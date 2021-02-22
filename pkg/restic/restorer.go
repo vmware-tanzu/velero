@@ -92,7 +92,7 @@ func newRestorer(
 }
 
 func (r *restorer) RestorePodVolumes(data RestoreData) []error {
-	volumesToRestore := GetVolumeBackupsForPod(data.PodVolumeBackups, data.Pod)
+	volumesToRestore := GetVolumeBackupsForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
 	if len(volumesToRestore) == 0 {
 		return nil
 	}

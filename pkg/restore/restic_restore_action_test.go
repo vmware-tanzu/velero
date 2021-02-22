@@ -122,6 +122,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 	tests := []struct {
 		name             string
 		pod              *corev1api.Pod
+		podFromBackup    *corev1api.Pod
 		podVolumeBackups []*velerov1api.PodVolumeBackup
 		want             *corev1api.Pod
 	}{
@@ -202,6 +203,49 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
+		{
+			name: "Restoring pod in another namespace adds the restic initContainer and uses the namespace of the backup pod for matching PVBs",
+			pod: builder.ForPod("new-ns", "my-pod").
+				Volumes(
+					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("original-ns", "my-pod").
+				Volumes(
+					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
+					PodName("my-pod").
+					PodNamespace("original-ns").
+					Volume("vol-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
+					Result(),
+				builder.ForPodVolumeBackup(veleroNs, "pvb-2").
+					PodName("my-pod").
+					PodNamespace("original-ns").
+					Volume("vol-2").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
+					Result(),
+			},
+			want: builder.ForPod("new-ns", "my-pod").
+				Volumes(
+					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				InitContainers(
+					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
+						Resources(&resourceReqs).
+						SecurityContext(&securityContext).
+						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).
+						Command([]string{"/velero-restic-restore-helper"}).Result()).
+				Result(),
+		},
 	}
 
 	for _, tc := range tests {
@@ -214,12 +258,24 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
+			unstructuredPod, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
 			require.NoError(t, err)
+
+			// Default to using the same pod for both Item and ItemFromBackup if podFromBackup not provided
+			var unstructuredPodFromBackup map[string]interface{}
+			if tc.podFromBackup != nil {
+				unstructuredPodFromBackup, err = runtime.DefaultUnstructuredConverter.ToUnstructured(tc.podFromBackup)
+				require.NoError(t, err)
+			} else {
+				unstructuredPodFromBackup = unstructuredPod
+			}
 
 			input := &velero.RestoreItemActionExecuteInput{
 				Item: &unstructured.Unstructured{
-					Object: unstructuredMap,
+					Object: unstructuredPod,
+				},
+				ItemFromBackup: &unstructured.Unstructured{
+					Object: unstructuredPodFromBackup,
 				},
 				Restore: builder.ForRestore(veleroNs, restoreName).
 					Backup(backupName).
