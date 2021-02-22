@@ -40,78 +40,93 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 		podVolumeBackups []*velerov1api.PodVolumeBackup
 		podAnnotations   map[string]string
 		podName          string
+		sourcePodNs      string
 		expected         map[string]string
 	}{
 		{
-			name:           "nil annotations",
+			name:           "nil annotations results in no volume backups returned",
 			podAnnotations: nil,
 			expected:       nil,
 		},
 		{
-			name:           "empty annotations",
+			name:           "empty annotations results in no volume backups returned",
 			podAnnotations: make(map[string]string),
 			expected:       nil,
 		},
 		{
-			name:           "non-empty map, no snapshot annotation",
+			name:           "pod annotations with no snapshot annotation prefix results in no volume backups returned",
 			podAnnotations: map[string]string{"foo": "bar"},
 			expected:       nil,
 		},
 		{
-			name:           "has snapshot annotation only, no suffix",
-			podAnnotations: map[string]string{podAnnotationPrefix: "bar"},
-			expected:       map[string]string{"": "bar"},
+			name:           "pod annotation with only snapshot annotation prefix, results in volume backup with empty volume key",
+			podAnnotations: map[string]string{podAnnotationPrefix: "snapshotID"},
+			expected:       map[string]string{"": "snapshotID"},
 		},
 		{
-			name:           "has snapshot annotation only, with suffix",
-			podAnnotations: map[string]string{podAnnotationPrefix + "foo": "bar"},
-			expected:       map[string]string{"foo": "bar"},
+			name:           "pod annotation with snapshot annotation prefix results in volume backup with volume name and snapshot ID",
+			podAnnotations: map[string]string{podAnnotationPrefix + "volume": "snapshotID"},
+			expected:       map[string]string{"volume": "snapshotID"},
 		},
 		{
-			name:           "has snapshot annotation, with suffix",
-			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
-			expected:       map[string]string{"foo": "bar", "abc": "123"},
+			name:           "only pod annotations with snapshot annotation prefix are considered",
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "volume1": "snapshot1", podAnnotationPrefix + "volume2": "snapshot2"},
+			expected:       map[string]string{"volume1": "snapshot1", "volume2": "snapshot2"},
 		},
 		{
-			name: "has snapshot annotation, with suffix, and also PVBs",
+			name: "pod annotations are not considered if PVBs are provided",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot1").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot2").Volume("pvbtest2-abc").Result(),
 			},
 			podName:        "TestPod",
+			sourcePodNs:    "TestNS",
 			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
-			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+			expected:       map[string]string{"pvbtest1-foo": "snapshot1", "pvbtest2-abc": "snapshot2"},
 		},
 		{
-			name: "no snapshot annotation, but with PVBs",
+			name: "volume backups are returned even if no pod annotations are present",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot1").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot2").Volume("pvbtest2-abc").Result(),
 			},
-			podName:  "TestPod",
-			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+			podName:     "TestPod",
+			sourcePodNs: "TestNS",
+			expected:    map[string]string{"pvbtest1-foo": "snapshot1", "pvbtest2-abc": "snapshot2"},
 		},
 		{
-			name: "no snapshot annotation, but with PVBs, some of which have snapshot IDs and some of which don't",
+			name: "only volumes from PVBs with snapshot IDs are returned",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestPod").Volume("pvbtest3-foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-4").PodName("TestPod").Volume("pvbtest4-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot1").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot2").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestPod").PodNamespace("TestNS").Volume("pvbtest3-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-4").PodName("TestPod").PodNamespace("TestNS").Volume("pvbtest4-abc").Result(),
 			},
-			podName:  "TestPod",
-			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+			podName:     "TestPod",
+			sourcePodNs: "TestNS",
+			expected:    map[string]string{"pvbtest1-foo": "snapshot1", "pvbtest2-abc": "snapshot2"},
 		},
 		{
-			name: "has snapshot annotation, with suffix, and with PVBs from current pod and a PVB from another pod",
+			name: "only volumes from PVBs for the given pod are returned",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestAnotherPod").SnapshotID("xyz").Volume("pvbtest3-xyz").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot1").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot2").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestAnotherPod").SnapshotID("snapshot3").Volume("pvbtest3-xyz").Result(),
 			},
-			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
-			podName:        "TestPod",
-			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+			podName:     "TestPod",
+			sourcePodNs: "TestNS",
+			expected:    map[string]string{"pvbtest1-foo": "snapshot1", "pvbtest2-abc": "snapshot2"},
+		},
+		{
+			name: "only volumes from PVBs which match the pod name and source pod namespace are returned",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").PodNamespace("TestNS").SnapshotID("snapshot1").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestAnotherPod").PodNamespace("TestNS").SnapshotID("snapshot2").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestPod").PodNamespace("TestAnotherNS").SnapshotID("snapshot3").Volume("pvbtest3-xyz").Result(),
+			},
+			podName:     "TestPod",
+			sourcePodNs: "TestNS",
+			expected:    map[string]string{"pvbtest1-foo": "snapshot1"},
 		},
 	}
 
@@ -121,7 +136,7 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 			pod.Annotations = test.podAnnotations
 			pod.Name = test.podName
 
-			res := GetVolumeBackupsForPod(test.podVolumeBackups, pod)
+			res := GetVolumeBackupsForPod(test.podVolumeBackups, pod, test.sourcePodNs)
 			assert.Equal(t, test.expected, res)
 		})
 	}
@@ -558,17 +573,14 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 
 func TestIsPVBMatchPod(t *testing.T) {
 	testCases := []struct {
-		name     string
-		pod      metav1.Object
-		pvb      velerov1api.PodVolumeBackup
-		expected bool
+		name        string
+		pvb         velerov1api.PodVolumeBackup
+		podName     string
+		sourcePodNs string
+		expected    bool
 	}{
 		{
 			name: "should match PVB and pod",
-			pod: &metav1.ObjectMeta{
-				Name:      "matching-pod",
-				Namespace: "matching-namespace",
-			},
 			pvb: velerov1api.PodVolumeBackup{
 				Spec: velerov1api.PodVolumeBackupSpec{
 					Pod: corev1api.ObjectReference{
@@ -577,14 +589,12 @@ func TestIsPVBMatchPod(t *testing.T) {
 					},
 				},
 			},
-			expected: true,
+			podName:     "matching-pod",
+			sourcePodNs: "matching-namespace",
+			expected:    true,
 		},
 		{
 			name: "should not match PVB and pod, pod name mismatch",
-			pod: &metav1.ObjectMeta{
-				Name:      "not-matching-pod",
-				Namespace: "matching-namespace",
-			},
 			pvb: velerov1api.PodVolumeBackup{
 				Spec: velerov1api.PodVolumeBackupSpec{
 					Pod: corev1api.ObjectReference{
@@ -593,14 +603,12 @@ func TestIsPVBMatchPod(t *testing.T) {
 					},
 				},
 			},
-			expected: false,
+			podName:     "not-matching-pod",
+			sourcePodNs: "matching-namespace",
+			expected:    false,
 		},
 		{
 			name: "should not match PVB and pod, pod namespace mismatch",
-			pod: &metav1.ObjectMeta{
-				Name:      "matching-pod",
-				Namespace: "not-matching-namespace",
-			},
 			pvb: velerov1api.PodVolumeBackup{
 				Spec: velerov1api.PodVolumeBackupSpec{
 					Pod: corev1api.ObjectReference{
@@ -609,14 +617,12 @@ func TestIsPVBMatchPod(t *testing.T) {
 					},
 				},
 			},
-			expected: false,
+			podName:     "matching-pod",
+			sourcePodNs: "not-matching-namespace",
+			expected:    false,
 		},
 		{
 			name: "should not match PVB and pod, pod name and namespace mismatch",
-			pod: &metav1.ObjectMeta{
-				Name:      "not-matching-pod",
-				Namespace: "not-matching-namespace",
-			},
 			pvb: velerov1api.PodVolumeBackup{
 				Spec: velerov1api.PodVolumeBackupSpec{
 					Pod: corev1api.ObjectReference{
@@ -625,13 +631,15 @@ func TestIsPVBMatchPod(t *testing.T) {
 					},
 				},
 			},
-			expected: false,
+			podName:     "not-matching-pod",
+			sourcePodNs: "not-matching-namespace",
+			expected:    false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := isPVBMatchPod(&tc.pvb, tc.pod)
+			actual := isPVBMatchPod(&tc.pvb, tc.podName, tc.sourcePodNs)
 			assert.Equal(t, tc.expected, actual)
 		})
 

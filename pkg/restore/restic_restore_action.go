@@ -76,6 +76,15 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 		return nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
 	}
 
+	// At the point when this function is called, the namespace mapping for the restore
+	// has not yet been applied to `input.Item` so we can't perform a reverse-lookup in
+	// the namespace mapping in the restore spec. Instead, use the pod from the backup
+	// so that if the mapping is applied earlier, we still use the correct namespace.
+	var podFromBackup corev1.Pod
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.ItemFromBackup.UnstructuredContent(), &podFromBackup); err != nil {
+		return nil, errors.Wrap(err, "unable to convert source pod from runtime.Unstructured")
+	}
+
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
 
 	opts := label.NewListOptionsForBackup(input.Restore.Spec.BackupName)
@@ -88,7 +97,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	for i := range podVolumeBackupList.Items {
 		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
-	volumeSnapshots := restic.GetVolumeBackupsForPod(podVolumeBackups, &pod)
+	volumeSnapshots := restic.GetVolumeBackupsForPod(podVolumeBackups, &pod, podFromBackup.Namespace)
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No restic backups found for pod")
 		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
