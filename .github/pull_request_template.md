@@ -8,6 +8,6 @@ Fixes #(issue)
 
 # Please indicate you've done the following:
 
-[ ] [Accepted the DCO](https://velero.io/docs/v1.5/code-standards/#dco-sign-off). Commits without the DCO will delay acceptance.
-[ ] [Created a changelog file](https://velero.io/docs/v1.5/code-standards/#adding-a-changelog) or added `/kind changelog-not-required`.
-[ ] Updated the corresponding documentation in `site/content/docs/main`.
+- [ ] [Accepted the DCO](https://velero.io/docs/v1.5/code-standards/#dco-sign-off). Commits without the DCO will delay acceptance.
+- [ ] [Created a changelog file](https://velero.io/docs/v1.5/code-standards/#adding-a-changelog) or added `/kind changelog-not-required`.
+- [ ] Updated the corresponding documentation in `site/content/docs/main`.
