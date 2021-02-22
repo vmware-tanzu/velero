@@ -109,7 +109,7 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	backupName := downloadRequest.Spec.Target.Name
 	if downloadRequest.Status.Phase == "" || downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseNew {
 
-		// Set expiration.
+		// Update the expiration.
 		downloadRequest.Status.Expiration = &metav1.Time{Time: r.Clock.Now().Add(persistence.DownloadURLTTL)}
 
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreLog ||
@@ -155,7 +155,7 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		downloadRequest.Status.Phase = velerov1api.DownloadRequestPhaseProcessed
 
-		// Update the expiration to extend the time we wait (the TTL) to start after successfully processing the URL.
+		// Update the expiration again to extend the time we wait (the TTL) to start after successfully processing the URL.
 		downloadRequest.Status.Expiration = &metav1.Time{Time: r.Clock.Now().Add(persistence.DownloadURLTTL)}
 	}
 

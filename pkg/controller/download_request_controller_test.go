@@ -80,14 +80,11 @@ var _ = Describe("Download Request Reconciler", func() {
 
 			Expect(test.downloadRequest).ToNot(BeNil())
 
-			// Set .status.expiration properly for processed requests. Since "expired" is relative to the controller's
+			// Set .status.expiration properly for all requests test cases that are
+			// meant to be expired. Since "expired" is relative to the controller's
 			// clock time, it's easier to do this here than as part of the test case definitions.
-			if test.downloadRequest != nil && test.downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && test.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-				if test.expired {
-					test.downloadRequest.Status.Expiration = &metav1.Time{Time: rClock.Now().Add(-1 * time.Minute)}
-				} else {
-					test.downloadRequest.Status.Expiration = &metav1.Time{Time: rClock.Now().Add(time.Minute)}
-				}
+			if test.expired {
+				test.downloadRequest.Status.Expiration = &metav1.Time{Time: rClock.Now().Add(-1 * time.Minute)}
 			}
 
 			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme)
@@ -142,15 +139,13 @@ var _ = Describe("Download Request Reconciler", func() {
 			err = r.Client.Get(ctx, kbclient.ObjectKey{Name: test.downloadRequest.Name, Namespace: test.downloadRequest.Namespace}, instance)
 
 			if test.expired {
-				if test.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-					Expect(apierrors.IsNotFound(err)).To(BeTrue())
-				} else {
-					Expect(instance).ToNot(Equal(test.downloadRequest))
-					Expect(err).To(BeNil())
-				}
+				Expect(instance).ToNot(Equal(test.downloadRequest))
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			} else {
 				if test.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
 					Expect(instance).To(Equal(test.downloadRequest))
+				} else {
+					Expect(instance).ToNot(Equal(test.downloadRequest))
 				}
 				Expect(err).To(BeNil())
 			}
@@ -256,11 +251,16 @@ var _ = Describe("Download Request Reconciler", func() {
 			expectedRequeue: ctrl.Result{Requeue: false},
 		}),
 		Entry("request with phase '' and expired is deleted", request{
-			downloadRequest:      builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
-			backup:               defaultBackup(),
-			expired:              true,
-			expectedReconcileErr: "backups.velero.io \"a-backup-20170912150214\" not found",
-			expectedRequeue:      ctrl.Result{Requeue: false},
+			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
+			backup:          defaultBackup(),
+			expired:         true,
+			expectedRequeue: ctrl.Result{Requeue: false},
+		}),
+		Entry("request with phase 'New' and expired is deleted", request{
+			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseNew).Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
+			backup:          defaultBackup(),
+			expired:         true,
+			expectedRequeue: ctrl.Result{Requeue: false},
 		}),
 	)
 })
