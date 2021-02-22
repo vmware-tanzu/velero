@@ -63,6 +63,12 @@ func (b *PodVolumeBackupBuilder) Phase(phase velerov1api.PodVolumeBackupPhase) *
 	return b
 }
 
+// Node sets the PodVolumeBackup's node name.
+func (b *PodVolumeBackupBuilder) Node(name string) *PodVolumeBackupBuilder {
+	b.object.Spec.Node = name
+	return b
+}
+
 // SnapshotID sets the PodVolumeBackup's snapshot ID.
 func (b *PodVolumeBackupBuilder) SnapshotID(snapshotID string) *PodVolumeBackupBuilder {
 	b.object.Status.SnapshotID = snapshotID

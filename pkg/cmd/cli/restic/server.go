@@ -34,10 +34,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -190,17 +192,24 @@ func (s *resticServer) run() {
 
 	s.logger.Info("Starting controllers")
 
-	backupController := controller.NewPodVolumeBackupController(
-		s.logger,
-		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
-		s.veleroClient.VeleroV1(),
-		s.podInformer,
-		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
-		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		s.metrics,
-		s.mgr.GetClient(),
-		os.Getenv("NODE_NAME"),
-	)
+	pvbr := controller.PodVolumeBackupReconciler{
+		Scheme:   s.mgr.GetScheme(),
+		Client:   s.mgr.GetClient(),
+		Ctx:      s.ctx,
+		Clock:    clock.RealClock{},
+		Metrics:  s.metrics,
+		NodeName: os.Getenv("NODE_NAME"),
+		FileSystem:            filesystem.NewFileSystem(),
+		Log: s.logger,
+
+		PvLister:              s.kubeInformerFactory.Core().V1().PersistentVolumes().Lister(),
+		PvcLister:             s.kubeInformerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		PodVolumeBackupLister: s.veleroInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
+
+	}
+	if err := pvbr.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
+	}
 
 	restoreController := controller.NewPodVolumeRestoreController(
 		s.logger,
@@ -224,7 +233,6 @@ func (s *resticServer) run() {
 
 	// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
 	// so the manager will ensure the cache is started and ready before all controller are started
-	s.mgr.Add(managercontroller.Runnable(backupController, 1))
 	s.mgr.Add(managercontroller.Runnable(restoreController, 1))
 
 	s.logger.Info("Controllers starting...")

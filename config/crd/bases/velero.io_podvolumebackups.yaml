@@ -48,7 +48,9 @@ spec:
     singular: podvolumebackup
   preserveUnknownFields: false
   scope: Namespaced
-  subresources: {}
+  subresources: {
+    status: {}
+  }
   validation:
     openAPIV3Schema:
       properties:
