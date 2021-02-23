@@ -212,11 +212,16 @@ type server struct {
 	namespace                           string
 	metricsAddress                      string
 	kubeClientConfig                    *rest.Config
+	kubeClientConfigTarget              *rest.Config
 	kubeClient                          kubernetes.Interface
+	kubeClientTarget                    kubernetes.Interface
 	veleroClient                        clientset.Interface
 	discoveryClient                     discovery.DiscoveryInterface
+	discoveryClientTarget               discovery.DiscoveryInterface
 	discoveryHelper                     velerodiscovery.Helper
+	discoveryHelperTarget                     velerodiscovery.Helper
 	dynamicClient                       dynamic.Interface
+	dynamicClientTarget                 dynamic.Interface
 	sharedInformerFactory               informers.SharedInformerFactory
 	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
 	csiSnapshotClient                   *snapshotv1beta1client.Clientset
@@ -246,6 +251,10 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	if err != nil {
 		return nil, err
 	}
+	kubeClientTarget, err := f.KubeClientTarget()
+	if err != nil {
+		return nil, err
+	}
 
 	veleroClient, err := f.Client()
 	if err != nil {
@@ -253,6 +262,10 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	dynamicClientTarget, err := f.DynamicClientTarget()
 	if err != nil {
 		return nil, err
 	}
@@ -269,6 +282,11 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	clientConfigTarget, err := f.ClientConfigTarget()
 	if err != nil {
 		cancelFunc()
 		return nil, err
@@ -299,10 +317,14 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		namespace:                           f.Namespace(),
 		metricsAddress:                      config.metricsAddress,
 		kubeClientConfig:                    clientConfig,
+		kubeClientConfigTarget:              clientConfigTarget,
 		kubeClient:                          kubeClient,
+		kubeClientTarget:                    kubeClientTarget,
 		veleroClient:                        veleroClient,
 		discoveryClient:                     veleroClient.Discovery(),
+		discoveryClientTarget:               kubeClientTarget.Discovery(),
 		dynamicClient:                       dynamicClient,
+		dynamicClientTarget:                 dynamicClientTarget,
 		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
 		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
 		csiSnapshotClient:                   csiSnapClient,
@@ -383,6 +405,21 @@ func (s *server) initDiscoveryHelper() error {
 		s.ctx.Done(),
 	)
 
+	discoveryHelperTarget, err := velerodiscovery.NewHelper(s.discoveryClient, s.logger)
+	if err != nil {
+		return err
+	}
+	s.discoveryHelperTarget = discoveryHelperTarget
+
+	go wait.Until(
+		func() {
+			if err := discoveryHelperTarget.Refresh(); err != nil {
+				s.logger.WithError(err).Error("Error refreshing discovery")
+			}
+		},
+		5*time.Minute,
+		s.ctx.Done(),
+	)
 	return nil
 }
 
@@ -581,9 +618,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	backupControllerRunInfo := func() controllerRunInfo {
 		backupper, err := backup.NewKubernetesBackupper(
 			s.veleroClient.VeleroV1(),
-			s.discoveryHelper,
-			client.NewDynamicFactory(s.dynamicClient),
-			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			s.discoveryHelperTarget,
+			client.NewDynamicFactory(s.dynamicClientTarget),
+			podexec.NewPodCommandExecutor(s.kubeClientConfigTarget, s.kubeClientTarget.CoreV1().RESTClient()),
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
@@ -679,16 +716,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
-			s.discoveryHelper,
-			client.NewDynamicFactory(s.dynamicClient),
+			s.discoveryHelperTarget,
+			client.NewDynamicFactory(s.dynamicClientTarget),
 			s.config.restoreResourcePriorities,
-			s.kubeClient.CoreV1().Namespaces(),
+			s.kubeClientTarget.CoreV1().Namespaces(),
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
 			s.logger,
-			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.kubeClient.CoreV1().RESTClient(),
+			podexec.NewPodCommandExecutor(s.kubeClientConfigTarget, s.kubeClient.CoreV1().RESTClient()),
+			s.kubeClientTarget.CoreV1().RESTClient(),
 		)
 		cmd.CheckError(err)
 

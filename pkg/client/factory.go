@@ -42,9 +42,11 @@ type Factory interface {
 	// KubeClient returns a Kubernetes client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubeClient() (kubernetes.Interface, error)
+	KubeClientTarget() (kubernetes.Interface, error)
 	// DynamicClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	DynamicClient() (dynamic.Interface, error)
+	DynamicClientTarget() (dynamic.Interface, error)
 	// KubebuilderClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubebuilderClient() (kbclient.Client, error)
@@ -58,6 +60,7 @@ type Factory interface {
 	SetClientBurst(int)
 	// ClientConfig returns a rest.Config struct used for client-go clients.
 	ClientConfig() (*rest.Config, error)
+	ClientConfigTarget() (*rest.Config, error)
 	// Namespace returns the namespace which the Factory will create clients for.
 	Namespace() string
 }
@@ -66,6 +69,8 @@ type factory struct {
 	flags       *pflag.FlagSet
 	kubeconfig  string
 	kubecontext string
+	kubeconfigTarget  string
+	kubecontextTarget string
 	baseName    string
 	namespace   string
 	clientQPS   float32
@@ -93,7 +98,8 @@ func NewFactory(baseName string, config VeleroConfig) Factory {
 	f.flags.StringVar(&f.kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
 	f.flags.StringVarP(&f.namespace, "namespace", "n", f.namespace, "The namespace in which Velero should operate")
 	f.flags.StringVar(&f.kubecontext, "kubecontext", "", "The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context)")
-
+	f.flags.StringVar(&f.kubeconfigTarget, "kubeconfig-target", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
+	f.flags.StringVar(&f.kubecontextTarget, "kubecontext-target", "", "The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context)")
 	return f
 }
 
@@ -103,6 +109,10 @@ func (f *factory) BindFlags(flags *pflag.FlagSet) {
 
 func (f *factory) ClientConfig() (*rest.Config, error) {
 	return Config(f.kubeconfig, f.kubecontext, f.baseName, f.clientQPS, f.clientBurst)
+}
+
+func (f *factory) ClientConfigTarget() (*rest.Config, error) {
+	return Config(f.kubeconfigTarget, f.kubecontextTarget, f.baseName, f.clientQPS, f.clientBurst)
 }
 
 func (f *factory) Client() (clientset.Interface, error) {
@@ -131,8 +141,33 @@ func (f *factory) KubeClient() (kubernetes.Interface, error) {
 	return kubeClient, nil
 }
 
+func (f *factory) KubeClientTarget() (kubernetes.Interface, error) {
+	clientConfig, err := f.ClientConfigTarget()
+	if err != nil {
+		return nil, err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return kubeClient, nil
+}
+
 func (f *factory) DynamicClient() (dynamic.Interface, error) {
 	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return dynamicClient, nil
+}
+
+func (f *factory) DynamicClientTarget() (dynamic.Interface, error) {
+	clientConfig, err := f.ClientConfigTarget()
 	if err != nil {
 		return nil, err
 	}

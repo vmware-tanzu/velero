@@ -587,6 +587,25 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	var fatalErrs []error
+
+	// discovery cluster name or cluster kubeconfig name/namespace
+	// kubeconfig
+	// create clients from kubeconfig
+	// create discoveryHelper from kubeconfig
+
+	//backupper, err := backup.NewKubernetesBackupper(
+	//	s.veleroClient.VeleroV1(),
+	//	discoveryHelperTarget,
+	//	client.NewDynamicFactory(s.dynamicClientTarget),
+	//	podexec.NewPodCommandExecutor(s.kubeClientConfigTarget, s.kubeClientTarget.CoreV1().RESTClient()),
+	//	s.resticManager,
+	//	s.config.podVolumeOperationTimeout,
+	//	s.config.defaultVolumesToRestic,
+	//)
+	//if err := backupper.Backup(backupLog, backup, backupFile, actions, pluginManager); err != nil {
+	//	fatalErrs = append(fatalErrs, err)
+	//}
+
 	if err := c.backupper.Backup(backupLog, backup, backupFile, actions, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
