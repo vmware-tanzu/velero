@@ -109,6 +109,9 @@ local_resource(
 # Note: we need a distro with a bash shell to exec into the Velero container
 tilt_dockerfile_header = """
 FROM ubuntu:focal as tilt
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -qq -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /
 COPY --from=tilt-helper /start.sh .
 COPY --from=tilt-helper /restart.sh .
