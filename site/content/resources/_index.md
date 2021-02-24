@@ -15,9 +15,9 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 ## Podcast shows
 
-* [vSpeaking Podcast Ep 124, with guests Carlisia Campos, Myles Gray and Cormac Hogan](https://blogs.vmware.com/virtualblocks/2019/08/02/vspeaking-podcast-velero/)
+* [vSpeaking Podcast Ep 124, with guests Carlisia Thompson, Myles Gray and Cormac Hogan](https://blogs.vmware.com/virtualblocks/2019/08/02/vspeaking-podcast-velero/)
 
-* [Listen to the PodCTL podcast with Carlisia Campos talking about Velero](<http://podcast.podctl.com/110399/986641-understanding-project-velero-formerly-ark>)
+* [Listen to the PodCTL podcast with Carlisia Thompson talking about Velero](<http://podcast.podctl.com/110399/986641-understanding-project-velero-formerly-ark>)
 
 ## Videos
 
@@ -26,7 +26,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
     {{< youtube JyzgS-KKuoo >}}
 
 
-* Kubernetes Back Up, Restore and Migration with Velero - A NewStack interview, with guests: Carlisia Campos, Tom Spoonemore, and Efri Nattel-Shayo:
+* Kubernetes Back Up, Restore and Migration with Velero - A NewStack interview, with guests: Carlisia Thompson, Tom Spoonemore, and Efri Nattel-Shayo:
 
     {{< youtube 71NoY5CIcQ8 >}}
 
@@ -52,7 +52,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 ## Blog posts
 
-* [How to Make Up for Kubernetes’ Disaster Recovery Shortfalls - by Carlisia Campos](https://thenewstack.io/how-to-make-up-for-kubernetes-disaster-recovery-shortfalls/)
+* [How to Make Up for Kubernetes’ Disaster Recovery Shortfalls - by Carlisia Thompson](https://thenewstack.io/how-to-make-up-for-kubernetes-disaster-recovery-shortfalls/)
 
 
 * [Project Velero 1.2 on OpenShift 3.11 - Backup and Restore (and backup to NFS) - by Rafael Brito](http://www.rafaelbrito.com/2019/11/project-velero-12-on-openshift-311.html)

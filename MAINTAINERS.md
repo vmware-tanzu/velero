@@ -6,7 +6,7 @@
 
 | Maintainer | GitHub ID | Affiliation |
 | --------------- | --------- | ----------- |
-| Carlisia Campos | [carlisia](https://github.com/carlisia) | [VMware](https://www.github.com/vmware/) |
+| Carlisia Thompson | [carlisia](https://github.com/carlisia) | [VMware](https://www.github.com/vmware/) |
 | Nolan Brubaker | [nrb](https://github.com/nrb) | [VMware](https://www.github.com/vmware/) |
 | Ashish Amarnath | [ashish-amarnath](https://github.com/ashish-amarnath) | [VMware](https://www.github.com/vmware/) |
 | Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
@@ -24,6 +24,6 @@
 | ----------------------------- | :---------------------: |
 | Technical Lead | Nolan Brubaker (nrb) |
 | Kubernetes CSI Liaison | Nolan Brubaker (nrb), Ashish Amarnath (ashish-amarnath) |
-| Deployment | Carlisia Campos (carlisia), Carlos Tadeu Panato Junior (cpanato), JenTing Hsiao (jenting) | 
+| Deployment | Carlisia Thompson (carlisia), Carlos Tadeu Panato Junior (cpanato), JenTing Hsiao (jenting) | 
 | Community Management | Jonas Rosland (jonasrosland) |
 | Product Management | Michael Michael (michmike) |

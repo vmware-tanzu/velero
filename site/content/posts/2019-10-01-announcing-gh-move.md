@@ -3,11 +3,11 @@ title: Announcing a new GitHub home for Velero
 slug: announcing-gh-move
 image: /img/posts/vmware-tanzu.png
 excerpt: The next Velero release (v1.2) will be built out of a new GitHub organization, and we have significant changes to our plugins.
-author_name: Carlisia Campos
-author_avatar: /img/contributors/carlisia-campos.png
+author_name: Carlisia Thompson
+author_avatar: /img/contributors/carlisia-thompson.png
 categories: ['velero']
 # Tag should match author to drive author pages
-tags: ['Carlisia Campos']
+tags: ['Carlisia Thompson']
 ---
 
 ## Big announcement
