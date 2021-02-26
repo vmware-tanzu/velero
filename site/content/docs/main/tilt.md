@@ -133,7 +133,7 @@ Here are two ways to use MinIO as the storage:
 
     In the `tilt-settings.json` file, set `"setup-minio": true`. This will configure a Kubernetes deployment containing a running
 instance of MinIO inside your cluster. There are [extra steps](contributions/minio/#expose-minio-outside-your-cluster-with-a-service)
-necessary to expose Minio outside the cluster. 
+necessary to expose MinIO outside the cluster. 
 
     To access this storage, you will need to expose MinIO outside the cluster by forwarding the MinIO port to the local machine using kubectl port-forward -n <velero-namespace> svc/minio 9000. Update the BSL configuration to use that as its "public URL" by adding `publicUrl: http://localhost:9000` to the BSL config. This is necessary to do things like download a backup file.
 
