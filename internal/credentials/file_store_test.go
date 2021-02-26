@@ -40,12 +40,12 @@ func TestNamespacedFileStore(t *testing.T) {
 		expectedContents string
 	}{
 		{
-			name:           "Get returns an error if the secret can't be found",
+			name:           "returns an error if the secret can't be found",
 			secretSelector: builder.ForSecretKeySelector("non-existent-secret", "secret-key").Result(),
-			wantErr:        "secrets \"non-existent-secret\" not found",
+			wantErr:        "unable to get key for secret: secrets \"non-existent-secret\" not found",
 		},
 		{
-			name:           "Get returns a filepath formed using fsRoot, namespace, secret name and key, with secret contents",
+			name:           "returns a filepath formed using fsRoot, namespace, secret name and key, with secret contents",
 			namespace:      "ns1",
 			fsRoot:         "/tmp/credentials",
 			secretSelector: builder.ForSecretKeySelector("credential", "key2").Result(),
@@ -67,22 +67,25 @@ func TestNamespacedFileStore(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := velerotest.NewFakeControllerRuntimeClient(t)
+
 			for _, secret := range tc.secrets {
 				require.NoError(t, client.Create(context.Background(), secret))
 			}
-			fs := velerotest.NewFakeFileSystem()
 
+			fs := velerotest.NewFakeFileSystem()
 			fileStore, err := NewNamespacedFileStore(client, tc.namespace, tc.fsRoot, fs)
 			require.NoError(t, err)
 
-			path, err := fileStore.Get(tc.secretSelector)
+			path, err := fileStore.Path(tc.secretSelector)
 
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}
+
 			require.Equal(t, path, tc.expectedPath)
+
 			contents, err := fs.ReadFile(path)
 			require.NoError(t, err)
 			require.Equal(t, []byte(tc.expectedContents), contents)

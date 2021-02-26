@@ -28,13 +28,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vmware-tanzu/velero/pkg/credentials"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -622,25 +621,25 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 		wantErr           string
 	}{
 		{
-			name:          "location with no ObjectStorage field results in an error",
+			name:          "when location does not use object storage, a backup store can't be retrieved",
 			location:      new(velerov1api.BackupStorageLocation),
 			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
 			wantErr:       "backup storage location does not use object storage",
 		},
 		{
-			name:          "location with no Provider field results in an error",
+			name:          "when object storage does not specify a provider, a backup store can't be retrieved",
 			location:      builder.ForBackupStorageLocation("", "").Bucket("").Result(),
 			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
 			wantErr:       "object storage provider name must not be empty",
 		},
 		{
-			name:          "location with a Bucket field with a '/' in the middle results in an error",
+			name:          "when the Bucket field has a '/' in the middle, a backup store can't be retrieved",
 			location:      builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("invalid/bucket").Result(),
 			credFileStore: velerotest.NewFakeCredentialsFileStore("", nil),
 			wantErr:       "backup storage location's bucket name \"invalid/bucket\" must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)",
 		},
 		{
-			name: "location with invalid credential selector results in an error",
+			name: "when the credential selector is invalid, a backup store can't be retrieved",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Credential(
 				builder.ForSecretKeySelector("does-not-exist", "does-not-exist").Result(),
 			).Result(),

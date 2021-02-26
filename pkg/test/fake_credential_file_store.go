@@ -23,9 +23,9 @@ import (
 // FileStore defines operations for interacting with credentials
 // that are stored on a file system.
 type FileStore interface {
-	// Get returns a path on disk where the secret defined by the given
-	// selector is serialized.
-	Get(selector *corev1api.SecretKeySelector) (string, error)
+	// Path returns a path on disk where the secret key defined by
+	// the given selector is serialized.
+	Path(selector *corev1api.SecretKeySelector) (string, error)
 }
 
 type fakeCredentialsFileStore struct {
@@ -33,12 +33,14 @@ type fakeCredentialsFileStore struct {
 	err  error
 }
 
-func (f *fakeCredentialsFileStore) Get(*corev1api.SecretKeySelector) (string, error) {
+// Path returns a path on disk where the secret key defined by
+// the given selector is serialized.
+func (f *fakeCredentialsFileStore) Path(*corev1api.SecretKeySelector) (string, error) {
 	return f.path, f.err
 }
 
 // NewFakeCredentialFileStore creates a FileStore which will return the given path
-// and error when Get is called.
+// and error when Path is called.
 func NewFakeCredentialsFileStore(path string, err error) FileStore {
 	return &fakeCredentialsFileStore{
 		path: path,

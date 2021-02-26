@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -33,39 +33,20 @@ import (
 // FileStore defines operations for interacting with credentials
 // that are stored on a file system.
 type FileStore interface {
-	// Get returns a path on disk where the secret defined by the given
-	// selector is serialized.
-	Get(selector *corev1.SecretKeySelector) (string, error)
+	// Path returns a path on disk where the secret key defined by
+	// the given selector is serialized.
+	Path(selector *corev1api.SecretKeySelector) (string, error)
 }
 
 type namespacedFileStore struct {
 	client    kbclient.Client
 	namespace string
-
-	fsRoot string
-	fs     filesystem.Interface
+	fsRoot    string
+	fs        filesystem.Interface
 }
 
-func (n *namespacedFileStore) Get(selector *corev1.SecretKeySelector) (string, error) {
-	creds, err := kube.GetSecretKey(n.client, n.namespace, selector)
-	if err != nil {
-		return "", err
-	}
-
-	keyFilePath := filepath.Join(n.fsRoot, fmt.Sprintf("%s-%s", selector.Name, selector.Key))
-	file, err := n.fs.OpenFile(keyFilePath, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to open credentials file for writing")
-	}
-	if _, err := file.Write(creds); err != nil {
-		return "", errors.Wrap(err, "unable to write credentials to store")
-	}
-	if err := file.Close(); err != nil {
-		return "", errors.Wrap(err, "unable to close credentials file")
-	}
-	return keyFilePath, nil
-}
-
+// NewNamespacedFileStore returns a FileStore which can interact with credentials
+// for the given namespace and will store them under the given fsRoot.
 func NewNamespacedFileStore(client kbclient.Client, namespace string, fsRoot string, fs filesystem.Interface) (FileStore, error) {
 	fsNamespaceRoot := filepath.Join(fsRoot, namespace)
 
@@ -79,4 +60,30 @@ func NewNamespacedFileStore(client kbclient.Client, namespace string, fsRoot str
 		fsRoot:    fsNamespaceRoot,
 		fs:        fs,
 	}, nil
+}
+
+// Path returns a path on disk where the secret key defined by
+// the given selector is serialized.
+func (n *namespacedFileStore) Path(selector *corev1api.SecretKeySelector) (string, error) {
+	creds, err := kube.GetSecretKey(n.client, n.namespace, selector)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to get key for secret")
+	}
+
+	keyFilePath := filepath.Join(n.fsRoot, fmt.Sprintf("%s-%s", selector.Name, selector.Key))
+
+	file, err := n.fs.OpenFile(keyFilePath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to open credentials file for writing")
+	}
+
+	if _, err := file.Write(creds); err != nil {
+		return "", errors.Wrap(err, "unable to write credentials to store")
+	}
+
+	if err := file.Close(); err != nil {
+		return "", errors.Wrap(err, "unable to close credentials file")
+	}
+
+	return keyFilePath, nil
 }

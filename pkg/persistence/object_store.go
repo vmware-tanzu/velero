@@ -26,12 +26,11 @@ import (
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
 
-	"github.com/vmware-tanzu/velero/pkg/credentials"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -134,15 +133,19 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 	if location.Spec.Config == nil {
 		location.Spec.Config = make(map[string]string)
 	}
+
 	location.Spec.Config["bucket"] = bucket
 	location.Spec.Config["prefix"] = prefix
+
 	// Only include a CACert if it's specified in order to maintain compatibility with plugins that don't expect it.
 	if location.Spec.ObjectStorage.CACert != nil {
 		location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
 	}
 
+	// If the BSL specifies a credential, fetch its path on disk and pass to
+	// plugin via the config.
 	if location.Spec.Credential != nil {
-		credsFile, err := b.credentialStore.Get(location.Spec.Credential)
+		credsFile, err := b.credentialStore.Path(location.Spec.Credential)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to get credentials")
 		}

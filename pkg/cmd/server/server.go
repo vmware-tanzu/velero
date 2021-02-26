@@ -49,14 +49,13 @@ import (
 	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
-	"github.com/vmware-tanzu/velero/pkg/credentials"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
@@ -69,6 +68,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -98,6 +98,8 @@ const (
 	defaultControllerWorkers = 1
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
+
+	defaultCredentialsDirectory = "/tmp/credentials"
 )
 
 type serverConfig struct {
@@ -555,7 +557,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
 
-	credentialFileStore, err := credentials.NewNamespacedFileStore(s.mgr.GetClient(), s.namespace, "/tmp/credentials/", filesystem.NewFileSystem())
+	// Create the credentials store which will fetch secrets from the Velero
+	// namespace and store them on the file system
+	credentialFileStore, err := credentials.NewNamespacedFileStore(
+		s.mgr.GetClient(),
+		s.namespace,
+		defaultCredentialsDirectory,
+		filesystem.NewFileSystem(),
+	)
 	cmd.CheckError(err)
 
 	backupStoreGetter := persistence.NewObjectBackupStoreGetter(credentialFileStore)
