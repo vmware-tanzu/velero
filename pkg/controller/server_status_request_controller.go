@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,12 +71,11 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	statusRequest := &velerov1api.ServerStatusRequest{}
 	if err := r.Client.Get(r.Ctx, req.NamespacedName, statusRequest); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.WithError(err).Error("ServerStatusRequest not found")
+			log.Debug("Unable to find ServerStatusRequest")
 			return ctrl.Result{}, nil
 		}
 
 		log.WithError(err).Error("Error getting ServerStatusRequest")
-		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
 

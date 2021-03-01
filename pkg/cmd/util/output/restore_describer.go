@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,40 +18,42 @@ package output
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/fatih/color"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 )
 
-func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertFile string) string {
+func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *velerov1api.Restore, podVolumeRestores []velerov1api.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertFile string) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
 		d.Println()
 		phase := restore.Status.Phase
 		if phase == "" {
-			phase = v1.RestorePhaseNew
+			phase = velerov1api.RestorePhaseNew
 		}
 		phaseString := string(phase)
 		switch phase {
-		case v1.RestorePhaseCompleted:
+		case velerov1api.RestorePhaseCompleted:
 			phaseString = color.GreenString(phaseString)
-		case v1.RestorePhaseFailedValidation, v1.RestorePhasePartiallyFailed, v1.RestorePhaseFailed:
+		case velerov1api.RestorePhaseFailedValidation, velerov1api.RestorePhasePartiallyFailed, velerov1api.RestorePhaseFailed:
 			phaseString = color.RedString(phaseString)
 		}
 
 		resultsNote := ""
-		if phase == v1.RestorePhaseFailed || phase == v1.RestorePhasePartiallyFailed {
+		if phase == velerov1api.RestorePhaseFailed || phase == velerov1api.RestorePhasePartiallyFailed {
 			resultsNote = fmt.Sprintf(" (run 'velero restore logs %s' for more information)", restore.Name)
 		}
 
@@ -79,7 +81,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 			}
 		}
 
-		describeRestoreResults(d, restore, veleroClient, insecureSkipTLSVerify, caCertFile)
+		describeRestoreResults(ctx, kbClient, d, restore, insecureSkipTLSVerify, caCertFile)
 
 		d.Println()
 		d.Printf("Backup:\t%s\n", restore.Spec.BackupName)
@@ -143,7 +145,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 	})
 }
 
-func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
+func describeRestoreResults(ctx context.Context, kbClient kbclient.Client, d *Describer, restore *velerov1api.Restore, insecureSkipTLSVerify bool, caCertPath string) {
 	if restore.Status.Warnings == 0 && restore.Status.Errors == 0 {
 		return
 	}
@@ -151,7 +153,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 	var buf bytes.Buffer
 	var resultMap map[string]pkgrestore.Result
 
-	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+	if err := downloadrequest.Stream(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
 		return
 	}
@@ -186,7 +188,7 @@ func describeRestoreResult(d *Describer, name string, result pkgrestore.Result) 
 }
 
 // describePodVolumeRestores describes pod volume restores in human-readable format.
-func describePodVolumeRestores(d *Describer, restores []v1.PodVolumeRestore, details bool) {
+func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRestore, details bool) {
 	if details {
 		d.Printf("Restic Restores:\n")
 	} else {
@@ -198,10 +200,10 @@ func describePodVolumeRestores(d *Describer, restores []v1.PodVolumeRestore, det
 
 	// go through phases in a specific order
 	for _, phase := range []string{
-		string(v1.PodVolumeRestorePhaseCompleted),
-		string(v1.PodVolumeRestorePhaseFailed),
+		string(velerov1api.PodVolumeRestorePhaseCompleted),
+		string(velerov1api.PodVolumeRestorePhaseFailed),
 		"In Progress",
-		string(v1.PodVolumeRestorePhaseNew),
+		string(velerov1api.PodVolumeRestorePhaseNew),
 	} {
 		if len(restoresByPhase[phase]) == 0 {
 			continue
@@ -230,15 +232,15 @@ func describePodVolumeRestores(d *Describer, restores []v1.PodVolumeRestore, det
 	}
 }
 
-func groupRestoresByPhase(restores []v1.PodVolumeRestore) map[string][]v1.PodVolumeRestore {
-	restoresByPhase := make(map[string][]v1.PodVolumeRestore)
+func groupRestoresByPhase(restores []velerov1api.PodVolumeRestore) map[string][]velerov1api.PodVolumeRestore {
+	restoresByPhase := make(map[string][]velerov1api.PodVolumeRestore)
 
-	phaseToGroup := map[v1.PodVolumeRestorePhase]string{
-		v1.PodVolumeRestorePhaseCompleted:  string(v1.PodVolumeRestorePhaseCompleted),
-		v1.PodVolumeRestorePhaseFailed:     string(v1.PodVolumeRestorePhaseFailed),
-		v1.PodVolumeRestorePhaseInProgress: "In Progress",
-		v1.PodVolumeRestorePhaseNew:        string(v1.PodVolumeRestorePhaseNew),
-		"":                                 string(v1.PodVolumeRestorePhaseNew),
+	phaseToGroup := map[velerov1api.PodVolumeRestorePhase]string{
+		velerov1api.PodVolumeRestorePhaseCompleted:  string(velerov1api.PodVolumeRestorePhaseCompleted),
+		velerov1api.PodVolumeRestorePhaseFailed:     string(velerov1api.PodVolumeRestorePhaseFailed),
+		velerov1api.PodVolumeRestorePhaseInProgress: "In Progress",
+		velerov1api.PodVolumeRestorePhaseNew:        string(velerov1api.PodVolumeRestorePhaseNew),
+		"":                                          string(velerov1api.PodVolumeRestorePhaseNew),
 	}
 
 	for _, restore := range restores {

@@ -32,7 +32,8 @@ spec:
     singular: downloadrequest
   preserveUnknownFields: false
   scope: Namespaced
-  subresources: {}
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: DownloadRequest is a request to download an artifact from backup

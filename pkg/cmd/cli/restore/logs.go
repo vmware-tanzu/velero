@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
@@ -52,6 +52,9 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
+			kbClient, err := f.KubebuilderClient()
+			cmd.CheckError(err)
+
 			restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(context.TODO(), restoreName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				cmd.Exit("Restore %q does not exist.", restoreName)
@@ -60,14 +63,14 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			}
 
 			switch restore.Status.Phase {
-			case v1.RestorePhaseCompleted, v1.RestorePhaseFailed, v1.RestorePhasePartiallyFailed:
+			case velerov1api.RestorePhaseCompleted, velerov1api.RestorePhaseFailed, velerov1api.RestorePhasePartiallyFailed:
 				// terminal phases, don't exit.
 			default:
 				cmd.Exit("Logs for restore %q are not available until it's finished processing. Please wait "+
 					"until the restore has a phase of Completed or Failed and try again.", restoreName)
 			}
 
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), restoreName, v1.DownloadTargetKindRestoreLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
+			err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
 			cmd.CheckError(err)
 		},
 	}

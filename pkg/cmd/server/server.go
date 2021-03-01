@@ -731,24 +731,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	downloadrequestControllerRunInfo := func() controllerRunInfo {
-		downloadRequestController := controller.NewDownloadRequestController(
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().DownloadRequests(),
-			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.mgr.GetClient(),
-			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			newPluginManager,
-			persistence.NewObjectBackupStoreGetter(),
-			s.logger,
-		)
-
-		return controllerRunInfo{
-			controller: downloadRequestController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	enabledControllers := map[string]func() controllerRunInfo{
 		controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
@@ -757,12 +739,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.BackupDeletion:    deletionControllerRunInfo,
 		controller.Restore:           restoreControllerRunInfo,
 		controller.ResticRepo:        resticRepoControllerRunInfo,
-		controller.DownloadRequest:   downloadrequestControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
-	enabledRuntimeControllers := map[string]struct{}{
-		controller.ServerStatusRequest: {},
-	}
+	enabledRuntimeControllers := make(map[string]struct{})
+	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
+	enabledRuntimeControllers[controller.DownloadRequest] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -836,6 +817,20 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
+		r := controller.DownloadRequestReconciler{
+			Scheme:            s.mgr.GetScheme(),
+			Client:            s.mgr.GetClient(),
+			Clock:             clock.RealClock{},
+			NewPluginManager:  newPluginManager,
+			BackupStoreGetter: persistence.NewObjectBackupStoreGetter(),
+			Log:               s.logger,
+		}
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
 		}
 	}
 
