@@ -32,15 +32,15 @@ type ResourceSelector struct {
 	// All namespaces in IncludedNamespaces, *except* those in
 	// this slice, will be matched.
 	ExcludedNamespaces []string
-	// IncludedResources is a slice of resources to match. Resources
-	// may be specified as full names (e.g. "services") or abbreviations
-	// (e.g. "svc"). All resources in this slice, except those in
-	// ExcludedResources, will be matched. A nil/empty slice matches
+	// IncludedResources is a slice of resources to match. Resources may be specified
+	// as full names (e.g. "services"), abbreviations (e.g. "svc"), or with the
+	// groups they are in (e.g. "ingresses.extensions"). All resources in this slice,
+	// except those in ExcludedResources, will be matched. A nil/empty slice matches
 	// all resources.
 	IncludedResources []string
-	// ExcludedResources is a slice of resources to exclude.
-	// Resources may be specified as full names (e.g. "services") or
-	// abbreviations (e.g. "svc"). All resources in IncludedResources,
+	// ExcludedResources is a slice of resources to exclude. Resources may be specified
+	// as full names (e.g. "services"), abbreviations (e.g. "svc"), or with the
+	// groups they are in (e.g. "ingresses.extensions"). All resources in IncludedResources,
 	// *except* those in this slice, will be matched.
 	ExcludedResources []string
 	// LabelSelector is a string representation of a selector to apply
