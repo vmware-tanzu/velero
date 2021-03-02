@@ -22,7 +22,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
@@ -43,7 +45,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 			"namespace": "cert-manager",
 		}
 
-		client, extensionsClient, err = GetClusterClient() // Currently we ignore the API extensions client
+		client, extensionsClient, err = kube.GetClusterClient() // Currently we ignore the API extensions client
 		Expect(err).NotTo(HaveOccurred())
 
 		err = InstallCRD(ctx, certMgrCRD["url"], certMgrCRD["namespace"])
@@ -342,7 +344,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 
 		// Uninstall Velero
 		if installVelero {
-			err = VeleroUninstall(ctx, client, extensionsClient, veleroNamespace)
+			err = uninstall.Uninstall(ctx, client, extensionsClient, veleroNamespace)
 			if err != nil {
 				return err
 			}

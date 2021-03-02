@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 )
@@ -41,7 +42,7 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 	AfterEach(func() {
 		if installVelero {
 			timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-			err := VeleroUninstall(timeoutCTX, client, extensionsClient, veleroNamespace)
+			err := uninstall.Uninstall(timeoutCTX, client, extensionsClient, veleroNamespace)
 			Expect(err).To(Succeed())
 		}
 

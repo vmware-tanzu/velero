@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,83 +17,77 @@ limitations under the License.
 package uninstall
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"strings"
+	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/install"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 )
 
-func Uninstall(c *cobra.Command, f client.Factory) error {
-	resources := install.AllCRDs()
-
-	dynamicClient, err := f.DynamicClient()
+// Uninstall uninstalls all components deployed using velero install command
+func Uninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclientset.Clientset,
+	veleroNamespace string) error {
+	if veleroNamespace == "" {
+		veleroNamespace = "velero"
+	}
+	err := DeleteNamespace(ctx, client, veleroNamespace)
 	if err != nil {
-		return err
+		return errors.WithMessagef(err, "Uninstall failed removing Velero namespace %s", veleroNamespace)
 	}
 
-	factory := client.NewDynamicFactory(dynamicClient)
+	rolebinding := install.ClusterRoleBinding(veleroNamespace)
 
-	veleroNs := strings.TrimSpace(f.Namespace())
-
-	if veleroNs == "" {
-		veleroNs = "velero"
+	err = client.RbacV1().ClusterRoleBindings().Delete(ctx, rolebinding.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.WithMessagef(err, "Uninstall failed removing Velero cluster role binding %s", rolebinding)
 	}
+	veleroLabels := labels.FormatLabels(install.Labels())
 
-	ds := install.DaemonSet(veleroNs, []install.PodTemplateOption{}...)
-	if err := install.AppendUnstructured(resources, ds); err != nil {
-		return err
+	crds, err := extensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{
+		LabelSelector: veleroLabels,
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "Uninstall failed listing Velero crds")
 	}
-
-	de := install.Deployment(veleroNs, []install.PodTemplateOption{}...)
-	if err := install.AppendUnstructured(resources, de); err != nil {
-		return err
-	}
-
-	se := install.Secret(veleroNs, nil)
-	if err := install.AppendUnstructured(resources, se); err != nil {
-		return err
-	}
-
-	sa := install.ServiceAccount(veleroNs, map[string]string{})
-	if err := install.AppendUnstructured(resources, sa); err != nil {
-		return err
-	}
-
-	crb := install.ClusterRoleBinding(veleroNs)
-	if err := install.AppendUnstructured(resources, crb); err != nil {
-		return err
-	}
-
-	ns := install.Namespace(veleroNs)
-	if err := install.AppendUnstructured(resources, ns); err != nil {
-		return err
-	}
-
-	for _, r := range resources.Items {
-		cl, err := install.CreateClient(&r, factory, os.Stdout)
+	for _, removeCRD := range crds.Items {
+		err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, removeCRD.ObjectMeta.Name, metav1.DeleteOptions{})
 		if err != nil {
-			return err
+			return errors.WithMessagef(err, "Uninstall failed removing CRD %s", removeCRD.ObjectMeta.Name)
 		}
-		fmt.Printf("%s/%s: attempting to delete resource\n", r.GetKind(), r.GetName())
-		if e := cl.Delete(r.GetName(), metav1.DeleteOptions{}); e != nil {
-			if apierrors.IsNotFound(e) {
-				fmt.Printf("%s/%s: skipping because resource is not present in the cluster\n", r.GetKind(), r.GetName())
-				continue
-			}
-		}
-		fmt.Printf("%s/%s: deleted resource\n", r.GetKind(), r.GetName())
 	}
 
+	fmt.Println("Uninstalled Velero")
 	return nil
+}
+
+func DeleteNamespace(ctx context.Context, client *kubernetes.Clientset, namespace string) error {
+	err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.WithMessagef(err, "Delete namespace failed removing namespace %s", namespace)
+	}
+	return wait.Poll(1*time.Second, 3*time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		if err != nil {
+			// Commented this out because not sure if removing this is okay
+			// Printing this on Uninstall will lead to confusion
+			// fmt.Printf("Namespaces.Get after delete return err %v\n", err)
+			return true, nil // Assume any error means the delete was successful
+		}
+		return false, nil
+	})
 }
 
 // NewCommand creates a cobra command.
@@ -107,7 +101,10 @@ The '--namespace' flag can be used to specify the namespace where velero is inst
 		`,
 		Example: `# velero uninstall -n backup`,
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(Uninstall(c, f))
+			veleroNs := strings.TrimSpace(f.Namespace())
+			cl, extCl, err := kube.GetClusterClient()
+			cmd.CheckError(err)
+			cmd.CheckError(Uninstall(context.Background(), cl, extCl, veleroNs))
 		},
 	}
 

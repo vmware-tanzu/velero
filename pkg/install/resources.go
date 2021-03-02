@@ -193,7 +193,7 @@ func Secret(namespace string, data []byte) *corev1.Secret {
 	}
 }
 
-func AppendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
+func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
 
 	// Remove the status field so we're not sending blank data to the server.
@@ -237,7 +237,7 @@ func AllCRDs() *unstructured.UnstructuredList {
 
 	for _, crd := range crds.CRDs {
 		crd.SetLabels(Labels())
-		AppendUnstructured(resources, crd)
+		appendUnstructured(resources, crd)
 	}
 
 	return resources
@@ -249,28 +249,28 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	resources := AllCRDs()
 
 	ns := Namespace(o.Namespace)
-	AppendUnstructured(resources, ns)
+	appendUnstructured(resources, ns)
 
 	crb := ClusterRoleBinding(o.Namespace)
-	AppendUnstructured(resources, crb)
+	appendUnstructured(resources, crb)
 
 	sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
-	AppendUnstructured(resources, sa)
+	appendUnstructured(resources, sa)
 
 	if o.SecretData != nil {
 		sec := Secret(o.Namespace, o.SecretData)
-		AppendUnstructured(resources, sec)
+		appendUnstructured(resources, sec)
 	}
 
 	if !o.NoDefaultBackupLocation {
 		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig, o.CACertData)
-		AppendUnstructured(resources, bsl)
+		appendUnstructured(resources, bsl)
 	}
 
 	// A snapshot location may not be desirable for users relying on restic
 	if o.UseVolumeSnapshots {
 		vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
-		AppendUnstructured(resources, vsl)
+		appendUnstructured(resources, vsl)
 	}
 
 	secretPresent := o.SecretData != nil
@@ -301,7 +301,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	deploy := Deployment(o.Namespace, deployOpts...)
 
-	AppendUnstructured(resources, deploy)
+	appendUnstructured(resources, deploy)
 
 	if o.UseRestic {
 		dsOpts := []PodTemplateOption{
@@ -314,7 +314,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
 		}
 		ds := DaemonSet(o.Namespace, dsOpts...)
-		AppendUnstructured(resources, ds)
+		appendUnstructured(resources, ds)
 	}
 
 	return resources, nil
