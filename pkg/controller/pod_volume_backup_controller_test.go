@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -72,16 +73,20 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 			r := PodVolumeBackupReconciler{
-				Client:   fake.NewFakeClientWithScheme(scheme.Scheme, test.pvb),
-				Ctx:      context.Background(),
-				Clock:    clock.NewFakeClock(now),
-				Metrics:  metrics.NewResticServerMetrics(),
-				NodeName: "foo",
-				Log:      velerotest.NewLogger(),
+				Client:     fake.NewFakeClientWithScheme(scheme.Scheme, test.pvb),
+				Ctx:        context.Background(),
+				Clock:      clock.NewFakeClock(now),
+				Metrics:    metrics.NewResticServerMetrics(),
+				NodeName:   "foo",
+				FileSystem: velerotest.NewFakeFileSystem(),
+				Log:        velerotest.NewLogger(),
 			}
 
 			err := r.Client.Create(r.Ctx, test.pod)
 			Expect(err).To(BeNil())
+
+			pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", "pvb-1-volume")
+			r.FileSystem.Create(pathGlob)
 
 			actualResult, err := r.Reconcile(r.Ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{

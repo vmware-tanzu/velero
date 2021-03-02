@@ -36,6 +36,10 @@ func NewFakeFileSystem() *FakeFileSystem {
 	}
 }
 
+func (fs *FakeFileSystem) Glob(path string) ([]string, error) {
+	return afero.Glob(fs.fs, path)
+}
+
 func (fs *FakeFileSystem) TempDir(dir, prefix string) (string, error) {
 	return afero.TempDir(fs.fs, dir, prefix)
 }

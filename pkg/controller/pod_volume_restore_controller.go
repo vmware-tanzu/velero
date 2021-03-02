@@ -344,6 +344,19 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
+func singlePathMatch(path string) (string, error) {
+	matches, err := filepath.Glob(path)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if len(matches) != 1 {
+		return "", errors.Errorf("expected one matching path, got %d", len(matches))
+	}
+
+	return matches[0], nil
+}
+
 func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>

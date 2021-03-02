@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -122,7 +121,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pvb.Spec.Pod.UID), volDir)
 	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
-	path, err := singlePathMatch(pathGlob)
+	path, err := r.singlePathMatch(pathGlob)
 	if err != nil {
 		return r.logErrorAndUpdateStatus(log, &pvb, err, "identifying unique volume path on host")
 	}
@@ -258,8 +257,8 @@ func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func singlePathMatch(path string) (string, error) {
-	matches, err := filepath.Glob(path)
+func (r *PodVolumeBackupReconciler) singlePathMatch(path string) (string, error) {
+	matches, err := r.FileSystem.Glob(path)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
