@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func DaemonSet(namespace string, opts ...PodTemplateOption) *appsv1.DaemonSet {
+func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
 		image: DefaultImage,
 	}

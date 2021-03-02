@@ -275,7 +275,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	secretPresent := o.SecretData != nil
 
-	deployOpts := []PodTemplateOption{
+	deployOpts := []podTemplateOption{
 		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
 		WithResources(o.VeleroPodResources),
@@ -304,7 +304,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	appendUnstructured(resources, deploy)
 
 	if o.UseRestic {
-		dsOpts := []PodTemplateOption{
+		dsOpts := []podTemplateOption{
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
