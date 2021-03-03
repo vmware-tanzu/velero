@@ -40,22 +40,11 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-const (
-	name = "pvb-1"
-)
-
-func pvbBuilder() *builder.PodVolumeBackupBuilder {
-	return builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, name)
-}
-
-func podBuilder() *builder.PodBuilder {
-	return builder.ForPod(velerov1api.DefaultNamespace, name)
-}
-
 var _ = Describe("Pod Volume Backup Reconciler", func() {
 	type request struct {
-		pvb *velerov1api.PodVolumeBackup
-		pod *corev1.Pod
+		pvb    *velerov1api.PodVolumeBackup
+		pod    *corev1.Pod
+		secret *corev1.Secret
 
 		expected        *velerov1api.PodVolumeBackup
 		expectedRequeue ctrl.Result
@@ -86,7 +75,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			Expect(err).To(BeNil())
 
 			pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", "pvb-1-volume")
-			r.FileSystem.Create(pathGlob)
+			_, err = r.FileSystem.Create(pathGlob)
+			Expect(err).To(BeNil())
+
+			err = r.Client.Create(r.Ctx, test.secret)
+			Expect(err).To(BeNil())
 
 			actualResult, err := r.Reconcile(r.Ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{
@@ -117,16 +110,18 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			}
 		},
 		Entry("with with phase=empty will be processed and phase successfully patched", request{
-			pvb: pvbBuilder().
+			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Node("foo").
-				PodName(name).
 				PodNamespace(velerov1api.DefaultNamespace).
 				Volume("pvb-1-volume").
 				Result(),
-			pod: podBuilder().
+			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
 				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
 				Result(),
-			expected: pvbBuilder().
+			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
+				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
+				Result(),
+			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
 				Result(),
 			expectedRequeue: ctrl.Result{},

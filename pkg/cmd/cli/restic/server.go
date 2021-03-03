@@ -39,7 +39,6 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -193,19 +192,18 @@ func (s *resticServer) run() {
 	s.logger.Info("Starting controllers")
 
 	pvbr := controller.PodVolumeBackupReconciler{
-		Scheme:   s.mgr.GetScheme(),
-		Client:   s.mgr.GetClient(),
-		Ctx:      s.ctx,
-		Clock:    clock.RealClock{},
-		Metrics:  s.metrics,
-		NodeName: os.Getenv("NODE_NAME"),
-		FileSystem:            filesystem.NewFileSystem(),
-		Log: s.logger,
+		Scheme:     s.mgr.GetScheme(),
+		Client:     s.mgr.GetClient(),
+		Ctx:        s.ctx,
+		Clock:      clock.RealClock{},
+		Metrics:    s.metrics,
+		NodeName:   os.Getenv("NODE_NAME"),
+		FileSystem: filesystem.NewFileSystem(),
+		Log:        s.logger,
 
-		PvLister:              s.kubeInformerFactory.Core().V1().PersistentVolumes().Lister(),
-		PvcLister:             s.kubeInformerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		PodVolumeBackupLister: s.veleroInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-
+		PvLister:  s.kubeInformerFactory.Core().V1().PersistentVolumes().Lister(),
+		PvcLister: s.kubeInformerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		PvbLister: s.veleroInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
 	}
 	if err := pvbr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
