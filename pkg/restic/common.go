@@ -238,10 +238,9 @@ func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister vele
 	return res, nil
 }
 
-// TempCredentialsFile creates a temp file containing a restic
-// encryption key for the given repo and returns its path. The
-// caller should generally call os.Remove() to remove the file
-// when done with it.
+// TempCredentialsFile creates a temp file containing the restic
+// encryption key and returns its path. The caller should generally
+// call os.Remove() to remove the file when done with it.
 func TempCredentialsFile(client kbclient.Client, veleroNamespace string, fs filesystem.Interface) (string, error) {
 	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
 	// When we move to full-backup encryption, we'll likely have a separate key per restic repo

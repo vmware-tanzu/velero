@@ -25,9 +25,8 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // FileStore defines operations for interacting with credentials

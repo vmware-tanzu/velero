@@ -20,11 +20,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/vmware-tanzu/velero/pkg/builder"
-
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
