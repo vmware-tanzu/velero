@@ -9,10 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"k8s.io/apimachinery/pkg/labels"
-
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -20,6 +17,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/install"
 )
@@ -277,36 +275,8 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 	return nil
 }
 
-func VeleroUninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclient.Clientset,
-	veleroNamespace string) error {
-	// TODO - replace with invocation of "velero uninstall" when that becomes available
-	err := DeleteNamespace(ctx, client, veleroNamespace)
-	if err != nil {
-		return errors.WithMessagef(err, "Uninstall failed removing Velero namespace %s", veleroNamespace)
-	}
-
-	return err
-	rolebinding := install.ClusterRoleBinding(veleroNamespace)
-
-	err = client.RbacV1().ClusterRoleBindings().Delete(ctx, rolebinding.Name, metav1.DeleteOptions{})
-	if err != nil {
-		return errors.WithMessagef(err, "Uninstall failed removing Velero cluster role binding %s", rolebinding)
-	}
-	veleroLabels := labels.FormatLabels(install.Labels())
-
-	crds, err := extensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{
-		LabelSelector: veleroLabels,
-	})
-	if err != nil {
-		return errors.WithMessagef(err, "Uninstall failed listing Velero crds")
-	}
-	for _, removeCRD := range crds.Items {
-		err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, removeCRD.ObjectMeta.Name, metav1.DeleteOptions{})
-		if err != nil {
-			return errors.WithMessagef(err, "Uninstall failed removing CRD %s", removeCRD.ObjectMeta.Name)
-		}
-	}
-	return nil
+func VeleroUninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclient.Clientset, veleroNamespace string) error {
+	return uninstall.Uninstall(ctx, client, extensionsClient, veleroNamespace)
 }
 
 func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {

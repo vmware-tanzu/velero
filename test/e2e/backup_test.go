@@ -10,6 +10,8 @@ import (
 	. "github.com/onsi/gomega"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var (
@@ -34,7 +36,7 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 			VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")
 		}
-		client, extensionsClient, err = GetClusterClient()
+		client, extensionsClient, err = kube.GetClusterClient()
 		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	})
 

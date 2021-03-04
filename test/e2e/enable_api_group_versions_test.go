@@ -23,6 +23,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
@@ -43,7 +44,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 			"namespace": "cert-manager",
 		}
 
-		client, extensionsClient, err = GetClusterClient() // Currently we ignore the API extensions client
+		client, extensionsClient, err = kube.GetClusterClient() // Currently we ignore the API extensions client
 		Expect(err).NotTo(HaveOccurred())
 
 		err = InstallCRD(ctx, certMgrCRD["url"], certMgrCRD["namespace"])

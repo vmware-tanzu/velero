@@ -67,3 +67,8 @@ func (c *FakeDynamicClient) Patch(name string, data []byte) (*unstructured.Unstr
 	args := c.Called(name, data)
 	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
 }
+
+func (c *FakeDynamicClient) Delete(name string, opts metav1.DeleteOptions) error {
+	args := c.Called(name, opts)
+	return args.Error(1)
+}
