@@ -1,5 +1,5 @@
 /*
-Copyright The Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -84,6 +85,21 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			fmt.Sprintf("%s/%s", req.Namespace, pvb.OwnerReferences[0].Name),
 		)
 	}
+
+	// Initialize patch helper.
+	patchHelper, err := patch.NewHelper(&pvb, r.Client)
+	if err != nil {
+		log.WithError(err).Error("error getting a patch helper to update this resource")
+		return ctrl.Result{}, err
+	}
+
+	defer func() {
+		// Attempt to Patch the pvb object and status after each reconciliation.
+		if err := patchHelper.Patch(r.Ctx, &pvb); err != nil {
+			log.WithError(err).Error("error updating download request")
+			return
+		}
+	}()
 
 	log.Info("Pod volume backup starting")
 
@@ -202,7 +218,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			emptySnapshot = true
 		} else {
 			log.WithError(errors.WithStack(err)).Errorf(
-				"Error running command=%s, stdout=%s, stderr=%s",
+				"error running command=%s, stdout=%s, stderr=%s",
 				resticCmd.String(),
 				stdout,
 				stderr,
@@ -280,7 +296,7 @@ func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation str
 
 	pvcBackups, err := pvbListers.List(labels.SelectorFromSet(map[string]string{velerov1api.PVCUIDLabel: pvcUID}))
 	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error listing pod volume backups for PVC")
+		log.WithError(errors.WithStack(err)).Error("error listing pod volume backups for PVC")
 		return ""
 	}
 
