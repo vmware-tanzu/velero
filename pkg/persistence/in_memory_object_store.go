@@ -1,6 +1,6 @@
 /*
 
-Copyright 2018, 2019 the Velero contributors.
+Copyright the Velero contributors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 
@@ -31,7 +31,8 @@ type BucketData map[string][]byte
 // that stores its data in-memory/in-proc. This is mainly intended to be used
 // as a test fake.
 type inMemoryObjectStore struct {
-	Data map[string]BucketData
+	Data   map[string]BucketData
+	Config map[string]string
 }
 
 func newInMemoryObjectStore(buckets ...string) *inMemoryObjectStore {
@@ -51,6 +52,7 @@ func newInMemoryObjectStore(buckets ...string) *inMemoryObjectStore {
 //
 
 func (o *inMemoryObjectStore) Init(config map[string]string) error {
+	o.Config = config
 	return nil
 }
 

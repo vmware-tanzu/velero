@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,12 @@ import (
 	"time"
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -96,12 +98,13 @@ type ObjectBackupStoreGetter interface {
 	Get(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error)
 }
 
-type objectBackupStoreGetter struct{}
+type objectBackupStoreGetter struct {
+	credentialStore credentials.FileStore
+}
 
-// NewObjectBackupStoreGetter returns a ObjectBackupStoreGetter that can get a
-// default velero.BackupStore.
-func NewObjectBackupStoreGetter() ObjectBackupStoreGetter {
-	return &objectBackupStoreGetter{}
+// NewObjectBackupStoreGetter returns a ObjectBackupStoreGetter that can get a velero.BackupStore.
+func NewObjectBackupStoreGetter(credentialStore credentials.FileStore) ObjectBackupStoreGetter {
+	return &objectBackupStoreGetter{credentialStore: credentialStore}
 }
 
 func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
@@ -127,16 +130,27 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 	// add the bucket name and prefix to the config map so that object stores
 	// can use them when initializing. The AWS object store uses the bucket
 	// name to determine the bucket's region when setting up its client.
-	if location.Spec.ObjectStorage != nil {
-		if location.Spec.Config == nil {
-			location.Spec.Config = make(map[string]string)
+	if location.Spec.Config == nil {
+		location.Spec.Config = make(map[string]string)
+	}
+
+	location.Spec.Config["bucket"] = bucket
+	location.Spec.Config["prefix"] = prefix
+
+	// Only include a CACert if it's specified in order to maintain compatibility with plugins that don't expect it.
+	if location.Spec.ObjectStorage.CACert != nil {
+		location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
+	}
+
+	// If the BSL specifies a credential, fetch its path on disk and pass to
+	// plugin via the config.
+	if location.Spec.Credential != nil {
+		credsFile, err := b.credentialStore.Path(location.Spec.Credential)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to get credentials")
 		}
-		location.Spec.Config["bucket"] = bucket
-		location.Spec.Config["prefix"] = prefix
-		// Only include a CACert if it's specified in order to maintain compatibility with plugins that don't expect it.
-		if location.Spec.ObjectStorage.CACert != nil {
-			location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
-		}
+
+		location.Spec.Config["credentialsFile"] = credsFile
 	}
 
 	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)

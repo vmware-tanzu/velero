@@ -300,7 +300,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	credsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
+	credsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, c.fileSystem)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)

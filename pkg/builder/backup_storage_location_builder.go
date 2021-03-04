@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package builder
 import (
 	"time"
 
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -83,6 +84,15 @@ func (b *BackupStorageLocationBuilder) Prefix(val string) *BackupStorageLocation
 	return b
 }
 
+// CACert sets the BackupStorageLocation's object storage CACert.
+func (b *BackupStorageLocationBuilder) CACert(val []byte) *BackupStorageLocationBuilder {
+	if b.object.Spec.StorageType.ObjectStorage == nil {
+		b.object.Spec.StorageType.ObjectStorage = new(velerov1api.ObjectStorageLocation)
+	}
+	b.object.Spec.ObjectStorage.CACert = val
+	return b
+}
+
 // Default sets the BackupStorageLocation's is default or not
 func (b *BackupStorageLocationBuilder) Default(isDefault bool) *BackupStorageLocationBuilder {
 	b.object.Spec.Default = isDefault
@@ -110,5 +120,11 @@ func (b *BackupStorageLocationBuilder) LastValidationTime(lastValidated time.Tim
 // Phase sets the BackupStorageLocation's status phase.
 func (b *BackupStorageLocationBuilder) Phase(phase velerov1api.BackupStorageLocationPhase) *BackupStorageLocationBuilder {
 	b.object.Status.Phase = phase
+	return b
+}
+
+// Credential sets the BackupStorageLocation's credential selector.
+func (b *BackupStorageLocationBuilder) Credential(selector *corev1api.SecretKeySelector) *BackupStorageLocationBuilder {
+	b.object.Spec.Credential = selector
 	return b
 }

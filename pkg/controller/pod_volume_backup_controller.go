@@ -221,7 +221,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// temp creds
-	credentialsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
+	credentialsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, c.fileSystem)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)

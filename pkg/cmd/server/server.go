@@ -49,6 +49,7 @@ import (
 	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -67,6 +68,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -96,6 +98,8 @@ const (
 	defaultControllerWorkers = 1
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
+
+	defaultCredentialsDirectory = "/tmp/credentials"
 )
 
 type serverConfig struct {
@@ -552,6 +556,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	newPluginManager := func(logger logrus.FieldLogger) clientmgmt.Manager {
 		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
+
+	// Create the credentials store which will fetch secrets from the Velero
+	// namespace and store them on the file system
+	credentialFileStore, err := credentials.NewNamespacedFileStore(
+		s.mgr.GetClient(),
+		s.namespace,
+		defaultCredentialsDirectory,
+		filesystem.NewFileSystem(),
+	)
+	cmd.CheckError(err)
+
+	backupStoreGetter := persistence.NewObjectBackupStoreGetter(credentialFileStore)
+
 	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
 
 	backupSyncControllerRunInfo := func() controllerRunInfo {
@@ -566,7 +583,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.kubeClient,
 			s.config.defaultBackupLocation,
 			newPluginManager,
-			persistence.NewObjectBackupStoreGetter(),
+			backupStoreGetter,
 			s.logger,
 		)
 
@@ -609,7 +626,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.formatFlag.Parse(),
 			csiVSLister,
 			csiVSCLister,
-			persistence.NewObjectBackupStoreGetter(),
+			backupStoreGetter,
 		)
 
 		return controllerRunInfo{
@@ -666,7 +683,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			csiVSCLister,
 			s.csiSnapshotClient,
 			newPluginManager,
-			persistence.NewObjectBackupStoreGetter(),
+			backupStoreGetter,
 			s.metrics,
 			s.discoveryHelper,
 		)
@@ -705,7 +722,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.logLevel,
 			newPluginManager,
-			persistence.NewObjectBackupStoreGetter(),
+			backupStoreGetter,
 			s.metrics,
 			s.config.formatFlag.Parse(),
 		)
@@ -800,7 +817,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			ServerValidationFrequency: s.config.storeValidationFrequency,
 		},
 		NewPluginManager:  newPluginManager,
-		BackupStoreGetter: persistence.NewObjectBackupStoreGetter(),
+		BackupStoreGetter: backupStoreGetter,
 		Log:               s.logger,
 	}
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
@@ -827,7 +844,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			Client:            s.mgr.GetClient(),
 			Clock:             clock.RealClock{},
 			NewPluginManager:  newPluginManager,
-			BackupStoreGetter: persistence.NewObjectBackupStoreGetter(),
+			BackupStoreGetter: backupStoreGetter,
 			Log:               s.logger,
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {

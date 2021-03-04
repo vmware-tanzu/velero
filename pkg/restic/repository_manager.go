@@ -227,7 +227,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 }
 
 func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
-	file, err := TempCredentialsFile(rm.kbClient, rm.namespace, cmd.RepoName(), rm.fileSystem)
+	file, err := TempCredentialsFile(rm.kbClient, rm.namespace, rm.fileSystem)
 	if err != nil {
 		return err
 	}
