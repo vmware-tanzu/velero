@@ -8,9 +8,10 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var (
@@ -35,14 +36,14 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 			VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")
 		}
-		client, extensionsClient, err = GetClusterClient()
+		client, extensionsClient, err = kube.GetClusterClient()
 		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	})
 
 	AfterEach(func() {
 		if installVelero {
 			timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-			err := uninstall.Uninstall(timeoutCTX, client, extensionsClient, veleroNamespace)
+			err := VeleroUninstall(timeoutCTX, client, extensionsClient, veleroNamespace)
 			Expect(err).To(Succeed())
 		}
 

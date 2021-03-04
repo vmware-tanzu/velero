@@ -29,17 +29,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/install"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 )
 
 // Uninstall uninstalls all components deployed using velero install command
-func Uninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclientset.Clientset,
-	veleroNamespace string) error {
+func Uninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclientset.Clientset, veleroNamespace string) error {
 	if veleroNamespace == "" {
 		veleroNamespace = "velero"
 	}

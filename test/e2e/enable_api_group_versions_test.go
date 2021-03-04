@@ -22,7 +22,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -344,7 +343,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 
 		// Uninstall Velero
 		if installVelero {
-			err = uninstall.Uninstall(ctx, client, extensionsClient, veleroNamespace)
+			err = VeleroUninstall(ctx, client, extensionsClient, veleroNamespace)
 			if err != nil {
 				return err
 			}

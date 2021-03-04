@@ -10,10 +10,14 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"k8s.io/client-go/kubernetes"
+
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/install"
 )
@@ -269,6 +273,10 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 		return errors.WithMessagef(err, "Failed to install Velero in cluster")
 	}
 	return nil
+}
+
+func VeleroUninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclient.Clientset, veleroNamespace string) error {
+	return uninstall.Uninstall(ctx, client, extensionsClient, veleroNamespace)
 }
 
 func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
