@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/restic"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -199,6 +200,7 @@ func (s *resticServer) run() {
 		Metrics:    s.metrics,
 		NodeName:   os.Getenv("NODE_NAME"),
 		FileSystem: filesystem.NewFileSystem(),
+		ResticExec: restic.BackupExec{},
 		Log:        s.logger,
 
 		PvLister:  s.kubeInformerFactory.Core().V1().PersistentVolumes().Lister(),

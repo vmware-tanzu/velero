@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -68,10 +69,17 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Metrics:    metrics.NewResticServerMetrics(),
 				NodeName:   "foo",
 				FileSystem: velerotest.NewFakeFileSystem(),
+				ResticExec: velerotest.FakeResticBackupExec{},
 				Log:        velerotest.NewLogger(),
 			}
 
-			err := r.Client.Create(r.Ctx, test.pod)
+			pvb := velerov1api.PodVolumeBackup{}
+			err = r.Client.Get(ctx, kbclient.ObjectKey{
+				Name:      test.pvb.Name,
+				Namespace: test.pvb.Namespace,
+			}, &pvb)
+
+			err = r.Client.Create(r.Ctx, test.pod)
 			Expect(err).To(BeNil())
 
 			pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", "pvb-1-volume")
@@ -95,12 +103,6 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Expect(err.Error()).To(BeEquivalentTo(test.expectedErrMsg))
 			}
 
-			pvb := velerov1api.PodVolumeBackup{}
-			err = r.Client.Get(ctx, kbclient.ObjectKey{
-				Name:      test.pvb.Name,
-				Namespace: test.pvb.Namespace,
-			}, &pvb)
-
 			// Assertions
 			if test.expected == nil {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
@@ -114,6 +116,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Node("foo").
 				PodNamespace(velerov1api.DefaultNamespace).
 				Volume("pvb-1-volume").
+				ObjectMeta(
+					func(obj metav1.Object) {
+						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
+					},
+				).
 				Result(),
 			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
 				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).

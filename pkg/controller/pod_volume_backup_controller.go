@@ -52,6 +52,7 @@ type PodVolumeBackupReconciler struct {
 	Metrics    *metrics.ServerMetrics
 	NodeName   string
 	FileSystem filesystem.Interface
+	ResticExec restic.BackupExecuter
 	Log        logrus.FieldLogger
 
 	PvLister  corev1listers.PersistentVolumeLister
@@ -154,7 +155,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	resticCmd.CACertFile = caCertFile
 
 	// Running restic command might need additional provider specific environment
-	// variables. Based on the provider, we set resticCmd.Env appropriately (currently
+	// variables. Set resticCmd.Env based on provider (currently
 	// for Azure and S3 based backuplocations)
 	var env []string
 	switch {
@@ -195,7 +196,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	var emptySnapshot bool
-	stdout, stderr, err := restic.RunBackup(resticCmd, log, r.updateBackupProgressFunc(&pvb, log))
+	stdout, stderr, err := r.ResticExec.RunBackup(resticCmd, log, r.updateBackupProgressFunc(&pvb, log))
 	if err != nil {
 		if strings.Contains(stderr, "snapshot is empty") {
 			emptySnapshot = true
@@ -218,7 +219,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	var snapshotID string
 	if !emptySnapshot {
-		snapshotID, err = restic.GetSnapshotID(
+		snapshotID, err = r.ResticExec.GetSnapshotID(
 			pvb.Spec.RepoIdentifier,
 			credsFile,
 			pvb.Spec.Tags,
