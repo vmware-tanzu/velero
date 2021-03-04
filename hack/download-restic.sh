@@ -46,14 +46,8 @@ if [[ -z "${RESTIC_VERSION}" ]]; then
     exit 1
 fi
 
-# TODO: when the new restic version is released, make ppc64le to be also downloaded from their github releases.
-#  This has been merged and will be applied to next release: https://github.com/restic/restic/pull/2342
-if [[ "${GOARCH}" = "ppc64le" ]]; then
-    curl -s --retry 5 -L https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-${RESTIC_VERSION} -o ${restic_bin}
-else
-    curl -s -L https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2 -O
-    bunzip2 restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2
-    mv restic_${RESTIC_VERSION}_${GOOS}_${GOARCH} ${restic_bin}
-fi
+curl -s -L https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2 -O
+bunzip2 restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2
+mv restic_${RESTIC_VERSION}_${GOOS}_${GOARCH} ${restic_bin}
 
 chmod +x ${restic_bin}
