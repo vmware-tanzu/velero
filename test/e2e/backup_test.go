@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,14 +50,61 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 
 	})
 
-	Context("When kibishii is the sample workload", func() {
-		It("should be successfully backed up and restored", func() {
+	When("kibishii is the sample workload", func() {
+		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
 			backupName = "backup-" + uuidgen.String()
 			restoreName = "restore-" + uuidgen.String()
 			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
-			Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName)).To(Succeed(),
+			Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, "")).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
+		})
+
+		It("should successfully back up and restore to multiple BackupStorageLocations with unique credentials", func() {
+			if additionalBslProvider == "" {
+				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
+			}
+
+			if additionalBslBucket == "" {
+				Skip("no additional BSL bucket given, not running multiple BackupStorageLocation with unique credentials tests")
+			}
+
+			if additionalBslCredentials == "" {
+				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
+			}
+
+			// Create Secret for additional BSL
+			secretName := fmt.Sprintf("bsl-credentials-%s", uuidgen)
+			secretKey := fmt.Sprintf("creds-%s", additionalBslProvider)
+			files := map[string]string{
+				secretKey: additionalBslCredentials,
+			}
+
+			Expect(CreateSecretFromFiles(context.TODO(), client, veleroNamespace, secretName, files)).To(Succeed())
+
+			// Create additional BSL using credential
+			additionalBsl := fmt.Sprintf("bsl-%s", uuidgen)
+			Expect(VeleroCreateBackupLocation(context.TODO(),
+				veleroCLI,
+				veleroNamespace,
+				additionalBsl,
+				additionalBslProvider,
+				additionalBslBucket,
+				additionalBslPrefix,
+				additionalBslConfig,
+				secretName,
+				secretKey,
+			)).To(Succeed())
+
+			bsls := []string{"default", additionalBsl}
+
+			for _, bsl := range bsls {
+				backupName = fmt.Sprintf("backup-%s-%s", bsl, uuidgen)
+				restoreName = fmt.Sprintf("restore-%s-%s", bsl, uuidgen)
+
+				Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, bsl)).To(Succeed(),
+					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
+			}
 		})
 	})
 })

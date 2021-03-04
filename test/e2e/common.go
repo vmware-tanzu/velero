@@ -2,9 +2,11 @@ package e2e
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,5 +44,22 @@ func WaitForNamespaceDeletion(interval, timeout time.Duration, client *kubernete
 		fmt.Printf("Namespace %s is still being deleted...\n", ns)
 		return false, nil
 	})
+	return err
+}
+
+func CreateSecretFromFiles(ctx context.Context, client *kubernetes.Clientset, namespace string, name string, files map[string]string) error {
+	data := make(map[string][]byte)
+
+	for key, filePath := range files {
+		contents, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return errors.WithMessagef(err, "Failed to read secret file %q", filePath)
+		}
+
+		data[key] = contents
+	}
+
+	secret := builder.ForSecret(namespace, name).Data(data).Result()
+	_, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }

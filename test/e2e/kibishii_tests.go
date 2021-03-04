@@ -85,7 +85,7 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 }
 
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, veleroNamespace, backupName, restoreName string) error {
+func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string) error {
 	fiveMinTimeout, _ := context.WithTimeout(context.Background(), 5*time.Minute)
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 	timeout := 10 * time.Minute
@@ -103,7 +103,7 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, vel
 		return errors.Wrap(err, "Failed to generate data")
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation); err != nil {
 		VeleroBackupLogs(fiveMinTimeout, veleroCLI, veleroNamespace, backupName)
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
