@@ -679,6 +679,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
+			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			s.config.restoreResourcePriorities,

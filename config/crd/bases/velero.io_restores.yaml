@@ -1651,6 +1651,22 @@ spec:
               - PartiallyFailed
               - Failed
               type: string
+            progress:
+              description: Progress contains information about the restore's execution
+                progress. Note that this information is best-effort only -- if Velero
+                fails to update it during a restore for any reason, it may be inaccurate/stale.
+              nullable: true
+              properties:
+                itemsRestored:
+                  description: ItemsRestored is the number of items that have actually
+                    been restored so far
+                  type: integer
+                totalItems:
+                  description: TotalItems is the total number of items to be restored.
+                    This number may change throughout the execution of the restore
+                    due to plugins that return additional related items to restore
+                  type: integer
+              type: object
             startTimestamp:
               description: StartTimestamp records the time the restore operation was
                 started. The server's time is used for StartTimestamps

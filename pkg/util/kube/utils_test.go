@@ -44,46 +44,53 @@ func TestNamespaceAndName(t *testing.T) {
 
 func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 	tests := []struct {
-		name           string
-		expectNSFound  bool
-		nsPhase        corev1.NamespacePhase
-		nsDeleting     bool
-		expectCreate   bool
-		alreadyExists  bool
-		expectedResult bool
+		name                  string
+		expectNSFound         bool
+		nsPhase               corev1.NamespacePhase
+		nsDeleting            bool
+		expectCreate          bool
+		alreadyExists         bool
+		expectedResult        bool
+		expectedCreatedResult bool
 	}{
 		{
-			name:           "namespace found, not deleting",
-			expectNSFound:  true,
-			expectedResult: true,
+			name:                  "namespace found, not deleting",
+			expectNSFound:         true,
+			expectedResult:        true,
+			expectedCreatedResult: false,
 		},
 		{
-			name:           "namespace found, terminating phase",
-			expectNSFound:  true,
-			nsPhase:        corev1.NamespaceTerminating,
-			expectedResult: false,
+			name:                  "namespace found, terminating phase",
+			expectNSFound:         true,
+			nsPhase:               corev1.NamespaceTerminating,
+			expectedResult:        false,
+			expectedCreatedResult: false,
 		},
 		{
-			name:           "namespace found, deletiontimestamp set",
-			expectNSFound:  true,
-			nsDeleting:     true,
-			expectedResult: false,
+			name:                  "namespace found, deletiontimestamp set",
+			expectNSFound:         true,
+			nsDeleting:            true,
+			expectedResult:        false,
+			expectedCreatedResult: false,
 		},
 		{
-			name:           "namespace not found, successfully created",
-			expectCreate:   true,
-			expectedResult: true,
+			name:                  "namespace not found, successfully created",
+			expectCreate:          true,
+			expectedResult:        true,
+			expectedCreatedResult: true,
 		},
 		{
-			name:           "namespace not found initially, create returns already exists error, returned namespace is ready",
-			alreadyExists:  true,
-			expectedResult: true,
+			name:                  "namespace not found initially, create returns already exists error, returned namespace is ready",
+			alreadyExists:         true,
+			expectedResult:        true,
+			expectedCreatedResult: false,
 		},
 		{
-			name:           "namespace not found initially, create returns already exists error, returned namespace is terminating",
-			alreadyExists:  true,
-			nsPhase:        corev1.NamespaceTerminating,
-			expectedResult: false,
+			name:                  "namespace not found initially, create returns already exists error, returned namespace is terminating",
+			alreadyExists:         true,
+			nsPhase:               corev1.NamespaceTerminating,
+			expectedResult:        false,
+			expectedCreatedResult: false,
 		},
 	}
 
@@ -122,9 +129,10 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 				nsClient.On("Create", namespace).Return(namespace, nil)
 			}
 
-			result, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout)
+			result, nsCreated, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout)
 
 			assert.Equal(t, test.expectedResult, result)
+			assert.Equal(t, test.expectedCreatedResult, nsCreated)
 		})
 	}
 
