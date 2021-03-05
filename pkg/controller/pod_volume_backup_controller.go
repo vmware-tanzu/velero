@@ -103,12 +103,12 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.Info("Pod volume backup starting")
 
-	// only process items for this node
+	// Only process items for this node.
 	if pvb.Spec.Node != r.NodeName {
 		return ctrl.Result{}, nil
 	}
 
-	// only process new items
+	// Only process new items.
 	if pvb.Status.Phase != "" && pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseNew {
 		log.Debug("Pod volume backup is not new, not processing")
 		return ctrl.Result{}, nil
@@ -116,7 +116,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	r.Metrics.RegisterPodVolumeBackupEnqueue(r.NodeName)
 
-	// update status to InProgress
+	// Update status to InProgress.
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
 	pvb.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
@@ -130,85 +130,10 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		)
 	}
 
-	volDir, err := kube.GetVolumeDirectory(&pod, pvb.Spec.Volume, r.PvcLister, r.PvLister)
+	var resticDetails resticDetails
+	resticCmd, err := r.resticCommand(log, req.Namespace, &pvb, &pod, &resticDetails)
 	if err != nil {
-		return r.logErrorAndUpdateStatus(log, &pvb, err, "getting volume directory name")
-	}
-
-	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pvb.Spec.Pod.UID), volDir)
-	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
-
-	path, err := r.singlePathMatch(pathGlob)
-	if err != nil {
-		return r.logErrorAndUpdateStatus(log, &pvb, err, "identifying unique volume path on host")
-	}
-	log.WithField("path", path).Debugf("Found path matching glob")
-
-	// temporary credentials
-	credsFile, err := restic.TempCredentialsFile(r.Client, req.Namespace, r.FileSystem)
-	if err != nil {
-		return r.logErrorAndUpdateStatus(log, &pvb, err, "creating temporary restic credentials file")
-	}
-	defer os.Remove(credsFile)
-
-	resticCmd := restic.BackupCommand(pvb.Spec.RepoIdentifier, credsFile, path, pvb.Spec.Tags)
-
-	caCert, err := restic.GetCACert(r.Client, pvb.Namespace, pvb.Spec.BackupStorageLocation)
-	if err != nil {
-		log.WithError(err).Error("getting caCert")
-	}
-
-	var caCertFile string
-	if caCert != nil {
-		caCertFile, err = restic.TempCACertFile(caCert, pvb.Spec.BackupStorageLocation, r.FileSystem)
-		if err != nil {
-			log.WithError(err).Error("creating temporary caCert file")
-		}
-		defer os.Remove(caCertFile)
-
-	}
-
-	resticCmd.CACertFile = caCertFile
-
-	// Running restic command might need additional provider specific environment
-	// variables. Set resticCmd.Env based on provider (currently
-	// for Azure and S3 based backuplocations)
-	var env []string
-	switch {
-	case strings.HasPrefix(pvb.Spec.RepoIdentifier, "azure"):
-		env, err = restic.AzureCmdEnv(r.Client, req.Namespace, pvb.Spec.BackupStorageLocation)
-		if err != nil {
-			return r.logErrorAndUpdateStatus(log, &pvb, err, "error setting restic with azure cmd env")
-
-		}
-	case strings.HasPrefix(pvb.Spec.RepoIdentifier, "s3"):
-		env, err = restic.S3CmdEnv(r.Client, req.Namespace, pvb.Spec.BackupStorageLocation)
-		if err != nil {
-			return r.logErrorAndUpdateStatus(log, &pvb, err, "error setting restic with s3 cmd env")
-
-		}
-	}
-	resticCmd.Env = env
-
-	// If this is a PVC, look for the most recent completed pod volume backup for it and get
-	// its restic snapshot ID to use as the value of the `--parent` flag. Without this,
-	// if the pod using the PVC (and therefore the directory path under /host_pods/) has
-	// changed since the PVC's last backup, restic will not be able to identify a suitable
-	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
-	if pvcUID, ok := pvb.Labels[velerov1api.PVCUIDLabel]; ok {
-		parentSnapshotID := getParentSnapshot(
-			log,
-			pvcUID,
-			pvb.Spec.BackupStorageLocation,
-			r.PvbLister.PodVolumeBackups(pvb.Namespace),
-		)
-
-		if parentSnapshotID == "" {
-			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
-		} else {
-			log.WithField("parentSnapshotID", parentSnapshotID).Info("Setting --parent flag for this backup")
-			resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshotID))
-		}
+		return r.logErrorAndUpdateStatus(log, &pvb, err, "building restic command")
 	}
 
 	var emptySnapshot bool
@@ -237,19 +162,18 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if !emptySnapshot {
 		snapshotID, err = r.ResticExec.GetSnapshotID(
 			pvb.Spec.RepoIdentifier,
-			credsFile,
+			resticDetails.credsFile,
 			pvb.Spec.Tags,
-			env,
-			caCertFile,
+			resticDetails.envs,
+			resticDetails.caCertFile,
 		)
 		if err != nil {
 			return r.logErrorAndUpdateStatus(log, &pvb, err, "getting snapshot id")
-
 		}
 	}
 
-	// update status to Completed with path & snapshot id
-	pvb.Status.Path = path
+	// Update status to Completed with path & snapshot ID.
+	pvb.Status.Path = resticDetails.path
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
 	pvb.Status.SnapshotID = snapshotID
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
@@ -268,6 +192,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager registers the PVB controller.
 func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.PodVolumeBackup{}).
@@ -351,4 +276,93 @@ func (r *PodVolumeBackupReconciler) logErrorAndUpdateStatus(log *logrus.Entry, p
 	pvb.Status.Message = ""
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	return ctrl.Result{}, errors.Wrap(err, msg)
+}
+
+type resticDetails struct {
+	credsFile, caCertFile string
+	envs                  []string
+	path                  string
+}
+
+func (r *PodVolumeBackupReconciler) resticCommand(log *logrus.Entry, ns string, pvb *velerov1api.PodVolumeBackup, pod *corev1.Pod, details *resticDetails) (*restic.Command, error) {
+	volDir, err := kube.GetVolumeDirectory(pod, pvb.Spec.Volume, r.PvcLister, r.PvLister)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting volume directory name")
+	}
+
+	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pvb.Spec.Pod.UID), volDir)
+	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
+
+	path, err := r.singlePathMatch(pathGlob)
+	if err != nil {
+		return nil, errors.Wrap(err, "identifying unique volume path on host")
+	}
+	log.WithField("path", path).Debugf("Found path matching glob")
+
+	// Temporary credentials
+	details.credsFile, err = restic.TempCredentialsFile(r.Client, ns, r.FileSystem)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating temporary restic credentials file")
+	}
+	defer os.Remove(details.credsFile)
+
+	cmd := restic.BackupCommand(pvb.Spec.RepoIdentifier, details.credsFile, path, pvb.Spec.Tags)
+
+	caCert, err := restic.GetCACert(r.Client, pvb.Namespace, pvb.Spec.BackupStorageLocation)
+	if err != nil {
+		log.WithError(err).Error("getting caCert")
+	}
+
+	if caCert != nil {
+		details.caCertFile, err = restic.TempCACertFile(caCert, pvb.Spec.BackupStorageLocation, r.FileSystem)
+		if err != nil {
+			log.WithError(err).Error("creating temporary caCert file")
+		}
+		defer os.Remove(details.caCertFile)
+
+	}
+	cmd.CACertFile = details.caCertFile
+
+	// Running restic command might need additional provider specific environment
+	// variables. Set resticCmd.Env based on provider (currently for Azure and
+	// S3-based backuplocations)
+	switch {
+	case strings.HasPrefix(pvb.Spec.RepoIdentifier, "azure"):
+		details.envs, err = restic.AzureCmdEnv(r.Client, ns, pvb.Spec.BackupStorageLocation)
+		if err != nil {
+			return nil, errors.Wrap(err, "error setting restic with azure cmd env")
+
+		}
+	case strings.HasPrefix(pvb.Spec.RepoIdentifier, "s3"):
+		details.envs, err = restic.S3CmdEnv(r.Client, ns, pvb.Spec.BackupStorageLocation)
+		if err != nil {
+			return nil, errors.Wrap(err, "error setting restic with s3 cmd env")
+		}
+	}
+	cmd.Env = details.envs
+
+	// If this is a PVC, look for the most recent completed pod volume backup for
+	// it and get its restic snapshot ID to use as the value of the `--parent`
+	// flag. Without this, if the pod using the PVC (and therefore the directory
+	// path under /host_pods/) has changed since the PVC's last backup, restic
+	// will not be able to identify a suitable parent snapshot to use, and will
+	// have to do a full rescan of the contents of the PVC.
+	if pvcUID, ok := pvb.Labels[velerov1api.PVCUIDLabel]; ok {
+		parentSnapshotID := getParentSnapshot(
+			log,
+			pvcUID,
+			pvb.Spec.BackupStorageLocation,
+			r.PvbLister.PodVolumeBackups(pvb.Namespace),
+		)
+
+		if parentSnapshotID == "" {
+			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
+		} else {
+			log.WithField("parentSnapshotID", parentSnapshotID).
+				Info("Setting --parent flag for this backup")
+			cmd.ExtraFlags = append(cmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshotID))
+		}
+	}
+
+	return cmd, nil
 }
