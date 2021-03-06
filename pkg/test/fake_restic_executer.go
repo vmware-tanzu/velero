@@ -20,14 +20,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 )
 
-// Backup ...
+// FakeResticBackupExec ...
 type FakeResticBackupExec struct{}
 
 // RunBackup ...
-func (exec FakeResticBackupExec) RunBackup(cmd *restic.Command, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+func (exec FakeResticBackupExec) RunBackup(cmd interface{}, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
 	return "", "", nil
 }
 

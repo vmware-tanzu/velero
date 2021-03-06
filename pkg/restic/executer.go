@@ -17,6 +17,7 @@ limitations under the License.
 package restic
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -24,15 +25,19 @@ import (
 
 // BackupExecuter ...
 type BackupExecuter interface {
-	RunBackup(*Command, logrus.FieldLogger, func(velerov1api.PodVolumeOperationProgress)) (string, string, error)
+	RunBackup(interface{}, logrus.FieldLogger, func(velerov1api.PodVolumeOperationProgress)) (string, string, error)
 	GetSnapshotID(string, string, map[string]string, []string, string) (string, error)
 }
 
-// Backup ...
+// BackupExec ...
 type BackupExec struct{}
 
 // RunBackup ...
-func (exec BackupExec) RunBackup(cmd *Command, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+func (exec BackupExec) RunBackup(command interface{}, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+	cmd, ok := command.(*Command)
+	if !ok {
+		return "", "", errors.New("expecting command to be of type *restic.Command")
+	}
 	return RunBackup(cmd, log, updateFn)
 }
 
