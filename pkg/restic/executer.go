@@ -32,7 +32,8 @@ type BackupExecuter interface {
 // BackupExec ...
 type BackupExec struct{}
 
-// RunBackup ...
+// RunBackup is a wrapper for the restic.RunBackup function in order to allow
+// test.FakeResticBackupExec to be passed in for testing purposes.
 func (exec BackupExec) RunBackup(command interface{}, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
 	cmd, ok := command.(*Command)
 	if !ok {
