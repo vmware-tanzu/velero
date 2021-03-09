@@ -1,8 +1,9 @@
 addReviewers: true
 addAssignees: author
 
-# Set this to the length of the reviewers list because the default was not including everyone
-numberOfReviewers: 6
+# Only require 2, random reviewers.
+# TODO expand this to support using reviewGroups
+numberOfReviewers: 2
 
 reviewers:
   - nrb
