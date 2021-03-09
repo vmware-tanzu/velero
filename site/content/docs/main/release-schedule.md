@@ -4,7 +4,7 @@ layout: docs
 toc: "true"
 ---
 
-Definitons borrowed from [the Kubernetes release process document](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-release/release.md#definitions)
+Definitions borrowed from [the Kubernetes release process document](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-release/release.md#definitions)
 
 General phases for a Velero release
 - Enhancement/Design freeze
@@ -12,3 +12,4 @@ General phases for a Velero release
 - Feature freeze & pruning
 - Code freeze & prerelease
 - Release
+
