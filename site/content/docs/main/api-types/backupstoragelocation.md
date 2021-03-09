@@ -22,6 +22,9 @@ spec:
   provider: aws
   objectStorage:
     bucket: myBucket
+  credential:
+    name: secret-name
+    key: key-in-secret
   config:
     region: us-west-2
     profile: "default"
@@ -45,4 +48,7 @@ The configurable parameters are as follows:
 | `accessMode` | String | `ReadWrite` | How Velero can access the backup storage location. Valid values are `ReadWrite`, `ReadOnly`. |
 | `backupSyncPeriod` | metav1.Duration | Optional Field | How frequently Velero should synchronize backups in object storage. Default is Velero's server backup sync period. Set this to `0s` to disable sync. |
 | `validationFrequency` | metav1.Duration | Optional Field | How frequently Velero should validate the object storage . Default is Velero's server validation frequency. Set this to `0s` to disable validation. Default 1 minute. |
+| `credential` | [corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#secretkeyselector-v1-core) | Optional Field | The credential information to be used with this location. |
+| `credential/name` | String | Optional Field | The name of the secret within the Velero namespace which contains the credential information. |
+| `credential/key` | String | Optional Field | The key to use within the secret. |
 {{< /table >}}

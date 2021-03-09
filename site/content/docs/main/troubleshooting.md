@@ -106,11 +106,17 @@ Now, visiting http://localhost:8085/metrics on a browser should show the metrics
 
 ## Is Velero using the correct cloud credentials?
 
-Cloud provider credentials are given to Velero to store and retrieve backups from the object store and to perform volume snapshotting operations. These credentials are passed to Velero at install time either using:
+Cloud provider credentials are given to Velero to store and retrieve backups from the object store and to perform volume snapshotting operations.
+
+These credentials are either passed to Velero at install time using:
 1. `--secret-file` flag to the `velero install` command.  OR
 1. `--set-file credentials.secretContents.cloud` flag to the `helm install` command.
 
-The supplied credentials are stored in the cluster as a Kubernetes secret named `cloud-credentials` in the same namespace in which Velero is installed. 
+Or, they are specified when creating a `BackupStorageLocation` using the `--credential` flag.
+
+### Troubleshooting credentials provided during install
+
+If using the credentials provided at install time, they are stored in the cluster as a Kubernetes secret named `cloud-credentials` in the same namespace in which Velero is installed.
 
 Follow the below troubleshooting steps to confirm that Velero is using the correct credentials:
 1. Confirm that the `cloud-credentials` secret exists and has the correct content.
@@ -168,6 +174,31 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
     <Output should be your credentials>
     ```
 
+### Troubleshooting `BackupStorageLocation` credentials
+
+Follow the below troubleshooting steps to confirm that Velero is using the correct credentials if using credentials specific to a [`BackupStorageLocation`][10]:
+1. Confirm that the object storage provider plugin being used supports multiple credentials.
+   If the error message contains `"config has invalid keys credentialsFile"`, the version of your object storage plugin does not yet support multiple credentials.
+   Object storage plugins [provided by the Velero team][11] support this feature, so update your plugin if you are using one of these.
+   If you are using a plugin from a different provider, please contact them for further advice.
+
+1. Confirm that the secret and key referenced by the `BackupStorageLocation` exists in the Velero namespace and has the correct content:
+   ```bash
+   # Determine which secret and key the BackupStorageLocation is using
+   BSL_SECRET=$(kubectl get backupstoragelocations.velero.io -n velero <bsl-name> -o yaml -o jsonpath={.spec.credential.name})
+   BSL_SECRET_KEY=$(kubectl get backupstoragelocations.velero.io -n velero <bsl-name> -o yaml -o jsonpath={.spec.credential.key})
+
+   # Confirm that the secret exists
+   kubectl -n velero get secret $BSL_SECRET
+
+   # Print the content of the secret and ensure it is correct
+   kubectl -n velero get secret $BSL_SECRET -ojsonpath={.data.$BSL_SECRET_KEY} | base64 --decode
+   ```
+   If the secret can't be found, the secret does not within the Velero namespace and must be created.
+
+   If no output is produced when printing the contents of the secret, the key within the secret may not exist or may have no content.
+
+
 [1]: debugging-restores.md
 [2]: debugging-install.md
 [3]: restic.md
@@ -177,4 +208,6 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 [7]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero/values.yaml#L44
 [8]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero/values.yaml#L49-L52
 [9]: https://kubectl.docs.kubernetes.io/pages/container_debugging/port_forward_to_pods.html
+[10]: locations.md
+[11]: /plugins
 [25]: https://kubernetes.slack.com/messages/velero

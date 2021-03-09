@@ -16,12 +16,17 @@ The user can pre-configure one or more possible `BackupStorageLocations` and one
 This configuration design enables a number of different use cases, including:
 
 - Take snapshots of more than one kind of persistent volume in a single Velero backup. For example, in a cluster with both EBS volumes and Portworx volumes
-- Have some Velero backups go to a bucket in an eastern USA region, and others go to a bucket in a western USA region
+- Have some Velero backups go to a bucket in an eastern USA region, and others go to a bucket in a western USA region, or to a different storage provider
 - For volume providers that support it, like Portworx, you can have some snapshots stored locally on the cluster and have others stored in the cloud
 
 ## Limitations / Caveats
 
-- Velero only supports a single set of credentials *per provider*. It's not yet possible to use different credentials for different locations, if they're for the same provider.
+- Velero supports multiple credentials for `BackupStorageLocations`, allowing you to specify the credentials to use with any `BackupStorageLocation`.
+  However, use of this feature requires support from object storage provider plugin.
+  [Plugins supported by the Velero team][5] support this feature.
+
+- Velero only supports a single set of credentials for `VolumeSnapshotLocations`.
+  Velero will always use the credentials provided at install time (stored in the `cloud-credentials` secret) for volume snapshots.
 
 - Volume snapshots are still limited by where your provider allows you to create snapshots. For example, AWS and Azure do not allow you to create a volume snapshot in a different region than where the volume is. If you try to take a Velero backup using a volume snapshot location with a different region than where your cluster's volumes are, the backup will fail.
 
@@ -166,6 +171,40 @@ During backup creation:
 velero backup create full-cluster-backup
 ```
 
+### Create a storage location that uses different credentials
+
+If your object storage provider plugin supports it, it is possible to create additional `BackupStorageLocations` that use their own credentials.
+It is necessary to follow the instructions for your [object storage provider plugin][5] to install the plugin if not already installed, and create a file with the object storage credentials.
+
+Once you have created the credentials file, create a [Kubernetes Secret][6] in the Velero namespace that contains these credentials:
+
+```shell
+kubectl create secret generic -n velero credentials --from-file=bsl=</path/to/credentialsfile>
+```
+
+This will create a secret named `credentials` with a single key (`bsl`) which contains the contents of your credentials file.
+The name and key of this secret will be given to Velero when creating the `BackupStorageLocation` using the flag `--credential`.
+When interacting with that `BackupStorageLocation`, it will fetch the data from that key within that secret.
+
+For example, a new `BackupStorageLocation` AWS with the created secret would be configured as follows:
+
+```bash
+velero backup-location create <bsl-name> \
+  --provider aws \
+  --bucket <bucket> \
+  --config region=<region> \
+  --credential=credentials=bsl
+```
+
+The `BackupStorageLocation` is ready to use when it has the phase `Available`.
+You can check the status with the following command:
+
+```bash
+velero backup-location get
+```
+
+To use this new `BackupStorageLocation` when performing a backup, use the flag `--storage-location <bsl-name>` when running `velero backup create`.
+
 ## Additional Use Cases
 
 1. If you're using Azure's AKS, you may want to store your volume snapshots outside of the "infrastructure" resource group that is automatically created when you create your AKS cluster. This is possible using a `VolumeSnapshotLocation`, by specifying a `resourceGroup` under the `config` section of the snapshot location. See the [Azure volume snapshot location documentation][3] for details.
@@ -178,3 +217,5 @@ velero backup create full-cluster-backup
 [2]: api-types/volumesnapshotlocation.md
 [3]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/volumesnapshotlocation.md
 [4]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/backupstoragelocation.md
+[5]: /plugins
+[6]: https://kubernetes.io/docs/concepts/configuration/secret/
