@@ -230,7 +230,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		backup := "backup-rockbands-" + uuidgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
 
-		err = VeleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr)
+		err = VeleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr, "")
 		if err != nil {
 			VeleroBackupLogs(ctx, veleroCLI, veleroNamespace, backup)
 			return errors.Wrapf(err, "backing up %s namespaces on source cluster", namespacesStr)

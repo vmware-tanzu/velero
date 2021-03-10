@@ -210,11 +210,20 @@ func CheckRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
-func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string) error {
-	backupCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "backup", backupName,
+func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string) error {
+	args := []string{
+		"--namespace", veleroNamespace,
+		"create", "backup", backupName,
 		"--include-namespaces", namespace,
-		"--default-volumes-to-restic", "--wait")
+		"--default-volumes-to-restic",
+		"--wait",
+	}
 
+	if backupLocation != "" {
+		args = append(args, "--storage-location", backupLocation)
+	}
+
+	backupCmd := exec.CommandContext(ctx, veleroCLI, args...)
 	backupCmd.Stdout = os.Stdout
 	backupCmd.Stderr = os.Stderr
 	fmt.Printf("backup cmd =%v\n", backupCmd)
@@ -313,4 +322,41 @@ func VeleroRestoreLogs(ctx context.Context, veleroCLI string, veleroNamespace st
 		return err
 	}
 	return nil
+}
+
+func VeleroCreateBackupLocation(ctx context.Context,
+	veleroCLI string,
+	veleroNamespace string,
+	name string,
+	objectStoreProvider string,
+	bucket string,
+	prefix string,
+	config string,
+	secretName string,
+	secretKey string,
+) error {
+	args := []string{
+		"--namespace", veleroNamespace,
+		"create", "backup-location", name,
+		"--provider", objectStoreProvider,
+		"--bucket", bucket,
+	}
+
+	if prefix != "" {
+		args = append(args, "--prefix", prefix)
+	}
+
+	if config != "" {
+		args = append(args, "--config", config)
+	}
+
+	if secretName != "" && secretKey != "" {
+		args = append(args, "--credential", fmt.Sprintf("%s=%s", secretName, secretKey))
+	}
+
+	bslCreateCmd := exec.CommandContext(ctx, veleroCLI, args...)
+	bslCreateCmd.Stdout = os.Stdout
+	bslCreateCmd.Stderr = os.Stderr
+
+	return bslCreateCmd.Run()
 }

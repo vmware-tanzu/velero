@@ -57,6 +57,13 @@ VSL_CONFIG ?=
 CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 
+# Flags to create an additional BSL for multiple credentials tests
+ADDITIONAL_OBJECT_STORE_PROVIDER ?=
+ADDITIONAL_CREDS_FILE ?=
+ADDITIONAL_BSL_BUCKET ?=
+ADDITIONAL_BSL_PREFIX ?=
+ADDITIONAL_BSL_CONFIG ?=
+
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
 	go get github.com/onsi/ginkgo/ginkgo
@@ -78,7 +85,12 @@ run: ginkgo
 		-bsl-config=$(BSL_CONFIG) \
 		-vsl-config=$(VSL_CONFIG) \
 		-cloud-provider=$(CLOUD_PROVIDER) \
-		-object-store-provider="$(OBJECT_STORE_PROVIDER)"
+		-object-store-provider="$(OBJECT_STORE_PROVIDER)" \
+		-additional-bsl-object-store-provider="$(ADDITIONAL_OBJECT_STORE_PROVIDER)" \
+		-additional-bsl-credentials-file=$(ADDITIONAL_CREDS_FILE) \
+		-additional-bsl-bucket=$(ADDITIONAL_BSL_BUCKET) \
+		-additional-bsl-prefix=$(ADDITIONAL_BSL_PREFIX) \
+		-additional-bsl-config=$(ADDITIONAL_BSL_CONFIG)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)
