@@ -178,8 +178,11 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 
 Follow the below troubleshooting steps to confirm that Velero is using the correct credentials if using credentials specific to a [`BackupStorageLocation`][10]:
 1. Confirm that the object storage provider plugin being used supports multiple credentials.
-   If the error message contains `"config has invalid keys credentialsFile"`, the version of your object storage plugin does not yet support multiple credentials.
-   Object storage plugins [provided by the Velero team][11] support this feature, so update your plugin if you are using one of these.
+
+   If the logs from the Velero deployment contain the error message `"config has invalid keys credentialsFile"`, the version of your object storage plugin does not yet support multiple credentials.
+
+   The object storage plugins [provided by the Velero team][11] support this feature, so please update your plugin to the latest version if you see the above error message.
+
    If you are using a plugin from a different provider, please contact them for further advice.
 
 1. Confirm that the secret and key referenced by the `BackupStorageLocation` exists in the Velero namespace and has the correct content:
@@ -194,9 +197,11 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
    # Print the content of the secret and ensure it is correct
    kubectl -n velero get secret $BSL_SECRET -ojsonpath={.data.$BSL_SECRET_KEY} | base64 --decode
    ```
-   If the secret can't be found, the secret does not within the Velero namespace and must be created.
+   If the secret can't be found, the secret does not exist within the Velero namespace and must be created.
 
    If no output is produced when printing the contents of the secret, the key within the secret may not exist or may have no content.
+   Ensure that the key exists within the secret's data by checking the output from `kubectl -n velero describe secret $BSL_SECRET`.
+   If it does not exist, follow the instructions for [editing a Kubernetes secret][12] to add the base64 encoded credentials data.
 
 
 [1]: debugging-restores.md
@@ -210,4 +215,5 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 [9]: https://kubectl.docs.kubernetes.io/pages/container_debugging/port_forward_to_pods.html
 [10]: locations.md
 [11]: /plugins
+[12]: https://kubernetes.io/docs/concepts/configuration/secret/#editing-a-secret
 [25]: https://kubernetes.slack.com/messages/velero

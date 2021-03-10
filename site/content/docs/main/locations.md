@@ -22,8 +22,9 @@ This configuration design enables a number of different use cases, including:
 ## Limitations / Caveats
 
 - Velero supports multiple credentials for `BackupStorageLocations`, allowing you to specify the credentials to use with any `BackupStorageLocation`.
-  However, use of this feature requires support from object storage provider plugin.
-  [Plugins supported by the Velero team][5] support this feature.
+  However, use of this feature requires support within the plugin for the object storage provider you wish to use.
+  All [plugins provided by the Velero team][5] support this feature.
+  If you are using a plugin from another provider, please check their documentation to determine if this feature is supported.
 
 - Velero only supports a single set of credentials for `VolumeSnapshotLocations`.
   Velero will always use the credentials provided at install time (stored in the `cloud-credentials` secret) for volume snapshots.
@@ -70,6 +71,10 @@ velero backup create full-cluster-backup
 ```
 
 ### Have some Velero backups go to a bucket in an eastern USA region (default), and others go to a bucket in a western USA region
+
+In this example, two `BackupStorageLocations` will be created within the same account but in different regions.
+They will both use the credentials provided at install time and stored in the `cloud-credentials` secret.
+If you need to configure unique credentials for each `BackupStorageLocation`, please refer to the [later example][8].
 
 During server configuration:
 
@@ -171,12 +176,22 @@ During backup creation:
 velero backup create full-cluster-backup
 ```
 
-### Create a storage location that uses different credentials
+### Create a storage location that uses unique credentials
 
-If your object storage provider plugin supports it, it is possible to create additional `BackupStorageLocations` that use their own credentials.
-It is necessary to follow the instructions for your [object storage provider plugin][5] to install the plugin if not already installed, and create a file with the object storage credentials.
+It is possible to create additional `BackupStorageLocations` that use their own credentials.
+This enables you to save backups to another storage provider or to another account with the storage provider you are already using.
 
-Once you have created the credentials file, create a [Kubernetes Secret][6] in the Velero namespace that contains these credentials:
+If you create additional `BackupStorageLocations` without specifying the credentials to use, Velero will use the credentials provided at install time and stored in the `cloud-credentials` secret.
+Please see the [earlier example][9] for details on how to create multiple `BackupStorageLocations` that use the same credentials.
+
+#### Prerequisites
+- This feature requires support from the [object storage provider plugin][5] you wish to use.
+  All plugins provided by the Velero team support this feature.
+  If you are using a plugin from another provider, please check their documentation to determine if this is supported.
+- The [plugin for the object storage provider][5] you wish to use must be [installed][6].
+- You must create a file with the object storage credentials. Follow the instructions provided by your object storage provider plugin to create this file.
+
+Once you have installed the necessary plugin and created the credentials file, create a [Kubernetes Secret][6] in the Velero namespace that contains these credentials:
 
 ```shell
 kubectl create secret generic -n velero credentials --from-file=bsl=</path/to/credentialsfile>
@@ -218,4 +233,7 @@ To use this new `BackupStorageLocation` when performing a backup, use the flag `
 [3]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/volumesnapshotlocation.md
 [4]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/backupstoragelocation.md
 [5]: /plugins
-[6]: https://kubernetes.io/docs/concepts/configuration/secret/
+[6]: overview-plugins.md
+[7]: https://kubernetes.io/docs/concepts/configuration/secret/
+[8]: #create-a-storage-location-that-uses-unique-credentials
+[9]: #have-some-velero-backups-go-to-a-bucket-in-an-eastern-usa-region-default-and-others-go-to-a-bucket-in-a-western-usa-region
