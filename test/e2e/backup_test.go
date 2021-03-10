@@ -60,24 +60,24 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
-		It("should successfully back up and restore to multiple BackupStorageLocations with unique credentials", func() {
-			if additionalBslProvider == "" {
+		It("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
+			if additionalBSLProvider == "" {
 				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
-			if additionalBslBucket == "" {
+			if additionalBSLBucket == "" {
 				Skip("no additional BSL bucket given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
-			if additionalBslCredentials == "" {
+			if additionalBSLCredentials == "" {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", uuidgen)
-			secretKey := fmt.Sprintf("creds-%s", additionalBslProvider)
+			secretKey := fmt.Sprintf("creds-%s", additionalBSLProvider)
 			files := map[string]string{
-				secretKey: additionalBslCredentials,
+				secretKey: additionalBSLCredentials,
 			}
 
 			Expect(CreateSecretFromFiles(context.TODO(), client, veleroNamespace, secretName, files)).To(Succeed())
@@ -88,10 +88,10 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 				veleroCLI,
 				veleroNamespace,
 				additionalBsl,
-				additionalBslProvider,
-				additionalBslBucket,
-				additionalBslPrefix,
-				additionalBslConfig,
+				additionalBSLProvider,
+				additionalBSLBucket,
+				additionalBSLPrefix,
+				additionalBSLConfig,
 				secretName,
 				secretKey,
 			)).To(Succeed())

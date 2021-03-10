@@ -10,7 +10,7 @@ import (
 
 var (
 	veleroCLI, veleroImage, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, cloudProvider, objectStoreProvider, veleroNamespace string
-	additionalBslProvider, additionalBslBucket, additionalBslPrefix, additionalBslConfig, additionalBslCredentials                                string
+	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials                                string
 	installVelero, useVolumeSnapshots                                                                                                             bool
 )
 
@@ -29,11 +29,11 @@ func init() {
 	flag.BoolVar(&useVolumeSnapshots, "use-volume-snapshots", false, "Use volume-snapshotter plugin for volume backup.  Optional")
 
 	// Flags to create an additional BSL for multiple credentials test
-	flag.StringVar(&additionalBslProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")
-	flag.StringVar(&additionalBslBucket, "additional-bsl-bucket", "", "name of the object storage bucket for additional backup storage location. Required if testing multiple credentials support.")
-	flag.StringVar(&additionalBslPrefix, "additional-bsl-prefix", "", "prefix under which all Velero data should be stored within the bucket for additional backup storage location. Optional.")
-	flag.StringVar(&additionalBslConfig, "additional-bsl-config", "", "configuration to use for the additional backup storage location. Format is key1=value1,key2=value2")
-	flag.StringVar(&additionalBslCredentials, "additional-bsl-credentials-file", "", "file containing credentials for additional backup storage location provider. Required if testing multiple credentials support.")
+	flag.StringVar(&additionalBSLProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")
+	flag.StringVar(&additionalBSLBucket, "additional-bsl-bucket", "", "name of the object storage bucket for additional backup storage location. Required if testing multiple credentials support.")
+	flag.StringVar(&additionalBSLPrefix, "additional-bsl-prefix", "", "prefix under which all Velero data should be stored within the bucket for additional backup storage location. Optional.")
+	flag.StringVar(&additionalBSLConfig, "additional-bsl-config", "", "configuration to use for the additional backup storage location. Format is key1=value1,key2=value2")
+	flag.StringVar(&additionalBSLCredentials, "additional-bsl-credentials-file", "", "file containing credentials for additional backup storage location provider. Required if testing multiple credentials support.")
 }
 
 func TestE2e(t *testing.T) {
