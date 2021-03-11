@@ -27,10 +27,8 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
@@ -41,6 +39,9 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " NAME",
 		Short: "Set specific features for a snapshot location",
 		Args:  cobra.ExactArgs(1),
+		// Mark this command as hidden until more functionality is added
+		// as part of https://github.com/vmware-tanzu/velero/issues/2426
+		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Validate(c, args, f))
@@ -53,27 +54,19 @@ func NewSetCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type SetOptions struct {
-	Name       string
-	Credential flag.Map
+	Name string
 }
 
 func NewSetOptions() *SetOptions {
-	return &SetOptions{
-		Credential: flag.NewMap(),
-	}
+	return &SetOptions{}
 }
 
-func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.Var(&o.Credential, "credential", "Sets the credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
+func (o *SetOptions) BindFlags(*pflag.FlagSet) {
 }
 
 func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
-	}
-
-	if len(o.Credential.Data()) > 1 {
-		return errors.New("--credential can only contain 1 key/value pair")
 	}
 
 	return nil
@@ -97,11 +90,6 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 	}, location)
 	if err != nil {
 		return errors.WithStack(err)
-	}
-
-	for name, key := range o.Credential.Data() {
-		location.Spec.Credential = builder.ForSecretKeySelector(name, key).Result()
-		break
 	}
 
 	if err := kbClient.Update(context.Background(), location, &kbclient.UpdateOptions{}); err != nil {

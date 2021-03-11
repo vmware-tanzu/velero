@@ -1653,11 +1653,6 @@ func (in *VolumeSnapshotLocationSpec) DeepCopyInto(out *VolumeSnapshotLocationSp
 			(*out)[key] = val
 		}
 	}
-	if in.Credential != nil {
-		in, out := &in.Credential, &out.Credential
-		*out = new(corev1.SecretKeySelector)
-		(*in).DeepCopyInto(*out)
-	}
 	return
 }
 
