@@ -181,7 +181,7 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 
    If the logs from the Velero deployment contain the error message `"config has invalid keys credentialsFile"`, the version of your object storage plugin does not yet support multiple credentials.
 
-   The object storage plugins [provided by the Velero team][11] support this feature, so please update your plugin to the latest version if you see the above error message.
+   The object storage plugins [maintained by the Velero team][11] support this feature, so please update your plugin to the latest version if you see the above error message.
 
    If you are using a plugin from a different provider, please contact them for further advice.
 

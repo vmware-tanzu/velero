@@ -23,7 +23,7 @@ This configuration design enables a number of different use cases, including:
 
 - Velero supports multiple credentials for `BackupStorageLocations`, allowing you to specify the credentials to use with any `BackupStorageLocation`.
   However, use of this feature requires support within the plugin for the object storage provider you wish to use.
-  All [plugins provided by the Velero team][5] support this feature.
+  All [plugins maintained by the Velero team][5] support this feature.
   If you are using a plugin from another provider, please check their documentation to determine if this feature is supported.
 
 - Velero only supports a single set of credentials for `VolumeSnapshotLocations`.
@@ -186,7 +186,7 @@ Please see the [earlier example][9] for details on how to create multiple `Backu
 
 #### Prerequisites
 - This feature requires support from the [object storage provider plugin][5] you wish to use.
-  All plugins provided by the Velero team support this feature.
+  All plugins maintained by the Velero team support this feature.
   If you are using a plugin from another provider, please check their documentation to determine if this is supported.
 - The [plugin for the object storage provider][5] you wish to use must be [installed][6].
 - You must create a file with the object storage credentials. Follow the instructions provided by your object storage provider plugin to create this file.
@@ -198,17 +198,17 @@ kubectl create secret generic -n velero credentials --from-file=bsl=</path/to/cr
 ```
 
 This will create a secret named `credentials` with a single key (`bsl`) which contains the contents of your credentials file.
-The name and key of this secret will be given to Velero when creating the `BackupStorageLocation` using the flag `--credential`.
-When interacting with that `BackupStorageLocation`, it will fetch the data from that key within that secret.
+Next, create a `BackupStorageLocation` that uses this Secret by passing the Secret name and key in the `--credential` flag.
+When interacting with this `BackupStroageLocation` in the future, Velero will fetch the data from the key within the Secret you provide.
 
-For example, a new `BackupStorageLocation` AWS with the created secret would be configured as follows:
+For example, a new `BackupStorageLocation` with a Secret would be configured as follows:
 
 ```bash
 velero backup-location create <bsl-name> \
-  --provider aws \
+  --provider <provider> \
   --bucket <bucket> \
   --config region=<region> \
-  --credential=credentials=bsl
+  --credential=<secret-name>=<key-within-secret>
 ```
 
 The `BackupStorageLocation` is ready to use when it has the phase `Available`.
@@ -219,6 +219,24 @@ velero backup-location get
 ```
 
 To use this new `BackupStorageLocation` when performing a backup, use the flag `--storage-location <bsl-name>` when running `velero backup create`.
+You may also set this new `BackupStorageLocation` as the default with the command `velero backup-location set --default <bsl-name>`.
+
+### Modify the credentials used by an existing storage location
+
+By default, `BackupStorageLocations` will use the credentials provided at install time and stored in the `cloud-credentials` secret in the Velero namespace.
+You can modify these existing credentials by [editing the `cloud-credentials` secret][10], however, these changes will apply to all locations using this secret.
+This may be the desired outcome, for example, in the case where you wish to rotate the credentials used for a particular account.
+
+You can also opt to modify an existing `BackupStorageLocation` such that it uses its own credentials by using the `backup-location set` command.
+
+If you have a credentials file that you wish to use for a `BackupStorageLocation`, follow the instructions above to create the Secret with that file in the Velero namespace.
+
+Once you have created the Secret, or have an existing Secret which contains the credentials you wish to use for your `BackupStorageLocation`, set the credential to use as follows:
+
+```bash
+velero backup-location set <bsl-name> \
+  --credential=<secret-name>=<key-within-secret>
+```
 
 ## Additional Use Cases
 
@@ -237,3 +255,4 @@ To use this new `BackupStorageLocation` when performing a backup, use the flag `
 [7]: https://kubernetes.io/docs/concepts/configuration/secret/
 [8]: #create-a-storage-location-that-uses-unique-credentials
 [9]: #have-some-velero-backups-go-to-a-bucket-in-an-eastern-usa-region-default-and-others-go-to-a-bucket-in-a-western-usa-region
+[10]: https://kubernetes.io/docs/concepts/configuration/secret/#editing-a-secret

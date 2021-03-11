@@ -44,9 +44,8 @@ type backupStatusLine struct {
 	TotalBytesProcessed int64 `json:"total_bytes_processed"`
 }
 
-// GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot
-// in the specified repo matching the set of provided tags, or an error if a
-// unique snapshot cannot be identified.
+// GetSnapshotID runs provided 'restic snapshots' command to get the ID of a snapshot
+// and an error if a unique snapshot cannot be identified.
 func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
 	stdout, stderr, err := exec.RunCommand(snapshotIdCmd.Cmd())
 	if err != nil {
