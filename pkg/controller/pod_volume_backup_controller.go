@@ -37,6 +37,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -60,6 +61,7 @@ type podVolumeBackupController struct {
 	kbClient              client.Client
 	nodeName              string
 	metrics               *metrics.ServerMetrics
+	credentialsFileStore  credentials.FileStore
 
 	processBackupFunc func(*velerov1api.PodVolumeBackup) error
 	fileSystem        filesystem.Interface
@@ -77,6 +79,7 @@ func NewPodVolumeBackupController(
 	metrics *metrics.ServerMetrics,
 	kbClient client.Client,
 	nodeName string,
+	credentialsFileStore credentials.FileStore,
 ) Interface {
 	c := &podVolumeBackupController{
 		genericController:     newGenericController(PodVolumeBackup, logger),
@@ -88,6 +91,7 @@ func NewPodVolumeBackupController(
 		kbClient:              kbClient,
 		nodeName:              nodeName,
 		metrics:               metrics,
+		credentialsFileStore:  credentialsFileStore,
 
 		fileSystem: filesystem.NewFileSystem(),
 		clock:      &clock.RealClock{},
@@ -221,7 +225,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// temp creds
-	credentialsFile, err := restic.TempCredentialsFile(c.kbClient, req.Namespace, c.fileSystem)
+	credentialsFile, err := c.credentialsFileStore.Path(restic.RepoKeySelector())
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
@@ -236,15 +240,18 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		req.Spec.Tags,
 	)
 
-	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
-	if err != nil {
-		log.WithError(err).Error("Error getting caCert")
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, backupLocation); err != nil {
+		return c.fail(req, errors.Wrap(err, "error getting backup storage location").Error(), log)
 	}
 
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
 	var caCertFile string
-	if caCert != nil {
-		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
+	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
+		caCertFile, err = restic.TempCACertFile(backupLocation.Spec.ObjectStorage.CACert, req.Spec.BackupStorageLocation, c.fileSystem)
 		if err != nil {
 			log.WithError(err).Error("Error creating temp cacert file")
 		}
@@ -253,20 +260,11 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	}
 	resticCmd.CACertFile = caCertFile
 
-	// Running restic command might need additional provider specific environment variables. Based on the provider, we
-	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
-	var env []string
-	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
-		if env, err = restic.AzureCmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
-			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
-		}
-		resticCmd.Env = env
-	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		if env, err = restic.S3CmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
-			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
-		}
-		resticCmd.Env = env
+	env, err := restic.CmdEnv(backupLocation, c.credentialsFileStore)
+	if err != nil {
+		return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 	}
+	resticCmd.Env = env
 
 	// If this is a PVC, look for the most recent completed pod volume backup for it and get
 	// its restic snapshot ID to use as the value of the `--parent` flag. Without this,
@@ -298,7 +296,11 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 
 	var snapshotID string
 	if !emptySnapshot {
-		snapshotID, err = restic.GetSnapshotID(req.Spec.RepoIdentifier, credentialsFile, req.Spec.Tags, env, caCertFile)
+		cmd := restic.GetSnapshotCommand(req.Spec.RepoIdentifier, credentialsFile, req.Spec.Tags)
+		cmd.Env = env
+		cmd.CACertFile = caCertFile
+
+		snapshotID, err = restic.GetSnapshotID(cmd)
 		if err != nil {
 			log.WithError(err).Error("Error getting SnapshotID")
 			return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)

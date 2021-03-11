@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,17 +44,10 @@ type backupStatusLine struct {
 	TotalBytesProcessed int64 `json:"total_bytes_processed"`
 }
 
-// GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot
-// in the specified repo matching the set of provided tags, or an error if a
-// unique snapshot cannot be identified.
-func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string, env []string, caCertFile string) (string, error) {
-	cmd := GetSnapshotCommand(repoIdentifier, passwordFile, tags)
-	if len(env) > 0 {
-		cmd.Env = env
-	}
-	cmd.CACertFile = caCertFile
-
-	stdout, stderr, err := exec.RunCommand(cmd.Cmd())
+// GetSnapshotID runs provided 'restic snapshots' command to get the ID of a snapshot
+// and an error if a unique snapshot cannot be identified.
+func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
+	stdout, stderr, err := exec.RunCommand(snapshotIdCmd.Cmd())
 	if err != nil {
 		return "", errors.Wrapf(err, "error running command, stderr=%s", stderr)
 	}

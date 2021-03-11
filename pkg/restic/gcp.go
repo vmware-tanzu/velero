@@ -17,24 +17,17 @@ limitations under the License.
 package restic
 
 const (
-	// AWS specific environment variable
-	awsProfileEnvVar         = "AWS_PROFILE"
-	awsProfileKey            = "profile"
-	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE"
+	// GCP specific environment variable
+	gcpCredentialsFileEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
-// getS3ResticEnvVars gets the environment variables that restic
-// relies on (AWS_PROFILE) based on info in the provided object
-// storage location config map.
-func getS3ResticEnvVars(config map[string]string) (map[string]string, error) {
+// getGCPResticEnvVars gets the environment variables that restic relies
+// on based on info in the provided object storage location config map.
+func getGCPResticEnvVars(config map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	if credentialsFile, ok := config[credentialsFileKey]; ok {
-		result[awsCredentialsFileEnvVar] = credentialsFile
-	}
-
-	if profile, ok := config[awsProfileKey]; ok {
-		result[awsProfileEnvVar] = profile
+		result[gcpCredentialsFileEnvVar] = credentialsFile
 	}
 
 	return result, nil

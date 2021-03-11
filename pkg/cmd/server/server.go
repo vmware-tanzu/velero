@@ -99,6 +99,8 @@ const (
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
 
+	// defaultCredentialsDirectory is the path on disk where credential
+	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
 )
 
@@ -233,6 +235,7 @@ type server struct {
 	metrics                             *metrics.ServerMetrics
 	config                              serverConfig
 	mgr                                 manager.Manager
+	credentialFileStore                 credentials.FileStore
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -299,6 +302,17 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
+	credentialFileStore, err := credentials.NewNamespacedFileStore(
+		mgr.GetClient(),
+		f.Namespace(),
+		defaultCredentialsDirectory,
+		filesystem.NewFileSystem(),
+	)
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
 	s := &server{
 		namespace:                           f.Namespace(),
 		metricsAddress:                      config.metricsAddress,
@@ -317,6 +331,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		pluginRegistry:                      pluginRegistry,
 		config:                              config,
 		mgr:                                 mgr,
+		credentialFileStore:                 credentialFileStore,
 	}
 
 	return s, nil
@@ -497,6 +512,7 @@ func (s *server) initRestic() error {
 		s.mgr.GetClient(),
 		s.kubeClient.CoreV1(),
 		s.kubeClient.CoreV1(),
+		s.credentialFileStore,
 		s.logger,
 	)
 	if err != nil {
@@ -557,17 +573,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
 
-	// Create the credentials store which will fetch secrets from the Velero
-	// namespace and store them on the file system
-	credentialFileStore, err := credentials.NewNamespacedFileStore(
-		s.mgr.GetClient(),
-		s.namespace,
-		defaultCredentialsDirectory,
-		filesystem.NewFileSystem(),
-	)
-	cmd.CheckError(err)
-
-	backupStoreGetter := persistence.NewObjectBackupStoreGetter(credentialFileStore)
+	backupStoreGetter := persistence.NewObjectBackupStoreGetter(s.credentialFileStore)
 
 	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
 
