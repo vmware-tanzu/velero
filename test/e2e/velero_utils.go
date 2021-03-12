@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
@@ -359,4 +361,32 @@ func VeleroCreateBackupLocation(ctx context.Context,
 	bslCreateCmd.Stderr = os.Stderr
 
 	return bslCreateCmd.Run()
+}
+
+// VeleroAddPluginsForProvider determines which plugins need to be installed for a provider and
+// installs them in the current Velero installation, skipping over those that are already installed.
+func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string) error {
+	for _, plugin := range getProviderPlugins(provider) {
+		stdoutBuf := new(bytes.Buffer)
+		stderrBuf := new(bytes.Buffer)
+
+		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "plugin", "add", plugin)
+		installPluginCmd.Stdout = stdoutBuf
+		installPluginCmd.Stderr = stdoutBuf
+
+		err := installPluginCmd.Run()
+
+		fmt.Fprint(os.Stdout, stdoutBuf)
+		fmt.Fprint(os.Stderr, stderrBuf)
+
+		if err != nil {
+			// If the plugin failed to install as it was already installed, ignore the error and continue
+			// TODO: Check which plugins are already installed by inspecting `velero plugin get`
+			if !strings.Contains(stderrBuf.String(), "Duplicate value") {
+				return errors.WithMessagef(err, "error installing plugin %s", plugin)
+			}
+		}
+	}
+
+	return nil
 }

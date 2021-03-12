@@ -34,8 +34,9 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")
+			Expect(VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
+
 		}
 		client, extensionsClient, err = kube.GetClusterClient()
 		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
@@ -72,6 +73,8 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 			if additionalBSLCredentials == "" {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
+
+			Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCLI, veleroNamespace, additionalBSLProvider)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", uuidgen)
