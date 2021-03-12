@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -1655,22 +1656,39 @@ func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[stri
 // getSelectedRestoreableItems applies Kubernetes selectors on individual items
 // of each resource type to create a list of items which will be actually
 // restored.
-func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, Result, Result) {
-	var res restoreableResource
+func (ctx *restoreContext) getSelectedRestoreableItems(resrc, targetNamespace, originalNamespace string, items []string) (restoreableResource, Result, Result) {
 	warnings, errs := Result{}, Result{}
-	res.resource = resource
-	if res.selectedItemsByNamespace == nil {
-		res.selectedItemsByNamespace = make(map[string][]restoreableItem)
+
+	restorable := restoreableResource{
+		resource: resrc,
+	}
+
+	if restorable.selectedItemsByNamespace == nil {
+		restorable.selectedItemsByNamespace = make(map[string][]restoreableItem)
 	}
 
 	if targetNamespace != "" {
-		ctx.log.Infof("Resource '%s' will be restored into namespace '%s'", resource, targetNamespace)
+		ctx.log.Infof("Resource '%s' will be restored into namespace '%s'", resrc, targetNamespace)
 	} else {
-		ctx.log.Infof("Resource '%s' will be restored at cluster scope", resource)
+		ctx.log.Infof("Resource '%s' will be restored at cluster scope", resrc)
+	}
+
+	// If the APIGroupVersionsFeatureFlag is enabled, the item path will be
+	// updated to include the API group version that was chosen for restore. For
+	// example, for "horizontalpodautoscalers.autoscaling", if v2beta1 is chosen
+	// to be restored, then "horizontalpodautoscalers.autoscaling/v2beta1" will
+	// be part of item path. Different versions would only have been stored
+	// if the APIGroupVersionsFeatureFlag was enabled during backup. The
+	// chosenGrpVersToRestore map would only be populated if
+	// APIGroupVersionsFeatureFlag was enabled for restore and the minimum
+	// required backup format version has been met.
+	cgv, ok := ctx.chosenGrpVersToRestore[resrc]
+	if ok {
+		resrc = filepath.Join(resrc, cgv.Dir)
 	}
 
 	for _, item := range items {
-		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
+		itemPath := archive.GetItemFilePath(ctx.restoreDir, resrc, originalNamespace, item)
 
 		obj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 		if err != nil {
@@ -1694,8 +1712,9 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 			name:            item,
 			targetNamespace: targetNamespace,
 		}
-		res.selectedItemsByNamespace[originalNamespace] = append(res.selectedItemsByNamespace[originalNamespace], selectedItem)
-		res.totalItems++
+		restorable.selectedItemsByNamespace[originalNamespace] =
+			append(restorable.selectedItemsByNamespace[originalNamespace], selectedItem)
+		restorable.totalItems++
 	}
-	return res, warnings, errs
+	return restorable, warnings, errs
 }
