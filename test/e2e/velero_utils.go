@@ -28,9 +28,9 @@ func getProviderPlugins(providerName string) []string {
 	case "aws":
 		return []string{"velero/velero-plugin-for-aws:v1.1.0"}
 	case "azure":
-		return []string{"velero/velero-plugin-for-microsoft-azure:v1.1.1"}
+		return []string{"velero/velero-plugin-for-microsoft-azure:v1.1.2"}
 	case "vsphere":
-		return []string{"velero/velero-plugin-for-aws:v1.1.0", "velero/velero-plugin-for-vsphere:v1.0.2"}
+		return []string{"velero/velero-plugin-for-aws:v1.1.0", "velero/velero-plugin-for-vsphere:v1.1.0"}
 	default:
 		return []string{""}
 	}
