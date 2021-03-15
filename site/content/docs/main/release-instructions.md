@@ -100,7 +100,9 @@ These are the steps to update the Velero Homebrew version.
 -
 ### Plugins
 
-To release plugins maintained by the core team, follow the [plugin release instructions](plugin-release-instructions.md).
+To release plugins maintained by the Velero team, follow the [plugin release instructions](plugin-release-instructions.md).
+
+After the plugin images are built, be sure to update any [e2e tests][3] that use these plugins.
 
 ## How to write and release a blog post
 What to include in a release blog:
@@ -130,3 +132,4 @@ What to include:
 
 [1]: https://velero.io/blog
 [2]: website-guidelines.md
+[3]: test/e2e/velero_utils.go
