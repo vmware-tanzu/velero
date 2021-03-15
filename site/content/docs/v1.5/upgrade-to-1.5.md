@@ -5,7 +5,7 @@ layout: docs
 
 ## Prerequisites
 
-- Velero [v1.4.x][5], [v1.5.2][9], or [v1.5.1][8] installed.
+- Velero [v1.5.2][9], [v1.5.1][8] or [v1.4.x][5] installed.
 
 If you're not yet running at least Velero v1.4, see the following:
 
