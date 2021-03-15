@@ -20,7 +20,19 @@ var (
 )
 
 // Test backup and restore of Kibishi using restic
-var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", func() {
+var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", backup_restore_with_restic)
+
+var _ = Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", backup_restore_with_snapshots)
+
+func backup_restore_with_snapshots() {
+	backup_restore_test(true)
+}
+
+func backup_restore_with_restic() {
+	backup_restore_test(false)
+}
+
+func backup_restore_test(useVolumeSnapshots bool) {
 	var (
 		client           *kubernetes.Clientset
 		extensionsClient *apiextensionsclientset.Clientset
@@ -29,6 +41,9 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 	)
 
 	BeforeEach(func() {
+		if useVolumeSnapshots && cloudProvider == "kind" {
+			Skip("Volume snapshots not supported on kind")
+		}
 		var err error
 		flag.Parse()
 		uuidgen, err = uuid.NewRandom()
@@ -57,7 +72,7 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 			restoreName = "restore-" + uuidgen.String()
 			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
-			Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, "")).To(Succeed(),
+			Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, "", useVolumeSnapshots)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
@@ -105,9 +120,9 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 				backupName = fmt.Sprintf("backup-%s-%s", bsl, uuidgen)
 				restoreName = fmt.Sprintf("restore-%s-%s", bsl, uuidgen)
 
-				Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, bsl)).To(Succeed(),
+				Expect(RunKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
 			}
 		})
 	})
-})
+}
