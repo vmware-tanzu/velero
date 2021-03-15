@@ -1656,11 +1656,11 @@ func (ctx *restoreContext) getOrderedResourceCollection(backupResources map[stri
 // getSelectedRestoreableItems applies Kubernetes selectors on individual items
 // of each resource type to create a list of items which will be actually
 // restored.
-func (ctx *restoreContext) getSelectedRestoreableItems(resrc, targetNamespace, originalNamespace string, items []string) (restoreableResource, Result, Result) {
+func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, Result, Result) {
 	warnings, errs := Result{}, Result{}
 
 	restorable := restoreableResource{
-		resource: resrc,
+		resource: resource,
 	}
 
 	if restorable.selectedItemsByNamespace == nil {
@@ -1668,9 +1668,9 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resrc, targetNamespace, o
 	}
 
 	if targetNamespace != "" {
-		ctx.log.Infof("Resource '%s' will be restored into namespace '%s'", resrc, targetNamespace)
+		ctx.log.Infof("Resource '%s' will be restored into namespace '%s'", resource, targetNamespace)
 	} else {
-		ctx.log.Infof("Resource '%s' will be restored at cluster scope", resrc)
+		ctx.log.Infof("Resource '%s' will be restored at cluster scope", resource)
 	}
 
 	// If the APIGroupVersionsFeatureFlag is enabled, the item path will be
@@ -1682,13 +1682,13 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resrc, targetNamespace, o
 	// chosenGrpVersToRestore map would only be populated if
 	// APIGroupVersionsFeatureFlag was enabled for restore and the minimum
 	// required backup format version has been met.
-	cgv, ok := ctx.chosenGrpVersToRestore[resrc]
+	cgv, ok := ctx.chosenGrpVersToRestore[resource]
 	if ok {
-		resrc = filepath.Join(resrc, cgv.Dir)
+		resource = filepath.Join(resource, cgv.Dir)
 	}
 
 	for _, item := range items {
-		itemPath := archive.GetItemFilePath(ctx.restoreDir, resrc, originalNamespace, item)
+		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
 
 		obj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 		if err != nil {
