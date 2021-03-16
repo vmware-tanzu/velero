@@ -19,9 +19,9 @@ Plugins the Velero core team is responsible include all those listed in [the Vel
 1. Once the PR is merged, checkout the upstream `main` branch. Your local upstream might be named `upstream` or `origin`, so use this command: `git checkout <upstream-name>/main`.
 1. Tag the git version - `git tag v<version>`.
 1. Push the git tag - `git push --tags <upstream-name>` to trigger the image build.
-1. Wait for the container images to build.
-1. Verify that an image with the new tag is available at `https://hub.docker.com/repository/docker/velero/<plugin-name>/`.
-1. Run the Velero e2e tests using the new image (you will have to edit the [plugin version][1] in the test).
+2. Wait for the container images to build. You may check the progress of the GH action that triggers the image build at `https://github.com/vmware-tanzu/<plugin-name>/actions`
+3. Verify that an image with the new tag is available at `https://hub.docker.com/repository/docker/velero/<plugin-name>/`.
+4. Run the Velero e2e tests using the new image. Until it is made configurable, you will have to edit the [plugin version][1] in the test.
 ### Release
 1. If all e2e tests pass, go to the GitHub release page of the plugin (`https://github.com/vmware-tanzu/<plugin-name>/releases`) and manually create a release for the new tag. 
 1. Copy and paste the content of the new changelog file into the release description field.
