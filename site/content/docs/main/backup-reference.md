@@ -30,7 +30,7 @@ velero schedule create NAME --schedule [flags]
 For example, to create a backup that runs every day at 3 am run
 
 ```
-velero create schedule backupName --schedule="0 0 3 ? * *"
+velero create schedule schedule-name --schedule="0 0 3 * * *"
 ```
 
 This command will create the backup within Velero, but it will not trigger until the next time it's specified interval, 3am. Scheduled backups are saved with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*.
@@ -38,7 +38,7 @@ This command will create the backup within Velero, but it will not trigger until
 Once you create the backup, you can then trigger it whenever you want by running
 
 ```
-velero backup create --from-schedule backupName
+velero backup create --from-schedule schedule-name
 ```
 
-This command will immediately trigger a new backup based on your template for `backupName`. This will not affect the backup schedule, and another backup will trigger at the scheduled time.
+This command will immediately trigger a new backup based on your template for `schedule-name`. This will not affect the backup schedule, and another backup will trigger at the scheduled time.
