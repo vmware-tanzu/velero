@@ -3,7 +3,7 @@ name: "Auto Assign PR Reviewers"
 # This should mean PRs from forks are supported.
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, ready_for_review]
 
 jobs:
   # Automatically assigns reviewers and owner
@@ -14,11 +14,3 @@ jobs:
         with:
           configuration-path: ".github/auto_assign.yml"
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
-  # Automatically labels PRs based on file globs in the change.
-  triage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/labeler@v3
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          configuration-path: .github/labels.yml
