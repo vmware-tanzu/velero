@@ -5,7 +5,7 @@ layout: docs
 
 ## Prerequisites
 
-- Velero [v1.4.x][5] installed.
+- Velero [v1.5.2][9], [v1.5.1][8] or [v1.4.x][5] installed.
 
 If you're not yet running at least Velero v1.4, see the following:
 
@@ -28,7 +28,7 @@ If you're not yet running at least Velero v1.4, see the following:
 
     ```bash
     Client:
-        Version: v1.5.1
+        Version: v1.5.3
         Git commit: <git SHA>
     ```
 
@@ -44,12 +44,12 @@ If you're not yet running at least Velero v1.4, see the following:
 
     ```bash
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.5.1 \
+        velero=velero/velero:v1.5.3 \
         --namespace velero
 
     # optional, if using the restic daemon set
     kubectl set image daemonset/restic \
-        restic=velero/velero:v1.5.1 \
+        restic=velero/velero:v1.5.3 \
         --namespace velero
     ```
 
@@ -63,11 +63,11 @@ If you're not yet running at least Velero v1.4, see the following:
 
     ```bash
     Client:
-        Version: v1.5.1
+        Version: v1.5.3
         Git commit: <git SHA>
 
     Server:
-        Version: v1.5.1
+        Version: v1.5.3
     ```
 
 [0]: basic-install.md#install-the-cli
@@ -78,3 +78,5 @@ If you're not yet running at least Velero v1.4, see the following:
 [5]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
 [6]: https://github.com/vmware-tanzu/velero/issues/2077
 [7]: https://github.com/vmware-tanzu/velero/issues/2311
+[8]: https://github.com/vmware-tanzu/velero/releases/tag/v1.5.1
+[9]: https://github.com/vmware-tanzu/velero/releases/tag/v1.5.2

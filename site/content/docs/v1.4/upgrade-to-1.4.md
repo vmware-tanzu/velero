@@ -5,7 +5,9 @@ layout: docs
 
 ## Prerequisites
 
-- Velero [v1.3.x][4] installed.
+- Velero [v1.4.2][8], [v1.4.0][7] or [v1.3.x][4] installed.
+
+Note: The v1.4.1 tag was created in code, but has no associated docker image due to misconfigured building infrastructure. v1.4.2 fixed this.
 
 If you're not yet running at least Velero v1.3, see the following:
 
@@ -27,7 +29,7 @@ If you're not yet running at least Velero v1.3, see the following:
 
     ```bash
     Client:
-        Version: v1.4.0
+        Version: v1.4.3
         Git commit: <git SHA>
     ```
 
@@ -35,12 +37,12 @@ If you're not yet running at least Velero v1.3, see the following:
 
     ```bash
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.4.0 \
+        velero=velero/velero:v1.4.3 \
         --namespace velero
 
     # optional, if using the restic daemon set
     kubectl set image daemonset/restic \
-        restic=velero/velero:v1.4.0 \
+        restic=velero/velero:v1.4.3 \
         --namespace velero
     ```
 
@@ -62,11 +64,11 @@ If you're not yet running at least Velero v1.3, see the following:
 
     ```bash
     Client:
-        Version: v1.4.0
+        Version: v1.4.3
         Git commit: <git SHA>
 
     Server:
-        Version: v1.4.0
+        Version: v1.4.3
     ```
 
 [0]: basic-install.md#install-the-cli
@@ -76,3 +78,5 @@ If you're not yet running at least Velero v1.3, see the following:
 [4]: https://github.com/vmware-tanzu/velero/releases/tag/v1.3.2
 [5]: https://github.com/vmware-tanzu/velero/issues/2077
 [6]: https://github.com/vmware-tanzu/velero/issues/2311
+[7]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.0
+[8]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
