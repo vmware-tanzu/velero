@@ -115,7 +115,7 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 
 	if io.UseRestic {
 		fmt.Println("Waiting for Velero restic daemonset to be ready.")
-		if _, err = install.DaemonSetIsReady(factory, "velero"); err != nil {
+		if _, err = install.DaemonSetIsReady(factory, io.Namespace); err != nil {
 			return errors.Wrap(err, errorMsg)
 		}
 	}
@@ -212,15 +212,20 @@ func CheckRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
-func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string) error {
+func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string,
+	useVolumeSnapshots bool) error {
 	args := []string{
 		"--namespace", veleroNamespace,
 		"create", "backup", backupName,
 		"--include-namespaces", namespace,
-		"--default-volumes-to-restic",
 		"--wait",
 	}
 
+	if useVolumeSnapshots {
+		args = append(args, "--snapshot-volumes")
+	} else {
+		args = append(args, "--default-volumes-to-restic")
+	}
 	if backupLocation != "" {
 		args = append(args, "--storage-location", backupLocation)
 	}

@@ -10,9 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -23,7 +26,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
@@ -220,7 +222,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		// TODO - Velero needs to be installed AFTER CRDs are installed because of https://github.com/vmware-tanzu/velero/issues/3471
 		// Once that issue is fixed, we should install Velero once for the test suite
 		if installVelero {
-			VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+			VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig,
 				"EnableAPIGroupVersions" /* TODO - remove this when the feature flag is removed */)
 			fmt.Println("Sleep 20s to wait for Velero to stabilize after install.")
@@ -230,7 +232,7 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		backup := "backup-rockbands-" + uuidgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
 
-		err = VeleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr, "")
+		err = VeleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr, "", false)
 		if err != nil {
 			VeleroBackupLogs(ctx, veleroCLI, veleroNamespace, backup)
 			return errors.Wrapf(err, "backing up %s namespaces on source cluster", namespacesStr)
