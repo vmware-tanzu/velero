@@ -26,4 +26,4 @@
 | Kubernetes CSI Liaison | Nolan Brubaker (nrb), Ashish Amarnath (ashish-amarnath) |
 | Deployment | Carlisia Thompson (carlisia), Carlos Tadeu Panato Junior (cpanato), JenTing Hsiao (jenting) | 
 | Community Management | Jonas Rosland (jonasrosland) |
-| Product Management | Michael Michael (michmike) |
+| Product Management | Eleanor Millman (eleanor-millman) |
