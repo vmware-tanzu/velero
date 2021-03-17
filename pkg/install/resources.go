@@ -245,7 +245,7 @@ func AllCRDs() *unstructured.UnstructuredList {
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
-func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
+func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	resources := AllCRDs()
 
 	ns := Namespace(o.Namespace)
@@ -317,5 +317,5 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		appendUnstructured(resources, ds)
 	}
 
-	return resources, nil
+	return resources
 }

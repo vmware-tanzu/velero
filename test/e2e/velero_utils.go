@@ -92,17 +92,17 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 	}
 
 	f := client.NewFactory("e2e", config)
-	resources, err := install.AllResources(vo)
-	if err != nil {
-		return errors.Wrap(err, "Failed to install Velero in the cluster")
-	}
+	resources := install.AllResources(vo)
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
 	}
+
 	factory := client.NewDynamicFactory(dynamicClient)
+
 	errorMsg := "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs"
+
 	err = install.Install(factory, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
@@ -119,6 +119,7 @@ func InstallVeleroServer(io *cliinstall.InstallOptions) error {
 			return errors.Wrap(err, errorMsg)
 		}
 	}
+	fmt.Printf("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n %s' to view the status.\n", io.Namespace)
 
 	return nil
 }
@@ -274,7 +275,7 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 	}
 	err := EnsureClusterExists(ctx)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to ensure kubernetes cluster exists")
+		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
 	}
 	veleroInstallOptions, err := GetProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
 		bslPrefix, bslConfig, vslConfig, getProviderPlugins(objectStoreProvider), features)
@@ -286,8 +287,9 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 	veleroInstallOptions.Namespace = veleroNamespace
 	err = InstallVeleroServer(veleroInstallOptions)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to install Velero in cluster")
+		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
+
 	return nil
 }
 

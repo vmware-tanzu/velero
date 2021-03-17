@@ -380,7 +380,7 @@ func installVeleroForAPIGroups(ctx context.Context) error {
 	options.Image = veleroImage
 
 	if err := InstallVeleroServer(options); err != nil {
-		return errors.Wrap(err, "install velero server")
+		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
 
 	return nil

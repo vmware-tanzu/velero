@@ -234,16 +234,19 @@ func createResource(r *unstructured.Unstructured, factory client.DynamicFactory,
 		format := strings.Join([]string{id, ": ", f, "\n"}, "")
 		fmt.Fprintf(w, format, a...)
 	}
-	log("attempting to create resource")
 
 	c, err := CreateClient(r, factory, w)
 	if err != nil {
 		return err
 	}
 
-	if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
-		log("already exists, proceeding")
-	} else if err != nil {
+	log("attempting to create resource")
+	_, err = c.Create(r)
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			log("already exists, proceeding")
+			return nil
+		}
 		return errors.Wrapf(err, "Error creating resource %s", id)
 	}
 
