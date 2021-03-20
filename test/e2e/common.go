@@ -13,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
@@ -24,19 +23,19 @@ func EnsureClusterExists(ctx context.Context) error {
 }
 
 // CreateNamespace creates a kubernetes namespace
-func CreateNamespace(ctx context.Context, client *kubernetes.Clientset, namespace string) error {
+func CreateNamespace(ctx context.Context, client TestClient, namespace string) error {
 	ns := builder.ForNamespace(namespace).Result()
-	_, err := client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
 	return err
 }
 
-// WaitForNamespaceDeletion Waits for namespace to be deleted.
-func WaitForNamespaceDeletion(interval, timeout time.Duration, client *kubernetes.Clientset, ns string) error {
+// WaitForNamespaceDeletion waits for namespace to be deleted.
+func WaitForNamespaceDeletion(interval, timeout time.Duration, client TestClient, ns string) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := client.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+		_, err := client.ClientGo.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -49,7 +48,7 @@ func WaitForNamespaceDeletion(interval, timeout time.Duration, client *kubernete
 	return err
 }
 
-func CreateSecretFromFiles(ctx context.Context, client *kubernetes.Clientset, namespace string, name string, files map[string]string) error {
+func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace string, name string, files map[string]string) error {
 	data := make(map[string][]byte)
 
 	for key, filePath := range files {
@@ -62,19 +61,17 @@ func CreateSecretFromFiles(ctx context.Context, client *kubernetes.Clientset, na
 	}
 
 	secret := builder.ForSecret(namespace, name).Data(data).Result()
-	_, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	_, err := client.ClientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }
 
-/*
- Waits until all of the pods have gone to PodRunning state
-*/
-func WaitForPods(ctx context.Context, client *kubernetes.Clientset, namespace string, pods []string) error {
+// WaitForPods waits until all of the pods have gone to PodRunning state
+func WaitForPods(ctx context.Context, client TestClient, namespace string, pods []string) error {
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		for _, podName := range pods {
-			checkPod, err := client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
 				return false, errors.WithMessage(err, fmt.Sprintf("Failed to verify pod %s/%s is %s", namespace, podName, corev1api.PodRunning))
 			}

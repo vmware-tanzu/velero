@@ -4,15 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/client-go/kubernetes"
-
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var (
@@ -34,11 +29,12 @@ func backup_restore_with_restic() {
 
 func backup_restore_test(useVolumeSnapshots bool) {
 	var (
-		client           *kubernetes.Clientset
-		extensionsClient *apiextensionsclientset.Clientset
-		backupName       string
-		restoreName      string
+		backupName  string
+		restoreName string
 	)
+
+	client, err := NewTestClient()
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
 		if useVolumeSnapshots && cloudProvider == "kind" {
@@ -53,17 +49,11 @@ func backup_restore_test(useVolumeSnapshots bool) {
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
 
 		}
-		client, extensionsClient, err = kube.GetClusterClient()
-		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	})
 
 	AfterEach(func() {
-		if installVelero {
-			timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-			err := VeleroUninstall(timeoutCTX, client, extensionsClient, veleroNamespace)
-			Expect(err).To(Succeed())
-		}
-
+		err = VeleroUninstall(client.Kubebuilder, installVelero, veleroNamespace)
+		Expect(err).To(Succeed())
 	})
 
 	When("kibishii is the sample workload", func() {

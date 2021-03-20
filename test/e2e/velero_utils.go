@@ -12,12 +12,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/client-go/kubernetes"
-
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -81,45 +78,36 @@ func GetProviderVeleroInstallOptions(
 
 // InstallVeleroServer installs velero in the cluster.
 func InstallVeleroServer(io *cliinstall.InstallOptions) error {
-	config, err := client.LoadConfig()
-	if err != nil {
-		return err
-	}
-
 	vo, err := io.AsVeleroOptions()
 	if err != nil {
 		return errors.Wrap(err, "Failed to translate InstallOptions to VeleroOptions for Velero")
 	}
 
-	f := client.NewFactory("e2e", config)
-	resources := install.AllResources(vo)
-
-	dynamicClient, err := f.DynamicClient()
+	client, err := NewTestClient()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to instantiate cluster client for installing Velero")
 	}
 
-	factory := client.NewDynamicFactory(dynamicClient)
-
 	errorMsg := "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs"
-
-	err = install.Install(factory, resources, os.Stdout)
+	resources := install.AllResources(vo)
+	err = install.Install(client.DynamicFactory, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
 
 	fmt.Println("Waiting for Velero deployment to be ready.")
-	if _, err = install.DeploymentIsReady(factory, io.Namespace); err != nil {
+	if _, err = install.DeploymentIsReady(client.DynamicFactory, io.Namespace); err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
 
 	if io.UseRestic {
 		fmt.Println("Waiting for Velero restic daemonset to be ready.")
-		if _, err = install.DaemonSetIsReady(factory, io.Namespace); err != nil {
+		if _, err = install.DaemonSetIsReady(client.DynamicFactory, io.Namespace); err != nil {
 			return errors.Wrap(err, errorMsg)
 		}
 	}
-	fmt.Printf("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n %s' to view the status.\n", io.Namespace)
+
+	fmt.Printf("Velero is installed and ready to be tested in the %s namespace! ⛵ \n", io.Namespace)
 
 	return nil
 }
@@ -293,8 +281,14 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 	return nil
 }
 
-func VeleroUninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclient.Clientset, veleroNamespace string) error {
-	return uninstall.Uninstall(ctx, client, extensionsClient, veleroNamespace)
+func VeleroUninstall(client kbclient.Client, installVelero bool, veleroNamespace string) error {
+	if installVelero {
+		err := uninstall.Run(client, veleroNamespace)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {

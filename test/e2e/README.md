@@ -105,3 +105,8 @@ For example, E2E tests can be run from Velero repository roots using the command
 Velero E2E tests uses [Ginkgo](https://onsi.github.io/ginkgo/) testing framework which allows a subset of the tests to be run using the [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) flags to ginkgo.
 
 The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. This can be used to focus on specific tests.
+
+## Adding tests
+
+### Tips
+Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall. 

@@ -19,57 +19,126 @@ package uninstall
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+
+	// apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/install"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-// Uninstall uninstalls all components deployed using velero install command
-func Uninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclientset.Clientset, veleroNamespace string) error {
-	if veleroNamespace == "" {
-		veleroNamespace = "velero"
-	}
-	err := DeleteNamespace(ctx, client, veleroNamespace)
-	if err != nil {
-		return errors.WithMessagef(err, "Uninstall failed removing Velero namespace %s", veleroNamespace)
+// NewCommand creates a cobra command.
+func NewCommand(f client.Factory) *cobra.Command {
+	c := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Uninstall Velero",
+		Long: `Uninstall Velero along with the CRDs.
+
+The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
+		`,
+		Example: `# velero uninstall -n backup`,
+		Run: func(c *cobra.Command, args []string) {
+
+			if !cli.GetConfirmation() {
+				// Don't do anything unless we get confirmation
+				return
+			}
+
+			kbClient, err := f.KubebuilderClient()
+			cmd.CheckError(err)
+			cmd.CheckError(Run(kbClient, f.Namespace()))
+		},
 	}
 
-	rolebinding := install.ClusterRoleBinding(veleroNamespace)
+	output.BindFlags(c.Flags())
+	output.ClearOutputFlagDefault(c)
+	return c
+}
 
-	err = client.RbacV1().ClusterRoleBindings().Delete(ctx, rolebinding.Name, metav1.DeleteOptions{})
-	if err != nil {
-		return errors.WithMessagef(err, "Uninstall failed removing Velero cluster role binding %s", rolebinding)
-	}
-	veleroLabels := labels.FormatLabels(install.Labels())
+// Run removes all components that were deployed using the Velero install command
+func Run(kbClient kbclient.Client, namespace string) error {
+	var errs []error
 
-	crds, err := extensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{
-		LabelSelector: veleroLabels,
-	})
-	if err != nil {
-		return errors.WithMessagef(err, "Uninstall failed listing Velero crds")
-	}
-	for _, removeCRD := range crds.Items {
-		err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, removeCRD.ObjectMeta.Name, metav1.DeleteOptions{})
-		if err != nil {
-			return errors.WithMessagef(err, "Uninstall failed removing CRD %s", removeCRD.ObjectMeta.Name)
+	// namespace
+	ns := &corev1.Namespace{}
+	key := kbclient.ObjectKey{Name: namespace}
+	if err := kbClient.Get(context.Background(), key, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("Velero installation namespace %q does not exist, skipping.\n", namespace)
+		} else {
+			errs = append(errs, errors.WithStack(err))
+		}
+	} else {
+		if ns.Status.Phase == corev1.NamespaceTerminating {
+			fmt.Printf("Velero installation namespace %q is terminating.\n", namespace)
+		} else {
+			if err := kbClient.Delete(context.Background(), ns); err != nil {
+				errs = append(errs, errors.WithStack(err))
+			}
 		}
 	}
 
-	fmt.Println("Uninstalled Velero")
+	time.Sleep(time.Second * 60)
+
+	// rolebinding
+	crb := install.ClusterRoleBinding(namespace)
+	key = kbclient.ObjectKey{Name: crb.Name, Namespace: namespace}
+	if err := kbClient.Get(context.Background(), key, crb); err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("Velero installation rolebinding %q does not exist, skipping.\n", crb.Name)
+		} else {
+			errs = append(errs, errors.WithStack(err))
+		}
+	} else {
+		if err := kbClient.Delete(context.Background(), crb); err != nil {
+			errs = append(errs, errors.WithStack(err))
+		}
+	}
+
+	// CRDs
+	veleroLabels := labels.FormatLabels(install.Labels())
+	crdList := apiextv1beta1.CustomResourceDefinitionList{}
+	opts := kbclient.ListOptions{
+		Namespace: namespace,
+		Raw: &metav1.ListOptions{
+			LabelSelector: veleroLabels,
+		},
+	}
+	if err := kbClient.List(context.Background(), &crdList, &opts); err != nil {
+		errs = append(errs, errors.WithStack(err))
+	} else {
+		if len(crdList.Items) == 0 {
+			fmt.Print("Velero CRDs do not exist, skipping.\n")
+		} else {
+			for _, crd := range crdList.Items {
+				if err := kbClient.Delete(context.Background(), &crd); err != nil {
+					errs = append(errs, errors.WithStack(err))
+				}
+			}
+		}
+	}
+
+	if kubeerrs.NewAggregate(errs) != nil {
+		fmt.Printf("Errors while attempting to uninstall Velero: %q", kubeerrs.NewAggregate(errs))
+		return kubeerrs.NewAggregate(errs)
+	}
+
+	fmt.Println("Velero uninstalled ⛵")
 	return nil
 }
 
@@ -88,27 +157,4 @@ func DeleteNamespace(ctx context.Context, client *kubernetes.Clientset, namespac
 		}
 		return false, nil
 	})
-}
-
-// NewCommand creates a cobra command.
-func NewCommand(f client.Factory) *cobra.Command {
-	c := &cobra.Command{
-		Use:   "uninstall",
-		Short: "Uninstall Velero",
-		Long: `Uninstall Velero along with the CRDs.
-
-The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
-		`,
-		Example: `# velero uninstall -n backup`,
-		Run: func(c *cobra.Command, args []string) {
-			veleroNs := strings.TrimSpace(f.Namespace())
-			cl, extCl, err := kube.GetClusterClient()
-			cmd.CheckError(err)
-			cmd.CheckError(Uninstall(context.Background(), cl, extCl, veleroNs))
-		},
-	}
-
-	output.BindFlags(c.Flags())
-	output.ClearOutputFlagDefault(c)
-	return c
 }
