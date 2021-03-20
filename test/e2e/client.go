@@ -22,38 +22,38 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type TestClient struct {
+type testClient struct {
 	Kubebuilder    kbclient.Client
 	ClientGo       kubernetes.Interface
 	DynamicFactory client.DynamicFactory
 }
 
-func NewTestClient() (TestClient, error) {
+func newTestClient() (testClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {
-		return TestClient{}, err
+		return testClient{}, err
 	}
 
 	f := client.NewFactory("e2e", config)
 
 	clientGo, err := f.KubeClient()
 	if err != nil {
-		return TestClient{}, err
+		return testClient{}, err
 	}
 
 	kb, err := f.KubebuilderClient()
 	if err != nil {
-		return TestClient{}, err
+		return testClient{}, err
 	}
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return TestClient{}, err
+		return testClient{}, err
 	}
 
 	factory := client.NewDynamicFactory(dynamicClient)
 
-	return TestClient{
+	return testClient{
 		Kubebuilder:    kb,
 		ClientGo:       clientGo,
 		DynamicFactory: factory,

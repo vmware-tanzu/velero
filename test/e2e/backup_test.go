@@ -1,3 +1,19 @@
+/*
+Copyright the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package e2e
 
 import (
@@ -33,7 +49,7 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		restoreName string
 	)
 
-	client, err := NewTestClient()
+	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
@@ -45,14 +61,14 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(VeleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
 
 		}
 	})
 
 	AfterEach(func() {
-		err = VeleroUninstall(client.Kubebuilder, installVelero, veleroNamespace)
+		err = veleroUninstall(client.Kubebuilder, installVelero, veleroNamespace)
 		Expect(err).To(Succeed())
 	})
 
@@ -79,7 +95,7 @@ func backup_restore_test(useVolumeSnapshots bool) {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
-			Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCLI, veleroNamespace, additionalBSLProvider)).To(Succeed())
+			Expect(veleroAddPluginsForProvider(context.TODO(), veleroCLI, veleroNamespace, additionalBSLProvider)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", uuidgen)
@@ -88,11 +104,11 @@ func backup_restore_test(useVolumeSnapshots bool) {
 				secretKey: additionalBSLCredentials,
 			}
 
-			Expect(CreateSecretFromFiles(context.TODO(), client, veleroNamespace, secretName, files)).To(Succeed())
+			Expect(createSecretFromFiles(context.TODO(), client, veleroNamespace, secretName, files)).To(Succeed())
 
 			// Create additional BSL using credential
 			additionalBsl := fmt.Sprintf("bsl-%s", uuidgen)
-			Expect(VeleroCreateBackupLocation(context.TODO(),
+			Expect(veleroCreateBackupLocation(context.TODO(),
 				veleroCLI,
 				veleroNamespace,
 				additionalBsl,
