@@ -17,9 +17,10 @@ limitations under the License.
 package e2e
 
 import (
-	"github.com/vmware-tanzu/velero/pkg/client"
 	"k8s.io/client-go/kubernetes"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
 type testClient struct {

@@ -56,14 +56,11 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		group = "music.example.io"
 		certManagerCRD =
 			map[string]resourceCRD{
-				cert: resourceCRD{
+				cert: {
 					url: "testdata/enable_api_group_versions/cert-manager.yaml",
 					ns:  "cert-manager",
 				},
 			}
-
-		err = installCRD(ctx, certManagerCRD[cert])
-		Expect(err).NotTo(HaveOccurred())
 
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).NotTo(HaveOccurred())
@@ -81,7 +78,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Should back up API group version and restore by version priority", func() {
-			Expect(RunEnableAPIGroupVersionsTests(
+			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
 				client,
 				resource,
@@ -92,7 +89,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 	})
 })
 
-func RunEnableAPIGroupVersionsTests(ctx context.Context, client testClient, resource, group string, certManager resourceCRD) error {
+func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, resource, group string, certManager resourceCRD) error {
 	const src = "source"
 	const tgt = "target"
 	const srcCRs = "srcCRs"
@@ -223,8 +220,14 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 	for i, tc := range tests {
 		fmt.Printf("\n====== Test Case %d ======\n", i)
 
-		err := installCRD(ctx, tc.resources[src])
+		err := installCRD(ctx, certManager)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = installCRD(ctx, tc.resources[src])
 		if err != nil {
+			testCleanup(ctx, client, nil, []resourceCRD{
+				certManager,
+			})
 			return errors.Wrap(err, "installing music-system CRD for source cluster")
 		}
 
@@ -291,6 +294,10 @@ func RunEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			}
 
 			if err := waitNamespaceDelete(ctx, ns); err != nil {
+				testCleanup(ctx, client, nil, []resourceCRD{
+					certManager,
+					tc.resources[src],
+				})
 				return errors.Wrapf(err, "deleting %s namespace from source cluster", ns)
 			}
 		}
