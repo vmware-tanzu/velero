@@ -285,7 +285,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 		}
 
 		for _, ns := range tc.namespaces {
-			if err := client.ClientGo.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{}); err != nil {
+			if err := client.clientGo.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{}); err != nil {
 				testCleanup(ctx, client, nil, []resourceCRD{
 					certManager,
 					tc.resources[src],
@@ -313,7 +313,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 
 		// Apply config map if there is one.
 		if tc.cm != nil {
-			_, err := client.ClientGo.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
+			_, err := client.clientGo.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
 			if err != nil {
 				testCleanup(ctx, client, tc.namespaces, []resourceCRD{
 					certManager,
@@ -415,7 +415,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			tc.resources[tgt],
 		})
 
-		err = veleroUninstall(client.Kubebuilder, installVelero, veleroNamespace)
+		err = veleroUninstall(client.kubebuilder, installVelero, veleroNamespace)
 		if err != nil {
 			return err
 		}
@@ -429,10 +429,11 @@ type resourceCRD struct {
 }
 
 func testCleanup(ctx context.Context, client testClient, namespaces []string, resources []resourceCRD) {
+	fmt.Println("Running test cleanup for [APIGroup]...")
 	// Delete namespaces created for CRs
 	for _, ns := range namespaces {
 		fmt.Println("Delete namespace", ns)
-		_ = client.ClientGo.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{})
+		_ = client.clientGo.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{})
 		_ = waitNamespaceDelete(ctx, ns)
 	}
 

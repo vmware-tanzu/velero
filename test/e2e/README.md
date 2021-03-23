@@ -108,5 +108,11 @@ The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. Th
 
 ## Adding tests
 
+### API clients
+When adding a test, aim to instantiate an API client only once at the beginning of the test. There is a constructor `newTestClient` that facilitates the configuration and instantiation of clients. Also, please use the `kubebuilder` runtime controller client for any new test, as we will phase out usage of `client-go` API clients.
+
+### Test cleanup
+If your test creates resources, be sure it is removing these resources everywhere where there is a potential failure point so even if the test ends with a failure, the environemnt will be cleaned up for the next test.
+
 ### Tips
 Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall. 

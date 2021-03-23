@@ -68,7 +68,7 @@ func backup_restore_test(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		err = veleroUninstall(client.Kubebuilder, installVelero, veleroNamespace)
+		err = veleroUninstall(client.kubebuilder, installVelero, veleroNamespace)
 		Expect(err).To(Succeed())
 	})
 

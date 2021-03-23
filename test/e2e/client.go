@@ -23,12 +23,29 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
+// testClient contains different API clients that are in use throughout
+// the e2e tests.
+
 type testClient struct {
-	Kubebuilder    kbclient.Client
-	ClientGo       kubernetes.Interface
-	DynamicFactory client.DynamicFactory
+	kubebuilder kbclient.Client
+
+	// clientGo returns a client-go API client.
+	//
+	// Deprecated, TODO(2.0): presuming all controllers and resources are converted to the
+	// controller runtime framework by v2.0, it is the intent to remove all
+	// client-go API clients. Please use the controller runtime to make API calls for tests.
+	clientGo kubernetes.Interface
+
+	// dynamicFactory returns a client-go API client for retrieving dynamic clients
+	// for GroupVersionResources and GroupVersionKinds.
+	//
+	// Deprecated, TODO(2.0): presuming all controllers and resources are converted to the
+	// controller runtime framework by v2.0, it is the intent to remove all
+	// client-go API clients. Please use the controller runtime to make API calls for tests.
+	dynamicFactory client.DynamicFactory
 }
 
+// newTestClient returns a set of ready-to-use API clients.
 func newTestClient() (testClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {
@@ -55,8 +72,8 @@ func newTestClient() (testClient, error) {
 	factory := client.NewDynamicFactory(dynamicClient)
 
 	return testClient{
-		Kubebuilder:    kb,
-		ClientGo:       clientGo,
-		DynamicFactory: factory,
+		kubebuilder:    kb,
+		clientGo:       clientGo,
+		dynamicFactory: factory,
 	}, nil
 }

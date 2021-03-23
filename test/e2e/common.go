@@ -41,7 +41,7 @@ func ensureClusterExists(ctx context.Context) error {
 // createNamespace creates a kubernetes namespace
 func createNamespace(ctx context.Context, client testClient, namespace string) error {
 	ns := builder.ForNamespace(namespace).Result()
-	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
@@ -51,7 +51,7 @@ func createNamespace(ctx context.Context, client testClient, namespace string) e
 // waitForNamespaceDeletion waits for namespace to be deleted.
 func waitForNamespaceDeletion(interval, timeout time.Duration, client testClient, ns string) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := client.ClientGo.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+		_, err := client.clientGo.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -77,7 +77,7 @@ func createSecretFromFiles(ctx context.Context, client testClient, namespace str
 	}
 
 	secret := builder.ForSecret(namespace, name).Data(data).Result()
-	_, err := client.ClientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	_, err := client.clientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }
 
@@ -87,7 +87,7 @@ func waitForPods(ctx context.Context, client testClient, namespace string, pods 
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		for _, podName := range pods {
-			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			checkPod, err := client.clientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
 				return false, errors.WithMessage(err, fmt.Sprintf("Failed to verify pod %s/%s is %s", namespace, podName, corev1api.PodRunning))
 			}
