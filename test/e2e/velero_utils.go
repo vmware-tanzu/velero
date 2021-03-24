@@ -292,7 +292,12 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 }
 
 func VeleroUninstall(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclient.Clientset, veleroNamespace string) error {
-	return uninstall.Uninstall(ctx, client, extensionsClient, veleroNamespace)
+	err := uninstall.Run(ctx, client, extensionsClient, veleroNamespace, true)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
