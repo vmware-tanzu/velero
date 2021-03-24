@@ -10,6 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
@@ -32,7 +37,7 @@ func getProviderPlugins(providerName string) []string {
 	case "azure":
 		return []string{"velero/velero-plugin-for-microsoft-azure:v1.2.0"}
 	case "vsphere":
-		return []string{"velero/velero-plugin-for-aws:v1.2.0", "velero/velero-plugin-for-vsphere:v1.1.0"}
+		return []string{"velero/velero-plugin-for-aws:v1.2.0", "vsphereveleroplugin/velero-plugin-for-vsphere:1.1.0"}
 	default:
 		return []string{""}
 	}
@@ -272,16 +277,36 @@ func VeleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
 		}
 	}
+
+	providerPlugins := getProviderPlugins(objectStoreProvider)
+
+	// TODO - handle this better
+	if cloudProvider == "vsphere" {
+		// We overrider the objectStoreProvider here for vSphere because we want to use the aws plugin for the
+		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
+		// Snapshot location specified
+		objectStoreProvider = "aws"
+	}
 	err := EnsureClusterExists(ctx)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to ensure kubernetes cluster exists")
 	}
 	veleroInstallOptions, err := GetProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
-		bslPrefix, bslConfig, vslConfig, getProviderPlugins(objectStoreProvider), features)
+		bslPrefix, bslConfig, vslConfig, providerPlugins, features)
+	if useVolumeSnapshots {
+		if cloudProvider != "vsphere" {
+			veleroInstallOptions.UseVolumeSnapshots = true
+		} else {
+			veleroInstallOptions.UseVolumeSnapshots = false // vSphere plug-in 1.1.0+ is not a volume snapshotter plug-in
+			// so we do not want to generate a VSL (this will wind up
+			// being an AWS VSL which causes problems)
+		}
+	}
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", objectStoreProvider)
 	}
 	veleroInstallOptions.UseRestic = !useVolumeSnapshots
+
 	veleroInstallOptions.Image = veleroImage
 	veleroInstallOptions.Namespace = veleroNamespace
 	err = InstallVeleroServer(veleroInstallOptions)
@@ -394,4 +419,52 @@ func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 	}
 
 	return nil
+}
+
+/*
+ Waits for uploads started by the Velero Plug-in for vSphere to complete
+ TODO - remove after upload progress monitoring is implemented
+*/
+func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, namespace string) error {
+	err := wait.PollImmediate(time.Minute, timeout, func() (bool, error) {
+		checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
+			"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}'")
+		fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
+		stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
+		if err != nil {
+			fmt.Print(stdout)
+			fmt.Print(stderr)
+			return false, errors.Wrap(err, "failed to verify")
+		}
+		lines := strings.Split(stdout, "\n")
+		complete := true
+		for _, curLine := range lines {
+			fmt.Println(curLine)
+			comps := strings.Split(curLine, "=")
+			// SnapshotPhase represents the lifecycle phase of a Snapshot.
+			// New - No work yet, next phase is InProgress
+			// InProgress - snapshot being taken
+			// Snapshotted - local snapshot complete, next phase is Protecting or SnapshotFailed
+			// SnapshotFailed - end state, snapshot was not able to be taken
+			// Uploading - snapshot is being moved to durable storage
+			// Uploaded - end state, snapshot has been protected
+			// UploadFailed - end state, unable to move to durable storage
+			// Canceling - when the SanpshotCancel flag is set, if the Snapshot has not already moved into a terminal state, the
+			//             status will move to Canceling.  The snapshot ID will be removed from the status status if has been filled in
+			//             and the snapshot ID will not longer be valid for a Clone operation
+			// Canceled - the operation was canceled, the snapshot ID is not valid
+			if len(comps) == 2 {
+				phase := comps[1]
+				if phase == "New" ||
+					phase == "InProgress" ||
+					phase == "Snapshotted" ||
+					phase == "Uploading" {
+					complete = false
+				}
+			}
+		}
+		return complete, nil
+	})
+
+	return err
 }
