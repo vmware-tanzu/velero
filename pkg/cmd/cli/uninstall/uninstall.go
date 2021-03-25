@@ -60,13 +60,13 @@ func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Uninstall Velero",
-		Long: `Uninstall Velero along with the CRDs.
+		Long: `Uninstall Velero along with the CRDs and clusterrolebinding.
 
 The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
 Use '--wait' to wait for the Velero uninstall to be ready before proceeding.
 Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 		`,
-		Example: `# velero uninstall -n staging`,
+		Example: ` # velero uninstall --namespace staging`,
 		Run: func(c *cobra.Command, args []string) {
 
 			// Confirm if not asked to force-skip confirmation
@@ -115,7 +115,7 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 	crb := install.ClusterRoleBinding(namespace)
 	if err := client.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Velero installation rolebinding %q does not exist, skipping.\n", crb.Name)
+			fmt.Printf("Velero installation clusterrolebinding %q does not exist, skipping.\n", crb.Name)
 		} else {
 			errs = append(errs, errors.WithStack(err))
 		}
