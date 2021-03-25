@@ -49,7 +49,7 @@ type uninstallOptions struct {
 
 // BindFlags adds command line values to the options struct.
 func (o *uninstallOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.wait, "wait", o.wait, "Wait for Velero deployment to be ready. Optional.")
+	flags.BoolVar(&o.wait, "wait", o.wait, "Wait for Velero uninstall to be ready. Optional.")
 	flags.BoolVar(&o.force, "force", o.force, "Forces the Velero uninstall. Optional.")
 }
 
@@ -63,7 +63,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long: `Uninstall Velero along with the CRDs.
 
 The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
-Use '--wait' to wait for the Velero Deployment to be ready before proceeding.
+Use '--wait' to wait for the Velero uninstall to be ready before proceeding.
 Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 		`,
 		Example: `# velero uninstall -n staging`,
@@ -134,7 +134,8 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 	} else {
 		for _, removeCRD := range crds.Items {
 			if err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, removeCRD.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
-				errs = append(errs, errors.WithStack(err))
+				err2 := errors.WithMessagef(err, "Uninstall failed removing CRD %s", removeCRD.ObjectMeta.Name)
+				errs = append(errs, errors.WithStack(err2))
 			}
 		}
 	}
