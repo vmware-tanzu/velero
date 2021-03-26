@@ -147,12 +147,12 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 		defer cancel()
 
 		checkFunc := func() {
-			ns, _ := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+			ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
-					fmt.Printf("Unexpectedly not able to retrieve namespace %q for checking its status. Halting.\n", namespace)
-					errs = append(errs, errors.WithStack(err))
+					fmt.Print("\n")
 					cancel()
+					return
 				}
 				errs = append(errs, errors.WithStack(err))
 			}
@@ -160,15 +160,9 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 			if ns.Status.Phase == corev1.NamespaceTerminating {
 				fmt.Print(".")
 			}
-
-			if ns.Status.Phase != corev1.NamespaceTerminating {
-				fmt.Print("\n")
-				cancel()
-			}
 		}
 
 		wait.Until(checkFunc, 5*time.Millisecond, ctx.Done())
-
 	}
 
 	if kubeerrs.NewAggregate(errs) != nil {
