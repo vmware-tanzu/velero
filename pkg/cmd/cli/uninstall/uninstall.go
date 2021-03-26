@@ -147,7 +147,7 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 		defer cancel()
 
 		checkFunc := func() {
-			ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+			_, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					fmt.Print("\n")
@@ -156,10 +156,7 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 				}
 				errs = append(errs, errors.WithStack(err))
 			}
-
-			if ns.Status.Phase == corev1.NamespaceTerminating {
-				fmt.Print(".")
-			}
+			fmt.Print(".")
 		}
 
 		wait.Until(checkFunc, 5*time.Millisecond, ctx.Done())
