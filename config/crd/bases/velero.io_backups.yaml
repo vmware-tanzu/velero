@@ -303,6 +303,13 @@ spec:
                     are ANDed.
                   type: object
               type: object
+            metadata:
+              properties:
+                labels:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
             orderedResources:
               additionalProperties:
                 type: string
