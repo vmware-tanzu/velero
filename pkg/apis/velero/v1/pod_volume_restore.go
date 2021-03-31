@@ -83,15 +83,6 @@ type PodVolumeRestoreStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Restore status such as InProgress/Completed"
-// +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".spec.pod.namespace",description="Namespace of pod containing the volume to be restored"
-// +kubebuilder:printcolumn:name="Pod",type="string",JSONPath=".spec.pod.name",description="Name of pod containing the volume to be restored"
-// +kubebuilder:printcolumn:name="Volume",type="string",JSONPath=".spec.volume",description="Name of volume to restore"
-// +kubebuilder:printcolumn:name="Bytes Done",type="string",JSONPath=".status.progress.bytesDone",description="Number of bytes restored"
-// +kubebuilder:printcolumn:name="Total Bytes",type="string",JSONPath=".status.progress.totalBytes",description="Total number of bytes to be restored"
-// +kubebuilder:printcolumn:name="Started",type="date",JSONPath=".status.startTimestamp",description="Time when the restore operation was started"
-// +kubebuilder:printcolumn:name="Completed",type="date",JSONPath=".status.completionTimestamp",description="Time when the restore operation was completed"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 type PodVolumeRestore struct {
 	metav1.TypeMeta `json:",inline"`
