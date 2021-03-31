@@ -41,6 +41,26 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
+const name = "pvb-1"
+
+func pvbBuilder() *builder.PodVolumeBackupBuilder {
+	return builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, name).
+		PodNamespace(velerov1api.DefaultNamespace).
+		PodName(name).
+		Volume("pvb-1-volume").
+		ObjectMeta(
+			func(obj metav1.Object) {
+				obj.SetOwnerReferences([]metav1.OwnerReference{{Name: name}})
+			},
+		)
+}
+
+func podBuilder() *builder.PodBuilder {
+	return builder.
+		ForPod(velerov1api.DefaultNamespace, name).
+		Volumes(&corev1.Volume{Name: "pvb-1-volume"})
+}
+
 var _ = Describe("Pod Volume Backup Reconciler", func() {
 	type request struct {
 		pvb    *velerov1api.PodVolumeBackup
@@ -85,7 +105,7 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Ctx:        ctx,
 				Clock:      clock.NewFakeClock(now),
 				Metrics:    metrics.NewResticServerMetrics(),
-				NodeName:   "pvb-1-node",
+				NodeName:   "test_node",
 				FileSystem: fakeFS,
 				ResticExec: velerotest.FakeResticBackupExec{},
 				Log:        velerotest.NewLogger(),
@@ -130,20 +150,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			}
 		},
 		Entry("empty phase pvb on same node should be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
-				Phase("").
-				Node("pvb-1-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
-				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pvb: pvbBuilder().Phase("").Node("test_node").Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -154,20 +162,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("new phase pvb on same node should be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
-				Node("pvb-1-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -178,20 +177,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("in progress phase pvb on same node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
-				Node("pvb-1-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -202,20 +192,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("completed phase pvb on same node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
-				Node("pvb-1-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -226,20 +207,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("failed phase pvb on same node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
-				Node("pvb-1-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -250,20 +222,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("empty phase pvb on different node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
-				Node("foo-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node_2").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -274,20 +237,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("new phase pvb on different node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
-				Node("foo-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node_2").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -298,20 +252,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("in progress phase pvb on different node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
-				Node("foo-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node_2").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -322,20 +267,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("completed phase pvb on different node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
-				Node("foo-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node_2").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
@@ -346,20 +282,11 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("failed phase pvb on different node should not be processed", request{
-			pvb: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
+			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
-				Node("foo-node").
-				PodNamespace(velerov1api.DefaultNamespace).
-				Volume("pvb-1-volume").
-				ObjectMeta(
-					func(obj metav1.Object) {
-						obj.SetOwnerReferences([]metav1.OwnerReference{{Name: "pvb-1"}})
-					},
-				).
+				Node("test_node_2").
 				Result(),
-			pod: builder.ForPod(velerov1api.DefaultNamespace, "pvb-1").
-				Volumes(&corev1.Volume{Name: "pvb-1-volume"}).
-				Result(),
+			pod: podBuilder().Result(),
 			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
 				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
 				Result(),
