@@ -20,10 +20,8 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
-      description: TODO(2.0) After converting all resources to use the runtime-controller
-        client, the k8s:deepcopy marker will no longer be needed and should be removed.
-        DownloadRequest is a request to download an artifact from backup object storage,
-        such as a backup log file.
+      description: DownloadRequest is a request to download an artifact from backup
+        object storage, such as a backup log file.
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
