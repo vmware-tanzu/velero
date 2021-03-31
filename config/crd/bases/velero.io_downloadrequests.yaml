@@ -8,22 +8,6 @@ metadata:
   creationTimestamp: null
   name: downloadrequests.velero.io
 spec:
-  additionalPrinterColumns:
-  - JSONPath: .status.phase
-    description: DownloadRequest status such as New/Processed
-    name: Status
-    type: string
-  - JSONPath: .spec.target.name
-    description: Name of the associated Kubernetes resource
-    name: Target Name
-    type: string
-  - JSONPath: .spec.target.kind
-    description: Type of file to download
-    name: Target Kind
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
   group: velero.io
   names:
     kind: DownloadRequest
@@ -36,8 +20,10 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
-      description: DownloadRequest is a request to download an artifact from backup
-        object storage, such as a backup log file.
+      description: TODO(2.0) After converting all resources to use the runtime-controller
+        client, the k8s:deepcopy marker will no longer be needed and should be removed.
+        DownloadRequest is a request to download an artifact from backup object storage,
+        such as a backup log file.
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
