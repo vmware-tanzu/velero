@@ -1,14 +1,20 @@
 name: Pull Request CI Check
 on: [pull_request]
 jobs:
-
   build:
     name: Run CI
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v2
 
-    - name: Check out the code
-      uses: actions/checkout@v2
+      - name: Fetch cached go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-    - name: Make ci
-      run: make ci
+      - name: Make ci
+        run: make ci
