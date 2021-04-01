@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/restic"
 )
 
 // FakeResticBackupExec ...
@@ -31,6 +32,6 @@ func (exec FakeResticBackupExec) RunBackup(cmd interface{}, log logrus.FieldLogg
 }
 
 // GetSnapshotID ...
-func (exec FakeResticBackupExec) GetSnapshotID(repoID, pwFile string, tags map[string]string, env []string, caCertFile string) (string, error) {
+func (exec FakeResticBackupExec) GetSnapshotID(snapshotIdCmd *restic.Command) (string, error) {
 	return "", nil
 }

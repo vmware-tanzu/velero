@@ -69,6 +69,12 @@ func (b *PodVolumeBackupBuilder) Node(name string) *PodVolumeBackupBuilder {
 	return b
 }
 
+// BackupStorageLocation sets the PodVolumeBackup's backup storage location.
+func (b *PodVolumeBackupBuilder) BackupStorageLocation(name string) *PodVolumeBackupBuilder {
+	b.object.Spec.BackupStorageLocation = name
+	return b
+}
+
 // SnapshotID sets the PodVolumeBackup's snapshot ID.
 func (b *PodVolumeBackupBuilder) SnapshotID(snapshotID string) *PodVolumeBackupBuilder {
 	b.object.Status.SnapshotID = snapshotID

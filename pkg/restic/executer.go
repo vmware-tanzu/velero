@@ -26,7 +26,7 @@ import (
 // BackupExecuter ...
 type BackupExecuter interface {
 	RunBackup(interface{}, logrus.FieldLogger, func(velerov1api.PodVolumeOperationProgress)) (string, string, error)
-	GetSnapshotID(string, string, map[string]string, []string, string) (string, error)
+	GetSnapshotID(*Command) (string, error)
 }
 
 // BackupExec ...
@@ -43,6 +43,6 @@ func (exec BackupExec) RunBackup(command interface{}, log logrus.FieldLogger, up
 }
 
 // GetSnapshotID ...
-func (exec BackupExec) GetSnapshotID(repoID, pwFile string, tags map[string]string, env []string, caCertFile string) (string, error) {
-	return GetSnapshotID(repoID, pwFile, tags, env, caCertFile)
+func (exec BackupExec) GetSnapshotID(snapshotIdCmd *Command) (string, error) {
+	return GetSnapshotID(snapshotIdCmd)
 }

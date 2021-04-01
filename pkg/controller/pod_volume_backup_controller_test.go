@@ -48,6 +48,7 @@ func pvbBuilder() *builder.PodVolumeBackupBuilder {
 		PodNamespace(velerov1api.DefaultNamespace).
 		PodName(name).
 		Volume("pvb-1-volume").
+		BackupStorageLocation("bsl-loc").
 		ObjectMeta(
 			func(obj metav1.Object) {
 				obj.SetOwnerReferences([]metav1.OwnerReference{{Name: name}})
@@ -61,11 +62,16 @@ func podBuilder() *builder.PodBuilder {
 		Volumes(&corev1.Volume{Name: "pvb-1-volume"})
 }
 
+func bslBuilder() *builder.BackupStorageLocationBuilder {
+	return builder.
+		ForBackupStorageLocation(velerov1api.DefaultNamespace, "bsl-loc")
+}
+
 var _ = Describe("Pod Volume Backup Reconciler", func() {
 	type request struct {
-		pvb    *velerov1api.PodVolumeBackup
-		pod    *corev1.Pod
-		secret *corev1.Secret
+		pvb *velerov1api.PodVolumeBackup
+		pod *corev1.Pod
+		bsl *velerov1api.BackupStorageLocation
 
 		expectedProcessed bool
 		expected          *velerov1api.PodVolumeBackup
@@ -90,7 +96,7 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			err = fakeClient.Create(ctx, test.pod)
 			Expect(err).To(BeNil())
 
-			err = fakeClient.Create(ctx, test.secret)
+			err = fakeClient.Create(ctx, test.bsl)
 			Expect(err).To(BeNil())
 
 			fakeFS := velerotest.NewFakeFileSystem()
@@ -101,14 +107,15 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 			r := PodVolumeBackupReconciler{
-				Client:     fakeClient,
-				Ctx:        ctx,
-				Clock:      clock.NewFakeClock(now),
-				Metrics:    metrics.NewResticServerMetrics(),
-				NodeName:   "test_node",
-				FileSystem: fakeFS,
-				ResticExec: velerotest.FakeResticBackupExec{},
-				Log:        velerotest.NewLogger(),
+				Client:         fakeClient,
+				Ctx:            ctx,
+				Clock:          clock.NewFakeClock(now),
+				Metrics:        metrics.NewResticServerMetrics(),
+				CredsFileStore: fakeCredsFileStore{},
+				NodeName:       "test_node",
+				FileSystem:     fakeFS,
+				ResticExec:     velerotest.FakeResticBackupExec{},
+				Log:            velerotest.NewLogger(),
 			}
 
 			actualResult, err := r.Reconcile(r.Ctx, ctrl.Request{
@@ -150,11 +157,9 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 			}
 		},
 		Entry("empty phase pvb on same node should be processed", request{
-			pvb: pvbBuilder().Phase("").Node("test_node").Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pvb:               pvbBuilder().Phase("").Node("test_node").Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: true,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -166,10 +171,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
 				Node("test_node").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: true,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -181,10 +184,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
 				Node("test_node").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
@@ -196,10 +197,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
 				Node("test_node").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -211,10 +210,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
 				Node("test_node").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
@@ -226,10 +223,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
 				Node("test_node_2").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
@@ -241,10 +236,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
 				Node("test_node_2").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
@@ -256,10 +249,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
 				Node("test_node_2").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
@@ -271,10 +262,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
 				Node("test_node_2").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -286,10 +275,8 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
 				Node("test_node_2").
 				Result(),
-			pod: podBuilder().Result(),
-			secret: builder.ForSecret(velerov1api.DefaultNamespace, "velero-restic-credentials").
-				Data(map[string][]byte{"repository-password": []byte("secret-information")}).
-				Result(),
+			pod:               podBuilder().Result(),
+			bsl:               bslBuilder().Result(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
@@ -298,3 +285,9 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 		}),
 	)
 })
+
+type fakeCredsFileStore struct{}
+
+func (f fakeCredsFileStore) Path(selector *corev1.SecretKeySelector) (string, error) {
+	return "/fake/path", nil
+}
