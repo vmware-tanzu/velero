@@ -26,7 +26,7 @@ import (
 // BackupExecuter ...
 type BackupExecuter interface {
 	RunBackup(interface{}, logrus.FieldLogger, func(velerov1api.PodVolumeOperationProgress)) (string, string, error)
-	GetSnapshotID(*Command) (string, error)
+	GetSnapshotID(interface{}) (string, error)
 }
 
 // BackupExec ...
@@ -43,6 +43,11 @@ func (exec BackupExec) RunBackup(command interface{}, log logrus.FieldLogger, up
 }
 
 // GetSnapshotID ...
-func (exec BackupExec) GetSnapshotID(snapshotIdCmd *Command) (string, error) {
-	return GetSnapshotID(snapshotIdCmd)
+func (exec BackupExec) GetSnapshotID(snapshotIdCmd interface{}) (string, error) {
+	cmd, ok := snapshotIdCmd.(*Command)
+	if !ok {
+		return "", errors.New("expecting command to be of type *restic.Command")
+	}
+
+	return GetSnapshotID(cmd)
 }
