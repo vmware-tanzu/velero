@@ -36,6 +36,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -46,15 +47,16 @@ import (
 
 // PodVolumeBackupReconciler reconciles a PodVolumeBackup object
 type PodVolumeBackupReconciler struct {
-	Scheme     *runtime.Scheme
-	Client     client.Client
-	Ctx        context.Context
-	Clock      clock.Clock
-	Metrics    *metrics.ServerMetrics
-	NodeName   string
-	FileSystem filesystem.Interface
-	ResticExec restic.BackupExecuter
-	Log        logrus.FieldLogger
+	Scheme         *runtime.Scheme
+	Client         client.Client
+	Ctx            context.Context
+	Clock          clock.Clock
+	Metrics        *metrics.ServerMetrics
+	CredsFileStore credentials.FileStore
+	NodeName       string
+	FileSystem     filesystem.Interface
+	ResticExec     restic.BackupExecuter
+	Log            logrus.FieldLogger
 
 	PvLister  corev1listers.PersistentVolumeLister
 	PvcLister corev1listers.PersistentVolumeClaimLister
@@ -131,7 +133,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	var resticDetails resticDetails
-	resticCmd, err := r.resticCommand(log, req.Namespace, &pvb, &pod, &resticDetails)
+	resticCmd, err := r.buildResticCommand(log, req.Namespace, &pvb, &pod, &resticDetails)
 	if err != nil {
 		return r.logErrorAndUpdateStatus(log, &pvb, err, "building restic command")
 	}
@@ -160,13 +162,15 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	var snapshotID string
 	if !emptySnapshot {
-		snapshotID, err = r.ResticExec.GetSnapshotID(
+		cmd := restic.GetSnapshotCommand(
 			pvb.Spec.RepoIdentifier,
 			resticDetails.credsFile,
 			pvb.Spec.Tags,
-			resticDetails.envs,
-			resticDetails.caCertFile,
 		)
+		cmd.Env = resticDetails.envs
+		cmd.CACertFile = resticDetails.caCertFile
+
+		snapshotID, err = r.ResticExec.GetSnapshotID(cmd)
 		if err != nil {
 			return r.logErrorAndUpdateStatus(log, &pvb, err, "getting snapshot id")
 		}
@@ -263,7 +267,7 @@ func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation str
 }
 
 // updateBackupProgressFunc returns a func that takes progress info and patches
-// the PVB with the new progress
+// the PVB with the new progress.
 func (r *PodVolumeBackupReconciler) updateBackupProgressFunc(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
 	return func(progress velerov1api.PodVolumeOperationProgress) {
 		pvb.Status.Progress = progress
@@ -284,7 +288,7 @@ type resticDetails struct {
 	path                  string
 }
 
-func (r *PodVolumeBackupReconciler) resticCommand(log *logrus.Entry, ns string, pvb *velerov1api.PodVolumeBackup, pod *corev1.Pod, details *resticDetails) (*restic.Command, error) {
+func (r *PodVolumeBackupReconciler) buildResticCommand(log *logrus.Entry, ns string, pvb *velerov1api.PodVolumeBackup, pod *corev1.Pod, details *resticDetails) (*restic.Command, error) {
 	volDir, err := kube.GetVolumeDirectory(pod, pvb.Spec.Volume, r.PvcLister, r.PvLister)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting volume directory name")
@@ -299,22 +303,38 @@ func (r *PodVolumeBackupReconciler) resticCommand(log *logrus.Entry, ns string, 
 	}
 	log.WithField("path", path).Debugf("Found path matching glob")
 
-	// Temporary credentials
-	details.credsFile, err = restic.TempCredentialsFile(r.Client, ns, r.FileSystem)
+	// Temporary credentials.
+	details.credsFile, err = r.CredsFileStore.Path(restic.RepoKeySelector())
 	if err != nil {
 		return nil, errors.Wrap(err, "creating temporary restic credentials file")
 	}
 	defer os.Remove(details.credsFile)
 
-	cmd := restic.BackupCommand(pvb.Spec.RepoIdentifier, details.credsFile, path, pvb.Spec.Tags)
+	cmd := restic.BackupCommand(
+		pvb.Spec.RepoIdentifier,
+		details.credsFile,
+		path,
+		pvb.Spec.Tags,
+	)
 
-	caCert, err := restic.GetCACert(r.Client, pvb.Namespace, pvb.Spec.BackupStorageLocation)
-	if err != nil {
-		log.WithError(err).Error("getting caCert")
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvb.Namespace,
+		Name:      pvb.Spec.BackupStorageLocation,
+	}, backupLocation); err != nil {
+		return nil, errors.Wrap(err, "getting backup storage location")
 	}
 
-	if caCert != nil {
-		details.caCertFile, err = restic.TempCACertFile(caCert, pvb.Spec.BackupStorageLocation, r.FileSystem)
+	// If there's a caCert on the ObjectStorage, write it to disk so that it can
+	// be passed to restic.
+	if backupLocation.Spec.ObjectStorage != nil &&
+		backupLocation.Spec.ObjectStorage.CACert != nil {
+
+		details.caCertFile, err = restic.TempCACertFile(
+			backupLocation.Spec.ObjectStorage.CACert,
+			pvb.Spec.BackupStorageLocation,
+			r.FileSystem,
+		)
 		if err != nil {
 			log.WithError(err).Error("creating temporary caCert file")
 		}
@@ -323,21 +343,9 @@ func (r *PodVolumeBackupReconciler) resticCommand(log *logrus.Entry, ns string, 
 	}
 	cmd.CACertFile = details.caCertFile
 
-	// Running restic command might need additional provider specific environment
-	// variables. Set resticCmd.Env based on provider (currently for Azure and
-	// S3-based backuplocations)
-	switch {
-	case strings.HasPrefix(pvb.Spec.RepoIdentifier, "azure"):
-		details.envs, err = restic.AzureCmdEnv(r.Client, ns, pvb.Spec.BackupStorageLocation)
-		if err != nil {
-			return nil, errors.Wrap(err, "error setting restic with azure cmd env")
-
-		}
-	case strings.HasPrefix(pvb.Spec.RepoIdentifier, "s3"):
-		details.envs, err = restic.S3CmdEnv(r.Client, ns, pvb.Spec.BackupStorageLocation)
-		if err != nil {
-			return nil, errors.Wrap(err, "error setting restic with s3 cmd env")
-		}
+	details.envs, err = restic.CmdEnv(backupLocation, r.CredsFileStore)
+	if err != nil {
+		return nil, errors.Wrap(err, "setting restic cmd env")
 	}
 	cmd.Env = details.envs
 

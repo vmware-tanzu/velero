@@ -1,22 +1,23 @@
 ---
-title: "Upgrading to Velero 1.5"
+title: "Upgrading to Velero 1.6"
 layout: docs
 ---
 
 ## Prerequisites
 
-- Velero [v1.4.x][5] installed.
+- Velero [v1.5.x][5] installed.
 
-If you're not yet running at least Velero v1.4, see the following:
+If you're not yet running at least Velero v1.5, see the following:
 
 - [Upgrading to v1.1][1]
 - [Upgrading to v1.2][2]
 - [Upgrading to v1.3][3]
 - [Upgrading to v1.4][4]
+- [Upgrading to v1.5][5]
 
 ## Instructions
 
-1. Install the Velero v1.5 command-line interface (CLI) by following the [instructions here][0].
+1. Install the Velero v1.6 command-line interface (CLI) by following the [instructions here][0].
 
     Verify that you've properly installed it by running:
 
@@ -28,7 +29,7 @@ If you're not yet running at least Velero v1.4, see the following:
 
     ```bash
     Client:
-        Version: v1.5.1
+        Version: v1.6.0-rc.1
         Git commit: <git SHA>
     ```
 
@@ -44,12 +45,12 @@ If you're not yet running at least Velero v1.4, see the following:
 
     ```bash
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.5.1 \
+        velero=velero/velero:v1.6.0-rc.1 \
         --namespace velero
 
     # optional, if using the restic daemon set
     kubectl set image daemonset/restic \
-        restic=velero/velero:v1.5.1 \
+        restic=velero/velero:v1.6.0-rc.1 \
         --namespace velero
     ```
 
@@ -63,18 +64,26 @@ If you're not yet running at least Velero v1.4, see the following:
 
     ```bash
     Client:
-        Version: v1.5.1
+        Version: v1.6.0-rc.1
         Git commit: <git SHA>
 
     Server:
-        Version: v1.5.1
+        Version: v1.6.0-rc.1
     ```
+
+## Notes
+### Default backup storage location
+We have deprecated the way to indicate the default backup storage location. Previously, that was indicated according to the backup storage location name set on the velero server-side via the flag `velero server --default-backup-storage-location`. Now we configure the default backup storage location on the velero client-side. Please refer to the [About locations][9] on how to indicate which backup storage location is the default one. 
+
+After upgrading, if there is a previously created backup storage location with the name that matches what was defined on the server side as the default, it will be automatically set as the `default`.
 
 [0]: basic-install.md#install-the-cli
 [1]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/
 [2]: https://velero.io/docs/v1.2.0/upgrade-to-1.2/
 [3]: https://velero.io/docs/v1.3.2/upgrade-to-1.3/
 [4]: https://velero.io/docs/v1.4/upgrade-to-1.4/
-[5]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
-[6]: https://github.com/vmware-tanzu/velero/issues/2077
-[7]: https://github.com/vmware-tanzu/velero/issues/2311
+[5]: https://velero.io/docs/v1.5/upgrade-to-1.5
+[6]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
+[7]: https://github.com/vmware-tanzu/velero/issues/2077
+[8]: https://github.com/vmware-tanzu/velero/issues/2311
+[9]: https://velero.io/docs/v1.6/locations

@@ -8,13 +8,6 @@ metadata:
   creationTimestamp: null
   name: volumesnapshotlocations.velero.io
 spec:
-  additionalPrinterColumns:
-  - JSONPath: .spec.provider
-    name: Provider
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
   group: velero.io
   names:
     kind: VolumeSnapshotLocation
@@ -23,7 +16,6 @@ spec:
     singular: volumesnapshotlocation
   preserveUnknownFields: false
   scope: Namespaced
-  subresources: {}
   validation:
     openAPIV3Schema:
       description: VolumeSnapshotLocation is a location where Velero stores volume
@@ -49,24 +41,6 @@ spec:
               additionalProperties:
                 type: string
               description: Config is for provider-specific configuration fields.
-              type: object
-            credential:
-              description: Credential contains the credential information intended
-                to be used with this location
-              properties:
-                key:
-                  description: The key of the secret to select from.  Must be a valid
-                    secret key.
-                  type: string
-                name:
-                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    TODO: Add other useful fields. apiVersion, kind, uid?'
-                  type: string
-                optional:
-                  description: Specify whether the Secret or its key must be defined
-                  type: boolean
-              required:
-              - key
               type: object
             provider:
               description: Provider is the provider of the volume storage.

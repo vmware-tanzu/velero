@@ -1,2 +1,0 @@
-Add Credential field to Volume Snapshot Locations for multiple credential support.
-Add `velero snapshot-location set` command to edit credentials on a Volume Snapshot Location.

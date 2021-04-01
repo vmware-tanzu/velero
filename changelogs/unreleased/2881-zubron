@@ -1,1 +1,0 @@
-Add additional printer columns for Velero CRDs to allow more information to be exposed when using `kubectl get`.

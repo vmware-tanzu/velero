@@ -26,13 +26,29 @@ REGISTRY ?= velero
 # Image name
 IMAGE ?= $(REGISTRY)/$(BIN)
 
-# Build image handling. We push a build image for every changed version of 
+# We allow the Dockerfile to be configurable to enable the use of custom Dockerfiles
+# that pull base images from different registries.
+VELERO_DOCKERFILE ?= Dockerfile
+BUILDER_IMAGE_DOCKERFILE ?= hack/build-image/Dockerfile
+
+# Calculate the realpath of the build-image Dockerfile as we `cd` into the hack/build
+# directory before this Dockerfile is used and any relative path will not be valid.
+BUILDER_IMAGE_DOCKERFILE_REALPATH := $(shell realpath $(BUILDER_IMAGE_DOCKERFILE))
+
+# Build image handling. We push a build image for every changed version of
 # /hack/build-image/Dockerfile. We tag the dockerfile with the short commit hash
 # of the commit that changed it. When determining if there is a build image in
 # the registry to use we look for one that matches the current "commit" for the
 # Dockerfile else we make one.
+# In the case where the Dockerfile for the build image has been overridden using
+# the BUILDER_IMAGE_DOCKERFILE variable, we always force a build.
 
-BUILDER_IMAGE_TAG := $(shell git log -1 --pretty=%h hack/build-image/Dockerfile)
+ifneq "$(origin BUILDER_IMAGE_DOCKERFILE)" "file"
+	BUILDER_IMAGE_TAG := "custom"
+else
+	BUILDER_IMAGE_TAG := $(shell git log -1 --pretty=%h $(BUILDER_IMAGE_DOCKERFILE))
+endif
+
 BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
 BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 
@@ -66,7 +82,7 @@ see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-v
 endef
 
 # The version of restic binary to be downloaded for power architecture
-RESTIC_VERSION ?= 0.9.6
+RESTIC_VERSION ?= 0.12.0
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
@@ -170,7 +186,7 @@ endif
 	--build-arg=VERSION=$(VERSION) \
 	--build-arg=GIT_SHA=$(GIT_SHA) \
 	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
-	-f Dockerfile .
+	-f $(VELERO_DOCKERFILE) .
 
 container:
 ifneq ($(BUILDX_ENABLED), true)
@@ -186,7 +202,7 @@ endif
 	--build-arg=GIT_SHA=$(GIT_SHA) \
 	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
 	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
-	-f Dockerfile .
+	-f $(VELERO_DOCKERFILE) .
 	@echo "container: $(IMAGE):$(VERSION)"
 
 SKIP_TESTS ?=
@@ -233,11 +249,17 @@ build-dirs:
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
 
 build-env:
-	@# if we detect changes in dockerfile force a new build-image 
+	@# if we have overridden the value for the build-image Dockerfile,
+	@# force a build using that Dockerfile
+	@# if we detect changes in dockerfile force a new build-image
 	@# else if we dont have a cached image make one
 	@# finally use the cached image
-ifneq ($(shell git diff --quiet HEAD -- hack/build-image/Dockerfile; echo $$?), 0)
-	@echo "Local changes detected in hack/build-image/Dockerfile"
+ifneq "$(origin BUILDER_IMAGE_DOCKERFILE)" "file"
+	@echo "Dockerfile for builder image has been overridden to $(BUILDER_IMAGE_DOCKERFILE)"
+	@echo "Preparing a new builder-image"
+	$(MAKE) build-image
+else ifneq ($(shell git diff --quiet HEAD -- $(BUILDER_IMAGE_DOCKERFILE); echo $$?), 0)
+	@echo "Local changes detected in $(BUILDER_IMAGE_DOCKERFILE)"
 	@echo "Preparing a new builder-image"
 	$(MAKE) build-image
 else ifneq ($(BUILDER_IMAGE_CACHED),)
@@ -252,9 +274,9 @@ build-image:
 	@# This makes sure we don't leave the orphaned image behind.
 	$(eval old_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
 ifeq ($(BUILDX_ENABLED), true)
-	@cd hack/build-image && docker buildx build --build-arg=GOPROXY=$(GOPROXY) --output=type=docker --pull -t $(BUILDER_IMAGE) .
+	@cd hack/build-image && docker buildx build --build-arg=GOPROXY=$(GOPROXY) --output=type=docker --pull -t $(BUILDER_IMAGE) -f $(BUILDER_IMAGE_DOCKERFILE_REALPATH) .
 else
-	@cd hack/build-image && docker build --build-arg=GOPROXY=$(GOPROXY) --pull -t $(BUILDER_IMAGE) .
+	@cd hack/build-image && docker build --build-arg=GOPROXY=$(GOPROXY) --pull -t $(BUILDER_IMAGE) -f $(BUILDER_IMAGE_DOCKERFILE_REALPATH) .
 endif
 	$(eval new_id=$(shell docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null))
 	@if [ "$(old_id)" != "" ] && [ "$(old_id)" != "$(new_id)" ]; then \
@@ -264,7 +286,13 @@ endif
 push-build-image:
 	@# this target will push the build-image it assumes you already have docker
 	@# credentials needed to accomplish this.
-	docker push $(BUILDER_IMAGE)
+	@# Pushing will be skipped if a custom Dockerfile was used to build the image.
+	ifneq "$(origin BUILDER_IMAGE_DOCKERFILE)" "file"
+		@echo "Dockerfile for builder image has been overridden"
+		@echo "Skipping push of custom image"
+	else
+		docker push $(BUILDER_IMAGE)
+	endif
 
 build-image-hugo:
 	cd site && docker build --pull -t $(HUGO_IMAGE) .

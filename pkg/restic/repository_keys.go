@@ -24,17 +24,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
 const (
-	CredentialsSecretName = "velero-restic-credentials"
-	CredentialsKey        = "repository-password"
+	credentialsSecretName = "velero-restic-credentials"
+	credentialsKey        = "repository-password"
 
 	encryptionKey = "static-passw0rd"
 )
 
 func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string) error {
-	_, err := secretClient.Secrets(namespace).Get(context.TODO(), CredentialsSecretName, metav1.GetOptions{})
+	_, err := secretClient.Secrets(namespace).Get(context.TODO(), credentialsSecretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.WithStack(err)
 	}
@@ -47,17 +49,27 @@ func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespac
 	secret := &corev1api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      CredentialsSecretName,
+			Name:      credentialsSecretName,
 		},
 		Type: corev1api.SecretTypeOpaque,
 		Data: map[string][]byte{
-			CredentialsKey: []byte(encryptionKey),
+			credentialsKey: []byte(encryptionKey),
 		},
 	}
 
 	if _, err = secretClient.Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-		return errors.Wrapf(err, "error creating %s secret", CredentialsSecretName)
+		return errors.Wrapf(err, "error creating %s secret", credentialsSecretName)
 	}
 
 	return nil
+}
+
+// RepoKeySelector returns the SecretKeySelector which can be used to fetch
+// the restic repository key.
+func RepoKeySelector() *corev1api.SecretKeySelector {
+	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
+	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
+	// (all within the Velero server's namespace) so RepoKeySelector will need to select the key
+	// for that repo.
+	return builder.ForSecretKeySelector(credentialsSecretName, credentialsKey).Result()
 }

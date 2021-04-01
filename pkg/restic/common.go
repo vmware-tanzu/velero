@@ -17,25 +17,21 @@ limitations under the License.
 package restic
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
-
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -65,6 +61,10 @@ const (
 	// VolumesToExcludeAnnotation is the annotation on a pod whose mounted volumes
 	// should be excluded from restic backup.
 	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
+
+	// credentialsFileKey is the key within a BSL config that is checked to see if
+	// the BSL is using its own credentials, rather than those in the environment
+	credentialsFileKey = "credentialsFile"
 
 	// Deprecated.
 	//
@@ -238,42 +238,6 @@ func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister vele
 	return res, nil
 }
 
-// TempCredentialsFile creates a temp file containing the restic
-// encryption key and returns its path. The caller should generally
-// call os.Remove() to remove the file when done with it.
-func TempCredentialsFile(client kbclient.Client, veleroNamespace string, fs filesystem.Interface) (string, error) {
-	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
-	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
-	// (all within the Velero server's namespace) so repoKeySelector will need to select the key
-	// for that repo.
-	repoKeySelector := builder.ForSecretKeySelector(CredentialsSecretName, CredentialsKey).Result()
-
-	repoKey, err := kube.GetSecretKey(client, veleroNamespace, repoKeySelector)
-	if err != nil {
-		return "", err
-	}
-
-	file, err := fs.TempFile("", fmt.Sprintf("%s-%s", CredentialsSecretName, CredentialsKey))
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	if _, err := file.Write(repoKey); err != nil {
-		// nothing we can do about an error closing the file here, and we're
-		// already returning an error about the write failing.
-		_ = file.Close()
-		return "", errors.WithStack(err)
-	}
-
-	name := file.Name()
-
-	if err := file.Close(); err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	return name, nil
-}
-
 // TempCACertFile creates a temp file containing a CA bundle
 // and returns its path. The caller should generally call os.Remove()
 // to remove the file when done with it.
@@ -299,22 +263,6 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
-func GetCACert(client kbclient.Client, namespace, backupLocation string) ([]byte, error) {
-	location := &velerov1api.BackupStorageLocation{}
-	if err := client.Get(context.Background(), kbclient.ObjectKey{
-		Namespace: namespace,
-		Name:      backupLocation,
-	}, location); err != nil {
-		return nil, err
-	}
-
-	if location.Spec.ObjectStorage == nil {
-		return nil, nil
-	}
-
-	return location.Spec.ObjectStorage.CACert, nil
-}
-
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
 // find PodVolumeRestores for the restore identified by name.
 func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
@@ -323,52 +271,48 @@ func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 	}
 }
 
-// AzureCmdEnv returns a list of environment variables (in the format var=val) that
-// should be used when running a restic command for an Azure backend. This list is
-// the current environment, plus the Azure-specific variables restic needs, namely
-// a storage account name and key.
-func AzureCmdEnv(client kbclient.Client, namespace, backupLocation string) ([]string, error) {
-	loc := &velerov1api.BackupStorageLocation{}
-	if err := client.Get(context.Background(), kbclient.ObjectKey{
-		Namespace: namespace,
-		Name:      backupLocation,
-	}, loc); err != nil {
-		return nil, err
-	}
-
-	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting azure restic env vars")
-	}
-
+// CmdEnv returns a list of environment variables (in the format var=val) that
+// should be used when running a restic command for a particular backend provider.
+// This list is the current environment, plus any provider-specific variables restic needs.
+func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 	env := os.Environ()
-	for k, v := range azureVars {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	customEnv := map[string]string{}
+	var err error
+
+	config := backupLocation.Spec.Config
+	if config == nil {
+		config = map[string]string{}
 	}
 
-	return env, nil
-}
-
-// S3CmdEnv returns a list of environment variables (in the format var=val) that
-// should be used when running a restic command for an S3 backend. This list is
-// the current environment, plus the AWS-specific variables restic needs, namely
-// a credential profile.
-func S3CmdEnv(client kbclient.Client, namespace, backupLocation string) ([]string, error) {
-	loc := &velerov1api.BackupStorageLocation{}
-	if err := client.Get(context.Background(), kbclient.ObjectKey{
-		Namespace: namespace,
-		Name:      backupLocation,
-	}, loc); err != nil {
-		return nil, err
+	if backupLocation.Spec.Credential != nil {
+		credsFile, err := credentialFileStore.Path(backupLocation.Spec.Credential)
+		if err != nil {
+			return []string{}, errors.WithStack(err)
+		}
+		config[credentialsFileKey] = credsFile
 	}
 
-	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting aws restic env vars")
+	backendType := getBackendType(backupLocation.Spec.Provider)
+
+	switch backendType {
+	case AWSBackend:
+		customEnv, err = getS3ResticEnvVars(config)
+		if err != nil {
+			return []string{}, err
+		}
+	case AzureBackend:
+		customEnv, err = getAzureResticEnvVars(config)
+		if err != nil {
+			return []string{}, err
+		}
+	case GCPBackend:
+		customEnv, err = getGCPResticEnvVars(config)
+		if err != nil {
+			return []string{}, err
+		}
 	}
 
-	env := os.Environ()
-	for k, v := range awsVars {
+	for k, v := range customEnv {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 

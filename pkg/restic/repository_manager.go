@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,6 +29,7 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -80,18 +80,19 @@ type RestorerFactory interface {
 }
 
 type repositoryManager struct {
-	namespace          string
-	veleroClient       clientset.Interface
-	repoLister         velerov1listers.ResticRepositoryLister
-	repoInformerSynced cache.InformerSynced
-	kbClient           kbclient.Client
-	log                logrus.FieldLogger
-	repoLocker         *repoLocker
-	repoEnsurer        *repositoryEnsurer
-	fileSystem         filesystem.Interface
-	ctx                context.Context
-	pvcClient          corev1client.PersistentVolumeClaimsGetter
-	pvClient           corev1client.PersistentVolumesGetter
+	namespace            string
+	veleroClient         clientset.Interface
+	repoLister           velerov1listers.ResticRepositoryLister
+	repoInformerSynced   cache.InformerSynced
+	kbClient             kbclient.Client
+	log                  logrus.FieldLogger
+	repoLocker           *repoLocker
+	repoEnsurer          *repositoryEnsurer
+	fileSystem           filesystem.Interface
+	ctx                  context.Context
+	pvcClient            corev1client.PersistentVolumeClaimsGetter
+	pvClient             corev1client.PersistentVolumesGetter
+	credentialsFileStore credentials.FileStore
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -104,18 +105,20 @@ func NewRepositoryManager(
 	kbClient kbclient.Client,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
+	credentialFileStore credentials.FileStore,
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
-		namespace:          namespace,
-		veleroClient:       veleroClient,
-		repoLister:         repoInformer.Lister(),
-		repoInformerSynced: repoInformer.Informer().HasSynced,
-		kbClient:           kbClient,
-		pvcClient:          pvcClient,
-		pvClient:           pvClient,
-		log:                log,
-		ctx:                ctx,
+		namespace:            namespace,
+		veleroClient:         veleroClient,
+		repoLister:           repoInformer.Lister(),
+		repoInformerSynced:   repoInformer.Informer().HasSynced,
+		kbClient:             kbClient,
+		pvcClient:            pvcClient,
+		pvClient:             pvClient,
+		credentialsFileStore: credentialFileStore,
+		log:                  log,
+		ctx:                  ctx,
 
 		repoLocker:  newRepoLocker(),
 		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
@@ -227,7 +230,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 }
 
 func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
-	file, err := TempCredentialsFile(rm.kbClient, rm.namespace, rm.fileSystem)
+	file, err := rm.credentialsFileStore.Path(RepoKeySelector())
 	if err != nil {
 		return err
 	}
@@ -236,36 +239,31 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 	cmd.PasswordFile = file
 
-	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := GetCACert(rm.kbClient, rm.namespace, backupLocation)
-	if err != nil {
-		return err
+	loc := &velerov1api.BackupStorageLocation{}
+	if err := rm.kbClient.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: rm.namespace,
+		Name:      backupLocation,
+	}, loc); err != nil {
+		return errors.Wrap(err, "error getting backup storage location")
 	}
 
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
 	var caCertFile string
-	if caCert != nil {
-		caCertFile, err = TempCACertFile(caCert, backupLocation, rm.fileSystem)
+	if loc.Spec.ObjectStorage != nil && loc.Spec.ObjectStorage.CACert != nil {
+		caCertFile, err = TempCACertFile(loc.Spec.ObjectStorage.CACert, backupLocation, rm.fileSystem)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error creating temp cacert file")
 		}
 		// ignore error since there's nothing we can do and it's a temp file.
 		defer os.Remove(caCertFile)
 	}
 	cmd.CACertFile = caCertFile
 
-	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
-		env, err := AzureCmdEnv(rm.kbClient, rm.namespace, backupLocation)
-		if err != nil {
-			return err
-		}
-		cmd.Env = env
-	} else if strings.HasPrefix(cmd.RepoIdentifier, "s3") {
-		env, err := S3CmdEnv(rm.kbClient, rm.namespace, backupLocation)
-		if err != nil {
-			return err
-		}
-		cmd.Env = env
+	env, err := CmdEnv(loc, rm.credentialsFileStore)
+	if err != nil {
+		return err
 	}
+	cmd.Env = env
 
 	stdout, stderr, err := veleroexec.RunCommand(cmd.Cmd())
 	rm.log.WithFields(logrus.Fields{

@@ -44,6 +44,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -65,6 +66,10 @@ var (
 const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
+
+	// defaultCredentialsDirectory is the path on disk where credential
+	// files will be written to
+	defaultCredentialsDirectory = "/tmp/credentials"
 )
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -110,6 +115,7 @@ type resticServer struct {
 	mgr                   manager.Manager
 	metrics               *metrics.ServerMetrics
 	metricsAddress        string
+	namespace             string
 }
 
 func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAddress string) (*resticServer, error) {
@@ -166,6 +172,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 		fileSystem:            filesystem.NewFileSystem(),
 		mgr:                   mgr,
 		metricsAddress:        metricAddress,
+		namespace:             factory.Namespace(),
 	}
 
 	if err := s.validatePodVolumesHostPath(); err != nil {
@@ -192,16 +199,27 @@ func (s *resticServer) run() {
 
 	s.logger.Info("Starting controllers")
 
+	credentialFileStore, err := credentials.NewNamespacedFileStore(
+		s.mgr.GetClient(),
+		s.namespace,
+		defaultCredentialsDirectory,
+		filesystem.NewFileSystem(),
+	)
+	if err != nil {
+		s.logger.Fatalf("Failed to create credentials file store: %v", err)
+	}
+
 	pvbr := controller.PodVolumeBackupReconciler{
-		Scheme:     s.mgr.GetScheme(),
-		Client:     s.mgr.GetClient(),
-		Ctx:        s.ctx,
-		Clock:      clock.RealClock{},
-		Metrics:    s.metrics,
-		NodeName:   os.Getenv("NODE_NAME"),
-		FileSystem: filesystem.NewFileSystem(),
-		ResticExec: restic.BackupExec{},
-		Log:        s.logger,
+		Scheme:         s.mgr.GetScheme(),
+		Client:         s.mgr.GetClient(),
+		Ctx:            s.ctx,
+		Clock:          clock.RealClock{},
+		Metrics:        s.metrics,
+		CredsFileStore: credentialFileStore,
+		NodeName:       os.Getenv("NODE_NAME"),
+		FileSystem:     filesystem.NewFileSystem(),
+		ResticExec:     restic.BackupExec{},
+		Log:            s.logger,
 
 		PvLister:  s.kubeInformerFactory.Core().V1().PersistentVolumes().Lister(),
 		PvcLister: s.kubeInformerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -220,6 +238,7 @@ func (s *resticServer) run() {
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
+		credentialFileStore,
 	)
 
 	go s.veleroInformerFactory.Start(s.ctx.Done())

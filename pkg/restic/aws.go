@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,9 @@ package restic
 
 const (
 	// AWS specific environment variable
-	awsProfileEnvVar = "AWS_PROFILE"
-	awsProfileKey    = "profile"
+	awsProfileEnvVar         = "AWS_PROFILE"
+	awsProfileKey            = "profile"
+	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE"
 )
 
 // getS3ResticEnvVars gets the environment variables that restic
@@ -27,6 +28,10 @@ const (
 // storage location config map.
 func getS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
+
+	if credentialsFile, ok := config[credentialsFileKey]; ok {
+		result[awsCredentialsFileEnvVar] = credentialsFile
+	}
 
 	if profile, ok := config[awsProfileKey]; ok {
 		result[awsProfileEnvVar] = profile
