@@ -1,17 +1,17 @@
-## v1.6.0-rc.1
+## v1.6.0-rc.2
 ### 2021-03-29
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0-rc.1
+https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0-rc.2
 
 ### Container Image
-`velero/velero:v1.6.0-rc.1`
+`velero/velero:v1.6.0-rc.2`
 
 ### Documentation
-https://velero.io/docs/v1.6.0-rc.1/
+https://velero.io/docs/v1.6.0-rc.2/
 
 ### Upgrading
-https://velero.io/docs/v1.6.0-rc.1/upgrade-to-1.6/
+https://velero.io/docs/v1.6.0-rc.2/upgrade-to-1.6/
 
 ### Highlights
 
@@ -24,6 +24,7 @@ https://velero.io/docs/v1.6.0-rc.1/upgrade-to-1.6/
 
 ### All Changes
 
+  * Upgrade restic from v0.9.6 to v0.12.0. (#3528, @ashish-amarnath)
   * Add support for restic to use per-BSL credentials. Velero will now serialize the secret referenced by the `Credential` field in the BSL and use this path when setting provider specific environment variables for restic commands.  (#3489, @zubron)
   * Upgrade restic from v0.9.6 to v0.12.0. (#3528, @ashish-amarnath)
   * Progress reporting added for Velero Restores (#3125, @pranavgaikwad)
@@ -69,4 +70,3 @@ https://velero.io/docs/v1.6.0-rc.1/upgrade-to-1.6/
   * Add instructions to clone repository for examples in docs (#3074, @MadhavJivrajani)
   * 🏃‍♂️ update setup-kind github actions CI (#3085, @ashish-amarnath)
   * Modify wrong function name to correct one. (#3106, @shellwedance)
-  * Add additional printer columns for Velero CRDs to allow more information to be exposed when using `kubectl get`. (#2881, @zubron)
