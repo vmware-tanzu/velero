@@ -9,7 +9,7 @@ This page covers the steps to perform when releasing a new version of Velero.
 - Please read the documented variables in each script to understand what they are for and how to properly format their values.
 - You will need to have an upstream remote configured to use to the [vmware-tanzu/velero](https://github.com/vmware-tanzu/velero) repository.
   You can check this using `git remote -v`.
-  The release script ([`tag-release.sh`](https://github.com/vmware-tanzu/velero/blob/v1.6.0-rc.1/hack/release-tools/tag-release.sh)) will use `upstream` as the default remote name if it is not specified using the environment variable `REMOTE`.
+  The release script ([`tag-release.sh`](https://github.com/vmware-tanzu/velero/blob/v1.6-rc.2/hack/release-tools/tag-release.sh)) will use `upstream` as the default remote name if it is not specified using the environment variable `REMOTE`.
 - GA release: major and minor releases only. Example: 1.0 (major), 1.5 (minor).
 - Pre-releases: Any release leading up to a GA. Example: 1.4.0-beta.1, 1.5.0-rc.1
 - RC releases: Release Candidate, contains everything that is supposed to ship with the GA release. This is still a pre-release.

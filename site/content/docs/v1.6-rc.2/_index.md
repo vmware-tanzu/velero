@@ -1,7 +1,7 @@
 ---
 toc: "false"
 cascade:
-  version: main
+  version: v1.6-rc.2
   toc: "true"
 ---
 ![100]
@@ -33,7 +33,7 @@ If you encounter issues, review the [troubleshooting docs][30], [file an issue][
 
 ## Contributing
 
-If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/v1.6.0-rc.1/start-contributing/) documentation for guidance on how to setup Velero for development.
+If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/v1.6-rc.2/start-contributing/) documentation for guidance on how to setup Velero for development.
 
 ## Changelog
 

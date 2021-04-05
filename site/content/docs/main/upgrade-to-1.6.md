@@ -29,7 +29,7 @@ If you're not yet running at least Velero v1.5, see the following:
 
     ```bash
     Client:
-        Version: v1.6.0-rc.1
+        Version: v1.6.0-rc.2
         Git commit: <git SHA>
     ```
 
@@ -45,12 +45,12 @@ If you're not yet running at least Velero v1.5, see the following:
 
     ```bash
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.6.0-rc.1 \
+        velero=velero/velero:v1.6.0-rc.2 \
         --namespace velero
 
     # optional, if using the restic daemon set
     kubectl set image daemonset/restic \
-        restic=velero/velero:v1.6.0-rc.1 \
+        restic=velero/velero:v1.6.0-rc.2 \
         --namespace velero
     ```
 
@@ -64,11 +64,11 @@ If you're not yet running at least Velero v1.5, see the following:
 
     ```bash
     Client:
-        Version: v1.6.0-rc.1
+        Version: v1.6.0-rc.2
         Git commit: <git SHA>
 
     Server:
-        Version: v1.6.0-rc.1
+        Version: v1.6.0-rc.2
     ```
 
 ## Notes
@@ -86,4 +86,4 @@ After upgrading, if there is a previously created backup storage location with t
 [6]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
 [7]: https://github.com/vmware-tanzu/velero/issues/2077
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
-[9]: https://velero.io/docs/v1.6/locations
+[9]: https://velero.io/docs/v1.6-rc.2/locations
