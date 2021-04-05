@@ -365,4 +365,4 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
 [9]: self-signed-certificates.md
 [10]: csi.md
-[11]: https://github.com/vmware-tanzu/velero/blob/v1.6/pkg/apis/velero/v1/constants.go
+[11]: https://github.com/vmware-tanzu/velero/blob/v1.6-rc.2/pkg/apis/velero/v1/constants.go

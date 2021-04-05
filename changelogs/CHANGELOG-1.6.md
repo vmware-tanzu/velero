@@ -8,10 +8,10 @@ https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0-rc.2
 `velero/velero:v1.6.0-rc.2`
 
 ### Documentation
-https://velero.io/docs/v1.6/
+https://velero.io/docs/v1.6-rc.2/
 
 ### Upgrading
-https://velero.io/docs/v1.6/upgrade-to-1.6/
+https://velero.io/docs/v1.6-rc.2/upgrade-to-1.6/
 
 ### Highlights
 
