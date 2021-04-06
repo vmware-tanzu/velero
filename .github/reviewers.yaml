@@ -1,0 +1,37 @@
+reviewers:
+  # The default reviewers
+  defaults:
+    - maintainers
+
+  groups:
+    maintainers:
+      - nrb
+      - ashish-amarnath
+      - carlisia
+      - zubron
+      - dsu-igeek
+      - jenting
+
+    tech-writer:
+      - a-mccarthy 
+
+files:
+  'public/**':
+    - tech-writer
+  '**/*.md':
+    - tech-writer
+  '/design/**': # Technical design requests are ".md" files but should be reviewed by maintainers
+    - maintainers
+
+options:
+  ignore_draft: true
+  ignored_keywords:
+    - WIP 
+    - wip
+    - DO NOT MERGE
+  
+  enable_group_assignment: true
+
+  # Randomly pick reviewers up to this number.
+  # Do not set this option if you'd like to assign all matching reviewers.
+  number_of_reviewers: 2
