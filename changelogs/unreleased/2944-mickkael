@@ -1,1 +1,0 @@
-Feature: It is possible to change the timezone of the container by specifying in the manifest.. env: [TZ: Zone/Country], or in the Helm Chart.. configuration: {extraEnvVars: [TZ: 'Zone/Country']}
