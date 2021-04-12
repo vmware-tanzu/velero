@@ -1,17 +1,17 @@
-## v1.6.0-rc.2
-### 2021-03-29
+## v1.6.0
+### 2021-04-12
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0-rc.2
+https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0
 
 ### Container Image
-`velero/velero:v1.6.0-rc.2`
+`velero/velero:v1.6.0`
 
 ### Documentation
-https://velero.io/docs/v1.6-rc.2/
+https://velero.io/docs/v1.6/
 
 ### Upgrading
-https://velero.io/docs/v1.6-rc.2/upgrade-to-1.6/
+https://velero.io/docs/v1.6/upgrade-to-1.6/
 
 ### Highlights
 

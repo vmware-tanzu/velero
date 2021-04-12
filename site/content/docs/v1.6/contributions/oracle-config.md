@@ -244,5 +244,5 @@ After creating the Velero server in your cluster, try this example:
 
 ## Additional Reading
 
-* [Official Velero Documentation](https://velero.io/docs/v1.6-rc.2/)
+* [Official Velero Documentation](https://velero.io/docs/v1.6/)
 * [Oracle Cloud Infrastructure Documentation](https://docs.cloud.oracle.com/)
