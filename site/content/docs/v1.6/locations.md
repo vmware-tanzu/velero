@@ -191,7 +191,7 @@ Please see the [earlier example][9] for details on how to create multiple `Backu
 - The [plugin for the object storage provider][5] you wish to use must be [installed][6].
 - You must create a file with the object storage credentials. Follow the instructions provided by your object storage provider plugin to create this file.
 
-Once you have installed the necessary plugin and created the credentials file, create a [Kubernetes Secret][6] in the Velero namespace that contains these credentials:
+Once you have installed the necessary plugin and created the credentials file, create a [Kubernetes Secret][7] in the Velero namespace that contains these credentials:
 
 ```shell
 kubectl create secret generic -n velero credentials --from-file=bsl=</path/to/credentialsfile>
