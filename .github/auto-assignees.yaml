@@ -35,3 +35,6 @@ options:
   # Randomly pick reviewers up to this number.
   # Do not set this option if you'd like to assign all matching reviewers.
   number_of_reviewers: 2
+
+# This assigns a PR to its author
+ addAssignees: author
