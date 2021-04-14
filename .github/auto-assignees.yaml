@@ -16,7 +16,7 @@ reviewers:
       - a-mccarthy 
 
 files:
-  'public/**':
+  'site/**':
     - tech-writer
   '**/*.md':
     - tech-writer
