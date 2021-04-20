@@ -1811,6 +1811,8 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
 		volumeSnapshotterGetter volumeSnapshotterGetter
 		want                    []*test.APIResource
+		wantError               bool
+		wantWarning             bool
 	}{
 		{
 			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
@@ -2192,6 +2194,95 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 		},
 		{
+			name:    "when a PV without a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is not replaced and there is a restore warning",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+			wantWarning: true,
+		},
+		{
+			name:    "when a PV without a snapshot is used by a PVC in a namespace that's being remapped, and the original PV does not exist in-cluster, the PV is not renamed",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+						ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("source-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+		},
+		{
 			name:    "when a PV is renamed and the original PV does not exist in-cluster, the PV should be renamed",
 			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
 			backup:  defaultBackup().Result(),
@@ -2423,7 +2514,16 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				tc.volumeSnapshotterGetter,
 			)
 
-			assertEmptyResults(t, warnings, errs)
+			if tc.wantWarning {
+				assertNonEmptyResults(t, "warning", warnings)
+			} else {
+				assertEmptyResults(t, warnings)
+			}
+			if tc.wantError {
+				assertNonEmptyResults(t, "error", errs)
+			} else {
+				assertEmptyResults(t, errs)
+			}
 			assertAPIContents(t, h, wantIDs)
 			assertRestoredItems(t, h, tc.want)
 		})
@@ -2802,6 +2902,17 @@ func assertEmptyResults(t *testing.T, res ...Result) {
 		assert.Empty(t, r.Namespaces)
 		assert.Empty(t, r.Velero)
 	}
+}
+
+func assertNonEmptyResults(t *testing.T, typeMsg string, res ...Result) {
+	t.Helper()
+	total := 0
+	for _, r := range res {
+		total += len(r.Cluster)
+		total += len(r.Namespaces)
+		total += len(r.Velero)
+	}
+	assert.Greater(t, total, 0, "Expected at least one "+typeMsg)
 }
 
 type harness struct {
