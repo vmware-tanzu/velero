@@ -45,7 +45,7 @@ func ForPluginContainer(image string, pullPolicy corev1api.PullPolicy) *Containe
 
 // getName returns the 'name' component of a docker
 // image that includes the entire string except the registry name, and transforms the combined
-// string into a DNS-1123 compatible name.
+// string into a RFC-1123 compatible name.
 func getName(image string) string {
 	slashIndex := strings.Index(image, "/")
 	slashCount := 0
@@ -67,7 +67,14 @@ func getName(image string) string {
 		end = colonIndex
 	}
 
-	return strings.Replace(image[start:end], "/", "-", -1) // this makes it DNS-1123 compatible
+	// https://github.com/distribution/distribution/blob/main/docs/spec/api.md#overview
+	// valid repository names match the regex [a-z0-9]+(?:[._-][a-z0-9]+)*
+	// image repository names can container [._] but [._] are not allowed in RFC-1123 labels.
+	// replace '/', '_' and '.' with '-'
+	re := strings.NewReplacer("/", "-",
+		"_", "-",
+		".", "-")
+	return re.Replace(image[start:end])
 }
 
 // Result returns the built Container.
