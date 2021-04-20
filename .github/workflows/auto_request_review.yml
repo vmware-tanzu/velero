@@ -1,0 +1,16 @@
+name: "Auto Request Review"
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize, reopened]
+
+jobs:
+  auto-request-review:
+    name: Auto Request Review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request a PR review based on files types/paths, and/or groups the author belongs to
+        uses: necojackarc/auto-request-review@v0.5.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config: .github/auto-assignees.yml
