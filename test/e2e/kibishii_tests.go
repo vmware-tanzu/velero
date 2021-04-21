@@ -109,6 +109,14 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, vel
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
 
+	if providerName == "vsphere" && useVolumeSnapshots {
+		// Wait for uploads started by the Velero Plug-in for vSphere to complete
+		// TODO - remove after upload progress monitoring is implemented
+		fmt.Println("Waiting for vSphere uploads to complete")
+		if err := waitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
+			return errors.Wrapf(err, "Error waiting for uploads to complete")
+		}
+	}
 	fmt.Printf("Simulating a disaster by removing namespace %s\n", kibishiiNamespace)
 	if err := client.CoreV1().Namespaces().Delete(oneHourTimeout, kibishiiNamespace, metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, "Failed to simulate a disaster")

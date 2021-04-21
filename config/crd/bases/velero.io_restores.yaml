@@ -6,34 +6,6 @@ metadata:
   creationTimestamp: null
   name: restores.velero.io
 spec:
-  additionalPrinterColumns:
-  - JSONPath: .spec.backupName
-    description: Name of backup to restore from
-    name: Backup
-    type: string
-  - JSONPath: .status.phase
-    description: Restore status such as InProgress/Completed
-    name: Status
-    type: string
-  - JSONPath: .status.startTimestamp
-    description: Time when the restore operation was started
-    name: Started
-    type: date
-  - JSONPath: .status.completionTimestamp
-    description: Time when the restore operation was completed
-    name: Completed
-    type: date
-  - JSONPath: .status.errors
-    description: Count of all errors generated during the restore
-    name: Errors
-    type: integer
-  - JSONPath: .status.warnings
-    description: Count of all warnings generated during the restore
-    name: Warnings
-    type: integer
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
   group: velero.io
   names:
     kind: Restore
@@ -42,7 +14,6 @@ spec:
     singular: restore
   preserveUnknownFields: false
   scope: Namespaced
-  subresources: {}
   validation:
     openAPIV3Schema:
       description: Restore is a Velero resource that represents the application of
