@@ -23,7 +23,8 @@ files:
     - tech-writer
   '**/*.md':
     - tech-writer
-  '/design/**': # Technical design requests are ".md" files but should be reviewed by maintainers
+  # Technical design requests are ".md" files but should be reviewed by maintainers
+  '/design/**':
     - maintainers
 
 options:
