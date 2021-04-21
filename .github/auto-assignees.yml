@@ -32,7 +32,6 @@ options:
     - WIP 
     - wip
     - DO NOT MERGE
-  
   enable_group_assignment: true
 
   # Randomly pick reviewers up to this number.
