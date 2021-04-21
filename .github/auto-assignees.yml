@@ -1,3 +1,7 @@
+---
+# This assigns a PR to its author
+addAssignees: author
+
 reviewers:
   # The default reviewers
   defaults:
@@ -13,28 +17,26 @@ reviewers:
       - jenting
 
     tech-writer:
-      - a-mccarthy 
+      - a-mccarthy
 
 files:
   'site/**':
     - tech-writer
   '**/*.md':
     - tech-writer
-  '/design/**': # Technical design requests are ".md" files but should be reviewed by maintainers
+  # Technical design requests are ".md" files but should
+  # be reviewed by maintainers
+  '/design/**':
     - maintainers
 
 options:
   ignore_draft: true
   ignored_keywords:
-    - WIP 
+    - WIP
     - wip
     - DO NOT MERGE
-  
   enable_group_assignment: true
 
-  # Randomly pick reviewers up to this number.
-  # Do not set this option if you'd like to assign all matching reviewers.
-  number_of_reviewers: 2
-
-# This assigns a PR to its author
- addAssignees: author
+# Randomly pick reviewers up to this number.
+# Do not set this option if you'd like to assign all matching reviewers.
+number_of_reviewers: 2
