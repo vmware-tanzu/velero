@@ -1,7 +1,8 @@
+---
 name: "Auto Assign Author"
 
-# pull_request_target means that this will run on pull requests, but in the context of the base repo.
-# This should mean PRs from forks are supported.
+# pull_request_target means that this will run on pull requests, but in
+# the context of the base repo. This should mean PRs from forks are supported.
 on:
   pull_request_target:
     types: [opened, reopened, ready_for_review]
