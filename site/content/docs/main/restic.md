@@ -195,7 +195,7 @@ Instructions to back up using this approach are as follows:
     ```bash
     kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes-excludes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
     ```
-    where the volume names are the names of the volumes in the pod sepc.
+    where the volume names are the names of the volumes in the pod spec.
 
     For example, in the following pod:
 
