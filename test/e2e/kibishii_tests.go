@@ -77,15 +77,15 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 	return nil
 }
 
-// RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
+// runKibishiiTests runs kibishii tests on the provider.
+func runKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
 	useVolumeSnapshots bool) error {
 	fiveMinTimeout, _ := context.WithTimeout(context.Background(), 5*time.Minute)
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 
-	if err := CreateNamespace(fiveMinTimeout, client, kibishiiNamespace); err != nil {
+	if err := createNamespace(fiveMinTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 
@@ -104,8 +104,8 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, vel
 		return errors.Wrap(err, "Failed to generate data")
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
-		VeleroBackupLogs(fiveMinTimeout, veleroCLI, veleroNamespace, backupName)
+	if err := veleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
+		veleroBackupLogs(fiveMinTimeout, veleroCLI, veleroNamespace, backupName)
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
 
@@ -122,13 +122,13 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, vel
 		return errors.Wrap(err, "Failed to simulate a disaster")
 	}
 	// wait for ns delete
-	err := WaitForNamespaceDeletion(interval, timeout, client, kibishiiNamespace)
+	err := waitForNamespaceDeletion(interval, timeout, client, kibishiiNamespace)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for deletion of namespace %s", kibishiiNamespace))
 	}
 
-	if err := VeleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
-		VeleroRestoreLogs(fiveMinTimeout, veleroCLI, veleroNamespace, restoreName)
+	if err := veleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
+		veleroRestoreLogs(fiveMinTimeout, veleroCLI, veleroNamespace, restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
 
@@ -149,7 +149,7 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, vel
 		return errors.Wrapf(err, "Failed to cleanup %s wrokload namespace", kibishiiNamespace)
 	}
 	// wait for ns delete
-	if err = WaitForNamespaceDeletion(interval, timeout, client, kibishiiNamespace); err != nil {
+	if err = waitForNamespaceDeletion(interval, timeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for deletion of namespace %s", kibishiiNamespace))
 	}
 	fmt.Printf("kibishii test completed successfully\n")
@@ -157,5 +157,5 @@ func RunKibishiiTests(client *kubernetes.Clientset, providerName, veleroCLI, vel
 }
 
 func waitForKibishiiPods(ctx context.Context, client *kubernetes.Clientset, kibishiiNamespace string) error {
-	return WaitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
+	return waitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
 }
