@@ -19,14 +19,16 @@ package client
 import (
 	"os"
 
+	k8scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
@@ -45,8 +47,9 @@ type Factory interface {
 	// DynamicClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	DynamicClient() (dynamic.Interface, error)
-	// KubebuilderClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
-	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
+	// KubebuilderClient returns a client for the controller runtime framework. It adds Kubernetes and Velero
+	// types to its scheme. It uses the following priority to specify the cluster
+	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration..
 	KubebuilderClient() (kbclient.Client, error)
 	// SetBasename changes the basename for an already-constructed client.
 	// This is useful for generating clients that require a different user-agent string below the root `velero`
@@ -151,6 +154,8 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	k8scheme.AddToScheme(scheme)
+	apiextv1beta1.AddToScheme(scheme)
 	kubebuilderClient, err := kbclient.New(clientConfig, kbclient.Options{
 		Scheme: scheme,
 	})

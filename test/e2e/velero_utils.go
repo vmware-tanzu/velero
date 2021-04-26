@@ -110,7 +110,7 @@ func installVeleroServer(io *cliinstall.InstallOptions) error {
 	}
 
 	f := client.NewFactory("e2e", config)
-	resources, err := install.AllResources(vo)
+	resources := install.AllResources(vo)
 	if err != nil {
 		return errors.Wrap(err, "Failed to install Velero in the cluster")
 	}

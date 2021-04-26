@@ -255,10 +255,7 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 			return err
 		}
 
-		resources, err = install.AllResources(vo)
-		if err != nil {
-			return err
-		}
+		resources = install.AllResources(vo)
 	}
 
 	if _, err := output.PrintWithFormat(c, resources); err != nil {
