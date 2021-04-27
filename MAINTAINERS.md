@@ -12,12 +12,12 @@
 | Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
 | Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [VMware](https://www.github.com/vmware/) |
 | JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/) 
-|
+
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
 * Andy Goldstein ([ncdc](https://github.com/ncdc))
 * Steve Kriss ([skriss](https://github.com/skriss))
- * Carlos Panato ([cpanato](https://github.com/cpanato))
+* Carlos Panato ([cpanato](https://github.com/cpanato))
 
 ## Velero Contributors & Stakeholders
 
