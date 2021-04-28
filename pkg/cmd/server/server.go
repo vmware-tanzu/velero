@@ -322,14 +322,17 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	s := &server{
-		namespace:                           f.Namespace(),
-		metricsAddress:                      config.metricsAddress,
-		kubeClientConfig:                    clientConfig,
-		kubeClient:                          kubeClient,
-		veleroClient:                        veleroClient,
-		discoveryClient:                     veleroClient.Discovery(),
-		dynamicClient:                       dynamicClient,
-		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
+		namespace:        f.Namespace(),
+		metricsAddress:   config.metricsAddress,
+		kubeClientConfig: clientConfig,
+		kubeClient:       kubeClient,
+		veleroClient:     veleroClient,
+		discoveryClient:  veleroClient.Discovery(),
+		dynamicClient:    dynamicClient,
+		// We setup an informer with an empty namespace so that we register changes of resources in any namespace.
+		// This is needed because CRs like Backup, Restore, Schedule etc. reside in other namespaces than the velero
+		// server itself.
+		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace("")),
 		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
 		csiSnapshotClient:                   csiSnapClient,
 		ctx:                                 ctx,
@@ -367,9 +370,10 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.initRestic(); err != nil {
-		return err
-	}
+	// We don't need the restic features for our use case.
+	//if err := s.initRestic(); err != nil {
+	//	return err
+	//}
 
 	if err := s.runControllers(s.config.defaultVolumeSnapshotLocations); err != nil {
 		return err
@@ -592,7 +596,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			s.config.backupSyncPeriod,
-			s.namespace,
+			// Empty namespace so that the controller is able to retrieve Backups from any namespace.
+			"",
 			s.csiSnapshotClient,
 			s.kubeClient,
 			s.config.defaultBackupLocation,
@@ -614,6 +619,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
+			s.mgr.GetClient(),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
@@ -652,7 +658,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	scheduleControllerRunInfo := func() controllerRunInfo {
 		scheduleController := controller.NewScheduleController(
-			s.namespace,
+			// Empty namespace so that the controller is able to retrieve Schedules from any namespace.
+			"",
 			s.veleroClient.VeleroV1(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Schedules(),
@@ -714,6 +721,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
+			s.mgr.GetClient(),
 			s.config.restoreResourcePriorities,
 			s.kubeClient.CoreV1().Namespaces(),
 			s.resticManager,
@@ -726,7 +734,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		cmd.CheckError(err)
 
 		restoreController := controller.NewRestoreController(
-			s.namespace,
+			// Empty namespace so that the controller is able to retrieve Restores from any namespace.
+			"",
 			s.sharedInformerFactory.Velero().V1().Restores(),
 			s.veleroClient.VeleroV1(),
 			s.veleroClient.VeleroV1(),

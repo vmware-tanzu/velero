@@ -20,6 +20,10 @@ import (
 	"context"
 	"encoding/json"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"sigs.k8s.io/cluster-api/controllers/remote"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -37,13 +41,14 @@ import (
 // RemapCRDVersionAction inspects CustomResourceDefinition and decides if it is a v1
 // CRD that needs to be backed up as v1beta1.
 type RemapCRDVersionAction struct {
-	logger        logrus.FieldLogger
-	betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface
+	logger logrus.FieldLogger
+	// client is a controller-runtime client to dynamically fetch target cluster kubeconfig secrets in the management cluster.
+	client client.Client
 }
 
 // NewRemapCRDVersionAction instantiates a new RemapCRDVersionAction plugin.
-func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
-	return &RemapCRDVersionAction{logger: logger, betaCRDClient: betaCRDClient}
+func NewRemapCRDVersionAction(logger logrus.FieldLogger, client client.Client) *RemapCRDVersionAction {
+	return &RemapCRDVersionAction{logger: logger, client: client}
 }
 
 // AppliesTo selects the resources the plugin should run against. In this case, CustomResourceDefinitions.
@@ -89,7 +94,23 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	switch {
 	case hasSingleVersion(crd), hasNonStructuralSchema(crd), hasPreserveUnknownFields(crd):
 		log.Infof("CustomResourceDefinition %s appears to be v1beta1, fetching the v1beta version", crd.Name)
-		item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
+		clusterName := backup.Spec.StorageLocation
+		cluster := client.ObjectKey{
+			Namespace: clusterName,
+			Name:      clusterName,
+		}
+		// a.client is the management cluster client to get kubeconfig secrets.
+		restConfig, err := remote.RESTConfig(context.Background(), a.client, cluster)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// c is the client that is used to talk to target clusters.
+		c, err := apiextensions.NewForConfig(restConfig)
+		if err != nil {
+			return nil, nil, err
+		}
+		item, err = fetchV1beta1CRD(crd.Name, c.ApiextensionsV1beta1().CustomResourceDefinitions())
 		if err != nil {
 			return nil, nil, err
 		}

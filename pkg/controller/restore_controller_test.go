@@ -57,6 +57,7 @@ func TestFetchBackupInfo(t *testing.T) {
 	tests := []struct {
 		name              string
 		backupName        string
+		namespace         string
 		informerLocations []*velerov1api.BackupStorageLocation
 		informerBackups   []*velerov1api.Backup
 		backupStoreBackup *velerov1api.Backup
@@ -67,6 +68,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		{
 			name:              "lister has backup",
 			backupName:        "backup-1",
+			namespace:         "velero",
 			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
 			informerBackups:   []*velerov1api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
@@ -74,6 +76,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		{
 			name:              "lister does not have a backup, but backupSvc does",
 			backupName:        "backup-1",
+			namespace:         "velero",
 			backupStoreBackup: defaultBackup().StorageLocation("default").Result(),
 			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
 			informerBackups:   []*velerov1api.Backup{defaultBackup().StorageLocation("default").Result()},
@@ -82,6 +85,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		{
 			name:             "no backup",
 			backupName:       "backup-1",
+			namespace:        "velero",
 			backupStoreError: errors.New("no backup here"),
 			expectedErr:      true,
 		},
@@ -144,7 +148,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				backupStore.On("GetBackupMetadata", test.backupName).Return(test.backupStoreBackup, nil).Maybe()
 			}
 
-			info, err := c.fetchBackupInfo(test.backupName, pluginManager)
+			info, err := c.fetchBackupInfo(test.backupName, test.namespace, pluginManager)
 
 			require.Equal(t, test.expectedErr, err != nil)
 			assert.Equal(t, test.expectedRes, info.backup)

@@ -324,8 +324,8 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{
 			velerov1api.ScheduleNameLabel: restore.Spec.ScheduleName,
 		}))
-
-		backups, err := c.backupLister.Backups(c.namespace).List(selector)
+		// NOTE: This assumes that Backups and Restores always reside in the same namespace.
+		backups, err := c.backupLister.Backups(restore.Namespace).List(selector)
 		if err != nil {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Unable to list backups for schedule")
 			return backupInfo{}
@@ -342,7 +342,8 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 		}
 	}
 
-	info, err := c.fetchBackupInfo(restore.Spec.BackupName, pluginManager)
+	// NOTE: This assumes that Backups and Restores always reside in the same namespace.
+	info, err := c.fetchBackupInfo(restore.Spec.BackupName, restore.Namespace, pluginManager)
 	if err != nil {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
 		return backupInfo{}
@@ -397,15 +398,17 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
-func (c *restoreController) fetchBackupInfo(backupName string, pluginManager clientmgmt.Manager) (backupInfo, error) {
-	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
+// NOTE: We adjust fetchBackupInfo to also accept a namespace explicitly, which will be the namespace of the
+// found Restore. As a corollary, this means that Restores and corresponding Backups must reside in the same namespace.
+func (c *restoreController) fetchBackupInfo(backupName, namespace string, pluginManager clientmgmt.Manager) (backupInfo, error) {
+	backup, err := c.backupLister.Backups(namespace).Get(backupName)
 	if err != nil {
 		return backupInfo{}, err
 	}
 
 	location := &velerov1api.BackupStorageLocation{}
 	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
-		Namespace: c.namespace,
+		Namespace: namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, location); err != nil {
 		return backupInfo{}, errors.WithStack(err)
@@ -471,11 +474,13 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	restoreReq := pkgrestore.Request{
 		Log:              restoreLog,
 		Restore:          restore,
+		Location:         info.location,
 		Backup:           info.backup,
 		PodVolumeBackups: podVolumeBackups,
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
+
 	restoreWarnings, restoreErrors := c.restorer.Restore(restoreReq, actions, c.snapshotLocationLister, pluginManager)
 	restoreLog.Info("restore completed")
 

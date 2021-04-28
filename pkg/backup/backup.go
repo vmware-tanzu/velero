@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -48,6 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // BackupVersion is the current backup major version for Velero.
@@ -67,8 +69,7 @@ type Backupper interface {
 // kubernetesBackupper implements Backupper.
 type kubernetesBackupper struct {
 	backupClient           velerov1client.BackupsGetter
-	dynamicFactory         client.DynamicFactory
-	discoveryHelper        discovery.Helper
+	client                 kbclient.Client
 	podCommandExecutor     podexec.PodCommandExecutor
 	resticBackupperFactory restic.BackupperFactory
 	resticTimeout          time.Duration
@@ -103,6 +104,7 @@ func NewKubernetesBackupper(
 	backupClient velerov1client.BackupsGetter,
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
+	client kbclient.Client,
 	podCommandExecutor podexec.PodCommandExecutor,
 	resticBackupperFactory restic.BackupperFactory,
 	resticTimeout time.Duration,
@@ -111,8 +113,7 @@ func NewKubernetesBackupper(
 ) (Backupper, error) {
 	return &kubernetesBackupper{
 		backupClient:           backupClient,
-		discoveryHelper:        discoveryHelper,
-		dynamicFactory:         dynamicFactory,
+		client:                 client,
 		podCommandExecutor:     podCommandExecutor,
 		resticBackupperFactory: resticBackupperFactory,
 		resticTimeout:          resticTimeout,
@@ -206,6 +207,22 @@ type VolumeSnapshotterGetter interface {
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
 func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+	// NOTE: This requires that the BackupStorageLocation must always be named exactly as the target cluster.
+	clusterName := backupRequest.StorageLocation.Name
+	clientSet, dynamicClient, err := kube.NewClusterClients(context.Background(), kb.client, kbclient.ObjectKey{
+		Namespace: backupRequest.Namespace,
+		Name:      clusterName,
+	})
+	if err != nil {
+		return err
+	}
+	discoveryHelper, err := discovery.NewHelper(clientSet, log)
+	if err != nil {
+		return err
+	}
+
+	dynamicFactory := client.NewDynamicFactory(dynamicClient)
+
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -221,18 +238,17 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
 	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
 
-	backupRequest.ResourceIncludesExcludes = collections.GetResourceIncludesExcludes(kb.discoveryHelper, backupRequest.Spec.IncludedResources, backupRequest.Spec.ExcludedResources)
+	backupRequest.ResourceIncludesExcludes = collections.GetResourceIncludesExcludes(discoveryHelper, backupRequest.Spec.IncludedResources, backupRequest.Spec.ExcludedResources)
 	log.Infof("Including resources: %s", backupRequest.ResourceIncludesExcludes.IncludesString())
 	log.Infof("Excluding resources: %s", backupRequest.ResourceIncludesExcludes.ExcludesString())
 	log.Infof("Backing up all pod volumes using restic: %t", *backupRequest.Backup.Spec.DefaultVolumesToRestic)
 
-	var err error
-	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)
+	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, discoveryHelper)
 	if err != nil {
 		return err
 	}
 
-	backupRequest.ResolvedActions, err = resolveActions(actions, kb.discoveryHelper)
+	backupRequest.ResolvedActions, err = resolveActions(actions, discoveryHelper)
 	if err != nil {
 		return err
 	}
@@ -271,8 +287,8 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	collector := &itemCollector{
 		log:                   log,
 		backupRequest:         backupRequest,
-		discoveryHelper:       kb.discoveryHelper,
-		dynamicFactory:        kb.dynamicFactory,
+		discoveryHelper:       discoveryHelper,
+		dynamicFactory:        dynamicFactory,
 		cohabitatingResources: cohabitatingResources(),
 		dir:                   tempDir,
 		pageSize:              kb.clientPageSize,
@@ -290,8 +306,8 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	itemBackupper := &itemBackupper{
 		backupRequest:           backupRequest,
 		tarWriter:               tw,
-		dynamicFactory:          kb.dynamicFactory,
-		discoveryHelper:         kb.discoveryHelper,
+		dynamicFactory:          dynamicFactory,
+		discoveryHelper:         discoveryHelper,
 		resticBackupper:         resticBackupper,
 		resticSnapshotTracker:   newPVCSnapshotTracker(),
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
@@ -406,7 +422,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	// we don't want to back it up, and if it's true it will already be included.
 	if backupRequest.Spec.IncludeClusterResources == nil {
 		for gr := range backedUpGroupResources {
-			kb.backupCRD(log, gr, itemBackupper)
+			kb.backupCRD(log, dynamicFactory, discoveryHelper, gr, itemBackupper)
 		}
 	}
 
@@ -446,11 +462,11 @@ func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.Grou
 
 // backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
 // associated with it.
-func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper) {
+func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, dynamicFactory client.DynamicFactory, discoveryHelper discovery.Helper, gr schema.GroupResource, itemBackupper *itemBackupper) {
 	crdGroupResource := kuberesource.CustomResourceDefinitions
 
 	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
-	gvr, apiResource, err := kb.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
+	gvr, apiResource, err := discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
 		return
@@ -458,7 +474,7 @@ func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.Group
 	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
 
 	log.Debugf("Getting dynamic client for %s", gvr.String())
-	crdClient, err := kb.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
+	crdClient, err := dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
 		return

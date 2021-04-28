@@ -217,7 +217,9 @@ func (c *backupSyncController) run() {
 				continue
 			}
 
-			backup.Namespace = c.namespace
+			// We want to keep the namespace of the found backup instead of deploying it into the namespace where the
+			// controller resides.
+			//backup.Namespace = c.namespace
 			backup.ResourceVersion = ""
 
 			// update the StorageLocation field and label since the name of the location
