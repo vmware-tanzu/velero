@@ -5,6 +5,9 @@ on:
   pull_request:
     types: [opened, ready_for_review, reopened]
 
+permissions:
+  pull-requests: write
+
 jobs:
   auto-request-review:
     name: Auto Request Review
