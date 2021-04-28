@@ -17,6 +17,7 @@
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
 * Andy Goldstein ([ncdc](https://github.com/ncdc))
 * Steve Kriss ([skriss](https://github.com/skriss))
+* Carlos Panato ([cpanato](https://github.com/cpanato))
 
 ## Velero Contributors & Stakeholders
 
@@ -24,6 +25,6 @@
 | ----------------------------- | :---------------------: |
 | Technical Lead | Nolan Brubaker (nrb) |
 | Kubernetes CSI Liaison | Nolan Brubaker (nrb), Ashish Amarnath (ashish-amarnath) |
-| Deployment | Carlisia Thompson (carlisia), Carlos Tadeu Panato Junior (cpanato), JenTing Hsiao (jenting) | 
+| Deployment | Carlisia Thompson (carlisia), JenTing Hsiao (jenting) | 
 | Community Management | Jonas Rosland (jonasrosland) |
 | Product Management | Eleanor Millman (eleanor-millman) |
