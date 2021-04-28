@@ -14,8 +14,6 @@
 | JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/)
 | Scott Seago | [sseago](https://github.com/sseago) | [OpenShift](https://github.com/openshift)
 
-
-
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
 * Andy Goldstein ([ncdc](https://github.com/ncdc))
@@ -31,4 +29,3 @@
 | Deployment | Carlisia Thompson (carlisia), JenTing Hsiao (jenting) | 
 | Community Management | Jonas Rosland (jonasrosland) |
 | Product Management | Eleanor Millman (eleanor-millman) |
-
