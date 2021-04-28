@@ -82,7 +82,7 @@ By default, `velero install` will use the public `velero/velero` image. When usi
 ```bash
 velero install \
  --image=$PRIVATE_REG/velero:$VELERO_VERSION \
- --plugin=$PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION \
+ --plugins=$PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION \
 <....>
 ```
 
