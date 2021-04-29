@@ -183,9 +183,10 @@ Although the handling of secrets will be similar to how credentials are currentl
 ## Parallelism
 In order to support parallelism, Velero will need to be able to use multiple credentials simultaneously with the
 ObjectStore.  Currently backups are single threaded and a single BSL will be used throughout the entire backup.  The only
-existing points of parallelism are when a user downloads logs for a backup and when the .  In the current code, `download_request_controller.go`
-creates a new plug-in manager and hence another ObjectStore plugin in parallel with the ObjectStore plugin servicing a
-backup or restore (if one is running).
+existing points of parallelism are when a user downloads logs for a backup or the BackupStorageLocationReconciler 
+reconciles while a backup or restore is running.  In the current code, `download_request_controller.go` and 
+`backup_storage_location_controller.go` create a new plug-in manager and hence another ObjectStore plugin in 
+parallel with the ObjectStore plugin servicing a backup or restore (if one is running).
 
 ## Alternatives Considered
 
