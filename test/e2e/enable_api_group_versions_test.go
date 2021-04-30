@@ -1,9 +1,12 @@
 /*
 Copyright the Velero contributors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,17 +28,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
@@ -43,13 +41,14 @@ import (
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
 	var (
-		resource, group  string
-		certMgrCRD       map[string]string
-		client           *kubernetes.Clientset
-		extensionsClient *apiextensionsclient.Clientset
-		err              error
-		ctx              = context.Background()
+		resource, group string
+		certMgrCRD      map[string]string
+		err             error
+		ctx             = context.Background()
 	)
+
+	client, err := newTestClient()
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
 
 	BeforeEach(func() {
 		resource = "rockbands"
@@ -58,9 +57,6 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 			"url":       "testdata/enable_api_group_versions/cert-manager.yaml",
 			"namespace": "cert-manager",
 		}
-
-		client, extensionsClient, err = kube.GetClusterClient() // Currently we ignore the API extensions client
-		Expect(err).NotTo(HaveOccurred())
 
 		err = installCRD(ctx, certMgrCRD["url"], certMgrCRD["namespace"])
 		Expect(err).NotTo(HaveOccurred())
@@ -83,17 +79,15 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		It("Should back up API group version and restore by version priority", func() {
 			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
+				client,
 				resource,
 				group,
-				client,
-				extensionsClient,
 			)).To(Succeed(), "Failed to successfully backup and restore multiple API Groups")
 		})
 	})
 })
 
-func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string, client *kubernetes.Clientset,
-	extensionsClient *apiextensionsclient.Clientset) error {
+func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, resource, group string) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -257,7 +251,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		}
 
 		for _, ns := range tc.namespaces {
-			if err := client.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{}); err != nil {
+			if err := client.clientGo.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{}); err != nil {
 				return errors.Wrapf(err, "deleting %s namespace from source cluster", ns)
 			}
 
@@ -273,7 +267,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 
 		// Apply config map if there is one.
 		if tc.cm != nil {
-			_, err := client.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
+			_, err := client.clientGo.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
 			if err != nil {
 				return errors.Wrap(err, "creating config map with user version priorities")
 			}
@@ -338,7 +332,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 		// Delete namespaces created for CRs
 		for _, ns := range tc.namespaces {
 			fmt.Println("Delete namespace", ns)
-			_ = client.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{})
+			_ = client.clientGo.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{})
 			_ = waitNamespaceDelete(ctx, ns)
 		}
 
@@ -356,12 +350,9 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 			tc.srcCRD["namespace"],
 		)
 
-		// Uninstall Velero
-		if installVelero {
-			err = veleroUninstall(ctx, client, extensionsClient, veleroNamespace)
-			if err != nil {
-				return err
-			}
+		err = veleroUninstall(client.kubebuilder, installVelero, veleroNamespace)
+		if err != nil {
+			return err
 		}
 	}
 
