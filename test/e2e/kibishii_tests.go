@@ -15,6 +15,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"time"
@@ -45,6 +46,8 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform string
 
 	kibishiiSetWaitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
 		"-n", namespace, "-w", "--timeout=30m")
+	kibishiiSetWaitCmd.Stdout = os.Stdout
+	kibishiiSetWaitCmd.Stderr = os.Stderr
 	_, _, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
 
 	if err != nil {
@@ -53,6 +56,8 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform string
 
 	fmt.Printf("Waiting for kibishii jump-pad pod to be ready\n")
 	jumpPadWaitCmd := exec.CommandContext(ctx, "kubectl", "wait", "--for=condition=ready", "-n", namespace, "pod/jump-pad")
+	jumpPadWaitCmd.Stdout = os.Stdout
+	jumpPadWaitCmd.Stderr = os.Stderr
 	_, _, err = veleroexec.RunCommand(jumpPadWaitCmd)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of pod %s/%s", namespace, jumpPadPod)
