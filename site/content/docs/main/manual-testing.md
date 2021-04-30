@@ -1,4 +1,7 @@
-# Manual Testing Requirements for Velero
+---
+title: "Manual Testing Requirements for Velero"
+layout: docs
+---
 
 Although we have automated unit and end-to-end tests, there is still a need for Velero to undergo manual tests during a release.
 This document outlines the manual test operations that Velero needs to correctly perform in order to be considered ready for release.

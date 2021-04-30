@@ -24,6 +24,8 @@ Some tips for doing reviews:
 
 ## Creating a release
 Maintainers are expected to create releases for the project. We have parts of the process automated, and full [instructions](release-instructions).
+We are working towards automating more the Velero testing, but there is still a need for manual testing as part of the release process.
+The manual test cases for release testing are documented [here](./manual-testing).
 
 ## Community support
 Maintainers are expected to participate in the community support rotation. We have guidelines for how we handle the [support](support-process).
