@@ -19,26 +19,44 @@ To backup resources of specific Kind in a specific order, use option --ordered-r
 velero backup create backupName --include-cluster-resources=true --ordered-resources 'pods=ns1/pod1,ns1/pod2;persistentvolumes=pv4,pv8' --include-namespaces=ns1
 velero backup create backupName --ordered-resources 'statefulsets=ns1/sts1,ns1/sts0' --include-namespaces=ns1
 ```
-## Set Scheduled Backups
+## Schedule a Backup
 
-The **schedule** operation allows you to back up your data at recurring intervals. These intervals are specified by a Cron expression.
-
-```
-velero schedule create NAME --schedule [flags]
-```
-
-For example, to create a backup that runs every day at 3 am run
+The **schedule** operation allows you to create a backup of your data at a specified time, defined by a [Cron expression](https://en.wikipedia.org/wiki/Cron).
 
 ```
-velero create schedule schedule-name --schedule="0 0 3 * * *"
+velero schedule create NAME --schedule="* * * * *" [flags]
 ```
 
-This command will create the backup within Velero, but it will not trigger until the next time it's specified interval, 3am. Scheduled backups are saved with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*.
-
-Once you create the backup, you can then trigger it whenever you want by running
+Cron schedules use the following format.
 
 ```
-velero backup create --from-schedule schedule-name
+# ┌───────────── minute (0 - 59)
+# │ ┌───────────── hour (0 - 23)
+# │ │ ┌───────────── day of the month (1 - 31)
+# │ │ │ ┌───────────── month (1 - 12)
+# │ │ │ │ ┌───────────── day of the week (0 - 6) (Sunday to Saturday;
+# │ │ │ │ │                                   7 is also Sunday on some systems)
+# │ │ │ │ │
+# │ │ │ │ │
+# * * * * *
 ```
 
-This command will immediately trigger a new backup based on your template for `schedule-name`. This will not affect the backup schedule, and another backup will trigger at the scheduled time.
+For example, the command below creates a backup that runs every day at 3am.
+
+```
+velero schedule create example-schedule --schedule="0 3 * * *"
+```
+
+This command will create the backup, `example-schedule`, within Velero, but the backup will not be taken until the next scheduled time, 3am. Backups created by a schedule are saved with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. For a full list of available configuration flags use the Velero CLI help command.
+
+```
+velero schedule create --help
+```
+
+Once you create the scheduled backup, you can then trigger it manually using the `velero backup` command.
+
+```
+velero backup create --from-schedule example-schedule
+```
+
+This command will immediately trigger a new backup based on your template for `example-schedule`. This will not affect the backup schedule, and another backup will trigger at the scheduled time.
