@@ -89,13 +89,13 @@ func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuil
 		logrus.WithFields(logrus.Fields{
 			"backup": fmt.Sprintf("%s/%s", b.object.GetNamespace(), b.object.GetName()),
 			"labels": schedule.Spec.Template.Metadata.Labels,
-		}).Debug("Schedule template labels applied to Backup")
+		}).Debug("Schedule.template.metadata.labels set - using those labels instead of schedule.labels for backup object")
 	} else {
 		labels = schedule.Labels
 		logrus.WithFields(logrus.Fields{
 			"backup": fmt.Sprintf("%s/%s", b.object.GetNamespace(), b.object.GetName()),
 			"labels": schedule.Labels,
-		}).Debug("Schedule labels applied to Backup")
+		}).Debug("No Schedule.template.metadata.labels set - using Schedule.labels for backup object")
 	}
 	if labels == nil {
 		labels = make(map[string]string)
