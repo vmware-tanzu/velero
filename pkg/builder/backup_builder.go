@@ -17,11 +17,14 @@ limitations under the License.
 package builder
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
@@ -77,10 +80,23 @@ func (b *BackupBuilder) ObjectMeta(opts ...ObjectMetaOpt) *BackupBuilder {
 
 // FromSchedule sets the Backup's spec and labels from the Schedule template
 func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuilder {
+	var labels = make(map[string]string)
+
+	// Check if there's explicit Labels defined in the Schedule object template
+	// and if present then copy it to the backup object.
 	if schedule.Spec.Template.Metadata.Labels != nil {
-		schedule.Labels = schedule.Spec.Template.Metadata.Labels
+		labels = schedule.Spec.Template.Metadata.Labels
+		logrus.WithFields(logrus.Fields{
+			"backup": fmt.Sprintf("%s/%s", b.object.GetNamespace(), b.object.GetName()),
+			"labels": schedule.Spec.Template.Metadata.Labels,
+		}).Debug("Schedule template labels applied to Backup")
+	} else {
+		labels = schedule.Labels
+		logrus.WithFields(logrus.Fields{
+			"backup": fmt.Sprintf("%s/%s", b.object.GetNamespace(), b.object.GetName()),
+			"labels": schedule.Labels,
+		}).Debug("Schedule labels applied to Backup")
 	}
-	labels := schedule.Labels
 	if labels == nil {
 		labels = make(map[string]string)
 	}
