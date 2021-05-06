@@ -76,10 +76,11 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	log = log.WithField("resource", groupResource.String())
 	log = log.WithField("namespace", namespace)
 
-	if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
-		log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
-		return false, nil
-	}
+	// NOTE: We don't want to allow to skip the backup of certain resources.
+	//if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
+	//	log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
+	//	return false, nil
+	//}
 
 	// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
 	// backupItem can be invoked by a custom action.
