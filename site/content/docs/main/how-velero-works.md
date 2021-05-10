@@ -26,7 +26,7 @@ Note that cluster backups are not strictly atomic. If Kubernetes objects are bei
 
 The **schedule** operation allows you to back up your data at recurring intervals. You can create a scheduled backup at any time, and the first backup is then performed at the schedule's specified interval. These intervals are specified by a Cron expression.
 
-Velero saves backups created from a schedule with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. For more information see the [Backup Reference documentation](backup-reference.mdd).
+Velero saves backups created from a schedule with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. For more information see the [Backup Reference documentation](backup-reference.md).
 
 ## Restores
 
