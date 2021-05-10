@@ -16,7 +16,6 @@ spec:
     shortNames:
     - ssr
     singular: serverstatusrequest
-  preserveUnknownFields: false
   scope: Namespaced
   subresources:
     status: {}
@@ -63,13 +62,11 @@ spec:
                 - kind
                 - name
                 type: object
-              nullable: true
               type: array
             processedTimestamp:
               description: ProcessedTimestamp is when the ServerStatusRequest was
                 processed by the ServerStatusRequestController.
               format: date-time
-              nullable: true
               type: string
             serverVersion:
               description: ServerVersion is the Velero server version.

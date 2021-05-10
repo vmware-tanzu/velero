@@ -14,7 +14,6 @@ spec:
     listKind: PodVolumeBackupList
     plural: podvolumebackups
     singular: podvolumebackup
-  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -107,7 +106,6 @@ spec:
                 is recorded before uploading the backup object. The server's time
                 is used for CompletionTimestamps
               format: date-time
-              nullable: true
               type: string
             message:
               description: Message is a message about the pod volume backup's status.
@@ -145,7 +143,6 @@ spec:
                 from CreationTimestamp, since that value changes on restores. The
                 server's time is used for StartTimestamps
               format: date-time
-              nullable: true
               type: string
           type: object
       type: object

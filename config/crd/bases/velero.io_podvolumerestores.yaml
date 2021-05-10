@@ -14,7 +14,6 @@ spec:
     listKind: PodVolumeRestoreList
     plural: podvolumerestores
     singular: podvolumerestore
-  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -99,7 +98,6 @@ spec:
                 Completion time is recorded even on failed restores. The server's
                 time is used for CompletionTimestamps
               format: date-time
-              nullable: true
               type: string
             message:
               description: Message is a message about the pod volume restore's status.
@@ -128,7 +126,6 @@ spec:
               description: StartTimestamp records the time a restore was started.
                 The server's time is used for StartTimestamps
               format: date-time
-              nullable: true
               type: string
           type: object
       type: object

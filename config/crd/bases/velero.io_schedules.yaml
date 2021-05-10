@@ -14,7 +14,6 @@ spec:
     listKind: ScheduleList
     plural: schedules
     singular: schedule
-  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -53,14 +52,12 @@ spec:
                     are not included in the backup.
                   items:
                     type: string
-                  nullable: true
                   type: array
                 excludedResources:
                   description: ExcludedResources is a slice of resource names that
                     are not included in the backup.
                   items:
                     type: string
-                  nullable: true
                   type: array
                 hooks:
                   description: Hooks represent custom behaviors that should be executed
@@ -79,14 +76,12 @@ spec:
                               to which this hook spec does not apply.
                             items:
                               type: string
-                            nullable: true
                             type: array
                           excludedResources:
                             description: ExcludedResources specifies the resources
                               to which this hook spec does not apply.
                             items:
                               type: string
-                            nullable: true
                             type: array
                           includedNamespaces:
                             description: IncludedNamespaces specifies the namespaces
@@ -94,7 +89,6 @@ spec:
                               to all namespaces.
                             items:
                               type: string
-                            nullable: true
                             type: array
                           includedResources:
                             description: IncludedResources specifies the resources
@@ -102,12 +96,10 @@ spec:
                               to all resources.
                             items:
                               type: string
-                            nullable: true
                             type: array
                           labelSelector:
                             description: LabelSelector, if specified, filters the
                               resources to which this hook spec applies.
-                            nullable: true
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
@@ -249,33 +241,28 @@ spec:
                         required:
                         - name
                         type: object
-                      nullable: true
                       type: array
                   type: object
                 includeClusterResources:
                   description: IncludeClusterResources specifies whether cluster-scoped
                     resources should be included for consideration in the backup.
-                  nullable: true
                   type: boolean
                 includedNamespaces:
                   description: IncludedNamespaces is a slice of namespace names to
                     include objects from. If empty, all namespaces are included.
                   items:
                     type: string
-                  nullable: true
                   type: array
                 includedResources:
                   description: IncludedResources is a slice of resource names to include
                     in the backup. If empty, all resources are included.
                   items:
                     type: string
-                  nullable: true
                   type: array
                 labelSelector:
                   description: LabelSelector is a metav1.LabelSelector to filter with
                     when adding individual objects to the backup. If empty or nil,
                     all objects are included. Optional.
-                  nullable: true
                   properties:
                     matchExpressions:
                       description: matchExpressions is a list of label selector requirements.
@@ -326,12 +313,10 @@ spec:
                     list of resource names separated by commas. Each resource name
                     has format "namespace/resourcename".  For cluster resources, simply
                     use "resourcename".
-                  nullable: true
                   type: object
                 snapshotVolumes:
                   description: SnapshotVolumes specifies whether to take cloud snapshots
                     of any PV's referenced in the set of objects included in the Backup.
-                  nullable: true
                   type: boolean
                 storageLocation:
                   description: StorageLocation is a string containing the name of
@@ -351,7 +336,6 @@ spec:
             useOwnerReferencesInBackup:
               description: UseOwnerReferencesBackup specifies whether to use OwnerReferences
                 on backups created by this Schedule.
-              nullable: true
               type: boolean
           required:
           - schedule
@@ -364,7 +348,6 @@ spec:
               description: LastBackup is the last time a Backup was run for this Schedule
                 schedule
               format: date-time
-              nullable: true
               type: string
             phase:
               description: Phase is the current phase of the Schedule

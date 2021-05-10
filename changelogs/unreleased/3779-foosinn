@@ -1,0 +1,1 @@
+remove all default value fields from crds to prevent gitops tools from detecting diffs

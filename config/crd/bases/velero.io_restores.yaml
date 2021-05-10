@@ -12,7 +12,6 @@ spec:
     listKind: RestoreList
     plural: restores
     singular: restore
-  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -43,14 +42,12 @@ spec:
                 not included in the restore.
               items:
                 type: string
-              nullable: true
               type: array
             excludedResources:
               description: ExcludedResources is a slice of resource names that are
                 not included in the restore.
               items:
                 type: string
-              nullable: true
               type: array
             hooks:
               description: Hooks represent custom behaviors that should be executed
@@ -67,14 +64,12 @@ spec:
                           which this hook spec does not apply.
                         items:
                           type: string
-                        nullable: true
                         type: array
                       excludedResources:
                         description: ExcludedResources specifies the resources to
                           which this hook spec does not apply.
                         items:
                           type: string
-                        nullable: true
                         type: array
                       includedNamespaces:
                         description: IncludedNamespaces specifies the namespaces to
@@ -82,7 +77,6 @@ spec:
                           namespaces.
                         items:
                           type: string
-                        nullable: true
                         type: array
                       includedResources:
                         description: IncludedResources specifies the resources to
@@ -90,12 +84,10 @@ spec:
                           resources.
                         items:
                           type: string
-                        nullable: true
                         type: array
                       labelSelector:
                         description: LabelSelector, if specified, filters the resources
                           to which this hook spec applies.
-                        nullable: true
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
@@ -1506,27 +1498,23 @@ spec:
               description: IncludeClusterResources specifies whether cluster-scoped
                 resources should be included for consideration in the restore. If
                 null, defaults to true.
-              nullable: true
               type: boolean
             includedNamespaces:
               description: IncludedNamespaces is a slice of namespace names to include
                 objects from. If empty, all namespaces are included.
               items:
                 type: string
-              nullable: true
               type: array
             includedResources:
               description: IncludedResources is a slice of resource names to include
                 in the restore. If empty, all resources in the backup are included.
               items:
                 type: string
-              nullable: true
               type: array
             labelSelector:
               description: LabelSelector is a metav1.LabelSelector to filter with
                 when restoring individual objects from the backup. If empty or nil,
                 all objects are included. Optional.
-              nullable: true
               properties:
                 matchExpressions:
                   description: matchExpressions is a list of label selector requirements.
@@ -1578,12 +1566,10 @@ spec:
             preserveNodePorts:
               description: PreserveNodePorts specifies whether to restore old nodePorts
                 from backup.
-              nullable: true
               type: boolean
             restorePVs:
               description: RestorePVs specifies whether to restore all included PVs
                 from snapshot (via the cloudprovider).
-              nullable: true
               type: boolean
             scheduleName:
               description: ScheduleName is the unique name of the Velero schedule
@@ -1601,7 +1587,6 @@ spec:
                 was completed. Completion time is recorded even on failed restore.
                 The server's time is used for StartTimestamps
               format: date-time
-              nullable: true
               type: string
             errors:
               description: Errors is a count of all error messages that were generated
@@ -1626,7 +1611,6 @@ spec:
               description: Progress contains information about the restore's execution
                 progress. Note that this information is best-effort only -- if Velero
                 fails to update it during a restore for any reason, it may be inaccurate/stale.
-              nullable: true
               properties:
                 itemsRestored:
                   description: ItemsRestored is the number of items that have actually
@@ -1642,14 +1626,12 @@ spec:
               description: StartTimestamp records the time the restore operation was
                 started. The server's time is used for StartTimestamps
               format: date-time
-              nullable: true
               type: string
             validationErrors:
               description: ValidationErrors is a slice of all validation errors (if
                 applicable)
               items:
                 type: string
-              nullable: true
               type: array
             warnings:
               description: Warnings is a count of all warning messages that were generated

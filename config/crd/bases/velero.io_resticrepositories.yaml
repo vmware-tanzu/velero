@@ -14,7 +14,6 @@ spec:
     listKind: ResticRepositoryList
     plural: resticrepositories
     singular: resticrepository
-  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -62,7 +61,6 @@ spec:
             lastMaintenanceTime:
               description: LastMaintenanceTime is the last time maintenance was run.
               format: date-time
-              nullable: true
               type: string
             message:
               description: Message is a message about the current status of the ResticRepository.

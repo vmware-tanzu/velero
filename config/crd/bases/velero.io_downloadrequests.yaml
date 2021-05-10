@@ -14,7 +14,6 @@ spec:
     listKind: DownloadRequestList
     plural: downloadrequests
     singular: downloadrequest
-  preserveUnknownFields: false
   scope: Namespaced
   subresources:
     status: {}
@@ -73,7 +72,6 @@ spec:
               description: Expiration is when this DownloadRequest expires and can
                 be deleted by the system.
               format: date-time
-              nullable: true
               type: string
             phase:
               description: Phase is the current state of the DownloadRequest.
