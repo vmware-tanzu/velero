@@ -24,7 +24,7 @@ cross-volume-type data migrations.
 
 - Understand how Velero performs [backups with the restic integration](#how-backup-and-restore-work-with-restic).
 - [Download][3] the latest Velero release.
-- Kubernetes v1.10.0 and later. Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
+- Kubernetes v1.12.0 and later. Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.12.0 and later.
 
 ### Install restic
 
@@ -526,3 +526,4 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
 [11]: customize-installation.md#default-pod-volume-backup-to-restic
+
