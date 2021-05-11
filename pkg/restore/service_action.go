@@ -18,6 +18,7 @@ package restore
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -84,14 +85,51 @@ func deleteNodePorts(service *corev1api.Service) error {
 	explicitNodePorts := sets.NewString()
 	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
 	if ok {
-		appliedService := new(corev1api.Service)
-		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedService); err != nil {
+		appliedServiceUnstructured := new(map[string]interface{})
+		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedServiceUnstructured); err != nil {
 			return errors.WithStack(err)
 		}
 
-		for _, port := range appliedService.Spec.Ports {
-			if port.NodePort > 0 {
-				explicitNodePorts.Insert(port.Name)
+		ports, bool, err := unstructured.NestedSlice(*appliedServiceUnstructured, "spec", "ports")
+
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if bool {
+			for _, port := range ports {
+				p, ok := port.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				nodePort, nodePortBool, err := unstructured.NestedFieldNoCopy(p, "nodePort")
+				if err != nil {
+					return errors.WithStack(err)
+				}
+				if nodePortBool {
+					nodePortInt := 0
+					switch nodePort.(type) {
+					case int32:
+						nodePortInt = int(nodePort.(int32))
+					case float64:
+						nodePortInt = int(nodePort.(float64))
+					case string:
+						nodePortInt, err = strconv.Atoi(nodePort.(string))
+						if err != nil {
+							return errors.WithStack(err)
+						}
+					}
+					if nodePortInt > 0 {
+						portName, ok := p["name"]
+						if !ok {
+							// unnamed port
+							explicitNodePorts.Insert("")
+						} else {
+							explicitNodePorts.Insert(portName.(string))
+						}
+
+					}
+				}
 			}
 		}
 	}
