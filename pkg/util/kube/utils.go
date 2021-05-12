@@ -126,6 +126,10 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 		if volume.VolumeSource.CSI != nil {
 			return volume.Name + "/mount", nil
 		}
+		// Pod volume is actually a HostPath
+		if volume.VolumeSource.HostPath != nil {
+			return volume.VolumeSource.HostPath.Path, nil
+		}
 		return volume.Name, nil
 	}
 
@@ -143,6 +147,11 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	// PV's been created with a CSI source.
 	if pv.Spec.CSI != nil {
 		return pvc.Spec.VolumeName + "/mount", nil
+	}
+
+	// PV's been created with a HostPath.
+	if pv.Spec.HostPath != nil {
+		return pv.Spec.HostPath.Path, nil
 	}
 
 	return pvc.Spec.VolumeName, nil
