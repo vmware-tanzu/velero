@@ -6,7 +6,6 @@ layout: docs
 Use this doc to get a basic installation of Velero.
 Refer [this document](customize-installation.md) to customize your installation.
 
-
 ## Prerequisites
 
 - Access to a Kubernetes cluster, v1.12 or later, with DNS and container networking enabled.
@@ -21,7 +20,6 @@ Velero supports storage providers for both cloud-provider environments and on-pr
 Velero does not officially support Windows. In testing, the Velero team was able to backup stateless Windows applications only. The restic integration and backups of stateful applications or PersistentVolumes were not supported.
 
 If you want to perform your own testing of Velero on Windows, you must deploy Velero as a Windows container. Velero does not provide official Windows images, but its possible for you to build your own Velero Windows container image to use. Note that you must build this image on a Windows node.
-
 
 ## Install the CLI
 
@@ -52,7 +50,6 @@ On Windows, you can use [Chocolatey](https://chocolatey.org/install) to install 
 choco install velero
 ```
 
-
 ## Install and configure the server components
 
 There are two supported methods for installing the Velero server components:
@@ -74,4 +71,3 @@ Please refer to [this part of the documentation][5].
 [3]: overview-plugins.md
 [4]: customize-installation.md#install-an-additional-volume-snapshot-provider
 [5]: customize-installation.md#optional-velero-cli-configurations
-
