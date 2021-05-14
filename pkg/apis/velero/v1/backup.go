@@ -207,6 +207,17 @@ const (
 	// BackupPhaseInProgress means the backup is currently executing.
 	BackupPhaseInProgress BackupPhase = "InProgress"
 
+	// BackupPhaseUploading means the backups of Kubernetes resources
+	// and creation of snapshots was successful and snapshot data
+	// is currently uploading.  The backup is not usable yet.
+	BackupPhaseUploading BackupPhase = "Uploading"
+
+	// BackupPhaseUploadingPartialFailure means the backup of Kubernetes
+	// resources and creation of snapshots partially failed (final phase
+	// will be PartiallyFailed) and snapshot data is currently uploading.
+	// The backup is not usable yet.
+	BackupPhaseUploadingPartialFailure BackupPhase = "UploadingPartialFailure"
+
 	// BackupPhaseCompleted means the backup has run successfully without
 	// errors.
 	BackupPhaseCompleted BackupPhase = "Completed"
