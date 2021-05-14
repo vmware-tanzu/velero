@@ -60,11 +60,18 @@ func getName(image string) string {
 		start = slashIndex + 1
 	}
 
-	// this removes the tag
-	colonIndex := strings.LastIndex(image, ":")
+	// If the image spec is by digest, remove the digest.
+	// If it is by tag, remove the tag.
+	// Otherwise (implicit :latest) leave it alone.
 	end := len(image)
-	if colonIndex > 0 {
-		end = colonIndex
+	atIndex := strings.LastIndex(image, "@")
+	if atIndex > 0 {
+		end = atIndex
+	} else {
+		colonIndex := strings.LastIndex(image, ":")
+		if colonIndex > 0 {
+			end = colonIndex
+		}
 	}
 
 	// https://github.com/distribution/distribution/blob/main/docs/spec/api.md#overview
