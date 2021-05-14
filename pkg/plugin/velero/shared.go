@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,4 +47,10 @@ type ResourceSelector struct {
 	// when matching resources. See "k8s.io/apimachinery/pkg/labels".Parse()
 	// for details on syntax.
 	LabelSelector string
+}
+
+// Applicable allows actions and plugins to specify which resources they should be invoked for
+type Applicable interface {
+	// AppliesTo returns information about which resources this Responder should be invoked for.
+	AppliesTo() (ResourceSelector, error)
 }

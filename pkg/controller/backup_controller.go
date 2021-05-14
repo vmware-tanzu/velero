@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
@@ -569,6 +570,10 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	if err != nil {
 		return err
 	}
+	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
+	if err != nil {
+		return err
+	}
 
 	backupLog.Info("Setting up backup store to check for backup existence")
 	backupStore, err := c.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
@@ -586,8 +591,12 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return errors.Errorf("backup already exists in object storage")
 	}
 
+	backupItemActionsResolver := framework.NewBackupItemActionResolver(actions)
+	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
+
 	var fatalErrs []error
-	if err := c.backupper.Backup(backupLog, backup, backupFile, actions, pluginManager); err != nil {
+	if err := c.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver,
+		itemSnapshottersResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 

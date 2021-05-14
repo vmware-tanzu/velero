@@ -22,6 +22,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -42,11 +43,11 @@ type Request struct {
 	NamespaceIncludesExcludes *collections.IncludesExcludes
 	ResourceIncludesExcludes  *collections.IncludesExcludes
 	ResourceHooks             []hook.ResourceHook
-	ResolvedActions           []resolvedAction
-
-	VolumeSnapshots  []*volume.Snapshot
-	PodVolumeBackups []*velerov1api.PodVolumeBackup
-	BackedUpItems    map[itemKey]struct{}
+	ResolvedActions           []framework.BackupItemResolvedAction
+	ResolvedItemSnapshotters  []framework.ItemSnapshotterResolvedAction
+	VolumeSnapshots           []*volume.Snapshot
+	PodVolumeBackups          []*velerov1api.PodVolumeBackup
+	BackedUpItems             map[itemKey]struct{}
 }
 
 // BackupResourceList returns the list of backed up resources grouped by the API

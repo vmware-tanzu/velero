@@ -33,7 +33,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -44,6 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -62,6 +62,9 @@ type Backupper interface {
 	// Backup takes a backup using the specification in the velerov1api.Backup and writes backup and log data
 	// to the given writers.
 	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
+	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
+		backupItemActions framework.BackupItemActionResolver, itemSnapshotters framework.ItemSnapshotterResolver,
+		volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -74,14 +77,6 @@ type kubernetesBackupper struct {
 	resticTimeout          time.Duration
 	defaultVolumesToRestic bool
 	clientPageSize         int
-}
-
-type resolvedAction struct {
-	velero.BackupItemAction
-
-	resourceIncludesExcludes  *collections.IncludesExcludes
-	namespaceIncludesExcludes *collections.IncludesExcludes
-	selector                  labels.Selector
 }
 
 func (i *itemKey) String() string {
@@ -119,38 +114,6 @@ func NewKubernetesBackupper(
 		defaultVolumesToRestic: defaultVolumesToRestic,
 		clientPageSize:         clientPageSize,
 	}, nil
-}
-
-func resolveActions(actions []velero.BackupItemAction, helper discovery.Helper) ([]resolvedAction, error) {
-	var resolved []resolvedAction
-
-	for _, action := range actions {
-		resourceSelector, err := action.AppliesTo()
-		if err != nil {
-			return nil, err
-		}
-
-		resources := collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
-		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
-
-		selector := labels.Everything()
-		if resourceSelector.LabelSelector != "" {
-			if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
-				return nil, err
-			}
-		}
-
-		res := resolvedAction{
-			BackupItemAction:          action,
-			resourceIncludesExcludes:  resources,
-			namespaceIncludesExcludes: namespaces,
-			selector:                  selector,
-		}
-
-		resolved = append(resolved, res)
-	}
-
-	return resolved, nil
 }
 
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
@@ -205,7 +168,17 @@ type VolumeSnapshotterGetter interface {
 // a complete backup failure is returned. Errors that constitute partial failures (i.e. failures to
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
-func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
+	actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+	backupItemActions := framework.NewBackupItemActionResolver(actions)
+	itemSnapshotters := framework.NewItemSnapshotterResolver(nil)
+	return kb.BackupWithResolvers(log, backupRequest, backupFile, backupItemActions, itemSnapshotters,
+		volumeSnapshotterGetter)
+}
+
+func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
+	backupItemActions framework.BackupItemActionResolver, itemSnapshotters framework.ItemSnapshotterResolver,
+	volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -232,7 +205,12 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		return err
 	}
 
-	backupRequest.ResolvedActions, err = resolveActions(actions, kb.discoveryHelper)
+	backupRequest.ResolvedActions, err = backupItemActions.ResolveActions(kb.discoveryHelper)
+	if err != nil {
+		return err
+	}
+
+	backupRequest.ResolvedItemSnapshotters, err = itemSnapshotters.ResolveActions(kb.discoveryHelper)
 	if err != nil {
 		return err
 	}

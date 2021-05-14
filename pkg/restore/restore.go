@@ -56,6 +56,7 @@ import (
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -93,6 +94,13 @@ type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
 	Restore(req Request,
 		actions []velero.RestoreItemAction,
+		snapshotLocationLister listers.VolumeSnapshotLocationLister,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
+	) (Result, Result)
+	RestoreWithResolvers(
+		req Request,
+		resolver framework.RestoreItemActionResolver,
+		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
@@ -162,6 +170,18 @@ func (kr *kubernetesRestorer) Restore(
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
+	resolver := framework.NewRestoreItemActionResolver(actions)
+	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
+	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, snapshotLocationLister, volumeSnapshotterGetter)
+}
+
+func (kr *kubernetesRestorer) RestoreWithResolvers(
+	req Request,
+	restoreItemActionResolver framework.RestoreItemActionResolver,
+	itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
+) (Result, Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -188,7 +208,12 @@ func (kr *kubernetesRestorer) Restore(
 		Includes(req.Restore.Spec.IncludedNamespaces...).
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
-	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
+	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper)
+	if err != nil {
+		return Result{}, Result{Velero: []string{err.Error()}}
+	}
+
+	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -252,6 +277,7 @@ func (kr *kubernetesRestorer) Restore(
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
 		actions:                    resolvedActions,
+		itemSnapshotterActions:     resolvedItemSnapshotterActions,
 		volumeSnapshotterGetter:    volumeSnapshotterGetter,
 		resticRestorer:             resticRestorer,
 		resticErrs:                 make(chan error),
@@ -277,46 +303,6 @@ func (kr *kubernetesRestorer) Restore(
 	return restoreCtx.execute()
 }
 
-type resolvedAction struct {
-	velero.RestoreItemAction
-
-	resourceIncludesExcludes  *collections.IncludesExcludes
-	namespaceIncludesExcludes *collections.IncludesExcludes
-	selector                  labels.Selector
-}
-
-func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper) ([]resolvedAction, error) {
-	var resolved []resolvedAction
-
-	for _, action := range actions {
-		resourceSelector, err := action.AppliesTo()
-		if err != nil {
-			return nil, err
-		}
-
-		resources := collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
-		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
-
-		selector := labels.Everything()
-		if resourceSelector.LabelSelector != "" {
-			if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
-				return nil, err
-			}
-		}
-
-		res := resolvedAction{
-			RestoreItemAction:         action,
-			resourceIncludesExcludes:  resources,
-			namespaceIncludesExcludes: namespaces,
-			selector:                  selector,
-		}
-
-		resolved = append(resolved, res)
-	}
-
-	return resolved, nil
-}
-
 type restoreContext struct {
 	backup                     *velerov1api.Backup
 	backupReader               io.Reader
@@ -331,7 +317,8 @@ type restoreContext struct {
 	dynamicFactory             client.DynamicFactory
 	fileSystem                 filesystem.Interface
 	namespaceClient            corev1.NamespaceInterface
-	actions                    []resolvedAction
+	actions                    []framework.RestoreItemResolvedAction
+	itemSnapshotterActions     []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter    VolumeSnapshotterGetter
 	resticRestorer             restic.Restorer
 	resticWaitGroup            sync.WaitGroup
@@ -713,23 +700,22 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 }
 
-// TODO: this should be combined with DeleteItemActions at some point.
-func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
-	var actions []resolvedAction
+func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.RestoreItemResolvedAction {
+	var actions []framework.RestoreItemResolvedAction
 	for _, action := range ctx.actions {
-		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-			continue
+		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
+			actions = append(actions, action)
 		}
+	}
+	return actions
+}
 
-		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			continue
+func (ctx *restoreContext) getApplicableItemSnapshotters(groupResource schema.GroupResource, namespace string) []framework.ItemSnapshotterResolvedAction {
+	var actions []framework.ItemSnapshotterResolvedAction
+	for _, action := range ctx.itemSnapshotterActions {
+		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
+			actions = append(actions, action)
 		}
-
-		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
-			continue
-		}
-
-		actions = append(actions, action)
 	}
 
 	return actions
@@ -1127,7 +1113,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
-		if !action.selector.Matches(labels.Set(obj.GetLabels())) {
+		if !action.GetSelector().Matches(labels.Set(obj.GetLabels())) {
 			return warnings, errs
 		}
 
