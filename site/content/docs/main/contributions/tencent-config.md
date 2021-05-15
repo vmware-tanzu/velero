@@ -11,7 +11,7 @@ You can deploy Velero on Tencent [TKE](https://cloud.tencent.com/document/produc
 
 - Registered [Tencent Cloud Account](https://cloud.tencent.com/register).
 -  [Tencent Cloud COS](https://console.cloud.tencent.com/cos) service, referred to as COS, has been launched
-- A Kubernetes cluster has been created, cluster version v1.10 or later, and the cluster can use DNS and Internet services normally. If you need to create a TKE cluster, refer to the Tencent [create a cluster](https://cloud.tencent.com/document/product/457/32189) documentation.
+- A Kubernetes cluster has been created, cluster version v1.12 or later, and the cluster can use DNS and Internet services normally. If you need to create a TKE cluster, refer to the Tencent [create a cluster](https://cloud.tencent.com/document/product/457/32189) documentation.
 
 ## Create a Tencent Cloud COS bucket
 

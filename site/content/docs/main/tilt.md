@@ -19,7 +19,7 @@ files in this directory are gitignored so you may configure your setup according
 
 ## Prerequisites
 1. [Docker](https://docs.docker.com/install/) v19.03 or newer
-1. A Kubernetes cluster v1.10 or greater (does not have to be Kind)
+1. A Kubernetes cluster v1.12 or greater (does not have to be Kind)
 1. [Tilt](https://docs.tilt.dev/install.html) v0.12.0 or newer
 1. Clone the [Velero project](https://github.com/vmware-tanzu/velero) repository
    locally
