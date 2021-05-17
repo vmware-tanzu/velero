@@ -5,13 +5,15 @@ layout: docs
 
 ## Background
 
-Velero serves to both restore and migrate Kubernetes applications. Typically, backup and restore does not involve upgrading Kubernetes API group versions. However, when migrating from a source cluster to a destination cluster, it is not unusual to see the API group versions differing between clusters.
+Velero serves to both restore and migrate Kubernetes applications. Typically, backup and restore does not involve upgrading Kubernetes API group versions. However, when migrating from a source cluster to a destination cluster, it is not unusual to see the API group versions differing between clusters.  
 
-> &#9432; **API Group Version** | Kubernetes applications are made up of various resources. Common resources are pods, jobs, and deployments. Custom resources are created via custom resource definitions (CRDs). Every resource, whether custom or not, is part of a group, and each group has a version called the API group version.
+**NOTE:** Kubernetes applications are made up of various resources. Common resources are pods, jobs, and deployments. Custom resources are created via custom resource definitions (CRDs). Every resource, whether custom or not, is part of a group, and each group has a version called the API group version.
 
-Kubernetes by default allows changing API group versions between clusters as long as the upgrade is a single version, for example, v1 -> v2beta1. Jumping multiple versions, for example, v1 -> v3, is not supported out of the box. This is where the Enable API Group Version feature comes in.
+Kubernetes by default allows changing API group versions between clusters as long as the upgrade is a single version, for example, v1 -> v2beta1. Jumping multiple versions, for example, v1 -> v3, is not supported out of the box. This is where the Velero Enable API Group Version feature can help you during an upgrade.
 
-Currently, the Enable API Group Version feature is in beta and can be enabled by installing Velero with a [feature flag](https://velero.io/docs/v1.5/customize-installation/#enable-server-side-features), `--features=EnableAPIGroupVersions`.
+Currently, the Enable API Group Version feature is in beta and can be enabled by installing Velero with a [feature flag](customize-installation.md/#enable-server-side-features), `--features=EnableAPIGroupVersions`.
+
+For the most up-to-date information on Kubernetes API version compatibility, you should always review the [Kubernetes release notes](https://github.com/kubernetes/kubernetes/tree/master/CHANGELOG) for the source and destination cluster version to before starting an upgrade, migration, or restore. If there is a difference between Kubernetes API versions, use the Enable API Group Version feature to help mitigate compatibility issues.
 
 ## How the Enable API Group Versions Feature Works
 
@@ -56,8 +58,8 @@ To better understand which API group version will be chosen, the following provi
 
 ## Procedure for Using the Enable API Group Versions Feature
 
-1. [Install Velero](https://velero.io/docs/v1.5/basic-install/) on source cluster with the [feature flag enabled](https://velero.io/docs/v1.5/customize-installation/#enable-server-side-features). The flag is `--features=EnableAPIGroupVersions`. For the enable API group versions feature to work, the feature flag needs to be used for Velero installations on both the source and destination clusters.
-2. Back up and restore following the [migration case instructions](https://velero.io/docs/v1.5/migration-case/). Note that "Cluster 1" in the instructions refers to the source cluster, and "Cluster 2" refers to the destination cluster.
+1. [Install Velero](basic-install.md) on source cluster with the [feature flag enabled](customize-installation.md/#enable-server-side-features). The flag is `--features=EnableAPIGroupVersions`. For the enable API group versions feature to work, the feature flag needs to be used for Velero installations on both the source and destination clusters.
+2. Back up and restore following the [migration case instructions](migration-case.md). Note that "Cluster 1" in the instructions refers to the source cluster, and "Cluster 2" refers to the destination cluster.
 
 ## Advanced Procedure for Customizing the Version Prioritization
 
@@ -108,6 +110,6 @@ Here are the steps for creating a config map that allows users to override the d
 
 ## Troubleshooting
 
-1. Refer to the [troubleshooting section](https://velero.io/docs/v1.5/troubleshooting/) of the docs as the techniques generally apply here as well.
-2. The [debug logs](https://velero.io/docs/v1.5/troubleshooting/#getting-velero-debug-logs) will contain information on which version was chosen to restore.
+1. Refer to the [troubleshooting section](troubleshooting.md) of the docs as the techniques generally apply here as well.
+2. The [debug logs](troubleshooting.md/#getting-velero-debug-logs) will contain information on which version was chosen to restore.
 3. If no API group version could be found that both exists in the backup tarball file and is supported by the destination cluster, then the following error will be recorded (no need to activate debug level logging): `"error restoring rockbands.music.example.io/rockstars/beatles: the server could not find the requested resource"`.
