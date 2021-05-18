@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 /*
@@ -85,8 +86,9 @@ func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuil
 	// Check if there's explicit Labels defined in the Schedule object template
 	// and if present then copy it to the backup object.
 	if schedule.Spec.Template.Metadata.Labels != nil {
+		logger := logging.DefaultLogger(logging.LogLevelFlag(logrus.InfoLevel).Parse(), logging.NewFormatFlag().Parse())
 		labels = schedule.Spec.Template.Metadata.Labels
-		logrus.WithFields(logrus.Fields{
+		logger.WithFields(logrus.Fields{
 			"backup": fmt.Sprintf("%s/%s", b.object.GetNamespace(), b.object.GetName()),
 			"labels": schedule.Spec.Template.Metadata.Labels,
 		}).Debug("Schedule.template.metadata.labels set - using those labels instead of schedule.labels for backup object")
