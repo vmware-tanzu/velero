@@ -39,10 +39,10 @@ In case you are using a custom S3-compatible server, you may encounter that the 
 
 ```
 rpc error: code = Unknown desc = RequestError: send request failed caused by:
-Get https://sv4-dell87-c3-ve02.com:3000/k8s-backup-bucket?delimiter=%2F&list-type=2&prefix=: remote error: tls: alert(116)
+Get https://minio.com:3000/k8s-backup-bucket?delimiter=%2F&list-type=2&prefix=: remote error: tls: alert(116)
 ```
 
-Error 116 represents certificate required as seen here in [error codes](https://datatracker.ietf.org/doc/html/rfc8446#appendix-B.2)
+Error 116 represents certificate required as seen here in [error codes](https://datatracker.ietf.org/doc/html/rfc8446#appendix-B.2).
 Velero as a client does not include its certificate while performing SSL handshake with the server.
 From [TLS 1.3 spec](https://tools.ietf.org/html/rfc8446), verifying client certificate is optional on the server.
-You will beed to change this setting on the server to make it work.
+You will need to change this setting on the server to make it work.
