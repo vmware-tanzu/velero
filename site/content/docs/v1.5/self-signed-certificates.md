@@ -35,7 +35,7 @@ velero backup describe my-backup --cacert <PATH_TO_CA_BUNDLE>
 
 ## Error with client certificate with custom S3 server
 
-In case you are using a custom S3-compatible server, you may encounter that the backup fails with error similar to one below -
+In case you are using a custom S3-compatible server, you may encounter that the backup fails with an error similar to one below.
 
 ```
 rpc error: code = Unknown desc = RequestError: send request failed caused by:
