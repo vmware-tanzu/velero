@@ -160,7 +160,7 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *velerov1a
 		},
 	)
 
-	r := newRestorer(ctx, rm, rm.repoEnsurer, informer, rm.log)
+	r := newRestorer(ctx, rm, rm.repoEnsurer, informer, rm.pvcClient, rm.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {

@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -48,6 +49,7 @@ type restorer struct {
 	ctx         context.Context
 	repoManager *repositoryManager
 	repoEnsurer *repositoryEnsurer
+	pvcClient   corev1client.PersistentVolumeClaimsGetter
 
 	resultsLock sync.Mutex
 	results     map[string]chan *velerov1api.PodVolumeRestore
@@ -58,12 +60,14 @@ func newRestorer(
 	rm *repositoryManager,
 	repoEnsurer *repositoryEnsurer,
 	podVolumeRestoreInformer cache.SharedIndexInformer,
+	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	log logrus.FieldLogger,
 ) *restorer {
 	r := &restorer{
 		ctx:         ctx,
 		repoManager: rm,
 		repoEnsurer: repoEnsurer,
+		pvcClient:   pvcClient,
 
 		results: make(map[string]chan *velerov1api.PodVolumeRestore),
 	}
@@ -116,10 +120,27 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 	var (
 		errs        []error
 		numRestores int
+		podVolumes  = make(map[string]corev1api.Volume)
 	)
 
+	// put the pod's volumes in a map for efficient lookup below
+	for _, podVolume := range data.Pod.Spec.Volumes {
+		podVolumes[podVolume.Name] = podVolume
+	}
 	for volume, snapshot := range volumesToRestore {
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, snapshot, repo.Spec.ResticIdentifier)
+		volumeObj, ok := podVolumes[volume]
+		var pvc *corev1api.PersistentVolumeClaim
+		if ok {
+			if volumeObj.PersistentVolumeClaim != nil {
+				pvc, err = r.pvcClient.PersistentVolumeClaims(data.Pod.Namespace).Get(context.TODO(), volumeObj.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "error getting persistent volume claim for volume"))
+					continue
+				}
+			}
+		}
+
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, snapshot, repo.Spec.ResticIdentifier, pvc)
 
 		if err := errorOnly(r.repoManager.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -148,8 +169,8 @@ ForEachVolume:
 	return errs
 }
 
-func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier string) *velerov1api.PodVolumeRestore {
-	return &velerov1api.PodVolumeRestore{
+func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeRestore {
+	pvr := &velerov1api.PodVolumeRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    restore.Namespace,
 			GenerateName: restore.Name + "-",
@@ -181,4 +202,9 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 			RepoIdentifier:        repoIdentifier,
 		},
 	}
+	if pvc != nil {
+		// this label is not used by velero, but useful for debugging.
+		pvr.Labels[velerov1api.PVCUIDLabel] = string(pvc.UID)
+	}
+	return pvr
 }
