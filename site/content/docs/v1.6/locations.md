@@ -39,6 +39,8 @@ This configuration design enables a number of different use cases, including:
 
 - Velero's backups are split into 2 pieces - the metadata stored in object storage, and snapshots/backups of the persistent volume data. Right now, Velero *itself* does not encrypt either of them, instead it relies on the native mechanisms in the object and snapshot systems. A special case is restic, which backs up the persistent volume data at the filesystem level and send it to Velero's object storage.
 
+- Velero's compression for object metadata is limited, using Golang's tar implementation. In most instances, Kubernetes objects are limited to 1.5MB in size, but many don't approach that, meaning that compression may not be necessary. Note that restic has not yet implemented compression, but does have de-deduplication capabilities.
+
 ## Examples
 
 Let's look at some examples of how you can use this configuration mechanism to address some common use cases:
