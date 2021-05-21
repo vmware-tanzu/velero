@@ -350,7 +350,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			tc.srcCRD["namespace"],
 		)
 
-		err = veleroUninstall(client.kubebuilder, installVelero, veleroNamespace)
+		err = veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
 		if err != nil {
 			return err
 		}

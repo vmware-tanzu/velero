@@ -320,9 +320,9 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 	return nil
 }
 
-func veleroUninstall(client kbclient.Client, installVelero bool, veleroNamespace string) error {
+func veleroUninstall(ctx context.Context, client kbclient.Client, installVelero bool, veleroNamespace string) error {
 	if installVelero {
-		return uninstall.Run(client, veleroNamespace, true)
+		return uninstall.Run(ctx, client, veleroNamespace, true)
 	}
 	return nil
 }

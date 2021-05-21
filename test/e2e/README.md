@@ -58,7 +58,6 @@ a specified object store type.  Currently supported cloud provider types are _aw
 E2E tests can be run from the Velero repository root by running `make test-e2e`. While running E2E tests using `make` the E2E test configuration values are passed using `make` variables.
 
 Below is a mapping between `make` variables to E2E configuration flags.
-1. `VELERO_NAMESPACE`: `velero-namespace`. Required.
 1. `CREDS_FILE`: `-credentials-file`. Required.
 1. `BSL_BUCKET`: `-bucket`. Required.
 1. `CLOUD_PROVIDER`: `-cloud-provider`. Required
