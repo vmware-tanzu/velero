@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -124,16 +125,32 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitTo
 	}
 
 	// CRDs
-	veleroLabelSelector := labels.SelectorFromSet(install.Labels())
-	opts := []kbclient.DeleteAllOfOption{
-		kbclient.InNamespace(namespace),
-		kbclient.MatchingLabelsSelector{
-			Selector: veleroLabelSelector,
+	veleroLabels := labels.FormatLabels(install.Labels())
+	crdList := apiextv1beta1.CustomResourceDefinitionList{}
+	opts := kbclient.ListOptions{
+		Namespace: namespace,
+		Raw: &metav1.ListOptions{
+			LabelSelector: veleroLabels,
 		},
 	}
-	crd := &apiextv1beta1.CustomResourceDefinition{}
-	if err := kbClient.DeleteAllOf(ctx, crd, opts...); err != nil {
+	if err := kbClient.List(context.Background(), &crdList, &opts); err != nil {
 		errs = append(errs, errors.WithStack(err))
+	} else {
+		if len(crdList.Items) == 0 {
+			fmt.Print("Velero CRDs do not exist, skipping.\n")
+		} else {
+			veleroLabelSelector := labels.SelectorFromSet(install.Labels())
+			opts := []kbclient.DeleteAllOfOption{
+				kbclient.InNamespace(namespace),
+				kbclient.MatchingLabelsSelector{
+					Selector: veleroLabelSelector,
+				},
+			}
+			crd := &apiextv1beta1.CustomResourceDefinition{}
+			if err := kbClient.DeleteAllOf(ctx, crd, opts...); err != nil {
+				errs = append(errs, errors.WithStack(err))
+			}
+		}
 	}
 
 	if waitToTerminate && len(ns.Name) != 0 {
