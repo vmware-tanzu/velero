@@ -281,6 +281,9 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 		}
 	}
 
+	// Fetch the plugins for the provider before checking for the object store provider below.
+	providerPlugins := getProviderPlugins(objectStoreProvider)
+
 	// TODO - handle this better
 	if cloudProvider == "vsphere" {
 		// We overrider the objectStoreProvider here for vSphere because we want to use the aws plugin for the
@@ -293,7 +296,6 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
 	}
 
-	providerPlugins := getProviderPlugins(objectStoreProvider)
 	veleroInstallOptions, err := getProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
 		bslPrefix, bslConfig, vslConfig, providerPlugins, features)
 	if err != nil {
@@ -321,10 +323,7 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 }
 
 func veleroUninstall(ctx context.Context, client kbclient.Client, installVelero bool, veleroNamespace string) error {
-	if installVelero {
-		return uninstall.Run(ctx, client, veleroNamespace, true)
-	}
-	return nil
+	return uninstall.Run(ctx, client, veleroNamespace, true)
 }
 
 func veleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {

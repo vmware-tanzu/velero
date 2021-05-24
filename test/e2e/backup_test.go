@@ -61,13 +61,14 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		if installVelero {
 			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
-
 		}
 	})
 
 	AfterEach(func() {
-		err = veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
-		Expect(err).To(Succeed())
+		if installVelero {
+			err = veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
+			Expect(err).To(Succeed())
+		}
 	})
 
 	When("kibishii is the sample workload", func() {

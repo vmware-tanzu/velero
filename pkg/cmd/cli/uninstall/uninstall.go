@@ -95,13 +95,13 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitTo
 	key := kbclient.ObjectKey{Name: namespace}
 	if err := kbClient.Get(ctx, key, ns); err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Velero installation namespace %q does not exist, skipping.\n", namespace)
+			fmt.Printf("Velero namespace %q does not exist, skipping.\n", namespace)
 		} else {
 			errs = append(errs, errors.WithStack(err))
 		}
 	} else {
 		if ns.Status.Phase == corev1.NamespaceTerminating {
-			fmt.Printf("Velero installation namespace %q is terminating.\n", namespace)
+			fmt.Printf("Velero namespace %q is terminating.\n", namespace)
 		} else {
 			if err := kbClient.Delete(ctx, ns); err != nil {
 				errs = append(errs, errors.WithStack(err))
@@ -111,10 +111,10 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitTo
 
 	// ClusterRoleBinding
 	crb := install.ClusterRoleBinding(namespace)
-	key = kbclient.ObjectKey{Name: crb.Name, Namespace: namespace}
+	key = kbclient.ObjectKey{Name: crb.Name}
 	if err := kbClient.Get(ctx, key, crb); err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Velero installation ClusterRoleBinding %q does not exist, skipping.\n", crb.Name)
+			fmt.Printf("Velero ClusterRoleBinding %q does not exist, skipping.\n", crb.Name)
 		} else {
 			errs = append(errs, errors.WithStack(err))
 		}
