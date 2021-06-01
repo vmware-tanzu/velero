@@ -24,7 +24,7 @@ If a PR does not warrant a changelog, the CI check for a changelog can be skippe
 
 ## Copyright header 
 
-Whenever a source code file is being modified, the copyright notice should be updated to our standard copyright notice. That is, it should read “Copyright [insert current year] the Velero contributors.” 
+Whenever a source code file is being modified, the copyright notice should be updated to our standard copyright notice. That is, it should read “Copyright the Velero contributors.” 
 
 For new files, the entire copyright and license header must be added.
 
