@@ -19,7 +19,7 @@ If you encounter issues with installing or configuring, see [Debugging Installat
 * Access to a Kubernetes cluster, version 1.7 or later.  **Note:** restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. Restic support is not required for this example, but may be of interest later. See [Restic Integration][17].
 * A DNS server on the cluster
 * `kubectl` installed
-* Sufficient disk space to store backups in Minio.  You will need sufficient disk space available to handle any 
+* Sufficient disk space to store backups in Minio.  You will need sufficient disk space available to handle any
 backups plus at least 1GB additional.  Minio will not operate if less than 1GB of free disk space is available.
 
 ## Download Velero
@@ -65,14 +65,14 @@ These instructions start the Velero server and a Minio instance that is accessib
     ```
     kubectl apply -f examples/minio/00-minio-deployment.yaml
     ```
-_Note_: The example Minio yaml provided uses "empty dir".  Your node needs to have enough space available to store the
-data being backed up plus 1GB of free space.  If the node does not have enough space, you can modify the example yaml to
-use a Persistent Volume instead of "empty dir"
+    _Note_: The example Minio yaml provided uses "empty dir".  Your node needs to have enough space available to store the
+    data being backed up plus 1GB of free space.  If the node does not have enough space, you can modify the example yaml to
+    use a Persistent Volume instead of "empty dir"
 
     ```
     velero install \
         --provider aws \
-        --plugins velero/velero-plugin-for-aws:v1.0.0 \
+        --plugins velero/velero-plugin-for-aws:v1.2.0 \
         --bucket velero \
         --secret-file ./credentials-velero \
         --use-volume-snapshots=false \
