@@ -4,18 +4,12 @@ This directory contains Kubernetes manifests that are used for the enable API gr
 
 ## Documentation
 
-Read more about cert-manager in the [Jet Stack repo](https://github.com/jetstack/cert-manager/blob/master/README.md).
 
 Read more about the music-system custom resource definitions and rockbands custom resources created for Velero tests at [@brito-rafa's repo](https://github.com/brito-rafa/k8s-webhooks/blob/master/examples-for-projectvelero/README.md).
 
 ## Reference
 
-These manifests, listed below, come from two different sources: github.com/jetstack/cert-manager and github.com/brito-rafa/k8s-webhooks:
-
-cert-manager.yaml
-
-- source: https://github.com/jetstack/cert-manager/releases/download/v1.0.3/cert-manager.yaml
-- license: https://github.com/jetstack/cert-manager/blob/master/LICENSE
+These manifests, listed below, come from github.com/brito-rafa/k8s-webhooks:
 
 case-a-source.yaml
 
