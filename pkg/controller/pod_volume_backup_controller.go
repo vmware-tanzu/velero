@@ -45,6 +45,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
+// BackupExecuter runs backups.
+type BackupExecuter interface {
+	RunBackup(*restic.Command, logrus.FieldLogger, func(velerov1api.PodVolumeOperationProgress)) (string, string, error)
+	GetSnapshotID(*restic.Command) (string, error)
+}
+
 // PodVolumeBackupReconciler reconciles a PodVolumeBackup object
 type PodVolumeBackupReconciler struct {
 	Scheme         *runtime.Scheme
@@ -55,7 +61,7 @@ type PodVolumeBackupReconciler struct {
 	CredsFileStore credentials.FileStore
 	NodeName       string
 	FileSystem     filesystem.Interface
-	ResticExec     restic.BackupExecuter
+	ResticExec     BackupExecuter
 	Log            logrus.FieldLogger
 
 	PvLister  corev1listers.PersistentVolumeLister

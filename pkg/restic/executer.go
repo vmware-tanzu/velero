@@ -17,37 +17,21 @@ limitations under the License.
 package restic
 
 import (
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-// BackupExecuter ...
-type BackupExecuter interface {
-	RunBackup(interface{}, logrus.FieldLogger, func(velerov1api.PodVolumeOperationProgress)) (string, string, error)
-	GetSnapshotID(interface{}) (string, error)
-}
-
-// BackupExec ...
+// BackupExec is able to run backups.
 type BackupExec struct{}
 
-// RunBackup is a wrapper for the restic.RunBackup function in order to allow
-// test.FakeResticBackupExec to be passed in for testing purposes.
-func (exec BackupExec) RunBackup(command interface{}, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
-	cmd, ok := command.(*Command)
-	if !ok {
-		return "", "", errors.New("expecting command to be of type *restic.Command")
-	}
+// RunBackup is a wrapper for the restic.RunBackup function in order to be able
+// to use interfaces (and swap out objects for testing purposes).
+func (exec BackupExec) RunBackup(cmd *Command, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
 	return RunBackup(cmd, log, updateFn)
 }
 
-// GetSnapshotID ...
-func (exec BackupExec) GetSnapshotID(snapshotIdCmd interface{}) (string, error) {
-	cmd, ok := snapshotIdCmd.(*Command)
-	if !ok {
-		return "", errors.New("expecting command to be of type *restic.Command")
-	}
-
-	return GetSnapshotID(cmd)
+// GetSnapshotID gets the Restic snapshot ID.
+func (exec BackupExec) GetSnapshotID(snapshotIdCmd *Command) (string, error) {
+	return GetSnapshotID(snapshotIdCmd)
 }

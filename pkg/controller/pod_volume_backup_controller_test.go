@@ -38,6 +38,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/restic/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -114,7 +115,7 @@ var _ = Describe("Pod Volume Backup Reconciler", func() {
 				CredsFileStore: fakeCredsFileStore{},
 				NodeName:       "test_node",
 				FileSystem:     fakeFS,
-				ResticExec:     velerotest.FakeResticBackupExec{},
+				ResticExec:     mocks.FakeResticBackupExec{},
 				Log:            velerotest.NewLogger(),
 			}
 

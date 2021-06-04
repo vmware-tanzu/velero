@@ -14,23 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package test
+package mocks
 
 import (
 	"github.com/sirupsen/logrus"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/restic"
 )
 
-// FakeResticBackupExec ...
+// FakeResticBackupExec represents an object that can run backups.
 type FakeResticBackupExec struct{}
 
-// RunBackup ...
-func (exec FakeResticBackupExec) RunBackup(cmd interface{}, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+// RunBackup runs a Restic backup.
+func (exec FakeResticBackupExec) RunBackup(cmd *restic.Command, log logrus.FieldLogger, updateFn func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
 	return "", "", nil
 }
 
-// GetSnapshotID ...
-func (exec FakeResticBackupExec) GetSnapshotID(snapshotIdCmd interface{}) (string, error) {
+// GetSnapshotID gets the Restic snapshot ID.
+func (exec FakeResticBackupExec) GetSnapshotID(cmd *restic.Command) (string, error) {
 	return "", nil
 }
