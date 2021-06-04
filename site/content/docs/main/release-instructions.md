@@ -14,6 +14,32 @@ This page covers the steps to perform when releasing a new version of Velero.
 - Pre-releases: Any release leading up to a GA. Example: 1.4.0-beta.1, 1.5.0-rc.1
 - RC releases: Release Candidate, contains everything that is supposed to ship with the GA release. This is still a pre-release.
 
+## Velero Release Requirements
+
+Velero is on a "train leaves the station" model for releases.  We will generate a release candidate (RC)
+at the scheduled time.  Multiple release candidates may be generated, depending on if bugs are found during testing.
+When testing has passed a release build will be generated.
+
+### Release Candidate criteria
+The release candidate commit must meet the following criteria:
+
+* No major bugs outstanding 
+* Unit tests pass
+* E2E tests against latest Kubernetes on AWS, vSphere and kind pass
+
+Once the release has moved to RC, a code freeze is in effect.  Only changes needed to release are allowable.
+
+### Release criteria
+In order for a release candidate to be released, it must meet the following criteria:
+
+* Unit tests pass
+* E2E tests against latest K8S and earliest supported K8S on Azure, vSphere, Kind, AWS, GCP
+* Manual tests pass (manual tests will be converted to automated testing)
+
+When bugs are identified by any of these methods, we will determine whether the bug is a release blocker or not and
+a fix generated if it is.  When release blocker bugs identifies in an release candidate are fixed, another RC will
+be generated and the test cycle will restart.
+
 ## Preparing
 
 ### Create release blog post (GA only)
@@ -98,7 +124,7 @@ These are the steps to update the Velero Homebrew version.
 - Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
 - Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
 -
-### Plugins
+## Plugins
 
 To release plugins maintained by the Velero team, follow the [plugin release instructions](plugin-release-instructions.md).
 
@@ -132,4 +158,4 @@ What to include:
 
 [1]: https://velero.io/blog
 [2]: website-guidelines.md
-[3]: test/e2e/velero_utils.go
+[3]: https://github.com/vmware-tanzu/velero/tree/main/test/e2e

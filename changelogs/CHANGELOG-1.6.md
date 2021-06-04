@@ -1,17 +1,17 @@
-## v1.6.0-rc.1
-### 2021-03-29
+## v1.6.0
+### 2021-04-12
 
 ### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0-rc.1
+https://github.com/vmware-tanzu/velero/releases/tag/v1.6.0
 
 ### Container Image
-`velero/velero:v1.6.0-rc.1`
+`velero/velero:v1.6.0`
 
 ### Documentation
-https://velero.io/docs/v1.6.0-rc.1/
+https://velero.io/docs/v1.6/
 
 ### Upgrading
-https://velero.io/docs/v1.6.0-rc.1/upgrade-to-1.6/
+https://velero.io/docs/v1.6/upgrade-to-1.6/
 
 ### Highlights
 
@@ -69,4 +69,3 @@ https://velero.io/docs/v1.6.0-rc.1/upgrade-to-1.6/
   * Add instructions to clone repository for examples in docs (#3074, @MadhavJivrajani)
   * 🏃‍♂️ update setup-kind github actions CI (#3085, @ashish-amarnath)
   * Modify wrong function name to correct one. (#3106, @shellwedance)
-  * Add additional printer columns for Velero CRDs to allow more information to be exposed when using `kubectl get`. (#2881, @zubron)

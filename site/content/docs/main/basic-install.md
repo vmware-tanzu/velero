@@ -8,7 +8,7 @@ Refer [this document](customize-installation.md) to customize your installation.
 
 ## Prerequisites
 
-- Access to a Kubernetes cluster, v1.10 or later, with DNS and container networking enabled.
+- Access to a Kubernetes cluster, v1.12 or later, with DNS and container networking enabled.
 - `kubectl` installed locally
 
 Velero uses object storage to store backups and associated artifacts. It also optionally integrates with supported block storage systems to snapshot your persistent volumes. Before beginning the installation process, you should identify the object storage provider and optional block storage provider(s) you'll be using from the list of [compatible providers][0].

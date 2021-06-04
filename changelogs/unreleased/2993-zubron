@@ -1,1 +1,0 @@
-Fixed an issue where the deletion of a backup would fail if the backup tarball couldn't be downloaded from object storage. Now the tarball is only downloaded if there are associated DeleteItemAction plugins and if downloading the tarball fails, the plugins are skipped.

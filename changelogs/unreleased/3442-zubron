@@ -1,1 +1,0 @@
-Add support for per-BSL credentials. Velero will now serialize the secret referenced by the `Credential` field in the BSL and pass this path through to Object Storage plugins via the `config` map using the `credentialsFile` key.
