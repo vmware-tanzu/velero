@@ -23,20 +23,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
@@ -80,8 +77,14 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 	})
 
 	AfterEach(func() {
+		fmt.Printf("Clean up resource: kubectl delete crd %s.%s\n", resource, group)
 		cmd := exec.CommandContext(ctx, "kubectl", "delete", "crd", resource+"."+group)
-		_, _, _ = veleroexec.RunCommand(cmd)
+		_, stderr, err := veleroexec.RunCommand(cmd)
+		if strings.Contains(stderr, "NotFound") {
+			fmt.Printf("Ignore error: %v\n", stderr)
+			err = nil
+		}
+		Expect(err).NotTo(HaveOccurred())
 
 		// Uninstall Velero.
 		if installVelero {
