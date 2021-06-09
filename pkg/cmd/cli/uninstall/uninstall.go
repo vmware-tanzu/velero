@@ -26,20 +26,18 @@ import (
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
 	"github.com/vmware-tanzu/velero/pkg/install"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // uninstallOptions collects all the options for uninstalling Velero from a Kubernetes cluster.
@@ -78,9 +76,9 @@ Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 				}
 			}
 
-			client, extCl, err := kube.GetClusterClient()
+			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
-			cmd.CheckError(Run(context.Background(), client, extCl, f.Namespace(), o.wait))
+			cmd.CheckError(Run(context.Background(), kbClient, f.Namespace(), o.wait))
 		},
 	}
 
@@ -89,53 +87,68 @@ Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 }
 
 // Run removes all components that were deployed using the Velero install command
-func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *apiextensionsclientset.Clientset, namespace string, waitToTerminate bool) error {
+func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitToTerminate bool) error {
 	var errs []error
 
 	// namespace
-	ns, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-	if err != nil {
+	ns := &corev1.Namespace{}
+	key := kbclient.ObjectKey{Name: namespace}
+	if err := kbClient.Get(ctx, key, ns); err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Velero installation namespace %q does not exist, skipping.\n", namespace)
+			fmt.Printf("Velero namespace %q does not exist, skipping.\n", namespace)
 		} else {
 			errs = append(errs, errors.WithStack(err))
 		}
 	} else {
 		if ns.Status.Phase == corev1.NamespaceTerminating {
-			fmt.Printf("Velero installation namespace %q is terminating.\n", namespace)
+			fmt.Printf("Velero namespace %q is terminating.\n", namespace)
 		} else {
-			err = client.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
-			if err != nil {
+			if err := kbClient.Delete(ctx, ns); err != nil {
 				errs = append(errs, errors.WithStack(err))
 			}
 		}
 	}
 
-	// rolebinding
+	// ClusterRoleBinding
 	crb := install.ClusterRoleBinding(namespace)
-	if err := client.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{}); err != nil {
+	key = kbclient.ObjectKey{Name: crb.Name}
+	if err := kbClient.Get(ctx, key, crb); err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Velero installation clusterrolebinding %q does not exist, skipping.\n", crb.Name)
+			fmt.Printf("Velero ClusterRoleBinding %q does not exist, skipping.\n", crb.Name)
 		} else {
+			errs = append(errs, errors.WithStack(err))
+		}
+	} else {
+		if err := kbClient.Delete(ctx, crb); err != nil {
 			errs = append(errs, errors.WithStack(err))
 		}
 	}
 
 	// CRDs
 	veleroLabels := labels.FormatLabels(install.Labels())
-	crds, err := extensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{
-		LabelSelector: veleroLabels,
-	})
-	if err != nil {
-		errs = append(errs, errors.WithStack(err))
+	crdList := apiextv1beta1.CustomResourceDefinitionList{}
+	opts := kbclient.ListOptions{
+		Namespace: namespace,
+		Raw: &metav1.ListOptions{
+			LabelSelector: veleroLabels,
+		},
 	}
-	if len(crds.Items) == 0 {
-		fmt.Print("Velero CRDs do not exist, skipping.\n")
+	if err := kbClient.List(context.Background(), &crdList, &opts); err != nil {
+		errs = append(errs, errors.WithStack(err))
 	} else {
-		for _, removeCRD := range crds.Items {
-			if err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, removeCRD.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
-				err2 := errors.WithMessagef(err, "Uninstall failed removing CRD %s", removeCRD.ObjectMeta.Name)
-				errs = append(errs, errors.WithStack(err2))
+		if len(crdList.Items) == 0 {
+			fmt.Print("Velero CRDs do not exist, skipping.\n")
+		} else {
+			veleroLabelSelector := labels.SelectorFromSet(install.Labels())
+			opts := []kbclient.DeleteAllOfOption{
+				kbclient.InNamespace(namespace),
+				kbclient.MatchingLabelsSelector{
+					Selector: veleroLabelSelector,
+				},
+			}
+			crd := &apiextv1beta1.CustomResourceDefinition{}
+			if err := kbClient.DeleteAllOf(ctx, crd, opts...); err != nil {
+				errs = append(errs, errors.WithStack(err))
 			}
 		}
 	}
@@ -147,7 +160,7 @@ func Run(ctx context.Context, client *kubernetes.Clientset, extensionsClient *ap
 		defer cancel()
 
 		checkFunc := func() {
-			_, err := client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+			err := kbClient.Get(ctx, key, ns)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					fmt.Print("\n")
