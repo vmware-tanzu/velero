@@ -166,7 +166,7 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 	}
 
 	if err := client.clientGo.CoreV1().Namespaces().Delete(oneHourTimeout, kibishiiNamespace, metav1.DeleteOptions{}); err != nil {
-		return errors.Wrapf(err, "Failed to cleanup %s wrokload namespace", kibishiiNamespace)
+		return errors.Wrapf(err, "Failed to cleanup %s workload namespace", kibishiiNamespace)
 	}
 	// wait for ns delete
 	if err = waitForNamespaceDeletion(interval, timeout, client, kibishiiNamespace); err != nil {
