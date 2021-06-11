@@ -507,6 +507,41 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			},
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
+		{
+			name:                   "should exclude projected volumes",
+			defaultVolumesToRestic: true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToExcludeAnnotation: "nonResticPV1,nonResticPV2,nonResticPV3",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+						{
+							Name: "projected",
+							VolumeSource: corev1api.VolumeSource{
+								Projected: &corev1api.ProjectedVolumeSource{
+									Sources: []corev1api.VolumeProjection{{
+										Secret: &corev1api.SecretProjection{
+											LocalObjectReference: corev1api.LocalObjectReference{},
+											Items:                nil,
+											Optional:             nil,
+										},
+										DownwardAPI:         nil,
+										ConfigMap:           nil,
+										ServiceAccountToken: nil,
+									}},
+									DefaultMode: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
 	}
 
 	for _, tc := range testCases {
