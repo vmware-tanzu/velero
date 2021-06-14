@@ -22,25 +22,25 @@ With this proposal, we aim to break this coupling and introduce plugin API versi
 
 ## Scenarios to Support
 The following describes interactions between Velero and its plugins that will be supported with the implementation of this proposal.
-For the purposes of this list, we will refer to existing Velero and plugin versions as `v1` and Velero and plugin versions that use and implement new APIs as “v2`.
+For the purposes of this list, we will refer to existing Velero and plugin versions as `v1` and all following versions as version `n`.
 
 Velero client communicating with plugins:
 
-- v2 Velero client will be able to communicate with v2 plugin
-- v2 Velero client will be able to communicate with v1 plugin
-- Optional: v1 Velero client will be able to communicate with V2 plugin
+- Version `n` Velero client will be able to communicate with Version `n` plugin
+- Version `n` Velero client will be able to communicate with all previous versions of the plugin (Version `n-1` back to `v1`)
+- Optional: `v1` Velero client will be able to communicate with Version `n` plugin
     - This may work but is not a requirement
 
 Plugin client communicating with other plugins:
 
-- v2 plugin client will be able to communicate with v2 plugin
-- v2 plugin client will be able to communicate with v1 plugin
-- Optional: v1 plugin will be able to communicate with v2 plugin
+- Version `n` plugin client will be able to communicate with Version `n` plugin
+- Version `n` plugin client will be able to communicate with all previous versions of the plugin (Version `n-1` back to `v1`)
+- Optional: `v1` plugin will be able to communicate with Version `n` plugin
     - This may work but is not a requirement
 
 Velero plugins importing Velero framework:
-- v1 plugin built against v2 Velero framework
-    - A plugin may choose to only implement a v1 API but it must be able to built using a v2 version of Velero framework
+- `v1` plugin built against Version `n` Velero framework
+    - A plugin may choose to only implement a `v1` API but it must be able to be built using Version `n` of the Velero framework
 
 
 ## Goals
