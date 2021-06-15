@@ -38,9 +38,9 @@ import (
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
 	var (
-		resource, group  string
-		err              error
-		ctx              = context.Background()
+		resource, group string
+		err             error
+		ctx             = context.Background()
 	)
 
 	client, err := newTestClient()
