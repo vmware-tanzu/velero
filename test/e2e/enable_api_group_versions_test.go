@@ -27,30 +27,25 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", func() {
 	var (
 		resource, group  string
-		client           *kubernetes.Clientset
-		extensionsClient *apiextensionsclient.Clientset
 		err              error
 		ctx              = context.Background()
 	)
 
+	client, err := newTestClient()
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
+
 	BeforeEach(func() {
 		resource = "rockbands"
 		group = "music.example.io"
-
-		client, extensionsClient, err = kube.GetClusterClient()
-		Expect(err).NotTo(HaveOccurred())
 
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).NotTo(HaveOccurred())
@@ -86,28 +81,24 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		// Uninstall Velero.
-		if installVelero {
-			err = veleroUninstall(ctx, client, extensionsClient, veleroNamespace)
-			Expect(err).NotTo(HaveOccurred())
-		}
+		err = veleroUninstall(ctx, client.kubebuilder, installVelero, veleroNamespace)
+		Expect(err).NotTo(HaveOccurred())
+
 	})
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Should back up API group version and restore by version priority", func() {
 			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
+				client,
 				resource,
 				group,
-				client,
-				extensionsClient,
 			)).To(Succeed(), "Failed to successfully backup and restore multiple API Groups")
 		})
 	})
 })
 
-func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string, client *kubernetes.Clientset,
-	extensionsClient *apiextensionsclient.Clientset) error {
+func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, resource, group string) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -255,7 +246,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, resource, group string,
 
 		// Apply config map if there is one.
 		if tc.cm != nil {
-			_, err := client.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
+			_, err := client.clientGo.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
 			if err != nil {
 				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.Wrap(err, "create config map with user version priorities")
