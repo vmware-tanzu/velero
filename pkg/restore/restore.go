@@ -1232,8 +1232,16 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs
 	}
 
-	if groupResource == kuberesource.Pods && len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, obj, originalNamespace)) > 0 {
-		restorePodVolumeBackups(ctx, createdObj, originalNamespace)
+	if groupResource == kuberesource.Pods {
+		pod := new(v1.Pod)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+			errs.Add(namespace, err)
+			return warnings, errs
+		}
+
+		if len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
+			restorePodVolumeBackups(ctx, createdObj, originalNamespace)
+		}
 	}
 
 	if groupResource == kuberesource.Pods {
