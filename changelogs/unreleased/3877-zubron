@@ -1,0 +1,1 @@
+Skip the restore of volumes that originally came from a projected volume when using restic.
