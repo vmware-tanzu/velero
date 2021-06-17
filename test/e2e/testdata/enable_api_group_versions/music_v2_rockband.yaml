@@ -3,10 +3,5 @@ kind: RockBand
 metadata:
   name: beatles
 spec:
-  # Add fields here
-  genre: '60s rock'
+  genre: "60s rock"
   numberComponents: 4
-  leadSinger: John
-  leadGuitar: George
-  drummer: Ringo
-  bass: Paul
