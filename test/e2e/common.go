@@ -22,10 +22,9 @@ import (
 	"os/exec"
 	"time"
 
-	corev1api "k8s.io/api/core/v1"
-
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -46,6 +45,10 @@ func createNamespace(ctx context.Context, client testClient, namespace string) e
 		return nil
 	}
 	return err
+}
+
+func getNamespace(ctx context.Context, client testClient, namespace string) (*corev1api.Namespace, error) {
+	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
 // waitForNamespaceDeletion waits for namespace to be deleted.
