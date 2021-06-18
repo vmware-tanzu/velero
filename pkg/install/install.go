@@ -307,10 +307,6 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 			return err
 		}
 	}
-	fmt.Fprint(w, "Waiting for deployment to be ready in cluster...\n")
-	if _, err = DeploymentIsReady(factory, "velero"); err != nil {
-		return err
-	}
 
 	return nil
 }
