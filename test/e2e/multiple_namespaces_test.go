@@ -19,7 +19,7 @@ import (
 var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
-	backupRestoreNamespacesBasic := testNamespace("backup-restore-Basic")
+	backupRestoreNamespacesBasic := testNamespace("backup-restore-basic")
 
 	BeforeEach(func() {
 		var err error
@@ -56,7 +56,7 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
-	backupRestoreNamespacesScale := testNamespace("backup-restore-Scale")
+	backupRestoreNamespacesScale := testNamespace("backup-restore-scale")
 
 	BeforeEach(func() {
 		var err error
