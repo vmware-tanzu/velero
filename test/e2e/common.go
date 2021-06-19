@@ -38,18 +38,42 @@ func ensureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
 }
 
-// createNamespace creates a kubernetes namespace
-func createNamespace(ctx context.Context, client testClient, namespace string) error {
-	ns := builder.ForNamespace(namespace).Result()
+// createNamespace creates a kubernetes namespace and adds optional labels (sets of k/v)
+func createNamespace(ctx context.Context, client testClient, namespace string, labels ...string) error {
+	ns := builder.ForNamespace(namespace).ObjectMeta(builder.WithLabels(labels...)).Result()
 	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
+
 	return err
 }
 
 func getNamespace(ctx context.Context, client testClient, namespace string) (*corev1api.Namespace, error) {
 	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+}
+
+// deleteNamespaceListWithLabel will delete all namespaces that match the given label
+func deleteNamespaceListWithLabel(ctx context.Context, client testClient, label string) error {
+	if label == "" {
+		return errors.New("a label must be specified to delete only the intented namespaces and not all")
+	}
+
+	namespaces, err := client.clientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+		LabelSelector: label,
+	})
+	if err != nil {
+		return errors.Wrap(err, "Could not retrieve namespaces")
+	}
+
+	for _, ns := range namespaces.Items {
+		err = client.clientGo.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "Could not delete namespace %s", ns.Name)
+		}
+	}
+
+	return nil
 }
 
 // waitForNamespaceDeletion waits for namespace to be deleted.

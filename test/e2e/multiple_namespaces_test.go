@@ -4,16 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/pkg/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Backup/restore of multiple namespaces", func() {
@@ -71,25 +70,30 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamespace testNamespace, numberOfNamespaces int,
 	nsBaseName, backupName, restoreName, backupLocation string) error {
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
-	defer cleanupNamespaces(ctx, client, nsBaseName) // Run at exit for final cleanup
-	var excludeNamespaces []string
+	nsLabel := "e2e-test"
+	defer deleteNamespaceListWithLabel(ctx, client, nsLabel) // Run at exit for final cleanup
+
+	// Create new namespaces for testing
+	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
+		if err := createNamespace(ctx, client, createNSName, nsLabel); err != nil {
+			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
+		}
+	}
 
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
 	// we will exclude all of the namespaces that existed prior to the test from the backup
-	namespaces, err := client.clientGo.CoreV1().Namespaces().List(shortTimeout, v1.ListOptions{})
+	existingNamespaces, err := client.clientGo.CoreV1().Namespaces().List(shortTimeout, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 
-	for _, excludeNamespace := range namespaces.Items {
+	var excludeNamespaces []string
+	for _, excludeNamespace := range existingNamespaces.Items {
 		excludeNamespaces = append(excludeNamespaces, excludeNamespace.Name)
 	}
-	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
-		if err := createNamespace(ctx, client, createNSName); err != nil {
-			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
-		}
-	}
+
+	// Backup created namespaces but with excluded namespaces
 	if err := veleroBackupExcludeNamespaces(ctx, testNamespace, veleroCLI, backupName, excludeNamespaces); err != nil {
 		veleroBackupLocationStatus(ctx, testNamespace, veleroCLI, backupLocation)
 		veleroBackupLogs(ctx, testNamespace, veleroCLI, backupName)
@@ -98,9 +102,10 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 		return err
 	}
 
-	err = cleanupNamespaces(ctx, client, nsBaseName)
+	// Simulate a disaster
+	err = deleteNamespaceListWithLabel(ctx, client, nsLabel)
 	if err != nil {
-		return errors.Wrap(err, "Could cleanup retrieve namespaces")
+		return errors.Wrap(err, "failed disaster simulation")
 	}
 
 	err = veleroRestoreNamespace(ctx, testNamespace, veleroCLI, restoreName, backupName)
@@ -124,23 +129,5 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 		}
 	}
 	// Cleanup is automatic on the way out
-	return nil
-}
-
-func cleanupNamespaces(ctx context.Context, client testClient, nsBaseName string) error {
-	namespaces, err := client.clientGo.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
-	if err != nil {
-		return errors.Wrap(err, "Could not retrieve namespaces")
-	}
-
-	for _, checkNamespace := range namespaces.Items {
-		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
-			fmt.Printf("Cleaning up namespace %s\n", checkNamespace.Name)
-			err = client.clientGo.CoreV1().Namespaces().Delete(ctx, checkNamespace.Name, v1.DeleteOptions{})
-			if err != nil {
-				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
-			}
-		}
-	}
 	return nil
 }
