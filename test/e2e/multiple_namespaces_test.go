@@ -73,19 +73,20 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 	nsLabel := "e2e-test"
 	defer deleteNamespaceListWithLabel(ctx, client, nsLabel) // Run at exit for final cleanup
 
+	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
+	// we will exclude all of the namespaces that existed prior to the test from the backup.
+	// This needs to be done before creating the new namespaces.
+	existingNamespaces, err := client.clientGo.CoreV1().Namespaces().List(shortTimeout, metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Could not retrieve namespaces")
+	}
+
 	// Create new namespaces for testing
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
 		if err := createNamespace(ctx, client, createNSName, nsLabel); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
-	}
-
-	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
-	// we will exclude all of the namespaces that existed prior to the test from the backup
-	existingNamespaces, err := client.clientGo.CoreV1().Namespaces().List(shortTimeout, metav1.ListOptions{})
-	if err != nil {
-		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 
 	var excludeNamespaces []string
