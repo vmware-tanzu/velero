@@ -16,10 +16,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
+var _ = Describe("Backup/restore of multiple namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
-	backupRestoreNamespacesBasic := testNamespace("backup-restore-basic")
+	backupRestorMultipleeNamespaces := testNamespace("backup-restore-multiple")
 
 	BeforeEach(func() {
 		var err error
@@ -28,7 +28,7 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 		Expect(err).To(Succeed())
 
 		if installVelero {
-			Expect(veleroInstall(client.ctx, backupRestoreNamespacesBasic, veleroImage, cloudProvider, objectStoreProvider,
+			Expect(veleroInstall(client.ctx, backupRestorMultipleeNamespaces, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", false)).To(Succeed())
 		}
 	})
@@ -36,57 +36,31 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 	AfterEach(func() {
 		if installVelero {
 			timeoutCTX, _ := context.WithTimeout(client.ctx, time.Minute)
-			err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestoreNamespacesBasic)
+			err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestorMultipleeNamespaces)
 			Expect(err).To(Succeed())
 		}
 	})
 
-	Context("When I create 2 namespaces", func() {
-		It("should be successfully backed up and restored", func() {
+	When("I create 2 namespaces", func() {
+		It("should successfully back up and restore [2 namespaces]", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
 			fiveMinTimeout, _ := context.WithTimeout(client.ctx, 5*time.Minute)
 
-			if err := runMultipleNamespaceTest(fiveMinTimeout, client, backupRestoreNamespacesBasic, 2,
+			if err := runMultipleNamespaceTest(fiveMinTimeout, client, backupRestorMultipleeNamespaces, 2,
 				"nstest-"+uuidgen.String(), backupName, restoreName, "default"); err != nil {
 				Expect(err).To(Succeed(), "Failed to successfully backup to/restore from 2 namespaces")
 			}
 		})
 	})
-})
 
-var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
-	client, err := newTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
-	backupRestoreNamespacesScale := testNamespace("backup-restore-scale")
-
-	BeforeEach(func() {
-		var err error
-		flag.Parse()
-		uuidgen, err = uuid.NewRandom()
-		Expect(err).To(Succeed())
-		if installVelero {
-			Expect(veleroInstall(client.ctx, backupRestoreNamespacesScale, veleroImage, cloudProvider, objectStoreProvider,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", false)).To(Succeed())
-
-		}
-	})
-
-	AfterEach(func() {
-		if installVelero {
-			timeoutCTX, _ := context.WithTimeout(client.ctx, time.Minute)
-			err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestoreNamespacesScale)
-			Expect(err).To(Succeed())
-		}
-	})
-
-	Context("When I create 2500 namespaces", func() {
-		It("should be successfully backed up and restored", func() {
+	When("When I create 2500 namespaces", func() {
+		It("should successfully back up and restore [2500 namespaces]", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
 			oneHourTimeout, _ := context.WithTimeout(client.ctx, 1*time.Hour)
 
-			if err := runMultipleNamespaceTest(oneHourTimeout, client, backupRestoreNamespacesScale, 2500,
+			if err := runMultipleNamespaceTest(oneHourTimeout, client, backupRestorMultipleeNamespaces, 2500,
 				"nstest-"+uuidgen.String(), backupName, restoreName, "default"); err != nil {
 				Expect(err).To(Succeed(), "Failed to successfully backup to/restore from 2500 namespaces")
 			}
