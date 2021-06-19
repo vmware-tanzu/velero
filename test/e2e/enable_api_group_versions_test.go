@@ -187,6 +187,24 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 				},
 			},
 		},
+		{
+			name:       "Restore successful when CRD doesn't (yet) exist in target",
+			srcCrdYaml: "testdata/enable_api_group_versions/case-a-source.yaml",
+			srcCRs: map[string]string{
+				"v1": "testdata/enable_api_group_versions/music_v1_rockband.yaml",
+			},
+			tgtCrdYaml: "",
+			tgtVer:     "v1",
+			cm:         nil,
+			want: map[string]map[string]string{
+				"annotations": {
+					"rockbands.music.example.io/originalVersion": "v1",
+				},
+				"specs": {
+					"genre": "60s rock",
+				},
+			},
+		},
 	}
 
 	for i, tc := range tests {
@@ -242,9 +260,12 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			}
 		}
 
-		if err := installCRD(ctx, tc.tgtCrdYaml); err != nil {
-			deleteNamespacesOnErr(ctx, tc.namespaces)
-			return errors.Wrapf(err, "install music-system CRD on target cluster")
+		// Install music-system CRD for target cluster.
+		if tc.tgtCrdYaml != "" {
+			if err := installCRD(ctx, tc.tgtCrdYaml); err != nil {
+				deleteNamespacesOnErr(ctx, tc.namespaces)
+				return errors.Wrapf(err, "install music-system CRD on target cluster")
+			}
 		}
 
 		// Apply config map if there is one.
@@ -323,7 +344,9 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			deleteNamespace(ctx, ns)
 		}
 		_ = deleteCRD(ctx, tc.srcCrdYaml)
-		_ = deleteCRD(ctx, tc.tgtCrdYaml)
+		if tc.tgtCrdYaml != "" {
+			_ = deleteCRD(ctx, tc.tgtCrdYaml)
+		}
 	}
 
 	return nil
