@@ -26,85 +26,70 @@ These are the current set of limitations with the E2E tests.
 
 ## Configuration for E2E tests
 
-Below is a list of the configuration used by E2E tests.
-These configuration parameters are expected as values to the following command line flags:
+Please look at the [e2e_suite_test.go](e2e_suite_test.go) for the set of flags needed to configure Velero. Those configurations or parameters are used to generate install options for Velero for each test suite.
 
-1. `-credentials-file`: File containing credentials for backup and volume provider. Required.
-1. `-bucket`: Name of the object storage bucket where backups from e2e tests should be stored. Required.
-1. `-cloud-provider`: The cloud the tests will be run in.  Appropriate plug-ins will be installed except for kind which requires
-the object-store-provider to be specified.
-1. `-object-store-provider`: Object store provider to use. Required when kind is the cloud provider.
-1. `-velerocli`: Path to the velero application to use. Optional, by default uses `velero` in the `$PATH`
-1. `-velero-image`: Image for the velero server to be tested. Optional, by default uses `velero/velero:main`
-1. `-bsl-config`: Configuration to use for the backup storage location. Format is key1=value1,key2=value2. Optional.
-1. `-prefix`: Prefix in the `bucket`, under which all Velero data should be stored within the bucket. Optional.
-1. `-vsl-config`: Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2. Optional.
-1. `-velero-namespace`: Namespace to install velero in.  Optional, defaults to "velero".
-1. `-install-velero`: Specifies whether to install/uninstall velero for the tests.  Optional, defaults to "true".
-1. `-additional-bsl-object-store-provider`: Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.
-1. `-additional-bsl-bucket`: Name of the object storage bucket for additional backup storage location. Required if testing multiple credentials support.
-1. `-additional-bsl-prefix`: Prefix in the `additional-bsl-bucket`, under which all Velero data should be stored. Optional.
-1. `-additional-bsl-config`: Configuration to use for the additional backup storage location. Format is key1=value1,key2=value2. Optional.
-1. `-additional-bsl-credentials-file`: File containing credentials for the additional backup storage location. Required if testing multiple credentials support.
-
-These configurations or parameters are used to generate install options for Velero for each test suite.
-
-Tests can be run with the Kubernetes cluster hosted in various cloud providers or in a _kind_ cluster with storage in
-a specified object store type.  Currently supported cloud provider types are _aws_, _azure_, _vsphere_ and _kind_.
-## Running tests locally
-
-### Running using `make`
+Tests can be run with the Kubernetes cluster hosted in various cloud providers or in a _Kind_ cluster with storage in
+a specified object store type.  Currently supported cloud provider types are _aws_, _azure_, _vsphere_ and _Kind_.
+## Running tests locally using `make`
 
 E2E tests can be run from the Velero repository root by running `make test-e2e`. While running E2E tests using `make` the E2E test configuration values are passed using `make` variables.
 
-Below is a mapping between `make` variables to E2E configuration flags.
-1. `CREDS_FILE`: `-credentials-file`. Required.
-1. `BSL_BUCKET`: `-bucket`. Required.
-1. `CLOUD_PROVIDER`: `-cloud-provider`. Required
-1. `OBJECT_STORE_PROVIDER`: `-object-store-provider`. Required when kind is the cloud provider.
-1. `VELERO_CLI`: the `-velerocli`. Optional.
-1. `VELERO_IMAGE`: the `-velero-image`. Optional.
-1. `BSL_PREFIX`: `-prefix`. Optional.
-1. `BSL_CONFIG`: `-bsl-config`. Optional.
-1. `VSL_CONFIG`: `-vsl-config`. Optional.
-1. `ADDITIONAL_OBJECT_STORE_PROVIDER`: `-additional-bsl-object-store-provider`. Optional.
-1. `ADDITIONAL_CREDS_FILE`: `-additional-bsl-bucket`. Optional.
-1. `ADDITIONAL_BSL_BUCKET`: `-additional-bsl-prefix`. Optional.
-1. `ADDITIONAL_BSL_PREFIX`: `-additional-bsl-config`. Optional.
-1. `ADDITIONAL_BSL_CONFIG`: `-additional-bsl-credentials-file`. Optional.
+### Run tests with Kind
 
-For example, E2E tests can be run from Velero repository roots using the commands below:
+- Run Velero tests on a Kind cluster with AWS (or Minio) as the storage provider.
 
-1. Run Velero tests in a kind cluster with AWS (or Minio) as the storage provider:
     ```bash
-    BSL_PREFIX=<PREFIX_UNDER_BUCKET> BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws make test-e2e
+    BSL_PREFIX=<PREFIX_UNDER_BUCKET> BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds CLOUD_PROVIDER=Kind OBJECT_STORE_PROVIDER=aws make test-e2e
     ```
+
+### Run tests on a provider
+
+Note: When running tests that take a snapshot on a provider, the optional paramenter `vsl-config` **must** be configued. This parameter is optional for tests where only objects (and not snapshots) are being backed up /restored. If you don't configure this parameter, be sure you are only running tests that don't need a snapshot. See the section [Filtering tests](#Filtering-tests) below for how to select specific tests.
+
+The test will detect when it is configured with a provider other than Kind but without this configuration and ask for confirmation. To skip this check, add `FORCE=true` to pass it as a variable to the test command. To configure the snapshot settings, pass the `VSL_CONFIG` parameter with the proper values for your provider. Here's an example for AWS: `VSL_CONFIG=region=us-west-2`.
+
+
 1. Run Velero tests in an AWS cluster:
+
     ```bash
     BSL_PREFIX=<PREFIX_UNDER_BUCKET> BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds CLOUD_PROVIDER=aws make test-e2e
     ```
+
 1. Run Velero tests in a Microsoft Azure cluster:
+
     ```bash
     BSL_CONFIG="resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID" BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/azure-creds CLOUD_PROVIDER=azure make test-e2e
     ```
+
     Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
+
 1. Run Ginko-focused Restore Multi-API Groups tests using Minio as the backup storage location: 
+
    ```bash
-   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws VELERO_NAMESPACE="velero" GINKGO_FOCUS="API group versions" make test-e2e
+   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=Kind OBJECT_STORE_PROVIDER=aws VELERO_NAMESPACE="velero" GINKGO_FOCUS="API group versions" make test-e2e
    ```
-1. Run Velero tests in a kind cluster with AWS (or Minio) as the storage provider and use Microsoft Azure as the storage provider for an additional Backup Storage Location:
+
+1. Run Velero tests in a Kind cluster with AWS (or Minio) as the storage provider and use Microsoft Azure as the storage provider for an additional Backup Storage Location:
+
     ```bash
     make test-e2e \
-      CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds \
+      CLOUD_PROVIDER=Kind OBJECT_STORE_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds \
       ADDITIONAL_OBJECT_STORE_PROVIDER=azure ADDITIONAL_BSL_BUCKET=<BUCKET_FOR_AZURE_BSL> ADDITIONAL_BSL_PREFIX=<PREFIX_UNDER_BUCKET> ADDITIONAL_BSL_CONFIG=<CONFIG_FOR_AZURE_BUCKET> ADDITIONAL_CREDS_FILE=/path/to/azure-creds
     ```
+
    Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
+
+## Code under test
+
+By default, the e2e tests will run against the `velero/velero:main` version of Velero. If you would like to test the code with any other image of Velero, pass the `<registry/image:version>` value to the `VELERO_IMAGE` paramenter to the `make test-e2e` command.
 
 ## Filtering tests
 
 Velero E2E tests uses [Ginkgo](https://onsi.github.io/ginkgo/) testing framework which allows a subset of the tests to be run using the [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) flags to ginkgo.
 
 The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. This can be used to focus on specific tests.
+
+Example:  `GINKGO_FOCUS='APIGroup'`
 
 ## Adding tests
 

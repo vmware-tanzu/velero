@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os/exec"
 	"time"
 
@@ -52,22 +53,28 @@ func getNamespace(ctx context.Context, client testClient, namespace string) (*co
 }
 
 // waitForNamespaceDeletion waits for namespace to be deleted.
-func waitForNamespaceDeletion(interval, timeout time.Duration, client testClient, ns string) error {
+func waitForNamespaceDeletion(ctx context.Context, interval, timeout time.Duration, client testClient, ns string) error {
+	fmt.Printf("Initiating termination of the %s namespace\n", ns)
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := client.clientGo.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+		_, err := client.clientGo.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
 		}
-		fmt.Printf("Namespace %s is still being deleted...\n", ns)
+		fmt.Printf("Waiting for namespace %s to terminate...\n", ns)
 		return false, nil
 	})
-	return err
+	if err != nil {
+		fmt.Printf("Namespace %s not successfully terminated...\n", ns)
+		return err
+	}
+	fmt.Printf("Namespace %s successfully terminated...\n", ns)
+	return nil
 }
 
-func createSecretFromFiles(ctx context.Context, client testClient, namespace string, name string, files map[string]string) error {
+func createSecretFromFiles(ctx context.Context, client testClient, testNamespace testNamespace, name string, files map[string]string) error {
 	data := make(map[string][]byte)
 
 	for key, filePath := range files {
@@ -79,8 +86,8 @@ func createSecretFromFiles(ctx context.Context, client testClient, namespace str
 		data[key] = contents
 	}
 
-	secret := builder.ForSecret(namespace, name).Data(data).Result()
-	_, err := client.clientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	secret := builder.ForSecret(testNamespace.String(), name).Data(data).Result()
+	_, err := client.clientGo.CoreV1().Secrets(testNamespace.String()).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }
 
@@ -107,4 +114,15 @@ func waitForPods(ctx context.Context, client testClient, namespace string, pods 
 		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for pods in namespace %s to start running", namespace))
 	}
 	return nil
+}
+
+// randomString generates a random string that is valid as a rmetadata.name for a namespace
+func randomString(n int, source string) string {
+	var letters = []rune(source)
+
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
 }

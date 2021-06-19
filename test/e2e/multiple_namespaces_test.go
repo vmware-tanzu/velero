@@ -17,46 +17,46 @@ import (
 )
 
 var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
-
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
+	backupRestoreNamespacesBasic := testNamespace("backup-restore-Basic")
 
 	BeforeEach(func() {
 		var err error
 		flag.Parse()
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
+
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
+			Expect(veleroInstall(client.ctx, backupRestoreNamespacesBasic, veleroImage, cloudProvider, objectStoreProvider,
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", false)).To(Succeed())
 
 		}
 	})
 
 	AfterEach(func() {
 		if installVelero {
-			timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-			err := veleroUninstall(timeoutCTX, client.kubebuilder, installVelero, veleroNamespace)
+			timeoutCTX, _ := context.WithTimeout(client.ctx, time.Minute)
+			err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestoreNamespacesBasic)
 			Expect(err).To(Succeed())
 		}
-
 	})
 
 	Context("When I create 2 namespaces", func() {
 		It("should be successfully backed up and restored", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
-			fiveMinTimeout, _ := context.WithTimeout(context.Background(), 5*time.Minute)
-			RunMultipleNamespaceTest(fiveMinTimeout, client, "nstest-"+uuidgen.String(), 2,
+			fiveMinTimeout, _ := context.WithTimeout(client.ctx, 5*time.Minute)
+			runMultipleNamespaceTest(fiveMinTimeout, client, backupRestoreNamespacesBasic, "nstest-"+uuidgen.String(), 2,
 				backupName, restoreName)
 		})
 	})
 })
 
 var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
-
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
+	backupRestoreNamespacesScale := testNamespace("backup-restore-Scale")
 
 	BeforeEach(func() {
 		var err error
@@ -64,33 +64,33 @@ var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
+			Expect(veleroInstall(client.ctx, backupRestoreNamespacesScale, veleroImage, cloudProvider, objectStoreProvider,
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", false)).To(Succeed())
 
 		}
 	})
 
 	AfterEach(func() {
 		if installVelero {
-			timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-			err := veleroUninstall(timeoutCTX, client.kubebuilder, installVelero, veleroNamespace)
+			timeoutCTX, _ := context.WithTimeout(client.ctx, time.Minute)
+			err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestoreNamespacesScale)
 			Expect(err).To(Succeed())
 		}
-
 	})
 
 	Context("When I create 2500 namespaces", func() {
 		It("should be successfully backed up and restored", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
-			oneHourTimeout, _ := context.WithTimeout(context.Background(), 1*time.Hour)
-			RunMultipleNamespaceTest(oneHourTimeout, client, "nstest-"+uuidgen.String(), 2500,
+			oneHourTimeout, _ := context.WithTimeout(client.ctx, 1*time.Hour)
+			runMultipleNamespaceTest(oneHourTimeout, client, backupRestoreNamespacesScale, "nstest-"+uuidgen.String(), 2500,
 				backupName, restoreName)
+			Expect(err).To(Succeed())
 		})
 	})
 })
 
-func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
+func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamespace testNamespace, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
 	defer cleanupNamespaces(ctx, client, nsBaseName) // Run at exit for final cleanup
 	var excludeNamespaces []string
@@ -111,8 +111,8 @@ func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
-	if err := veleroBackupExcludeNamespaces(ctx, veleroCLI, veleroNamespace, backupName, excludeNamespaces); err != nil {
-		veleroBackupLogs(ctx, veleroCLI, "", backupName)
+	if err := veleroBackupExcludeNamespaces(ctx, testNamespace, veleroCLI, backupName, excludeNamespaces); err != nil {
+		veleroBackupLogs(ctx, testNamespace, veleroCLI, backupName)
 		return errors.Wrapf(err, "Failed to backup backup namespaces %s-*", nsBaseName)
 	}
 
@@ -121,7 +121,7 @@ func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}
 
-	err = veleroRestore(ctx, veleroCLI, veleroNamespace, restoreName, backupName)
+	err = veleroRestoreNamespace(ctx, testNamespace, veleroCLI, restoreName, backupName)
 	if err != nil {
 		return errors.Wrap(err, "Restore failed")
 	}
