@@ -41,9 +41,9 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
-type testNamespace string
+type veleroNamespace string
 
-func (n testNamespace) String() string {
+func (n veleroNamespace) String() string {
 	return string(n)
 }
 
@@ -141,9 +141,9 @@ func installVeleroServer(io *cliinstall.InstallOptions) error {
 }
 
 // checkBackupPhase uses veleroCLI to inspect the phase of a Velero backup.
-func checkBackupPhase(ctx context.Context, veleroCLI string, testNamespace testNamespace, backupName string,
+func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace veleroNamespace, backupName string,
 	expectedPhase velerov1api.BackupPhase) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "backup", "get", "-o", "json",
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "backup", "get", "-o", "json",
 		backupName)
 
 	fmt.Printf("get backup cmd =%v\n", checkCMD)
@@ -185,9 +185,9 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, testNamespace testN
 }
 
 // checkRestorePhase uses veleroCLI to inspect the phase of a Velero restore.
-func checkRestorePhase(ctx context.Context, veleroCLI string, testNamespace testNamespace, restoreName string,
+func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace veleroNamespace, restoreName string,
 	expectedPhase velerov1api.RestorePhase) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "restore", "get", "-o", "json",
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "restore", "get", "-o", "json",
 		restoreName)
 
 	fmt.Printf("get restore cmd =%v\n", checkCMD)
@@ -229,10 +229,10 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, testNamespace test
 }
 
 // veleroBackupNamespace uses the veleroCLI to backup a namespace.
-func veleroBackupNamespace(ctx context.Context, testNamespace testNamespace, veleroCLI, backupName, namespace, backupLocation string,
+func veleroBackupNamespace(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, backupName, namespace, backupLocation string,
 	useVolumeSnapshots bool) error {
 	args := []string{
-		"--namespace", testNamespace.String(),
+		"--namespace", veleroNamespace.String(),
 		"create", "backup", backupName,
 		"--include-namespaces", namespace,
 		"--wait",
@@ -255,15 +255,15 @@ func veleroBackupNamespace(ctx context.Context, testNamespace testNamespace, vel
 	if err != nil {
 		return err
 	}
-	err = checkBackupPhase(ctx, veleroCLI, testNamespace, backupName, velerov1api.BackupPhaseCompleted)
+	err = checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
 
 	return err
 }
 
 // veleroBackupExcludeNamespaces uses the veleroCLI to backup a namespace.
-func veleroBackupExcludeNamespaces(ctx context.Context, testNamespace testNamespace, veleroCLI, backupName string, excludeNamespaces []string) error {
+func veleroBackupExcludeNamespaces(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, backupName string, excludeNamespaces []string) error {
 	namespaces := strings.Join(excludeNamespaces, ",")
-	backupCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "create", "backup", backupName,
+	backupCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "create", "backup", backupName,
 		"--exclude-namespaces", namespaces,
 		"--default-volumes-to-restic", "--wait")
 	backupCmd.Stdout = os.Stdout
@@ -273,14 +273,14 @@ func veleroBackupExcludeNamespaces(ctx context.Context, testNamespace testNamesp
 	if err != nil {
 		return err
 	}
-	err = checkBackupPhase(ctx, veleroCLI, testNamespace, backupName, velerov1api.BackupPhaseCompleted)
+	err = checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
 
 	return err
 }
 
 // veleroRestoreNamespace uses the veleroCLI to restore from a Velero backup.
-func veleroRestoreNamespace(ctx context.Context, testNamespace testNamespace, veleroCLI, restoreName, backupName string) error {
-	restoreCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "create", "restore", restoreName,
+func veleroRestoreNamespace(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, restoreName, backupName string) error {
+	restoreCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "create", "restore", restoreName,
 		"--from-backup", backupName, "--wait")
 
 	restoreCmd.Stdout = os.Stdout
@@ -290,10 +290,10 @@ func veleroRestoreNamespace(ctx context.Context, testNamespace testNamespace, ve
 	if err != nil {
 		return err
 	}
-	return checkRestorePhase(ctx, veleroCLI, testNamespace, restoreName, velerov1api.RestorePhaseCompleted)
+	return checkRestorePhase(ctx, veleroCLI, veleroNamespace, restoreName, velerov1api.RestorePhaseCompleted)
 }
 
-func veleroInstall(ctx context.Context, testNamespace testNamespace, veleroImage, cloudProvider, objectStoreProvider,
+func veleroInstall(ctx context.Context, veleroNamespace veleroNamespace, veleroImage, cloudProvider, objectStoreProvider,
 	cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, features string, useVolumeSnapshots bool) error {
 
 	if cloudProvider != "kind" {
@@ -338,7 +338,7 @@ func veleroInstall(ctx context.Context, testNamespace testNamespace, veleroImage
 	}
 	veleroInstallOptions.UseRestic = !useVolumeSnapshots
 	veleroInstallOptions.Image = veleroImage
-	veleroInstallOptions.Namespace = testNamespace.String()
+	veleroInstallOptions.Namespace = veleroNamespace.String()
 
 	err = installVeleroServer(veleroInstallOptions)
 	if err != nil {
@@ -348,76 +348,76 @@ func veleroInstall(ctx context.Context, testNamespace testNamespace, veleroImage
 	return nil
 }
 
-func veleroUninstall(ctx context.Context, client kbclient.Client, veleroCLI string, testNamespace testNamespace) error {
+func veleroUninstall(ctx context.Context, client kbclient.Client, veleroCLI string, veleroNamespace veleroNamespace) error {
 	fmt.Println("Start uninstall...")
 
 	var errs []error
 
-	if err := veleroDeleteBackupsInNamespace(ctx, testNamespace, veleroCLI); err != nil {
+	if err := veleroDeleteBackupsInNamespace(ctx, veleroNamespace, veleroCLI); err != nil {
 		errs = append(errs, errors.WithStack(err))
 	}
 
-	if err := veleroDeleteRestoresInNamespace(ctx, testNamespace, veleroCLI); err != nil {
+	if err := veleroDeleteRestoresInNamespace(ctx, veleroNamespace, veleroCLI); err != nil {
 		errs = append(errs, errors.WithStack(err))
 	}
 
-	if err := veleroDeleteBSLInNamespace(ctx, testNamespace, veleroCLI); err != nil {
+	if err := veleroDeleteBSLInNamespace(ctx, veleroNamespace, veleroCLI); err != nil {
 		errs = append(errs, errors.WithStack(err))
 	}
 
-	if err := uninstall.Run(ctx, client, testNamespace.String(), true); err != nil {
+	if err := uninstall.Run(ctx, client, veleroNamespace.String(), true); err != nil {
 		errs = append(errs, errors.WithStack(err))
 	}
 
 	return kubeerrs.NewAggregate(errs)
 }
 
-func veleroDeleteBackupsInNamespace(ctx context.Context, testNamespace testNamespace, veleroCLI string) error {
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "delete", "backups", "--all", "--confirm")
+func veleroDeleteBackupsInNamespace(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI string) error {
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "delete", "backups", "--all", "--confirm")
 	describeCmd.Stdout = os.Stdout
 	describeCmd.Stderr = os.Stderr
 	err := describeCmd.Run()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Finished submitting all `delete backups` requests in the %s namespace\n", testNamespace.String())
+	fmt.Printf("Finished submitting all `delete backups` requests in the %s namespace\n", veleroNamespace.String())
 	return nil
 }
 
-func veleroDeleteRestoresInNamespace(ctx context.Context, testNamespace testNamespace, veleroCLI string) error {
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "delete", "restores", "--all", "--confirm")
+func veleroDeleteRestoresInNamespace(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI string) error {
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "delete", "restores", "--all", "--confirm")
 	describeCmd.Stdout = os.Stdout
 	describeCmd.Stderr = os.Stderr
 	err := describeCmd.Run()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Finished submitting all `delete restores` requests in the %s namespace\n", testNamespace.String())
+	fmt.Printf("Finished submitting all `delete restores` requests in the %s namespace\n", veleroNamespace.String())
 	return nil
 }
 
-func veleroDeleteBSLInNamespace(ctx context.Context, testNamespace testNamespace, veleroCLI string) error {
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "delete", "backup-locations", "--all", "--confirm")
+func veleroDeleteBSLInNamespace(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI string) error {
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "delete", "backup-locations", "--all", "--confirm")
 	describeCmd.Stdout = os.Stdout
 	describeCmd.Stderr = os.Stderr
 	err := describeCmd.Run()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Finished submitting all `delete backup-locations` requests in the %s namespace\n", testNamespace.String())
+	fmt.Printf("Finished submitting all `delete backup-locations` requests in the %s namespace\n", veleroNamespace.String())
 	return nil
 }
 
-func veleroBackupLogs(ctx context.Context, testNamespace testNamespace, veleroCLI, backupName string) error {
+func veleroBackupLogs(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, backupName string) error {
 	fmt.Print("\nGetting backup logs...\n")
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "backup", "describe", backupName, "--details")
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "backup", "describe", backupName, "--details")
 	describeCmd.Stdout = os.Stdout
 	describeCmd.Stderr = os.Stderr
 	err := describeCmd.Run()
 	if err != nil {
 		return err
 	}
-	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "backup", "logs", backupName)
+	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "backup", "logs", backupName)
 	logCmd.Stdout = os.Stdout
 	logCmd.Stderr = os.Stderr
 	err = logCmd.Run()
@@ -427,16 +427,16 @@ func veleroBackupLogs(ctx context.Context, testNamespace testNamespace, veleroCL
 	return nil
 }
 
-func veleroRestoreLogs(ctx context.Context, testNamespace testNamespace, veleroCLI, restoreName string) error {
+func veleroRestoreLogs(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, restoreName string) error {
 	fmt.Print("\nGetting restore logs...\n")
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "restore", "describe", restoreName, "--details")
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "restore", "describe", restoreName, "--details")
 	describeCmd.Stdout = os.Stdout
 	describeCmd.Stderr = os.Stderr
 	err := describeCmd.Run()
 	if err != nil {
 		return err
 	}
-	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "restore", "logs", restoreName)
+	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "restore", "logs", restoreName)
 	logCmd.Stdout = os.Stdout
 	logCmd.Stderr = os.Stderr
 	fmt.Printf("restore logs cmd =%v\n", logCmd)
@@ -447,9 +447,9 @@ func veleroRestoreLogs(ctx context.Context, testNamespace testNamespace, veleroC
 	return nil
 }
 
-func veleroBackupLocationStatus(ctx context.Context, testNamespace testNamespace, veleroCLI, bslName string) error {
+func veleroBackupLocationStatus(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, bslName string) error {
 	fmt.Printf("\nGetting backup location status for location %s...\n", bslName)
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "backup-location", "get", bslName)
+	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "backup-location", "get", bslName)
 	describeCmd.Stdout = os.Stdout
 	describeCmd.Stderr = os.Stderr
 	err := describeCmd.Run()
@@ -462,7 +462,7 @@ func veleroBackupLocationStatus(ctx context.Context, testNamespace testNamespace
 
 func veleroCreateBackupLocation(ctx context.Context,
 	veleroCLI string,
-	testNamespace testNamespace,
+	veleroNamespace veleroNamespace,
 	bslName string,
 	objectStoreProvider string,
 	bucket string,
@@ -472,7 +472,7 @@ func veleroCreateBackupLocation(ctx context.Context,
 	secretKey string,
 ) error {
 	args := []string{
-		"--namespace", testNamespace.String(),
+		"--namespace", veleroNamespace.String(),
 		"create", "backup-location", bslName,
 		"--provider", objectStoreProvider,
 		"--bucket", bucket,
@@ -500,12 +500,12 @@ func veleroCreateBackupLocation(ctx context.Context,
 
 // veleroAddPluginsForProvider determines which plugins need to be installed for a provider and
 // installs them in the current Velero installation, skipping over those that are already installed.
-func veleroAddPluginsForProvider(ctx context.Context, testNamespace testNamespace, veleroCLI, provider string) error {
+func veleroAddPluginsForProvider(ctx context.Context, veleroNamespace veleroNamespace, veleroCLI, provider string) error {
 	for _, plugin := range getProviderPlugins(provider) {
 		stdoutBuf := new(bytes.Buffer)
 		stderrBuf := new(bytes.Buffer)
 
-		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", testNamespace.String(), "plugin", "add", plugin)
+		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace.String(), "plugin", "add", plugin)
 		installPluginCmd.Stdout = stdoutBuf
 		installPluginCmd.Stderr = stdoutBuf
 
@@ -528,10 +528,10 @@ func veleroAddPluginsForProvider(ctx context.Context, testNamespace testNamespac
 
 // waitForVSphereUploadCompletion waits for uploads started by the Velero Plug-in for vSphere to complete
 // TODO - remove after upload progress monitoring is implemented
-func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, testNamespace testNamespace) error {
+func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, veleroNamespace veleroNamespace) error {
 	err := wait.PollImmediate(time.Minute, timeout, func() (bool, error) {
 		checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
-			"get", "-n", testNamespace.String(), "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}'")
+			"get", "-n", veleroNamespace.String(), "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}'")
 		fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
 		stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
 		if err != nil {

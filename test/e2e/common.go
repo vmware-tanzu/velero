@@ -107,7 +107,7 @@ func waitForNamespaceDeletion(ctx context.Context, interval, timeout time.Durati
 	return nil
 }
 
-func createSecretFromFiles(ctx context.Context, client testClient, testNamespace testNamespace, name string, files map[string]string) error {
+func createSecretFromFiles(ctx context.Context, client testClient, veleroNamespace veleroNamespace, name string, files map[string]string) error {
 	data := make(map[string][]byte)
 
 	for key, filePath := range files {
@@ -119,9 +119,9 @@ func createSecretFromFiles(ctx context.Context, client testClient, testNamespace
 		data[key] = contents
 	}
 
-	secret := builder.ForSecret(testNamespace.String(), name).Data(data).Result()
+	secret := builder.ForSecret(veleroNamespace.String(), name).Data(data).Result()
 	addE2ELabel(secret, "")
-	_, err := client.clientGo.CoreV1().Secrets(testNamespace.String()).Create(ctx, secret, metav1.CreateOptions{})
+	_, err := client.clientGo.CoreV1().Secrets(veleroNamespace.String()).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }
 

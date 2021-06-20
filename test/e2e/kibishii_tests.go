@@ -105,7 +105,7 @@ func terminateKibishiiWorkload(client testClient, labelValue string) error {
 // - creates a Velero restore of the created backup in the given names-ace
 // - verifies the data restored is what's expected
 // Assumes the kibishii workload has been created and Velero has been installed.
-func runKibishiiTests(client testClient, testNamespace testNamespace, providerName, veleroCLI, backupName,
+func runKibishiiTests(client testClient, veleroNamespace veleroNamespace, providerName, veleroCLI, backupName,
 	restoreName, backupLocation, labelValue string, useVolumeSnapshots bool) error {
 	fmt.Println("Starting the backup and restore of the kibishii workload")
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
@@ -126,9 +126,9 @@ func runKibishiiTests(client testClient, testNamespace testNamespace, providerNa
 		return errors.Wrap(err, "failed to generate data")
 	}
 
-	if err := veleroBackupNamespace(oneHourTimeout, testNamespace, veleroCLI, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
-		veleroBackupLocationStatus(fiveMinTimeout, testNamespace, veleroCLI, backupLocation)
-		veleroBackupLogs(fiveMinTimeout, testNamespace, veleroCLI, backupName)
+	if err := veleroBackupNamespace(oneHourTimeout, veleroNamespace, veleroCLI, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
+		veleroBackupLocationStatus(fiveMinTimeout, veleroNamespace, veleroCLI, backupLocation)
+		veleroBackupLogs(fiveMinTimeout, veleroNamespace, veleroCLI, backupName)
 
 		err = fmt.Errorf("failed to backup the kibishii namespace with error %s", errors.WithStack(err))
 		return err
@@ -148,9 +148,9 @@ func runKibishiiTests(client testClient, testNamespace testNamespace, providerNa
 		return errors.Wrap(err, "failed to simulate a disaster")
 	}
 
-	if err := veleroRestoreNamespace(oneHourTimeout, testNamespace, veleroCLI, restoreName, backupName); err != nil {
-		veleroBackupLocationStatus(fiveMinTimeout, testNamespace, veleroCLI, backupLocation)
-		veleroRestoreLogs(fiveMinTimeout, testNamespace, veleroCLI, restoreName)
+	if err := veleroRestoreNamespace(oneHourTimeout, veleroNamespace, veleroCLI, restoreName, backupName); err != nil {
+		veleroBackupLocationStatus(fiveMinTimeout, veleroNamespace, veleroCLI, backupLocation)
+		veleroRestoreLogs(fiveMinTimeout, veleroNamespace, veleroCLI, restoreName)
 
 		err = fmt.Errorf("restore %s failed from backup %s with error %s", restoreName, backupName, errors.WithStack(err))
 		return err

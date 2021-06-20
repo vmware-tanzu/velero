@@ -18,7 +18,7 @@ import (
 var _ = Describe("Backup/restore of multiple namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
-	backupRestorMultipleeNamespaces := testNamespace("backup-restore-multiple")
+	backupRestorMultipleeNamespaces := veleroNamespace("backup-restore-multiple")
 	labelValue := "multiple-namespaces"
 
 	BeforeEach(func() {
@@ -64,7 +64,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 	})
 })
 
-func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamespace testNamespace, numberOfNamespaces int,
+func runMultipleNamespaceTest(ctx context.Context, client testClient, veleroNamespace veleroNamespace, numberOfNamespaces int,
 	nsBaseName, backupName, restoreName, backupLocation, labelValue string) error {
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
 	defer deleteNamespaceListWithLabel(ctx, client, labelValue) // Run at exit for final cleanup
@@ -91,9 +91,9 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 	}
 
 	// Backup created namespaces but with excluded namespaces
-	if err := veleroBackupExcludeNamespaces(ctx, testNamespace, veleroCLI, backupName, excludeNamespaces); err != nil {
-		veleroBackupLocationStatus(ctx, testNamespace, veleroCLI, backupLocation)
-		veleroBackupLogs(ctx, testNamespace, veleroCLI, backupName)
+	if err := veleroBackupExcludeNamespaces(ctx, veleroNamespace, veleroCLI, backupName, excludeNamespaces); err != nil {
+		veleroBackupLocationStatus(ctx, veleroNamespace, veleroCLI, backupLocation)
+		veleroBackupLogs(ctx, veleroNamespace, veleroCLI, backupName)
 
 		err = fmt.Errorf("failed to backup the namespaces %s-* with error %s", nsBaseName, errors.WithStack(err))
 		return err
@@ -104,10 +104,10 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 		return errors.Wrap(err, "failed disaster simulation")
 	}
 
-	err = veleroRestoreNamespace(ctx, testNamespace, veleroCLI, restoreName, backupName)
+	err = veleroRestoreNamespace(ctx, veleroNamespace, veleroCLI, restoreName, backupName)
 	if err != nil {
-		veleroBackupLocationStatus(ctx, testNamespace, veleroCLI, backupLocation)
-		veleroRestoreLogs(ctx, testNamespace, veleroCLI, restoreName)
+		veleroBackupLocationStatus(ctx, veleroNamespace, veleroCLI, backupLocation)
+		veleroRestoreLogs(ctx, veleroNamespace, veleroCLI, restoreName)
 
 		err = fmt.Errorf("restore %s failed from backup %s with error %s", restoreName, backupName, errors.WithStack(err))
 		return err

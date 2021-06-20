@@ -34,16 +34,16 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 var _ = Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", backup_restore_with_snapshots)
 
 func backup_restore_with_snapshots() {
-	backupRestoreNamespace := testNamespace("backup-restore-snapshot")
+	backupRestoreNamespace := veleroNamespace("backup-restore-snapshot")
 	backup_restore_test(backupRestoreNamespace, true)
 }
 
 func backup_restore_with_restic() {
-	backupRestoreNamespace := testNamespace("backup-restore-restic")
+	backupRestoreNamespace := veleroNamespace("backup-restore-restic")
 	backup_restore_test(backupRestoreNamespace, false)
 }
 
-func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshots bool) {
+func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapshots bool) {
 	var (
 		backupName, restoreName string
 	)
@@ -63,7 +63,7 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 			Expect(err).To(Succeed())
 
 			// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
-			backupRestoreNamespace = backupRestoreNamespace + "-" + testNamespace(randomString(5, backupRestoreNamespace.String()))
+			backupRestoreNamespace = backupRestoreNamespace + "-" + veleroNamespace(randomString(5, backupRestoreNamespace.String()))
 			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
@@ -109,7 +109,7 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 			Expect(err).To(Succeed())
 
 			// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
-			backupRestoreNamespace = backupRestoreNamespace + "-" + testNamespace(randomString(5, backupRestoreNamespace.String()))
+			backupRestoreNamespace = backupRestoreNamespace + "-" + veleroNamespace(randomString(5, backupRestoreNamespace.String()))
 			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 

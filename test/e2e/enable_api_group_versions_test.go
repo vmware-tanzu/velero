@@ -44,7 +44,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
-	apiGroupNamespace := testNamespace("api-group")
+	apiGroupNamespace := veleroNamespace("api-group")
 	labelValue := "api-group-version"
 
 	BeforeEach(func() {
@@ -55,7 +55,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		Expect(err).NotTo(HaveOccurred())
 
 		// Randomize the namespace so resource creation doesn;t collide with previously terminating resources in the same namespace.
-		apiGroupNamespace = apiGroupNamespace + "-" + testNamespace(randomString(5, apiGroupNamespace.String()))
+		apiGroupNamespace = apiGroupNamespace + "-" + veleroNamespace(randomString(5, apiGroupNamespace.String()))
 
 		// TODO: install Velero once for the test suite once feature flag is
 		// removed and velero installation becomes the same as other e2e tests.
@@ -108,7 +108,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 	})
 })
 
-func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiGroupNamespace testNamespace, resource, group, labelValue string) error {
+func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiGroupNamespace veleroNamespace, resource, group, labelValue string) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -229,7 +229,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiG
 				return errors.Wrapf(err, "create %s namespace", ns)
 			}
 
-			if err := installCR(ctx, testNamespace(ns), cr); err != nil {
+			if err := installCR(ctx, veleroNamespace(ns), cr); err != nil {
 				return errors.Wrapf(err, "install %s custom resource on source cluster in namespace %s", cr, ns)
 			}
 
@@ -366,7 +366,7 @@ func deleteCRD(ctx context.Context, yaml string) error {
 	return nil
 }
 
-func restartPods(ctx context.Context, ns testNamespace) error {
+func restartPods(ctx context.Context, ns veleroNamespace) error {
 	fmt.Printf("Restart pods in %s namespace.\n", ns)
 	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "--all", "-n", ns.String(), "--wait=true")
 
@@ -380,7 +380,7 @@ func restartPods(ctx context.Context, ns testNamespace) error {
 	return nil
 }
 
-func installCR(ctx context.Context, ns testNamespace, crFile string) error {
+func installCR(ctx context.Context, ns veleroNamespace, crFile string) error {
 	retries := 5
 	var stderr string
 	var err error
