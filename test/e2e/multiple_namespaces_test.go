@@ -19,6 +19,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
 	backupRestorMultipleeNamespaces := testNamespace("backup-restore-multiple")
+	nsLabel := "multiple-namespaces"
 
 	BeforeEach(func() {
 		var err error
@@ -43,7 +44,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 			fiveMinTimeout, _ := context.WithTimeout(client.ctx, 5*time.Minute)
 
 			if err := runMultipleNamespaceTest(fiveMinTimeout, client, backupRestorMultipleeNamespaces, 2,
-				"nstest-"+uuidgen.String(), backupName, restoreName, "default"); err != nil {
+				"nstest-"+uuidgen.String(), backupName, restoreName, "default", nsLabel); err != nil {
 				Expect(err).To(Succeed(), "Failed to successfully backup to/restore from 2 namespaces")
 			}
 		})
@@ -56,7 +57,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 			oneHourTimeout, _ := context.WithTimeout(client.ctx, 1*time.Hour)
 
 			if err := runMultipleNamespaceTest(oneHourTimeout, client, backupRestorMultipleeNamespaces, 2500,
-				"nstest-"+uuidgen.String(), backupName, restoreName, "default"); err != nil {
+				"nstest-"+uuidgen.String(), backupName, restoreName, "default", nsLabel); err != nil {
 				Expect(err).To(Succeed(), "Failed to successfully backup to/restore from 2500 namespaces")
 			}
 		})
@@ -64,9 +65,8 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 })
 
 func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamespace testNamespace, numberOfNamespaces int,
-	nsBaseName, backupName, restoreName, backupLocation string) error {
+	nsBaseName, backupName, restoreName, backupLocation, nsLabel string) error {
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
-	nsLabel := "e2e-test"
 	defer deleteNamespaceListWithLabel(ctx, client, nsLabel) // Run at exit for final cleanup
 
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
@@ -100,8 +100,7 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 	}
 
 	// Simulate a disaster
-	err = deleteNamespaceListWithLabel(ctx, client, nsLabel)
-	if err != nil {
+	if err := deleteNamespaceListWithLabel(ctx, client, nsLabel); err != nil {
 		return errors.Wrap(err, "failed disaster simulation")
 	}
 
@@ -125,6 +124,6 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", checkNSName, checkNS.Name)
 		}
 	}
-	// Cleanup is automatic on the way out
+
 	return nil
 }

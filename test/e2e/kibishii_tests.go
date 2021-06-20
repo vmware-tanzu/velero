@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -35,12 +34,12 @@ const (
 	jumpPadPod        = "jump-pad"
 )
 
-func installKibishiiWorkload(client testClient, cloudPlatform string) error {
+func installKibishiiWorkload(client testClient, cloudPlatform, nsLabel string) error {
 	fmt.Println("Creating the kibishii namespace and workload")
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
 
-	if err := createNamespace(fiveMinTimeout, client, kibishiiNamespace); err != nil {
+	if err := createNamespace(fiveMinTimeout, client, kibishiiNamespace, nsLabel); err != nil {
 		return errors.Wrapf(err, "Failed to create the namespace kibishii for the Kibishii workload")
 	}
 
@@ -75,7 +74,7 @@ func installKibishiiWorkload(client testClient, cloudPlatform string) error {
 	return err
 }
 
-func terminateKibishiiWorkload(client testClient) error {
+func terminateKibishiiWorkload(client testClient, nsLabel string) error {
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
 
@@ -86,14 +85,14 @@ func terminateKibishiiWorkload(client testClient) error {
 	timeout := 10 * time.Minute
 
 	// delete the ns
-	if err := client.clientGo.CoreV1().Namespaces().Delete(oneHourTimeout, kibishiiNamespace, metav1.DeleteOptions{}); err != nil {
-		return errors.Wrap(err, "Failed to delete the kibishii namespace")
+	if err := deleteNamespaceListWithLabel(oneHourTimeout, client, nsLabel); err != nil {
+		return errors.Wrap(err, "failed to delete the kibishii namespace")
 	}
 
 	// wait for ns delete
 	err := waitForNamespaceDeletion(fiveMinTimeout, interval, timeout, client, kibishiiNamespace)
 	if err != nil {
-		return errors.Wrap(err, "Failed to wait for the kibishii namespace to terminate")
+		return errors.Wrap(err, "failed to wait for the kibishii namespace to terminate")
 	}
 
 	return nil
@@ -107,7 +106,7 @@ func terminateKibishiiWorkload(client testClient) error {
 // - verifies the data restored is what's expected
 // Assumes the kibishii workload has been created and Velero has been installed.
 func runKibishiiTests(client testClient, testNamespace testNamespace, providerName, veleroCLI, backupName,
-	restoreName, backupLocation string, useVolumeSnapshots bool) error {
+	restoreName, backupLocation, nsLabel string, useVolumeSnapshots bool) error {
 	fmt.Println("Starting the backup and restore of the kibishii workload")
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
@@ -145,7 +144,7 @@ func runKibishiiTests(client testClient, testNamespace testNamespace, providerNa
 	}
 
 	fmt.Println("Simulating a disaster by removing the kibishii namespace")
-	if err := terminateKibishiiWorkload(client); err != nil {
+	if err := terminateKibishiiWorkload(client, nsLabel); err != nil {
 		return errors.Wrap(err, "failed to simulate a disaster")
 	}
 
