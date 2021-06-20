@@ -40,10 +40,11 @@ func ensureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
 }
 
-// createNamespace creates a kubernetes namespace and adds optional label value
-func createNamespace(ctx context.Context, client testClient, namespace, label string) error {
+// createNamespace creates a Kubernetes namespace with the given name and adds the
+// label key "e2e:". The optional labelValue parameter sets the label value: "e2e:<labelValue>".
+func createNamespace(ctx context.Context, client testClient, namespace, labelValue string) error {
 	ns := builder.ForNamespace(namespace).Result()
-	addE2ELabel(ns, label)
+	addE2ELabel(ns, labelValue)
 	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
@@ -56,7 +57,7 @@ func getNamespace(ctx context.Context, client testClient, namespace string) (*co
 	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
-// deleteNamespaceListWithLabel will delete all namespaces that match the given label
+// deleteNamespaceListWithLabel will delete all namespaces that match the label "e2e:<labelValue>".
 func deleteNamespaceListWithLabel(ctx context.Context, client testClient, labelValue string) error {
 	if labelValue == "" {
 		return errors.New("a label must be specified to delete only the intented namespaces and not all")
