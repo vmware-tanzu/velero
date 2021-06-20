@@ -15,15 +15,6 @@ Running the E2E tests expects:
     1. With necessary storage drivers/provisioners installed.
 1. `kubectl` installed locally.
 
-## Limitations
-
-These are the current set of limitations with the E2E tests.
-
-1. E2E tests only accepts credentials only for a single provider and for that reason, only tests for a single provider can be run at a time.
-1. Each E2E test suite installs an instance of Velero to run tests and uninstalls it after test completion. It is possible that a test suite may be installing Velero while another may be uninstalling Velero. This race condition can lead to tests being flaky and cause false negatives. The options for resolving this are:
-    1. Make each test suite setup wait for Velero to be uninstalled before attempting to install as part of its setup.
-    1. Make each test suite install Velero in a different namespace.
-
 ## Configuration for E2E tests
 
 Please look at the [e2e_suite_test.go](e2e_suite_test.go) for the set of flags needed to configure Velero. Those configurations or parameters are used to generate install options for Velero for each test suite.
@@ -66,7 +57,7 @@ The test will detect when it is configured with a provider other than Kind but w
 1. Run Ginko-focused Restore Multi-API Groups tests using Minio as the backup storage location: 
 
    ```bash
-   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=Kind OBJECT_STORE_PROVIDER=aws VELERO_NAMESPACE="velero" GINKGO_FOCUS="API group versions" make test-e2e
+   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=Kind OBJECT_STORE_PROVIDER=aws GINKGO_FOCUS="API group versions" make test-e2e
    ```
 
 1. Run Velero tests in a Kind cluster with AWS (or Minio) as the storage provider and use Microsoft Azure as the storage provider for an additional Backup Storage Location:

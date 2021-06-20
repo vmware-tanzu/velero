@@ -63,10 +63,8 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 
 			// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
 			backupRestoreNamespace = backupRestoreNamespace + "-" + testNamespace(randomString(5, backupRestoreNamespace.String()))
-			if installVelero {
-				Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
-					cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
-			}
+			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
 			if err := installKibishiiWorkload(client, cloudProvider); err != nil {
 				Expect(err).To(Succeed(), "Failed to install the Kibishii workload")
@@ -79,10 +77,8 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 				Expect(err).To(Succeed(), "Failed to terminate the Kibishii workload")
 			}
 
-			if installVelero {
-				err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, backupRestoreNamespace)
-				Expect(err).To(Succeed())
-			}
+			err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, backupRestoreNamespace)
+			Expect(err).To(Succeed())
 		})
 
 		When("single credential is configured", func() {
@@ -113,10 +109,8 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 
 			// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
 			backupRestoreNamespace = backupRestoreNamespace + "-" + testNamespace(randomString(5, backupRestoreNamespace.String()))
-			if installVelero {
-				Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
-					cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
-			}
+			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
 			if err := installKibishiiWorkload(client, cloudProvider); err != nil {
 				Expect(err).To(Succeed(), "Failed to install the Kibishii workload")
@@ -129,10 +123,8 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 				Expect(err).To(Succeed(), "Failed to terminate the Kibishii workload")
 			}
 
-			if installVelero {
-				err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, backupRestoreNamespace)
-				Expect(err).To(Succeed())
-			}
+			err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, backupRestoreNamespace)
+			Expect(err).To(Succeed())
 		})
 
 		When("additional unique credential is configured", func() {

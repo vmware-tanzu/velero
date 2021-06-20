@@ -28,7 +28,7 @@ import (
 var (
 	veleroCLI, veleroImage, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, cloudProvider, objectStoreProvider string
 	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials               string
-	installVelero, force                                                                                                         bool
+	force                                                                                                                        bool
 )
 
 func init() {
@@ -41,7 +41,6 @@ func init() {
 	flag.StringVar(&bslConfig, "bsl-config", "", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&bslPrefix, "prefix", "", "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flag.StringVar(&vslConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
-	flag.BoolVar(&installVelero, "install-velero", true, "Install/uninstall velero during the test.  Optional.")
 
 	// Flags to create an additional BSL for multiple credentials test
 	flag.StringVar(&additionalBSLProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")

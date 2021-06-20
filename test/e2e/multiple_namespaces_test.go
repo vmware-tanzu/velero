@@ -26,18 +26,14 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 
-		if installVelero {
-			Expect(veleroInstall(client.ctx, backupRestorMultipleeNamespaces, veleroImage, cloudProvider, objectStoreProvider,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", false)).To(Succeed())
-		}
+		Expect(veleroInstall(client.ctx, backupRestorMultipleeNamespaces, veleroImage, cloudProvider, objectStoreProvider,
+			cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", false)).To(Succeed())
 	})
 
 	AfterEach(func() {
-		if installVelero {
-			timeoutCTX, _ := context.WithTimeout(client.ctx, time.Minute)
-			err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestorMultipleeNamespaces)
-			Expect(err).To(Succeed())
-		}
+		timeoutCTX, _ := context.WithTimeout(client.ctx, time.Minute)
+		err := veleroUninstall(timeoutCTX, client.kubebuilder, veleroCLI, backupRestorMultipleeNamespaces)
+		Expect(err).To(Succeed())
 	})
 
 	When("I create 2 namespaces", func() {

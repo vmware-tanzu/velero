@@ -58,23 +58,21 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 
 		// TODO: install Velero once for the test suite once feature flag is
 		// removed and velero installation becomes the same as other e2e tests.
-		if installVelero {
-			err = veleroInstall(
-				client.ctx,
-				apiGroupNamespace,
-				veleroImage,
-				cloudProvider,
-				objectStoreProvider,
-				cloudCredentialsFile,
-				bslBucket,
-				bslPrefix,
-				bslConfig,
-				vslConfig,
-				"EnableAPIGroupVersions", // TODO: remove when feature flag is removed
-				false,
-			)
-			Expect(err).NotTo(HaveOccurred())
-		}
+		err = veleroInstall(
+			client.ctx,
+			apiGroupNamespace,
+			veleroImage,
+			cloudProvider,
+			objectStoreProvider,
+			cloudCredentialsFile,
+			bslBucket,
+			bslPrefix,
+			bslConfig,
+			vslConfig,
+			"EnableAPIGroupVersions", // TODO: remove when feature flag is removed
+			false,
+		)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
@@ -88,11 +86,8 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		if installVelero {
-			err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, apiGroupNamespace)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
+		err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, apiGroupNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
