@@ -17,13 +17,35 @@ Running the E2E tests expects:
 
 ## Configuration for E2E tests
 
-Please look at the [e2e_suite_test.go](e2e_suite_test.go) for the set of flags needed to configure Velero. Those configurations or parameters are used to generate install options for Velero for each test suite.
+The [e2e_suite_test.go](e2e_suite_test.go) contains the set of flags needed to configure Velero. Those configurations or parameters are used to generate install options for Velero for each test suite. The input to these flags come from the variables in the [Makefile](Makefile).
 
-Tests can be run with the Kubernetes cluster hosted in various cloud providers or in a _Kind_ cluster with storage in
-a specified object store type.  Currently supported cloud provider types are _aws_, _azure_, _vsphere_ and _Kind_.
+To configure a single test spec to run, prepend the `GINKGO_FOCUS` variable with the name of the spec. 
+
+### Examples: 
+
+To run the spec `It("should successfully back up and restore [2 namespaces]"...`, prepend:
+
+`GINKGO_FOCUS='2 namespaces'`
+
+To skip the spec `Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups"`, prepend:
+ 
+`GINKGO_SKIP='Snapshot'` - This flag setting is particularly useful for running the e2e tests against a Kind cluster, since it will run all tests except the tests related to snapshotting.
+
+If a test spec is a subtest and you make it the focus of the test run, it will run once for all parent tests. If you want to isolate the test run to only 1 set of parent/child, using the `GINKGO_SKIP` + `GINKGO_FOCUS` will work. For example, to run `Describe("[Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups"` + `It("should be successfully backed up and restored [using the default BackupStorageLocation]"` and skip the `[Snapshot]` spec:
+
+`GINKGO_SKIP='Snapshot' GINKGO_FOCUS='using the default BackupStorageLocation'` 
+
+Any test that is skipped by setting the combination of those flags will keep from having the BeforeEach/AfterEach actions invoked for those tests.
+
+Note: By default, the test suite is configured to skip a test that creates 2,500 namespaces. To enable this test to run, set:
+
+`GINKGO_SKIP2=''`
+
 ## Running tests locally using `make`
 
 E2E tests can be run from the Velero repository root by running `make test-e2e`. While running E2E tests using `make` the E2E test configuration values are passed using `make` variables.
+
+Tests can be run with the Kubernetes cluster hosted in various cloud providers or in a _Kind_ cluster with storage in a specified object store type.  Currently supported cloud provider types are _aws_, _azure_, _vsphere_ and _kind_.
 
 ### Run tests with Kind
 
@@ -35,7 +57,7 @@ E2E tests can be run from the Velero repository root by running `make test-e2e`.
 
 ### Run tests on a provider
 
-Note: When running tests that take a snapshot on a provider, the optional paramenter `vsl-config` **must** be configued. This parameter is optional for tests where only objects (and not snapshots) are being backed up /restored. If you don't configure this parameter, be sure you are only running tests that don't need a snapshot. See the section [Filtering tests](#Filtering-tests) below for how to select specific tests.
+Note: When running tests that take a snapshot on a provider, the optional paramenter `vsl-config` **must** be configued. This parameter is optional for tests where only objects (and not snapshots) are being backed up /restored. If you don't configure this parameter, be sure you are only running tests that don't need a snapshot.
 
 The test will detect when it is configured with a provider other than Kind but without this configuration and ask for confirmation. To skip this check, add `FORCE=true` to pass it as a variable to the test command. To configure the snapshot settings, pass the `VSL_CONFIG` parameter with the proper values for your provider. Here's an example for AWS: `VSL_CONFIG=region=us-west-2`.
 
@@ -74,18 +96,35 @@ The test will detect when it is configured with a provider other than Kind but w
 
 By default, the e2e tests will run against the `velero/velero:main` version of Velero. If you would like to test the code with any other image of Velero, pass the `<registry/image:version>` value to the `VELERO_IMAGE` paramenter to the `make test-e2e` command.
 
-## Filtering tests
-
-Velero E2E tests uses [Ginkgo](https://onsi.github.io/ginkgo/) testing framework which allows a subset of the tests to be run using the [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) flags to ginkgo.
-
-The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. This can be used to focus on specific tests.
-
-Example:  `GINKGO_FOCUS='APIGroup'`
-
 ## Adding tests
+
+### Add a label to all resources created in a test
+To faciliate cleanup in a cluster when things go awry, please add a label to every resource your test creates. The label should have `e2e` as the key, and a unique name as the value. Example:
+
+`e2e:multiple-namespaces`
+
+### Util code
+
+Please look at the files [common.go](common.go) and [velero_utils.go](velero_utils.go) for functionality that you will likely need.
 
 ### API clients
 When adding a test, aim to instantiate an API client only once at the beginning of the test. There is a constructor `newTestClient` that facilitates the configuration and instantiation of clients. Also, please use the `kubebuilder` runtime controller client for any new test, as we will phase out usage of `client-go` API clients.
 
 ### Tips
-Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall. 
+1) Logs
+
+    Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall. 
+
+2) Clean up dangling resources
+
+    If you had to stop a test that created resources and you need to manually delete them, the easiest way is to use the label added when creating resources.
+
+    To see a list of namespaces and their labels, for example:
+
+    `kubectl get ns -A --show-labels`
+    NAME                       STATUS   AGE    LABELS
+    multiple-namespaces-llpn   Active   24m    e2e=multiple-namespaces
+
+    To delete:
+
+    `kubectl delete ns -l e2e=multiple-namespaces`
