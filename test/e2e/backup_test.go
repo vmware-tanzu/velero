@@ -50,7 +50,7 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
-	nsLabel := "kibishii-namespace"
+	labelValue := "backup-restore-kibishii"
 
 	Describe("Backing up and restoring the kibishii workload", func() {
 		BeforeEach(func() {
@@ -67,14 +67,14 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
-			if err := installKibishiiWorkload(client, cloudProvider, nsLabel); err != nil {
+			if err := installKibishiiWorkload(client, cloudProvider, labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to install the Kibishii workload")
 			}
 		})
 
 		AfterEach(func() {
 			fmt.Print("\nInitialize test clean up...\n")
-			if err := terminateKibishiiWorkload(client, nsLabel); err != nil {
+			if err := terminateKibishiiWorkload(client, labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to terminate the Kibishii workload")
 			}
 
@@ -88,7 +88,7 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 				restoreName = "restore-" + uuidgen.String()
 				// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 				// KinD. So use the kind installation for Kibishii.
-				Expect(runKibishiiTests(client, backupRestoreNamespace, cloudProvider, veleroCLI, backupName, restoreName, "default", nsLabel, useVolumeSnapshots)).To(Succeed(),
+				Expect(runKibishiiTests(client, backupRestoreNamespace, cloudProvider, veleroCLI, backupName, restoreName, "default", labelValue, useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore the Kibishii workload on the %s namespace and using the default BSL", backupRestoreNamespace)
 			})
 
@@ -113,14 +113,14 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
-			if err := installKibishiiWorkload(client, cloudProvider, nsLabel); err != nil {
+			if err := installKibishiiWorkload(client, cloudProvider, labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to install the Kibishii workload")
 			}
 		})
 
 		AfterEach(func() {
 			fmt.Print("\nInitialize test clean up...\n")
-			if err := terminateKibishiiWorkload(client, nsLabel); err != nil {
+			if err := terminateKibishiiWorkload(client, labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to terminate the Kibishii workload")
 			}
 
@@ -161,7 +161,7 @@ func backup_restore_test(backupRestoreNamespace testNamespace, useVolumeSnapshot
 					backupName = fmt.Sprintf("backup-%s-%s", bsl, uuidgen)
 					restoreName = fmt.Sprintf("restore-%s-%s", bsl, uuidgen)
 
-					Expect(runKibishiiTests(client, backupRestoreNamespace, cloudProvider, veleroCLI, backupName, restoreName, bsl, nsLabel, useVolumeSnapshots)).To(Succeed(),
+					Expect(runKibishiiTests(client, backupRestoreNamespace, cloudProvider, veleroCLI, backupName, restoreName, bsl, labelValue, useVolumeSnapshots)).To(Succeed(),
 						"Failed to successfully backup and restore Kibishii on the %s namespace and using the %s BSL", backupRestoreNamespace, bsl)
 				}
 			})

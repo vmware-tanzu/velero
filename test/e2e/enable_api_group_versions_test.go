@@ -45,7 +45,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
 	apiGroupNamespace := testNamespace("api-group")
-	nsLabel := "api-group-namespace"
+	labelValue := "api-group-version"
 
 	BeforeEach(func() {
 		resource = "rockbands"
@@ -87,7 +87,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		err = deleteNamespaceListWithLabel(client.ctx, client, nsLabel)
+		err = deleteNamespaceListWithLabel(client.ctx, client, labelValue)
 		Expect(err).NotTo(HaveOccurred())
 
 		err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, apiGroupNamespace)
@@ -102,13 +102,13 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 				apiGroupNamespace,
 				resource,
 				group,
-				nsLabel,
+				labelValue,
 			)).To(Succeed(), "Failed to successfully backup and restore multiple API Groups")
 		})
 	})
 })
 
-func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiGroupNamespace testNamespace, resource, group, nsLabel string) error {
+func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiGroupNamespace testNamespace, resource, group, labelValue string) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -225,7 +225,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiG
 		for version, cr := range tc.srcCRs {
 			ns := resource + "-src-" + version
 
-			if err := createNamespace(ctx, client, ns, nsLabel); err != nil {
+			if err := createNamespace(ctx, client, ns, labelValue); err != nil {
 				return errors.Wrapf(err, "create %s namespace", ns)
 			}
 
@@ -256,7 +256,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiG
 			return errors.Wrapf(err, "delete music-system CRD from source cluster")
 		}
 
-		if err := deleteNamespaceListWithLabel(ctx, client, nsLabel); err != nil {
+		if err := deleteNamespaceListWithLabel(ctx, client, labelValue); err != nil {
 			return errors.Wrap(err, "failed to delete namespaces")
 		}
 

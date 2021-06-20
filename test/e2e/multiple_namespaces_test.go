@@ -19,7 +19,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
 	backupRestorMultipleeNamespaces := testNamespace("backup-restore-multiple")
-	nsLabel := "multiple-namespaces"
+	labelValue := "multiple-namespaces"
 
 	BeforeEach(func() {
 		var err error
@@ -44,7 +44,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 			fiveMinTimeout, _ := context.WithTimeout(client.ctx, 5*time.Minute)
 
 			if err := runMultipleNamespaceTest(fiveMinTimeout, client, backupRestorMultipleeNamespaces, 2,
-				"nstest-"+uuidgen.String(), backupName, restoreName, "default", nsLabel); err != nil {
+				"nstest-"+uuidgen.String(), backupName, restoreName, "default", labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to successfully backup to/restore from 2 namespaces")
 			}
 		})
@@ -57,7 +57,7 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 			oneHourTimeout, _ := context.WithTimeout(client.ctx, 1*time.Hour)
 
 			if err := runMultipleNamespaceTest(oneHourTimeout, client, backupRestorMultipleeNamespaces, 2500,
-				"nstest-"+uuidgen.String(), backupName, restoreName, "default", nsLabel); err != nil {
+				"nstest-"+uuidgen.String(), backupName, restoreName, "default", labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to successfully backup to/restore from 2500 namespaces")
 			}
 		})
@@ -65,9 +65,9 @@ var _ = Describe("Backup/restore of multiple namespaces", func() {
 })
 
 func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamespace testNamespace, numberOfNamespaces int,
-	nsBaseName, backupName, restoreName, backupLocation, nsLabel string) error {
+	nsBaseName, backupName, restoreName, backupLocation, labelValue string) error {
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
-	defer deleteNamespaceListWithLabel(ctx, client, nsLabel) // Run at exit for final cleanup
+	defer deleteNamespaceListWithLabel(ctx, client, labelValue) // Run at exit for final cleanup
 
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
 	// we will exclude all of the namespaces that existed prior to the test from the backup.
@@ -80,7 +80,7 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 	// Create new namespaces for testing
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
-		if err := createNamespace(ctx, client, createNSName, nsLabel); err != nil {
+		if err := createNamespace(ctx, client, createNSName, labelValue); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
@@ -100,7 +100,7 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, testNamesp
 	}
 
 	// Simulate a disaster
-	if err := deleteNamespaceListWithLabel(ctx, client, nsLabel); err != nil {
+	if err := deleteNamespaceListWithLabel(ctx, client, labelValue); err != nil {
 		return errors.Wrap(err, "failed disaster simulation")
 	}
 

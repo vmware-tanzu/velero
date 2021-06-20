@@ -34,12 +34,12 @@ const (
 	jumpPadPod        = "jump-pad"
 )
 
-func installKibishiiWorkload(client testClient, cloudPlatform, nsLabel string) error {
+func installKibishiiWorkload(client testClient, cloudPlatform, labelValue string) error {
 	fmt.Println("Creating the kibishii namespace and workload")
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
 
-	if err := createNamespace(fiveMinTimeout, client, kibishiiNamespace, nsLabel); err != nil {
+	if err := createNamespace(fiveMinTimeout, client, kibishiiNamespace, labelValue); err != nil {
 		return errors.Wrapf(err, "Failed to create the namespace kibishii for the Kibishii workload")
 	}
 
@@ -74,7 +74,7 @@ func installKibishiiWorkload(client testClient, cloudPlatform, nsLabel string) e
 	return err
 }
 
-func terminateKibishiiWorkload(client testClient, nsLabel string) error {
+func terminateKibishiiWorkload(client testClient, labelValue string) error {
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
 
@@ -85,7 +85,7 @@ func terminateKibishiiWorkload(client testClient, nsLabel string) error {
 	timeout := 10 * time.Minute
 
 	// delete the ns
-	if err := deleteNamespaceListWithLabel(oneHourTimeout, client, nsLabel); err != nil {
+	if err := deleteNamespaceListWithLabel(oneHourTimeout, client, labelValue); err != nil {
 		return errors.Wrap(err, "failed to delete the kibishii namespace")
 	}
 
@@ -106,7 +106,7 @@ func terminateKibishiiWorkload(client testClient, nsLabel string) error {
 // - verifies the data restored is what's expected
 // Assumes the kibishii workload has been created and Velero has been installed.
 func runKibishiiTests(client testClient, testNamespace testNamespace, providerName, veleroCLI, backupName,
-	restoreName, backupLocation, nsLabel string, useVolumeSnapshots bool) error {
+	restoreName, backupLocation, labelValue string, useVolumeSnapshots bool) error {
 	fmt.Println("Starting the backup and restore of the kibishii workload")
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
@@ -144,7 +144,7 @@ func runKibishiiTests(client testClient, testNamespace testNamespace, providerNa
 	}
 
 	fmt.Println("Simulating a disaster by removing the kibishii namespace")
-	if err := terminateKibishiiWorkload(client, nsLabel); err != nil {
+	if err := terminateKibishiiWorkload(client, labelValue); err != nil {
 		return errors.Wrap(err, "failed to simulate a disaster")
 	}
 

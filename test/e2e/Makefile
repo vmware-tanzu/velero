@@ -51,7 +51,7 @@ KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin/
 GINKGO_SKIP ?= 
 GINKGO_FOCUS ?=
-GINKGO_SKIP2 ?= "2500 namespaces"
+GINKGO_SKIP_LONG ?= "2500 namespaces"
 VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 
 ## --------------------------------------
@@ -81,7 +81,7 @@ run: ginkgo
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
 		@[ "${CLOUD_PROVIDER}" ] && echo "Using cloud provider ${CLOUD_PROVIDER}" || \
 		    (echo "Cloud provider for target cloud/plug-in provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
-	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" -skip="$(GINKGO_SKIP)" -skip="$(GINKGO_SKIP2)" . -- -velerocli=$(VELERO_CLI) \
+	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" -skip="$(GINKGO_SKIP)" -skip="$(GINKGO_SKIP_LONG)" . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-credentials-file=$(CREDS_FILE) \
 		-bucket=$(BSL_BUCKET) \

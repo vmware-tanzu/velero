@@ -28,9 +28,11 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 // ensureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
@@ -38,9 +40,10 @@ func ensureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
 }
 
-// createNamespace creates a kubernetes namespace and adds optional labels (sets of k/v)
-func createNamespace(ctx context.Context, client testClient, namespace string, labels ...string) error {
-	ns := builder.ForNamespace(namespace).ObjectMeta(builder.WithLabels(labels...)).Result()
+// createNamespace creates a kubernetes namespace and adds optional label value
+func createNamespace(ctx context.Context, client testClient, namespace, label string) error {
+	ns := builder.ForNamespace(namespace).Result()
+	addE2ELabel(ns, label)
 	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
@@ -54,18 +57,23 @@ func getNamespace(ctx context.Context, client testClient, namespace string) (*co
 }
 
 // deleteNamespaceListWithLabel will delete all namespaces that match the given label
-func deleteNamespaceListWithLabel(ctx context.Context, client testClient, label string) error {
-	if label == "" {
+func deleteNamespaceListWithLabel(ctx context.Context, client testClient, labelValue string) error {
+	if labelValue == "" {
 		return errors.New("a label must be specified to delete only the intented namespaces and not all")
 	}
 
 	namespaces, err := client.clientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
-		LabelSelector: label,
+		LabelSelector: e2eLabel(labelValue),
 	})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 
+	if len(namespaces.Items) == 0 {
+		return errors.Errorf("\na request was made to delete namespaces with the label %s, but none was found\n", labelValue)
+	}
+
+	fmt.Println("Deleting namespaces with the label", labelValue)
 	for _, ns := range namespaces.Items {
 		err = client.clientGo.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 		if err != nil {
@@ -111,6 +119,7 @@ func createSecretFromFiles(ctx context.Context, client testClient, testNamespace
 	}
 
 	secret := builder.ForSecret(testNamespace.String(), name).Data(data).Result()
+	addE2ELabel(secret, "")
 	_, err := client.clientGo.CoreV1().Secrets(testNamespace.String()).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }
@@ -149,4 +158,26 @@ func randomString(n int, source string) string {
 		s[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(s)
+}
+
+// addE2ELabel labels the provided object with a "e2e" key and, optionally, the given label value.
+// Example: an input of "multiple-resources" will add
+// a properly formatted label of "e2e=multiple-resources".
+// An empty value will label the object with only the key "e2e".
+func addE2ELabel(obj metav1.Object, labelValue string) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels["e2e"] = label.GetValidName(labelValue)
+	obj.SetLabels(labels)
+}
+
+func e2eLabel(labelValue string) string {
+	label := map[string]string{
+		"e2e": labelValue,
+	}
+
+	return labels.FormatLabels(label)
 }
