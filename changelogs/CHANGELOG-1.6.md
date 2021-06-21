@@ -1,3 +1,25 @@
+## v1.6.1
+### 2021-06-21
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.6.1
+
+### Container Image
+`velero/velero:v1.6.1`
+
+### Documentation
+https://velero.io/docs/v1.6/
+
+### Upgrading
+https://velero.io/docs/v1.6/upgrade-to-1.6/
+
+### All Changes
+
+  * Fix CR restore regression introduced in 1.6 restore progress. (#3845, @sseago)
+  * Skip the restore of volumes that originally came from a projected volume when using restic. (#3877, @zubron)
+  * skip backuping projected volume when using restic (#3866, @alaypatel07)
+  * 🐛 Fix plugin name derivation from image name (#3711, @ashish-amarnath)
+
 ## v1.6.0
 ### 2021-04-12
 
