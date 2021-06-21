@@ -67,7 +67,10 @@ Methods can not be removed or modified.
 This restriction will be in place until Velero v2 when backwards incompatible changes may be included.
 
 Although adding new rpc methods to a service is considered a backwards compatible change within gRPC, due to the way the proto definitions are compiled and included in the framework used by plugins, this will require every plugin to implement the new methods.
-Instead, we are opting to treat _any_ API change as one requiring versioning.
+Instead, we are opting to treat the addition of a method to an API as one requiring versioning.
+
+The addition of optional fields to existing structs which are used as parameters to or return values of API methods will not be considered as a change requiring versioning.
+These kinds of changes do not modify method signatures and have been safely made in the past with no impact on existing plugins.
 
 ## Detailed Design
 
@@ -123,35 +126,62 @@ When the plugin manager is requested to provide a particular plugin, it checks t
 If it is available in the registry, the manager retrieves a `RestartableProcess` for the plugin binary, creating it if it does not already exist.
 That `RestartableProcess` is then used by individual restartable implementations of a plugin kind (e.g. `restartableObjectStore`, `restartableVolumeSnapshotter`).
 
-As new plugin versions are added, the plugin manager will be modified to retrieve the latest version of a plugin kind, adapting earlier versions of the plugin kind if possible.
+As new plugin versions are added, the plugin manager will be modified to always retrieve the latest version of a plugin kind.
 This is to allow the remainder of the Velero codebase to assume that it will always interact with the latest version of a plugin.
-The manager will check the registry for the plugin kind and name, and if the requested version is not found, it will attempt to fetch previous versions of the plugin kind and adapt it if possible.
+If the latest version of a plugin is not available, it will fall back to previous versions and use an implementation adapted to the latest version if available.
 It will be up to the author of new plugin versions to determine whether a previous version of a plugin can be adapted to work with the interface of the new version.
 
+For each plugin kind, a new "Restartable<PluginKind>" struct will be introduced which will contain the plugin Kind and a function, `Get`, which will instantiate a restartable instance of that plugin kind and perform any adaptation required to make it compatible with the latest version.
+For example, "RestartableObjectStore" or "RestartableVolumeSnapshotter".
+For each restartable plugin kind, a new function will be introduced which will return a slice of "Restartable<PluginKind>" objects, sorted by version in descending order.
+
+The manager will iterate through the list of "Restartable<PluginKind>s" and will check the registry for the given plugin kind and name.
+If the requested version is not found, it will skip and continue to iterate, attempting to fetch previous versions of the plugin kind.
+Once the requested version is found, the `Get` function will be called, returning the restartable implementation of the latest version of that plugin Kind.
+
 ```
+type RestartableObjectStore struct {
+	kind framework.PluginKind
+	// Get returns a restartable ObjectStore for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) v2.ObjectStore
+}
+
+func (m *manager) restartableObjectStores() []RestartableObjectStore {
+	return []RestartableObjectStore{
+		{
+			kind: framework.PluginKindObjectStoreV2,
+			Get: func(name string, restartableProcess RestartableProcess) v2.ObjectStore {
+				return newRestartableObjectStoreV2(name, restartableProcess), nil
+			},
+		},
+		{
+			kind: framework.PluginKindObjectStore,
+			Get: func(name string, restartableProcess RestartableProcess) v2.ObjectStore {
+				r := newRestartableObjectStore(name, restartableProcess)
+				// Adapt v1 plugin to v2
+				return newAdaptedV1ObjectStore(r), nil
+			},
+		},
+	}
+}
+
 // GetObjectStore returns a restartableObjectStore for name.
 func (m *manager) GetObjectStore(name string) (v2.ObjectStore, error) {
-    name = sanitizeName(name)
+	name = sanitizeName(name)
 
-    restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStoreV2, name)
-    if err != nil {
-        // Check if plugin was not found
-        if errors.Is(err, pluginNotFoundError) {
-            // Try again but with previous version
-            restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
-            if err != nil {
-                // No v1 version found, return
-                return nil, err
-            }
+	for _, restartableObjStore := range m.restartableObjectStores() {
+		restartableProcess, err := m.getRestartableProcess(restartableObjStore.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableObjStore.Get(name, restartableProcess), nil
+	}
 
-            r := newRestartableObjectStore(name, restartableProcess)
-            // Adapt v1 plugin to v2
-            return newAdaptedV1ObjectStore(r), nil
-        } else {
-            return nil, err
-        }
-    }
-    return newRestartableObjectStoreV2(name, restartableProcess), nil
+	return nil, fmt.Errorf("unable to get valid ObjectStore for %q", name)
 }
 ```
 
@@ -167,9 +197,11 @@ These are currently located within "pkg/plugin/clientmgmt" but will be rearrange
 
 ## Versioning Considerations
 
-It should be noted that if changes are being made to a plugin's API, it will only be necessary to bump the version once within a release cycle, regardless of how many changes are made within that cycle.
-This is because the changes will only impact consumers when they upgrade the versions of the Velero library that they import.
-Once a new version of Velero has been released however, any further changes will need to follow the process above and use a new version.
+It should be noted that if changes are being made to a plugin's API, it will only be necessary to bump the API version once within a release cycle, regardless of how many changes are made within that cycle.
+This is because the changes will only be available to consumers when they upgrade to the next minor version of the Velero library.
+New plugin API versions will not be introduced or backported to patch releases.
+
+Once a new minor or major version of Velero has been released however, any further changes will need to follow the process above and use a new API version.
 
 ## Alternatives Considered
 
