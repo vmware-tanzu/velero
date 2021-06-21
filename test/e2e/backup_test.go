@@ -74,7 +74,7 @@ func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapsh
 
 		AfterEach(func() {
 			fmt.Print("\nInitialize test clean up...\n")
-			if err := terminateKibishiiWorkload(client, labelValue); err != nil {
+			if _, err := terminateKibishiiWorkload(client, labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to terminate the Kibishii workload")
 			}
 
@@ -120,7 +120,7 @@ func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapsh
 
 		AfterEach(func() {
 			fmt.Print("\nInitialize test clean up...\n")
-			if err := terminateKibishiiWorkload(client, labelValue); err != nil {
+			if _, err := terminateKibishiiWorkload(client, labelValue); err != nil {
 				Expect(err).To(Succeed(), "Failed to terminate the Kibishii workload")
 			}
 

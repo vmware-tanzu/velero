@@ -87,7 +87,7 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		err = deleteNamespaceListWithLabel(client.ctx, client, labelValue)
+		_, err = deleteNamespaceListWithLabel(client.ctx, client, labelValue)
 		Expect(err).NotTo(HaveOccurred())
 
 		err = veleroUninstall(client.ctx, client.kubebuilder, veleroCLI, apiGroupNamespace)
@@ -252,11 +252,13 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, apiG
 			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)
 		}
 
+		// Simulate a disaster.
 		if err := deleteCRD(ctx, tc.srcCrdYaml); err != nil {
-			return errors.Wrapf(err, "delete music-system CRD from source cluster")
+			return errors.Wrapf(err, "failed to delete music-system CRD from source cluster")
 		}
 
-		if err := deleteNamespaceListWithLabel(ctx, client, labelValue); err != nil {
+		namespaces, err := deleteNamespaceListWithLabel(ctx, client, labelValue)
+		if err != nil || len(namespaces) == 0 {
 			return errors.Wrap(err, "failed to delete namespaces")
 		}
 

@@ -100,7 +100,8 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, veleroName
 	}
 
 	// Simulate a disaster
-	if err := deleteNamespaceListWithLabel(ctx, client, labelValue); err != nil {
+	namespaces, err := deleteNamespaceListWithLabel(ctx, client, labelValue)
+	if err != nil || len(namespaces) == 0 {
 		return errors.Wrap(err, "failed disaster simulation")
 	}
 

@@ -57,32 +57,30 @@ func getNamespace(ctx context.Context, client testClient, namespace string) (*co
 	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
-// deleteNamespaceListWithLabel will delete all namespaces that match the label "e2e:<labelValue>".
-func deleteNamespaceListWithLabel(ctx context.Context, client testClient, labelValue string) error {
+// deleteNamespaceListWithLabel deletes all namespaces that match the label "e2e:<labelValue>". If a matching list
+// is found and successfully deleted, the list of the deleted namespaces is returned. When calling this function
+// inside tear-down blocks probably not necessary to check if namespaces were found.
+func deleteNamespaceListWithLabel(ctx context.Context, client testClient, labelValue string) ([]corev1api.Namespace, error) {
 	if labelValue == "" {
-		return errors.New("a label must be specified to delete only the intented namespaces and not all")
+		return nil, errors.New("a label must be specified to delete only the intented namespaces and not all")
 	}
 
-	namespaces, err := client.clientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+	namespaceList, err := client.clientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: e2eLabel(labelValue),
 	})
 	if err != nil {
-		return errors.Wrap(err, "Could not retrieve namespaces")
-	}
-
-	if len(namespaces.Items) == 0 {
-		return errors.Errorf("\na request was made to delete namespaces with the label %s, but none was found\n", labelValue)
+		return nil, errors.Wrap(err, "Could not retrieve namespaces")
 	}
 
 	fmt.Println("Deleting namespaces with the label", labelValue)
-	for _, ns := range namespaces.Items {
+	for _, ns := range namespaceList.Items {
 		err = client.clientGo.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "Could not delete namespace %s", ns.Name)
+			return nil, errors.Wrapf(err, "Could not delete namespace %s", ns.Name)
 		}
 	}
 
-	return nil
+	return namespaceList.Items, nil
 }
 
 // waitForNamespaceDeletion waits for namespace to be deleted.

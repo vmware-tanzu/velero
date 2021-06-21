@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1api "k8s.io/api/core/v1"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
@@ -74,7 +75,9 @@ func installKibishiiWorkload(client testClient, cloudPlatform, labelValue string
 	return err
 }
 
-func terminateKibishiiWorkload(client testClient, labelValue string) error {
+// terminateKibishiiWorkload deletes all namespaces that match the label "e2e:<labelValue>". If it succeeeds,
+// it waits for the found namespaces to be terminated and returns the list of the namespaces deleted.
+func terminateKibishiiWorkload(client testClient, labelValue string) ([]corev1api.Namespace, error) {
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
 
@@ -85,17 +88,24 @@ func terminateKibishiiWorkload(client testClient, labelValue string) error {
 	timeout := 10 * time.Minute
 
 	// delete the ns
-	if err := deleteNamespaceListWithLabel(oneHourTimeout, client, labelValue); err != nil {
-		return errors.Wrap(err, "failed to delete the kibishii namespace")
+	var namespaces []corev1api.Namespace
+	var err error
+	if namespaces, err = deleteNamespaceListWithLabel(oneHourTimeout, client, labelValue); err != nil {
+		return namespaces, errors.Wrap(err, "failed to delete the kibishii namespace")
+	}
+
+	if len(namespaces) == 0 {
+		fmt.Printf("\nAn attempt was made to delete namespaces with the label %s, but none was found\n", labelValue)
+		return nil, nil
 	}
 
 	// wait for ns delete
-	err := waitForNamespaceDeletion(fiveMinTimeout, interval, timeout, client, kibishiiNamespace)
+	err = waitForNamespaceDeletion(fiveMinTimeout, interval, timeout, client, kibishiiNamespace)
 	if err != nil {
-		return errors.Wrap(err, "failed to wait for the kibishii namespace to terminate")
+		return namespaces, errors.Wrap(err, "failed to wait for the kibishii namespace to terminate")
 	}
 
-	return nil
+	return namespaces, nil
 }
 
 // runKibishiiTests:
@@ -144,7 +154,8 @@ func runKibishiiTests(client testClient, veleroNamespace veleroNamespace, provid
 	}
 
 	fmt.Println("Simulating a disaster by removing the kibishii namespace")
-	if err := terminateKibishiiWorkload(client, labelValue); err != nil {
+	namespaces, err := terminateKibishiiWorkload(client, labelValue)
+	if err != nil || len(namespaces) == 0 {
 		return errors.Wrap(err, "failed to simulate a disaster")
 	}
 
