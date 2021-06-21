@@ -95,7 +95,7 @@ func terminateKibishiiWorkload(client testClient, labelValue string) ([]corev1ap
 	}
 
 	if len(namespaces) == 0 {
-		fmt.Printf("\nAn attempt was made to delete namespaces with the label %s, but none was found\n", labelValue)
+		fmt.Printf("An attempt was made to delete namespaces with the label %s, but none was found\n", e2eLabel(labelValue))
 		return nil, nil
 	}
 

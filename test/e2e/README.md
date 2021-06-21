@@ -170,13 +170,13 @@ Resources created for the purpose of testing should be created in their own name
 Note: The Velero e2e suite already has functionality to create workloads, generate and load data onto it, and verify this data was properly restored. Any test that needs data can reuse this existing setup. Look for `Kibishii` related functionalaties.
 
 ###  6.2. <a name='Addalabeltoallresourcescreatedinatest'></a>Add a label to all resources created in a test
-To faciliate cleanup in a cluster when things go awry, please add a label to every resource your test creates. The label should have `e2e` as the key, and a unique name as the value. Example:
+To faciliate cleanup in a cluster when things go awry, please add a label to every resource your test creates. The label should have `velero-e2e` as the key, and a unique name as the value. Example:
 
 `e2e:multiple-namespaces`
 
 In the [common.go](common.go) file there is a helper function `addE2ELabel` to which you can pass any object and value for the label. 
 
-If you are using `yaml` files, add the`e2e=<name>` label to the manifests.
+If you are using `yaml` files, add the`velero-e2e=<name>` label to the manifests.
 
 ###  6.3. <a name='Cleaninguptestdata'></a>Cleaning up test data
 Please clean up any created test data after each test run. For example, if namespaces were created (and properly labeled), add this to the `AfterEach` block:
@@ -214,7 +214,7 @@ Finally, use the `context.Context` object that is instantiated with the `newTest
 ```
     NAME                       STATUS   AGE    LABELS
 
-    multiple-namespaces-llpn   Active   24m    e2e=multiple-namespaces
+    multiple-namespaces-llpn   Active   24m    velero-e2e=multiple-namespaces
 ```
 
 
@@ -222,6 +222,6 @@ Finally, use the `context.Context` object that is instantiated with the `newTest
 
     `kubectl delete ns -l e2e=multiple-namespaces`
 
-    To delete all resources created with the `e2e` label
+    To delete all resources created with the `velero-e2e` label
 
-    `kubectl delete ns -l e2e`
+    `kubectl delete ns -l velero-e2e`

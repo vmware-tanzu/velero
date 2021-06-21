@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/cluster-api/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,8 +18,9 @@ import (
 var _ = Describe("Backup/restore of multiple namespaces", func() {
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
-	backupRestorMultipleeNamespaces := veleroNamespace("backup-restore-multiple")
-	labelValue := "multiple-namespaces"
+	labelValue := "multiple-namespaces-" + util.RandomString(3)
+	// Randomize the namespace so resource creation doesn;t collide with previously terminating resources in the same namespace.
+	backupRestorMultipleeNamespaces := veleroNamespace("backup-restore-multiple-") + veleroNamespace(util.RandomString(5))
 
 	BeforeEach(func() {
 		var err error
@@ -69,15 +70,7 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, veleroName
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
 	defer deleteNamespaceListWithLabel(ctx, client, labelValue) // Run at exit for final cleanup
 
-	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
-	// we will exclude all of the namespaces that existed prior to the test from the backup.
-	// This needs to be done before creating the new namespaces.
-	existingNamespaces, err := client.clientGo.CoreV1().Namespaces().List(shortTimeout, metav1.ListOptions{})
-	if err != nil {
-		return errors.Wrap(err, "Could not retrieve namespaces")
-	}
-
-	// Create new namespaces for testing
+	// Create and label new namespaces for testing
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
 		if err := createNamespace(ctx, client, createNSName, labelValue); err != nil {
@@ -85,13 +78,8 @@ func runMultipleNamespaceTest(ctx context.Context, client testClient, veleroName
 		}
 	}
 
-	var excludeNamespaces []string
-	for _, excludeNamespace := range existingNamespaces.Items {
-		excludeNamespaces = append(excludeNamespaces, excludeNamespace.Name)
-	}
-
-	// Backup created namespaces but with excluded namespaces
-	if err := veleroBackupExcludeNamespaces(ctx, veleroNamespace, veleroCLI, backupName, excludeNamespaces); err != nil {
+	// Backup namespaces created with the given label
+	if err := veleroBackupNamespacesWithLabel(ctx, veleroNamespace, veleroCLI, backupName, labelValue); err != nil {
 		veleroBackupLocationStatus(ctx, veleroNamespace, veleroCLI, backupLocation)
 		veleroBackupLogs(ctx, veleroNamespace, veleroCLI, backupName)
 

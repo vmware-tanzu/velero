@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os/exec"
 	"time"
 
@@ -72,7 +71,7 @@ func deleteNamespaceListWithLabel(ctx context.Context, client testClient, labelV
 		return nil, errors.Wrap(err, "Could not retrieve namespaces")
 	}
 
-	fmt.Println("Deleting namespaces with the label", labelValue)
+	fmt.Println("Deleting namespaces with the label", e2eLabel(labelValue))
 	for _, ns := range namespaceList.Items {
 		err = client.clientGo.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 		if err != nil {
@@ -148,17 +147,6 @@ func waitForPods(ctx context.Context, client testClient, namespace string, pods 
 	return nil
 }
 
-// randomString generates a random string that is valid as a rmetadata.name for a namespace
-func randomString(n int, source string) string {
-	var letters = []rune(source)
-
-	s := make([]rune, n)
-	for i := range s {
-		s[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(s)
-}
-
 // addE2ELabel labels the provided object with a "e2e" key and, optionally, the given label value.
 // Example: an input of "multiple-resources" will add
 // a properly formatted label of "e2e=multiple-resources".
@@ -169,13 +157,13 @@ func addE2ELabel(obj metav1.Object, labelValue string) {
 		labels = make(map[string]string)
 	}
 
-	labels["e2e"] = label.GetValidName(labelValue)
+	labels["velero-e2e"] = label.GetValidName(labelValue)
 	obj.SetLabels(labels)
 }
 
 func e2eLabel(labelValue string) string {
 	label := map[string]string{
-		"e2e": labelValue,
+		"velero-e2e": labelValue,
 	}
 
 	return labels.FormatLabels(label)

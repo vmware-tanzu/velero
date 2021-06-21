@@ -31,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/cluster-api/util"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
@@ -44,8 +45,9 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
-	apiGroupNamespace := veleroNamespace("api-group")
-	labelValue := "api-group-version"
+	// Randomize the namespace so resource creation doesn;t collide with previously terminating resources in the same namespace.
+	apiGroupNamespace := veleroNamespace("api-group-") + veleroNamespace(util.RandomString(5))
+	labelValue := "api-group-version-" + util.RandomString(3)
 
 	BeforeEach(func() {
 		resource = "rockbands"
@@ -53,9 +55,6 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).NotTo(HaveOccurred())
-
-		// Randomize the namespace so resource creation doesn;t collide with previously terminating resources in the same namespace.
-		apiGroupNamespace = apiGroupNamespace + "-" + veleroNamespace(randomString(5, apiGroupNamespace.String()))
 
 		// TODO: install Velero once for the test suite once feature flag is
 		// removed and velero installation becomes the same as other e2e tests.

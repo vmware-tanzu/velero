@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/cluster-api/util"
 )
 
 var (
@@ -34,12 +35,12 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 var _ = Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", backup_restore_with_snapshots)
 
 func backup_restore_with_snapshots() {
-	backupRestoreNamespace := veleroNamespace("backup-restore-snapshot")
+	backupRestoreNamespace := veleroNamespace("backup-restore-snapshot-")
 	backup_restore_test(backupRestoreNamespace, true)
 }
 
 func backup_restore_with_restic() {
-	backupRestoreNamespace := veleroNamespace("backup-restore-restic")
+	backupRestoreNamespace := veleroNamespace("backup-restore-restic-")
 	backup_restore_test(backupRestoreNamespace, false)
 }
 
@@ -50,9 +51,12 @@ func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapsh
 
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
-	labelValue := "backup-restore-kibishii"
 
 	Describe("Backing up and restoring the kibishii workload", func() {
+		// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
+		backupRestoreNamespace = backupRestoreNamespace + veleroNamespace(util.RandomString(5))
+		labelValue := "backup-restore-kibishii-" + util.RandomString(3)
+
 		BeforeEach(func() {
 			if useVolumeSnapshots && cloudProvider == "kind" {
 				Skip("Volume snapshots not supported on kind")
@@ -62,8 +66,6 @@ func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapsh
 			uuidgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
 
-			// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
-			backupRestoreNamespace = backupRestoreNamespace + "-" + veleroNamespace(randomString(5, backupRestoreNamespace.String()))
 			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
@@ -96,6 +98,10 @@ func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapsh
 	})
 
 	Describe("Backing up and restoring the kibishii workload", func() {
+		// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
+		backupRestoreNamespace = backupRestoreNamespace + veleroNamespace(util.RandomString(5))
+		labelValue := "backup-restore-kibishii-" + util.RandomString(3)
+
 		BeforeEach(func() {
 			if additionalBSLProvider == "" && additionalBSLBucket == "" && additionalBSLCredentials == "" {
 				Skip("Not enough arguments passed in to configure the additional BackupStorageLocation")
@@ -108,8 +114,6 @@ func backup_restore_test(backupRestoreNamespace veleroNamespace, useVolumeSnapsh
 			uuidgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
 
-			// Randomize the namespace to minimize resource creation collision with previously terminating resources in the same namespace.
-			backupRestoreNamespace = backupRestoreNamespace + "-" + veleroNamespace(randomString(5, backupRestoreNamespace.String()))
 			Expect(veleroInstall(client.ctx, backupRestoreNamespace, veleroImage, cloudProvider, objectStoreProvider,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", useVolumeSnapshots)).To(Succeed())
 
