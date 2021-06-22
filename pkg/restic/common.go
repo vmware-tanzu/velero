@@ -100,9 +100,20 @@ func isPVBMatchPod(pvb *velerov1api.PodVolumeBackup, podName string, namespace s
 	return podName == pvb.Spec.Pod.Name && namespace == pvb.Spec.Pod.Namespace
 }
 
+// volumeIsProjected checks if the given volume exists in the list of podVolumes
+// and returns true if the volume has a projected source
+func volumeIsProjected(volumeName string, podVolumes []corev1api.Volume) bool {
+	for _, volume := range podVolumes {
+		if volume.Name == volumeName && volume.Projected != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // GetVolumeBackupsForPod returns a map, of volume name -> snapshot id,
 // of the PodVolumeBackups that exist for the provided pod.
-func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod metav1.Object, sourcePodNs string) map[string]string {
+func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *corev1api.Pod, sourcePodNs string) map[string]string {
 	volumes := make(map[string]string)
 
 	for _, pvb := range podVolumeBackups {
@@ -113,6 +124,13 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 		// skip PVBs without a snapshot ID since there's nothing
 		// to restore (they could be failed, or for empty volumes).
 		if pvb.Status.SnapshotID == "" {
+			continue
+		}
+
+		// If the volume came from a projected source, skip its restore.
+		// This allows backups affected by https://github.com/vmware-tanzu/velero/issues/3863
+		// to be restored successfully.
+		if volumeIsProjected(pvb.Spec.Volume, pod.Spec.Volumes) {
 			continue
 		}
 
@@ -181,6 +199,10 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 		}
 		// don't backup volumes mounting config maps. Config maps will be backed up separately.
 		if pv.ConfigMap != nil {
+			continue
+		}
+		// don't backup volumes mounted as projected volumes, all data in those come from kube state.
+		if pv.Projected != nil {
 			continue
 		}
 		// don't backup volumes that are included in the exclude list.
