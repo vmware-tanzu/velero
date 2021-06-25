@@ -1,0 +1,1 @@
+Run the E2E test with kind(provision various versions of k8s cluster) and MinIO on Github Action
