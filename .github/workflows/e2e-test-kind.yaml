@@ -87,10 +87,16 @@ jobs:
         # TODO specify cli path
         # TODO load image
         run: |
-          ls -al /home/runner/work/velero/velero/test/e2e/../../_output/bin/linux/amd64/velero
-          echo "=============1"
           pwd
+          echo "=============1"
+          ls -al ./_output/bin/linux/amd64/velero || true
           echo "=============2"
+          ls -al /home/runner/work/velero/velero/test/e2e/../../ || true
+          echo "=============3"
+          ls -al /home/runner/work/velero/velero/test/e2e/../../_output/bin/linux/amd64/velero || true
+
+
+
           cat << EOF > /tmp/credential
           [default]
           aws_access_key_id=minio
