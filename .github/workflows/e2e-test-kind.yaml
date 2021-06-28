@@ -58,6 +58,8 @@ jobs:
           #- 1.19.7
           - 1.20.2
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v2
       - name: Install MinIO
         run: |
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio
@@ -72,7 +74,7 @@ jobs:
         with:
           path: ./_output/bin/linux/amd64/velero
           key: velero-${{ github.event.pull_request.number }}-${{ github.sha }}
-      - name: Install CRDs
+      - name: Run E2E test
         # TODO credential file
         # TODO specify cli path
         # TODO load image
