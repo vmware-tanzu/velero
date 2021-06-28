@@ -21,11 +21,8 @@ jobs:
       - name: Install CRDs
         run: |
           ifconfig
-          echo "1"
-          hostname -i
-          echo "2"
-          hostname -i | awk '{print $3}'
-          echo "3"
+          docker ps
+          docker inspect minio
           curl -i http://$(hostname -i):9000
           docker network ls
           docker network inspect bridge
