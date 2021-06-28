@@ -1,0 +1,26 @@
+name: "Run the E2E test on kind"
+on:
+  pull_request:
+
+jobs:
+  # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
+  build-cli:
+    runs-on: ubuntu-latest
+    services:
+      minio:
+        image: minio/minio
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio123
+        options: server /data
+    steps:
+      - uses: engineerd/setup-kind@v0.5.0
+        #with:
+        #  image: "kindest/node:v${{ matrix.k8s }}"
+      - name: Install CRDs
+        run: |
+          docker network ls
+          docker network inspect bridge
+          docker exec -it kind-control-plane curl -i http://172.17.0.1:9000
