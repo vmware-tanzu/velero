@@ -5,14 +5,15 @@ jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build-cli:
     runs-on: ubuntu-latest
-    container:
-      image: bitnami/minio
-      ports:
-        - 9000:9000
-      env:
-        MINIO_ACCESS_KEY: minio
-        MINIO_SECRET_KEY: minio123
-        MINIO_DEFAULT_BUCKETS: my-first-bucket:policy,my-second-bucket
+    services:
+      minio:
+        image: bitnami/minio
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ACCESS_KEY: minio
+          MINIO_SECRET_KEY: minio123
+          MINIO_DEFAULT_BUCKETS: my-first-bucket:policy,my-second-bucket
     steps:
       - uses: engineerd/setup-kind@v0.5.0
         #with:
@@ -21,4 +22,5 @@ jobs:
         run: |
           docker network ls
           docker network inspect bridge
-          docker exec -it kind-control-plane curl -i http://172.17.0.1:9000
+          docker exec -i kind-control-plane curl -i http://172.17.0.1:9000
+          docker exec -i kind-control-plane curl -i http://minio:9000
