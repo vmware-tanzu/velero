@@ -5,27 +5,18 @@ jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build-cli:
     runs-on: ubuntu-latest
-    services:
-      minio:
-        image: bitnami/minio
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ACCESS_KEY: minio
-          MINIO_SECRET_KEY: minio123
-          MINIO_DEFAULT_BUCKETS: my-first-bucket:policy,my-second-bucket
     steps:
       #- uses: engineerd/setup-kind@v0.5.0
         #with:
         #  image: "kindest/node:v${{ matrix.k8s }}"
       - name: Install CRDs
         run: |
-          docker run -d --rm -p 9001:9001 bitnami/minio
+          docker run -d --rm -p 9000:9000 bitnami/minio
           ifconfig
           docker ps
           sleep 10
-          curl -i http://127.0.0.1:9001
-          curl -i http://$(hostname -i):9001
+          curl -i http://127.0.0.1:9000
+          curl -i http://$(hostname -i):9000
           docker network ls
           docker network inspect bridge
           docker exec -i kind-control-plane curl -i http://172.17.0.1:9000
