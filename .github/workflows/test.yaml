@@ -22,7 +22,8 @@ jobs:
         run: |
           ifconfig
           docker ps
-          docker inspect minio
+          sleep 10
+          curl -i http://127.0.0.1:9000
           curl -i http://$(hostname -i):9000
           docker network ls
           docker network inspect bridge
