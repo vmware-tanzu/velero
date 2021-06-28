@@ -15,6 +15,6 @@ jobs:
           ifconfig
           docker ps
           sleep 10
-          curl -i http://127.0.0.1:9000
+          curl -i http://127.0.0.1:9000 || true
           echo "==============================
-          curl -i http://$(hostname -i):9000
+          curl -i http://$(hostname -i):9000 || true
