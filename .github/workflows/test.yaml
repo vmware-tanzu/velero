@@ -20,6 +20,7 @@ jobs:
         #  image: "kindest/node:v${{ matrix.k8s }}"
       - name: Install CRDs
         run: |
+          ifconfig
           docker network ls
           docker network inspect bridge
           docker exec -i kind-control-plane curl -i http://172.17.0.1:9000
