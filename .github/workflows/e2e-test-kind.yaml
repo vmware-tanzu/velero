@@ -87,16 +87,6 @@ jobs:
         # TODO specify cli path
         # TODO load image
         run: |
-          pwd
-          echo "=============1"
-          ls -al ./_output/bin/linux/amd64/velero || true
-          echo "=============2"
-          ls -al /home/runner/work/velero/velero/test/e2e/../../ || true
-          echo "=============3"
-          ls -al /home/runner/work/velero/velero/test/e2e/../../_output/bin/linux/amd64/velero || true
-
-
-
           cat << EOF > /tmp/credential
           [default]
           aws_access_key_id=minio
@@ -107,5 +97,5 @@ jobs:
               CREDS_FILE=/tmp/credential BSL_BUCKET=bucket \
               ADDITIONAL_OBJECT_STORE_PROVIDER=aws ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
-              GINKGO_FOCUS=APIGroup VELERO_IMAGE=velero/velero:main \
+              VELERO_IMAGE=velero/velero:main \
               make -C test/e2e run
