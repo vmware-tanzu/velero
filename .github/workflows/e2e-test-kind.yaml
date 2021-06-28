@@ -58,6 +58,8 @@ jobs:
           #- 1.19.7
           - 1.20.2
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v2
       - name: Install MinIO
         run: |
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio
@@ -72,8 +74,6 @@ jobs:
         with:
           path: ./_output/bin/linux/amd64/velero
           key: velero-${{ github.event.pull_request.number }}-${{ github.sha }}
-      - name: Check out the code
-        uses: actions/checkout@v2
       # always try to fetch the cached go modules as the e2e test needs it either
       - name: Fetch cached go modules
         uses: actions/cache@v2
