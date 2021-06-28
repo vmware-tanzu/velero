@@ -26,7 +26,7 @@ jobs:
           echo "2"
           hostname -i | awk '{print $3}'
           echo "3"
-          minio=$(hostname -i | awk '{print $3}');echo ${minio};curl -i http://${minio}:9000
+          curl -i http://$(hostname -i):9000
           docker network ls
           docker network inspect bridge
           docker exec -i kind-control-plane curl -i http://172.17.0.1:9000
