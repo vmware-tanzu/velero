@@ -1,6 +1,5 @@
 name: "Run the E2E test on kind"
-on:
-  pull_request:
+on: push
 
 jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
