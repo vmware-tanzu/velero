@@ -13,7 +13,7 @@ jobs:
         env:
           MINIO_ROOT_USER: minio
           MINIO_ROOT_PASSWORD: minio123
-        options: server /data
+        options: --cmd "server /data"
     steps:
       - uses: engineerd/setup-kind@v0.5.0
         #with:
