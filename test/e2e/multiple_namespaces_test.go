@@ -53,6 +53,7 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 	})
 })
 
+/*
 var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 
 	client, err := newTestClient()
@@ -89,6 +90,8 @@ var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 		})
 	})
 })
+
+ */
 
 func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)

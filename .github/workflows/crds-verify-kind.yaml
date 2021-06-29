@@ -1,5 +1,6 @@
 name: "Verify Velero CRDs across k8s versions"
 on:
+  push:
   pull_request:
     # Do not run when the change only includes these directories.
     paths-ignore:
@@ -84,3 +85,4 @@ jobs:
           echo "current-context:" $(kubectl config current-context)
           echo "environment-kubeconfig:" ${KUBECONFIG}
           ./_output/bin/linux/amd64/velero install --crds-only --dry-run -oyaml | kubectl apply -f -
+          kubectl get crd backups.velero.io -o yaml
