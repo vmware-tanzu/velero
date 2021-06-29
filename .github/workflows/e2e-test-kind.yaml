@@ -49,7 +49,6 @@ jobs:
           IMAGE=velero VERSION=main make container
           docker ps
           docker save velero:main -o ./velero.tar
-          ls -alh
   # Run E2E test against all kubernetes versions on kind
   run-e2e-test:
     needs: build
@@ -57,12 +56,14 @@ jobs:
     strategy:
       matrix:
         k8s:
-          - 1.15.12
+          # doesn't cover 1.15 as 1.15 doesn't support "apiextensions.k8s.io/v1" that is needed for the case
+          #- 1.15.12
           - 1.16.15
           - 1.17.17
           - 1.18.15
           - 1.19.7
           - 1.20.2
+      fail-fast: false
     steps:
       - name: Check out the code
         uses: actions/checkout@v2
