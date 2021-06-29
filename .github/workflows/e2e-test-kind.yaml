@@ -57,11 +57,11 @@ jobs:
     strategy:
       matrix:
         k8s:
-          #- 1.15.12
-          #- 1.16.15
-          #- 1.17.17
-          #- 1.18.15
-          #- 1.19.7
+          - 1.15.12
+          - 1.16.15
+          - 1.17.17
+          - 1.18.15
+          - 1.19.7
           - 1.20.2
     steps:
       - name: Check out the code
@@ -84,6 +84,9 @@ jobs:
         with:
           path: ./velero.tar
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
+      - name: Load Velero Image
+        run:
+          kind load image-archive velero.tar
       # always try to fetch the cached go modules as the e2e test needs it either
       - name: Fetch cached go modules
         uses: actions/cache@v2
@@ -92,9 +95,6 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Load Velero Image
-        run:
-          kind load image-archive velero.tar
       - name: Run E2E test
         run: |
           cat << EOF > /tmp/credential
