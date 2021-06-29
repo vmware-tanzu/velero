@@ -82,7 +82,7 @@ jobs:
         id: image-cache
         uses: actions/cache@v2
         with:
-          path: ./velero.tar.gz
+          path: ./velero.tar
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
       # always try to fetch the cached go modules as the e2e test needs it either
       - name: Fetch cached go modules
