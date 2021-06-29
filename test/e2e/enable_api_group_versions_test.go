@@ -75,7 +75,6 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 	})
 
 	AfterEach(func() {
-		/*
 		fmt.Printf("Clean up resource: kubectl delete crd %s.%s\n", resource, group)
 		cmd := exec.CommandContext(ctx, "kubectl", "delete", "crd", resource+"."+group)
 		_, stderr, err := veleroexec.RunCommand(cmd)
@@ -87,9 +86,6 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 
 		err = veleroUninstall(ctx, client.kubebuilder, installVelero, veleroNamespace)
 		Expect(err).NotTo(HaveOccurred())
-
-		 */
-
 	})
 
 	Context("When EnableAPIGroupVersions flag is set", func() {

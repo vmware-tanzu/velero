@@ -1,6 +1,5 @@
 name: "Verify Velero CRDs across k8s versions"
 on:
-  push:
   pull_request:
     # Do not run when the change only includes these directories.
     paths-ignore:
