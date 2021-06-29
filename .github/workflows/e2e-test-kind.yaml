@@ -23,12 +23,12 @@ jobs:
         id: image-cache
         uses: actions/cache@v2
         with:
-          path: ./velero.tar.gz
+          path: ./velero.tar
           # The cache key a combination of the current PR number and the commit SHA
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch cached go modules
         uses: actions/cache@v2
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cli-cache.outputs.cache-hit != 'true'
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -36,7 +36,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Check out the code
         uses: actions/checkout@v2
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cli-cache.outputs.cache-hit != 'true' || steps.image-cache.outputs.cache-hit != 'true'
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
         if: steps.cli-cache.outputs.cache-hit != 'true'
