@@ -6,7 +6,6 @@ on:
     paths-ignore:
       - "site/**"
       - "design/**"
-
 jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build:
@@ -14,17 +13,19 @@ jobs:
     steps:
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
-        id: cache
+        id: cli-cache
         uses: actions/cache@v2
-        env:
-          cache-name: cache-velero-cli
         with:
           path: ./_output/bin/linux/amd64/velero
           # The cache key a combination of the current PR number and the commit SHA
-          key: velero-${{ github.event.pull_request.number }}-${{ github.sha }}
-
-      # TODO image
-
+          key: velero-cli-${{ github.event.pull_request.number }}-${{ github.sha }}
+      - name: Fetch built image
+        id: image-cache
+        uses: actions/cache@v2
+        with:
+          path: ./velero.tar.gz
+          # The cache key a combination of the current PR number and the commit SHA
+          key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch cached go modules
         uses: actions/cache@v2
         if: steps.cache.outputs.cache-hit != 'true'
@@ -33,17 +34,20 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-
       - name: Check out the code
         uses: actions/checkout@v2
         if: steps.cache.outputs.cache-hit != 'true'
-
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cli-cache.outputs.cache-hit != 'true'
         run: |
           make local
-
+      # If no image were built for this PR, build it now.
+      - name: Build Velero Image
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          IMAGE=velero VERSION=main make container
+          docker save velero:main -o velero.tar
   # Run E2E test against all kubernetes versions on kind
   run-e2e-test:
     needs: build
@@ -61,19 +65,23 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v2
       - name: Install MinIO
-        run: |
-          docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio
+        run:
+          docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
       - uses: engineerd/setup-kind@v0.5.0
         with:
           image: "kindest/node:v${{ matrix.k8s }}"
       - name: Fetch built CLI
-        id: cache
+        id: cli-cache
         uses: actions/cache@v2
-        env:
-          cache-name: cache-velero-cli
         with:
           path: ./_output/bin/linux/amd64/velero
-          key: velero-${{ github.event.pull_request.number }}-${{ github.sha }}
+          key: velero-cli-${{ github.event.pull_request.number }}-${{ github.sha }}
+      - name: Fetch built Image
+        id: image-cache
+        uses: actions/cache@v2
+        with:
+          path: ./velero.tar.gz
+          key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
       # always try to fetch the cached go modules as the e2e test needs it either
       - name: Fetch cached go modules
         uses: actions/cache@v2
@@ -82,10 +90,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Load Velero Image
+        run:
+          kind load image-archive velero.tar
       - name: Run E2E test
-        # TODO credential file
-        # TODO specify cli path
-        # TODO load image
         run: |
           cat << EOF > /tmp/credential
           [default]
@@ -97,5 +105,5 @@ jobs:
               CREDS_FILE=/tmp/credential BSL_BUCKET=bucket \
               ADDITIONAL_OBJECT_STORE_PROVIDER=aws ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
-              VELERO_IMAGE=velero/velero:main \
+              VELERO_IMAGE=velero:main \
               make -C test/e2e run
