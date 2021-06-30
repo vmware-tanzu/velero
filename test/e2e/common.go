@@ -61,7 +61,7 @@ func getNamespace(ctx context.Context, client testClient, namespace string) (*co
 // inside tear-down blocks probably not necessary to check if namespaces were found.
 func deleteNamespaceListWithLabel(ctx context.Context, client testClient, labelValue string) ([]corev1api.Namespace, error) {
 	if labelValue == "" {
-		return nil, errors.New("a label must be specified to delete only the intented namespaces and not all")
+		return nil, errors.New("a label must be specified to delete only the intended namespaces and not all")
 	}
 
 	namespaceList, err := client.clientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{

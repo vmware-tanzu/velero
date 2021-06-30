@@ -46,7 +46,7 @@ Velero does not need to be installed in the cluster.
 
 ##  2. <a name='FlowofaVeleroe2etest'></a>Flow of a Velero e2e test
 
-1. An API client is created at setup time 
+1. An API client is created at setup time
 
     This client is passed through to all the test specs to use.
 
@@ -74,21 +74,21 @@ Velero does not need to be installed in the cluster.
 
 The [e2e_suite_test.go](e2e_suite_test.go) contains the set of flags needed to configure Velero. Those configurations or parameters are used to generate install options for Velero for each test suite. The input to these flags come from the variables in the [Makefile](Makefile).
 
-To configure a single test spec to run, prepend the `GINKGO_FOCUS` variable with the name of the spec. 
+To configure a single test spec to run, prepend the `GINKGO_FOCUS` variable with the name of the spec.
 
-###  3.1. <a name='Examples:'></a>Examples: 
+###  3.1. <a name='Examples:'></a>Examples:
 
 To run the spec `It("should successfully back up and restore [2 namespaces]"...`, prepend:
 
 `GINKGO_FOCUS='2 namespaces'`
 
 To skip the spec `Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups"`, prepend:
- 
+
 `GINKGO_SKIP='Snapshot'` - This flag setting is particularly useful for running the e2e tests against a Kind cluster, since it will run all tests except the tests related to snapshotting.
 
 If a test spec is a subtest and you make it the focus of the test run, it will run once for all parent tests. If you want to isolate the test run to only 1 set of parent/child, using the `GINKGO_SKIP` + `GINKGO_FOCUS` will work. For example, to run `Describe("[Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups"` + `It("should be successfully backed up and restored [using the default BackupStorageLocation]"` and skip the `[Snapshot]` spec:
 
-`GINKGO_SKIP='Snapshot' GINKGO_FOCUS='using the default BackupStorageLocation'` 
+`GINKGO_SKIP='Snapshot' GINKGO_FOCUS='using the default BackupStorageLocation'`
 
 Any test that is skipped by setting the combination of those flags will keep from having the BeforeEach/AfterEach actions invoked for those tests.
 
@@ -119,7 +119,7 @@ Tests can be run with the Kubernetes cluster hosted in various cloud providers o
 
 ####  4.2.1. <a name='Noteaboutsnapshottingg'></a>Note about snapshottingg
 
-    When running tests that take a snapshot on a provider, the optional paramenter `VSL_CONFIG` **must** be configued. This parameter is optional for tests where only objects (and not snapshots) are being backed up /restored. If you don't configure this parameter, be sure you are only running tests that don't need a snapshot.
+    When running tests that take a snapshot on a provider, the optional paramenter `VSL_CONFIG` **must** be configured. This parameter is optional for tests where only objects (and not snapshots) are being backed up /restored. If you don't configure this parameter, be sure you are only running tests that don't need a snapshot.
 
     The test will detect when it is configured with a provider other than Kind but without this configuration and ask for confirmation. To skip this check, add `FORCE=true` to pass it as a variable to the test command. To configure the snapshot settings, pass the `VSL_CONFIG` parameter with the proper values for your provider. Here's an example for AWS: `VSL_CONFIG=region=us-west-2`.
 ####  4.2.2. <a name='Instructions-1'></a>Instructions
@@ -138,7 +138,7 @@ Tests can be run with the Kubernetes cluster hosted in various cloud providers o
 
     Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
 
-1. Run Ginko-focused Restore Multi-API Groups tests using Minio as the backup storage location: 
+1. Run Ginko-focused Restore Multi-API Groups tests using Minio as the backup storage location:
 
    ```bash
    BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=Kind OBJECT_STORE_PROVIDER=aws GINKGO_FOCUS="API group versions" make test-e2e
@@ -161,20 +161,20 @@ By default, the e2e tests will run against the `velero/velero:main` version of V
 ##  6. <a name='Addingresourcesandtests'></a>Adding resources and tests
 
 ###  6.1. <a name='Addresources'></a>Add resources
-It is common for tests to need to create object resources in a cluster. 
+It is common for tests to need to create object resources in a cluster.
 
-These resoures can be created using the `Kubebuilder` API client (preferred) but it can also be created by running the `kubectl` command against `yaml` files. If you use new `yaml` files, create a new folder for the test under the [testdata](/testdada) directory and add them in there.
+These resources can be created using the `Kubebuilder` API client (preferred) but it can also be created by running the `kubectl` command against `yaml` files. If you use new `yaml` files, create a new folder for the test under the [testdata](/testdada) directory and add them in there.
 
 Resources created for the purpose of testing should be created in their own namespace, not in the namespace where Velero is installed.
 
 Note: The Velero e2e suite already has functionality to create workloads, generate and load data onto it, and verify this data was properly restored. Any test that needs data can reuse this existing setup. Look for `Kibishii` related functionalaties.
 
 ###  6.2. <a name='Addalabeltoallresourcescreatedinatest'></a>Add a label to all resources created in a test
-To faciliate cleanup in a cluster when things go awry, please add a label to every resource your test creates. The label should have `velero-e2e` as the key, and a unique name as the value. Example:
+To facilitate cleanup in a cluster when things go awry, please add a label to every resource your test creates. The label should have `velero-e2e` as the key, and a unique name as the value. Example:
 
 `e2e:multiple-namespaces`
 
-In the [common.go](common.go) file there is a helper function `addE2ELabel` to which you can pass any object and value for the label. 
+In the [common.go](common.go) file there is a helper function `addE2ELabel` to which you can pass any object and value for the label.
 
 If you are using `yaml` files, add the`velero-e2e=<name>` label to the manifests.
 
@@ -191,7 +191,7 @@ Expect(err).NotTo(HaveOccurred())
 Please look at the files [common.go](common.go) and [velero_utils.go](velero_utils.go) for functionality that you will likely need.
 
 ###  6.5. <a name='APIclients'></a>API clients
-When adding a test, aim to instantiate an API client only once at the beginning of the test. There is a constructor `newTestClient` that facilitates the configuration and instantiation of clients. 
+When adding a test, aim to instantiate an API client only once at the beginning of the test. There is a constructor `newTestClient` that facilitates the configuration and instantiation of clients.
 
 Also, please use the `Kubebuilder` runtime controller client for any new test, as we will phase out usage of `client-go` API clients.
 
@@ -201,7 +201,7 @@ Finally, use the `context.Context` object that is instantiated with the `newTest
 
 1) Logs
 
-    Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall. 
+    Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall.
 
 2) Clean up dangling resources
 
@@ -210,7 +210,7 @@ Finally, use the `context.Context` object that is instantiated with the `newTest
     To see a list of namespaces and their labels:
 
     `kubectl get ns -A --show-labels`
-    
+
 ```
     NAME                       STATUS   AGE    LABELS
 
