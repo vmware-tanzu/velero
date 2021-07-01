@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"time"
@@ -40,29 +39,23 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform string
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
 		"github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/"+cloudPlatform)
-
-	_, _, err := veleroexec.RunCommand(kibishiiInstallCmd)
+	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
 	if err != nil {
-		return errors.Wrap(err, "failed to install kibishii")
+		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
 
 	kibishiiSetWaitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
 		"-n", namespace, "-w", "--timeout=30m")
-	kibishiiSetWaitCmd.Stdout = os.Stdout
-	kibishiiSetWaitCmd.Stderr = os.Stderr
-	_, _, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
-
+	_, stderr, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to rollout, stderr=%s", stderr)
 	}
 
 	fmt.Printf("Waiting for kibishii jump-pad pod to be ready\n")
 	jumpPadWaitCmd := exec.CommandContext(ctx, "kubectl", "wait", "--for=condition=ready", "-n", namespace, "pod/jump-pad")
-	jumpPadWaitCmd.Stdout = os.Stdout
-	jumpPadWaitCmd.Stderr = os.Stderr
-	_, _, err = veleroexec.RunCommand(jumpPadWaitCmd)
+	_, stderr, err = veleroexec.RunCommand(jumpPadWaitCmd)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to wait for ready status of pod %s/%s", namespace, jumpPadPod)
+		return errors.Wrapf(err, "Failed to wait for ready status of pod %s/%s, stderr=%s", namespace, jumpPadPod, stderr)
 	}
 
 	return err
@@ -75,9 +68,9 @@ func generateData(ctx context.Context, namespace string, levels int, filesPerLev
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
 
-	_, _, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+	_, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
 	if err != nil {
-		return errors.Wrap(err, "failed to generate")
+		return errors.Wrapf(err, "failed to generate, stderr=%s", stderr)
 	}
 
 	return nil
@@ -90,9 +83,9 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
 
-	_, _, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+	_, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
 	if err != nil {
-		return errors.Wrap(err, "failed to verify")
+		return errors.Wrapf(err, "failed to verify, stderr=%s", stderr)
 	}
 	return nil
 }
