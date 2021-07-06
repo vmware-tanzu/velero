@@ -19,7 +19,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"time"
@@ -47,29 +46,23 @@ func installKibishiiWorkload(client testClient, cloudPlatform, labelValue string
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(client.ctx, "kubectl", "apply", "-n", kibishiiNamespace, "-k",
 		"github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/"+cloudPlatform)
-
-	_, _, err := veleroexec.RunCommand(kibishiiInstallCmd)
+	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
 	if err != nil {
-		return errors.Wrap(err, "failed to install kibishii")
+		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
 
 	kibishiiSetWaitCmd := exec.CommandContext(client.ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
 		"-n", kibishiiNamespace, "-w", "--timeout=30m")
-	kibishiiSetWaitCmd.Stdout = os.Stdout
-	kibishiiSetWaitCmd.Stderr = os.Stderr
-	_, _, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
-
+	_, stderr, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to rollout, stderr=%s", stderr)
 	}
 
 	fmt.Printf("Waiting for kibishii jump-pad pod to be ready\n")
-	jumpPadWaitCmd := exec.CommandContext(client.ctx, "kubectl", "wait", "--for=condition=ready", "-n", kibishiiNamespace, "pod/jump-pad")
-	jumpPadWaitCmd.Stdout = os.Stdout
-	jumpPadWaitCmd.Stderr = os.Stderr
-	_, _, err = veleroexec.RunCommand(jumpPadWaitCmd)
+	jumpPadWaitCmd := exec.CommandContext(client.ctxctx, "kubectl", "wait", "--for=condition=ready", "-n", kibishiiNamespace, "pod/jump-pad")
+	_, stderr, err = veleroexec.RunCommand(jumpPadWaitCmd)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to wait for ready status of pod %s/%s", kibishiiNamespace, jumpPadPod)
+		return errors.Wrapf(err, "Failed to wait for ready status of pod %s/%s, stderr=%s", kibishiiNamespace, jumpPadPod, stderr)
 	}
 
 	return err
@@ -81,7 +74,7 @@ func terminateKibishiiWorkload(client testClient, labelValue string) ([]corev1ap
 	fiveMinTimeout, cancel := context.WithTimeout(client.ctx, 5*time.Minute)
 	defer cancel()
 
-	oneHourTimeout, stop := context.WithTimeout(client.ctx, time.Minute*15) // TODO(carlisai) set this back to 60 min
+	oneHourTimeout, stop := context.WithTimeout(client.ctx, time.Minute*60)
 	defer stop()
 
 	interval := 5 * time.Second
@@ -124,14 +117,12 @@ func runKibishiiTests(client testClient, veleroNamespace veleroNamespace, provid
 	oneHourTimeout, stop := context.WithTimeout(client.ctx, time.Minute*60)
 	defer stop()
 
-	// wait for kibishii pod startup
 	// TODO - Fix kibishii so we can check that it is ready to go
 	fmt.Printf("Waiting for kibishii pods to be ready\n")
 	if err := waitForKibishiiPods(oneHourTimeout, client); err != nil {
 		return errors.Wrapf(err, "failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
 
-	// if err := generateData(oneHourTimeout, 2, 10, 10, 1024, 1024, 0, 2); err != nil {
 	if err := generateData(oneHourTimeout, 1, 1, 1, 1024, 1024, 0, 2); err != nil {
 		return errors.Wrap(err, "failed to generate data")
 	}
@@ -167,7 +158,6 @@ func runKibishiiTests(client testClient, veleroNamespace veleroNamespace, provid
 		return err
 	}
 
-	// wait for kibishii pod startup
 	// TODO - Fix kibishii so we can check that it is ready to go
 	fmt.Printf("Waiting for kibishii pods to be ready\n")
 	if err := waitForKibishiiPods(oneHourTimeout, client); err != nil {
@@ -194,10 +184,9 @@ func generateData(ctx context.Context, levels int, filesPerLevel int, dirsPerLev
 		"/usr/local/bin/generate.sh", strconv.Itoa(levels), strconv.Itoa(filesPerLevel), strconv.Itoa(dirsPerLevel), strconv.Itoa(fileSize),
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
-
-	_, _, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+  _, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate data")
+		return errors.Wrapf(err, "failed to generate data, stderr=%s", stderr)
 	}
 
 	return nil
@@ -209,11 +198,10 @@ func verifyData(ctx context.Context, levels int, filesPerLevel int, dirsPerLevel
 		"/usr/local/bin/verify.sh", strconv.Itoa(levels), strconv.Itoa(filesPerLevel), strconv.Itoa(dirsPerLevel), strconv.Itoa(fileSize),
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
-
-	_, _, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+	_, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
 	if err != nil {
-		return errors.Wrapf(err, "failed to verify data")
-	}
-
+		return errors.Wrapf(err, "failed to verify data, stderr=%s", stderr)
+  }
+    
 	return nil
 }
