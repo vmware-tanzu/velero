@@ -59,7 +59,7 @@ func installKibishiiWorkload(client testClient, cloudPlatform, labelValue string
 	}
 
 	fmt.Printf("Waiting for kibishii jump-pad pod to be ready\n")
-	jumpPadWaitCmd := exec.CommandContext(client.ctxctx, "kubectl", "wait", "--for=condition=ready", "-n", kibishiiNamespace, "pod/jump-pad")
+	jumpPadWaitCmd := exec.CommandContext(client.ctx, "kubectl", "wait", "--for=condition=ready", "-n", kibishiiNamespace, "pod/jump-pad")
 	_, stderr, err = veleroexec.RunCommand(jumpPadWaitCmd)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of pod %s/%s, stderr=%s", kibishiiNamespace, jumpPadPod, stderr)
@@ -184,7 +184,7 @@ func generateData(ctx context.Context, levels int, filesPerLevel int, dirsPerLev
 		"/usr/local/bin/generate.sh", strconv.Itoa(levels), strconv.Itoa(filesPerLevel), strconv.Itoa(dirsPerLevel), strconv.Itoa(fileSize),
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
-  _, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+	_, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate data, stderr=%s", stderr)
 	}
@@ -201,7 +201,7 @@ func verifyData(ctx context.Context, levels int, filesPerLevel int, dirsPerLevel
 	_, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to verify data, stderr=%s", stderr)
-  }
-    
+	}
+
 	return nil
 }
