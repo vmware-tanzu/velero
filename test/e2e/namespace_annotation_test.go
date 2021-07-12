@@ -82,8 +82,6 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 	}
 
 
-
-	//calls the velerobackupnamespaces function, and if there are errors, logs it via a function called veleroBackupLogs, and returns error wrapped as below
 	if err := veleroBackupExcludeNamespaces(ctx, veleroCLI, veleroNamespace, backupName, excludeNamespaces); err != nil {
 		veleroBackupLogs(ctx, veleroCLI, "", backupName)
 		return errors.Wrapf(err, "Failed to backup backup namespaces %s-*", nsBaseName)
