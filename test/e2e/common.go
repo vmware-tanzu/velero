@@ -47,6 +47,26 @@ func createNamespace(ctx context.Context, client testClient, namespace string) e
 	return err
 }
 
+// createNamespaceAndAnnotation creates a kubernetes namespace and an annotation
+func createNamespaceAndAnnotation(ctx context.Context, client testClient, namespace string, annotation string) error {
+	ns := builder.ForNamespace(namespace).Result()
+	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	nsAnno := ns.ObjectMeta.Annotations
+
+	if nsAnno == nil{
+		nsAnno = make(map[string]string)
+	}
+	nsAnno["testAnnotation"] = annotation
+	ns.ObjectMeta.Annotations = nsAnno
+	n, err := client.clientGo.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
+	fmt.Println(n)
+
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
+}
+
 func getNamespace(ctx context.Context, client testClient, namespace string) (*corev1api.Namespace, error) {
 	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
