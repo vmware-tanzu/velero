@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
 	corev1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,25 +105,25 @@ func ServiceAccount(namespace string, annotations map[string]string) *corev1.Ser
 	}
 }
 
-func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
+func ClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
 	crbName := "velero"
 	if namespace != DefaultVeleroNamespace {
 		crbName = "velero-" + namespace
 	}
-	crb := &rbacv1beta1.ClusterRoleBinding{
+	crb := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: objectMeta("", crbName),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
-			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Namespace: namespace,
 				Name:      "velero",
 			},
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
 			Name:     "cluster-admin",
 			APIGroup: "rbac.authorization.k8s.io",
