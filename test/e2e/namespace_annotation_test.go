@@ -55,8 +55,8 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces -  Namespace Annotation
 func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
 	//timeout logic
 	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
-	
-	//defer does not run until the actual surrounding function returns a value, this line is meant for post test cleanup 
+
+	//defer does not run until the actual surrounding function returns a value, this line is meant for post test cleanup
 	defer cleanupNamespaces(ctx, client, nsBaseName) // Run at exit for final cleanup
 	var excludeNamespaces []string
 
@@ -72,7 +72,7 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 		excludeNamespaces = append(excludeNamespaces, excludeNamespace.Name)
 	}
 
-	//creates the test namespaces mentioned in arguments of the function, with format of nstest-someuuid. This loops runs upto the number mentioned in the argument
+	//creates the test namespaces mentioned in arguments of the function, with format of nstest-someuuid. This loops runs up to the number mentioned in the argument
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
 		createAnnotationName := fmt.Sprintf("annotation-%s-%00000d", nsBaseName, nsNum)
@@ -81,12 +81,10 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 		}
 	}
 
-
 	if err := veleroBackupExcludeNamespaces(ctx, veleroCLI, veleroNamespace, backupName, excludeNamespaces); err != nil {
 		veleroBackupLogs(ctx, veleroCLI, "", backupName)
 		return errors.Wrapf(err, "Failed to backup backup namespaces %s-*", nsBaseName)
 	}
-
 
 	//if error in cleaning up namespaces, then throw error
 	err = cleanupNamespaces(ctx, client, nsBaseName)
@@ -106,7 +104,7 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 		checkAnnoName := fmt.Sprintf("annotation-%s-%00000d", nsBaseName, nsNum)
 		checkNS, err := getNamespace(shortTimeout, client, checkNSName)
 		c := checkNS.ObjectMeta.Annotations["testAnnotation"]
-		
+
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}

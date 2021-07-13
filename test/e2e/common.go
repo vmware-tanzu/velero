@@ -51,15 +51,19 @@ func createNamespace(ctx context.Context, client testClient, namespace string) e
 func createNamespaceAndAnnotation(ctx context.Context, client testClient, namespace string, annotation string) error {
 	ns := builder.ForNamespace(namespace).Result()
 	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+
 	nsAnno := ns.ObjectMeta.Annotations
 
-	if nsAnno == nil{
+	if nsAnno == nil {
 		nsAnno = make(map[string]string)
 	}
 	nsAnno["testAnnotation"] = annotation
 	ns.ObjectMeta.Annotations = nsAnno
-	n, err := client.clientGo.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
-	fmt.Println(n)
+	_, err = client.clientGo.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
 
 	if apierrors.IsAlreadyExists(err) {
 		return nil
