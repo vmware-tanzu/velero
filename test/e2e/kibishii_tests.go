@@ -68,9 +68,9 @@ func generateData(ctx context.Context, namespace string, levels int, filesPerLev
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
 
-	_, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+	stdout, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate, stderr=%s", stderr)
+		return errors.Wrapf(err, "failed to generate, stderr=%s, stdout=%s", stderr, stdout)
 	}
 
 	return nil

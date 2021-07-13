@@ -21,12 +21,14 @@ import (
 	"testing"
 
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 )
 
+// TODO use a structure to contain the parameters for the E2E test suite for better extensibility
 var (
 	veleroCLI, veleroImage, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, cloudProvider, objectStoreProvider, veleroNamespace string
-	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials                                string
+	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials, registryCredentialFile        string
 	installVelero                                                                                                                                 bool
 )
 
@@ -42,6 +44,7 @@ func init() {
 	flag.StringVar(&vslConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flag.StringVar(&veleroNamespace, "velero-namespace", "velero", "Namespace to install Velero into")
 	flag.BoolVar(&installVelero, "install-velero", true, "Install/uninstall velero during the test.  Optional.")
+	flag.StringVar(&registryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, in the format kubernetes.io/dockerconfigjson. Optional.")
 
 	// Flags to create an additional BSL for multiple credentials test
 	flag.StringVar(&additionalBSLProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")
@@ -60,5 +63,6 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2e Suite")
+	junitReporter := reporters.NewJUnitReporter("report.xml")
+	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
 }

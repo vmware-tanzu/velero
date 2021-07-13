@@ -60,7 +60,7 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		Expect(err).To(Succeed())
 		if installVelero {
 			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", registryCredentialFile)).To(Succeed())
 		}
 	})
 
@@ -122,8 +122,13 @@ func backup_restore_test(useVolumeSnapshots bool) {
 			bsls := []string{"default", additionalBsl}
 
 			for _, bsl := range bsls {
-				backupName = fmt.Sprintf("backup-%s-%s", bsl, uuidgen)
-				restoreName = fmt.Sprintf("restore-%s-%s", bsl, uuidgen)
+				backupName = fmt.Sprintf("backup-%s", bsl)
+				restoreName = fmt.Sprintf("restore-%s", bsl)
+				// control the length of the name to avoid the issue: Failed to create snapshot record: Snapshot.backupdriver.cnsdp.vmware.com \"snap-8945e7df-069e-4f56-aeb5-75b1dd87547f\" is invalid: metadata.labels: Invalid value: \"backup-bsl-e7a1d0f3-2f29-4d80-9184-6214dac91d96-e7a1d0f3-2f29-4d80-9184-6214dac91d96\": must be no more than 63 characters"
+				if bsl == "default" {
+					backupName = fmt.Sprintf("%s-%s", backupName, uuidgen)
+					restoreName = fmt.Sprintf("%s-%s", restoreName, uuidgen)
+				}
 
 				Expect(runKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
