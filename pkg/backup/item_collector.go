@@ -198,11 +198,6 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 		}
 	}
 
-	if !r.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
-		log.Infof("Skipping resource because it's excluded")
-		return nil, nil
-	}
-
 	if cohabitator, found := r.cohabitatingResources[resource.Name]; found {
 		if cohabitator.seen {
 			log.WithFields(
@@ -214,6 +209,11 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			return nil, nil
 		}
 		cohabitator.seen = true
+	}
+
+	if !r.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
+		log.Infof("Skipping resource because it's excluded")
+		return nil, nil
 	}
 
 	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
