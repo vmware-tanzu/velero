@@ -52,8 +52,11 @@ func createNamespaceAndAnnotation(ctx context.Context, client testClient, namesp
 	ns := builder.ForNamespace(namespace).Result()
 	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 
-	if apierrors.IsAlreadyExists(err) {
-		return nil
+	if err != nil {
+		if !(apierrors.IsAlreadyExists(err)) {
+			return err
+		}
+		return err
 	}
 
 	nsAnno := ns.ObjectMeta.Annotations
@@ -65,8 +68,8 @@ func createNamespaceAndAnnotation(ctx context.Context, client testClient, namesp
 	ns.ObjectMeta.Annotations = nsAnno
 	_, err = client.clientGo.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
 
-	if apierrors.IsAlreadyExists(err) {
-		return nil
+	if err != nil {
+		return err
 	}
 	return err
 }

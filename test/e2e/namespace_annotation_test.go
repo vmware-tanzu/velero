@@ -53,8 +53,6 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces -  Namespace Annotation
 })
 
 func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
-	//timeout logic
-	shortTimeout, _ := context.WithTimeout(ctx, 5*time.Minute)
 
 	//defer does not run until the actual surrounding function returns a value, this line is meant for post test cleanup
 	defer cleanupNamespaces(ctx, client, nsBaseName) // Run at exit for final cleanup
@@ -62,7 +60,7 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
 	// we will exclude all of the namespaces that existed prior to the test from the backup
-	namespaces, err := client.clientGo.CoreV1().Namespaces().List(shortTimeout, v1.ListOptions{})
+	namespaces, err := client.clientGo.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
@@ -102,8 +100,7 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		checkNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
 		checkAnnoName := fmt.Sprintf("annotation-%s-%00000d", nsBaseName, nsNum)
-		checkNS, err := getNamespace(shortTimeout, client, checkNSName)
-		c := checkNS.ObjectMeta.Annotations["testAnnotation"]
+		checkNS, err := getNamespace(ctx, client, checkNSName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
@@ -112,6 +109,8 @@ func RunNamespaceAnnotationTest(ctx context.Context, client testClient, nsBaseNa
 		if checkNS.Name != checkNSName {
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", checkNSName, checkNS.Name)
 		}
+
+		c := checkNS.ObjectMeta.Annotations["testAnnotation"]
 
 		if c != checkAnnoName {
 			return errors.Errorf("Retrieved annotation for %s has name %s instead", checkAnnoName, c)
