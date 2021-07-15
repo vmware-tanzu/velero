@@ -208,14 +208,14 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 	if len(parts) == 1 {
 		defaultImage := veleroimage.DefaultResticRestoreHelperImage()
 		// Image supplied without registry part
-		log.Debugf("Plugin config contains image name without registry name. Using default init container image: %q", defaultImage)
+		log.Infof("Plugin config contains image name without registry name. Using default init container image: %q", defaultImage)
 		return defaultImage
 	}
 
 	if !(strings.Contains(parts[len(parts)-1], ":")) {
 		tag := veleroimage.ImageTag()
 		// tag-less image name: add default image tag for this version of Velero
-		log.Debugf("Plugin config contains image name without tag. Adding tag: %q", tag)
+		log.Infof("Plugin config contains image name without tag. Adding tag: %q", tag)
 		return fmt.Sprintf("%s:%s", image, tag)
 	} else {
 		// tagged image name
