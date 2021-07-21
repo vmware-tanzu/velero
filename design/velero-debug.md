@@ -53,7 +53,7 @@ output = args.output if args.output else "bundle.tar.gz"
 # Working dir for writing during script execution
 crshd = crashd_config(workdir="{0}/velero-bundle".format(basedir))
 set_defaults(kube_config(path=args.kubeconfig))
-capture_local(cmd="velero version")
+capture_local(cmd="velero version -n {}".format(ns))
 capture_backup_logs()
 capture_restore_logs()
 kube_capture(what="logs", namespaces=[ns])
