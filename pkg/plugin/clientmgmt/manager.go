@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,40 +17,44 @@ limitations under the License.
 package clientmgmt
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	backupitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+	deleteitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
+	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
+	volumesnapshotterv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v2"
 )
 
 // Manager manages the lifecycles of plugins.
 type Manager interface {
 	// GetObjectStore returns the ObjectStore plugin for name.
-	GetObjectStore(name string) (velero.ObjectStore, error)
+	GetObjectStore(name string) (objectstorev2.ObjectStore, error)
 
 	// GetVolumeSnapshotter returns the VolumeSnapshotter plugin for name.
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (volumesnapshotterv2.VolumeSnapshotter, error)
 
 	// GetBackupItemActions returns all backup item action plugins.
-	GetBackupItemActions() ([]velero.BackupItemAction, error)
+	GetBackupItemActions() ([]backupitemactionv2.BackupItemAction, error)
 
 	// GetBackupItemAction returns the backup item action plugin for name.
-	GetBackupItemAction(name string) (velero.BackupItemAction, error)
+	GetBackupItemAction(name string) (backupitemactionv2.BackupItemAction, error)
 
 	// GetRestoreItemActions returns all restore item action plugins.
-	GetRestoreItemActions() ([]velero.RestoreItemAction, error)
+	GetRestoreItemActions() ([]restoreitemactionv2.RestoreItemAction, error)
 
 	// GetRestoreItemAction returns the restore item action plugin for name.
-	GetRestoreItemAction(name string) (velero.RestoreItemAction, error)
+	GetRestoreItemAction(name string) (restoreitemactionv2.RestoreItemAction, error)
 
 	// GetDeleteItemActions returns all delete item action plugins.
-	GetDeleteItemActions() ([]velero.DeleteItemAction, error)
+	GetDeleteItemActions() ([]deleteitemactionv2.DeleteItemAction, error)
 
 	// GetDeleteItemAction returns the delete item action plugin for name.
-	GetDeleteItemAction(name string) (velero.DeleteItemAction, error)
+	GetDeleteItemAction(name string) (deleteitemactionv2.DeleteItemAction, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
@@ -92,7 +96,7 @@ func (m *manager) CleanupClients() {
 	m.lock.Unlock()
 }
 
-// getRestartableProcess returns a restartableProcess for a plugin identified by kind and name, creating a
+// getRestartableProcessV2 returns a restartableProcess for a plugin identified by kind and name, creating a
 // restartableProcess if it is the first time it has been requested.
 func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) (RestartableProcess, error) {
 	m.lock.Lock()
@@ -130,38 +134,61 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 }
 
 // GetObjectStore returns a restartableObjectStore for name.
-func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
+func (m *manager) GetObjectStore(name string) (objectstorev2.ObjectStore, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStoreV2, name)
 	if err != nil {
-		return nil, err
+		// Check if plugin was not found
+		if errors.Is(err, &pluginNotFoundError{}) {
+			// Try again but with previous version
+			restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
+			if err != nil {
+				// No v1 version found, return
+				return nil, err
+			}
+			// Adapt v1 plugin to v2
+			return newAdaptedV1ObjectStore(name, restartableProcess), nil
+		} else {
+			return nil, err
+		}
 	}
-
-	r := newRestartableObjectStore(name, restartableProcess)
-
-	return r, nil
+	return newRestartableObjectStoreV2(name, restartableProcess), nil
 }
 
 // GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.
-func (m *manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+func (m *manager) GetVolumeSnapshotter(name string) (volumesnapshotterv2.VolumeSnapshotter, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindVolumeSnapshotter, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindVolumeSnapshotterV2, name)
 	if err != nil {
-		return nil, err
+		// Check if plugin was not found
+		if errors.Is(err, &pluginNotFoundError{}) {
+			// Try again but with previous version
+			restartableProcess, err := m.getRestartableProcess(framework.PluginKindVolumeSnapshotter, name)
+			if err != nil {
+				// No v1 version found, return
+				return nil, err
+			}
+			// Adapt v1 plugin to v2
+			return newAdaptedV1VolumeSnapshotter(name, restartableProcess), nil
+		} else {
+			return nil, err
+		}
 	}
 
-	r := newRestartableVolumeSnapshotter(name, restartableProcess)
+	r := newRestartableVolumeSnapshotterV2(name, restartableProcess)
 
 	return r, nil
 }
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
-func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
-	list := m.registry.List(framework.PluginKindBackupItemAction)
+func (m *manager) GetBackupItemActions() ([]backupitemactionv2.BackupItemAction, error) {
+	listv1 := m.registry.List(framework.PluginKindBackupItemAction)
+	listv2 := m.registry.List(framework.PluginKindBackupItemActionV2)
+	list := append(listv1, listv2...)
 
-	actions := make([]velero.BackupItemAction, 0, len(list))
+	actions := make([]backupitemactionv2.BackupItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -178,23 +205,37 @@ func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 }
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
-func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
+func (m *manager) GetBackupItemAction(name string) (backupitemactionv2.BackupItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemAction, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemActionV2, name)
 	if err != nil {
-		return nil, err
+		// Check if plugin was not found
+		if errors.Is(err, &pluginNotFoundError{}) {
+			// Try again but with previous version
+			restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemAction, name)
+			if err != nil {
+				// No v1 version found, return
+				return nil, err
+			}
+			// Adapt v1 plugin to v2
+			return newAdaptedV1BackupItemAction(name, restartableProcess), nil
+		} else {
+			return nil, err
+		}
 	}
 
-	r := newRestartableBackupItemAction(name, restartableProcess)
+	r := newRestartableBackupItemActionV2(name, restartableProcess)
 	return r, nil
 }
 
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
-func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
-	list := m.registry.List(framework.PluginKindRestoreItemAction)
+func (m *manager) GetRestoreItemActions() ([]restoreitemactionv2.RestoreItemAction, error) {
+	listv1 := m.registry.List(framework.PluginKindRestoreItemAction)
+	listv2 := m.registry.List(framework.PluginKindRestoreItemActionV2)
+	list := append(listv1, listv2...)
 
-	actions := make([]velero.RestoreItemAction, 0, len(list))
+	actions := make([]restoreitemactionv2.RestoreItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -211,23 +252,37 @@ func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
 }
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
-func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, error) {
+func (m *manager) GetRestoreItemAction(name string) (restoreitemactionv2.RestoreItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindRestoreItemAction, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindRestoreItemActionV2, name)
 	if err != nil {
-		return nil, err
+		// Check if plugin was not found
+		if errors.Is(err, &pluginNotFoundError{}) {
+			// Try again but with previous version
+			restartableProcess, err := m.getRestartableProcess(framework.PluginKindRestoreItemAction, name)
+			if err != nil {
+				// No v1 version found, return
+				return nil, err
+			}
+			// Adapt v1 plugin to v2
+			return newAdaptedV1RestoreItemAction(name, restartableProcess), nil
+		} else {
+			return nil, err
+		}
 	}
 
-	r := newRestartableRestoreItemAction(name, restartableProcess)
+	r := newRestartableRestoreItemActionV2(name, restartableProcess)
 	return r, nil
 }
 
 // GetDeleteItemActions returns all delete item actions as restartableDeleteItemActions.
-func (m *manager) GetDeleteItemActions() ([]velero.DeleteItemAction, error) {
-	list := m.registry.List(framework.PluginKindDeleteItemAction)
+func (m *manager) GetDeleteItemActions() ([]deleteitemactionv2.DeleteItemAction, error) {
+	listv1 := m.registry.List(framework.PluginKindDeleteItemAction)
+	listv2 := m.registry.List(framework.PluginKindDeleteItemActionV2)
+	list := append(listv1, listv2...)
 
-	actions := make([]velero.DeleteItemAction, 0, len(list))
+	actions := make([]deleteitemactionv2.DeleteItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -244,15 +299,27 @@ func (m *manager) GetDeleteItemActions() ([]velero.DeleteItemAction, error) {
 }
 
 // GetDeleteItemAction returns a restartableDeleteItemAction for name.
-func (m *manager) GetDeleteItemAction(name string) (velero.DeleteItemAction, error) {
+func (m *manager) GetDeleteItemAction(name string) (deleteitemactionv2.DeleteItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindDeleteItemAction, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindDeleteItemActionV2, name)
 	if err != nil {
-		return nil, err
+		// Check if plugin was not found
+		if errors.Is(err, &pluginNotFoundError{}) {
+			// Try again but with previous version
+			restartableProcess, err := m.getRestartableProcess(framework.PluginKindDeleteItemAction, name)
+			if err != nil {
+				// No v1 version found, return
+				return nil, err
+			}
+			// Adapt v1 plugin to v2
+			return newAdaptedV1DeleteItemAction(name, restartableProcess), nil
+		} else {
+			return nil, err
+		}
 	}
 
-	r := newRestartableDeleteItemAction(name, restartableProcess)
+	r := newRestartableDeleteItemActionV2(name, restartableProcess)
 	return r, nil
 }
 

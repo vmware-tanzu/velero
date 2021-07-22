@@ -22,23 +22,19 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
+	restoreitemactionv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
-// restartableRestoreItemAction is a restore item action for a given implementation (such as "pod"). It is associated with
-// a restartableProcess, which may be shared and used to run multiple plugins. At the beginning of each method
-// call, the restartableRestoreItemAction asks its restartableProcess to restart itself if needed (e.g. if the
-// process terminated for any reason), then it proceeds with the actual call.
-type restartableRestoreItemAction struct {
+type restartableAdaptedV1RestoreItemAction struct {
 	key                 kindAndName
 	sharedPluginProcess RestartableProcess
 	config              map[string]string
 }
 
-// newRestartableRestoreItemActionV2 returns a new restartableRestoreItemAction.
-func newRestartableRestoreItemActionV2(name string, sharedPluginProcess RestartableProcess) *restartableRestoreItemAction {
-	r := &restartableRestoreItemAction{
-		key:                 kindAndName{kind: framework.PluginKindRestoreItemActionV2, name: name},
+// newRestartableRestoreItemAction returns a new restartableRestoreItemAction.
+func newAdaptedV1RestoreItemAction(name string, sharedPluginProcess RestartableProcess) *restartableAdaptedV1RestoreItemAction {
+	r := &restartableAdaptedV1RestoreItemAction{
+		key:                 kindAndName{kind: framework.PluginKindRestoreItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r
@@ -46,13 +42,13 @@ func newRestartableRestoreItemActionV2(name string, sharedPluginProcess Restarta
 
 // getRestoreItemAction returns the restore item action for this restartableRestoreItemAction. It does *not* restart the
 // plugin process.
-func (r *restartableRestoreItemAction) getRestoreItemAction() (restoreitemactionv2.RestoreItemAction, error) {
+func (r *restartableAdaptedV1RestoreItemAction) getRestoreItemAction() (restoreitemactionv1.RestoreItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	restoreItemAction, ok := plugin.(restoreitemactionv2.RestoreItemAction)
+	restoreItemAction, ok := plugin.(restoreitemactionv1.RestoreItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a RestoreItemAction!", plugin)
 	}
@@ -61,7 +57,7 @@ func (r *restartableRestoreItemAction) getRestoreItemAction() (restoreitemaction
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the restore item action for this restartableRestoreItemAction.
-func (r *restartableRestoreItemAction) getDelegate() (restoreitemactionv2.RestoreItemAction, error) {
+func (r *restartableAdaptedV1RestoreItemAction) getDelegate() (restoreitemactionv1.RestoreItemAction, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -70,7 +66,7 @@ func (r *restartableRestoreItemAction) getDelegate() (restoreitemactionv2.Restor
 }
 
 // AppliesTo restarts the plugin's process if needed, then delegates the call.
-func (r *restartableRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (r *restartableAdaptedV1RestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return velero.ResourceSelector{}, err
@@ -80,7 +76,7 @@ func (r *restartableRestoreItemAction) AppliesTo() (velero.ResourceSelector, err
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *restartableRestoreItemAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (r *restartableAdaptedV1RestoreItemAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
@@ -90,12 +86,12 @@ func (r *restartableRestoreItemAction) Execute(input *velero.RestoreItemActionEx
 }
 
 // ExecuteV2 restarts the plugin's process if needed, then delegates the call.
-func (r *restartableRestoreItemAction) ExecuteV2(
+func (r *restartableAdaptedV1RestoreItemAction) ExecuteV2(
 	ctx context.Context, input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
 	}
 
-	return delegate.ExecuteV2(ctx, input)
+	return delegate.Execute(input)
 }

@@ -26,6 +26,7 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 )
 
 // RestoreItemActionGRPCServer implements the proto-generated RestoreItemActionServer interface, and accepts
@@ -34,13 +35,13 @@ type RestoreItemActionGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *RestoreItemActionGRPCServer) getImpl(name string) (velero.RestoreItemAction, error) {
+func (s *RestoreItemActionGRPCServer) getImpl(name string) (restoreitemactionv2.RestoreItemAction, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.RestoreItemAction)
+	itemAction, ok := impl.(restoreitemactionv2.RestoreItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a restore item action", impl)
 	}
@@ -76,7 +77,9 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 	}, nil
 }
 
-func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreItemActionExecuteRequest) (response *proto.RestoreItemActionExecuteResponse, err error) {
+func (s *RestoreItemActionGRPCServer) Execute(
+	ctx context.Context, req *proto.RestoreItemActionExecuteRequest) (response *proto.RestoreItemActionExecuteResponse, err error) {
+
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -106,11 +109,12 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, newGRPCError(errors.WithStack(err))
 	}
 
-	executeOutput, err := impl.Execute(&velero.RestoreItemActionExecuteInput{
-		Item:           &item,
-		ItemFromBackup: &itemFromBackup,
-		Restore:        &restoreObj,
-	})
+	executeOutput, err := impl.ExecuteV2(ctx,
+		&velero.RestoreItemActionExecuteInput{
+			Item:           &item,
+			ItemFromBackup: &itemFromBackup,
+			Restore:        &restoreObj,
+		})
 	if err != nil {
 		return nil, newGRPCError(err)
 	}

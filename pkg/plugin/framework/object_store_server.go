@@ -24,7 +24,7 @@ import (
 	"golang.org/x/net/context"
 
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 )
 
 // ObjectStoreGRPCServer implements the proto-generated ObjectStoreServer interface, and accepts
@@ -33,13 +33,13 @@ type ObjectStoreGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *ObjectStoreGRPCServer) getImpl(name string) (velero.ObjectStore, error) {
+func (s *ObjectStoreGRPCServer) getImpl(name string) (objectstorev2.ObjectStore, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.ObjectStore)
+	itemAction, ok := impl.(objectstorev2.ObjectStore)
 	if !ok {
 		return nil, errors.Errorf("%T is not an object store", impl)
 	}
@@ -62,7 +62,7 @@ func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.ObjectStore
 		return nil, newGRPCError(err)
 	}
 
-	if err := impl.Init(req.Config); err != nil {
+	if err := impl.InitV2(ctx, req.Config); err != nil {
 		return nil, newGRPCError(err)
 	}
 
@@ -141,7 +141,7 @@ func (s *ObjectStoreGRPCServer) ObjectExists(ctx context.Context, req *proto.Obj
 		return nil, newGRPCError(err)
 	}
 
-	exists, err := impl.ObjectExists(req.Bucket, req.Key)
+	exists, err := impl.ObjectExistsV2(ctx, req.Bucket, req.Key)
 	if err != nil {
 		return nil, newGRPCError(err)
 	}
@@ -200,7 +200,7 @@ func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *pro
 		return nil, newGRPCError(err)
 	}
 
-	prefixes, err := impl.ListCommonPrefixes(req.Bucket, req.Prefix, req.Delimiter)
+	prefixes, err := impl.ListCommonPrefixesV2(ctx, req.Bucket, req.Prefix, req.Delimiter)
 	if err != nil {
 		return nil, newGRPCError(err)
 	}
@@ -221,7 +221,7 @@ func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.List
 		return nil, newGRPCError(err)
 	}
 
-	keys, err := impl.ListObjects(req.Bucket, req.Prefix)
+	keys, err := impl.ListObjectsV2(ctx, req.Bucket, req.Prefix)
 	if err != nil {
 		return nil, newGRPCError(err)
 	}
@@ -243,7 +243,7 @@ func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.Del
 		return nil, newGRPCError(err)
 	}
 
-	if err := impl.DeleteObject(req.Bucket, req.Key); err != nil {
+	if err := impl.DeleteObjectV2(ctx, req.Bucket, req.Key); err != nil {
 		return nil, newGRPCError(err)
 	}
 
@@ -263,7 +263,7 @@ func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.
 		return nil, newGRPCError(err)
 	}
 
-	url, err := impl.CreateSignedURL(req.Bucket, req.Key, time.Duration(req.Ttl))
+	url, err := impl.CreateSignedURLV2(ctx, req.Bucket, req.Key, time.Duration(req.Ttl))
 	if err != nil {
 		return nil, newGRPCError(err)
 	}

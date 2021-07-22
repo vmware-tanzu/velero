@@ -53,12 +53,19 @@ func newVolumeSnapshotterGRPCClient(base *clientBase, clientConn *grpc.ClientCon
 // configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config.
 func (c *VolumeSnapshotterGRPCClient) Init(config map[string]string) error {
+	return c.InitV2(context.Background(), config)
+}
+
+// InitV2 prepares the VolumeSnapshotter for usage using the provided map of
+// configuration key-value pairs. It returns an error if the VolumeSnapshotter
+// cannot be initialized from the provided config.
+func (c *VolumeSnapshotterGRPCClient) InitV2(ctx context.Context, config map[string]string) error {
 	req := &proto.VolumeSnapshotterInitRequest{
 		Plugin: c.plugin,
 		Config: config,
 	}
 
-	if _, err := c.grpcClient.Init(context.Background(), req); err != nil {
+	if _, err := c.grpcClient.Init(ctx, req); err != nil {
 		return fromGRPCError(err)
 	}
 
@@ -67,7 +74,14 @@ func (c *VolumeSnapshotterGRPCClient) Init(config map[string]string) error {
 
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 // and with the specified type and IOPS (if using provisioned IOPS).
-func (c *VolumeSnapshotterGRPCClient) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+func (c *VolumeSnapshotterGRPCClient) CreateVolumeFromSnapshot(
+	snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+	return c.CreateVolumeFromSnapshotV2(context.Background(), snapshotID, volumeType, volumeAZ, iops)
+}
+
+func (c *VolumeSnapshotterGRPCClient) CreateVolumeFromSnapshotV2(
+	ctx context.Context, snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+
 	req := &proto.CreateVolumeRequest{
 		Plugin:     c.plugin,
 		SnapshotID: snapshotID,
@@ -81,7 +95,7 @@ func (c *VolumeSnapshotterGRPCClient) CreateVolumeFromSnapshot(snapshotID, volum
 		req.Iops = *iops
 	}
 
-	res, err := c.grpcClient.CreateVolumeFromSnapshot(context.Background(), req)
+	res, err := c.grpcClient.CreateVolumeFromSnapshot(ctx, req)
 	if err != nil {
 		return "", fromGRPCError(err)
 	}
@@ -92,13 +106,19 @@ func (c *VolumeSnapshotterGRPCClient) CreateVolumeFromSnapshot(snapshotID, volum
 // GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 // volume.
 func (c *VolumeSnapshotterGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	return c.GetVolumeInfoV2(context.Background(), volumeID, volumeAZ)
+}
+
+func (c *VolumeSnapshotterGRPCClient) GetVolumeInfoV2(
+	ctx context.Context, volumeID, volumeAZ string) (string, *int64, error) {
+
 	req := &proto.GetVolumeInfoRequest{
 		Plugin:   c.plugin,
 		VolumeID: volumeID,
 		VolumeAZ: volumeAZ,
 	}
 
-	res, err := c.grpcClient.GetVolumeInfo(context.Background(), req)
+	res, err := c.grpcClient.GetVolumeInfo(ctx, req)
 	if err != nil {
 		return "", nil, fromGRPCError(err)
 	}
@@ -114,6 +134,11 @@ func (c *VolumeSnapshotterGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
 func (c *VolumeSnapshotterGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+	return c.CreateSnapshotV2(context.Background(), volumeID, volumeID, tags)
+}
+
+func (c *VolumeSnapshotterGRPCClient) CreateSnapshotV2(
+	ctx context.Context, volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	req := &proto.CreateSnapshotRequest{
 		Plugin:   c.plugin,
 		VolumeID: volumeID,
@@ -121,7 +146,7 @@ func (c *VolumeSnapshotterGRPCClient) CreateSnapshot(volumeID, volumeAZ string, 
 		Tags:     tags,
 	}
 
-	res, err := c.grpcClient.CreateSnapshot(context.Background(), req)
+	res, err := c.grpcClient.CreateSnapshot(ctx, req)
 	if err != nil {
 		return "", fromGRPCError(err)
 	}
@@ -131,12 +156,17 @@ func (c *VolumeSnapshotterGRPCClient) CreateSnapshot(volumeID, volumeAZ string, 
 
 // DeleteSnapshot deletes the specified volume snapshot.
 func (c *VolumeSnapshotterGRPCClient) DeleteSnapshot(snapshotID string) error {
+	return c.DeleteSnapshotV2(context.Background(), snapshotID)
+}
+
+func (c *VolumeSnapshotterGRPCClient) DeleteSnapshotV2(
+	ctx context.Context, snapshotID string) error {
 	req := &proto.DeleteSnapshotRequest{
 		Plugin:     c.plugin,
 		SnapshotID: snapshotID,
 	}
 
-	if _, err := c.grpcClient.DeleteSnapshot(context.Background(), req); err != nil {
+	if _, err := c.grpcClient.DeleteSnapshot(ctx, req); err != nil {
 		return fromGRPCError(err)
 	}
 
@@ -144,6 +174,11 @@ func (c *VolumeSnapshotterGRPCClient) DeleteSnapshot(snapshotID string) error {
 }
 
 func (c *VolumeSnapshotterGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	return c.GetVolumeIDV2(context.Background(), pv)
+}
+
+func (c *VolumeSnapshotterGRPCClient) GetVolumeIDV2(
+	ctx context.Context, pv runtime.Unstructured) (string, error) {
 	encodedPV, err := json.Marshal(pv.UnstructuredContent())
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -154,7 +189,7 @@ func (c *VolumeSnapshotterGRPCClient) GetVolumeID(pv runtime.Unstructured) (stri
 		PersistentVolume: encodedPV,
 	}
 
-	resp, err := c.grpcClient.GetVolumeID(context.Background(), req)
+	resp, err := c.grpcClient.GetVolumeID(ctx, req)
 	if err != nil {
 		return "", fromGRPCError(err)
 	}
@@ -163,6 +198,11 @@ func (c *VolumeSnapshotterGRPCClient) GetVolumeID(pv runtime.Unstructured) (stri
 }
 
 func (c *VolumeSnapshotterGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	return c.SetVolumeIDV2(context.Background(), pv, volumeID)
+}
+
+func (c *VolumeSnapshotterGRPCClient) SetVolumeIDV2(
+	ctx context.Context, pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	encodedPV, err := json.Marshal(pv.UnstructuredContent())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -174,7 +214,7 @@ func (c *VolumeSnapshotterGRPCClient) SetVolumeID(pv runtime.Unstructured, volum
 		VolumeID:         volumeID,
 	}
 
-	resp, err := c.grpcClient.SetVolumeID(context.Background(), req)
+	resp, err := c.grpcClient.SetVolumeID(ctx, req)
 	if err != nil {
 		return nil, fromGRPCError(err)
 	}

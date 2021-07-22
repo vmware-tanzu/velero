@@ -218,3 +218,161 @@ func (c *ObjectStoreGRPCClient) CreateSignedURL(bucket, key string, ttl time.Dur
 
 	return res.Url, nil
 }
+
+// Version 2
+// PutObjectV2 creates a new object using the data in body within the specified
+// object storage bucket with the given key.
+func (c *ObjectStoreGRPCClient) PutObjectV2(ctx context.Context, bucket, key string, body io.Reader) error {
+	stream, err := c.grpcClient.PutObject(ctx)
+	if err != nil {
+		return fromGRPCError(err)
+	}
+
+	// read from the provider io.Reader into chunks, and send each one over
+	// the gRPC stream
+	chunk := make([]byte, byteChunkSize)
+	for {
+		n, err := body.Read(chunk)
+		if err == io.EOF {
+			if _, resErr := stream.CloseAndRecv(); resErr != nil {
+				return fromGRPCError(resErr)
+			}
+			return nil
+		}
+		if err != nil {
+			stream.CloseSend()
+			return errors.WithStack(err)
+		}
+
+		if err := stream.Send(&proto.PutObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key, Body: chunk[0:n]}); err != nil {
+			return fromGRPCError(err)
+		}
+	}
+}
+
+// ObjectExistsV2 checks if there is an object with the given key in the object storage bucket.
+func (c *ObjectStoreGRPCClient) ObjectExistsV2(ctx context.Context, bucket, key string) (bool, error) {
+	req := &proto.ObjectExistsRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+	}
+
+	res, err := c.grpcClient.ObjectExists(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	return res.Exists, nil
+}
+
+// GetObjectV2 retrieves the object with the given key from the specified
+// bucket in object storage.
+func (c *ObjectStoreGRPCClient) GetObjectV2(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+	req := &proto.GetObjectRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+	}
+
+	stream, err := c.grpcClient.GetObject(ctx, req)
+	if err != nil {
+		return nil, fromGRPCError(err)
+	}
+
+	receive := func() ([]byte, error) {
+		data, err := stream.Recv()
+		if err == io.EOF {
+			// we need to return io.EOF errors unwrapped so that
+			// calling code sees them as io.EOF and knows to stop
+			// reading.
+			return nil, err
+		}
+		if err != nil {
+			return nil, fromGRPCError(err)
+		}
+
+		return data.Data, nil
+	}
+
+	close := func() error {
+		if err := stream.CloseSend(); err != nil {
+			return fromGRPCError(err)
+		}
+		return nil
+	}
+
+	return &StreamReadCloser{receive: receive, close: close}, nil
+}
+
+// ListCommonPrefixesV2 gets a list of all object key prefixes that come
+// after the provided prefix and before the provided delimiter (this is
+// often used to simulate a directory hierarchy in object storage).
+func (c *ObjectStoreGRPCClient) ListCommonPrefixesV2(
+	ctx context.Context, bucket, prefix, delimiter string) ([]string, error) {
+	req := &proto.ListCommonPrefixesRequest{
+		Plugin:    c.plugin,
+		Bucket:    bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+	}
+
+	res, err := c.grpcClient.ListCommonPrefixes(ctx, req)
+	if err != nil {
+		return nil, fromGRPCError(err)
+	}
+
+	return res.Prefixes, nil
+}
+
+// ListObjectsV2 gets a list of all objects in bucket that have the same prefix.
+func (c *ObjectStoreGRPCClient) ListObjectsV2(
+	ctx context.Context, bucket, prefix string) ([]string, error) {
+	req := &proto.ListObjectsRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Prefix: prefix,
+	}
+
+	res, err := c.grpcClient.ListObjects(ctx, req)
+	if err != nil {
+		return nil, fromGRPCError(err)
+	}
+
+	return res.Keys, nil
+}
+
+// DeleteObjectV2 removes object with the specified key from the given
+// bucket.
+func (c *ObjectStoreGRPCClient) DeleteObjectV2(
+	ctx context.Context, bucket, key string) error {
+	req := &proto.DeleteObjectRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+	}
+
+	if _, err := c.grpcClient.DeleteObject(ctx, req); err != nil {
+		return fromGRPCError(err)
+	}
+
+	return nil
+}
+
+// CreateSignedURLV2 creates a pre-signed URL for the given bucket and key that expires after ttl.
+func (c *ObjectStoreGRPCClient) CreateSignedURLV2(
+	ctx context.Context, bucket, key string, ttl time.Duration) (string, error) {
+	req := &proto.CreateSignedURLRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+		Ttl:    int64(ttl),
+	}
+
+	res, err := c.grpcClient.CreateSignedURL(ctx, req)
+	if err != nil {
+		return "", fromGRPCError(err)
+	}
+
+	return res.Url, nil
+}

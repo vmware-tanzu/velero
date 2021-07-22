@@ -46,7 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	volumesnapshotter "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v2"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -333,7 +333,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
 			errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
 		} else {
-			volumeSnapshotters := make(map[string]velero.VolumeSnapshotter)
+			volumeSnapshotters := make(map[string]volumesnapshotter.VolumeSnapshotter)
 
 			for _, snapshot := range snapshots {
 				log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
@@ -433,7 +433,7 @@ func volumeSnapshotterForSnapshotLocation(
 	namespace, snapshotLocationName string,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	pluginManager clientmgmt.Manager,
-) (velero.VolumeSnapshotter, error) {
+) (volumesnapshotter.VolumeSnapshotter, error) {
 	snapshotLocation, err := snapshotLocationLister.VolumeSnapshotLocations(namespace).Get(snapshotLocationName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting volume snapshot location %s", snapshotLocationName)

@@ -45,6 +45,27 @@ const (
 	PluginKindPluginLister PluginKind = "PluginLister"
 )
 
+const (
+	// PluginKindObjectStoreV2 represents an object store plugin version 2.
+	PluginKindObjectStoreV2 PluginKind = "ObjectStoreV2"
+
+	// PluginKindVolumeSnapshotterV2 represents a volume snapshotter plugin version 2.
+	PluginKindVolumeSnapshotterV2 PluginKind = "VolumeSnapshotterV2"
+
+	// PluginKindBackupItemActionV2 represents a backup item action plugin version 2.
+	PluginKindBackupItemActionV2 PluginKind = "BackupItemActionV2"
+
+	// PluginKindRestoreItemActionV2 represents a restore item action plugin version 2.
+	PluginKindRestoreItemActionV2 PluginKind = "RestoreItemActionV2"
+
+	// PluginKindDeleteItemActionV2 represents a delete item action plugin version 2.
+	PluginKindDeleteItemActionV2 PluginKind = "DeleteItemActionV2"
+
+	// TODO: we may not need this
+	// PluginKindPluginListerV2 represents a plugin lister plugin version 2.
+	PluginKindPluginListerV2 PluginKind = "PluginListerV2"
+)
+
 // AllPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
 // kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).
 func AllPluginKinds() map[string]PluginKind {

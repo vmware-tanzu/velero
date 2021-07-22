@@ -45,7 +45,7 @@ import (
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	deleteitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -802,7 +802,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		pluginManager := &pluginmocks.Manager{}
 		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
-		pluginManager.On("GetDeleteItemActions").Return([]velero.DeleteItemAction{}, nil)
+		pluginManager.On("GetDeleteItemActions").Return([]deleteitemactionv2.DeleteItemAction{}, nil)
 		pluginManager.On("CleanupClients")
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
@@ -932,7 +932,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		pluginManager := &pluginmocks.Manager{}
 		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
-		pluginManager.On("GetDeleteItemActions").Return([]velero.DeleteItemAction{new(mocks.DeleteItemAction)}, nil)
+		pluginManager.On("GetDeleteItemActions").Return([]deleteitemactionv2.DeleteItemAction{new(mocks.DeleteItemAction)}, nil)
 		pluginManager.On("CleanupClients")
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 

@@ -29,6 +29,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	deleteactionitemv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -37,7 +38,7 @@ import (
 type Context struct {
 	Backup          *velerov1api.Backup
 	BackupReader    io.Reader
-	Actions         []velero.DeleteItemAction
+	Actions         []deleteactionitemv2.DeleteItemAction
 	Filesystem      filesystem.Interface
 	Log             logrus.FieldLogger
 	DiscoveryHelper discovery.Helper
@@ -163,7 +164,7 @@ func (ctx *Context) getApplicableActions(groupResource schema.GroupResource, nam
 
 // resolvedActions are DeleteItemActions decorated with resource/namespace include/exclude collections, as well as label selectors for easy comparison.
 type resolvedAction struct {
-	velero.DeleteItemAction
+	deleteactionitemv2.DeleteItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
@@ -171,7 +172,7 @@ type resolvedAction struct {
 }
 
 // resolveActions resolves the AppliesTo ResourceSelectors of DeleteItemActions plugins against the Kubernetes discovery API for fully-qualified names.
-func resolveActions(actions []velero.DeleteItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []deleteactionitemv2.DeleteItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {

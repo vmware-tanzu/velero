@@ -25,9 +25,10 @@ import (
 
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	deleteitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"
 )
 
-var _ velero.DeleteItemAction = &DeleteItemActionGRPCClient{}
+var _ deleteitemactionv2.DeleteItemAction = &DeleteItemActionGRPCClient{}
 
 // NewDeleteItemActionPlugin constructs a DeleteItemActionPlugin.
 func NewDeleteItemActionPlugin(options ...PluginOption) *DeleteItemActionPlugin {
@@ -88,6 +89,31 @@ func (c *DeleteItemActionGRPCClient) Execute(input *velero.DeleteItemActionExecu
 
 	// First return item is just an empty struct no matter what.
 	if _, err = c.grpcClient.Execute(context.Background(), req); err != nil {
+		return fromGRPCError(err)
+	}
+
+	return nil
+}
+
+func (c *DeleteItemActionGRPCClient) ExecuteV2(ctx context.Context, input *velero.DeleteItemActionExecuteInput) error {
+	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	backupJSON, err := json.Marshal(input.Backup)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	req := &proto.DeleteItemActionExecuteRequest{
+		Plugin: c.plugin,
+		Item:   itemJSON,
+		Backup: backupJSON,
+	}
+
+	// First return item is just an empty struct no matter what.
+	if _, err = c.grpcClient.Execute(ctx, req); err != nil {
 		return fromGRPCError(err)
 	}
 

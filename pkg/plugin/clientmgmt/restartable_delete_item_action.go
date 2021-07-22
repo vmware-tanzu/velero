@@ -17,10 +17,14 @@ limitations under the License.
 package clientmgmt
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	deleteitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"
 )
 
 // restartableDeleteItemAction is a delete item action for a given implementation (such as "pod"). It is associated with
@@ -34,7 +38,7 @@ type restartableDeleteItemAction struct {
 }
 
 // newRestartableDeleteItemAction returns a new restartableDeleteItemAction.
-func newRestartableDeleteItemAction(name string, sharedPluginProcess RestartableProcess) *restartableDeleteItemAction {
+func newRestartableDeleteItemActionV2(name string, sharedPluginProcess RestartableProcess) *restartableDeleteItemAction {
 	r := &restartableDeleteItemAction{
 		key:                 kindAndName{kind: framework.PluginKindDeleteItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
@@ -44,13 +48,13 @@ func newRestartableDeleteItemAction(name string, sharedPluginProcess Restartable
 
 // getDeleteItemAction returns the delete item action for this restartableDeleteItemAction. It does *not* restart the
 // plugin process.
-func (r *restartableDeleteItemAction) getDeleteItemAction() (velero.DeleteItemAction, error) {
+func (r *restartableDeleteItemAction) getDeleteItemAction() (deleteitemactionv2.DeleteItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	deleteItemAction, ok := plugin.(velero.DeleteItemAction)
+	deleteItemAction, ok := plugin.(deleteitemactionv2.DeleteItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a DeleteItemAction!", plugin)
 	}
@@ -59,7 +63,7 @@ func (r *restartableDeleteItemAction) getDeleteItemAction() (velero.DeleteItemAc
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the delete item action for this restartableDeleteItemAction.
-func (r *restartableDeleteItemAction) getDelegate() (velero.DeleteItemAction, error) {
+func (r *restartableDeleteItemAction) getDelegate() (deleteitemactionv2.DeleteItemAction, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -85,4 +89,14 @@ func (r *restartableDeleteItemAction) Execute(input *velero.DeleteItemActionExec
 	}
 
 	return delegate.Execute(input)
+}
+
+// ExecuteV2 restarts the plugin's process if needed, then delegates the call.
+func (r *restartableDeleteItemAction) ExecuteV2(ctx context.Context, input *velero.DeleteItemActionExecuteInput) error {
+	delegate, err := r.getDelegate()
+	if err != nil {
+		return err
+	}
+
+	return delegate.ExecuteV2(ctx, input)
 }

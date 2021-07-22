@@ -33,7 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -80,16 +80,16 @@ type BackupStore interface {
 const DownloadURLTTL = 10 * time.Minute
 
 type objectBackupStore struct {
-	objectStore velero.ObjectStore
+	objectStore objectstorev2.ObjectStore
 	bucket      string
 	layout      *ObjectStoreLayout
 	logger      logrus.FieldLogger
 }
 
-// ObjectStoreGetter is a type that can get a velero.ObjectStore
+// ObjectStoreGetter is a type that can get a objectstorev2.ObjectStore
 // from a provider name.
 type ObjectStoreGetter interface {
-	GetObjectStore(provider string) (velero.ObjectStore, error)
+	GetObjectStore(provider string) (objectstorev2.ObjectStore, error)
 }
 
 // ObjectBackupStoreGetter is a type that can get a velero.BackupStore for a
@@ -326,7 +326,7 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 
 // tryGet returns the object with the given key if it exists, nil if it does not exist,
 // or an error if it was unable to check existence or get the object.
-func tryGet(objectStore velero.ObjectStore, bucket, key string) (io.ReadCloser, error) {
+func tryGet(objectStore objectstorev2.ObjectStore, bucket, key string) (io.ReadCloser, error) {
 	exists, err := objectStore.ObjectExists(bucket, key)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -494,7 +494,7 @@ func seekToBeginning(r io.Reader) error {
 	return err
 }
 
-func seekAndPutObject(objectStore velero.ObjectStore, bucket, key string, file io.Reader) error {
+func seekAndPutObject(objectStore objectstorev2.ObjectStore, bucket, key string, file io.Reader) error {
 	if file == nil {
 		return nil
 	}

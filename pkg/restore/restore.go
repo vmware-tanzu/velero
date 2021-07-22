@@ -57,6 +57,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	restoreitemaction "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
+	volumesnapshotter "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v2"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -75,7 +77,7 @@ const KubeAnnBoundByController = "pv.kubernetes.io/bound-by-controller"
 const KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
 type VolumeSnapshotterGetter interface {
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (volumesnapshotter.VolumeSnapshotter, error)
 }
 
 type Request struct {
@@ -92,7 +94,7 @@ type Request struct {
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
 	Restore(req Request,
-		actions []velero.RestoreItemAction,
+		actions []restoreitemaction.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
@@ -158,7 +160,7 @@ func NewKubernetesRestorer(
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(
 	req Request,
-	actions []velero.RestoreItemAction,
+	actions []restoreitemaction.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
@@ -278,14 +280,14 @@ func (kr *kubernetesRestorer) Restore(
 }
 
 type resolvedAction struct {
-	velero.RestoreItemAction
+	restoreitemaction.RestoreItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
 	selector                  labels.Selector
 }
 
-func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []restoreitemaction.RestoreItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {

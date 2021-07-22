@@ -21,40 +21,35 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	backupitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+	backupitemactionv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 )
 
-// restartableBackupItemAction is a backup item action for a given implementation (such as "pod"). It is associated with
-// a restartableProcess, which may be shared and used to run multiple plugins. At the beginning of each method
-// call, the restartableBackupItemAction asks its restartableProcess to restart itself if needed (e.g. if the
-// process terminated for any reason), then it proceeds with the actual call.
-type restartableBackupItemAction struct {
+type restartableAdaptedV1BackupItemAction struct {
 	key                 kindAndName
 	sharedPluginProcess RestartableProcess
 }
 
-// newRestartableBackupItemActionV2 returns a new restartableBackupItemAction.
-func newRestartableBackupItemActionV2(name string, sharedPluginProcess RestartableProcess) *restartableBackupItemAction {
-	r := &restartableBackupItemAction{
-		key:                 kindAndName{kind: framework.PluginKindBackupItemActionV2, name: name},
+// newAdaptedV1BackupItemAction returns a new restartableAdaptedV1BackupItemAction.
+func newAdaptedV1BackupItemAction(name string, sharedPluginProcess RestartableProcess) *restartableAdaptedV1BackupItemAction {
+	r := &restartableAdaptedV1BackupItemAction{
+		key:                 kindAndName{kind: framework.PluginKindBackupItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r
 }
 
-// getBackupItemAction returns the backup item action for this restartableBackupItemAction. It does *not* restart the
+// getBackupItemAction returns the backup item action for this restartableAdaptedV1BackupItemAction. It does *not* restart the
 // plugin process.
-func (r *restartableBackupItemAction) getBackupItemAction() (backupitemactionv2.BackupItemAction, error) {
+func (r *restartableAdaptedV1BackupItemAction) getBackupItemAction() (backupitemactionv1.BackupItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	backupItemAction, ok := plugin.(backupitemactionv2.BackupItemAction)
+	backupItemAction, ok := plugin.(backupitemactionv1.BackupItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a BackupItemAction!", plugin)
 	}
@@ -62,8 +57,8 @@ func (r *restartableBackupItemAction) getBackupItemAction() (backupitemactionv2.
 	return backupItemAction, nil
 }
 
-// getDelegate restarts the plugin process (if needed) and returns the backup item action for this restartableBackupItemAction.
-func (r *restartableBackupItemAction) getDelegate() (backupitemactionv2.BackupItemAction, error) {
+// getDelegate restarts the plugin process (if needed) and returns the backup item action for this restartableAdaptedV1BackupItemAction.
+func (r *restartableAdaptedV1BackupItemAction) getDelegate() (backupitemactionv1.BackupItemAction, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -72,7 +67,7 @@ func (r *restartableBackupItemAction) getDelegate() (backupitemactionv2.BackupIt
 }
 
 // AppliesTo restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (r *restartableAdaptedV1BackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return velero.ResourceSelector{}, err
@@ -82,7 +77,7 @@ func (r *restartableBackupItemAction) AppliesTo() (velero.ResourceSelector, erro
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (r *restartableAdaptedV1BackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, nil, err
@@ -91,12 +86,12 @@ func (r *restartableBackupItemAction) Execute(item runtime.Unstructured, backup 
 	return delegate.Execute(item, backup)
 }
 
+// Version 2: simply discard ctx and call version 1 function.
 // ExecuteV2 restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBackupItemAction) ExecuteV2(ctx context.Context, item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (r *restartableAdaptedV1BackupItemAction) ExecuteV2(ctx context.Context, item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, nil, err
 	}
-
-	return delegate.ExecuteV2(ctx, item, backup)
+	return delegate.Execute(item, backup)
 }

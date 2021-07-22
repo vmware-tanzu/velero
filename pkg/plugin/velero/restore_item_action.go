@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2019, 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,22 +21,6 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
-
-// RestoreItemAction is an actor that performs an operation on an individual item being restored.
-type RestoreItemAction interface {
-	// AppliesTo returns information about which resources this action should be invoked for.
-	// A RestoreItemAction's Execute function will only be invoked on items that match the returned
-	// selector. A zero-valued ResourceSelector matches all resources.
-	AppliesTo() (ResourceSelector, error)
-
-	// Execute allows the ItemAction to perform arbitrary logic with the item being restored,
-	// including mutating the item itself prior to restore. The item (unmodified or modified)
-	// should be returned, along with an optional slice of ResourceIdentifiers specifying additional
-	// related items that should be restored, a warning (which will be logged but will not prevent
-	// the item from being restored) or error (which will be logged and will prevent the item
-	// from being restored) if applicable.
-	Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error)
-}
 
 // RestoreItemActionExecuteInput contains the input parameters for the ItemAction's Execute function.
 type RestoreItemActionExecuteInput struct {

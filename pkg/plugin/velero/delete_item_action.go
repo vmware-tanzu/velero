@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright 2020, 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,20 +21,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
-
-// DeleteItemAction is an actor that performs an operation on an individual item being restored.
-type DeleteItemAction interface {
-	// AppliesTo returns information about which resources this action should be invoked for.
-	// A DeleteItemAction's Execute function will only be invoked on items that match the returned
-	// selector. A zero-valued ResourceSelector matches all resources.
-	AppliesTo() (ResourceSelector, error)
-
-	// Execute allows the ItemAction to perform arbitrary logic with the item being deleted.
-	// An error should be returned if there were problems with the deletion process, but the
-	// overall deletion process cannot be stopped.
-	// Returned errors are logged.
-	Execute(input *DeleteItemActionExecuteInput) error
-}
 
 // DeleteItemActionExecuteInput contains the input parameters for the ItemAction's Execute function.
 type DeleteItemActionExecuteInput struct {

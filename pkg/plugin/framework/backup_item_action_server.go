@@ -26,6 +26,7 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	backupitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 )
 
 // BackupItemActionGRPCServer implements the proto-generated BackupItemAction interface, and accepts
@@ -34,13 +35,13 @@ type BackupItemActionGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *BackupItemActionGRPCServer) getImpl(name string) (velero.BackupItemAction, error) {
+func (s *BackupItemActionGRPCServer) getImpl(name string) (backupitemactionv2.BackupItemAction, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.BackupItemAction)
+	itemAction, ok := impl.(backupitemactionv2.BackupItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a backup item action", impl)
 	}
@@ -98,7 +99,7 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 		return nil, newGRPCError(errors.WithStack(err))
 	}
 
-	updatedItem, additionalItems, err := impl.Execute(&item, &backup)
+	updatedItem, additionalItems, err := impl.ExecuteV2(ctx, &item, &backup)
 	if err != nil {
 		return nil, newGRPCError(err)
 	}

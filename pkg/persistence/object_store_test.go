@@ -36,8 +36,8 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -595,9 +595,9 @@ func TestGetDownloadURL(t *testing.T) {
 	}
 }
 
-type objectStoreGetter map[string]velero.ObjectStore
+type objectStoreGetter map[string]objectstorev2.ObjectStore
 
-func (osg objectStoreGetter) GetObjectStore(provider string) (velero.ObjectStore, error) {
+func (osg objectStoreGetter) GetObjectStore(provider string) (objectstorev2.ObjectStore, error) {
 	res, ok := osg[provider]
 	if !ok {
 		return nil, errors.New("object store not found")

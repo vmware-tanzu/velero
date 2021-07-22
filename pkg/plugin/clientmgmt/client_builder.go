@@ -73,6 +73,12 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
 			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(b.clientLogger)),
 			string(framework.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(framework.ClientLogger(b.clientLogger)),
+			// Version 2
+			string(framework.PluginKindBackupItemActionV2):  framework.NewBackupItemActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindVolumeSnapshotterV2): framework.NewVolumeSnapshotterPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindObjectStoreV2):       framework.NewObjectStorePlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindRestoreItemActionV2): framework.NewRestoreItemActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindDeleteItemActionV2):  framework.NewDeleteItemActionPlugin(framework.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...),

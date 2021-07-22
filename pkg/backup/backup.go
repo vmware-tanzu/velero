@@ -44,7 +44,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	backupitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+	volumesnapshotterv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v2"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
@@ -61,7 +62,8 @@ const BackupFormatVersion = "1.1.0"
 type Backupper interface {
 	// Backup takes a backup using the specification in the velerov1api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
+	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer,
+		actions []backupitemactionv2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -77,7 +79,7 @@ type kubernetesBackupper struct {
 }
 
 type resolvedAction struct {
-	velero.BackupItemAction
+	backupitemactionv2.BackupItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
@@ -121,7 +123,7 @@ func NewKubernetesBackupper(
 	}, nil
 }
 
-func resolveActions(actions []velero.BackupItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []backupitemactionv2.BackupItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {
@@ -197,7 +199,7 @@ func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelpe
 }
 
 type VolumeSnapshotterGetter interface {
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (volumesnapshotterv2.VolumeSnapshotter, error)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
@@ -205,7 +207,8 @@ type VolumeSnapshotterGetter interface {
 // a complete backup failure is returned. Errors that constitute partial failures (i.e. failures to
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
-func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
+	actions []backupitemactionv2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 

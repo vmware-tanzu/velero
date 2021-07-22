@@ -27,9 +27,10 @@ import (
 
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 )
 
-var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}
+var _ restoreitemactionv2.RestoreItemAction = &RestoreItemActionGRPCClient{}
 
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
 func NewRestoreItemActionPlugin(options ...PluginOption) *RestoreItemActionPlugin {
@@ -71,7 +72,14 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, erro
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (c *RestoreItemActionGRPCClient) Execute(
+	input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	return c.ExecuteV2(context.Background(), input)
+}
+
+func (c *RestoreItemActionGRPCClient) ExecuteV2(
+	ctx context.Context, input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+
 	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -94,7 +102,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 		Restore:        restoreJSON,
 	}
 
-	res, err := c.grpcClient.Execute(context.Background(), req)
+	res, err := c.grpcClient.Execute(ctx, req)
 	if err != nil {
 		return nil, fromGRPCError(err)
 	}

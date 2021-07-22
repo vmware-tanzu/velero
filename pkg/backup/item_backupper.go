@@ -39,7 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	volumesnapshotterv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v2"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -56,7 +56,7 @@ type itemBackupper struct {
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 
 	itemHookHandler                    hook.ItemHookHandler
-	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
+	snapshotLocationVolumeSnapshotters map[string]volumesnapshotterv2.VolumeSnapshotter
 }
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
@@ -367,7 +367,8 @@ func (ib *itemBackupper) executeActions(
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
+func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (
+	volumesnapshotterv2.VolumeSnapshotter, error) {
 	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -382,7 +383,7 @@ func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeS
 	}
 
 	if ib.snapshotLocationVolumeSnapshotters == nil {
-		ib.snapshotLocationVolumeSnapshotters = make(map[string]velero.VolumeSnapshotter)
+		ib.snapshotLocationVolumeSnapshotters = make(map[string]volumesnapshotterv2.VolumeSnapshotter)
 	}
 	ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name] = bs
 
@@ -438,7 +439,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 	var (
 		volumeID, location string
-		volumeSnapshotter  velero.VolumeSnapshotter
+		volumeSnapshotter  volumesnapshotterv2.VolumeSnapshotter
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {

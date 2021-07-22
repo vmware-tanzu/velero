@@ -26,6 +26,7 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	deleteitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"
 )
 
 // DeleteItemActionGRPCServer implements the proto-generated DeleteItemActionServer interface, and accepts
@@ -34,13 +35,13 @@ type DeleteItemActionGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *DeleteItemActionGRPCServer) getImpl(name string) (velero.DeleteItemAction, error) {
+func (s *DeleteItemActionGRPCServer) getImpl(name string) (deleteitemactionv2.DeleteItemAction, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.DeleteItemAction)
+	itemAction, ok := impl.(deleteitemactionv2.DeleteItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a delete item action", impl)
 	}
@@ -76,7 +77,8 @@ func (s *DeleteItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.D
 	}, nil
 }
 
-func (s *DeleteItemActionGRPCServer) Execute(ctx context.Context, req *proto.DeleteItemActionExecuteRequest) (_ *proto.Empty, err error) {
+func (s *DeleteItemActionGRPCServer) Execute(
+	ctx context.Context, req *proto.DeleteItemActionExecuteRequest) (_ *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -101,7 +103,7 @@ func (s *DeleteItemActionGRPCServer) Execute(ctx context.Context, req *proto.Del
 		return nil, newGRPCError(errors.WithStack(err))
 	}
 
-	if err := impl.Execute(&velero.DeleteItemActionExecuteInput{
+	if err := impl.ExecuteV2(ctx, &velero.DeleteItemActionExecuteInput{
 		Item:   &item,
 		Backup: &backup,
 	}); err != nil {

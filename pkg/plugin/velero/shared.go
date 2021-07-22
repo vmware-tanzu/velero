@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2019, 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,10 @@ limitations under the License.
 // implementations of the plugin kinds in this package. Multiple
 // plugins of any type can be implemented.
 package velero
+
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 // ResourceSelector is a collection of included/excluded namespaces,
 // included/excluded resources, and a label-selector that can be used
@@ -47,4 +51,11 @@ type ResourceSelector struct {
 	// when matching resources. See "k8s.io/apimachinery/pkg/labels".Parse()
 	// for details on syntax.
 	LabelSelector string
+}
+
+// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
+type ResourceIdentifier struct {
+	schema.GroupResource
+	Namespace string
+	Name      string
 }
