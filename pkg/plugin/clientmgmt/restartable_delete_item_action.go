@@ -38,7 +38,8 @@ type restartableDeleteItemAction struct {
 }
 
 // newRestartableDeleteItemAction returns a new restartableDeleteItemAction.
-func newRestartableDeleteItemActionV2(name string, sharedPluginProcess RestartableProcess) *restartableDeleteItemAction {
+func newRestartableDeleteItemActionV2(
+	name string, sharedPluginProcess RestartableProcess) deleteitemactionv2.DeleteItemAction {
 	r := &restartableDeleteItemAction{
 		key:                 kindAndName{kind: framework.PluginKindDeleteItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,

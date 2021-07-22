@@ -38,7 +38,8 @@ type restartableBackupItemAction struct {
 }
 
 // newRestartableBackupItemActionV2 returns a new restartableBackupItemAction.
-func newRestartableBackupItemActionV2(name string, sharedPluginProcess RestartableProcess) *restartableBackupItemAction {
+func newRestartableBackupItemActionV2(
+	name string, sharedPluginProcess RestartableProcess) backupitemactionv2.BackupItemAction {
 	r := &restartableBackupItemAction{
 		key:                 kindAndName{kind: framework.PluginKindBackupItemActionV2, name: name},
 		sharedPluginProcess: sharedPluginProcess,

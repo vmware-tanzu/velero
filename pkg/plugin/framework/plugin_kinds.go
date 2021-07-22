@@ -60,11 +60,42 @@ const (
 
 	// PluginKindDeleteItemActionV2 represents a delete item action plugin version 2.
 	PluginKindDeleteItemActionV2 PluginKind = "DeleteItemActionV2"
-
-	// TODO: we may not need this
-	// PluginKindPluginListerV2 represents a plugin lister plugin version 2.
-	PluginKindPluginListerV2 PluginKind = "PluginListerV2"
 )
+
+func ObjectStoreKinds() []PluginKind {
+	return []PluginKind{
+		PluginKindObjectStoreV2,
+		PluginKindObjectStore,
+	}
+}
+
+func VolumeSnapshotterKinds() []PluginKind {
+	return []PluginKind{
+		PluginKindVolumeSnapshotterV2,
+		PluginKindVolumeSnapshotter,
+	}
+}
+
+func BackupItemActionKinds() []PluginKind {
+	return []PluginKind{
+		PluginKindBackupItemActionV2,
+		PluginKindBackupItemAction,
+	}
+}
+
+func RestoreItemActionKinds() []PluginKind {
+	return []PluginKind{
+		PluginKindRestoreItemActionV2,
+		PluginKindRestoreItemAction,
+	}
+}
+
+func DeleteItemActionKinds() []PluginKind {
+	return []PluginKind{
+		PluginKindDeleteItemActionV2,
+		PluginKindDeleteItemAction,
+	}
+}
 
 // AllPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
 // kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).

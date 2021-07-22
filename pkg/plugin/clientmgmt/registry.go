@@ -34,6 +34,8 @@ type Registry interface {
 	DiscoverPlugins() error
 	// List returns all PluginIdentifiers for kind.
 	List(kind framework.PluginKind) []framework.PluginIdentifier
+	// List returns all PluginIdentifiers for a list of kinds.
+	ListForKinds(kinds []framework.PluginKind) (list []framework.PluginIdentifier)
 	// Get returns the PluginIdentifier for kind and name.
 	Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error)
 }
@@ -106,6 +108,13 @@ func (r *registry) discoverPlugins(commands []string) error {
 	}
 
 	return nil
+}
+
+func (r *registry) ListForKinds(kinds []framework.PluginKind) (list []framework.PluginIdentifier) {
+	for _, kind := range kinds {
+		list = append(list, r.pluginsByKind[kind]...)
+	}
+	return
 }
 
 // List returns info about all plugin binaries that implement the given

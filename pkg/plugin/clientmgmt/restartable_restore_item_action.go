@@ -36,7 +36,8 @@ type restartableRestoreItemAction struct {
 }
 
 // newRestartableRestoreItemActionV2 returns a new restartableRestoreItemAction.
-func newRestartableRestoreItemActionV2(name string, sharedPluginProcess RestartableProcess) *restartableRestoreItemAction {
+func newRestartableRestoreItemActionV2(
+	name string, sharedPluginProcess RestartableProcess) restoreitemactionv2.RestoreItemAction {
 	r := &restartableRestoreItemAction{
 		key:                 kindAndName{kind: framework.PluginKindRestoreItemActionV2, name: name},
 		sharedPluginProcess: sharedPluginProcess,

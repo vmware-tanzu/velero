@@ -23,6 +23,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	restoreitemactionv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 )
 
 type restartableAdaptedV1RestoreItemAction struct {
@@ -32,7 +33,8 @@ type restartableAdaptedV1RestoreItemAction struct {
 }
 
 // newRestartableRestoreItemAction returns a new restartableRestoreItemAction.
-func newAdaptedV1RestoreItemAction(name string, sharedPluginProcess RestartableProcess) *restartableAdaptedV1RestoreItemAction {
+func newAdaptedV1RestoreItemAction(
+	name string, sharedPluginProcess RestartableProcess) restoreitemactionv2.RestoreItemAction {
 	r := &restartableAdaptedV1RestoreItemAction{
 		key:                 kindAndName{kind: framework.PluginKindRestoreItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,

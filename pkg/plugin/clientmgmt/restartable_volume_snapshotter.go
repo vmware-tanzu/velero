@@ -37,7 +37,8 @@ type restartableVolumeSnapshotter struct {
 }
 
 // newRestartableVolumeSnapshotterV2 returns a new restartableVolumeSnapshotter.
-func newRestartableVolumeSnapshotterV2(name string, sharedPluginProcess RestartableProcess) *restartableVolumeSnapshotter {
+func newRestartableVolumeSnapshotterV2(
+	name string, sharedPluginProcess RestartableProcess) volumesnapshotterv2.VolumeSnapshotter {
 	key := kindAndName{kind: framework.PluginKindVolumeSnapshotterV2, name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,

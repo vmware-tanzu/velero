@@ -18,12 +18,13 @@ package clientmgmt
 
 import (
 	"context"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"io"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	objectstorev1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v1"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 )
 
 // restartableAdaptedV1ObjectStore is restartableAdaptedV1ObjectStore version 1 adaptive to version 2 plugin
@@ -32,7 +33,7 @@ type restartableAdaptedV1ObjectStore struct {
 }
 
 // newAdaptedV1ObjectStore returns a new restartableAdaptedV1ObjectStore.
-func newAdaptedV1ObjectStore(name string, sharedPluginProcess RestartableProcess) *restartableAdaptedV1ObjectStore {
+func newAdaptedV1ObjectStore(name string, sharedPluginProcess RestartableProcess) objectstorev2.ObjectStore {
 	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
 	r := &restartableAdaptedV1ObjectStore{
 		restartableObjectStore: restartableObjectStore{

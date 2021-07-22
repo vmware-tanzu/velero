@@ -39,8 +39,8 @@ type restartableObjectStore struct {
 	config map[string]string
 }
 
-// newRestartableObjectStoreV2 returns a new restartableObjectStore for version 2.
-func newRestartableObjectStoreV2(name string, sharedPluginProcess RestartableProcess) *restartableObjectStore {
+// newRestartableObjectStoreV2 returns a new objectstorev2.ObjectStore for PluginKindObjectStoreV2
+func newRestartableObjectStoreV2(name string, sharedPluginProcess RestartableProcess) objectstorev2.ObjectStore {
 	key := kindAndName{kind: framework.PluginKindObjectStoreV2, name: name}
 	r := &restartableObjectStore{
 		key:                 key,

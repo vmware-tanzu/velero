@@ -20,11 +20,12 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	backupitemactionv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	backupitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type restartableAdaptedV1BackupItemAction struct {
@@ -33,7 +34,8 @@ type restartableAdaptedV1BackupItemAction struct {
 }
 
 // newAdaptedV1BackupItemAction returns a new restartableAdaptedV1BackupItemAction.
-func newAdaptedV1BackupItemAction(name string, sharedPluginProcess RestartableProcess) *restartableAdaptedV1BackupItemAction {
+func newAdaptedV1BackupItemAction(
+	name string, sharedPluginProcess RestartableProcess) backupitemactionv2.BackupItemAction {
 	r := &restartableAdaptedV1BackupItemAction{
 		key:                 kindAndName{kind: framework.PluginKindBackupItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
