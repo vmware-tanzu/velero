@@ -14,6 +14,7 @@ exemptLabels:
   - Area/Design
   - Area/Documentation
   - Area/Plugins
+  - Enhancement/User
   - kind/tech-debt
   - Needs investigation
   - P0 - Hair on fire
