@@ -118,7 +118,6 @@ func (r *restartableVolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID strin
 	return delegate.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
 }
 
-
 // GetVolumeID restarts the plugin's process if needed, then delegates the call.
 func (r *restartableVolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	delegate, err := r.getDelegate()
@@ -168,6 +167,7 @@ func (r *restartableVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 func (r *restartableVolumeSnapshotter) InitV2(ctx context.Context, config map[string]string) error {
 	return r.Init(config)
 }
+
 // CreateVolumeFromSnapshotV2 restarts the plugin's process if needed, then delegates the call.
 func (r *restartableVolumeSnapshotter) CreateVolumeFromSnapshotV2(
 	ctx context.Context, snapshotID string, volumeType string, volumeAZ string, iops *int64) (volumeID string, err error) {

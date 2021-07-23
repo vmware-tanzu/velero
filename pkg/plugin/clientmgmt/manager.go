@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	backupitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	deleteitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/deleteitemaction/v2"

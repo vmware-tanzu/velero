@@ -106,5 +106,11 @@ func AllPluginKinds() map[string]PluginKind {
 	allPluginKinds[PluginKindBackupItemAction.String()] = PluginKindBackupItemAction
 	allPluginKinds[PluginKindRestoreItemAction.String()] = PluginKindRestoreItemAction
 	allPluginKinds[PluginKindDeleteItemAction.String()] = PluginKindDeleteItemAction
+	// Version 2
+	allPluginKinds[PluginKindObjectStoreV2.String()] = PluginKindObjectStoreV2
+	allPluginKinds[PluginKindVolumeSnapshotterV2.String()] = PluginKindVolumeSnapshotterV2
+	allPluginKinds[PluginKindBackupItemActionV2.String()] = PluginKindBackupItemActionV2
+	allPluginKinds[PluginKindRestoreItemActionV2.String()] = PluginKindRestoreItemActionV2
+	allPluginKinds[PluginKindDeleteItemActionV2.String()] = PluginKindDeleteItemActionV2
 	return allPluginKinds
 }
