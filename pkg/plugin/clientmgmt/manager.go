@@ -97,22 +97,6 @@ func (m *manager) CleanupClients() {
 	m.lock.Unlock()
 }
 
-func (m *manager) getRestartableProcessOfKinds(
-	kinds []framework.PluginKind, name string) (RestartableProcess, framework.PluginKind, error) {
-	var err error
-	var process RestartableProcess
-	var kind framework.PluginKind
-	for _, kind = range kinds {
-		process, err = m.getRestartableProcess(kind, name)
-		if err == nil {
-			return process, kind, nil
-		} else if !errors.Is(err, &pluginNotFoundError{}) {
-			return nil, kind, err
-		}
-	}
-	return nil, kind, err
-}
-
 // getRestartableProcess returns a restartableProcess for a plugin identified by kind and name, creating a
 // restartableProcess if it is the first time it has been requested.
 func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) (RestartableProcess, error) {
@@ -150,52 +134,86 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 	return restartableProcess, nil
 }
 
-type NewObjectStoreFunction func(string, RestartableProcess) objectstorev2.ObjectStore
+type RestartableObjectStore struct {
+	kind framework.PluginKind
+	// Get returns a restartable ObjectStore for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) objectstorev2.ObjectStore
+}
 
-var ObjectStoreFunctions = map[framework.PluginKind]NewObjectStoreFunction{
-	framework.PluginKindObjectStoreV2: newRestartableObjectStoreV2,
-	framework.PluginKindObjectStore:   newAdaptedV1ObjectStore,
+func (m *manager) restartableObjectStores() []RestartableObjectStore {
+	return []RestartableObjectStore{
+		{
+			kind: framework.PluginKindObjectStoreV2,
+			Get: func(name string, restartableProcess RestartableProcess) objectstorev2.ObjectStore {
+				return newRestartableObjectStoreV2(name, restartableProcess)
+			},
+		},
+		{
+			kind: framework.PluginKindObjectStore,
+			Get: func(name string, restartableProcess RestartableProcess) objectstorev2.ObjectStore {
+				// Adapt v1 plugin to v2
+				return newAdaptedV1ObjectStore(name, restartableProcess)
+			},
+		},
+	}
 }
 
 // GetObjectStore returns a restartableObjectStore for name.
 func (m *manager) GetObjectStore(name string) (objectstorev2.ObjectStore, error) {
 	name = sanitizeName(name)
-
-	restartableProcess, kind, err := m.getRestartableProcessOfKinds(framework.ObjectStoreKinds(), name)
-	if err != nil {
-		return nil, err
+	for _, restartableObjStore := range m.restartableObjectStores() {
+		restartableProcess, err := m.getRestartableProcess(restartableObjStore.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableObjStore.Get(name, restartableProcess), nil
 	}
-
-	f, ok := ObjectStoreFunctions[kind]
-	if !ok || f == nil {
-		err = fmt.Errorf("Unable to create ObjectStore for kind '%s'.", kind)
-		return nil, err
-	}
-	return f(name, restartableProcess), nil
+	return nil, fmt.Errorf("unable to get valid ObjectStore for %q", name)
 }
 
-type NewVolumeSnapshotterFunction func(string, RestartableProcess) volumesnapshotterv2.VolumeSnapshotter
+type RestartableVolumeSnapshotter struct {
+	kind framework.PluginKind
+	// Get returns a restartable VolumeSnapshotter for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) volumesnapshotterv2.VolumeSnapshotter
+}
 
-var VolumeSnapshotterFunctions = map[framework.PluginKind]NewVolumeSnapshotterFunction{
-	framework.PluginKindVolumeSnapshotterV2: newRestartableVolumeSnapshotterV2,
-	framework.PluginKindVolumeSnapshotter:   newAdaptedV1VolumeSnapshotter,
+func (m *manager) restartableVolumeSnapshotters() []RestartableVolumeSnapshotter {
+	return []RestartableVolumeSnapshotter{
+		{
+			kind: framework.PluginKindVolumeSnapshotterV2,
+			Get: func(name string, restartableProcess RestartableProcess) volumesnapshotterv2.VolumeSnapshotter {
+				return newRestartableVolumeSnapshotterV2(name, restartableProcess)
+			},
+		},
+		{
+			kind: framework.PluginKindVolumeSnapshotter,
+			Get: func(name string, restartableProcess RestartableProcess) volumesnapshotterv2.VolumeSnapshotter {
+				// Adapt v1 plugin to v2
+				return newAdaptedV1VolumeSnapshotter(name, restartableProcess)
+			},
+		},
+	}
 }
 
 // GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.
 func (m *manager) GetVolumeSnapshotter(name string) (volumesnapshotterv2.VolumeSnapshotter, error) {
 	name = sanitizeName(name)
-
-	restartableProcess, kind, err := m.getRestartableProcessOfKinds(framework.VolumeSnapshotterKinds(), name)
-	if err != nil {
-		return nil, err
+	for _, restartableVolumeSnapshotter := range m.restartableVolumeSnapshotters() {
+		restartableProcess, err := m.getRestartableProcess(restartableVolumeSnapshotter.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableVolumeSnapshotter.Get(name, restartableProcess), nil
 	}
-
-	f, ok := VolumeSnapshotterFunctions[kind]
-	if !ok || f == nil {
-		err = fmt.Errorf("Unable to create VolumeSnapshotter for kind '%s'.", kind)
-		return nil, err
-	}
-	return f(name, restartableProcess), nil
+	return nil, fmt.Errorf("unable to get valid VolumeSnapshotter for %q", name)
 }
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
@@ -217,28 +235,45 @@ func (m *manager) GetBackupItemActions() ([]backupitemactionv2.BackupItemAction,
 	return actions, nil
 }
 
-type NewBackupItemActionFunction func(string, RestartableProcess) backupitemactionv2.BackupItemAction
+type RestartableBackupItemAction struct {
+	kind framework.PluginKind
+	// Get returns a restartable BackupItemAction for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) backupitemactionv2.BackupItemAction
+}
 
-var BackupItemActionFunctions = map[framework.PluginKind]NewBackupItemActionFunction {
-	framework.PluginKindBackupItemActionV2: newRestartableBackupItemActionV2,
-	framework.PluginKindBackupItemAction:   newAdaptedV1BackupItemAction,
+func (m *manager) restartableBackupItemActions() []RestartableBackupItemAction {
+	return []RestartableBackupItemAction{
+		{
+			kind: framework.PluginKindBackupItemActionV2,
+			Get: func(name string, restartableProcess RestartableProcess) backupitemactionv2.BackupItemAction {
+				return newRestartableBackupItemActionV2(name, restartableProcess)
+			},
+		},
+		{
+			kind: framework.PluginKindBackupItemAction,
+			Get: func(name string, restartableProcess RestartableProcess) backupitemactionv2.BackupItemAction {
+				// Adapt v1 plugin to v2
+				return newAdaptedV1BackupItemAction(name, restartableProcess)
+			},
+		},
+	}
 }
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
 func (m *manager) GetBackupItemAction(name string) (backupitemactionv2.BackupItemAction, error) {
 	name = sanitizeName(name)
-
-	restartableProcess, kind, err := m.getRestartableProcessOfKinds(framework.BackupItemActionKinds(), name)
-	if err != nil {
-		return nil, err
+	for _, restartableBackupItemAction := range m.restartableBackupItemActions() {
+		restartableProcess, err := m.getRestartableProcess(restartableBackupItemAction.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableBackupItemAction.Get(name, restartableProcess), nil
 	}
-
-	f, ok := BackupItemActionFunctions[kind]
-	if !ok || f == nil {
-		err = fmt.Errorf("Unable to create BackupItemAction for kind '%s'.", kind)
-		return nil, err
-	}
-	return f(name, restartableProcess), nil
+	return nil, fmt.Errorf("unable to get valid BackupItemAction for %q", name)
 }
 
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
@@ -261,28 +296,45 @@ func (m *manager) GetRestoreItemActions() ([]restoreitemactionv2.RestoreItemActi
 	return actions, nil
 }
 
-type NewRestoreItemActionFunction func(string, RestartableProcess) restoreitemactionv2.RestoreItemAction
+type RestartableRestoreItemAction struct {
+	kind framework.PluginKind
+	// Get returns a restartable RestoreItemAction for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) restoreitemactionv2.RestoreItemAction
+}
 
-var RestoreItemActionFunctions = map[framework.PluginKind]NewRestoreItemActionFunction {
-	framework.PluginKindRestoreItemActionV2: newRestartableRestoreItemActionV2,
-	framework.PluginKindRestoreItemAction:   newAdaptedV1RestoreItemAction,
+func (m *manager) restartableRestoreItemActions() []RestartableRestoreItemAction {
+	return []RestartableRestoreItemAction{
+		{
+			kind: framework.PluginKindRestoreItemActionV2,
+			Get: func(name string, restartableProcess RestartableProcess) restoreitemactionv2.RestoreItemAction {
+				return newRestartableRestoreItemActionV2(name, restartableProcess)
+			},
+		},
+		{
+			kind: framework.PluginKindRestoreItemAction,
+			Get: func(name string, restartableProcess RestartableProcess) restoreitemactionv2.RestoreItemAction {
+				// Adapt v1 plugin to v2
+				return newAdaptedV1RestoreItemAction(name, restartableProcess)
+			},
+		},
+	}
 }
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
 func (m *manager) GetRestoreItemAction(name string) (restoreitemactionv2.RestoreItemAction, error) {
 	name = sanitizeName(name)
-
-	restartableProcess, kind, err := m.getRestartableProcessOfKinds(framework.RestoreItemActionKinds(), name)
-	if err != nil {
-		return nil, err
+	for _, restartableRestoreItemAction := range m.restartableRestoreItemActions() {
+		restartableProcess, err := m.getRestartableProcess(restartableRestoreItemAction.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableRestoreItemAction.Get(name, restartableProcess), nil
 	}
-
-	f, ok := RestoreItemActionFunctions[kind]
-	if !ok || f == nil {
-		err = fmt.Errorf("Unable to create RestoreItemAction for kind '%s'.", kind)
-		return nil, err
-	}
-	return f(name, restartableProcess), nil
+	return nil, fmt.Errorf("unable to get valid RestoreItemAction for %q", name)
 }
 
 // GetDeleteItemActions returns all delete item actions as restartableDeleteItemActions.
@@ -305,27 +357,45 @@ func (m *manager) GetDeleteItemActions() ([]deleteitemactionv2.DeleteItemAction,
 	return actions, nil
 }
 
-type NewDeleteItemActionFunction func(string, RestartableProcess) deleteitemactionv2.DeleteItemAction
-var DeleteItemActionFunctions = map[framework.PluginKind]NewDeleteItemActionFunction {
-	framework.PluginKindDeleteItemActionV2: newRestartableDeleteItemActionV2,
-	framework.PluginKindDeleteItemAction:   newAdaptedV1DeleteItemAction,
+type RestartableDeleteItemAction struct {
+	kind framework.PluginKind
+	// Get returns a restartable DeleteItemAction for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) deleteitemactionv2.DeleteItemAction
+}
+
+func (m *manager) restartableDeleteItemActions() []RestartableDeleteItemAction {
+	return []RestartableDeleteItemAction{
+		{
+			kind: framework.PluginKindDeleteItemActionV2,
+			Get: func(name string, restartableProcess RestartableProcess) deleteitemactionv2.DeleteItemAction {
+				return newRestartableDeleteItemActionV2(name, restartableProcess)
+			},
+		},
+		{
+			kind: framework.PluginKindDeleteItemAction,
+			Get: func(name string, restartableProcess RestartableProcess) deleteitemactionv2.DeleteItemAction {
+				// Adapt v1 plugin to v2
+				return newAdaptedV1DeleteItemAction(name, restartableProcess)
+			},
+		},
+	}
 }
 
 // GetDeleteItemAction returns a restartableDeleteItemAction for name.
 func (m *manager) GetDeleteItemAction(name string) (deleteitemactionv2.DeleteItemAction, error) {
 	name = sanitizeName(name)
-
-	restartableProcess, kind, err := m.getRestartableProcessOfKinds(framework.DeleteItemActionKinds(), name)
-	if err != nil {
-		return nil, err
+	for _, restartableDeleteItemAction := range m.restartableDeleteItemActions() {
+		restartableProcess, err := m.getRestartableProcess(restartableDeleteItemAction.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableDeleteItemAction.Get(name, restartableProcess), nil
 	}
-
-	f, ok := DeleteItemActionFunctions[kind]
-	if !ok || f == nil {
-		err = fmt.Errorf("Unable to create DeleteItemAction for kind '%s'.", kind)
-		return nil, err
-	}
-	return f(name, restartableProcess), nil
+	return nil, fmt.Errorf("unable to get valid DeleteItemAction for %q", name)
 }
 
 // sanitizeName adds "velero.io" to legacy plugins that weren't namespaced.
