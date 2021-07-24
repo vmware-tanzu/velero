@@ -149,6 +149,11 @@ func NewServer() Server {
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
 		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
 		deleteItemAction:  NewDeleteItemActionPlugin(serverLogger(log)),
+		backupItemActionV2:  NewBackupItemActionPlugin(serverLogger(log)),
+		volumeSnapshotterV2: NewVolumeSnapshotterPlugin(serverLogger(log)),
+		objectStoreV2:       NewObjectStorePlugin(serverLogger(log)),
+		restoreItemActionV2: NewRestoreItemActionPlugin(serverLogger(log)),
+		deleteItemActionV2:  NewDeleteItemActionPlugin(serverLogger(log)),
 	}
 }
 
@@ -330,8 +335,6 @@ func (s *server) Serve() {
 			string(PluginKindRestoreItemAction): s.restoreItemAction,
 			string(PluginKindDeleteItemAction):  s.deleteItemAction,
 			// Version 2
-			// TODO: check to see if need pluginLister for V2
-			// string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
 			string(PluginKindBackupItemActionV2):  s.backupItemActionV2,
 			string(PluginKindVolumeSnapshotterV2): s.volumeSnapshotterV2,
 			string(PluginKindObjectStoreV2):       s.objectStoreV2,

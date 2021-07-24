@@ -76,48 +76,7 @@ func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error
 }
 
 func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	itemJSON, err := json.Marshal(item.UnstructuredContent())
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	backupJSON, err := json.Marshal(backup)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	req := &proto.ExecuteRequest{
-		Plugin: c.plugin,
-		Item:   itemJSON,
-		Backup: backupJSON,
-	}
-
-	res, err := c.grpcClient.Execute(context.Background(), req)
-	if err != nil {
-		return nil, nil, fromGRPCError(err)
-	}
-
-	var updatedItem unstructured.Unstructured
-	if err := json.Unmarshal(res.Item, &updatedItem); err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	var additionalItems []velero.ResourceIdentifier
-
-	for _, itm := range res.AdditionalItems {
-		newItem := velero.ResourceIdentifier{
-			GroupResource: schema.GroupResource{
-				Group:    itm.Group,
-				Resource: itm.Resource,
-			},
-			Namespace: itm.Namespace,
-			Name:      itm.Name,
-		}
-
-		additionalItems = append(additionalItems, newItem)
-	}
-
-	return &updatedItem, additionalItems, nil
+	return c.ExecuteV2(context.Background(), item, backup)
 }
 
 func (c *BackupItemActionGRPCClient) ExecuteV2(

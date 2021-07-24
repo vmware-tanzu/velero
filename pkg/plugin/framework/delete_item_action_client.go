@@ -71,28 +71,7 @@ func (c *DeleteItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error
 }
 
 func (c *DeleteItemActionGRPCClient) Execute(input *velero.DeleteItemActionExecuteInput) error {
-	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	backupJSON, err := json.Marshal(input.Backup)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	req := &proto.DeleteItemActionExecuteRequest{
-		Plugin: c.plugin,
-		Item:   itemJSON,
-		Backup: backupJSON,
-	}
-
-	// First return item is just an empty struct no matter what.
-	if _, err = c.grpcClient.Execute(context.Background(), req); err != nil {
-		return fromGRPCError(err)
-	}
-
-	return nil
+	return c.ExecuteV2(context.Background(), input)
 }
 
 func (c *DeleteItemActionGRPCClient) ExecuteV2(ctx context.Context, input *velero.DeleteItemActionExecuteInput) error {

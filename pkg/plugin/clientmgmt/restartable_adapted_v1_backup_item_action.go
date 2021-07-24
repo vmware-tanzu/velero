@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2021 the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,8 +44,8 @@ func newAdaptedV1BackupItemAction(
 	return r
 }
 
-// getBackupItemAction returns the backup item action for this restartableAdaptedV1BackupItemAction. It does *not* restart the
-// plugin process.
+// getBackupItemAction returns the backup item action for this restartableAdaptedV1BackupItemAction.
+// It does *not* restart the plugin process.
 func (r *restartableAdaptedV1BackupItemAction) getBackupItemAction() (backupitemactionv1.BackupItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
@@ -60,7 +60,8 @@ func (r *restartableAdaptedV1BackupItemAction) getBackupItemAction() (backupitem
 	return backupItemAction, nil
 }
 
-// getDelegate restarts the plugin process (if needed) and returns the backup item action for this restartableAdaptedV1BackupItemAction.
+// getDelegate restarts the plugin process (if needed) and returns the backup item
+// action for this restartableAdaptedV1BackupItemAction.
 func (r *restartableAdaptedV1BackupItemAction) getDelegate() (backupitemactionv1.BackupItemAction, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
@@ -80,7 +81,8 @@ func (r *restartableAdaptedV1BackupItemAction) AppliesTo() (velero.ResourceSelec
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *restartableAdaptedV1BackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (r *restartableAdaptedV1BackupItemAction) Execute(
+	item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, nil, err
@@ -91,7 +93,10 @@ func (r *restartableAdaptedV1BackupItemAction) Execute(item runtime.Unstructured
 
 // Version 2: simply discard ctx and call version 1 function.
 // ExecuteV2 restarts the plugin's process if needed, then delegates the call.
-func (r *restartableAdaptedV1BackupItemAction) ExecuteV2(ctx context.Context, item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (r *restartableAdaptedV1BackupItemAction) ExecuteV2(
+	ctx context.Context, item runtime.Unstructured, backup *api.Backup) (
+	runtime.Unstructured, []velero.ResourceIdentifier, error) {
+
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, nil, err

@@ -43,8 +43,8 @@ func newAdaptedV1RestoreItemAction(
 	return r
 }
 
-// getRestoreItemAction returns the restore item action for this restartableRestoreItemAction. It does *not* restart the
-// plugin process.
+// getRestoreItemAction returns the restore item action for this restartableRestoreItemAction.
+// It does *not* restart the plugin process.
 func (r *restartableAdaptedV1RestoreItemAction) getRestoreItemAction() (restoreitemactionv1.RestoreItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
