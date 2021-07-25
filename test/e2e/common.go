@@ -27,6 +27,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -47,8 +48,86 @@ func createNamespace(ctx context.Context, client testClient, namespace string) e
 	return err
 }
 
+// createNamespaceAndRbac creates a kubernetes namespace, service account, clusterrole, and clusterrolebinding
+func createNamespaceAndRbac(ctx context.Context, client testClient, namespace string, serviceaccount string, clusterrole string, clusterrolebinding string ) error {
+	ns := builder.ForNamespace(namespace).Result()
+	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+
+	if err != nil && !apierrors.IsAlreadyExists(err){
+		return err
+	}
+
+	//creating service account
+	sa := &corev1api.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: serviceaccount,
+			},
+			AutomountServiceAccountToken: nil,
+	}
+
+	_, err = client.clientGo.CoreV1().ServiceAccounts(namespace).Create(ctx,sa,metav1.CreateOptions{})
+
+
+	if err != nil && !apierrors.IsAlreadyExists(err){
+		return err
+	}
+
+	//creating cluster role
+	role := &v1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterrole,
+		},
+	}
+
+	_, err = client.clientGo.RbacV1().ClusterRoles().Create(ctx,role,metav1.CreateOptions{})
+
+	if err != nil && !apierrors.IsAlreadyExists(err){
+		return err
+	}
+
+	//creating role binding and binding it to the test service account
+	rolebinding := &v1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterrolebinding,
+		},
+		Subjects: []v1.Subject{
+			{
+				Kind: "ServiceAccount",
+				Name: serviceaccount,
+				Namespace: namespace,
+			},
+		},
+		RoleRef: v1.RoleRef{
+			Kind: "ClusterRole",
+			Name: clusterrole,
+		},
+	}
+
+
+	_, err = client.clientGo.RbacV1().ClusterRoleBindings().Create(ctx,rolebinding,metav1.CreateOptions{})
+
+	if err != nil && !apierrors.IsAlreadyExists(err){
+		return err
+	}
+
+
+	return err
+}
+
 func getNamespace(ctx context.Context, client testClient, namespace string) (*corev1api.Namespace, error) {
 	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+}
+
+func getServiceAccount(ctx context.Context, client testClient,namespace string, serviceAccount string) (*corev1api.ServiceAccount, error) {
+	return client.clientGo.CoreV1().ServiceAccounts(namespace).Get(ctx, serviceAccount, metav1.GetOptions{})
+}
+
+func getClusterRole(ctx context.Context, client testClient, role string) (*v1.ClusterRole, error) {
+	return client.clientGo.RbacV1().ClusterRoles().Get(ctx, role, metav1.GetOptions{})
+}
+
+func getClusterRoleBinding(ctx context.Context, client testClient, rolebinding string) (*v1.ClusterRoleBinding, error) {
+	return client.clientGo.RbacV1().ClusterRoleBindings().Get(ctx, rolebinding, metav1.GetOptions{})
 }
 
 // waitForNamespaceDeletion waits for namespace to be deleted.
