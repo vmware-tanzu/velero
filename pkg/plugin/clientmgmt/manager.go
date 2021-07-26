@@ -145,16 +145,11 @@ func (m *manager) restartableObjectStores() []RestartableObjectStore {
 	return []RestartableObjectStore{
 		{
 			kind: framework.PluginKindObjectStoreV2,
-			Get: func(name string, restartableProcess RestartableProcess) objectstorev2.ObjectStore {
-				return newRestartableObjectStoreV2(name, restartableProcess)
-			},
+			Get: newRestartableObjectStoreV2,
 		},
 		{
 			kind: framework.PluginKindObjectStore,
-			Get: func(name string, restartableProcess RestartableProcess) objectstorev2.ObjectStore {
-				// Adapt v1 plugin to v2
-				return newAdaptedV1ObjectStore(name, restartableProcess)
-			},
+			Get: newAdaptedV1ObjectStore,	// Adapt v1 plugin to v2
 		},
 	}
 }
@@ -186,16 +181,11 @@ func (m *manager) restartableVolumeSnapshotters() []RestartableVolumeSnapshotter
 	return []RestartableVolumeSnapshotter{
 		{
 			kind: framework.PluginKindVolumeSnapshotterV2,
-			Get: func(name string, restartableProcess RestartableProcess) volumesnapshotterv2.VolumeSnapshotter {
-				return newRestartableVolumeSnapshotterV2(name, restartableProcess)
-			},
+			Get: newRestartableVolumeSnapshotterV2,
 		},
 		{
 			kind: framework.PluginKindVolumeSnapshotter,
-			Get: func(name string, restartableProcess RestartableProcess) volumesnapshotterv2.VolumeSnapshotter {
-				// Adapt v1 plugin to v2
-				return newAdaptedV1VolumeSnapshotter(name, restartableProcess)
-			},
+			Get: newAdaptedV1VolumeSnapshotter,	// Adapt v1 plugin to v2
 		},
 	}
 }
@@ -246,16 +236,11 @@ func (m *manager) restartableBackupItemActions() []RestartableBackupItemAction {
 	return []RestartableBackupItemAction{
 		{
 			kind: framework.PluginKindBackupItemActionV2,
-			Get: func(name string, restartableProcess RestartableProcess) backupitemactionv2.BackupItemAction {
-				return newRestartableBackupItemActionV2(name, restartableProcess)
-			},
+			Get: newRestartableBackupItemActionV2,
 		},
 		{
 			kind: framework.PluginKindBackupItemAction,
-			Get: func(name string, restartableProcess RestartableProcess) backupitemactionv2.BackupItemAction {
-				// Adapt v1 plugin to v2
-				return newAdaptedV1BackupItemAction(name, restartableProcess)
-			},
+			Get: newAdaptedV1BackupItemAction,	// Adapt v1 plugin to v2
 		},
 	}
 }
@@ -307,16 +292,11 @@ func (m *manager) restartableRestoreItemActions() []RestartableRestoreItemAction
 	return []RestartableRestoreItemAction{
 		{
 			kind: framework.PluginKindRestoreItemActionV2,
-			Get: func(name string, restartableProcess RestartableProcess) restoreitemactionv2.RestoreItemAction {
-				return newRestartableRestoreItemActionV2(name, restartableProcess)
-			},
+			Get: newRestartableRestoreItemActionV2,
 		},
 		{
 			kind: framework.PluginKindRestoreItemAction,
-			Get: func(name string, restartableProcess RestartableProcess) restoreitemactionv2.RestoreItemAction {
-				// Adapt v1 plugin to v2
-				return newAdaptedV1RestoreItemAction(name, restartableProcess)
-			},
+			Get: newAdaptedV1RestoreItemAction,  // Adapt v1 plugin to v2
 		},
 	}
 }
@@ -368,16 +348,11 @@ func (m *manager) restartableDeleteItemActions() []RestartableDeleteItemAction {
 	return []RestartableDeleteItemAction{
 		{
 			kind: framework.PluginKindDeleteItemActionV2,
-			Get: func(name string, restartableProcess RestartableProcess) deleteitemactionv2.DeleteItemAction {
-				return newRestartableDeleteItemActionV2(name, restartableProcess)
-			},
+			Get: newRestartableDeleteItemActionV2,
 		},
 		{
 			kind: framework.PluginKindDeleteItemAction,
-			Get: func(name string, restartableProcess RestartableProcess) deleteitemactionv2.DeleteItemAction {
-				// Adapt v1 plugin to v2
-				return newAdaptedV1DeleteItemAction(name, restartableProcess)
-			},
+			Get: newAdaptedV1DeleteItemAction, // Adapt v1 plugin to v2
 		},
 	}
 }
