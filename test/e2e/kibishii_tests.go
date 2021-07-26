@@ -92,14 +92,24 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 
 // runKibishiiTests runs kibishii tests on the provider.
 func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
-	useVolumeSnapshots bool) error {
+	useVolumeSnapshots bool, registryCredentialFile string) error {
 	fiveMinTimeout, _ := context.WithTimeout(context.Background(), 5*time.Minute)
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
+	serviceAccountName := "default"
 
 	if err := createNamespace(fiveMinTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
+	}
+
+	// wait until the service account is created before patch the image pull secret
+	if err := waitUntilServiceAccountCreated(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, timeout); err != nil {
+		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, kibishiiNamespace)
+	}
+	// add the image pull secret to avoid the image pull limit issue of Docker Hub
+	if err := patchServiceAccountWithImagePullSecret(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, registryCredentialFile); err != nil {
+		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
 
 	if err := installKibishii(fiveMinTimeout, kibishiiNamespace, providerName); err != nil {
