@@ -122,8 +122,14 @@ func backup_restore_test(useVolumeSnapshots bool) {
 			bsls := []string{"default", additionalBsl}
 
 			for _, bsl := range bsls {
-				backupName = fmt.Sprintf("backup-%s-%s", bsl, uuidgen)
-				restoreName = fmt.Sprintf("restore-%s-%s", bsl, uuidgen)
+				backupName = fmt.Sprintf("backup-%s", bsl)
+				restoreName = fmt.Sprintf("restore-%s", bsl)
+				// We limit the length of backup name here to avoid the issue of vsphere plugin https://github.com/vmware-tanzu/velero-plugin-for-vsphere/issues/370
+				// We can remove the logic once the issue is fixed
+				if bsl == "default" {
+					backupName = fmt.Sprintf("%s-%s", backupName, uuidgen)
+					restoreName = fmt.Sprintf("%s-%s", restoreName, uuidgen)
+				}
 
 				Expect(runKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
