@@ -4,8 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -48,7 +48,7 @@ var _ = Describe("[Basic] Backup/restore of Namespaced Scoped and Cluster Scoped
 			restoreName := "restore-" + uuidgen.String()
 			tenMinTimeout, _ := context.WithTimeout(context.Background(), 10*time.Minute)
 			Expect(RunRBACTest(tenMinTimeout, client, "test-"+uuidgen.String(), 5,
-				backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore RBAC" )
+				backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore RBAC")
 		})
 	})
 })
@@ -77,7 +77,7 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 		createServiceAccountName := fmt.Sprintf("service-account-%s-%00000d", nsBaseName, nsNum)
 		createClusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", nsBaseName, nsNum)
 		createClusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", nsBaseName, nsNum)
-		if err := createNamespaceAndRbac(ctx, client, createNSName, createServiceAccountName,createClusterRoleName, createClusterRoleBindingName); err != nil {
+		if err := createNamespaceAndRbac(ctx, client, createNSName, createServiceAccountName, createClusterRoleName, createClusterRoleBindingName); err != nil {
 			return errors.Wrapf(err, "Failed to create test resources")
 		}
 	}
@@ -104,7 +104,6 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 		return errors.Wrap(err, "Could not cleanup clusterrolebindings")
 	}
 
-
 	//if error in restoring namespaces, then throw error
 	err = veleroRestore(ctx, veleroCLI, veleroNamespace, restoreName, backupName)
 	if err != nil {
@@ -119,7 +118,6 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 		checkClusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", nsBaseName, nsNum)
 		checkNS, err := getNamespace(ctx, client, checkNSName)
 
-
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}
@@ -128,9 +126,8 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", checkNSName, checkNS.Name)
 		}
 
-		
 		//getting service account from the restore
-		checkSA, err := getServiceAccount(ctx, client, checkNSName ,checkServiceAccountName)
+		checkSA, err := getServiceAccount(ctx, client, checkNSName, checkServiceAccountName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test service account %s", checkSA)
@@ -140,9 +137,8 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 			return errors.Errorf("Retrieved service account for %s has name %s instead", checkServiceAccountName, checkSA.Name)
 		}
 
-
 		//getting cluster role from the restore
-		checkClusterRole, err := getClusterRole(ctx, client,checkClusterRoleName)
+		checkClusterRole, err := getClusterRole(ctx, client, checkClusterRoleName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role %s", checkClusterRole)
@@ -152,9 +148,8 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 			return errors.Errorf("Retrieved cluster role for %s has name %s instead", checkClusterRoleName, checkClusterRole.Name)
 		}
 
-
 		//getting cluster role binding from the restore
-		checkClusterRoleBinding, err := getClusterRoleBinding(ctx, client,checkClusterRoleBindingName)
+		checkClusterRoleBinding, err := getClusterRoleBinding(ctx, client, checkClusterRoleBindingName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role binding %s", checkClusterRoleBinding)
@@ -164,14 +159,12 @@ func RunRBACTest(ctx context.Context, client testClient, nsBaseName string, numb
 			return errors.Errorf("Retrieved cluster role binding for %s has name %s instead", checkClusterRoleBindingName, checkClusterRoleBinding.Name)
 		}
 
-
 		//check if the role binding maps to service account
 		checkSubjects := checkClusterRoleBinding.Subjects[0].Name
 
 		if checkSubjects != checkServiceAccountName {
 			return errors.Errorf("Retrieved cluster role binding for %s has name %s instead", checkServiceAccountName, checkSubjects)
 		}
-
 
 	}
 	// Cleanup is automatic on the way out

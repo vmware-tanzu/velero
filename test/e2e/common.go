@@ -25,9 +25,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	corev1api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -49,26 +49,25 @@ func createNamespace(ctx context.Context, client testClient, namespace string) e
 }
 
 // createNamespaceAndRbac creates a kubernetes namespace, service account, clusterrole, and clusterrolebinding
-func createNamespaceAndRbac(ctx context.Context, client testClient, namespace string, serviceaccount string, clusterrole string, clusterrolebinding string ) error {
+func createNamespaceAndRbac(ctx context.Context, client testClient, namespace string, serviceaccount string, clusterrole string, clusterrolebinding string) error {
 	ns := builder.ForNamespace(namespace).Result()
 	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 
-	if err != nil && !apierrors.IsAlreadyExists(err){
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
 	//creating service account
 	sa := &corev1api.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: serviceaccount,
-			},
-			AutomountServiceAccountToken: nil,
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceaccount,
+		},
+		AutomountServiceAccountToken: nil,
 	}
 
-	_, err = client.clientGo.CoreV1().ServiceAccounts(namespace).Create(ctx,sa,metav1.CreateOptions{})
+	_, err = client.clientGo.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
 
-
-	if err != nil && !apierrors.IsAlreadyExists(err){
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
@@ -79,9 +78,9 @@ func createNamespaceAndRbac(ctx context.Context, client testClient, namespace st
 		},
 	}
 
-	_, err = client.clientGo.RbacV1().ClusterRoles().Create(ctx,role,metav1.CreateOptions{})
+	_, err = client.clientGo.RbacV1().ClusterRoles().Create(ctx, role, metav1.CreateOptions{})
 
-	if err != nil && !apierrors.IsAlreadyExists(err){
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
@@ -92,8 +91,8 @@ func createNamespaceAndRbac(ctx context.Context, client testClient, namespace st
 		},
 		Subjects: []v1.Subject{
 			{
-				Kind: "ServiceAccount",
-				Name: serviceaccount,
+				Kind:      "ServiceAccount",
+				Name:      serviceaccount,
 				Namespace: namespace,
 			},
 		},
@@ -103,13 +102,11 @@ func createNamespaceAndRbac(ctx context.Context, client testClient, namespace st
 		},
 	}
 
+	_, err = client.clientGo.RbacV1().ClusterRoleBindings().Create(ctx, rolebinding, metav1.CreateOptions{})
 
-	_, err = client.clientGo.RbacV1().ClusterRoleBindings().Create(ctx,rolebinding,metav1.CreateOptions{})
-
-	if err != nil && !apierrors.IsAlreadyExists(err){
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
-
 
 	return err
 }
@@ -118,7 +115,7 @@ func getNamespace(ctx context.Context, client testClient, namespace string) (*co
 	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
-func getServiceAccount(ctx context.Context, client testClient,namespace string, serviceAccount string) (*corev1api.ServiceAccount, error) {
+func getServiceAccount(ctx context.Context, client testClient, namespace string, serviceAccount string) (*corev1api.ServiceAccount, error) {
 	return client.clientGo.CoreV1().ServiceAccounts(namespace).Get(ctx, serviceAccount, metav1.GetOptions{})
 }
 
