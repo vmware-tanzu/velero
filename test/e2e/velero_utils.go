@@ -341,6 +341,14 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 }
 
 func veleroUninstall(ctx context.Context, client kbclient.Client, installVelero bool, veleroNamespace string) error {
+	// TODO remove the workaround logic after the issue fixed
+	// this is a workaround for issue https://github.com/vmware-tanzu/velero/issues/3974
+	cmd := exec.CommandContext(ctx, "bash", "-c", fmt.Sprintf(`kubectl delete "$(kubectl api-resources --api-group=velero.io -o name | tr "\n" "," | sed -e 's/,$//')" --all -n %s`, veleroNamespace))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return err
+	}
 	return uninstall.Run(ctx, client, veleroNamespace, true)
 }
 
