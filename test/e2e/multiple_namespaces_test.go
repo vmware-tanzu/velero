@@ -47,8 +47,8 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
 			fiveMinTimeout, _ := context.WithTimeout(context.Background(), 5*time.Minute)
-			RunMultipleNamespaceTest(fiveMinTimeout, client, "nstest-"+uuidgen.String(), 2,
-				backupName, restoreName)
+			Expect(RunMultipleNamespaceTest(fiveMinTimeout, client, "nstest-"+uuidgen.String(), 2,
+				backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore multiple namespaces")
 		})
 	})
 })
@@ -84,8 +84,8 @@ var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
 			oneHourTimeout, _ := context.WithTimeout(context.Background(), 1*time.Hour)
-			RunMultipleNamespaceTest(oneHourTimeout, client, "nstest-"+uuidgen.String(), 2500,
-				backupName, restoreName)
+			Expect(RunMultipleNamespaceTest(oneHourTimeout, client, "nstest-"+uuidgen.String(), 2500,
+				backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore multiple namespaces")
 		})
 	})
 })
