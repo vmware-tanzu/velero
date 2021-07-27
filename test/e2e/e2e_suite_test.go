@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 )
 
@@ -60,5 +61,6 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2e Suite")
+	junitReporter := reporters.NewJUnitReporter("report.xml")
+	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
 }
