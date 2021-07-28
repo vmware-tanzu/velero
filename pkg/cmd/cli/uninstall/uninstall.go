@@ -26,9 +26,10 @@ import (
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -125,31 +126,36 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitTo
 	}
 
 	// CRDs
-	veleroLabels := labels.FormatLabels(install.Labels())
-	crdList := apiextv1beta1.CustomResourceDefinitionList{}
-	opts := kbclient.ListOptions{
-		Namespace: namespace,
-		Raw: &metav1.ListOptions{
-			LabelSelector: veleroLabels,
+
+	veleroLabelSelector := labels.SelectorFromSet(install.Labels())
+	opts := []kbclient.DeleteAllOfOption{
+		kbclient.InNamespace(namespace),
+		kbclient.MatchingLabelsSelector{
+			Selector: veleroLabelSelector,
 		},
 	}
-	if err := kbClient.List(context.Background(), &crdList, &opts); err != nil {
-		errs = append(errs, errors.WithStack(err))
-	} else {
-		if len(crdList.Items) == 0 {
-			fmt.Print("Velero CRDs do not exist, skipping.\n")
+	v1CRDsRemoved := false
+	v1crd := &apiextv1.CustomResourceDefinition{}
+	if err := kbClient.DeleteAllOf(ctx, v1crd, opts...); err != nil {
+		if meta.IsNoMatchError(err) {
+			fmt.Println("V1 Velero CRDs not found, skipping...")
 		} else {
-			veleroLabelSelector := labels.SelectorFromSet(install.Labels())
-			opts := []kbclient.DeleteAllOfOption{
-				kbclient.InNamespace(namespace),
-				kbclient.MatchingLabelsSelector{
-					Selector: veleroLabelSelector,
-				},
+			errs = append(errs, errors.WithStack(err))
+		}
+	} else {
+		v1CRDsRemoved = true
+	}
+
+	// Remove any old Velero v1beta1 CRDs hanging around.
+	v1beta1crd := &apiextv1beta1.CustomResourceDefinition{}
+	if err := kbClient.DeleteAllOf(ctx, v1beta1crd, opts...); err != nil {
+		if meta.IsNoMatchError(err) {
+			if !v1CRDsRemoved {
+				// Only mention this if there were no V1 CRDs removed
+				fmt.Println("V1Beta1 Velero CRDs not found, skipping...")
 			}
-			crd := &apiextv1beta1.CustomResourceDefinition{}
-			if err := kbClient.DeleteAllOf(ctx, crd, opts...); err != nil {
-				errs = append(errs, errors.WithStack(err))
-			}
+		} else {
+			errs = append(errs, errors.WithStack(err))
 		}
 	}
 
