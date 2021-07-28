@@ -19,6 +19,8 @@ package client
 import (
 	"os"
 
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	k8scheme "k8s.io/client-go/kubernetes/scheme"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
@@ -45,7 +47,8 @@ type Factory interface {
 	// DynamicClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	DynamicClient() (dynamic.Interface, error)
-	// KubebuilderClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
+	// KubebuilderClient returns a client for the controller runtime framework. It adds Kubernetes and Velero
+	// types to its scheme. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubebuilderClient() (kbclient.Client, error)
 	// SetBasename changes the basename for an already-constructed client.
@@ -151,6 +154,8 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	k8scheme.AddToScheme(scheme)
+	apiextv1beta1.AddToScheme(scheme)
 	kubebuilderClient, err := kbclient.New(clientConfig, kbclient.Options{
 		Scheme: scheme,
 	})

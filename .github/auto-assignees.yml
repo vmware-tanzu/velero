@@ -9,11 +9,12 @@ reviewers:
 
   groups:
     maintainers:
-      - carlisia
       - zubron
       - dsu-igeek
       - jenting
       - sseago
+      - reasonerjt
+      - ywk253100
 
     tech-writer:
       - a-mccarthy

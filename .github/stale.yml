@@ -1,0 +1,38 @@
+# Number of days of inactivity before an issue becomes stale
+daysUntilStale: 60
+# Number of days of inactivity before a stale issue is closed
+daysUntilClose: 14
+# Issues with these labels will never be considered stale
+exemptLabels:
+  - Epic
+  - Area/CLI
+  - Area/Cloud/AWS
+  - Area/Cloud/Azure
+  - Area/Cloud/GCP
+  - Area/Cloud/vSphere
+  - Area/CSI
+  - Area/Design
+  - Area/Documentation
+  - Area/Plugins
+  - Enhancement/User
+  - kind/tech-debt
+  - Needs investigation
+  - P0 - Hair on fire
+  - P1 - Important
+  - P2 - Long-term important
+  - P3 - Wouldn't it be nice if...
+  - Product Requirements
+  - Restic - GA
+  - Restic
+  - release-blocker
+  - Security
+# Label to use when marking an issue as stale
+staleLabel: staled
+# Comment to post when marking an issue as stale. Set to `false` to disable
+markComment: >
+  This issue has been automatically marked as stale because it has not had
+  recent activity. It will be closed if no further activity occurs. Thank you
+  for your contributions.
+# Comment to post when closing a stale issue. Set to `false` to disable
+closeComment: >
+  Closing the stale issue.

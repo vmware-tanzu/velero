@@ -26,156 +26,215 @@ import (
 )
 
 func TestGetRepoIdentifier(t *testing.T) {
-	// if getAWSBucketRegion returns an error, use default "s3.amazonaws.com/..." URL
-	getAWSBucketRegion = func(string) (string, error) {
-		return "", errors.New("no region found")
-	}
-
-	backupLocation := &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "aws",
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
-					Prefix: "prefix",
+	testCases := []struct {
+		name               string
+		bsl                *velerov1api.BackupStorageLocation
+		repoName           string
+		getAWSBucketRegion func(string) (string, error)
+		expected           string
+		expectedErr        string
+	}{
+		{
+			name: "error is returned if BSL uses unsupported provider and resticRepoPrefix is not set",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "unsupported-provider",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket-2",
+							Prefix: "prefix-2",
+						},
+					},
 				},
 			},
+			repoName:    "repo-1",
+			expectedErr: "restic repository prefix (resticRepoPrefix) not specified in backup storage location's config",
 		},
-	}
-	id, err := GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "s3:s3.amazonaws.com/bucket/prefix/restic/repo-1", id)
-
-	// stub implementation of getAWSBucketRegion
-	getAWSBucketRegion = func(string) (string, error) {
-		return "us-west-2", nil
-	}
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "aws",
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
+		{
+			name: "resticRepoPrefix in BSL config is used if set",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "custom-repo-identifier",
+					Config: map[string]string{
+						"resticRepoPrefix": "custom:prefix:/restic",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "prefix",
+						},
+					},
 				},
 			},
+			repoName: "repo-1",
+			expected: "custom:prefix:/restic/repo-1",
 		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/restic/repo-1", id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "aws",
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
-					Prefix: "prefix",
+		{
+			name: "s3.amazonaws.com URL format is used if region cannot be determined for AWS BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+						},
+					},
 				},
 			},
-		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/prefix/restic/repo-1", id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "aws",
-			Config: map[string]string{
-				"s3Url": "alternate-url",
+			repoName: "repo-1",
+			getAWSBucketRegion: func(string) (string, error) {
+				return "", errors.New("no region found")
 			},
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
-					Prefix: "prefix",
+			expected: "s3:s3.amazonaws.com/bucket/restic/repo-1",
+		},
+		{
+			name: "s3.s3-<region>.amazonaws.com URL format is used if region can be determined for AWS BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+						},
+					},
 				},
 			},
-		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "s3:alternate-url/bucket/prefix/restic/repo-1", id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "aws",
-			Config: map[string]string{
-				"s3Url": "alternate-url-with-trailing-slash/",
+			repoName: "repo-1",
+			getAWSBucketRegion: func(string) (string, error) {
+				return "eu-west-1", nil
 			},
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
-					Prefix: "prefix",
+			expected: "s3:s3-eu-west-1.amazonaws.com/bucket/restic/repo-1",
+		},
+		{
+			name: "prefix is included in repo identifier if set for AWS BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "prefix",
+						},
+					},
 				},
 			},
+			repoName: "repo-1",
+			getAWSBucketRegion: func(string) (string, error) {
+				return "eu-west-1", nil
+			},
+			expected: "s3:s3-eu-west-1.amazonaws.com/bucket/prefix/restic/repo-1",
 		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "s3:alternate-url-with-trailing-slash/bucket/prefix/restic/repo-1", id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "azure",
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
-					Prefix: "prefix",
+		{
+			name: "s3Url is used in repo identifier if set for AWS BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					Config: map[string]string{
+						"s3Url": "alternate-url",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "prefix",
+						},
+					},
 				},
 			},
+			repoName: "repo-1",
+			getAWSBucketRegion: func(string) (string, error) {
+				return "eu-west-1", nil
+			},
+			expected: "s3:alternate-url/bucket/prefix/restic/repo-1",
 		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "azure:bucket:/prefix/restic/repo-1", id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "gcp",
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket-2",
-					Prefix: "prefix-2",
+		{
+			name: "region is used in repo identifier if set for AWS BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					Config: map[string]string{
+						"region": "us-west-1",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "prefix",
+						},
+					},
 				},
 			},
+			repoName: "aws-repo",
+			getAWSBucketRegion: func(string) (string, error) {
+				return "eu-west-1", nil
+			},
+			expected: "s3:s3-us-west-1.amazonaws.com/bucket/prefix/restic/aws-repo",
 		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-2")
-	assert.NoError(t, err)
-	assert.Equal(t, "gs:bucket-2:/prefix-2/restic/repo-2", id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "unsupported-provider",
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket-2",
-					Prefix: "prefix-2",
+		{
+			name: "trailing slash in s3Url is not included in repo identifier for AWS BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					Config: map[string]string{
+						"s3Url": "alternate-url-with-trailing-slash/",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "prefix",
+						},
+					},
 				},
 			},
-		},
-	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.EqualError(t, err, "restic repository prefix (resticRepoPrefix) not specified in backup storage location's config")
-	assert.Empty(t, id)
-
-	backupLocation = &velerov1api.BackupStorageLocation{
-		Spec: velerov1api.BackupStorageLocationSpec{
-			Provider: "custom-repo-identifier",
-			Config: map[string]string{
-				"resticRepoPrefix": "custom:prefix:/restic",
+			repoName: "aws-repo",
+			getAWSBucketRegion: func(string) (string, error) {
+				return "eu-west-1", nil
 			},
-			StorageType: velerov1api.StorageType{
-				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: "bucket",
-					Prefix: "prefix",
+			expected: "s3:alternate-url-with-trailing-slash/bucket/prefix/restic/aws-repo",
+		},
+		{
+			name: "repo identifier includes bucket and prefix for Azure BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "azure",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "azure-bucket",
+							Prefix: "azure-prefix",
+						},
+					},
 				},
 			},
+			repoName: "azure-repo",
+			expected: "azure:azure-bucket:/azure-prefix/restic/azure-repo",
+		},
+		{
+			name: "repo identifier includes bucket and prefix for GCP BSL",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "gcp",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "gcp-bucket",
+							Prefix: "gcp-prefix",
+						},
+					},
+				},
+			},
+			repoName: "gcp-repo",
+			expected: "gs:gcp-bucket:/gcp-prefix/restic/gcp-repo",
 		},
 	}
-	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.NoError(t, err)
-	assert.Equal(t, "custom:prefix:/restic/repo-1", id)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			getAWSBucketRegion = tc.getAWSBucketRegion
+			id, err := GetRepoIdentifier(tc.bsl, tc.repoName)
+			assert.Equal(t, tc.expected, id)
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+				assert.Empty(t, id)
+			}
+		})
+	}
 }

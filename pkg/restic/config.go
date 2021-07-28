@@ -64,21 +64,23 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 	switch backendType {
 	case AWSBackend:
 		var url string
-		switch {
 		// non-AWS, S3-compatible object store
-		case location.Spec.Config["s3Url"] != "":
-			url = location.Spec.Config["s3Url"]
-		default:
-			region, err := getAWSBucketRegion(bucket)
+		if s3Url := location.Spec.Config["s3Url"]; s3Url != "" {
+			url = strings.TrimSuffix(s3Url, "/")
+		} else {
+			var err error
+			region := location.Spec.Config["region"]
+			if region == "" {
+				region, err = getAWSBucketRegion(bucket)
+			}
 			if err != nil {
 				url = "s3.amazonaws.com"
-				break
+			} else {
+				url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 			}
-
-			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 		}
 
-		return fmt.Sprintf("s3:%s/%s", strings.TrimSuffix(url, "/"), path.Join(bucket, prefix)), nil
+		return fmt.Sprintf("s3:%s/%s", url, path.Join(bucket, prefix)), nil
 	case AzureBackend:
 		return fmt.Sprintf("azure:%s:/%s", bucket, prefix), nil
 	case GCPBackend:

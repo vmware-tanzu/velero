@@ -24,15 +24,12 @@ import (
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
@@ -219,27 +216,4 @@ func IsUnstructuredCRDReady(crd *unstructured.Unstructured) (bool, error) {
 	}
 
 	return (isEstablished && namesAccepted), nil
-}
-
-// GetClusterClient instantiates and returns a client for the cluster.
-func GetClusterClient() (*kubernetes.Clientset, *apiextensionsclientset.Clientset, error) {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	configOverrides := &clientcmd.ConfigOverrides{}
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-	clientConfig, err := kubeConfig.ClientConfig()
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	client, err := kubernetes.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	extensionClientSet, err := apiextensionsclientset.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	return client, extensionClientSet, nil
 }

@@ -1,31 +1,28 @@
 /*
 Copyright the Velero contributors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 package e2e
 
 import (
 	"context"
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/client-go/kubernetes"
-
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var (
@@ -47,11 +44,11 @@ func backup_restore_with_restic() {
 
 func backup_restore_test(useVolumeSnapshots bool) {
 	var (
-		client           *kubernetes.Clientset
-		extensionsClient *apiextensionsclientset.Clientset
-		backupName       string
-		restoreName      string
+		backupName, restoreName string
 	)
+
+	client, err := newTestClient()
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
 		if useVolumeSnapshots && cloudProvider == "kind" {
@@ -64,19 +61,14 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		if installVelero {
 			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
-
 		}
-		client, extensionsClient, err = kube.GetClusterClient()
-		Expect(err).To(Succeed(), "Failed to instantiate cluster client")
 	})
 
 	AfterEach(func() {
 		if installVelero {
-			timeoutCTX, _ := context.WithTimeout(context.Background(), time.Minute)
-			err := veleroUninstall(timeoutCTX, client, extensionsClient, veleroNamespace)
+			err = veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
 			Expect(err).To(Succeed())
 		}
-
 	})
 
 	When("kibishii is the sample workload", func() {
@@ -130,8 +122,14 @@ func backup_restore_test(useVolumeSnapshots bool) {
 			bsls := []string{"default", additionalBsl}
 
 			for _, bsl := range bsls {
-				backupName = fmt.Sprintf("backup-%s-%s", bsl, uuidgen)
-				restoreName = fmt.Sprintf("restore-%s-%s", bsl, uuidgen)
+				backupName = fmt.Sprintf("backup-%s", bsl)
+				restoreName = fmt.Sprintf("restore-%s", bsl)
+				// We limit the length of backup name here to avoid the issue of vsphere plugin https://github.com/vmware-tanzu/velero-plugin-for-vsphere/issues/370
+				// We can remove the logic once the issue is fixed
+				if bsl == "default" {
+					backupName = fmt.Sprintf("%s-%s", backupName, uuidgen)
+					restoreName = fmt.Sprintf("%s-%s", restoreName, uuidgen)
+				}
 
 				Expect(runKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
