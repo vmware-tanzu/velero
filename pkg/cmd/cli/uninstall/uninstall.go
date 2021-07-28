@@ -43,12 +43,13 @@ import (
 
 // uninstallOptions collects all the options for uninstalling Velero from a Kubernetes cluster.
 type uninstallOptions struct {
-	wait, force bool
+	wait  bool // deprecated
+	force bool
 }
 
 // BindFlags adds command line values to the options struct.
 func (o *uninstallOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.wait, "wait", o.wait, "Wait for Velero uninstall to be ready. Optional.")
+	flags.BoolVar(&o.wait, "wait", o.wait, "Wait for Velero uninstall to be ready. Optional. Deprecated.")
 	flags.BoolVar(&o.force, "force", o.force, "Forces the Velero uninstall. Optional.")
 }
 
@@ -62,11 +63,13 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long: `Uninstall Velero along with the CRDs and clusterrolebinding.
 
 The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
-Use '--wait' to wait for the Velero uninstall to be ready before proceeding.
 Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 		`,
 		Example: ` # velero uninstall --namespace staging`,
 		Run: func(c *cobra.Command, args []string) {
+			if o.wait {
+				fmt.Println("Warning: the \"--wait\" option is deprecated and will be removed in a future release. The uninstall command always waits for the uninstall to complete.")
+			}
 
 			// Confirm if not asked to force-skip confirmation
 			if !o.force {
@@ -79,7 +82,7 @@ Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
-			cmd.CheckError(Run(context.Background(), kbClient, f.Namespace(), o.wait))
+			cmd.CheckError(Run(context.Background(), kbClient, f.Namespace()))
 		},
 	}
 
@@ -88,31 +91,18 @@ Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 }
 
 // Run removes all components that were deployed using the Velero install command
-func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitToTerminate bool) error {
-	var errs []error
-
-	// namespace
-	ns := &corev1.Namespace{}
-	key := kbclient.ObjectKey{Name: namespace}
-	if err := kbClient.Get(ctx, key, ns); err != nil {
-		if apierrors.IsNotFound(err) {
-			fmt.Printf("Velero namespace %q does not exist, skipping.\n", namespace)
-		} else {
-			errs = append(errs, errors.WithStack(err))
-		}
-	} else {
-		if ns.Status.Phase == corev1.NamespaceTerminating {
-			fmt.Printf("Velero namespace %q is terminating.\n", namespace)
-		} else {
-			if err := kbClient.Delete(ctx, ns); err != nil {
-				errs = append(errs, errors.WithStack(err))
-			}
-		}
+func Run(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	// The CRDs cannot be removed until the namespace is deleted to avoid the problem in issue #3974 so if the namespace deletion fails we error out here
+	if err := deleteNamespace(ctx, kbClient, namespace); err != nil {
+		fmt.Printf("Errors while attempting to uninstall Velero: %q \n", err)
+		return err
 	}
+
+	var errs []error
 
 	// ClusterRoleBinding
 	crb := install.ClusterRoleBinding(namespace)
-	key = kbclient.ObjectKey{Name: crb.Name}
+	key := kbclient.ObjectKey{Name: crb.Name}
 	if err := kbClient.Get(ctx, key, crb); err != nil {
 		if apierrors.IsNotFound(err) {
 			fmt.Printf("Velero ClusterRoleBinding %q does not exist, skipping.\n", crb.Name)
@@ -159,33 +149,57 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string, waitTo
 		}
 	}
 
-	if waitToTerminate && len(ns.Name) != 0 {
-		fmt.Println("Waiting for Velero uninstall to complete. You may safely press ctrl-c to stop waiting - uninstall will continue in the background.")
-
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		checkFunc := func() {
-			err := kbClient.Get(ctx, key, ns)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					fmt.Print("\n")
-					cancel()
-					return
-				}
-				errs = append(errs, errors.WithStack(err))
-			}
-			fmt.Print(".")
-		}
-
-		wait.Until(checkFunc, 5*time.Millisecond, ctx.Done())
-	}
-
 	if kubeerrs.NewAggregate(errs) != nil {
-		fmt.Printf("Errors while attempting to uninstall Velero: %q", kubeerrs.NewAggregate(errs))
+		fmt.Printf("Errors while attempting to uninstall Velero: %q \n", kubeerrs.NewAggregate(errs))
 		return kubeerrs.NewAggregate(errs)
 	}
 
 	fmt.Println("Velero uninstalled ⛵")
+	return nil
+}
+
+func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	ns := &corev1.Namespace{}
+	key := kbclient.ObjectKey{Name: namespace}
+	if err := kbClient.Get(ctx, key, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("Velero namespace %q does not exist, skipping.\n", namespace)
+			return nil
+		}
+		return err
+	}
+
+	if err := kbClient.Delete(ctx, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("Velero namespace %q does not exist, skipping.\n", namespace)
+			return nil
+		}
+		return err
+	}
+
+	fmt.Printf("Waiting for velero namespace %q to be deleted\n", namespace)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var err error
+	checkFunc := func() {
+		if err = kbClient.Get(ctx, key, ns); err != nil {
+			if apierrors.IsNotFound(err) {
+				fmt.Print("\n")
+				err = nil
+			}
+			cancel()
+			return
+		}
+		fmt.Print(".")
+	}
+
+	// Must wait until the namespace is deleted to avoid the issue https://github.com/vmware-tanzu/velero/issues/3974
+	wait.Until(checkFunc, 5*time.Millisecond, ctx.Done())
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Velero namespace %q deleted\n", namespace)
 	return nil
 }

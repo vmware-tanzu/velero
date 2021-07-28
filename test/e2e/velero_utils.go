@@ -342,7 +342,7 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 }
 
 func veleroUninstall(ctx context.Context, client kbclient.Client, installVelero bool, veleroNamespace string) error {
-	return uninstall.Run(ctx, client, veleroNamespace, true)
+	return uninstall.Run(ctx, client, veleroNamespace)
 }
 
 func veleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
