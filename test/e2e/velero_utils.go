@@ -408,7 +408,7 @@ func veleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 
 		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "plugin", "add", plugin)
 		installPluginCmd.Stdout = stdoutBuf
-		installPluginCmd.Stderr = stdoutBuf
+		installPluginCmd.Stderr = stderrBuf
 
 		err := installPluginCmd.Run()
 
