@@ -28,7 +28,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/install"
 )
 
-// veleroDeployment returns a Velero deployment object, selected using a label.
+// veleroDeployment returns a Velero deployment object, selected with label and container name,
+// refer to https://github.com/vmware-tanzu/velero/issues/3961 for more information
 func veleroDeployment(ctx context.Context, kubeClient kubernetes.Interface, namespace string) (*appsv1api.Deployment, error) {
 	veleroLabels := labels.FormatLabels(install.Labels())
 
@@ -42,9 +43,13 @@ func veleroDeployment(ctx context.Context, kubeClient kubernetes.Interface, name
 		return nil, err
 	}
 
-	if len(deployList.Items) < 1 {
-		return nil, errors.New("Velero deployment not found")
+	for _, deploy := range deployList.Items {
+		for _, container := range deploy.Spec.Template.Spec.Containers {
+			if container.Name == "velero" {
+				return &deploy, nil
+			}
+		}
 	}
 
-	return &deployList.Items[0], nil
+	return nil, errors.New("Velero deployment not found")
 }
