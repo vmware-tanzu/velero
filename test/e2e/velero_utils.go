@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -96,7 +100,7 @@ func getProviderVeleroInstallOptions(
 }
 
 // installVeleroServer installs velero in the cluster.
-func installVeleroServer(io *cliinstall.InstallOptions) error {
+func installVeleroServer(io *cliinstall.InstallOptions, registryCredentialFile string) error {
 	vo, err := io.AsVeleroOptions()
 	if err != nil {
 		return errors.Wrap(err, "Failed to translate InstallOptions to VeleroOptions for Velero")
@@ -109,6 +113,14 @@ func installVeleroServer(io *cliinstall.InstallOptions) error {
 
 	errorMsg := "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs"
 	resources := install.AllResources(vo)
+
+	// apply the image pull secret to avoid the image pull limit of Docker Hub
+	if len(registryCredentialFile) > 0 {
+		if err = patchResources(io.Namespace, registryCredentialFile, resources); err != nil {
+			return err
+		}
+	}
+
 	err = install.Install(client.dynamicFactory, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
@@ -129,6 +141,60 @@ func installVeleroServer(io *cliinstall.InstallOptions) error {
 	fmt.Printf("Velero is installed and ready to be tested in the %s namespace! ⛵ \n", io.Namespace)
 
 	return nil
+}
+
+// patch the velero resources for E2E testing
+func patchResources(namespace, registryCredentialFile string, resources *unstructured.UnstructuredList) error {
+	credential, err := ioutil.ReadFile(registryCredentialFile)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read the registry credential file %s", registryCredentialFile)
+	}
+
+	imagePullSecret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "image-pull-secret",
+			Namespace: namespace,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": credential,
+		},
+	}
+
+	for resourceIndex, resource := range resources.Items {
+		if resource.GetKind() == "ServiceAccount" && resource.GetName() == "velero" {
+			resource.Object["imagePullSecrets"] = []map[string]interface{}{
+				{
+					"name": "image-pull-secret",
+				},
+			}
+			resources.Items[resourceIndex] = resource
+			fmt.Printf("image pull secret %q set for velero serviceaccount \n", "image-pull-secret")
+			continue
+		}
+	}
+
+	un, err := toUnstructured(imagePullSecret)
+	if err != nil {
+		return errors.Wrapf(err, "failed to convert pull secret to unstructure")
+	}
+	resources.Items = append(resources.Items, un)
+
+	return nil
+}
+
+func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
+	un := unstructured.Unstructured{}
+	data, err := json.Marshal(res)
+	if err != nil {
+		return un, err
+	}
+	err = json.Unmarshal(data, &un)
+	return un, err
 }
 
 // checkBackupPhase uses veleroCLI to inspect the phase of a Velero backup.
@@ -286,7 +352,7 @@ func veleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string
 
 func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace string, cloudProvider string, objectStoreProvider string, useVolumeSnapshots bool,
 	cloudCredentialsFile string, bslBucket string, bslPrefix string, bslConfig string, vslConfig string,
-	crdsVersion string, features string) error {
+	crdsVersion string, features string, registryCredentialFile string) error {
 
 	if cloudProvider != "kind" {
 		if objectStoreProvider != "" {
@@ -333,7 +399,7 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 	veleroInstallOptions.CRDsVersion = crdsVersion
 	veleroInstallOptions.Namespace = veleroNamespace
 
-	err = installVeleroServer(veleroInstallOptions)
+	err = installVeleroServer(veleroInstallOptions, registryCredentialFile)
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
