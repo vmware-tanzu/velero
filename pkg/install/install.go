@@ -103,6 +103,9 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 
 		return true, nil
 	})
+	if err != nil {
+		return false, errors.Wrap(err, "Error polling for CRD")
+	}
 	return areReady, nil
 }
 
