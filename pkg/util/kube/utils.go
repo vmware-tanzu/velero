@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,8 +146,23 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	return pvc.Spec.VolumeName, nil
 }
 
-// IsCRDReady checks a CRD to see if it's ready, with both the Established and NamesAccepted conditions.
-func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
+// IsV1CRDReady checks a v1 CRD to see if it's ready, with both the Established and NamesAccepted conditions.
+func IsV1CRDReady(crd *apiextv1.CustomResourceDefinition) bool {
+	var isEstablished, namesAccepted bool
+	for _, cond := range crd.Status.Conditions {
+		if cond.Type == apiextv1.Established && cond.Status == apiextv1.ConditionTrue {
+			isEstablished = true
+		}
+		if cond.Type == apiextv1.NamesAccepted && cond.Status == apiextv1.ConditionTrue {
+			namesAccepted = true
+		}
+	}
+
+	return (isEstablished && namesAccepted)
+}
+
+// IsV1Beta1CRDReady checks a v1beta1 CRD to see if it's ready, with both the Established and NamesAccepted conditions.
+func IsV1Beta1CRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 	var isEstablished, namesAccepted bool
 	for _, cond := range crd.Status.Conditions {
 		if cond.Type == apiextv1beta1.Established && cond.Status == apiextv1beta1.ConditionTrue {
@@ -161,8 +177,8 @@ func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 }
 
 // IsUnstructuredCRDReady checks an unstructured CRD to see if it's ready, with both the Established and NamesAccepted conditions.
-// TODO: Delete this function and use IsCRDReady when the upstream runtime.FromUnstructured function properly handles int64 field conversions.
-// Duplicated function because the velero install package uses IsCRDReady with the beta types.
+// TODO: Delete this function and use Isv1beta1CRDReady when the upstream runtime.FromUnstructured function properly handles int64 field conversions.
+// Duplicated function because the velero install package uses Isv1beta1CRDReady with the beta types.
 // See https://github.com/kubernetes/kubernetes/issues/87675
 // This is different from the fix for https://github.com/vmware-tanzu/velero/issues/2319 because here,
 // we need to account for *both* v1beta1 and v1 CRDs, so doing marshalling into JSON to convert to a Go type may not be as useful here, unless we do

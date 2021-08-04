@@ -121,7 +121,7 @@ func installVeleroServer(io *cliinstall.InstallOptions, registryCredentialFile s
 		}
 	}
 
-	err = install.Install(client.dynamicFactory, resources, os.Stdout)
+	err = install.Install(client.dynamicFactory, client.kubebuilder, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
