@@ -59,6 +59,7 @@ jobs:
           - 1.19.7
           - 1.20.2
           - 1.21.1
+          - 1.22.0
     # All steps run in parallel unless otherwise specified.
     # See https://docs.github.com/en/actions/learn-github-actions/managing-complex-workflows#creating-dependent-jobs
     steps:
