@@ -298,24 +298,28 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	if err != nil {
 		return err
 	}
-	factory := client.NewDynamicFactory(dynamicClient)
+	dynamicFactory := client.NewDynamicFactory(dynamicClient)
 
+	kbClient, err := f.KubebuilderClient()
+	if err != nil {
+		return err
+	}
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
-	err = install.Install(factory, resources, os.Stdout)
+	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
 
 	if o.Wait {
 		fmt.Println("Waiting for Velero deployment to be ready.")
-		if _, err = install.DeploymentIsReady(factory, o.Namespace); err != nil {
+		if _, err = install.DeploymentIsReady(dynamicFactory, o.Namespace); err != nil {
 			return errors.Wrap(err, errorMsg)
 		}
 
 		if o.UseRestic {
 			fmt.Println("Waiting for Velero restic daemonset to be ready.")
-			if _, err = install.DaemonSetIsReady(factory, o.Namespace); err != nil {
+			if _, err = install.DaemonSetIsReady(dynamicFactory, o.Namespace); err != nil {
 				return errors.Wrap(err, errorMsg)
 			}
 		}

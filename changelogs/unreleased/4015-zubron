@@ -1,0 +1,1 @@
+Use the cluster preferred CRD API version when polling for Velero CRD readiness.
