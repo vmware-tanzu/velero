@@ -258,26 +258,26 @@ func TestIsV1CRDReady(t *testing.T) {
 	}{
 		{
 			name: "CRD is not established & not accepting names - not ready",
-			crd:  builder.ForCustomResourceDefinitionV1("MyCRD").Result(),
+			crd:  builder.ForV1CustomResourceDefinition("MyCRD").Result(),
 			want: false,
 		},
 		{
 			name: "CRD is established & not accepting names - not ready",
-			crd: builder.ForCustomResourceDefinitionV1("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionV1Condition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).Result(),
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
 			name: "CRD is not established & accepting names - not ready",
-			crd: builder.ForCustomResourceDefinitionV1("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionV1Condition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).Result(),
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
 			name: "CRD is established & accepting names - ready",
-			crd: builder.ForCustomResourceDefinitionV1("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionV1Condition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).
-				Condition(builder.ForCustomResourceDefinitionV1Condition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).
 				Result(),
 			want: true,
 		},
