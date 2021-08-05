@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -767,9 +767,9 @@ func TestCRDInclusion(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
-					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
 					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
@@ -793,9 +793,9 @@ func TestCRDInclusion(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
-					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
 					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
@@ -813,9 +813,9 @@ func TestCRDInclusion(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
-					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
 					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
@@ -839,9 +839,9 @@ func TestCRDInclusion(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
-					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
 					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
@@ -862,9 +862,9 @@ func TestCRDInclusion(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
-					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
 					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
@@ -883,9 +883,9 @@ func TestCRDInclusion(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
-					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
-					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
-					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
 					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
