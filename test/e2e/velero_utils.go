@@ -109,7 +109,7 @@ func installVeleroServer(io *cliinstall.InstallOptions) error {
 
 	errorMsg := "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs"
 	resources := install.AllResources(vo)
-	err = install.Install(client.dynamicFactory, resources, os.Stdout)
+	err = install.Install(client.dynamicFactory, client.kubebuilder, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}

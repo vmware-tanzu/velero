@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func TestRemapCRDVersionAction(t *testing.T) {
 
 	// build a v1beta1 CRD with the same name and add it to the fake client that the plugin is going to call.
 	// keep the same one for all 3 tests, since there's little value in recreating it
-	b := builder.ForCustomResourceDefinition("test.velero.io")
+	b := builder.ForCustomResourceDefinitionV1Beta1("test.velero.io")
 	c := b.Result()
 	_, err := betaClient.Create(context.TODO(), c, metav1.CreateOptions{})
 	require.NoError(t, err)
