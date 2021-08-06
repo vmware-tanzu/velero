@@ -33,6 +33,7 @@ This API version was introduced in Kubernetes v1.8.
   * enable e2e tests to choose crd apiVersion (#3941, @sseago)
   * Upgrade Velero ClusterRoleBinding to use v1 API (#3995, @jenting)
   * Install Kubernetes preferred CRDs API version (v1beta1/v1). (#3999, @jenting)
+  * Use the cluster preferred CRD API version when polling for Velero CRD readiness. (#4015, @zubron)
 
 ## v1.6.2
 ### 2021-07-16
