@@ -196,6 +196,9 @@ func TestServiceActionExecute(t *testing.T) {
 						{
 							NodePort: 8080,
 						},
+						{
+							NodePort: 9090,
+						},
 					},
 				},
 			},
@@ -212,6 +215,7 @@ func TestServiceActionExecute(t *testing.T) {
 						{
 							NodePort: 8080,
 						},
+						{},
 					},
 				},
 			},
