@@ -54,6 +54,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
 				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
+				RegisterRestoreItemAction("velero.io/apiservice", newAPIServiceRestoreItemAction).
 				Serve()
 		},
 	}
@@ -196,4 +197,8 @@ func newChangePVCNodeSelectorItemAction(f client.Factory) veleroplugin.HandlerIn
 			client.CoreV1().Nodes(),
 		), nil
 	}
+}
+
+func newAPIServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewAPIServiceAction(logger), nil
 }
