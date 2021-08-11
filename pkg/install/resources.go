@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,30 +19,19 @@ package install
 import (
 	"time"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	corev1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/vmware-tanzu/velero/config/crd/crds"
-	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
+	v1beta1crds "github.com/vmware-tanzu/velero/config/crd/v1beta1/crds"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-// Use "latest" if the build process didn't supply a version
-func imageVersion() string {
-	if buildinfo.Version == "" {
-		return "latest"
-	}
-	return buildinfo.Version
-}
-
-// DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.
 var (
-	DefaultImage               = "velero/velero:" + imageVersion()
 	DefaultVeleroPodCPURequest = "500m"
 	DefaultVeleroPodMemRequest = "128Mi"
 	DefaultVeleroPodCPULimit   = "1000m"
@@ -105,25 +94,25 @@ func ServiceAccount(namespace string, annotations map[string]string) *corev1.Ser
 	}
 }
 
-func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
+func ClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
 	crbName := "velero"
 	if namespace != DefaultVeleroNamespace {
 		crbName = "velero-" + namespace
 	}
-	crb := &rbacv1beta1.ClusterRoleBinding{
+	crb := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: objectMeta("", crbName),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
-			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Namespace: namespace,
 				Name:      "velero",
 			},
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
 			Name:     "cluster-admin",
 			APIGroup: "rbac.authorization.k8s.io",
@@ -227,17 +216,26 @@ type VeleroOptions struct {
 	NoDefaultBackupLocation           bool
 	CACertData                        []byte
 	Features                          []string
+	CRDsVersion                       string
 	DefaultVolumesToRestic            bool
 }
 
-func AllCRDs() *unstructured.UnstructuredList {
+func AllCRDs(perferredAPIVersion string) *unstructured.UnstructuredList {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
-	for _, crd := range crds.CRDs {
-		crd.SetLabels(Labels())
-		appendUnstructured(resources, crd)
+	switch perferredAPIVersion {
+	case "v1beta1":
+		for _, crd := range v1beta1crds.CRDs {
+			crd.SetLabels(Labels())
+			appendUnstructured(resources, crd)
+		}
+	case "v1":
+		for _, crd := range v1crds.CRDs {
+			crd.SetLabels(Labels())
+			appendUnstructured(resources, crd)
+		}
 	}
 
 	return resources
@@ -246,7 +244,7 @@ func AllCRDs() *unstructured.UnstructuredList {
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
 func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
-	resources := AllCRDs()
+	resources := AllCRDs(o.CRDsVersion)
 
 	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)

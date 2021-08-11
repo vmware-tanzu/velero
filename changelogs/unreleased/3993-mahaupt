@@ -1,0 +1,1 @@
+Fix restic error when volume is emptyDir and Pod not running

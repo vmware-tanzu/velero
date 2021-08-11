@@ -48,6 +48,7 @@ OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
 VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
+CRDS_VERSION ?= v1
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
 BSL_BUCKET ?=
@@ -56,6 +57,8 @@ BSL_CONFIG ?=
 VSL_CONFIG ?=
 CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
+INSTALL_VELERO ?= true
+REGISTRY_CREDENTIAL_FILE ?=
 
 # Flags to create an additional BSL for multiple credentials tests
 ADDITIONAL_OBJECT_STORE_PROVIDER ?=
@@ -79,6 +82,7 @@ run: ginkgo
 	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-velero-namespace=$(VELERO_NAMESPACE) \
+		-crds-version=$(CRDS_VERSION) \
 		-credentials-file=$(CREDS_FILE) \
 		-bucket=$(BSL_BUCKET) \
 		-prefix=$(BSL_PREFIX) \
@@ -90,7 +94,9 @@ run: ginkgo
 		-additional-bsl-credentials-file=$(ADDITIONAL_CREDS_FILE) \
 		-additional-bsl-bucket=$(ADDITIONAL_BSL_BUCKET) \
 		-additional-bsl-prefix=$(ADDITIONAL_BSL_PREFIX) \
-		-additional-bsl-config=$(ADDITIONAL_BSL_CONFIG)
+		-additional-bsl-config=$(ADDITIONAL_BSL_CONFIG) \
+		-install-velero=$(INSTALL_VELERO) \
+		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

@@ -68,8 +68,9 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 				bslPrefix,
 				bslConfig,
 				vslConfig,
+				crdsVersion,
 				"EnableAPIGroupVersions", // TODO: remove when feature flag is removed
-			)
+				registryCredentialFile)
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})
@@ -84,8 +85,10 @@ var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", 
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		err = veleroUninstall(ctx, client.kubebuilder, installVelero, veleroNamespace)
-		Expect(err).NotTo(HaveOccurred())
+		if installVelero {
+			err = veleroUninstall(ctx, client.kubebuilder, installVelero, veleroNamespace)
+			Expect(err).NotTo(HaveOccurred())
+		}
 
 	})
 

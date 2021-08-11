@@ -28,8 +28,7 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 		Expect(err).To(Succeed())
 		if installVelero {
 			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
-
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
 		}
 	})
 
@@ -47,8 +46,8 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
 			fiveMinTimeout, _ := context.WithTimeout(context.Background(), 5*time.Minute)
-			RunMultipleNamespaceTest(fiveMinTimeout, client, "nstest-"+uuidgen.String(), 2,
-				backupName, restoreName)
+			Expect(RunMultipleNamespaceTest(fiveMinTimeout, client, "nstest-"+uuidgen.String(), 2,
+				backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore multiple namespaces")
 		})
 	})
 })
@@ -65,8 +64,7 @@ var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 		Expect(err).To(Succeed())
 		if installVelero {
 			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "")).To(Succeed())
-
+				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
 		}
 	})
 
@@ -84,8 +82,8 @@ var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 			backupName := "backup-" + uuidgen.String()
 			restoreName := "restore-" + uuidgen.String()
 			oneHourTimeout, _ := context.WithTimeout(context.Background(), 1*time.Hour)
-			RunMultipleNamespaceTest(oneHourTimeout, client, "nstest-"+uuidgen.String(), 2500,
-				backupName, restoreName)
+			Expect(RunMultipleNamespaceTest(oneHourTimeout, client, "nstest-"+uuidgen.String(), 2500,
+				backupName, restoreName)).To(Succeed(), "Failed to successfully backup and restore multiple namespaces")
 		})
 	})
 })
@@ -112,7 +110,7 @@ func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName
 		}
 	}
 	if err := veleroBackupExcludeNamespaces(ctx, veleroCLI, veleroNamespace, backupName, excludeNamespaces); err != nil {
-		veleroBackupLogs(ctx, veleroCLI, "", backupName)
+		veleroBackupLogs(ctx, veleroCLI, veleroNamespace, backupName)
 		return errors.Wrapf(err, "Failed to backup backup namespaces %s-*", nsBaseName)
 	}
 

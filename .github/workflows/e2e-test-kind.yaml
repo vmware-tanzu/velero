@@ -63,6 +63,7 @@ jobs:
           - 1.19.7
           - 1.20.2
           - 1.21.1
+          - 1.22.0
       fail-fast: false
     steps:
       - name: Check out the code
@@ -109,5 +110,5 @@ jobs:
               CREDS_FILE=/tmp/credential BSL_BUCKET=bucket \
               ADDITIONAL_OBJECT_STORE_PROVIDER=aws ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
-              VELERO_IMAGE=velero:pr-test \
+              GINKGO_FOCUS=Basic VELERO_IMAGE=velero:pr-test \
               make -C test/e2e run

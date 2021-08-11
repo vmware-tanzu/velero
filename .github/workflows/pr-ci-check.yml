@@ -5,9 +5,13 @@ jobs:
     name: Run CI
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
       - name: Check out the code
         uses: actions/checkout@v2
-
       - name: Fetch cached go modules
         uses: actions/cache@v2
         with:
@@ -15,6 +19,5 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-
       - name: Make ci
         run: make ci
