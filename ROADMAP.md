@@ -25,28 +25,23 @@ The top priority of 1.7 is to increase the technical health of Velero and be mor
 
 |Issue|Description|
 |---|---|
-|Issue coming soon|Streamline release process|
-|Issue coming soon|Automate the running of the E2E tests|
-|Issue coming soon|Convert pre-release manual tests to automated E2E tests|
+||Streamline release process|
+||Automate the running of the E2E tests|
+||Convert pre-release manual tests to automated E2E tests|
 |[3493](https://github.com/vmware-tanzu/velero/issues/3493)|[Carvel](https://github.com/vmware-tanzu/velero/issues/3493) based installation (in addition to the existing *velero install* CLI).|
-|[3531](https://github.com/vmware-tanzu/velero/issues/3531)|Test plan for Velero|
 |[675](https://github.com/vmware-tanzu/velero/issues/675)|Velero command to generate debugging information.  Will integrate with [Crashd - Crash Diagnostics](https://github.com/vmware-tanzu/velero/issues/675)|
-|[3285](https://github.com/vmware-tanzu/velero/issues/3285)|Support Velero plugin versioning|
+|[3285](https://github.com/vmware-tanzu/velero/issues/3285)|Design doc for Velero plugin versioning|
 |[1975](https://github.com/vmware-tanzu/velero/issues/1975)|IPV6 support|
 |[3533](https://github.com/vmware-tanzu/velero/issues/3533)|Upload Progress Monitoring|
 |[3500](https://github.com/vmware-tanzu/velero/issues/3500)|Use distroless containers as a base|
 
 
-##### Desired items
-|Issue|Description|
-|---|---|
 
-|[2922](https://github.com/vmware-tanzu/velero/issues/2922)|Plugin timeouts|
-
-##### Items formerly in 1.7 that will likely slip due to staffing changes
+##### Items formerly in 1.7 that will slip due to staffing changes
 |Issue|Description|
 |---|---|
 |[3536](https://github.com/vmware-tanzu/velero/issues/3536)|Manifest for backup/restore|
 |[2066](https://github.com/vmware-tanzu/velero/issues/2066)|CSI Snapshots GA|
 |[3535](https://github.com/vmware-tanzu/velero/issues/3535)|Design doc for multiple cluster support|
-
+|[2922](https://github.com/vmware-tanzu/velero/issues/2922)|Plugin timeouts|
+|[3531](https://github.com/vmware-tanzu/velero/issues/3531)|Test plan for Velero|
