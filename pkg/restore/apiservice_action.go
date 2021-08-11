@@ -17,10 +17,7 @@ limitations under the License.
 package restore
 
 import (
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -41,20 +38,14 @@ func NewAPIServiceAction(logger logrus.FieldLogger) *APIServiceAction {
 func (a *APIServiceAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"apiservices"},
+		LabelSelector:     autoregister.AutoRegisterManagedLabel,
 	}, nil
 }
 
 func (a *APIServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-	apiService := new(apiregistrationv1.APIService)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), apiService); err != nil {
-		return nil, errors.WithStack(err)
-	}
+	a.logger.Info("Executing APIServiceAction")
+	defer a.logger.Info("Done executing APIServiceAction")
 
-	output := velero.NewRestoreItemActionExecuteOutput(input.Item)
-
-	if _, ok := apiService.Labels[autoregister.AutoRegisterManagedLabel]; ok {
-		output = output.WithoutRestore()
-	}
-
-	return output, nil
+	a.logger.Infof("Skipping restore of APIService as it is managed by Kubernetes")
+	return velero.NewRestoreItemActionExecuteOutput(input.Item).WithoutRestore(), nil
 }
