@@ -224,9 +224,13 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			if err := createNamespace(ctx, client, ns); err != nil {
 				return errors.Wrapf(err, "create %s namespace", ns)
 			}
+			defer func(namespace string) {
+				if err = deleteNamespace(ctx, client, namespace, true); err != nil {
+					fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", ns))
+				}
+			}(ns)
 
 			if err := installCR(ctx, cr, ns); err != nil {
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.Wrapf(err, "install %s custom resource on source cluster in namespace %s", cr, ns)
 			}
 
@@ -237,7 +241,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 		// instead of waiting for discovery helper to refresh. See
 		// https://github.com/vmware-tanzu/velero/issues/3471.
 		if err := restartPods(ctx, veleroNamespace); err != nil {
-			deleteNamespacesOnErr(ctx, tc.namespaces)
 			return errors.Wrapf(err, "restart Velero pods")
 		}
 
@@ -247,18 +250,15 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 		err = veleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr, "", false)
 		if err != nil {
 			veleroBackupLogs(ctx, veleroCLI, veleroNamespace, backup)
-			deleteNamespacesOnErr(ctx, tc.namespaces)
 			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)
 		}
 
 		if err := deleteCRD(ctx, tc.srcCrdYaml); err != nil {
-			deleteNamespacesOnErr(ctx, tc.namespaces)
 			return errors.Wrapf(err, "delete music-system CRD from source cluster")
 		}
 
 		for _, ns := range tc.namespaces {
-			if err := deleteNamespace(ctx, ns); err != nil {
-				deleteNamespacesOnErr(ctx, tc.namespaces)
+			if err := deleteNamespace(ctx, client, ns, true); err != nil {
 				return errors.Wrapf(err, "delete %s namespace from source cluster", ns)
 			}
 		}
@@ -266,7 +266,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 		// Install music-system CRD for target cluster.
 		if tc.tgtCrdYaml != "" {
 			if err := installCRD(ctx, tc.tgtCrdYaml); err != nil {
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.Wrapf(err, "install music-system CRD on target cluster")
 			}
 		}
@@ -275,14 +274,12 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 		if tc.cm != nil {
 			_, err := client.clientGo.CoreV1().ConfigMaps(veleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
 			if err != nil {
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.Wrap(err, "create config map with user version priorities")
 			}
 		}
 
 		// Reset Velero to recognize music-system CRD.
 		if err := restartPods(ctx, veleroNamespace); err != nil {
-			deleteNamespacesOnErr(ctx, tc.namespaces)
 			return errors.Wrapf(err, "restart Velero pods")
 		}
 
@@ -292,13 +289,11 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 		if tc.want != nil {
 			if err := veleroRestore(ctx, veleroCLI, veleroNamespace, restore, backup); err != nil {
 				veleroRestoreLogs(ctx, veleroCLI, veleroNamespace, restore)
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.Wrapf(err, "restore %s namespaces on target cluster", namespacesStr)
 			}
 
 			annoSpec, err := resourceInfo(ctx, group, tc.tgtVer, resource)
 			if err != nil {
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.Wrapf(
 					err,
 					"get annotation and spec from %s.%s/%s object",
@@ -315,7 +310,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 					annoSpec["annotations"],
 					tc.want["annotations"],
 				)
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.New(msg)
 			}
 
@@ -326,7 +320,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 					annoSpec["specs"],
 					tc.want["specs"],
 				)
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.New(msg)
 			}
 
@@ -336,16 +329,10 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 			err := veleroRestore(ctx, veleroCLI, veleroNamespace, restore, backup)
 
 			if err.Error() != "Unexpected restore phase got PartiallyFailed, expecting Completed" {
-				deleteNamespacesOnErr(ctx, tc.namespaces)
 				return errors.New("expected error but not none")
 			}
 		}
 
-		// Clean up.
-		for _, ns := range tc.namespaces {
-			fmt.Println("Delete namespace", ns)
-			deleteNamespace(ctx, ns)
-		}
 		_ = deleteCRD(ctx, tc.srcCrdYaml)
 		if tc.tgtCrdYaml != "" {
 			_ = deleteCRD(ctx, tc.tgtCrdYaml)
@@ -394,33 +381,6 @@ func restartPods(ctx context.Context, ns string) error {
 		return errors.Wrap(err, stderr)
 	}
 	return nil
-}
-
-func deleteNamespace(ctx context.Context, ns string) error {
-	fmt.Println("Delete namespace", ns)
-	cmd := exec.CommandContext(ctx, "kubectl", "delete", "ns", ns, "--wait")
-
-	_, stderr, err := veleroexec.RunCommand(cmd)
-	if strings.Contains(stderr, "not found") {
-		return nil
-	}
-	if err != nil {
-		return errors.Wrap(err, stderr)
-	}
-
-	return nil
-}
-
-// DeleteNamespacesOnErr cleans up the namespaces created for a test cast after an
-// error interrupts a test case.
-func deleteNamespacesOnErr(ctx context.Context, namespaces []string) {
-	if len(namespaces) > 0 {
-		fmt.Println("An error has occurred. Cleaning up test case namespaces.")
-	}
-
-	for _, ns := range namespaces {
-		deleteNamespace(ctx, ns)
-	}
 }
 
 func installCR(ctx context.Context, crFile, ns string) error {
