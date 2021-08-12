@@ -1,0 +1,1 @@
+Add a RestoreItemAction plugin (`velero.io/apiservice`) which skips the restore of any `APIService` which is managed by Kubernetes. These are identified using the `kube-aggregator.kubernetes.io/automanaged` label.
