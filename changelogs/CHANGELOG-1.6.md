@@ -34,6 +34,7 @@ This API version was introduced in Kubernetes v1.8.
   * Upgrade Velero ClusterRoleBinding to use v1 API (#3995, @jenting)
   * Install Kubernetes preferred CRDs API version (v1beta1/v1). (#3999, @jenting)
   * Use the cluster preferred CRD API version when polling for Velero CRD readiness. (#4015, @zubron)
+  * Add a RestoreItemAction plugin (`velero.io/apiservice`) which skips the restore of any `APIService` which is managed by Kubernetes. These are identified using the `kube-aggregator.kubernetes.io/automanaged` label. (#4028, @zubron)
 
 ## v1.6.2
 ### 2021-07-16
