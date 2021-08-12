@@ -121,6 +121,7 @@ type serverConfig struct {
 	formatFlag                                                              *logging.FormatFlag
 	defaultResticMaintenanceFrequency                                       time.Duration
 	defaultVolumesToRestic                                                  bool
+	defaultControllerWorkers                                                int
 }
 
 type controllerRunInfo struct {
@@ -150,6 +151,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
 			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
+			defaultControllerWorkers:          defaultControllerWorkers,
 		}
 	)
 
@@ -214,6 +216,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
+	command.Flags().IntVar(&config.defaultControllerWorkers, "default-controller-workers", config.defaultControllerWorkers, "How many concurrent workers reconcile by default.")
 
 	return command
 }
@@ -608,7 +611,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: backupSyncContoller,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
@@ -652,7 +655,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: backupController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
@@ -669,7 +672,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: scheduleController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
@@ -684,7 +687,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: gcController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
@@ -712,7 +715,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: deletionController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
@@ -753,7 +756,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: restoreController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
@@ -769,7 +772,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: resticRepoController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.defaultControllerWorkers,
 		}
 	}
 
