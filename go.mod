@@ -41,6 +41,9 @@ require (
 	k8s.io/cli-runtime v0.19.12
 	k8s.io/client-go v0.19.12
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.3.0 // indirect
+	k8s.io/kube-aggregator v0.19.12
+	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7 // indirect
 	sigs.k8s.io/cluster-api v0.3.11-0.20210106212952-b6c1b5b3db3d
 	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
 )
