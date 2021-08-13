@@ -20,8 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type Metadata struct {
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
 // BackupSpec defines the specification for a Velero backup.
 type BackupSpec struct {
+	// +optional
+	Metadata `json:"metadata,omitempty"`
 	// IncludedNamespaces is a slice of namespace names to include objects
 	// from. If empty, all namespaces are included.
 	// +optional
@@ -206,6 +212,17 @@ const (
 
 	// BackupPhaseInProgress means the backup is currently executing.
 	BackupPhaseInProgress BackupPhase = "InProgress"
+
+	// BackupPhaseUploading means the backups of Kubernetes resources
+	// and creation of snapshots was successful and snapshot data
+	// is currently uploading.  The backup is not usable yet.
+	BackupPhaseUploading BackupPhase = "Uploading"
+
+	// BackupPhaseUploadingPartialFailure means the backup of Kubernetes
+	// resources and creation of snapshots partially failed (final phase
+	// will be PartiallyFailed) and snapshot data is currently uploading.
+	// The backup is not usable yet.
+	BackupPhaseUploadingPartialFailure BackupPhase = "UploadingPartialFailure"
 
 	// BackupPhaseCompleted means the backup has run successfully without
 	// errors.

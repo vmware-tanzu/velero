@@ -5,7 +5,5 @@ metadata:
   annotations:
     rockbands.music.example.io/originalVersion: v1alpha1
 spec:
-  # Add fields here
-  genre: '60s rock'
+  genre: "60s rock"
   numberComponents: 4
-

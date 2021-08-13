@@ -553,6 +553,9 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 
 	n, err := io.Copy(file, readCloser)
 	if err != nil {
+		//Temporary file has been created if we go here. And some problems occurs such as network interruption and
+		//so on. So we close and remove temporary file first to prevent residual file.
+		closeAndRemoveFile(file, logger)
 		return nil, errors.Wrap(err, "error copying Backup to temp file")
 	}
 
@@ -564,6 +567,7 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 	}).Debug("Copied Backup to file")
 
 	if _, err := file.Seek(0, 0); err != nil {
+		closeAndRemoveFile(file, logger)
 		return nil, errors.Wrap(err, "error resetting Backup file offset")
 	}
 

@@ -1,6 +1,6 @@
 module github.com/vmware-tanzu/velero
 
-go 1.15
+go 1.16
 
 require (
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
@@ -16,31 +16,38 @@ require (
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/protobuf v1.4.2
 	github.com/google/uuid v1.1.2
+	github.com/googleapis/gnostic v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
 	github.com/joho/godotenv v1.3.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
-	github.com/onsi/ginkgo v1.15.2
+	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.10.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/robfig/cron v1.1.0
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
+	golang.org/x/crypto v0.0.0-20201012173705-84dcc777aaee // indirect
 	golang.org/x/mod v0.3.0
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	google.golang.org/genproto v0.0.0-20200731012542-8145dea6a485 // indirect
+	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.31.0
-	google.golang.org/protobuf v1.25.0 // indirect
-	k8s.io/api v0.19.7
-	k8s.io/apiextensions-apiserver v0.19.7
-	k8s.io/apimachinery v0.19.7
-	k8s.io/cli-runtime v0.19.7
-	k8s.io/client-go v0.19.7
+	k8s.io/api v0.19.12
+	k8s.io/apiextensions-apiserver v0.19.12
+	k8s.io/apimachinery v0.19.12
+	k8s.io/cli-runtime v0.19.12
+	k8s.io/client-go v0.19.12
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.3.0 // indirect
+	k8s.io/kube-aggregator v0.19.12
+	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7 // indirect
 	sigs.k8s.io/cluster-api v0.3.11-0.20210106212952-b6c1b5b3db3d
 	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
 )
+
+replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2

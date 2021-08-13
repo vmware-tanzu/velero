@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,7 +211,7 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 	}
 }
 
-func TestIsCRDReady(t *testing.T) {
+func TestIsV1Beta1CRDReady(t *testing.T) {
 	tests := []struct {
 		name string
 		crd  *apiextv1beta1.CustomResourceDefinition
@@ -218,33 +219,72 @@ func TestIsCRDReady(t *testing.T) {
 	}{
 		{
 			name: "CRD is not established & not accepting names - not ready",
-			crd:  builder.ForCustomResourceDefinition("MyCRD").Result(),
+			crd:  builder.ForCustomResourceDefinitionV1Beta1("MyCRD").Result(),
 			want: false,
 		},
 		{
 			name: "CRD is established & not accepting names - not ready",
-			crd: builder.ForCustomResourceDefinition("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
 			name: "CRD is not established & accepting names - not ready",
-			crd: builder.ForCustomResourceDefinition("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
 			name: "CRD is established & accepting names - ready",
-			crd: builder.ForCustomResourceDefinition("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
+			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
 				Result(),
 			want: true,
 		},
 	}
 
 	for _, tc := range tests {
-		result := IsCRDReady(tc.crd)
+		result := IsV1Beta1CRDReady(tc.crd)
+		assert.Equal(t, tc.want, result)
+	}
+}
+
+func TestIsV1CRDReady(t *testing.T) {
+	tests := []struct {
+		name string
+		crd  *apiextv1.CustomResourceDefinition
+		want bool
+	}{
+		{
+			name: "CRD is not established & not accepting names - not ready",
+			crd:  builder.ForV1CustomResourceDefinition("MyCRD").Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & not accepting names - not ready",
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is not established & accepting names - not ready",
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & accepting names - ready",
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).
+				Result(),
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		result := IsV1CRDReady(tc.crd)
 		assert.Equal(t, tc.want, result)
 	}
 }
@@ -257,26 +297,26 @@ func TestIsUnstructuredCRDReady(t *testing.T) {
 	}{
 		{
 			name: "CRD is not established & not accepting names - not ready",
-			crd:  builder.ForCustomResourceDefinition("MyCRD").Result(),
+			crd:  builder.ForCustomResourceDefinitionV1Beta1("MyCRD").Result(),
 			want: false,
 		},
 		{
 			name: "CRD is established & not accepting names - not ready",
-			crd: builder.ForCustomResourceDefinition("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
 			name: "CRD is not established & accepting names - not ready",
-			crd: builder.ForCustomResourceDefinition("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
 			name: "CRD is established & accepting names - ready",
-			crd: builder.ForCustomResourceDefinition("MyCRD").
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
-				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
+			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
+				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
 				Result(),
 			want: true,
 		},

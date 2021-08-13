@@ -78,6 +78,11 @@ spec:
     # a default value of 30 days will be used. The default can be configured on the velero server
     # by passing the flag --default-backup-ttl.
     ttl: 24h0m0s
+    # The labels you want on backup objects, created from this schedule (instead of copying the labels you have on schedule object itself).
+    # When this field is set, the labels from the Schedule resource are not copied to the Backup resource.
+    metadata:
+      labels:
+        labelname: somelabelvalue
     # Actions to perform at different times during a backup. The only hook supported is
     # executing a command in a container in a pod using the pod exec API. Optional.
     hooks:

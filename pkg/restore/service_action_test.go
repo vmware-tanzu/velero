@@ -48,6 +48,21 @@ func svcJSON(ports ...corev1api.ServicePort) string {
 	return string(data)
 }
 
+func svcJSONFromUnstructured(ports ...map[string]interface{}) string {
+	svc := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"ports": ports,
+		},
+	}
+
+	data, err := json.Marshal(svc)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(data)
+}
+
 func TestServiceActionExecute(t *testing.T) {
 
 	tests := []struct {
@@ -224,6 +239,38 @@ func TestServiceActionExecute(t *testing.T) {
 					Name: "svc-1",
 					Annotations: map[string]string{
 						annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{Name: "http", NodePort: 8080}),
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Ports: []corev1api.ServicePort{
+						{},
+					},
+				},
+			},
+		},
+		{
+			name: "unnamed nodePort should be deleted when named a string nodePort specified in annotation",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					Annotations: map[string]string{
+						annotationLastAppliedConfig: svcJSONFromUnstructured(map[string]interface{}{"name": "http", "nodePort": "8080"}),
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Ports: []corev1api.ServicePort{
+						{
+							NodePort: 8080,
+						},
+					},
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					Annotations: map[string]string{
+						annotationLastAppliedConfig: svcJSONFromUnstructured(map[string]interface{}{"name": "http", "nodePort": "8080"}),
 					},
 				},
 				Spec: corev1api.ServiceSpec{

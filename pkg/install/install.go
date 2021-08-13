@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package install
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -57,53 +60,95 @@ type ResourceGroup struct {
 	OtherResources []*unstructured.Unstructured
 }
 
-// crdsAreReady polls the API server to see if the BackupStorageLocation and VolumeSnapshotLocation CRDs are ready to create objects.
-func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error) {
-	gvk := schema.FromAPIVersionAndKind(apiextv1beta1.SchemeGroupVersion.String(), "CustomResourceDefinition")
-	apiResource := metav1.APIResource{
-		Name:       kindToResource["CustomResourceDefinition"],
-		Namespaced: false,
-	}
-	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, "")
-	if err != nil {
-		return false, errors.Wrapf(err, "Error creating client for CustomResourceDefinition polling")
-	}
-	// Track all the CRDs that have been found and successfully marshalled.
-	// len should be equal to len(crdKinds) in the happy path.
-	foundCRDs := make([]*apiextv1beta1.CustomResourceDefinition, 0)
-	var areReady bool
-	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		for _, k := range crdKinds {
-			unstruct, err := c.Get(k, metav1.GetOptions{})
+// crdV1Beta1ReadinessFn returns a function that can be used for polling to check
+// if the provided unstructured v1beta1 CRDs are ready for use in the cluster.
+func crdV1Beta1ReadinessFn(kbClient kbclient.Client, unstructuredCrds []*unstructured.Unstructured) func() (bool, error) {
+	// Track all the CRDs that have been found and in ready state.
+	// len should be equal to len(unstructuredCrds) in the happy path.
+	return func() (bool, error) {
+		foundCRDs := make([]*apiextv1beta1.CustomResourceDefinition, 0)
+		for _, unstructuredCrd := range unstructuredCrds {
+			crd := &apiextv1beta1.CustomResourceDefinition{}
+			key := kbclient.ObjectKey{Name: unstructuredCrd.GetName()}
+			err := kbClient.Get(context.Background(), key, crd)
 			if apierrors.IsNotFound(err) {
 				return false, nil
 			} else if err != nil {
-				return false, errors.Wrapf(err, "error waiting for %s to be ready", k)
+				return false, errors.Wrapf(err, "error waiting for %s to be ready", crd.GetName())
 			}
-
-			crd := new(apiextv1beta1.CustomResourceDefinition)
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, crd); err != nil {
-				return false, errors.Wrapf(err, "error converting %s from unstructured", k)
-			}
-
 			foundCRDs = append(foundCRDs, crd)
 		}
 
-		if len(foundCRDs) != len(crdKinds) {
+		if len(foundCRDs) != len(unstructuredCrds) {
 			return false, nil
 		}
 
 		for _, crd := range foundCRDs {
-			if !kube.IsCRDReady(crd) {
+			ready := kube.IsV1Beta1CRDReady(crd)
+			if !ready {
 				return false, nil
 			}
-
 		}
-		areReady = true
-
 		return true, nil
-	})
-	return areReady, nil
+	}
+}
+
+// crdV1ReadinessFn returns a function that can be used for polling to check
+// if the provided unstructured v1 CRDs are ready for use in the cluster.
+func crdV1ReadinessFn(kbClient kbclient.Client, unstructuredCrds []*unstructured.Unstructured) func() (bool, error) {
+	return func() (bool, error) {
+		foundCRDs := make([]*apiextv1.CustomResourceDefinition, 0)
+		for _, unstructuredCrd := range unstructuredCrds {
+			crd := &apiextv1.CustomResourceDefinition{}
+			key := kbclient.ObjectKey{Name: unstructuredCrd.GetName()}
+			err := kbClient.Get(context.Background(), key, crd)
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			} else if err != nil {
+				return false, errors.Wrapf(err, "error waiting for %s to be ready", crd.GetName())
+			}
+			foundCRDs = append(foundCRDs, crd)
+		}
+
+		if len(foundCRDs) != len(unstructuredCrds) {
+			return false, nil
+		}
+
+		for _, crd := range foundCRDs {
+			ready := kube.IsV1CRDReady(crd)
+			if !ready {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+}
+
+// crdsAreReady polls the API server to see if the Velero CRDs are ready to create objects.
+func crdsAreReady(kbClient kbclient.Client, crds []*unstructured.Unstructured) (bool, error) {
+	if len(crds) == 0 {
+		// no CRDs to check so return
+		return true, nil
+	}
+
+	// We assume that all Velero CRDs have the same GVK so we can use the GVK of the
+	// first CRD to determine whether to use the v1beta1 or v1 API during polling.
+	gvk := crds[0].GroupVersionKind()
+
+	var crdReadinessFn func() (bool, error)
+	if gvk.Version == "v1beta1" {
+		crdReadinessFn = crdV1Beta1ReadinessFn(kbClient, crds)
+	} else if gvk.Version == "v1" {
+		crdReadinessFn = crdV1ReadinessFn(kbClient, crds)
+	} else {
+		return false, fmt.Errorf("unsupported CRD version %q", gvk.Version)
+	}
+
+	err := wait.PollImmediate(time.Second, time.Minute, crdReadinessFn)
+	if err != nil {
+		return false, errors.Wrap(err, "Error polling for CRDs")
+	}
+	return true, nil
 }
 
 func isAvailable(c appsv1.DeploymentCondition) bool {
@@ -282,19 +327,19 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 // Resources will be sorted into CustomResourceDefinitions and any other resource type, and the function will wait up to 1 minute
 // for CRDs to be ready before proceeding.
 // An io.Writer can be used to output to a log or the console.
-func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, w io.Writer) error {
+func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer) error {
 	rg := GroupResources(resources)
 
 	//Install CRDs first
 	for _, r := range rg.CRDResources {
-		if err := createResource(r, factory, w); err != nil {
+		if err := createResource(r, dynamicFactory, w); err != nil {
 			return err
 		}
 	}
 
 	// Wait for CRDs to be ready before proceeding
 	fmt.Fprint(w, "Waiting for resources to be ready in cluster...\n")
-	_, err := crdsAreReady(factory, []string{"backupstoragelocations.velero.io", "volumesnapshotlocations.velero.io"})
+	_, err := crdsAreReady(kbClient, rg.CRDResources)
 	if err == wait.ErrWaitTimeout {
 		return errors.Errorf("timeout reached, CRDs not ready")
 	} else if err != nil {
@@ -303,7 +348,7 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 
 	// Install all other resources
 	for _, r := range rg.OtherResources {
-		if err = createResource(r, factory, w); err != nil {
+		if err = createResource(r, dynamicFactory, w); err != nil {
 			return err
 		}
 	}

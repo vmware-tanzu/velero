@@ -1,0 +1,16 @@
+Added BackupPhaseUploading and BackupPhaseUploadingPartialFailure backup phases as part of Upload Progress Monitoring
+
+Uploading (new)
+The "Uploading" phase signifies that the main part of the backup, including 
+snapshotting has completed successfully and uploading is continuing. In 
+the event of an error during uploading, the phase will change to 
+UploadingPartialFailure. On success, the phase changes to Completed. The 
+backup cannot be restored from when it is in the Uploading state.
+
+UploadingPartialFailure (new)
+The "UploadingPartialFailure" phase signifies that the main part of the backup,
+including snapshotting has completed, but there were partial failures either 
+during the main part or during the uploading. The backup cannot be restored 
+from when it is in the UploadingPartialFailure state.
+
+

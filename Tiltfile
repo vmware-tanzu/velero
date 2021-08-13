@@ -1,17 +1,17 @@
 # -*- mode: Python -*-
 
 k8s_yaml([
-    'config/crd/bases/velero.io_backups.yaml',
-    'config/crd/bases/velero.io_backupstoragelocations.yaml',
-    'config/crd/bases/velero.io_deletebackuprequests.yaml',
-    'config/crd/bases/velero.io_downloadrequests.yaml',
-    'config/crd/bases/velero.io_podvolumebackups.yaml',
-    'config/crd/bases/velero.io_podvolumerestores.yaml',
-    'config/crd/bases/velero.io_resticrepositories.yaml',
-    'config/crd/bases/velero.io_restores.yaml',
-    'config/crd/bases/velero.io_schedules.yaml',
-    'config/crd/bases/velero.io_serverstatusrequests.yaml',
-    'config/crd/bases/velero.io_volumesnapshotlocations.yaml',
+    'config/crd/v1/bases/velero.io_backups.yaml',
+    'config/crd/v1/bases/velero.io_backupstoragelocations.yaml',
+    'config/crd/v1/bases/velero.io_deletebackuprequests.yaml',
+    'config/crd/v1/bases/velero.io_downloadrequests.yaml',
+    'config/crd/v1/bases/velero.io_podvolumebackups.yaml',
+    'config/crd/v1/bases/velero.io_podvolumerestores.yaml',
+    'config/crd/v1/bases/velero.io_resticrepositories.yaml',
+    'config/crd/v1/bases/velero.io_restores.yaml',
+    'config/crd/v1/bases/velero.io_schedules.yaml',
+    'config/crd/v1/bases/velero.io_serverstatusrequests.yaml',
+    'config/crd/v1/bases/velero.io_volumesnapshotlocations.yaml',
 ])
 
 # default values
@@ -50,7 +50,7 @@ git_sha = str(local("git rev-parse HEAD", quiet = True, echo_off = True)).strip(
 
 tilt_helper_dockerfile_header = """
 # Tilt image
-FROM golang:1.15.3 as tilt-helper
+FROM golang:1.16.6 as tilt-helper
 
 # Support live reloading with Tilt
 RUN wget --output-document /restart.sh --quiet https://raw.githubusercontent.com/windmilleng/rerun-process-wrapper/master/restart.sh  && \

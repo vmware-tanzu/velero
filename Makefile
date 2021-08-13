@@ -110,7 +110,6 @@ GOPROXY ?= https://proxy.golang.org
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
-# If you want to build AND push all containers, see the 'all-push' rule.
 all:
 	@$(MAKE) build
 	@$(MAKE) build BIN=velero-restic-restore-helper
@@ -129,6 +128,7 @@ local: build-dirs
 	GOOS=$(GOOS) \
 	GOARCH=$(GOARCH) \
 	VERSION=$(VERSION) \
+	REGISTRY=$(REGISTRY) \
 	PKG=$(PKG) \
 	BIN=$(BIN) \
 	GIT_SHA=$(GIT_SHA) \
@@ -144,6 +144,7 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 		GOOS=$(GOOS) \
 		GOARCH=$(GOARCH) \
 		VERSION=$(VERSION) \
+		REGISTRY=$(REGISTRY) \
 		PKG=$(PKG) \
 		BIN=$(BIN) \
 		GIT_SHA=$(GIT_SHA) \
@@ -186,6 +187,7 @@ endif
 	--build-arg=VERSION=$(VERSION) \
 	--build-arg=GIT_SHA=$(GIT_SHA) \
 	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	--build-arg=REGISTRY=$(REGISTRY) \
 	-f $(VELERO_DOCKERFILE) .
 
 container:
@@ -201,6 +203,7 @@ endif
 	--build-arg=VERSION=$(VERSION) \
 	--build-arg=GIT_SHA=$(GIT_SHA) \
 	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	--build-arg=REGISTRY=$(REGISTRY) \
 	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
 	-f $(VELERO_DOCKERFILE) .
 	@echo "container: $(IMAGE):$(VERSION)"
@@ -287,12 +290,12 @@ push-build-image:
 	@# this target will push the build-image it assumes you already have docker
 	@# credentials needed to accomplish this.
 	@# Pushing will be skipped if a custom Dockerfile was used to build the image.
-	ifneq "$(origin BUILDER_IMAGE_DOCKERFILE)" "file"
-		@echo "Dockerfile for builder image has been overridden"
-		@echo "Skipping push of custom image"
-	else
-		docker push $(BUILDER_IMAGE)
-	endif
+ifneq "$(origin BUILDER_IMAGE_DOCKERFILE)" "file"
+	@echo "Dockerfile for builder image has been overridden"
+	@echo "Skipping push of custom image"
+else
+	docker push $(BUILDER_IMAGE)
+endif
 
 build-image-hugo:
 	cd site && docker build --pull -t $(HUGO_IMAGE) .
@@ -335,9 +338,9 @@ changelog:
 #		PUBLISH=false \
 #		make release
 #
-# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero 
+# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero
 # (you still need to review/publish the GitHub release manually):
-#		GITHUB_TOKEN=your-github-token \ 
+#		GITHUB_TOKEN=your-github-token \
 #		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \
 #		PUBLISH=true \
 #		make release
@@ -346,6 +349,7 @@ release:
 		GITHUB_TOKEN=$(GITHUB_TOKEN) \
 		RELEASE_NOTES_FILE=$(RELEASE_NOTES_FILE) \
 		PUBLISH=$(PUBLISH) \
+		REGISTRY=$(REGISTRY) \
 		./hack/release-tools/goreleaser.sh'"
 
 serve-docs: build-image-hugo
@@ -355,7 +359,7 @@ serve-docs: build-image-hugo
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
 	hugo server --bind=0.0.0.0 --enableGitInfo=false
-# gen-docs generates a new versioned docs directory under site/content/docs. 
+# gen-docs generates a new versioned docs directory under site/content/docs.
 # Please read the documentation in the script for instructions on how to use it.
 gen-docs:
 	@hack/release-tools/gen-docs.sh

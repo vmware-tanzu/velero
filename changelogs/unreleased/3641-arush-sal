@@ -1,0 +1,1 @@
+Add Label to BackupSpec so that labels can explicitly be provided to Schedule.Spec.Template.Metadata.Labels which will be reflected on the backups created.

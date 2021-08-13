@@ -1,0 +1,1 @@
+Use region specified in the BackupStorageLocation spec when getting restic repo identifier. Originally fixed by @jala-dx in #3617.

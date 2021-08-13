@@ -459,7 +459,7 @@ cqlsh:demodb> select * from emp;
 cqlsh:demodb>
 ```
 
-It looks like the restore has been successful. Velero v1.1 has successfully restored the Kubenetes objects for the Cassandra application, as well as restored the database and table contents.
+It looks like the restore has been successful. Velero v1.1 has successfully restored the Kubernetes objects for the Cassandra application, as well as restored the database and table contents.
 
 ## Feedback and Participation
 

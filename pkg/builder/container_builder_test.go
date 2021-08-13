@@ -75,7 +75,22 @@ func TestGetName(t *testing.T) {
 		{
 			name:     "image name with registry hostname starting with a / will include the registry name ¯\\_(ツ)_/¯",
 			image:    "/gcr.io/my-repo/mystery/another/my-image",
-			expected: "gcr.io-my-repo-mystery-another-my-image",
+			expected: "gcr-io-my-repo-mystery-another-my-image",
+		},
+		{
+			name:     "image repository names containing _ ",
+			image:    "projects.registry.vmware.com/tanzu_migrator/route-2-httpproxy:myTag",
+			expected: "tanzu-migrator-route-2-httpproxy",
+		},
+		{
+			name:     "image repository names containing . ",
+			image:    "projects.registry.vmware.com/tanzu.migrator/route-2-httpproxy:myTag",
+			expected: "tanzu-migrator-route-2-httpproxy",
+		},
+		{
+			name:     "pull by digest",
+			image:    "quay.io/vmware-tanzu/velero@sha256:a75f9e8c3ced3943515f249597be389f8233e1258d289b11184796edceaa7dab",
+			expected: "vmware-tanzu-velero",
 		},
 	}
 

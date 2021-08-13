@@ -1,0 +1,4 @@
+✨ ⚠️ Remove CSI volumesnapshot artifact deletion
+
+This change requires https://github.com/vmware-tanzu/velero-plugin-for-csi/pull/86 for Velero to continue
+deleting of CSI volumesnapshots when the corresponding backups are deleted.
