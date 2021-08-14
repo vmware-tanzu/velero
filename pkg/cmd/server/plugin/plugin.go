@@ -40,7 +40,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterBackupItemAction(PVBackupPlugin, newPVBackupItemAction).
 				RegisterBackupItemAction(PodBackupPlugin, newPodBackupItemAction).
 				RegisterBackupItemAction(ServiceAccountBackupPlugin, newServiceAccountBackupItemAction(f)).
-				RegisterBackupItemAction(RemapCRDVersionBackupPlugin, newRemapCRDVersionBackupItemAction(f)).
+				RegisterBackupItemAction(RemapCRDVersionBackupPlugin, newRemapCRDVersionAction(f)).
 				RegisterRestoreItemAction(JobRestorePlugin, newJobRestoreItemAction).
 				RegisterRestoreItemAction(PodRestorePlugin, newPodRestoreItemAction).
 				RegisterRestoreItemAction(ResticRestorePlugin, newResticRestoreItemAction(f)).
@@ -51,8 +51,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction(AddPVFromPVCRestorePlugin, newAddPVFromPVCRestoreItemAction).
 				RegisterRestoreItemAction(ChangeStorageClassRestorePlugin, newChangeStorageClassRestoreItemAction(f)).
 				RegisterRestoreItemAction(RoleBindingItemPlugin, newRoleBindingItemAction).
-				RegisterRestoreItemAction(ClusterRoleBindingRestorePlugin, newClusterRoleBindingRestoreItemAction).
-				RegisterRestoreItemAction(CRDV1PreserveUnknownFieldsRestorePlugin, newCRDV1PreserveUnknownFieldsRestoreItemAction).
+				RegisterRestoreItemAction(ClusterRoleBindingRestorePlugin, newClusterRoleBindingItemAction).
+				RegisterRestoreItemAction(CRDV1PreserveUnknownFieldsRestorePlugin, newCRDV1PreserveUnknownFieldsItemAction).
 				RegisterRestoreItemAction(ChangePVCNodeSelectorPlugin, newChangePVCNodeSelectorItemAction(f)).
 				RegisterRestoreItemAction(APIServiceRestorePlugin, newAPIServiceRestoreItemAction).
 				Serve()
@@ -97,7 +97,7 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 	}
 }
 
-func newRemapCRDVersionBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newRemapCRDVersionAction(f client.Factory) veleroplugin.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		config, err := f.ClientConfig()
 		if err != nil {
@@ -157,7 +157,7 @@ func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, e
 	return restore.NewAddPVFromPVCAction(logger), nil
 }
 
-func newCRDV1PreserveUnknownFieldsRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewCRDV1PreserveUnknownFieldsAction(logger), nil
 }
 
@@ -180,7 +180,7 @@ func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewRoleBindingAction(logger), nil
 }
 
-func newClusterRoleBindingRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewClusterRoleBindingAction(logger), nil
 }
 
