@@ -46,6 +46,20 @@ func backup_restore_test(useVolumeSnapshots bool) {
 	var (
 		backupName, restoreName string
 	)
+	installParams := &VeleroInstallationParams{veleroCLI,
+		veleroImage,
+		veleroNamespace,
+		cloudProvider,
+		objectStoreProvider,
+		useVolumeSnapshots,
+		cloudCredentialsFile,
+		bslBucket,
+		bslPrefix,
+		bslConfig,
+		vslConfig,
+		crdsVersion,
+		"",
+		registryCredentialFile}
 
 	client, err := newTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
@@ -59,9 +73,10 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
-				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
+			err = veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
+			Expect(err).To(Succeed())
 		}
+		installParams.veleroImage = veleroImage
 	})
 
 	AfterEach(func() {
@@ -72,16 +87,34 @@ func backup_restore_test(useVolumeSnapshots bool) {
 	})
 
 	When("kibishii is the sample workload", func() {
-		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
+		XIt("should be successfully backed up and restored to the default BackupStorageLocation", func() {
 			backupName = "backup-" + uuidgen.String()
 			restoreName = "restore-" + uuidgen.String()
+			if installVelero {
+				Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+					cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
+			}
 			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
 			Expect(runKibishiiTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, "", useVolumeSnapshots, registryCredentialFile)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
-		It("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
+		FIt("should be successfully backed up, upgraded and restored to the default BackupStorageLocation", func() {
+			backupName = "backup-" + uuidgen.String()
+			restoreName = "restore-" + uuidgen.String()
+			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
+			// KinD. So use the kind installation for Kibishii.
+			installParams.veleroImage = upgradedVeleroImage
+			if installVelero {
+				Expect(veleroInstallNew(installParams)).To(Succeed())
+			}
+			installParams.veleroImage = veleroImage
+			Expect(runUpgradeTests(client, cloudProvider, veleroCLI, veleroNamespace, backupName, restoreName, "", useVolumeSnapshots, registryCredentialFile, installParams)).To(Succeed(),
+				"Failed to successfully backup and restore Kibishii namespace")
+		})
+
+		XIt("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
 			if additionalBSLProvider == "" {
 				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
@@ -95,6 +128,11 @@ func backup_restore_test(useVolumeSnapshots bool) {
 			}
 
 			Expect(veleroAddPluginsForProvider(context.TODO(), veleroCLI, veleroNamespace, additionalBSLProvider)).To(Succeed())
+
+			if installVelero {
+				Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+					cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
+			}
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", uuidgen)

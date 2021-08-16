@@ -28,6 +28,7 @@ import (
 var (
 	veleroCLI, veleroImage, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, cloudProvider, objectStoreProvider, veleroNamespace, crdsVersion string
 	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials, registryCredentialFile                     string
+	upgradedVeleroImage                                                                                                                                        string
 	installVelero                                                                                                                                              bool
 )
 
@@ -38,6 +39,7 @@ func init() {
 	flag.StringVar(&cloudCredentialsFile, "credentials-file", "", "file containing credentials for backup and volume provider. Required.")
 	flag.StringVar(&veleroCLI, "velerocli", "velero", "path to the velero application to use.")
 	flag.StringVar(&veleroImage, "velero-image", "velero/velero:main", "image for the velero server to be tested.")
+	flag.StringVar(&upgradedVeleroImage, "upgraded-velero-image", "velero/velero:v1.6.3", "image for the upgrade test.")
 	flag.StringVar(&bslConfig, "bsl-config", "", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&bslPrefix, "prefix", "", "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flag.StringVar(&vslConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")

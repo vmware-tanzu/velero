@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -43,6 +44,23 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/install"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
+
+type VeleroInstallationParams struct {
+	veleroCLI              string
+	veleroImage            string
+	veleroNamespace        string
+	cloudProvider          string
+	objectStoreProvider    string
+	useVolumeSnapshots     bool
+	cloudCredentialsFile   string
+	bslBucket              string
+	bslPrefix              string
+	bslConfig              string
+	vslConfig              string
+	crdsVersion            string
+	features               string
+	registryCredentialFile string
+}
 
 func getProviderPlugins(providerName string) []string {
 	// TODO: make plugin images configurable
@@ -285,6 +303,35 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 	return nil
 }
 
+func getVeleroVersion(ctx context.Context, veleroCLI string) (string, error) {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "version")
+
+	stdoutPipe, err := checkCMD.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+
+	jsonBuf := make([]byte, 1*1024)
+
+	err = checkCMD.Start()
+	if err != nil {
+		return "", err
+	}
+
+	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
+
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return "", err
+	}
+	if bytesRead == len(jsonBuf) {
+		errors.New("Velero version command returned bigger than expected")
+	}
+	output := strings.Replace(string(jsonBuf), "\n", " ", -1)
+	regCompiler := regexp.MustCompile(`(?i)server\s*:\s*version\s*:\s*([\w|\.]+)`)
+	versionMatches := regCompiler.FindStringSubmatch(output)
+	return versionMatches[1], nil
+}
+
 // veleroBackupNamespace uses the veleroCLI to backup a namespace.
 func veleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string,
 	useVolumeSnapshots bool) error {
@@ -404,6 +451,73 @@ func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace stri
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
 
+	return nil
+}
+
+func veleroInstallNew(installParams *VeleroInstallationParams) error {
+
+	ctx := context.Background()
+	if installParams.cloudProvider != "kind" {
+		if installParams.objectStoreProvider != "" {
+			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
+		}
+		installParams.objectStoreProvider = installParams.cloudProvider
+	} else {
+		if installParams.objectStoreProvider == "" {
+			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
+		}
+	}
+
+	// Fetch the plugins for the provider before checking for the object store provider below.
+	providerPlugins := getProviderPlugins(installParams.objectStoreProvider)
+
+	// TODO - handle this better
+	if installParams.cloudProvider == "vsphere" {
+		// We overrider the objectStoreProvider here for vSphere because we want to use the aws plugin for the
+		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
+		// Snapshot location specified
+		installParams.objectStoreProvider = "aws"
+	}
+	err := ensureClusterExists(ctx)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
+	}
+
+	veleroInstallOptions, err := getProviderVeleroInstallOptions(installParams.objectStoreProvider, installParams.cloudCredentialsFile, installParams.bslBucket,
+		installParams.bslPrefix, installParams.bslConfig, installParams.vslConfig, providerPlugins, installParams.features)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", installParams.objectStoreProvider)
+	}
+	if installParams.useVolumeSnapshots {
+		if installParams.cloudProvider != "vsphere" {
+			veleroInstallOptions.UseVolumeSnapshots = true
+		} else {
+			veleroInstallOptions.UseVolumeSnapshots = false // vSphere plug-in 1.1.0+ is not a volume snapshotter plug-in
+			// so we do not want to generate a VSL (this will wind up
+			// being an AWS VSL which causes problems)
+		}
+	}
+	veleroInstallOptions.UseRestic = !installParams.useVolumeSnapshots
+	veleroInstallOptions.Image = installParams.veleroImage
+	veleroInstallOptions.CRDsVersion = installParams.crdsVersion
+	veleroInstallOptions.Namespace = installParams.veleroNamespace
+	fmt.Println(veleroInstallOptions.Image)
+
+	err = installVeleroServer(veleroInstallOptions, installParams.registryCredentialFile)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
+	}
+	tagDividerPos := strings.Index(installParams.veleroImage, ":")
+	tag := installParams.veleroImage[tagDividerPos+1 : len(installParams.veleroImage)]
+	tagInstalled, err := getVeleroVersion(ctx, installParams.veleroCLI)
+	fmt.Printf("Velero version %s and expected %s\n", tagInstalled, tag)
+	if strings.Trim(tag, " ") != strings.Trim(tagInstalled, " ") {
+		return errors.New(fmt.Sprintf("Velero version %s is not as expected %s", tagInstalled, tag))
+	}
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to get Velero version")
+	}
+	fmt.Printf("Velero version %s is as expected %s\n", tagInstalled, tag)
 	return nil
 }
 
