@@ -42,7 +42,7 @@ Several comments:
 
 1. The Velero service will write its backup into the bucket, so it requires the “Writer” access role.
 
-2. Velero uses an AWS S3 compatible API. Which means it authenticates using a signature created from a pair of access and secret keys — a set of HMAC credentials. You can create these HMAC credentials by specifying `{“HMAC”:true}` as an optional inline parameter. See step 3 in the [Service credentials][3] guide.
+2. Velero uses an AWS S3 compatible API. Which means it authenticates using a signature created from a pair of access and secret keys — a set of HMAC credentials. You can create these HMAC credentials by specifying `{“HMAC”:true}` as an optional inline parameter. See [HMAC credentials][31] guide.
 
 3. After successfully creating a Service credential, you can view the JSON definition of the credential. Under the `cos_hmac_keys` entry there are `access_key_id` and `secret_access_key`. Use them in the next step.
 
@@ -90,11 +90,12 @@ If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 Uncomment `storageClassName: <YOUR_STORAGE_CLASS_NAME>` and replace with your `StorageClass` name.
 
 [0]: namespace.md
-[1]: https://console.bluemix.net/docs/services/cloud-object-storage/basics/order-storage.html#creating-a-new-resource-instance
-[2]: https://console.bluemix.net/docs/services/cloud-object-storage/getting-started.html#create-buckets
-[3]: https://console.bluemix.net/docs/services/cloud-object-storage/iam/service-credentials.html#service-credentials
-[4]: https://www.ibm.com/support/knowledgecenter/SSBS6K_2.1.0/kc_welcome_containers.html
-[5]: https://console.bluemix.net/docs/containers/container_index.html#container_index
+[1]: https://cloud.ibm.com/docs/cloud-object-storage/getting-started.html
+[2]: https://cloud.ibm.com/docs/cloud-object-storage/getting-started.html#create-buckets
+[3]: https://cloud.ibm.com/docs/cloud-object-storage/iam?topic=cloud-object-storage-service-credentials
+[31]: https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-uhc-hmac-credentials-main
+[4]: https://www.ibm.com/docs/en/cloud-private
+[5]: https://cloud.ibm.com/docs/containers/container_index.html#container_index
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
 [15]: customize-installation.md#customize-resource-requests-and-limits
 [16]: restic.md
