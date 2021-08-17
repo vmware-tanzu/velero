@@ -492,7 +492,7 @@ on that node. The controller executes `restic restore` commands to restore pod v
     check it for integrity)
 1. Velero adds an init container to the pod, whose job is to wait for all restic restores for the pod to complete (more
 on this shortly)
-1. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API
+1. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API. Then, Kubernetes scheduler schedule this pod to a worker node, and the pod must be in a running state. If the pod fails to start for some reason (i.e. lack of cluster resources), the Restic restore will not be done."
 1. Velero creates a `PodVolumeRestore` custom resource for each volume to be restored in the pod
 1. The main Velero process now waits for each `PodVolumeRestore` resource to complete or fail
 1. Meanwhile, each `PodVolumeRestore` is handled by the controller on the appropriate node, which:
@@ -526,4 +526,3 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
 [11]: customize-installation.md#default-pod-volume-backup-to-restic
-

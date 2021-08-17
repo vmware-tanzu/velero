@@ -10,7 +10,7 @@ the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Az
 It also provides a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.
 
-The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
+The restic integration was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
 local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
@@ -195,7 +195,7 @@ Instructions to back up using this approach are as follows:
     ```bash
     kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes-excludes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
     ```
-    where the volume names are the names of the volumes in the pod sepc.
+    where the volume names are the names of the volumes in the pod spec.
 
     For example, in the following pod:
 
@@ -492,7 +492,7 @@ on that node. The controller executes `restic restore` commands to restore pod v
     check it for integrity)
 1. Velero adds an init container to the pod, whose job is to wait for all restic restores for the pod to complete (more
 on this shortly)
-1. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API
+1. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API. Then, Kubernetes scheduler schedule this pod to a worker node, and the pod must be in a running state. If the pod fails to start for some reason (i.e. lack of cluster resources), the Restic restore will not be done."
 1. Velero creates a `PodVolumeRestore` custom resource for each volume to be restored in the pod
 1. The main Velero process now waits for each `PodVolumeRestore` resource to complete or fail
 1. Meanwhile, each `PodVolumeRestore` is handled by the controller on the appropriate node, which:
