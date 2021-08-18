@@ -48,6 +48,7 @@ OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
 VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
+RESTIC_HELPER_IMAGE ?=
 CRDS_VERSION ?= v1
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
@@ -81,6 +82,7 @@ run: ginkgo
 		    (echo "Cloud provider for target cloud/plug-in provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
 	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
+		-restic-helper-image=$(RESTIC_HELPER_IMAGE) \
 		-velero-namespace=$(VELERO_NAMESPACE) \
 		-crds-version=$(CRDS_VERSION) \
 		-credentials-file=$(CREDS_FILE) \

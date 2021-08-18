@@ -59,7 +59,7 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroCLI, veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+			Expect(veleroInstall(context.Background(), veleroCLI, veleroImage, resticHelperImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
 		}
 	})
