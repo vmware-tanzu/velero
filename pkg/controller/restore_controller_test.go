@@ -487,7 +487,7 @@ func TestProcessQueueItem(t *testing.T) {
 						res.Spec.BackupName = backupName
 					}
 
-					return true, res, nil
+					return true, res, err
 				})
 			}
 
