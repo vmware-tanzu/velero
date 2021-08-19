@@ -50,13 +50,11 @@ RUN mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
-FROM ubuntu:focal
+FROM gcr.io/distroless/base-debian10:nonroot
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -qq -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
-
 COPY --from=builder /output /
 
-USER nobody:nogroup
+USER nonroot:nonroot
 
