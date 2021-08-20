@@ -27,7 +27,7 @@ type PutObjectRequest struct {
 func (m *PutObjectRequest) Reset()                    { *m = PutObjectRequest{} }
 func (m *PutObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*PutObjectRequest) ProtoMessage()               {}
-func (*PutObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (*PutObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
 
 func (m *PutObjectRequest) GetPlugin() string {
 	if m != nil {
@@ -66,7 +66,7 @@ type ObjectExistsRequest struct {
 func (m *ObjectExistsRequest) Reset()                    { *m = ObjectExistsRequest{} }
 func (m *ObjectExistsRequest) String() string            { return proto.CompactTextString(m) }
 func (*ObjectExistsRequest) ProtoMessage()               {}
-func (*ObjectExistsRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+func (*ObjectExistsRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
 
 func (m *ObjectExistsRequest) GetPlugin() string {
 	if m != nil {
@@ -96,7 +96,7 @@ type ObjectExistsResponse struct {
 func (m *ObjectExistsResponse) Reset()                    { *m = ObjectExistsResponse{} }
 func (m *ObjectExistsResponse) String() string            { return proto.CompactTextString(m) }
 func (*ObjectExistsResponse) ProtoMessage()               {}
-func (*ObjectExistsResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{2} }
+func (*ObjectExistsResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{2} }
 
 func (m *ObjectExistsResponse) GetExists() bool {
 	if m != nil {
@@ -114,7 +114,7 @@ type GetObjectRequest struct {
 func (m *GetObjectRequest) Reset()                    { *m = GetObjectRequest{} }
 func (m *GetObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*GetObjectRequest) ProtoMessage()               {}
-func (*GetObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{3} }
+func (*GetObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{3} }
 
 func (m *GetObjectRequest) GetPlugin() string {
 	if m != nil {
@@ -144,7 +144,7 @@ type Bytes struct {
 func (m *Bytes) Reset()                    { *m = Bytes{} }
 func (m *Bytes) String() string            { return proto.CompactTextString(m) }
 func (*Bytes) ProtoMessage()               {}
-func (*Bytes) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{4} }
+func (*Bytes) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{4} }
 
 func (m *Bytes) GetData() []byte {
 	if m != nil {
@@ -163,7 +163,7 @@ type ListCommonPrefixesRequest struct {
 func (m *ListCommonPrefixesRequest) Reset()                    { *m = ListCommonPrefixesRequest{} }
 func (m *ListCommonPrefixesRequest) String() string            { return proto.CompactTextString(m) }
 func (*ListCommonPrefixesRequest) ProtoMessage()               {}
-func (*ListCommonPrefixesRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{5} }
+func (*ListCommonPrefixesRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{5} }
 
 func (m *ListCommonPrefixesRequest) GetPlugin() string {
 	if m != nil {
@@ -200,7 +200,7 @@ type ListCommonPrefixesResponse struct {
 func (m *ListCommonPrefixesResponse) Reset()                    { *m = ListCommonPrefixesResponse{} }
 func (m *ListCommonPrefixesResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListCommonPrefixesResponse) ProtoMessage()               {}
-func (*ListCommonPrefixesResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{6} }
+func (*ListCommonPrefixesResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{6} }
 
 func (m *ListCommonPrefixesResponse) GetPrefixes() []string {
 	if m != nil {
@@ -218,7 +218,7 @@ type ListObjectsRequest struct {
 func (m *ListObjectsRequest) Reset()                    { *m = ListObjectsRequest{} }
 func (m *ListObjectsRequest) String() string            { return proto.CompactTextString(m) }
 func (*ListObjectsRequest) ProtoMessage()               {}
-func (*ListObjectsRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{7} }
+func (*ListObjectsRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{7} }
 
 func (m *ListObjectsRequest) GetPlugin() string {
 	if m != nil {
@@ -248,7 +248,7 @@ type ListObjectsResponse struct {
 func (m *ListObjectsResponse) Reset()                    { *m = ListObjectsResponse{} }
 func (m *ListObjectsResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListObjectsResponse) ProtoMessage()               {}
-func (*ListObjectsResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{8} }
+func (*ListObjectsResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{8} }
 
 func (m *ListObjectsResponse) GetKeys() []string {
 	if m != nil {
@@ -266,7 +266,7 @@ type DeleteObjectRequest struct {
 func (m *DeleteObjectRequest) Reset()                    { *m = DeleteObjectRequest{} }
 func (m *DeleteObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeleteObjectRequest) ProtoMessage()               {}
-func (*DeleteObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{9} }
+func (*DeleteObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{9} }
 
 func (m *DeleteObjectRequest) GetPlugin() string {
 	if m != nil {
@@ -299,7 +299,7 @@ type CreateSignedURLRequest struct {
 func (m *CreateSignedURLRequest) Reset()                    { *m = CreateSignedURLRequest{} }
 func (m *CreateSignedURLRequest) String() string            { return proto.CompactTextString(m) }
 func (*CreateSignedURLRequest) ProtoMessage()               {}
-func (*CreateSignedURLRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{10} }
+func (*CreateSignedURLRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{10} }
 
 func (m *CreateSignedURLRequest) GetPlugin() string {
 	if m != nil {
@@ -336,7 +336,7 @@ type CreateSignedURLResponse struct {
 func (m *CreateSignedURLResponse) Reset()                    { *m = CreateSignedURLResponse{} }
 func (m *CreateSignedURLResponse) String() string            { return proto.CompactTextString(m) }
 func (*CreateSignedURLResponse) ProtoMessage()               {}
-func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{11} }
+func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{11} }
 
 func (m *CreateSignedURLResponse) GetUrl() string {
 	if m != nil {
@@ -353,7 +353,7 @@ type ObjectStoreInitRequest struct {
 func (m *ObjectStoreInitRequest) Reset()                    { *m = ObjectStoreInitRequest{} }
 func (m *ObjectStoreInitRequest) String() string            { return proto.CompactTextString(m) }
 func (*ObjectStoreInitRequest) ProtoMessage()               {}
-func (*ObjectStoreInitRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{12} }
+func (*ObjectStoreInitRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{12} }
 
 func (m *ObjectStoreInitRequest) GetPlugin() string {
 	if m != nil {
@@ -750,9 +750,9 @@ var _ObjectStore_serviceDesc = grpc.ServiceDesc{
 	Metadata: "ObjectStore.proto",
 }
 
-func init() { proto.RegisterFile("ObjectStore.proto", fileDescriptor2) }
+func init() { proto.RegisterFile("ObjectStore.proto", fileDescriptor3) }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor3 = []byte{
 	// 577 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xcd, 0x6e, 0xd3, 0x40,
 	0x10, 0xd6, 0xc6, 0x69, 0x54, 0x4f, 0x22, 0x61, 0xb6, 0x55, 0x30, 0x2e, 0x94, 0xb0, 0x02, 0x29,
