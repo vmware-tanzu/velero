@@ -21,6 +21,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -152,6 +153,46 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 	}
 
 	return errs
+}
+
+// ValidateNamespaceIncludesExcludes checks provided lists of included and
+// excluded namespaces to ensure they are a valid set of IncludesExcludes data.
+func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []error {
+	errs := ValidateIncludesExcludes(includesList, excludesList)
+
+	includes := sets.NewString(includesList...)
+	excludes := sets.NewString(excludesList...)
+
+	for _, itm := range includes.List() {
+		// Although asterisks is not a valid Kubernetes namespace name, it is
+		// allowed here.
+		if itm != "*" {
+			if err := validateNamespaceName(itm); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	for _, itm := range excludes.List() {
+		// Asterisks in excludes list have been checked previously.
+		if itm != "*" {
+			if err := validateNamespaceName(itm); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	return errs
+}
+
+func validateNamespaceName(ns string) error {
+	if errs := validation.ValidateNamespaceName(ns, false); errs != nil {
+		for _, e := range errs {
+			return errors.Errorf("namespace name, %q: %v", ns, e)
+		}
+	}
+
+	return nil
 }
 
 // GenerateIncludesExcludes constructs an IncludesExcludes struct by taking the provided
