@@ -59,14 +59,14 @@ func backup_restore_test(useVolumeSnapshots bool) {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+			Expect(veleroInstall(context.Background(), veleroCLI, veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
 		if installVelero {
-			err = veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
+			err = veleroUninstall(context.Background(), veleroCLI, veleroNamespace)
 			Expect(err).To(Succeed())
 		}
 	})

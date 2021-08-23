@@ -27,14 +27,14 @@ var _ = Describe("[Basic] Backup/restore of 2 namespaces", func() {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
+			Expect(veleroInstall(context.Background(), veleroCLI, veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
 		if installVelero {
-			err := veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
+			err := veleroUninstall(context.Background(), veleroCLI, veleroNamespace)
 			Expect(err).To(Succeed())
 		}
 
@@ -62,14 +62,14 @@ var _ = Describe("[Scale] Backup/restore of 2500 namespaces", func() {
 		uuidgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if installVelero {
-			Expect(veleroInstall(context.Background(), veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
+			Expect(veleroInstall(context.Background(), veleroCLI, veleroImage, veleroNamespace, cloudProvider, objectStoreProvider, false,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
 		if installVelero {
-			err := veleroUninstall(context.Background(), client.kubebuilder, installVelero, veleroNamespace)
+			err := veleroUninstall(context.Background(), veleroCLI, veleroNamespace)
 			Expect(err).To(Succeed())
 		}
 

@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,17 +29,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/uninstall"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	"github.com/vmware-tanzu/velero/pkg/install"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
@@ -97,104 +90,6 @@ func getProviderVeleroInstallOptions(
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = features
 	return io, nil
-}
-
-// installVeleroServer installs velero in the cluster.
-func installVeleroServer(io *cliinstall.InstallOptions, registryCredentialFile string) error {
-	vo, err := io.AsVeleroOptions()
-	if err != nil {
-		return errors.Wrap(err, "Failed to translate InstallOptions to VeleroOptions for Velero")
-	}
-
-	client, err := newTestClient()
-	if err != nil {
-		return errors.Wrap(err, "Failed to instantiate cluster client for installing Velero")
-	}
-
-	errorMsg := "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs"
-	resources := install.AllResources(vo)
-
-	// apply the image pull secret to avoid the image pull limit of Docker Hub
-	if len(registryCredentialFile) > 0 {
-		if err = patchResources(io.Namespace, registryCredentialFile, resources); err != nil {
-			return err
-		}
-	}
-
-	err = install.Install(client.dynamicFactory, client.kubebuilder, resources, os.Stdout)
-	if err != nil {
-		return errors.Wrap(err, errorMsg)
-	}
-
-	fmt.Println("Waiting for Velero deployment to be ready.")
-	if _, err = install.DeploymentIsReady(client.dynamicFactory, io.Namespace); err != nil {
-		return errors.Wrap(err, errorMsg)
-	}
-
-	if io.UseRestic {
-		fmt.Println("Waiting for Velero restic daemonset to be ready.")
-		if _, err = install.DaemonSetIsReady(client.dynamicFactory, io.Namespace); err != nil {
-			return errors.Wrap(err, errorMsg)
-		}
-	}
-
-	fmt.Printf("Velero is installed and ready to be tested in the %s namespace! ⛵ \n", io.Namespace)
-
-	return nil
-}
-
-// patch the velero resources for E2E testing
-func patchResources(namespace, registryCredentialFile string, resources *unstructured.UnstructuredList) error {
-	credential, err := ioutil.ReadFile(registryCredentialFile)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read the registry credential file %s", registryCredentialFile)
-	}
-
-	imagePullSecret := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "image-pull-secret",
-			Namespace: namespace,
-		},
-		Type: corev1.SecretTypeDockerConfigJson,
-		Data: map[string][]byte{
-			".dockerconfigjson": credential,
-		},
-	}
-
-	for resourceIndex, resource := range resources.Items {
-		if resource.GetKind() == "ServiceAccount" && resource.GetName() == "velero" {
-			resource.Object["imagePullSecrets"] = []map[string]interface{}{
-				{
-					"name": "image-pull-secret",
-				},
-			}
-			resources.Items[resourceIndex] = resource
-			fmt.Printf("image pull secret %q set for velero serviceaccount \n", "image-pull-secret")
-			continue
-		}
-	}
-
-	un, err := toUnstructured(imagePullSecret)
-	if err != nil {
-		return errors.Wrapf(err, "failed to convert pull secret to unstructure")
-	}
-	resources.Items = append(resources.Items, un)
-
-	return nil
-}
-
-func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
-	un := unstructured.Unstructured{}
-	data, err := json.Marshal(res)
-	if err != nil {
-		return un, err
-	}
-	err = json.Unmarshal(data, &un)
-	return un, err
 }
 
 // checkBackupPhase uses veleroCLI to inspect the phase of a Velero backup.
@@ -348,67 +243,6 @@ func veleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string
 		return err
 	}
 	return checkRestorePhase(ctx, veleroCLI, veleroNamespace, restoreName, velerov1api.RestorePhaseCompleted)
-}
-
-func veleroInstall(ctx context.Context, veleroImage string, veleroNamespace string, cloudProvider string, objectStoreProvider string, useVolumeSnapshots bool,
-	cloudCredentialsFile string, bslBucket string, bslPrefix string, bslConfig string, vslConfig string,
-	crdsVersion string, features string, registryCredentialFile string) error {
-
-	if cloudProvider != "kind" {
-		if objectStoreProvider != "" {
-			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
-		}
-		objectStoreProvider = cloudProvider
-	} else {
-		if objectStoreProvider == "" {
-			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
-		}
-	}
-
-	// Fetch the plugins for the provider before checking for the object store provider below.
-	providerPlugins := getProviderPlugins(objectStoreProvider)
-
-	// TODO - handle this better
-	if cloudProvider == "vsphere" {
-		// We overrider the objectStoreProvider here for vSphere because we want to use the aws plugin for the
-		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
-		// Snapshot location specified
-		objectStoreProvider = "aws"
-	}
-	err := ensureClusterExists(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
-	}
-
-	veleroInstallOptions, err := getProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
-		bslPrefix, bslConfig, vslConfig, providerPlugins, features)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", objectStoreProvider)
-	}
-	if useVolumeSnapshots {
-		if cloudProvider != "vsphere" {
-			veleroInstallOptions.UseVolumeSnapshots = true
-		} else {
-			veleroInstallOptions.UseVolumeSnapshots = false // vSphere plug-in 1.1.0+ is not a volume snapshotter plug-in
-			// so we do not want to generate a VSL (this will wind up
-			// being an AWS VSL which causes problems)
-		}
-	}
-	veleroInstallOptions.UseRestic = !useVolumeSnapshots
-	veleroInstallOptions.Image = veleroImage
-	veleroInstallOptions.CRDsVersion = crdsVersion
-	veleroInstallOptions.Namespace = veleroNamespace
-
-	err = installVeleroServer(veleroInstallOptions, registryCredentialFile)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
-	}
-
-	return nil
-}
-
-func veleroUninstall(ctx context.Context, client kbclient.Client, installVelero bool, veleroNamespace string) error {
-	return uninstall.Run(ctx, client, veleroNamespace)
 }
 
 func veleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
