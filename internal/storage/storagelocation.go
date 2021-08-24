@@ -53,7 +53,7 @@ func IsReadyToValidate(bslValidationFrequency *metav1.Duration, lastValidationTi
 	}
 
 	if validationFrequency < 0 {
-		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, validationFrequency)
+		log.Debugf("Validation period must be non-negative, changing from %d to %d", validationFrequency, serverValidationFrequency)
 		validationFrequency = serverValidationFrequency
 	}
 
