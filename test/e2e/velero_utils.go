@@ -48,11 +48,11 @@ func getProviderPlugins(providerName string) []string {
 	// TODO: make plugin images configurable
 	switch providerName {
 	case "aws":
-		return []string{"velero/velero-plugin-for-aws:v1.2.0"}
+		return []string{"velero/velero-plugin-for-aws:v1.2.1"}
 	case "azure":
 		return []string{"velero/velero-plugin-for-microsoft-azure:v1.2.0"}
 	case "vsphere":
-		return []string{"velero/velero-plugin-for-aws:v1.2.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"}
+		return []string{"velero/velero-plugin-for-aws:v1.2.1", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"}
 	default:
 		return []string{""}
 	}
