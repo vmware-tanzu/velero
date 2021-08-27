@@ -1,6 +1,9 @@
 ## Current release:
   * [CHANGELOG-1.6.md][16]
 
+## Development releases:
+  * [CHANGELOG-1.6.md][16]
+
 ## Older releases:
   * [CHANGELOG-1.5.md][15]
   * [CHANGELOG-1.4.md][14]

@@ -23,7 +23,7 @@ When testing has passed a release build will be generated.
 ### Release Candidate criteria
 The release candidate commit must meet the following criteria:
 
-* No major bugs outstanding 
+* No major bugs outstanding
 * Unit tests pass
 * E2E tests against latest Kubernetes on AWS, vSphere and kind pass
 
@@ -53,27 +53,27 @@ For each major or minor release, create and publish a blog post to let folks kno
 1.  If it doesn't already exist: in a branch, create the file `changelogs/CHANGELOG-<major>.<minor>.md` by copying the most recent one.
 1.  Update the file `changelogs/CHANGELOG-<major>.<minor>.md`
 	- Run `make changelog` to generate a list of all unreleased changes.
-    - Copy/paste the output into `CHANGELOG-<major>.<minor>.md`, under the "All Changes" section for the release. 
+	- Copy/paste the output into `CHANGELOG-<major>.<minor>.md`, under the "All Changes" section for the release.
 	- You *may* choose to tweak formatting on the list of changes by adding code blocks, etc.
 	- 	Update links at the top of the file to point to the new release version
 1.  Update the main `CHANGELOG.md` file to properly reference the release-specific changelog file
-	- Under "Current release": 
-	    - Should contain only the current GA release.
-    - Under "Development release": 
-	    - Should contain only the latest pre-release
-	    - Move any prior pre-release into "Older releases"
+	- Under "Current release":
+		- Should contain only the current GA release.
+	- Under "Development release":
+		- Should contain only the latest pre-release
+		- Move any prior pre-release into "Older releases"
 1. GA Only: Remove all changelog files from `changelogs/unreleased`.
 1. Generate new docs
 	- Run `make gen-docs`, passing the appropriate variables. Examples:
-		a) `VELERO_VERSION=v1.5.0-rc.1 NEW_DOCS_VERSION=v1.5.0-rc.1 make gen-docs`.
-		b) `VELERO_VERSION=v1.5.0 NEW_DOCS_VERSION=v1.5 make gen-docs`).
+	  a) `VELERO_VERSION=v1.5.0-rc.1 NEW_DOCS_VERSION=v1.5.0-rc.1 make gen-docs`.
+	  b) `VELERO_VERSION=v1.5.0 NEW_DOCS_VERSION=v1.5 make gen-docs`).
 	- Note: `PREVIOUS_DOCS_VERSION=<doc-version-to-copy-from>` is optional; when not set, it will default to the latest doc version.
 1. Clean up when there is an existing set of pre-release versioned docs for the version you are releasing
 	- Example: `site/content/docs/v1.5.0-beta.1` exists, and you're releasing `v1.5.0-rc.1` or `v1.5`
-    - Remove the directory containing the pre-release docs, i.e. `site/content/docs/<pre-release-version>`.
-    - Delete the pre-release docs table of contents file, i.e. `site/data/docs/<pre-release-version>-toc.yml`.
-    - Remove the pre-release docs table of contents mapping entry from `site/data/toc-mapping.yml`.
-    - Remove all references to the pre-release docs from `site/config.yml`.
+	- Remove the directory containing the pre-release docs, i.e. `site/content/docs/<pre-release-version>`.
+	- Delete the pre-release docs table of contents file, i.e. `site/data/docs/<pre-release-version>-toc.yml`.
+	- Remove the pre-release docs table of contents mapping entry from `site/data/toc-mapping.yml`.
+	- Remove all references to the pre-release docs from `site/config.yml`.
 1. Create the "Upgrade to $major.minor" page if it does not already exist ([example](https://velero.io/docs/v1.5/upgrade-to-1.5/)).
    If it already exists, update any usage of the previous version string within this file to use the new version string instead ([example](https://github.com/vmware-tanzu/velero/pull/2941/files#diff-d594f8fd0901fed79c39aab4b348193d)).
    This needs to be done in both the versioned and the `main` folders.
@@ -101,19 +101,19 @@ For each major or minor release, create and publish a blog post to let folks kno
 1. Publish the release
 	- Navigate to the draft GitHub release at https://github.com/vmware-tanzu/velero/releases and edit the release.
 	- If this is a patch release (e.g. `v1.4.1`), note that the full `CHANGELOG-1.4.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
-	- Do a quick review for formatting. 
+	- Do a quick review for formatting.
 	- **Note:** the `goreleaser` process should have detected if it's a pre-release version and, if so, checked the box at the bottom of the GitHub release page appropriately, but it's always worth double-checking.
 	- Verify that GitHub has built and pushed all the images (it takes a while): https://github.com/vmware-tanzu/velero/actions
 	- Verify that the images are on Docker Hub: https://hub.docker.com/r/velero/velero/tags
 	- Verify that the assets were published to the GitHub release
 	- Publish the release.
 1.  Test the release
-	- By now, the Docker images should have been published. 
+	- By now, the Docker images should have been published.
 	- Perform a smoke-test - for example:
 		- Download the CLI from the GitHub release
-	    - Use it to install Velero into a cluster (or manually update an existing deployment to use the new images)
-	    - Verify that `velero version` shows the expected output
-	    - Run a backup/restore and ensure it works
+		- Use it to install Velero into a cluster (or manually update an existing deployment to use the new images)
+		- Verify that `velero version` shows the expected output
+		- Run a backup/restore and ensure it works
 
 ## Homebrew release (GA only)
 These are the steps to update the Velero Homebrew version.
@@ -133,11 +133,11 @@ After the plugin images are built, be sure to update any [e2e tests][3] that use
 ## How to write and release a blog post
 What to include in a release blog:
 * Thank all contributors for their involvement in the release.
-  * Where possible shoutout folks by name or consider spotlighting new maintainers.
+	* Where possible shoutout folks by name or consider spotlighting new maintainers.
 * Highlight the themes, or areas of focus, for the release. Some examples of themes are security, bug fixes, feature improvements. See past Velero [release blog posts][1] for more examples.
 * Include summaries of new features or workflows introduced in a release.
-  * This can also include new project initiatives, like a code-of-conduct update.
-  * Consider creating additional blog posts that go through new features in more detail. Plan to publish additional blogs after the release blog (all blogs don’t have to be publish all at once).
+	* This can also include new project initiatives, like a code-of-conduct update.
+	* Consider creating additional blog posts that go through new features in more detail. Plan to publish additional blogs after the release blog (all blogs don’t have to be publish all at once).
 
 Release blog post PR:
 * Prepare a PR containing the release blog post. Read the [website guidelines][2] for more information on creating a blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.

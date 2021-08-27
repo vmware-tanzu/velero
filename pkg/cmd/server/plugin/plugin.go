@@ -37,24 +37,24 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
 			pluginServer.
-				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
-				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
-				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
-				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction(f)).
-				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
-				RegisterRestoreItemAction("velero.io/init-restore-hook", newInitRestoreHookPodAction).
-				RegisterRestoreItemAction("velero.io/service", newServiceRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/service-account", newServiceAccountRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/add-pvc-from-pod", newAddPVCFromPodRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/add-pv-from-pvc", newAddPVFromPVCRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/change-storage-class", newChangeStorageClassRestoreItemAction(f)).
-				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
-				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
-				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
-				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
-				RegisterRestoreItemAction("velero.io/apiservice", newAPIServiceRestoreItemAction).
+				RegisterBackupItemAction(PVBackupPlugin, newPVBackupItemAction).
+				RegisterBackupItemAction(PodBackupPlugin, newPodBackupItemAction).
+				RegisterBackupItemAction(ServiceAccountBackupPlugin, newServiceAccountBackupItemAction(f)).
+				RegisterBackupItemAction(RemapCRDVersionBackupPlugin, newRemapCRDVersionAction(f)).
+				RegisterRestoreItemAction(JobRestorePlugin, newJobRestoreItemAction).
+				RegisterRestoreItemAction(PodRestorePlugin, newPodRestoreItemAction).
+				RegisterRestoreItemAction(ResticRestorePlugin, newResticRestoreItemAction(f)).
+				RegisterRestoreItemAction(InitRestoreHookPlugin, newInitRestoreHookPodAction).
+				RegisterRestoreItemAction(ServiceRestorePlugin, newServiceRestoreItemAction).
+				RegisterRestoreItemAction(ServiceAccountRestorePlugin, newServiceAccountRestoreItemAction).
+				RegisterRestoreItemAction(AddPVCFromPodRestorePlugin, newAddPVCFromPodRestoreItemAction).
+				RegisterRestoreItemAction(AddPVFromPVCRestorePlugin, newAddPVFromPVCRestoreItemAction).
+				RegisterRestoreItemAction(ChangeStorageClassRestorePlugin, newChangeStorageClassRestoreItemAction(f)).
+				RegisterRestoreItemAction(RoleBindingItemPlugin, newRoleBindingItemAction).
+				RegisterRestoreItemAction(ClusterRoleBindingRestorePlugin, newClusterRoleBindingItemAction).
+				RegisterRestoreItemAction(CRDV1PreserveUnknownFieldsRestorePlugin, newCRDV1PreserveUnknownFieldsItemAction).
+				RegisterRestoreItemAction(ChangePVCNodeSelectorPlugin, newChangePVCNodeSelectorItemAction(f)).
+				RegisterRestoreItemAction(APIServiceRestorePlugin, newAPIServiceRestoreItemAction).
 				Serve()
 		},
 	}
