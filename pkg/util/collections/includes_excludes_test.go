@@ -29,86 +29,87 @@ func TestShouldInclude(t *testing.T) {
 		name     string
 		includes []string
 		excludes []string
-		check    string
-		should   bool
+		item     string
+		want     bool
 	}{
 		{
-			name:   "empty - include everything",
-			check:  "foo",
-			should: true,
+			name: "empty string should include every item",
+			item: "foo",
+			want: true,
 		},
 		{
-			name:     "include *",
+			name:     "include * should include every item",
 			includes: []string{"*"},
-			check:    "foo",
-			should:   true,
+			item:     "foo",
+			want:     true,
 		},
 		{
-			name:     "include specific - found",
+			name:     "item in includes list should include item",
 			includes: []string{"foo", "bar", "baz"},
-			check:    "foo",
-			should:   true,
+			item:     "foo",
+			want:     true,
 		},
 		{
-			name:     "include specific - not found",
+			name:     "item not in includes list should not include item",
 			includes: []string{"foo", "baz"},
-			check:    "bar",
-			should:   false,
+			item:     "bar",
+			want:     false,
 		},
 		{
-			name:     "include *, exclude foo",
+			name:     "include *, excluded item should not include item",
 			includes: []string{"*"},
 			excludes: []string{"foo"},
-			check:    "foo",
-			should:   false,
+			item:     "foo",
+			want:     false,
 		},
 		{
-			name:     "include *, exclude foo, check bar",
+			name:     "include *, exclude foo, bar should be included",
 			includes: []string{"*"},
 			excludes: []string{"foo"},
-			check:    "bar",
-			should:   true,
+			item:     "bar",
+			want:     true,
 		},
 		{
-			name:     "both include and exclude foo",
+			name:     "an item both included and excluded should not be included",
 			includes: []string{"foo"},
 			excludes: []string{"foo"},
-			check:    "foo",
-			should:   false,
+			item:     "foo",
+			want:     false,
 		},
 		{
-			name:     "wildcard include",
+			name:     "wildcard should include item",
 			includes: []string{"*.bar"},
-			check:    "foo.bar",
-			should:   true,
+			item:     "foo.bar",
+			want:     true,
 		},
 		{
-			name:     "wildcard include fail",
+			name:     "wildcard mismatch should not include item",
 			includes: []string{"*.bar"},
-			check:    "bar.foo",
-			should:   false,
+			item:     "bar.foo",
+			want:     false,
 		},
 		{
-			name:     "wildcard exclude",
+			name:     "wildcard exclude should not include item",
 			includes: []string{"*"},
 			excludes: []string{"*.bar"},
-			check:    "foo.bar",
-			should:   false,
+			item:     "foo.bar",
+			want:     false,
 		},
 		{
-			name:     "wildcard exclude fail",
+			name:     "wildcard mismatch should include item",
 			includes: []string{"*"},
 			excludes: []string{"*.bar"},
-			check:    "bar.foo",
-			should:   true,
+			item:     "bar.foo",
+			want:     true,
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			i := NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
-			if e, a := test.should, i.ShouldInclude(test.check); e != a {
-				t.Errorf("expected %t, got %t", e, a)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			includesExcludes := NewIncludesExcludes().Includes(tc.includes...).Excludes(tc.excludes...)
+
+			if got := includesExcludes.ShouldInclude((tc.item)); got != tc.want {
+				t.Errorf("want %t, got %t", tc.want, got)
 			}
 		})
 	}
@@ -119,7 +120,7 @@ func TestValidateIncludesExcludes(t *testing.T) {
 		name     string
 		includes []string
 		excludes []string
-		expected []error
+		want     []error
 	}{
 		{
 			name:     "empty includes (everything) is allowed",
@@ -132,30 +133,30 @@ func TestValidateIncludesExcludes(t *testing.T) {
 		{
 			name:     "include everything not allowed with other includes",
 			includes: []string{"*", "foo"},
-			expected: []error{errors.New("includes list must either contain '*' only, or a non-empty list of items")},
+			want:     []error{errors.New("includes list must either contain '*' only, or a non-empty list of items")},
 		},
 		{
 			name:     "exclude everything not allowed",
 			includes: []string{"foo"},
 			excludes: []string{"*"},
-			expected: []error{errors.New("excludes list cannot contain '*'")},
+			want:     []error{errors.New("excludes list cannot contain '*'")},
 		},
 		{
 			name:     "excludes cannot contain items in includes",
 			includes: []string{"foo", "bar"},
 			excludes: []string{"bar"},
-			expected: []error{errors.New("excludes list cannot contain an item in the includes list: bar")},
+			want:     []error{errors.New("excludes list cannot contain an item in the includes list: bar")},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			res := ValidateIncludesExcludes(test.includes, test.excludes)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateIncludesExcludes(tc.includes, tc.excludes)
 
-			require.Equal(t, len(test.expected), len(res))
+			require.Equal(t, len(tc.want), len(errs))
 
-			for i := 0; i < len(test.expected); i++ {
-				assert.Equal(t, test.expected[i].Error(), res[i].Error())
+			for i := 0; i < len(tc.want); i++ {
+				assert.Equal(t, tc.want[i].Error(), errs[i].Error())
 			}
 		})
 	}
@@ -163,33 +164,33 @@ func TestValidateIncludesExcludes(t *testing.T) {
 
 func TestIncludeExcludeString(t *testing.T) {
 	tests := []struct {
-		name             string
-		includes         []string
-		excludes         []string
-		expectedIncludes string
-		expectedExcludes string
+		name         string
+		includes     []string
+		excludes     []string
+		wantIncludes string
+		wantExcludes string
 	}{
 		{
-			name:             "unspecified includes/excludes should return '*'/'<none>'",
-			includes:         nil,
-			excludes:         nil,
-			expectedIncludes: "*",
-			expectedExcludes: "<none>",
+			name:         "unspecified includes/excludes should return '*'/'<none>'",
+			includes:     nil,
+			excludes:     nil,
+			wantIncludes: "*",
+			wantExcludes: "<none>",
 		},
 		{
-			name:             "specific resources should result in sorted joined string",
-			includes:         []string{"foo", "bar"},
-			excludes:         []string{"baz", "xyz"},
-			expectedIncludes: "bar, foo",
-			expectedExcludes: "baz, xyz",
+			name:         "specific resources should result in sorted joined string",
+			includes:     []string{"foo", "bar"},
+			excludes:     []string{"baz", "xyz"},
+			wantIncludes: "bar, foo",
+			wantExcludes: "baz, xyz",
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ie := NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
-			assert.Equal(t, test.expectedIncludes, ie.IncludesString())
-			assert.Equal(t, test.expectedExcludes, ie.ExcludesString())
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			includesExcludes := NewIncludesExcludes().Includes(tc.includes...).Excludes(tc.excludes...)
+			assert.Equal(t, tc.wantIncludes, includesExcludes.IncludesString())
+			assert.Equal(t, tc.wantExcludes, includesExcludes.ExcludesString())
 		})
 	}
 }
