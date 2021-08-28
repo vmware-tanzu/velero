@@ -25,6 +25,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 )
 
@@ -121,4 +122,88 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 	}
 	assert.Equal(t, orderedResources, expectedMixedResources)
 
+}
+
+func TestAreNamespacesValid(t *testing.T) {
+
+	tests := []struct {
+		name       string
+		namespaces []string
+		wantErr    bool
+	}{
+		{
+			name:       "empty slice doesn't return error",
+			namespaces: []string{},
+			wantErr:    false,
+		},
+		{
+			name:       "empty string is invalid",
+			namespaces: []string{""},
+			wantErr:    true,
+		},
+		{
+			name:       "asterisk is not valid",
+			namespaces: []string{"*"},
+			wantErr:    true,
+		},
+		{
+			name:       "alphanumeric names with optional dash inside are valid",
+			namespaces: []string{"foobar", "bar-321", "foo123bar"},
+			wantErr:    false,
+		},
+		{
+			name:       "not starting or ending with an alphanumeric character is invalid",
+			namespaces: []string{"-123foo", "-123foo-", "123foo-"},
+			wantErr:    true,
+		},
+		{
+			name:       "special characters in name is invalid",
+			namespaces: []string{"foo?", "foo.bar", "bar_321", "bar*321", "'321'"},
+			wantErr:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		err := areNamespacesValid(tc.namespaces)
+
+		if tc.wantErr && err == nil {
+			t.Errorf("%s: wanted errors but got none", tc.name)
+		}
+
+		if !tc.wantErr && err != nil {
+			t.Errorf("%s: wanted no errors but got: %v", tc.name, err)
+		}
+	}
+}
+
+func TestFilterNamespaces(t *testing.T) {
+	tests := []struct {
+		name     string
+		includes []string
+		excludes []string
+		want     []string
+	}{
+		{
+			name:     "nothing to filter",
+			includes: []string{"foo", "bar"},
+			excludes: []string{"123foo", "bar321"},
+			want:     []string{"foo", "bar", "123foo", "bar321"},
+		},
+		{
+			name:     "filter out asterisks",
+			includes: []string{"*", "foo-bar"},
+			excludes: []string{"*", "foofoo-barbar"},
+			want:     []string{"foo-bar", "foofoo-barbar"},
+		},
+	}
+
+	for _, tc := range tests {
+		opts := CreateOptions{
+			IncludeNamespaces: flag.StringArray(tc.includes),
+			ExcludeNamespaces: flag.StringArray(tc.excludes),
+		}
+
+		got := opts.filterNamespaces()
+		assert.Equal(t, tc.want, got)
+	}
 }

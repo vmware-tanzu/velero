@@ -194,3 +194,60 @@ func TestIncludeExcludeString(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNamespaceIncludesExcludes(t *testing.T) {
+	tests := []struct {
+		name     string
+		includes []string
+		excludes []string
+		wantErr  bool
+	}{
+		{
+			name:     "empty slice doesn't return error",
+			includes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "empty string is invalid",
+			includes: []string{""},
+			wantErr:  true,
+		},
+		{
+			name:     "asterisk by itself is valid",
+			includes: []string{"*"},
+			wantErr:  false,
+		},
+		{
+			name:     "alphanumeric names with optional dash inside are valid",
+			includes: []string{"foobar", "bar-321", "foo123bar"},
+			excludes: []string{"123bar", "barfoo", "foo-321", "bar123foo"},
+			wantErr:  false,
+		},
+		{
+			name:     "not starting or ending with an alphanumeric character is invalid",
+			includes: []string{"-123foo"},
+			excludes: []string{"foo321-", "foo321-"},
+			wantErr:  true,
+		},
+		{
+			name:     "special characters in name is invalid",
+			includes: []string{"foo?", "foo.bar", "bar_321"},
+			excludes: []string{"$foo", "foo*bar", "bar=321"},
+			wantErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateNamespaceIncludesExcludes(tc.includes, tc.excludes)
+
+			if tc.wantErr && len(errs) == 0 {
+				t.Errorf("%s: wanted errors but got none", tc.name)
+			}
+
+			if !tc.wantErr && len(errs) != 0 {
+				t.Errorf("%s: wanted no errors but got: %v", tc.name, errs)
+			}
+		})
+	}
+}
