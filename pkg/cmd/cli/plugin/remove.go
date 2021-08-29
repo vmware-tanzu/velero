@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/server/plugin"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
 func NewRemoveCommand(f client.Factory) *cobra.Command {
@@ -36,6 +39,14 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 		Short: "Remove a plugin",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
+
+			for _, p := range plugin.DefaultPlugins {
+				if strings.ToLower(p) == strings.ToLower(args[0]) {
+					output.PrintDefaultPlugins(plugin.DefaultPlugins, args[0])
+					return
+				}
+			}
+
 			kubeClient, err := f.KubeClient()
 			if err != nil {
 				cmd.CheckError(err)

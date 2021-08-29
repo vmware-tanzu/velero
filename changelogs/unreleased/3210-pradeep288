@@ -1,0 +1,39 @@
+Display which plugins are mandatory and can't be removed
+
+This change: 
+- Makes registering the default plugin cleaner during initialization by creating a constant file and adding the plugin there.
+- Makes message handling more elegant when a user tries to remove the system default plugin. With this change when user tries to remove default plugin, the command exits saying it's not possible to remove the default plugin and also displays list of default plugin.
+
+***Output Without Change***
+
+```
+$ velero plugin remove velero.io/service-account  
+
+An error occurred: init container velero.io/service-account not found in Velero server deployment
+```
+
+***Output With Change***
+
+```
+$ velero plugin  remove  velero.io/service-account
+velero.io/service-account  is system default plugin and it cannot be removed
+List of system default plugins:
+velero.io/pv
+velero.io/pod
+velero.io/service-account
+velero.io/crd-remap-version
+velero.io/job
+velero.io/pod
+velero.io/restic
+velero.io/init-restore-hook
+velero.io/service
+velero.io/service-account
+velero.io/add-pvc-from-pod
+velero.io/add-pv-from-pvc
+velero.io/change-storage-class
+velero.io/role-bindings
+velero.io/cluster-role-bindings
+velero.io/crd-preserve-fields
+velero.io/change-pvc-node-selector
+velero.io/apiservice
+```

@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2020 the Velero contributors.
+Copyright 2017, 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -145,7 +145,6 @@ func printEncoded(obj runtime.Object, format string) (bool, error) {
 func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 	// 1. generate table
 	var table *metav1.Table
-
 	switch obj.(type) {
 	case *velerov1api.Backup:
 		table = &metav1.Table{
@@ -245,4 +244,14 @@ func NewPrinter(cmd *cobra.Command) (printers.ResourcePrinter, error) {
 	printer := printers.NewTablePrinter(options)
 
 	return printer, nil
+}
+
+func PrintDefaultPlugins(defaultPlugins []string, p string) {
+	fmt.Println(p, " is system default plugin and it cannot be removed")
+
+	fmt.Println("List of system default plugins:")
+	for _, plugin := range defaultPlugins {
+		fmt.Println(plugin)
+	}
+	return
 }
