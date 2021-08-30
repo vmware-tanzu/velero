@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,10 +68,14 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
 			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindPreBackupAction):   framework.NewPreBackupActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindPostBackupAction):  framework.NewPostBackupActionPlugin(framework.ClientLogger(b.clientLogger)),
 			string(framework.PluginKindVolumeSnapshotter): framework.NewVolumeSnapshotterPlugin(framework.ClientLogger(b.clientLogger)),
 			string(framework.PluginKindObjectStore):       framework.NewObjectStorePlugin(framework.ClientLogger(b.clientLogger)),
 			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
 			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindPreRestoreAction):  framework.NewPreRestoreActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindPostRestoreAction): framework.NewPostRestoreActionPlugin(framework.ClientLogger(b.clientLogger)),
 			string(framework.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(framework.ClientLogger(b.clientLogger)),
 			string(framework.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(framework.ClientLogger(b.clientLogger)),
 		},

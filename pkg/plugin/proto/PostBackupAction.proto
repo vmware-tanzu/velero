@@ -1,0 +1,13 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message PostBackupActionExecuteRequest {
+    string plugin = 1;
+    bytes backup = 2;
+}
+
+service PostBackupAction {
+    rpc Execute(PostBackupActionExecuteRequest) returns (Empty);
+}

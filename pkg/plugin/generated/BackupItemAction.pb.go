@@ -10,6 +10,10 @@ It is generated from these files:
 	ItemSnapshotter.proto
 	ObjectStore.proto
 	PluginLister.proto
+	PostBackupAction.proto
+	PostRestoreAction copy.proto
+	PreBackupAction.proto
+	PreRestoreAction.proto
 	RestoreItemAction.proto
 	Shared.proto
 	VolumeSnapshotter.proto
@@ -49,6 +53,10 @@ It has these top-level messages:
 	ObjectStoreInitRequest
 	PluginIdentifier
 	ListPluginsResponse
+	PostBackupActionExecuteRequest
+	PostRestoreActionExecuteRequest
+	PreBackupActionExecuteRequest
+	PreRestoreActionExecuteRequest
 	RestoreItemActionExecuteRequest
 	RestoreItemActionExecuteResponse
 	RestoreItemActionAppliesToRequest

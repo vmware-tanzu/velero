@@ -1,0 +1,13 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message PreRestoreActionExecuteRequest {
+    string plugin = 1;
+    bytes restore = 2;
+}
+
+service PreRestoreAction {
+    rpc Execute(PreRestoreActionExecuteRequest) returns (Empty);
+}

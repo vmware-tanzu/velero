@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -277,6 +277,21 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 		c.logger.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
 	}
 
+	c.logger.Info("Getting PostRestore actions")
+	postRestoreActions, err := pluginManager.GetPostRestoreActions()
+	if err != nil {
+		return errors.Wrap(err, "error getting post-restore actions")
+	}
+
+	for _, postRestoreAction := range postRestoreActions {
+		err := postRestoreAction.Execute(restore)
+
+		if err != nil {
+			// Plugin logs would be set here via BackupStore, status via ActionStatus
+			c.logger.Error(err.Error())
+		}
+	}
+
 	return nil
 }
 
@@ -452,6 +467,12 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	snapshotItemResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
+	restoreLog.Info("Getting PreRestore actions")
+	preRestoreActions, err := pluginManager.GetPreRestoreActions()
+	if err != nil {
+		return errors.Wrap(err, "error getting pre-restore actions")
+	}
+
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, restoreLog)
 	if err != nil {
 		return errors.Wrap(err, "error downloading backup")
@@ -470,6 +491,13 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
+	for _, preRestoreAction := range preRestoreActions {
+		err := preRestoreAction.Execute(restore)
+		if err != nil {
+			return errors.Wrap(err, "error executing pre-restore action")
+		}
+	}
+
 	restoreLog.Info("starting restore")
 
 	var podVolumeBackups []*velerov1api.PodVolumeBackup
@@ -484,8 +512,10 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
+
 	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
 		c.snapshotLocationLister, pluginManager)
+
 	restoreLog.Info("restore completed")
 
 	// re-instantiate the backup store because credentials could have changed since the original

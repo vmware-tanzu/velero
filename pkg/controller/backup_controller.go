@@ -299,6 +299,24 @@ func (c *backupController) processBackup(key string) error {
 		log.WithError(err).Error("error updating backup's final status")
 	}
 
+	log.Info("Setting up plugin manager")
+	pluginManager := c.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	log.Info("Getting PostBackup actions")
+	postBackupActions, err := pluginManager.GetPostBackupActions()
+	if err != nil {
+		return err
+	}
+
+	for _, postBackupAction := range postBackupActions {
+		err := postBackupAction.Execute(request.Backup)
+		if err != nil {
+			// Plugin logs would be set here via BackupStore, status via ActionStatus
+			log.Error(err)
+		}
+	}
+
 	return nil
 }
 
@@ -593,6 +611,19 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	backupItemActionsResolver := framework.NewBackupItemActionResolver(actions)
 	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
+
+	backupLog.Info("Getting PreBackup actions")
+	preBackupActions, err := pluginManager.GetPreBackupActions()
+	if err != nil {
+		return err
+	}
+
+	for _, preBackupAction := range preBackupActions {
+		err := preBackupAction.Execute(backup.Backup)
+		if err != nil {
+			return err
+		}
+	}
 
 	var fatalErrs []error
 	if err := c.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver,

@@ -832,6 +832,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 			}
 
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
+			pluginManager.On("GetPreBackupActions").Return(nil, nil)
+			pluginManager.On("GetPostBackupActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 			pluginManager.On("GetItemSnapshotters").Return(nil, nil)
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)

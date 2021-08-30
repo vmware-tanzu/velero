@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,8 +35,20 @@ const (
 	// PluginKindBackupItemAction represents a backup item action plugin.
 	PluginKindBackupItemAction PluginKind = "BackupItemAction"
 
+	// PluginKindPreBackupAction represents a pre-backup action plugin.
+	PluginKindPreBackupAction PluginKind = "PreBackupAction"
+
+	// PluginKindPostBackupAction represents a post-backup action plugin.
+	PluginKindPostBackupAction PluginKind = "PostBackupAction"
+
 	// PluginKindRestoreItemAction represents a restore item action plugin.
 	PluginKindRestoreItemAction PluginKind = "RestoreItemAction"
+
+	// PluginKindPreRestoreAction represents a pre-restore action plugin.
+	PluginKindPreRestoreAction PluginKind = "PreRestoreAction"
+
+	// PluginKindPostRestoreAction represents a post-restore action plugin.
+	PluginKindPostRestoreAction PluginKind = "PostRestoreAction"
 
 	// PluginKindDeleteItemAction represents a delete item action plugin.
 	PluginKindDeleteItemAction PluginKind = "DeleteItemAction"
@@ -55,7 +67,11 @@ func AllPluginKinds() map[string]PluginKind {
 	allPluginKinds[PluginKindObjectStore.String()] = PluginKindObjectStore
 	allPluginKinds[PluginKindVolumeSnapshotter.String()] = PluginKindVolumeSnapshotter
 	allPluginKinds[PluginKindBackupItemAction.String()] = PluginKindBackupItemAction
+	allPluginKinds[PluginKindPreBackupAction.String()] = PluginKindPreBackupAction
+	allPluginKinds[PluginKindPostBackupAction.String()] = PluginKindPostBackupAction
 	allPluginKinds[PluginKindRestoreItemAction.String()] = PluginKindRestoreItemAction
+	allPluginKinds[PluginKindPreRestoreAction.String()] = PluginKindPreRestoreAction
+	allPluginKinds[PluginKindPostRestoreAction.String()] = PluginKindPostRestoreAction
 	allPluginKinds[PluginKindDeleteItemAction.String()] = PluginKindDeleteItemAction
 	allPluginKinds[PluginKindItemSnapshotter.String()] = PluginKindItemSnapshotter
 	return allPluginKinds
