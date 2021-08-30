@@ -28,14 +28,14 @@ Velero client communicating with plugins:
 
 - Version `n` Velero client will be able to communicate with Version `n` plugin
 - Version `n` Velero client will be able to communicate with all previous versions of the plugin (Version `n-1` back to `v1`)
-- Optional: `v1` Velero client will be able to communicate with Version `n` plugin
+- Optional: Previous versions of the Velero client (from version `v1` to version `n-1`) will be able to communicate with Version `n` plugin
     - This may work but is not a requirement
 
 Plugin client communicating with other plugins:
 
 - Version `n` plugin client will be able to communicate with Version `n` plugin
 - Version `n` plugin client will be able to communicate with all previous versions of the plugin (Version `n-1` back to `v1`)
-- Optional: `v1` plugin will be able to communicate with Version `n` plugin
+- Optional: Previous versions of the plugin (from version `v1` to version `n-1`) will be able to communicate with Version `n` plugin
     - This may work but is not a requirement
 
 Velero plugins importing Velero framework:
@@ -157,9 +157,8 @@ func (m *manager) restartableObjectStores() []RestartableObjectStore {
 		{
 			kind: framework.PluginKindObjectStore,
 			Get: func(name string, restartableProcess RestartableProcess) v2.ObjectStore {
-				r := newRestartableObjectStore(name, restartableProcess)
-				// Adapt v1 plugin to v2
-				return newAdaptedV1ObjectStore(r), nil
+				// Adapt the existing restartable v1 plugin to be compatible with the v2 interface
+				return newAdaptedV1ObjectStore(newRestartableObjectStore(name, restartableProcess)), nil
 			},
 		},
 	}
