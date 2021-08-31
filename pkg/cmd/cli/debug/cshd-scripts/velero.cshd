@@ -1,0 +1,27 @@
+def capture_backup_logs(namespace):
+    if args.backup:
+        log("Collecting log for backup: {}".format(args.backup))
+        backupLogsCmd = "velero --namespace={} backup logs {}".format(namespace, args.backup)
+        capture_local(cmd=backupLogsCmd, file_name="backup_{}.log".format(args.backup))
+def capture_restore_logs(namespace):
+    if args.restore:
+        log("Collecting log for restore: {}".format(args.restore))
+        restoreLogsCmd = "velero --namespace={} restore logs {}".format(namespace, args.restore)
+        capture_local(cmd=restoreLogsCmd, file_name="restore_{}.log".format(args.restore))
+
+ns = args.namespace if args.namespace else "velero"
+output = args.output if args.output else "bundle.tar.gz"
+# Working dir for writing during script execution
+crshd = crashd_config(workdir="./velero-bundle")
+set_defaults(kube_config(path=args.kubeconfig, cluster_context=args.kubecontext))
+log("Collecting velero resources in namespace: {}". format(ns))
+kube_capture(what="objects", namespaces=[ns], groups=['velero.io'])
+capture_local(cmd="velero version -n {}".format(ns), file_name="version.txt")
+log("Collecting velero deployment logs in namespace: {}". format(ns))
+kube_capture(what="logs", namespaces=[ns])
+capture_backup_logs(ns)
+capture_restore_logs(ns)
+archive(output_file=output, source_paths=[crshd.workdir])
+log("Generated debug information bundle: {}".format(output))
+
+     

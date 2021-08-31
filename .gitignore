@@ -24,8 +24,6 @@ _testmain.go
 *.test
 *.prof
 
-debug
-
 /velero
 .idea/
 
