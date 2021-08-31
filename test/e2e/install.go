@@ -280,7 +280,7 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 
 	if useRestic {
 		fmt.Println("Waiting for Velero restic daemonset to be ready.")
-		wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
+		err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
 			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/restic",
 				"-o", "json", "-n", namespace))
 			if err != nil {
@@ -295,6 +295,9 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 			}
 			return false, nil
 		})
+		if err != nil {
+			return errors.Wrap(err, "fail to wait for the velero restic ready")
+		}
 	}
 
 	fmt.Printf("Velero is installed and ready to be tested in the %s namespace! ⛵ \n", namespace)
