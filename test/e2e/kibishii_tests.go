@@ -81,9 +81,9 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
 
-	_, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+	stdout, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
 	if err != nil {
-		return errors.Wrapf(err, "failed to verify, stderr=%s", stderr)
+		return errors.Wrapf(err, "failed to verify, stderr=%s, stdout=%s", stderr, stdout)
 	}
 	return nil
 }
@@ -97,7 +97,8 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
-		if err := deleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
+		// if other functions runs timeout, the defer has no change to run, so use a separated context rather than the "oneHourTimeout" to avoid this
+		if err := deleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 		}
 	}()
@@ -144,6 +145,13 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
 
+	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+	if providerName == "aws" && useVolumeSnapshots {
+		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
+		time.Sleep(5 * time.Minute)
+	}
 	if err := veleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
 		veleroRestoreLogs(oneHourTimeout, veleroCLI, veleroNamespace, restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
