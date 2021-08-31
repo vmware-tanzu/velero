@@ -235,6 +235,33 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 			excludes: []string{"$foo", "foo*bar", "bar=321"},
 			wantErr:  true,
 		},
+		{
+			name:     "empty includes (everything) is valid",
+			includes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "include everything using asterisk is valid",
+			includes: []string{"*"},
+			wantErr:  false,
+		},
+		{
+			name:     "include everything not allowed with other includes",
+			includes: []string{"*", "foo"},
+			wantErr:  true,
+		},
+		{
+			name:     "exclude everything not allowed",
+			includes: []string{"foo"},
+			excludes: []string{"*"},
+			wantErr:  true,
+		},
+		{
+			name:     "excludes cannot contain items in includes",
+			includes: []string{"foo", "bar"},
+			excludes: []string{"bar"},
+			wantErr:  true,
+		},
 	}
 
 	for _, tc := range tests {

@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -38,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
 const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
@@ -163,9 +164,9 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return fmt.Errorf("A backup name is required, unless you are creating based on a schedule.")
 	}
 
-	namespaces := o.filterNamespaces()
-	if err := areNamespacesValid(namespaces); err != nil {
-		return err
+	errs := collections.ValidateNamespaceIncludesExcludes(o.IncludeNamespaces, o.ExcludeNamespaces)
+	if len(errs) > 0 {
+		return kubeerrs.NewAggregate(errs)
 	}
 
 	if o.StorageLocation != "" {
@@ -356,38 +357,4 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 
 	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
 	return backup, nil
-}
-
-// filterNamespaces will create a list of included and excluded namespaces that
-// are not asterisks.
-func (o *CreateOptions) filterNamespaces() []string {
-	var namespaces []string
-
-	for _, ns := range []string(o.IncludeNamespaces) {
-		if ns != "*" {
-			namespaces = append(namespaces, ns)
-		}
-	}
-
-	for _, ns := range []string(o.ExcludeNamespaces) {
-		if ns != "*" {
-			namespaces = append(namespaces, ns)
-		}
-	}
-
-	return namespaces
-}
-
-// areNamespacesValid loops through namespaces and return the first validation
-// error encountered.
-func areNamespacesValid(namespaces []string) error {
-	for _, ns := range namespaces {
-		if errs := validation.ValidateNamespaceName(ns, false); errs != nil {
-			for _, e := range errs {
-				return fmt.Errorf("invalid namespace, %q: %s", ns, e)
-			}
-		}
-	}
-
-	return nil
 }
