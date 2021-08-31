@@ -60,7 +60,7 @@ func TestParseSecurityContext(t *testing.T) {
 		},
 		{
 			"valid securityContext with comments only secCtx key",
-			args{"", "", "",`
+			args{"", "", "", `
 capabilities:
     drop:
     - ALL
@@ -81,16 +81,16 @@ readOnlyRootFilesystem: true
 allowPrivilegeEscalation: false`},
 			false,
 			&corev1.SecurityContext{
-				RunAsUser:                pointInt64(3333),
-				RunAsGroup:               pointInt64(3333),
-				Capabilities:  &corev1.Capabilities{
+				RunAsUser:  pointInt64(3333),
+				RunAsGroup: pointInt64(3333),
+				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
-					Add: []corev1.Capability{"cap1", "cap2"},
+					Add:  []corev1.Capability{"cap1", "cap2"},
 				},
-				SELinuxOptions:  &corev1.SELinuxOptions{
-					User: "userLabel",
-					Role: "roleLabel",
-					Type: "typeLabel",
+				SELinuxOptions: &corev1.SELinuxOptions{
+					User:  "userLabel",
+					Role:  "roleLabel",
+					Type:  "typeLabel",
 					Level: "levelLabel",
 				},
 				RunAsNonRoot:             boolptr.True(),
@@ -100,7 +100,7 @@ allowPrivilegeEscalation: false`},
 		},
 		{
 			"valid securityContext with secCtx key override runAsUser runAsGroup and allowPrivilegeEscalation",
-			args{"1001", "999", "true",`
+			args{"1001", "999", "true", `
 capabilities:
     drop:
     - ALL
@@ -121,16 +121,16 @@ readOnlyRootFilesystem: true
 allowPrivilegeEscalation: false`},
 			false,
 			&corev1.SecurityContext{
-				RunAsUser:                pointInt64(3333),
-				RunAsGroup:               pointInt64(3333),
-				Capabilities:  &corev1.Capabilities{
+				RunAsUser:  pointInt64(3333),
+				RunAsGroup: pointInt64(3333),
+				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
-					Add: []corev1.Capability{"cap1", "cap2"},
+					Add:  []corev1.Capability{"cap1", "cap2"},
 				},
-				SELinuxOptions:  &corev1.SELinuxOptions{
-					User: "userLabel",
-					Role: "roleLabel",
-					Type: "typeLabel",
+				SELinuxOptions: &corev1.SELinuxOptions{
+					User:  "userLabel",
+					Role:  "roleLabel",
+					Type:  "typeLabel",
 					Level: "levelLabel",
 				},
 				RunAsNonRoot:             boolptr.True(),
@@ -157,7 +157,7 @@ allowPrivilegeEscalation: false`},
 		{"empty context without runAsUser", args{"", "", "", ""}, false, &corev1.SecurityContext{}},
 		{
 			"invalid securityContext secCtx unknown key",
-			args{"", "", "",`
+			args{"", "", "", `
 capabilitiesUnknownkey:
     drop:
     - ALL
@@ -175,7 +175,7 @@ allowPrivilegeEscalation: false`},
 		},
 		{
 			"invalid securityContext secCtx wrong value type string instead of bool",
-			args{"", "", "",`
+			args{"", "", "", `
 capabilitiesUnknownkey:
     drop:
     - ALL
@@ -193,7 +193,7 @@ allowPrivilegeEscalation: false`},
 		},
 		{
 			"invalid securityContext secCtx wrong value type string instead of int",
-			args{"", "", "",`
+			args{"", "", "", `
 capabilitiesUnknownkey:
     drop:
     - ALL

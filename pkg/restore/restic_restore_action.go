@@ -245,6 +245,7 @@ func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string
 
 	return config.Data["cpuLimit"], config.Data["memLimit"]
 }
+
 // getSecurityContext extracts securityContext runAsUser, runAsGroup, allowPrivilegeEscalation, and securityContext from a ConfigMap.
 func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string, string, string) {
 	if config == nil {
@@ -252,10 +253,10 @@ func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (strin
 		return "", "", "", ""
 	}
 
-	return  config.Data["secCtxRunAsUser"],
-			config.Data["secCtxRunAsGroup"],
-			config.Data["secCtxAllowPrivilegeEscalation"],
-			config.Data["secCtx"]
+	return config.Data["secCtxRunAsUser"],
+		config.Data["secCtxRunAsGroup"],
+		config.Data["secCtxAllowPrivilegeEscalation"],
+		config.Data["secCtx"]
 }
 
 // TODO eventually this can move to pkg/plugin/framework since it'll be used across multiple
