@@ -30,6 +30,7 @@ func TestParseSecurityContext(t *testing.T) {
 		runAsUser                string
 		runAsGroup               string
 		allowPrivilegeEscalation string
+		secCtx                   string
 	}
 	tests := []struct {
 		name     string
@@ -37,33 +38,184 @@ func TestParseSecurityContext(t *testing.T) {
 		wantErr  bool
 		expected *corev1.SecurityContext
 	}{
-		{"valid security context", args{"1001", "999", "true"}, false, &corev1.SecurityContext{
-			RunAsUser:                pointInt64(1001),
-			RunAsGroup:               pointInt64(999),
-			AllowPrivilegeEscalation: boolptr.True(),
-		}},
+		{
+			"valid security context",
+			args{"1001", "999", "true", ``},
+			false,
+			&corev1.SecurityContext{
+				RunAsUser:                pointInt64(1001),
+				RunAsGroup:               pointInt64(999),
+				AllowPrivilegeEscalation: boolptr.True(),
+			},
+		},
+		{
+			"valid security context with override runAsUser",
+			args{"1001", "999", "true", `runAsUser: 2000`},
+			false,
+			&corev1.SecurityContext{
+				RunAsUser:                pointInt64(2000),
+				RunAsGroup:               pointInt64(999),
+				AllowPrivilegeEscalation: boolptr.True(),
+			},
+		},
+		{
+			"valid securityContext with comments only secCtx key",
+			args{"", "", "",`
+capabilities:
+    drop:
+    - ALL
+    add:
+    - cap1
+    - cap2
+sELinuxOptions:
+    user: userLabel
+    role: roleLabel
+    type: typeLabel
+    level: levelLabel
+# user www-data
+runAsUser: 3333
+# group www-data
+runAsGroup: 3333
+runAsNonRoot: true
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false`},
+			false,
+			&corev1.SecurityContext{
+				RunAsUser:                pointInt64(3333),
+				RunAsGroup:               pointInt64(3333),
+				Capabilities:  &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+					Add: []corev1.Capability{"cap1", "cap2"},
+				},
+				SELinuxOptions:  &corev1.SELinuxOptions{
+					User: "userLabel",
+					Role: "roleLabel",
+					Type: "typeLabel",
+					Level: "levelLabel",
+				},
+				RunAsNonRoot:             boolptr.True(),
+				ReadOnlyRootFilesystem:   boolptr.True(),
+				AllowPrivilegeEscalation: boolptr.False(),
+			},
+		},
+		{
+			"valid securityContext with secCtx key override runAsUser runAsGroup and allowPrivilegeEscalation",
+			args{"1001", "999", "true",`
+capabilities:
+    drop:
+    - ALL
+    add:
+    - cap1
+    - cap2
+sELinuxOptions:
+    user: userLabel
+    role: roleLabel
+    type: typeLabel
+    level: levelLabel
+# user www-data
+runAsUser: 3333
+# group www-data
+runAsGroup: 3333
+runAsNonRoot: true
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false`},
+			false,
+			&corev1.SecurityContext{
+				RunAsUser:                pointInt64(3333),
+				RunAsGroup:               pointInt64(3333),
+				Capabilities:  &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+					Add: []corev1.Capability{"cap1", "cap2"},
+				},
+				SELinuxOptions:  &corev1.SELinuxOptions{
+					User: "userLabel",
+					Role: "roleLabel",
+					Type: "typeLabel",
+					Level: "levelLabel",
+				},
+				RunAsNonRoot:             boolptr.True(),
+				ReadOnlyRootFilesystem:   boolptr.True(),
+				AllowPrivilegeEscalation: boolptr.False(),
+			},
+		},
 		{
 			"another valid security context",
-			args{"1001", "999", "false"}, false, &corev1.SecurityContext{
+			args{"1001", "999", "false", ""},
+			false,
+			&corev1.SecurityContext{
 				RunAsUser:                pointInt64(1001),
 				RunAsGroup:               pointInt64(999),
 				AllowPrivilegeEscalation: boolptr.False(),
 			},
 		},
-		{"security context without runAsGroup", args{"1001", "", ""}, false, &corev1.SecurityContext{
+		{"security context without runAsGroup", args{"1001", "", "", ""}, false, &corev1.SecurityContext{
 			RunAsUser: pointInt64(1001),
 		}},
-		{"security context without runAsUser", args{"", "999", ""}, false, &corev1.SecurityContext{
+		{"security context without runAsUser", args{"", "999", "", ""}, false, &corev1.SecurityContext{
 			RunAsGroup: pointInt64(999),
 		}},
-		{"empty context without runAsUser", args{"", "", ""}, false, &corev1.SecurityContext{}},
-		{"invalid security context runAsUser", args{"not a number", "", ""}, true, nil},
-		{"invalid security context runAsGroup", args{"", "not a number", ""}, true, nil},
-		{"invalid security context allowPrivilegeEscalation", args{"", "", "not a bool"}, true, nil},
+		{"empty context without runAsUser", args{"", "", "", ""}, false, &corev1.SecurityContext{}},
+		{
+			"invalid securityContext secCtx unknown key",
+			args{"", "", "",`
+capabilitiesUnknownkey:
+    drop:
+    - ALL
+    add:
+    - cap1
+    - cap2
+# user www-data
+runAsUser: 3333
+# group www-data
+runAsGroup: 3333
+runAsNonRoot: true
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false`},
+			true, nil,
+		},
+		{
+			"invalid securityContext secCtx wrong value type string instead of bool",
+			args{"", "", "",`
+capabilitiesUnknownkey:
+    drop:
+    - ALL
+    add:
+    - cap1
+    - cap2
+# user www-data
+runAsUser: 3333
+# group www-data
+runAsGroup: 3333
+runAsNonRoot: plop
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false`},
+			true, nil,
+		},
+		{
+			"invalid securityContext secCtx wrong value type string instead of int",
+			args{"", "", "",`
+capabilitiesUnknownkey:
+    drop:
+    - ALL
+    add:
+    - cap1
+    - cap2
+# user www-data
+runAsUser: plop
+# group www-data
+runAsGroup: 3333
+runAsNonRoot: true
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false`},
+			true, nil,
+		},
+		{"invalid security context runAsUser", args{"not a number", "", "", ""}, true, nil},
+		{"invalid security context runAsGroup", args{"", "not a number", "", ""}, true, nil},
+		{"invalid security context allowPrivilegeEscalation", args{"", "", "not a bool", ""}, true, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseSecurityContext(tt.args.runAsUser, tt.args.runAsGroup, tt.args.allowPrivilegeEscalation)
+			got, err := ParseSecurityContext(tt.args.runAsUser, tt.args.runAsGroup, tt.args.allowPrivilegeEscalation, tt.args.secCtx)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -74,8 +226,7 @@ func TestParseSecurityContext(t *testing.T) {
 				tt.expected = &corev1.SecurityContext{}
 			}
 
-			assert.Equal(t, tt.expected.RunAsUser, got.RunAsUser)
-			assert.Equal(t, tt.expected.RunAsGroup, got.RunAsGroup)
+			assert.Equal(t, *tt.expected, got)
 		})
 	}
 }
