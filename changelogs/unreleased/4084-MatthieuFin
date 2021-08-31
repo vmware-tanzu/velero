@@ -1,0 +1,1 @@
+restic: add full support for setting SecurityContext for restore init container from configMap.
