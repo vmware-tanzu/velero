@@ -43,7 +43,7 @@ require (
 	k8s.io/kube-aggregator v0.19.12
 	sigs.k8s.io/cluster-api v0.3.11-0.20210106212952-b6c1b5b3db3d
 	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	sigs.k8s.io/yaml v1.2.0
 )
 
 replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
