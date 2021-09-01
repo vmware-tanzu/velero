@@ -167,8 +167,8 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 		// Although asterisks is not a valid Kubernetes namespace name, it is
 		// allowed here.
 		if itm != "*" {
-			if err := validateNamespaceName(itm); err != nil {
-				errs = append(errs, err)
+			if nsErrs := validateNamespaceName(itm); nsErrs != nil {
+				errs = append(errs, nsErrs...)
 			}
 		}
 	}
@@ -176,8 +176,8 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 	for _, itm := range excludes.List() {
 		// Asterisks in excludes list have been checked previously.
 		if itm != "*" {
-			if err := validateNamespaceName(itm); err != nil {
-				errs = append(errs, err)
+			if nsErrs := validateNamespaceName(itm); nsErrs != nil {
+				errs = append(errs, nsErrs...)
 			}
 		}
 	}
@@ -185,14 +185,16 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 	return errs
 }
 
-func validateNamespaceName(ns string) error {
-	if errs := validation.ValidateNamespaceName(ns, false); errs != nil {
-		for _, e := range errs {
-			return errors.Errorf("namespace name, %q: %v", ns, e)
+func validateNamespaceName(ns string) []error {
+	var errs []error
+
+	if errMsgs := validation.ValidateNamespaceName(ns, false); errMsgs != nil {
+		for _, msg := range errMsgs {
+			errs = append(errs, errors.Errorf("namespace, %q: %s", ns, msg))
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // GenerateIncludesExcludes constructs an IncludesExcludes struct by taking the provided
