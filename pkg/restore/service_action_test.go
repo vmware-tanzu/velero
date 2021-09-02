@@ -73,13 +73,14 @@ func TestServiceActionExecute(t *testing.T) {
 		expectedRes corev1api.Service
 	}{
 		{
-			name: "clusterIP (only) should be deleted from spec",
+			name: "clusterIP/clusterIPs should be deleted from spec",
 			obj: corev1api.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "svc-1",
 				},
 				Spec: corev1api.ServiceSpec{
 					ClusterIP:      "should-be-removed",
+					ClusterIPs:     []string{"should-be-removed"},
 					LoadBalancerIP: "should-be-kept",
 				},
 			},
