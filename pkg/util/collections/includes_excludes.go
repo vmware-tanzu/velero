@@ -190,7 +190,7 @@ func validateNamespaceName(ns string) []error {
 
 	if errMsgs := validation.ValidateNamespaceName(ns, false); errMsgs != nil {
 		for _, msg := range errMsgs {
-			errs = append(errs, errors.Errorf("namespace, %q: %s", ns, msg))
+			errs = append(errs, errors.Errorf("invalid namespace %q: %s", ns, msg))
 		}
 	}
 
