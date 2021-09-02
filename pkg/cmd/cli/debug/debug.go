@@ -42,6 +42,8 @@ import (
 var scriptBytes []byte
 
 type option struct {
+	// currCmd the velero command
+	currCmd string
 	// workdir for crashd will be $baseDir/velero-debug
 	baseDir string
 	// the namespace where velero server is installed
@@ -74,6 +76,7 @@ func (o *option) asCrashdArgs() string {
 
 func (o *option) asCrashdArgMap() exec.ArgMap {
 	return exec.ArgMap{
+		"cmd":         o.currCmd,
 		"output":      o.outputPath,
 		"namespace":   o.namespace,
 		"basedir":     o.baseDir,
@@ -100,6 +103,10 @@ func (o *option) complete(f client.Factory, fs *pflag.FlagSet) error {
 	o.baseDir = tmpDir
 	o.namespace = f.Namespace()
 	kp, kc := kubeconfigAndContext(fs)
+	o.currCmd, err = os.Executable()
+	if err != nil {
+		return err
+	}
 	o.kubeconfigPath, err = filepath.Abs(kp)
 	if err != nil {
 		return fmt.Errorf("invalid kubeconfig path: %s, %v", kp, err)
