@@ -55,6 +55,7 @@ func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*v
 
 	if service.Spec.ClusterIP != "None" {
 		service.Spec.ClusterIP = ""
+		service.Spec.ClusterIPs = nil
 	}
 
 	/* Do not delete NodePorts if restore triggered with "--preserve-nodeports" flag */
