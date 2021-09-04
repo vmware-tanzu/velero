@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2021 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -122,24 +122,31 @@ func PrintWithFormat(c *cobra.Command, obj runtime.Object) (bool, error) {
 
 func printEncoded(obj runtime.Object, format string) (bool, error) {
 	// assume we're printing obj
-	toPrint := obj
 
-	if meta.IsListType(obj) {
-		list, _ := meta.ExtractList(obj)
-		if len(list) == 1 {
-			// if obj was a list and there was only 1 item, just print that 1 instead of a list
-			toPrint = list[0]
+	switch obj.(type) {
+	case *velerov1api.ServerStatusRequest:
+		encoded, err := printPluginEncoded(obj.(*velerov1api.ServerStatusRequest), format)
+		if err != nil {
+			return false, err
 		}
+		fmt.Println(string(encoded))
+		return true, nil
+	default:
+		toPrint := obj
+		if meta.IsListType(obj) {
+			list, _ := meta.ExtractList(obj)
+			if len(list) == 1 {
+				// if obj was a list and there was only 1 item, just print that 1 instead of a list
+				toPrint = list[0]
+			}
+		}
+		encoded, err := encode.Encode(toPrint, format)
+		if err != nil {
+			return false, err
+		}
+		fmt.Println(string(encoded))
+		return true, nil
 	}
-
-	encoded, err := encode.Encode(toPrint, format)
-	if err != nil {
-		return false, err
-	}
-
-	fmt.Println(string(encoded))
-
-	return true, nil
 }
 
 func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
