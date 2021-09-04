@@ -41,10 +41,11 @@ import (
 type installOptions struct {
 	*install.InstallOptions
 	RegistryCredentialFile string
+	ResticHelperImage      string
 }
 
 // TODO too many parameters for this function, better to make it a structure, we can introduces a structure `config` for the E2E to hold all configuration items
-func veleroInstall(ctx context.Context, cli, veleroImage string, veleroNamespace string, cloudProvider string, objectStoreProvider string, useVolumeSnapshots bool,
+func veleroInstall(ctx context.Context, cli, veleroImage string, resticHelperImage string, veleroNamespace string, cloudProvider string, objectStoreProvider string, useVolumeSnapshots bool,
 	cloudCredentialsFile string, bslBucket string, bslPrefix string, bslConfig string, vslConfig string,
 	crdsVersion string, features string, registryCredentialFile string) error {
 
@@ -88,6 +89,7 @@ func veleroInstall(ctx context.Context, cli, veleroImage string, veleroNamespace
 	err = installVeleroServer(ctx, cli, &installOptions{
 		InstallOptions:         veleroInstallOptions,
 		RegistryCredentialFile: registryCredentialFile,
+		ResticHelperImage:      resticHelperImage,
 	})
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
@@ -140,14 +142,14 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 		args = append(args, "--features", options.Features)
 	}
 
-	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile); err != nil {
+	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.ResticHelperImage); err != nil {
 		return err
 	}
 
 	return waitVeleroReady(ctx, namespace, options.UseRestic)
 }
 
-func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile string) error {
+func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, resticHelperImage string) error {
 	args = append(args, "--dry-run", "--output", "json", "--crds-only")
 
 	// get the CRD definitions
@@ -192,7 +194,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to unmarshal the resources: %s", string(stdout))
 	}
 
-	if err = patchResources(ctx, resources, namespace, registryCredentialFile); err != nil {
+	if err = patchResources(ctx, resources, namespace, registryCredentialFile, resticHelperImage); err != nil {
 		return errors.Wrapf(err, "failed to patch resources")
 	}
 
@@ -214,7 +216,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 }
 
 // patch the velero resources
-func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile string) error {
+func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, resticHelperImage string) error {
 	// apply the image pull secret to avoid the image pull limit of Docker Hub
 	if len(registryCredentialFile) > 0 {
 		credential, err := ioutil.ReadFile(registryCredentialFile)
@@ -257,6 +259,34 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 		resources.Items = append(resources.Items, un)
 	}
 
+	// customize the restic restore helper image
+	if len(resticHelperImage) > 0 {
+		restoreActionConfig := corev1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: corev1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "restic-restore-action-config",
+				Namespace: namespace,
+				Labels: map[string]string{
+					"velero.io/plugin-config": "",
+					"velero.io/restic":        "RestoreItemAction",
+				},
+			},
+			Data: map[string]string{
+				"image": resticHelperImage,
+			},
+		}
+
+		un, err := toUnstructured(restoreActionConfig)
+		if err != nil {
+			return errors.Wrapf(err, "failed to convert restore action config to unstructure")
+		}
+		resources.Items = append(resources.Items, un)
+		fmt.Printf("the restic restore helper image is set by the configmap %q \n", "restic-restore-action-config")
+	}
+
 	return nil
 }
 
@@ -280,7 +310,7 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 
 	if useRestic {
 		fmt.Println("Waiting for Velero restic daemonset to be ready.")
-		wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
+		err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
 			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/restic",
 				"-o", "json", "-n", namespace))
 			if err != nil {
@@ -295,6 +325,9 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 			}
 			return false, nil
 		})
+		if err != nil {
+			return errors.Wrap(err, "fail to wait for the velero restic ready")
+		}
 	}
 
 	fmt.Printf("Velero is installed and ready to be tested in the %s namespace! ⛵ \n", namespace)

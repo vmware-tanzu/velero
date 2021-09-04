@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
 const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
@@ -160,6 +162,11 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
 		return fmt.Errorf("A backup name is required, unless you are creating based on a schedule.")
+	}
+
+	errs := collections.ValidateNamespaceIncludesExcludes(o.IncludeNamespaces, o.ExcludeNamespaces)
+	if len(errs) > 0 {
+		return kubeerrs.NewAggregate(errs)
 	}
 
 	if o.StorageLocation != "" {

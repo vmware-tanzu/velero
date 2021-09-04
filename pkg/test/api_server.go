@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	discoveryfake "k8s.io/client-go/discovery/fake"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -42,9 +43,21 @@ func NewAPIServer(t *testing.T) *APIServer {
 	t.Helper()
 
 	var (
-		veleroClient    = fake.NewSimpleClientset()
-		kubeClient      = kubefake.NewSimpleClientset()
-		dynamicClient   = dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+		veleroClient  = fake.NewSimpleClientset()
+		kubeClient    = kubefake.NewSimpleClientset()
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+			map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "namespaces"}:                                         "NamespacesList",
+				{Group: "", Version: "v1", Resource: "pods"}:                                               "PodsList",
+				{Group: "", Version: "v1", Resource: "persistentvolumes"}:                                  "PVList",
+				{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}:                             "PVCList",
+				{Group: "", Version: "v1", Resource: "secrets"}:                                            "SecretsList",
+				{Group: "", Version: "v1", Resource: "serviceaccounts"}:                                    "ServiceAccountsList",
+				{Group: "apps", Version: "v1", Resource: "deployments"}:                                    "DeploymentsList",
+				{Group: "apiextensions.k8s.io", Version: "v1beta1", Resource: "customresourcedefinitions"}: "CRDList",
+				{Group: "velero.io", Version: "v1", Resource: "volumesnapshotlocations"}:                   "VSLList",
+				{Group: "extensions", Version: "v1", Resource: "deployments"}:                              "ExtDeploymentsList",
+			})
 		discoveryClient = &DiscoveryClient{FakeDiscovery: kubeClient.Discovery().(*discoveryfake.FakeDiscovery)}
 	)
 

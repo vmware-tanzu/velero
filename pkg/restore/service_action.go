@@ -55,6 +55,7 @@ func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*v
 
 	if service.Spec.ClusterIP != "None" {
 		service.Spec.ClusterIP = ""
+		service.Spec.ClusterIPs = nil
 	}
 
 	/* Do not delete NodePorts if restore triggered with "--preserve-nodeports" flag */
@@ -83,6 +84,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 	// to the last-applied-config annotation. We'll retain these values, and
 	// clear out any other (presumably auto-assigned) NodePort values.
 	explicitNodePorts := sets.NewString()
+	unnamedPortInts := sets.NewInt()
 	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
 	if ok {
 		appliedServiceUnstructured := new(map[string]interface{})
@@ -123,7 +125,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 						portName, ok := p["name"]
 						if !ok {
 							// unnamed port
-							explicitNodePorts.Insert("")
+							unnamedPortInts.Insert(nodePortInt)
 						} else {
 							explicitNodePorts.Insert(portName.(string))
 						}
@@ -135,8 +137,14 @@ func deleteNodePorts(service *corev1api.Service) error {
 	}
 
 	for i, port := range service.Spec.Ports {
-		if !explicitNodePorts.Has(port.Name) {
-			service.Spec.Ports[i].NodePort = 0
+		if port.Name != "" {
+			if !explicitNodePorts.Has(port.Name) {
+				service.Spec.Ports[i].NodePort = 0
+			}
+		} else {
+			if !unnamedPortInts.Has(int(port.NodePort)) {
+				service.Spec.Ports[i].NodePort = 0
+			}
 		}
 	}
 
