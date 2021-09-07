@@ -17,13 +17,14 @@ These tips can help you troubleshoot known issues. If they don't help, you can [
 
 You can use the `velero bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `velero` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
 
-Some general commands for troubleshooting that may be helpful:
+You can use the `velero debug` command to generate a debug bundle, which is a tarball
+that contains:
+* Version information
+* Logs of velero server and plugins
+* Resources managed by velero server such as backup, restore, podvolumebackup, podvolumerestore, etc.
+* Logs of the backup and restore, if specified in the parameters
 
-* `velero backup describe <backupName>` - describe the details of a backup
-* `velero backup logs <backupName>` - fetch the logs for this specific backup. Useful for viewing failures and warnings, including resources that could not be backed up.
-* `velero restore describe <restoreName>` - describe the details of a restore
-* `velero restore logs <restoreName>` - fetch the logs for this specific restore. Useful for viewing failures and warnings, including resources that could not be restored.
-* `kubectl logs deployment/velero -n velero` - fetch the logs of the Velero server pod. This provides the output of the Velero server processes.
+Please use command `velero debug --help` to see more usage details.
 
 ### Getting velero debug logs
 
