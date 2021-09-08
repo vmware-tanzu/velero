@@ -302,8 +302,10 @@ func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
 
 func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) error {
 	fmt.Println("Waiting for Velero deployment to be ready.")
-	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "wait", "--for=condition=available",
-		"deployment/velero", "-n", namespace, "--timeout=600s"))
+	// when doing upgrade by the "kubectl apply" the command "kubectl wait --for=condition=available deployment/velero -n velero --timeout=600s" returns directly
+	// use "rollout status" instead to avoid this. For more detail information, refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment
+	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "rollout", "status",
+		"deployment/velero", "-n", namespace))
 	if err != nil {
 		return errors.Wrapf(err, "fail to wait for the velero deployment ready, stdout=%s, stderr=%s", stdout, stderr)
 	}
