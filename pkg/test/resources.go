@@ -108,6 +108,18 @@ func ExtensionsDeployments(items ...metav1.Object) *APIResource {
 	}
 }
 
+// test CRD
+func VeleroDeployments(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "velero.io",
+		Version:    "v1",
+		Name:       "deployments",
+		ShortName:  "deploy",
+		Namespaced: true,
+		Items:      items,
+	}
+}
+
 func Namespaces(items ...metav1.Object) *APIResource {
 	return &APIResource{
 		Group:      "",
