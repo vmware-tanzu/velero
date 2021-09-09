@@ -1,1 +1,0 @@
-Skip the backup and restore of DownwardAPI volumes when using restic.
