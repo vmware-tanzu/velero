@@ -44,11 +44,14 @@ If you're not yet running at least Velero v1.6, see the following:
 
     **NOTE:** If you are upgrading Velero in Kubernetes 1.14.x or earlier, you will need to use `kubectl apply`'s `--validate=false` option when applying the CRD configuration above. See [issue 2077][10] and [issue 2311][11] for more context.
 
-1. Update the container image used by the Velero deployment and, optionally, the restic daemon set:
+1. Update the container image used by the Velero deployment, plugin and, optionally, the restic daemon set:
 
     ```bash
+   # set the container and image of the init container for plugin accordingly, 
+   # if you are using other plugin
     kubectl set image deployment/velero \
         velero=velero/velero:v1.7.0 \
+        velero-velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.3.0 \
         --namespace velero
 
     # optional, if using the restic daemon set
