@@ -42,7 +42,7 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
-		if err := deleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
+		if err := deleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 		}
 	}()
@@ -51,7 +51,7 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 	}
 
 	if err := veleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
-		veleroBackupLogs(oneHourTimeout, veleroCLI, veleroNamespace, backupName)
+		runDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
 
@@ -69,7 +69,7 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 	}
 
 	if err := veleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
-		veleroRestoreLogs(oneHourTimeout, veleroCLI, veleroNamespace, restoreName)
+		runDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
 

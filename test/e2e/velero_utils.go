@@ -269,22 +269,24 @@ func veleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace str
 	return nil
 }
 
-func veleroRestoreLogs(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string) error {
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "describe", restoreName)
-	describeCmd.Stdout = os.Stdout
-	describeCmd.Stderr = os.Stderr
-	err := describeCmd.Run()
-	if err != nil {
-		return err
+func runDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore string) {
+	output := fmt.Sprintf("debug-bundle-%d.tar.gz", time.Now().UnixNano())
+	args := []string{"debug", "--namespace", veleroNamespace, "--output", output, "--verbose"}
+	if len(backup) > 0 {
+		args = append(args, "--backup", backup)
 	}
-	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "logs", restoreName)
-	logCmd.Stdout = os.Stdout
-	logCmd.Stderr = os.Stderr
-	err = logCmd.Run()
-	if err != nil {
-		return err
+	if len(restore) > 0 {
+		args = append(args, "--restore", restore)
 	}
-	return nil
+
+	cmd := exec.CommandContext(ctx, veleroCLI, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	fmt.Printf("debug cmd=%s\n", cmd.String())
+	fmt.Printf("Generating the debug tarball at %s\n", output)
+	if err := cmd.Run(); err != nil {
+		fmt.Println(errors.Wrapf(err, "failed to run the debug command"))
+	}
 }
 
 func veleroCreateBackupLocation(ctx context.Context,

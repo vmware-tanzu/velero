@@ -107,7 +107,7 @@ func runUpgradeTests(client testClient, upgradeToVeleroImage, upgradeToVeleroVer
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", upgradeNamespace)
 	}
 	defer func() {
-		if err := deleteNamespace(oneHourTimeout, client, upgradeNamespace, true); err != nil {
+		if err := deleteNamespace(context.Background(), client, upgradeNamespace, true); err != nil {
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", upgradeNamespace))
 		}
 	}()
@@ -116,7 +116,9 @@ func runUpgradeTests(client testClient, upgradeToVeleroImage, upgradeToVeleroVer
 	}
 
 	if err := veleroBackupNamespace(oneHourTimeout, upgradeFromVeleroCLI, veleroNamespace, backupName, upgradeNamespace, backupLocation, useVolumeSnapshots); err != nil {
-		veleroBackupLogs(oneHourTimeout, upgradeFromVeleroCLI, veleroNamespace, backupName)
+		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
+		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
+		veleroBackupLogs(context.Background(), upgradeFromVeleroCLI, veleroNamespace, backupName)
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", upgradeNamespace)
 	}
 
@@ -140,7 +142,7 @@ func runUpgradeTests(client testClient, upgradeToVeleroImage, upgradeToVeleroVer
 		return errors.Wrapf(err, "Velero install version mismatch.")
 	}
 	if err := veleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
-		veleroRestoreLogs(oneHourTimeout, veleroCLI, veleroNamespace, restoreName)
+		runDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
 
