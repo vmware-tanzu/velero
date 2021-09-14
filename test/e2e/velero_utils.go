@@ -41,20 +41,56 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
-func getProviderPlugins(providerName string) []string {
-	// TODO: make plugin images configurable
-	switch providerName {
-	case "aws":
-		return []string{"velero/velero-plugin-for-aws:v1.2.1"}
-	case "azure":
-		return []string{"velero/velero-plugin-for-microsoft-azure:v1.2.0"}
-	case "vsphere":
-		return []string{"velero/velero-plugin-for-aws:v1.2.1", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"}
-	case "gcp":
-		return []string{"velero/velero-plugin-for-gcp:v1.2.1"}
-	default:
-		panic(fmt.Errorf("unknown provider name: %s", providerName))
+var pluginsMatrix = map[string]map[string][]string{
+	"v1.4": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.1.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.1.2"},
+		"vsphere": {"velero/velero-plugin-for-aws:v1.1.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.0.2"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.1.0"},
+	},
+	"v1.5": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.1.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.1.2"},
+		"vsphere": {"velero/velero-plugin-for-aws:v1.1.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.1.0"},
+	},
+	"v1.6": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.2.1"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.2.1"},
+		"vsphere": {"velero/velero-plugin-for-aws:v1.2.1", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.2.1"},
+	},
+	"v1.7": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.3.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.3.0"},
+		"vsphere": {"velero/velero-plugin-for-aws:v1.3.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.3.0"},
+	},
+	"main": {
+		"aws":     {"velero/velero-plugin-for-aws:main"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:main"},
+		"vsphere": {"velero/velero-plugin-for-aws:main", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
+		"gcp":     {"velero/velero-plugin-for-gcp:main"},
+	},
+}
+
+func getProviderPluginsByVersion(version, providerName string) ([]string, error) {
+	var cloudMap map[string][]string
+	arr := strings.Split(version, ".")
+	if len(arr) >= 3 {
+		cloudMap = pluginsMatrix[arr[0]+"."+arr[1]]
 	}
+	if len(cloudMap) == 0 {
+		cloudMap = pluginsMatrix["main"]
+		if len(cloudMap) == 0 {
+			return nil, errors.Errorf("fail to get plugins by version: main")
+		}
+	}
+	plugins, ok := cloudMap[providerName]
+	if !ok {
+		return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, providerName)
+	}
+	return plugins, nil
 }
 
 // getProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
@@ -326,10 +362,32 @@ func veleroCreateBackupLocation(ctx context.Context,
 	return bslCreateCmd.Run()
 }
 
+func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, providerPlugins string) ([]string, error) {
+	// Fetch the plugins for the provider before checking for the object store provider below.
+	var plugins []string
+	if len(providerPlugins) > 0 {
+		plugins = strings.Split(providerPlugins, ",")
+	} else {
+		version, err := getVeleroVersion(ctx, veleroCLI, true)
+		if err != nil {
+			return nil, errors.WithMessage(err, "failed to get velero version")
+		}
+		plugins, err = getProviderPluginsByVersion(version, objectStoreProvider)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
+		}
+	}
+	return plugins, nil
+}
+
 // veleroAddPluginsForProvider determines which plugins need to be installed for a provider and
 // installs them in the current Velero installation, skipping over those that are already installed.
-func veleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string) error {
-	for _, plugin := range getProviderPlugins(provider) {
+func veleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins string) error {
+	plugins, err := getProviderPlugins(ctx, veleroCLI, provider, addPlugins)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to get plugins")
+	}
+	for _, plugin := range plugins {
 		stdoutBuf := new(bytes.Buffer)
 		stderrBuf := new(bytes.Buffer)
 
@@ -400,8 +458,12 @@ func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 	return err
 }
 
-func getVeleroVersion(ctx context.Context, veleroCLI string) (string, error) {
-	cmd := exec.CommandContext(ctx, veleroCLI, "version", "--timeout", "60s")
+func getVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (string, error) {
+	args := []string{"version", "--timeout", "60s"}
+	if clientOnly {
+		args = append(args, "--client-only")
+	}
+	cmd := exec.CommandContext(ctx, veleroCLI, args...)
 	fmt.Println("Get Version Command:" + cmd.String())
 	stdout, stderr, err := veleroexec.RunCommand(cmd)
 	if err != nil {
@@ -410,25 +472,33 @@ func getVeleroVersion(ctx context.Context, veleroCLI string) (string, error) {
 
 	output := strings.Replace(stdout, "\n", " ", -1)
 	fmt.Println("Version:" + output)
-	regCompiler := regexp.MustCompile(`(?i)client\s*:\s*version\s*:\s*(\S+).+server\s*:\s*version\s*:\s*(\S+)`)
-	versionMatches := regCompiler.FindStringSubmatch(output)
-	if len(versionMatches) < 3 {
-		return "", errors.New("Velero version command returned null version")
+	resultCount := 3
+	regexpRule := `(?i)client\s*:\s*version\s*:\s*(\S+).+server\s*:\s*version\s*:\s*(\S+)`
+	if clientOnly {
+		resultCount = 2
+		regexpRule = `(?i)client\s*:\s*version\s*:\s*(\S+)`
 	}
-	if versionMatches[1] != versionMatches[2] {
-		return "", errors.New("Velero server and client version are not matched")
+	regCompiler := regexp.MustCompile(regexpRule)
+	versionMatches := regCompiler.FindStringSubmatch(output)
+	if len(versionMatches) != resultCount {
+		return "", errors.New("failed to parse velero version from output")
+	}
+	if !clientOnly {
+		if versionMatches[1] != versionMatches[2] {
+			return "", errors.New("velero server and client version are not matched")
+		}
 	}
 	return versionMatches[1], nil
 }
 
 func checkVeleroVersion(ctx context.Context, veleroCLI string, expectedVer string) error {
 	tag := expectedVer
-	tagInstalled, err := getVeleroVersion(ctx, veleroCLI)
+	tagInstalled, err := getVeleroVersion(ctx, veleroCLI, false)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to get Velero version")
+		return errors.WithMessagef(err, "failed to get Velero version")
 	}
 	if strings.Trim(tag, " ") != strings.Trim(tagInstalled, " ") {
-		return errors.New(fmt.Sprintf("Velero version %s is not as expected %s", tagInstalled, tag))
+		return errors.New(fmt.Sprintf("velero version %s is not as expected %s", tagInstalled, tag))
 	}
 	fmt.Printf("Velero version %s is as expected %s\n", tagInstalled, tag)
 	return nil
@@ -440,18 +510,18 @@ func installVeleroCLI(version string) (string, error) {
 	tarball := name + postfix
 	tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
 	if err != nil {
-		return "", errors.WithMessagef(err, "Failed to get Velero CLI tarball")
+		return "", errors.WithMessagef(err, "failed to get Velero CLI tarball")
 	}
 	tempVeleroCliDir, err := ioutil.TempDir("", "velero-test")
 	if err != nil {
-		return "", errors.WithMessagef(err, "Failed to create temp dir for tarball extraction")
+		return "", errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
 	}
 
 	cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
 	defer os.Remove(tempFile.Name())
 
 	if _, err := cmd.Output(); err != nil {
-		return "", errors.WithMessagef(err, "Failed to extract file from velero CLI tarball")
+		return "", errors.WithMessagef(err, "failed to extract file from velero CLI tarball")
 	}
 	return tempVeleroCliDir + "/" + name + "/velero", nil
 }
@@ -462,21 +532,21 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 
 	resp, err := http.Get(cliTarballUrl)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to access Velero CLI tarball")
+		return nil, errors.WithMessagef(err, "failed to access Velero CLI tarball")
 	}
 	defer resp.Body.Close()
 
 	tarballBuf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to read buffer for tarball %s.", tarball)
+		return nil, errors.WithMessagef(err, "failed to read buffer for tarball %s.", tarball)
 	}
 	tmpfile, err := ioutil.TempFile("", tarball)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to create temp file for tarball %s locally.", tarball)
+		return nil, errors.WithMessagef(err, "failed to create temp file for tarball %s locally.", tarball)
 	}
 
 	if _, err := tmpfile.Write(tarballBuf); err != nil {
-		return nil, errors.WithMessagef(err, "Failed to write tarball file %s locally.", tarball)
+		return nil, errors.WithMessagef(err, "failed to write tarball file %s locally.", tarball)
 	}
 
 	return tmpfile, nil

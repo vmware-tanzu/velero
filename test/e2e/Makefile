@@ -49,6 +49,7 @@ GINKGO_FOCUS ?=
 VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 VELERO_VERSION ?= $(VERSION)
+PLUGINS ?=
 RESTIC_HELPER_IMAGE ?=
 #Released version only
 UPGRADE_FROM_VELERO_CLI ?=
@@ -66,6 +67,7 @@ INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
 
 # Flags to create an additional BSL for multiple credentials tests
+ADDITIONAL_BSL_PLUGINS ?=
 ADDITIONAL_OBJECT_STORE_PROVIDER ?=
 ADDITIONAL_CREDS_FILE ?=
 ADDITIONAL_BSL_BUCKET ?=
@@ -86,6 +88,7 @@ run: ginkgo
 			(echo "Cloud provider for target cloud/plug-in provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
 	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
+		-plugins=$(PLUGINS) \
 		-velero-version=$(VELERO_VERSION) \
 		-restic-helper-image=$(RESTIC_HELPER_IMAGE) \
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
@@ -99,6 +102,7 @@ run: ginkgo
 		-vsl-config=$(VSL_CONFIG) \
 		-cloud-provider=$(CLOUD_PROVIDER) \
 		-object-store-provider="$(OBJECT_STORE_PROVIDER)" \
+		-additional-bsl-plugins=$(ADDITIONAL_BSL_PLUGINS) \
 		-additional-bsl-object-store-provider="$(ADDITIONAL_OBJECT_STORE_PROVIDER)" \
 		-additional-bsl-credentials-file=$(ADDITIONAL_CREDS_FILE) \
 		-additional-bsl-bucket=$(ADDITIONAL_BSL_BUCKET) \
