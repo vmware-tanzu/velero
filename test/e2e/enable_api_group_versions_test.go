@@ -251,7 +251,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 
 		err = veleroBackupNamespace(ctx, veleroCLI, veleroNamespace, backup, namespacesStr, "", false)
 		if err != nil {
-			veleroBackupLogs(ctx, veleroCLI, veleroNamespace, backup)
+			runDebug(context.Background(), veleroCLI, veleroNamespace, backup, "")
 			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)
 		}
 
@@ -290,7 +290,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client testClient, reso
 
 		if tc.want != nil {
 			if err := veleroRestore(ctx, veleroCLI, veleroNamespace, restore, backup); err != nil {
-				veleroRestoreLogs(ctx, veleroCLI, veleroNamespace, restore)
+				runDebug(context.Background(), veleroCLI, veleroNamespace, "", restore)
 				return errors.Wrapf(err, "restore %s namespaces on target cluster", namespacesStr)
 			}
 

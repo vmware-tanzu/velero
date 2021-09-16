@@ -109,7 +109,7 @@ func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName
 		}
 	}
 	if err := veleroBackupExcludeNamespaces(ctx, veleroCLI, veleroNamespace, backupName, excludeNamespaces); err != nil {
-		veleroBackupLogs(ctx, veleroCLI, veleroNamespace, backupName)
+		runDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup backup namespaces %s-*", nsBaseName)
 	}
 
@@ -120,7 +120,7 @@ func RunMultipleNamespaceTest(ctx context.Context, client testClient, nsBaseName
 
 	err = veleroRestore(ctx, veleroCLI, veleroNamespace, restoreName, backupName)
 	if err != nil {
-		veleroRestoreLogs(ctx, veleroCLI, veleroNamespace, restoreName)
+		runDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrap(err, "Restore failed")
 	}
 
