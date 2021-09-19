@@ -134,6 +134,15 @@ func runUpgradeTests(client testClient, upgradeToVeleroImage, upgradeToVeleroVer
 	if err := deleteNamespace(oneHourTimeout, client, upgradeNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", upgradeNamespace)
 	}
+
+	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+	if providerName == "aws" && useVolumeSnapshots {
+		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
+		time.Sleep(5 * time.Minute)
+	}
+
 	if err := veleroInstall(context.Background(), veleroCLI, upgradeToVeleroImage, resticHelperImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 		cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile); err != nil {
 		return errors.Wrapf(err, "Failed to install velero from image %s", upgradeToVeleroImage)
