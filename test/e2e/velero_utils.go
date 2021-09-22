@@ -236,6 +236,10 @@ func veleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespac
 		args = append(args, "--snapshot-volumes")
 	} else {
 		args = append(args, "--default-volumes-to-restic")
+		// if the "--snapshot-volumes=false" isn't specified explicitly, the vSphere plugin will always take snapshots
+		// for the volumes even though the "--default-volumes-to-restic" is specified
+		// This can be removed if the logic of vSphere plugin changes
+		args = append(args, "--snapshot-volumes=false")
 	}
 	if backupLocation != "" {
 		args = append(args, "--storage-location", backupLocation)
