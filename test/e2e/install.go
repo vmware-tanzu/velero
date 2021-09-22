@@ -45,7 +45,7 @@ type installOptions struct {
 }
 
 // TODO too many parameters for this function, better to make it a structure, we can introduces a structure `config` for the E2E to hold all configuration items
-func veleroInstall(ctx context.Context, cli, veleroImage string, resticHelperImage string, veleroNamespace string, cloudProvider string, objectStoreProvider string, useVolumeSnapshots bool,
+func veleroInstall(ctx context.Context, cli, veleroImage, resticHelperImage, providerPlugins, veleroNamespace, cloudProvider, objectStoreProvider string, useVolumeSnapshots bool,
 	cloudCredentialsFile string, bslBucket string, bslPrefix string, bslConfig string, vslConfig string,
 	crdsVersion string, features string, registryCredentialFile string) error {
 
@@ -60,9 +60,10 @@ func veleroInstall(ctx context.Context, cli, veleroImage string, resticHelperIma
 		}
 	}
 
-	// Fetch the plugins for the provider before checking for the object store provider below.
-	providerPlugins := getProviderPlugins(objectStoreProvider)
-
+	providerPluginsTmp, err := getProviderPlugins(ctx, cli, objectStoreProvider, providerPlugins)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to get provider plugins")
+	}
 	// TODO - handle this better
 	if cloudProvider == "vsphere" {
 		// We overrider the objectStoreProvider here for vSphere because we want to use the aws plugin for the
@@ -70,13 +71,13 @@ func veleroInstall(ctx context.Context, cli, veleroImage string, resticHelperIma
 		// Snapshot location specified
 		objectStoreProvider = "aws"
 	}
-	err := ensureClusterExists(ctx)
+	err = ensureClusterExists(ctx)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
 	}
 
 	veleroInstallOptions, err := getProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
-		bslPrefix, bslConfig, vslConfig, providerPlugins, features)
+		bslPrefix, bslConfig, vslConfig, providerPluginsTmp, features)
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", objectStoreProvider)
 	}

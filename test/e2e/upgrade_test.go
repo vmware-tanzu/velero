@@ -74,7 +74,7 @@ func backup_upgrade_restore_test(useVolumeSnapshots bool) {
 		if installVelero {
 			//Set veleroImage and resticHelperImage to blank
 			//veleroImage and resticHelperImage should be the default value in originalCli
-			Expect(veleroInstall(context.Background(), upgradeFromVeleroCLI, "", "", veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+			Expect(veleroInstall(context.Background(), upgradeFromVeleroCLI, "", "", "", veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 				cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, "", "", registryCredentialFile)).To(Succeed())
 			Expect(checkVeleroVersion(context.Background(), upgradeFromVeleroCLI, upgradeFromVeleroVersion)).To(Succeed())
 		} else {
@@ -143,7 +143,7 @@ func runUpgradeTests(client testClient, upgradeToVeleroImage, upgradeToVeleroVer
 		time.Sleep(5 * time.Minute)
 	}
 
-	if err := veleroInstall(context.Background(), veleroCLI, upgradeToVeleroImage, resticHelperImage, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
+	if err := veleroInstall(context.Background(), veleroCLI, upgradeToVeleroImage, resticHelperImage, plugins, veleroNamespace, cloudProvider, objectStoreProvider, useVolumeSnapshots,
 		cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, vslConfig, crdsVersion, "", registryCredentialFile); err != nil {
 		return errors.Wrapf(err, "Failed to install velero from image %s", upgradeToVeleroImage)
 	}
