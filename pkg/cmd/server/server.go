@@ -303,7 +303,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	corev1api.AddToScheme(scheme)
 
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
-		Scheme: scheme,
+		Scheme:    scheme,
+		Namespace: f.Namespace(),
 	})
 	if err != nil {
 		cancelFunc()
