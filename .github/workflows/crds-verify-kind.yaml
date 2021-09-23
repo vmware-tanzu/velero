@@ -11,6 +11,11 @@ jobs:
   build-cli:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cache
@@ -59,6 +64,7 @@ jobs:
           - 1.19.7
           - 1.20.2
           - 1.21.1
+          - 1.22.0
     # All steps run in parallel unless otherwise specified.
     # See https://docs.github.com/en/actions/learn-github-actions/managing-complex-workflows#creating-dependent-jobs
     steps:

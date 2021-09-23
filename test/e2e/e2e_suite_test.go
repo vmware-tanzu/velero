@@ -26,23 +26,31 @@ import (
 )
 
 var (
-	veleroCLI, veleroImage, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, cloudProvider, objectStoreProvider, veleroNamespace string
-	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials                                string
-	installVelero                                                                                                                                 bool
+	veleroCLI, veleroImage, veleroVersion, cloudCredentialsFile, bslConfig, bslBucket, bslPrefix, vslConfig, cloudProvider, objectStoreProvider, veleroNamespace, crdsVersion string
+	additionalBSLProvider, additionalBSLBucket, additionalBSLPrefix, additionalBSLConfig, additionalBSLCredentials, registryCredentialFile, resticHelperImage                 string
+	upgradeFromVeleroVersion, upgradeFromVeleroCLI, plugins, addBSLPlugins                                                                                                    string
+	installVelero                                                                                                                                                             bool
 )
 
 func init() {
-	flag.StringVar(&cloudProvider, "cloud-provider", "", "Cloud that Velero will be installed into.  Required.")
-	flag.StringVar(&objectStoreProvider, "object-store-provider", "", "Provider of object store plugin. Required if cloud-provider is kind, otherwise ignored.")
+	flag.StringVar(&cloudProvider, "cloud-provider", "", "cloud that Velero will be installed into.  Required.")
+	flag.StringVar(&objectStoreProvider, "object-store-provider", "", "provider of object store plugin. Required if cloud-provider is kind, otherwise ignored.")
 	flag.StringVar(&bslBucket, "bucket", "", "name of the object storage bucket where backups from e2e tests should be stored. Required.")
 	flag.StringVar(&cloudCredentialsFile, "credentials-file", "", "file containing credentials for backup and volume provider. Required.")
 	flag.StringVar(&veleroCLI, "velerocli", "velero", "path to the velero application to use.")
 	flag.StringVar(&veleroImage, "velero-image", "velero/velero:main", "image for the velero server to be tested.")
+	flag.StringVar(&plugins, "plugins", "", "provider plugins to be tested.")
+	flag.StringVar(&addBSLPlugins, "additional-bsl-plugins", "", "additional plugins to be tested.")
+	flag.StringVar(&veleroVersion, "velero-version", "main", "image version for the velero server to be tested with.")
+	flag.StringVar(&resticHelperImage, "restic-helper-image", "", "image for the velero restic restore helper to be tested.")
+	flag.StringVar(&upgradeFromVeleroCLI, "upgrade-from-velero-cli", "", "path to the pre-upgrade velero application to use.")
+	flag.StringVar(&upgradeFromVeleroVersion, "upgrade-from-velero-version", "v1.6.3", "image for the pre-upgrade velero server to be tested.")
 	flag.StringVar(&bslConfig, "bsl-config", "", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&bslPrefix, "prefix", "", "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flag.StringVar(&vslConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
-	flag.StringVar(&veleroNamespace, "velero-namespace", "velero", "Namespace to install Velero into")
-	flag.BoolVar(&installVelero, "install-velero", true, "Install/uninstall velero during the test.  Optional.")
+	flag.StringVar(&veleroNamespace, "velero-namespace", "velero", "namespace to install Velero into")
+	flag.BoolVar(&installVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
+	flag.StringVar(&registryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
 
 	// Flags to create an additional BSL for multiple credentials test
 	flag.StringVar(&additionalBSLProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")
@@ -50,6 +58,7 @@ func init() {
 	flag.StringVar(&additionalBSLPrefix, "additional-bsl-prefix", "", "prefix under which all Velero data should be stored within the bucket for additional backup storage location. Optional.")
 	flag.StringVar(&additionalBSLConfig, "additional-bsl-config", "", "configuration to use for the additional backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&additionalBSLCredentials, "additional-bsl-credentials-file", "", "file containing credentials for additional backup storage location provider. Required if testing multiple credentials support.")
+	flag.StringVar(&crdsVersion, "crds-version", "v1", "CRD apiVersion for velero CRD creation.")
 }
 
 func TestE2e(t *testing.T) {

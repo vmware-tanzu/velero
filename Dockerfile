@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM --platform=$BUILDPLATFORM golang:1.15 as builder-env
+FROM --platform=$BUILDPLATFORM golang:1.16 as builder-env
 
 ARG GOPROXY
 ARG PKG
@@ -50,13 +50,11 @@ RUN mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
-FROM ubuntu:focal
+FROM gcr.io/distroless/base-debian10:nonroot
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -qq -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
-
 COPY --from=builder /output /
 
-USER nobody:nogroup
+USER nonroot:nonroot
 

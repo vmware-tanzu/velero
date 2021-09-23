@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1137,6 +1137,22 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("pods"): {"ns-1/pod-1"},
+			},
+		},
+		{
+			name:    "single action with a resource and label selector runs only for resources matching that label",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("restore-resource", "true")).Result(),
+					builder.ForPod("ns-1", "pod-2").ObjectMeta(builder.WithLabels("do-not-restore-resource", "true")).Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").ObjectMeta(builder.WithLabels("restore-resource")).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("pods").ForLabelSelector("restore-resource"): {"ns-1/pod-1", "ns-2/pod-2"},
 			},
 		},
 		{

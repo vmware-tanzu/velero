@@ -68,6 +68,10 @@ func InvokeDeleteActions(ctx *Context) error {
 	ctx.Log.Debugf("Downloaded and extracted the backup file to: %s", dir)
 
 	backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing backup %q", dir)
+	}
+
 	processdResources := sets.NewString()
 
 	ctx.Log.Debugf("Trying to reconcile resource names with Kube API server.")

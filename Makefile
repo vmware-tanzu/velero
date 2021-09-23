@@ -366,4 +366,4 @@ gen-docs:
 
 .PHONY: test-e2e
 test-e2e: local
-	$(MAKE) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run

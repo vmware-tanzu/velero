@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	corev1api "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -35,36 +34,6 @@ import (
 // ensureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
 func ensureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
-}
-
-// createNamespace creates a kubernetes namespace
-func createNamespace(ctx context.Context, client testClient, namespace string) error {
-	ns := builder.ForNamespace(namespace).Result()
-	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		return nil
-	}
-	return err
-}
-
-func getNamespace(ctx context.Context, client testClient, namespace string) (*corev1api.Namespace, error) {
-	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-}
-
-// waitForNamespaceDeletion waits for namespace to be deleted.
-func waitForNamespaceDeletion(interval, timeout time.Duration, client testClient, ns string) error {
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := client.clientGo.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, err
-		}
-		fmt.Printf("Namespace %s is still being deleted...\n", ns)
-		return false, nil
-	})
-	return err
 }
 
 func createSecretFromFiles(ctx context.Context, client testClient, namespace string, name string, files map[string]string) error {

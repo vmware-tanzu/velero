@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,10 +23,12 @@ import (
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -145,8 +147,23 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	return pvc.Spec.VolumeName, nil
 }
 
-// IsCRDReady checks a CRD to see if it's ready, with both the Established and NamesAccepted conditions.
-func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
+// IsV1CRDReady checks a v1 CRD to see if it's ready, with both the Established and NamesAccepted conditions.
+func IsV1CRDReady(crd *apiextv1.CustomResourceDefinition) bool {
+	var isEstablished, namesAccepted bool
+	for _, cond := range crd.Status.Conditions {
+		if cond.Type == apiextv1.Established && cond.Status == apiextv1.ConditionTrue {
+			isEstablished = true
+		}
+		if cond.Type == apiextv1.NamesAccepted && cond.Status == apiextv1.ConditionTrue {
+			namesAccepted = true
+		}
+	}
+
+	return (isEstablished && namesAccepted)
+}
+
+// IsV1Beta1CRDReady checks a v1beta1 CRD to see if it's ready, with both the Established and NamesAccepted conditions.
+func IsV1Beta1CRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 	var isEstablished, namesAccepted bool
 	for _, cond := range crd.Status.Conditions {
 		if cond.Type == apiextv1beta1.Established && cond.Status == apiextv1beta1.ConditionTrue {
@@ -160,60 +177,25 @@ func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 	return (isEstablished && namesAccepted)
 }
 
-// IsUnstructuredCRDReady checks an unstructured CRD to see if it's ready, with both the Established and NamesAccepted conditions.
-// TODO: Delete this function and use IsCRDReady when the upstream runtime.FromUnstructured function properly handles int64 field conversions.
-// Duplicated function because the velero install package uses IsCRDReady with the beta types.
-// See https://github.com/kubernetes/kubernetes/issues/87675
-// This is different from the fix for https://github.com/vmware-tanzu/velero/issues/2319 because here,
-// we need to account for *both* v1beta1 and v1 CRDs, so doing marshalling into JSON to convert to a Go type may not be as useful here, unless we do
-// type switching.
-func IsUnstructuredCRDReady(crd *unstructured.Unstructured) (bool, error) {
-	var isEstablished, namesAccepted bool
-
-	conditions, ok, err := unstructured.NestedSlice(crd.UnstructuredContent(), "status", "conditions")
-	if !ok {
-		return false, nil
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "unable to access CRD's conditions")
-	}
-
-	for _, c := range conditions {
-		// Unlike the typed version of this function, we need to cast the Condition since it's an interface{} here,
-		// then we fetch the type and status of the Condition before inspecting them for relevant values
-		cond, ok := c.(map[string]interface{})
-		if !ok {
-			return false, errors.New("unable to convert condition to map[string]interface{}")
-		}
-		conditionType, ok, err := unstructured.NestedString(cond, "type")
-		if !ok {
-			// This should never happen unless someone manually edits the serialized data.
-			return false, errors.New("condition missing a type")
-		}
-
+// IsCRDReady triggers IsV1Beta1CRDReady/IsV1CRDReady according to the version of the input param
+func IsCRDReady(crd *unstructured.Unstructured) (bool, error) {
+	ver := crd.GroupVersionKind().Version
+	switch ver {
+	case "v1beta1":
+		v1beta1crd := &apiextv1beta1.CustomResourceDefinition{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(crd.Object, v1beta1crd)
 		if err != nil {
-			return false, errors.Wrap(err, "unable to access condition's type")
+			return false, err
 		}
-
-		status, ok, err := unstructured.NestedString(cond, "status")
-		if !ok {
-			// This should never happen unless someone manually edits the serialized data.
-			return false, errors.New("condition missing a status")
-		}
-
+		return IsV1Beta1CRDReady(v1beta1crd), nil
+	case "v1":
+		v1crd := &apiextv1.CustomResourceDefinition{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(crd.Object, v1crd)
 		if err != nil {
-			return false, errors.Wrap(err, "unable to access condition's status")
+			return false, err
 		}
-
-		// Here is the actual logic of the function
-		// Cast the API's types into strings since we're pulling strings out of the unstructured data.
-		if conditionType == string(apiextv1beta1.Established) && status == string(apiextv1beta1.ConditionTrue) {
-			isEstablished = true
-		}
-		if conditionType == string(apiextv1beta1.NamesAccepted) && status == string(apiextv1beta1.ConditionTrue) {
-			namesAccepted = true
-		}
+		return IsV1CRDReady(v1crd), nil
+	default:
+		return false, fmt.Errorf("unable to handle CRD with version %s", ver)
 	}
-
-	return (isEstablished && namesAccepted), nil
 }

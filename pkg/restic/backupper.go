@@ -157,6 +157,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
+		// emptyDir volumes on finished pods are not supported because the volume is already gone and would result in an error
+		if (pod.Status.Phase == corev1api.PodSucceeded || pod.Status.Phase == corev1api.PodFailed) && volume.EmptyDir != nil {
+			continue
+		}
+
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, pvc)
 		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)

@@ -842,12 +842,7 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 		if err != nil {
 			return true, err
 		}
-
-		// TODO: Due to upstream conversion issues in runtime.FromUnstructured,
-		// we use the unstructured object here. Once the upstream conversion
-		// functions are fixed, we should convert to the CRD types and use
-		// IsCRDReady.
-		available, err = kube.IsUnstructuredCRDReady(unstructuredCRD)
+		available, err = kube.IsCRDReady(unstructuredCRD)
 		if err != nil {
 			return true, err
 		}

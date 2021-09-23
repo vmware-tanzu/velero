@@ -25,6 +25,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/debug"
+
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backuplocation"
@@ -116,6 +118,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		bug.NewCommand(),
 		backuplocation.NewCommand(f),
 		snapshotlocation.NewCommand(f),
+		debug.NewCommand(f),
 	)
 
 	// init and add the klog flags

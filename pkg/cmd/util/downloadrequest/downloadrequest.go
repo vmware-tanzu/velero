@@ -28,6 +28,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +42,12 @@ import (
 var ErrNotFound = errors.New("file not found")
 
 func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name string, kind velerov1api.DownloadTargetKind, w io.Writer, timeout time.Duration, insecureSkipTLSVerify bool, caCertFile string) error {
-	reqName := fmt.Sprintf("%s-%s", name, time.Now().Format("20060102150405"))
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	reqName := fmt.Sprintf("%s-%s", name, uuid.String())
 	created := builder.ForDownloadRequest(namespace, reqName).Target(kind, name).Result()
 
 	if err := kbClient.Create(context.Background(), created, &kbclient.CreateOptions{}); err != nil {
