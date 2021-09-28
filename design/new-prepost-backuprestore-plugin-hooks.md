@@ -3,15 +3,90 @@
 ## Abstract
 
 Velero should provide a way to trigger actions before and after each backup and restore.
-**Important**: These proposed plugin hooks are fundamentally different from the existing plugin hooks, BackupItemAction and RestoreItemAction, which are triggered per item during backup and restore, respectively.
-The proposed plugin hooks are to be executed only once.
+**Important**: These proposed plugin hooks are fundamentally different from the existing plugin hooks, BackupItemAction and RestoreItemAction, which are triggered per resource item during backup and restore, respectively.
+The proposed plugin hooks are to be executed only once: pre-backup (before backup starts), post-backup (after the backup is completed and uploaded to object storage, including volumes snapshots), pre-restore (before restore starts) and post-restore (after the restore is completed, including volumes are restored).
+
+### PreBackup and PostBackup Actions
+
+For the backup,  the sequence of events of Velero backup are the following (these sequence depicted is prior upcoming changes for [upload progress #3533](https://github.com/vmware-tanzu/velero/issues/3533) ):
+
+New Backup Request
+ |--> Validation of the request
+       |--> Set Backup Phase "In Progress"
+            | --> Start Backup
+                  | --> Discover all Plugins
+                        |--> Check if Backup Exists
+                             |--> Backup all K8s Resource Items
+                                  |--> Perform all Volumes Snapshots
+                                       |--> Final Backup Phase is determined
+                                            |--> Persist Backup and Logs on Object Storage
+
+We propose the pre-backup and post-backup plugin hooks to be executed in this sequence:
+
+New Backup Request
+ |--> Validation of the request
+       |--> Set Backup Phase "In Progress"
+            | --> Start Backup
+                  | --> Discover all Plugins
+                        |--> Check if Backup Exists
+                             |--> *PreBackupActions* are executed, logging actions on existent backup log file
+                                   |--> Backup all K8s Resource Items
+                                        |--> Perform all Volumes Snapshots
+                                            |--> Final Backup Phase is determined
+                                                 |--> Persist Backup and logs on Object Storage
+                                                    |--> *PostBackupActions* are executed, logging to its own file
 
 These plugin hooks will be invoked:
 
-- PreBackupAction: plugin actions are executed after the backup object is created and validated but before the backup is being processed, more precisely _before_ function [c.backupper.Backup](https://github.com/vmware-tanzu/velero/blob/74476db9d791fa91bba0147eac8ec189820adb3d/pkg/controller/backup_controller.go#L590). If the PreBackupActions return an err, the backup object is not processed.
-- PostBackupAction: plugin actions are executed after the backup is finished and persisted, more precisely _after_ function [c.runBackup](https://github.com/vmware-tanzu/velero/blob/74476db9d791fa91bba0147eac8ec189820adb3d/pkg/controller/backup_controller.go#L274). If the PostBackupActions return errors or warnings, these return statuses are counted towards to the backup Status object and the the final status of the backup will be patched.
-- PreRestoreAction: plugin actions are executed after the restore object is created and validated and before the backup object is fetched, more precisely in function `validateAndComplete` _before_ function [backupXorScheduleProvided](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L316). If the PreRestoreActions return an err, the restore object is not processed.
-- PostRestoreAction: plugin actions are executed after the restore finishes processing all items and volumes snapshots are restored and logs persisted, more precisely in function `processRestore` _after_ setting [`restore.Status.CompletionTimestamp`](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L273). If the PostRestoreActions return errors or warnings, these return statuses are counted towards to the final restore Status object.
+- PreBackupAction: plugin actions are executed after the backup object is created and validated but before the backup is being processed, more precisely _before_ function [c.backupper.Backup](https://github.com/vmware-tanzu/velero/blob/74476db9d791fa91bba0147eac8ec189820adb3d/pkg/controller/backup_controller.go#L590). If the PreBackupActions return an err, the backup object is not processed and the Backup phase will be set as `FailedPreBackupActions`.
+
+- PostBackupAction: plugin actions are executed after the backup is finished and persisted, more precisely _after_ function [c.runBackup](https://github.com/vmware-tanzu/velero/blob/74476db9d791fa91bba0147eac8ec189820adb3d/pkg/controller/backup_controller.go#L274).
+
+The proposed plugin hooks will execute actions that will have statuses on their own:
+`Backup.Status.PreBackupActionsStatuses` and `Backup.Status.PostBackupActionsStatuses` which will be an array of a proposed struct `ActionStatus` with PluginName, StartTimestamp, CompletionTimestamp and Phase.
+
+### PreRestore and PostRestore Actions
+
+For the restore,  the sequence of events of Velero restore are the following (these sequence depicted is prior upcoming changes for [upload progress #3533](https://github.com/vmware-tanzu/velero/issues/3533) ):
+
+New Restore Request
+ |--> Validation of the request
+      |--> Checks if restore is from a backup or a schedule
+           |--> Fetches backup
+                |--> Set Restore Phase "In Progress"
+                     |--> Start Restore
+                          |--> Discover all Plugins
+                               |--> Download backup file to temp
+                                    |--> Fetch list of volumes snapshots
+                                         |--> Restore K8s items, including PVs
+                                              |--> Final Restore Phase is determined
+                                                   |--> Persist Restore logs on Object Storage
+
+We propose the pre-restore and post-restore plugin hooks to be executed in this sequence:
+
+New Restore Request
+ |--> Validation of the request
+      |--> Checks if restore is from a backup or a schedule
+           |--> Fetches backup
+                |--> Set Restore Phase "In Progress"
+                     |--> Start Restore
+                          |--> Discover all Plugins
+                                |--> Download backup file to temp
+                                         |--> Fetch list of volumes snapshots
+                                            |--> *PreRestoreActions* are executed, logging actions on existent backup log file
+                                              |--> Restore K8s items, including PVs
+                                                   |--> Final Restore Phase is determined
+                                                        |--> Persist Restore logs on Object Storage
+                                                            |--> *PostRestoreActions* are executed, logging to its own file
+
+These plugin hooks will be invoked:
+
+- PreRestoreAction: plugin actions are executed after the restore object is created and validated and before the backup object is fetched, more precisely in function `runValidatedRestore` _after_ function [info.backupStore.GetBackupVolumeSnapshots](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L460). If the PreRestoreActions return an err, the restore object is not processed and the Restore phase will be set a `FailedPreRestoreActions`.
+  
+- PostRestoreAction: plugin actions are executed after the restore finishes processing all items and volumes snapshots are restored and logs persisted, more precisely in function `processRestore` _after_ setting [`restore.Status.CompletionTimestamp`](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L273).
+
+The proposed plugin hooks will execute actions that will have statuses on their own:
+`Restore.Status.PreRestoreActionsStatuses` and `Restore.Status.PostRestoreActionsStatuses` which will be an array of a proposed struct `ActionStatus` with PluginName, StartTimestamp, CompletionTimestamp and Phase.
 
 ## Background
 
@@ -46,9 +121,11 @@ This design seeks to provide missing extension points. This proposal's scope is 
 - Provide PreBackupAction, PostBackupAction, PreRestoreAction, and PostRestoreAction APIs for plugins to implement.
 - Update Velero backup and restore creation logic to invoke registered PreBackupAction and PreRestoreAction plugins before processing the backup and restore respectively.
 - Update Velero backup and restore complete logic to invoke registered PostBackupAction and PostRestoreAction plugins the objects are uploaded on disk.
-- Create two new Backup phases: `ExecutingPreBackupActions` (after `New` and before `InProgress`) and `ExecutingPostBackupActions` (after `Uploading` or `UploadingPartialFailure`)
-- Create two new Restore phases: `ExecutingPreRestoreActions` (after `New` and before `InProgress`) and `ExecutingPostRestoreActions` (after `InProgress`)
-  
+- Create one `ActionStatus` struct to keep track of execution of the plugin hooks. This struct has PluginName, StartTimestamp, CompletionTimestamp and Phase.
+- Add sub statuses for the plugins on Backup object: `Backup.Status.PreBackupActionsStatuses` and `Backup.Status.PostBackupActionsStatuses`. They will be flagged as optional and nullable. They will be populated only each plugin registered for the PreBackup and PostBackup hooks, respectively.
+- Add sub statuses for the plugins on Restore object: `Backup.Status.PreRestoreActionsStatuses` and `Backup.Status.PostRestoreActionsStatuses`. They will be flagged as optional and nullable. They will be populated only each plugin registered for the PreRestore and PostRestore hooks, respectively.
+- that will be populated optionally if Pre/Post Backup/Restore.
+
 ## Non-Goals
 
 - Specific implementations of the PreBackupAction, PostBackupAction, PreRestoreAction and PostRestoreAction API beyond test cases.
@@ -62,13 +139,13 @@ The PreBackupAction plugin API will resemble the BackupItemAction plugin hook de
 It will not receive any resource list items because the backup is not yet running at that stage.
 In addition, the `PreBackupAction` interface will only have an `Execute()` method since the plugin will be executed once per Backup creation, not per item.
 
-The Velero backup controller will be modified so that if there are any PreBackupAction plugins registered, they will be executed after backup object is created and validated but they will execute prior to processing the backup items and volume snapshots. More precisely _before_ function [c.backupper.Backup](https://github.com/vmware-tanzu/velero/blob/74476db9d791fa91bba0147eac8ec189820adb3d/pkg/controller/backup_controller.go#L590). During the execution of `PreBackupAction`, the status of the backup object will be set to `ExecutingPreBackupActions`. If the PreBackupActions return an err, the function `runBackup` returns it and backup object is not processed.
+The Velero backup controller will be modified so that if there are any PreBackupAction plugins registered, they will be executed after the restore object is created and validated and before the backup object is fetched, more precisely in function `runValidatedRestore` _after_ function [info.backupStore.GetBackupVolumeSnapshots](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L460). If the PreRestoreActions return an err, the restore object is not processed and the Restore phase will be set a `FailedPreRestoreActions`.
 
 The PostBackupAction plugin API will resemble the BackupItemAction plugin design, but with the fundamental difference that it will receive only as input the Velero `Backup` object without any resource list items.
 By this stage, the backup has already been executed, with items backed up and volumes snapshots processed and persisted.
 The `PostBackupAction` interface will only have an `Execute()` method since the plugin will be executed only once per Backup, not per item.
 
-If there are any PostBackupAction plugins registered, they will be executed after backup is processed and persisted, more precisely _after_ [c.runBackup](https://github.com/vmware-tanzu/velero/blob/74476db9d791fa91bba0147eac8ec189820adb3d/pkg/controller/backup_controller.go#L274). During the execution of `PostBackupAction`, the status of the backup object will be set to `ExecutingPostBackupActions`.  We want to capture the logs from the PostBackupActions on the object storage, so after execution of `PostBackupAction`, backup controller will persist the logs adding a new log on the existent backup store via a new method called `PatchBackup` on `BackupStore` interface. If the PostBackupActions return errors or warnings, these return statuses are counted towards to the backup Status object on `backup.Status.Warnings` and `backup.Status.Errors`.
+If there are any PostBackupAction plugins registered, they will be executed after the restore finishes processing all items and volumes snapshots are restored and logs persisted, more precisely in function `processRestore` _after_ setting [`restore.Status.CompletionTimestamp`](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L273).
 
 The Velero restore controller package will be modified for `PreRestoreAction` and `PostRestoreAction`.
 
@@ -84,9 +161,103 @@ The PostRestoreAction plugin API will resemble the RestoreItemAction plugin desi
 At this stage, the restore has already been executed.
 The `PostRestoreAction` interface will only have an `Execute()` method since the plugin will be executed only once per Restore, not per item.
 
-If any PostRestoreAction plugins are registered, they will be executed after the restore finishes processing all items and volumes snapshots are restored and logs persisted, more precisely in function `processRestore` _after_ setting [`restore.Status.CompletionTimestamp`](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L273). In this case registerd, the status of the restore object will be set to `ExecutingPreRestoreActions`. If the actions return errors or warnings, these return statuses are counted towards to the restore Status object, on `restoreWarnings`, `restoreErrors` and dissaminated to the restore's final status.
+If any PostRestoreAction plugins are registered, they will be executed after the restore finishes processing all items and volumes snapshots are restored and logs persisted, more precisely in function `processRestore` _after_ setting [`restore.Status.CompletionTimestamp`](https://github.com/vmware-tanzu/velero/blob/7c75cd6cf854064c9a454e53ba22cc5881d3f1f0/pkg/controller/restore_controller.go#L273).
 
 ## Detailed Design
+
+### New Status struct
+
+To keep the status of the plugins, we propose the following struct:
+
+```go
+type ActionStatus struct {
+    // PluginName is the name of the registered plugin
+    // retrieved by the PluginManager as id.Name
+    // +optional
+    // +nullable
+    PluginName string `json:"pluginName,omitempty"`
+
+    // StartTimestamp records the time the plugin started.
+    // +optional
+    // +nullable
+    StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+
+    // CompletionTimestamp records the time the plugin was completed.
+    // +optional
+    // +nullable
+    CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+    // Phase is the current state of the Action.
+    // +optional
+    // +nullable
+    Phase ActionPhase `json:"phase,omitempty"`
+}
+
+// ActionPhase is a string representation of the lifecycle phase of an action being executed by a plugin
+// of a Velero backup.
+// +kubebuilder:validation:Enum=InProgress;Completed;Failed
+type ActionPhase string
+
+const (
+    // ActionPhaseInProgress means the action has being executed
+    ActionPhaseInProgress ActionPhase = "InProgress"
+
+    // ActionPhaseCompleted means the action finished successfully
+    ActionPhaseCompleted ActionPhase = "Completed"
+
+    // ActionPhaseFailed means the action failed
+    ActionPhaseFailed ActionPhase = "Failed"
+)
+
+```
+
+### Backup Status of the Plugins
+
+The `Backup` Status section will have the follow:
+
+```go
+type BackupStatus struct {
+    (...)
+    // PreBackupActionsStatuses contains information about the pre backup plugins's execution.
+    // Note that this information is will be only populated if there are prebackup plugins actions
+    // registered
+    // +optional
+    // +nullable
+    PreBackupActionsStatuses *[]ActionStatus `json:"preBackupActionsStatuses,omitempty"`
+
+    // PostBackupActionsStatuses contains information about the post backup plugins's execution.
+    // Note that this information is will be only populated if there are postbackup plugins actions
+    // registered
+    // +optional
+    // +nullable
+    PostBackupActionsStatuses *[]ActionStatus `json:"postBackupActionsStatuses,omitempty"`
+
+}
+```
+
+### Restore Status of the Plugins
+
+The `Restore` Status section will have the follow:
+
+```go
+type RestoreStatus struct {
+    (...)
+    // PreRestoreActionsStatuses contains information about the pre Restore plugins's execution.
+    // Note that this information is will be only populated if there are preRestore plugins actions
+    // registered
+    // +optional
+    // +nullable
+    PreRestoreActionsStatuses *[]ActionStatus `json:"preRestoreActionsStatuses,omitempty"`
+
+    // PostRestoreActionsStatuses contains information about the post restore plugins's execution.
+    // Note that this information is will be only populated if there are postrestore plugins actions
+    // registered
+    // +optional
+    // +nullable
+    PostRestoreActionsStatuses *[]ActionStatus `json:"postRestoreActionsStatuses,omitempty"`
+
+}
+```
 
 ### New types
 
@@ -149,6 +320,18 @@ type PostRestoreAction interface {
 ```
 
 `PostRestoreAction` will be defined in `pkg/plugin/velero/post_restore_action.go`.
+
+### New BackupStore Interface Methods
+
+For the persistence of the logs originated from the PostBackup and PostRestore plugins, create two additional methods on `BackupStore` interface:
+
+```go
+type BackupStore interface {
+    (...)
+    PutPostBackuplog(backup string, log io.Reader) error
+    PutPostRestoreLog(backup, restore string, log io.Reader) error
+    (...)
+```
 
 ### Generate Protobuf Definitions and Client/Servers
 
