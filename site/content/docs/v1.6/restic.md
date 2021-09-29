@@ -10,41 +10,41 @@ the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Az
 It also provides a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.
 
-The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
-local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
+Velero's Restic integration was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using Restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
+local, or any other volume type that doesn't have a native snapshot concept, Restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
 cross-volume-type data migrations.
 
 **NOTE:** hostPath volumes are not supported, but the [local volume type][4] is supported.
 
-## Setup restic
+## Setup Restic
 
 ### Prerequisites
 
-- Understand how Velero performs [backups with the restic integration](#how-backup-and-restore-work-with-restic).
+- Understand how Velero performs [backups with the Restic integration](#how-backup-and-restore-work-with-restic).
 - [Download][3] the latest Velero release.
-- Kubernetes v1.12.0 and later. Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.12.0 and later.
+- Kubernetes v1.12.0 and later. Velero's Restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.12.0 and later.
 
-### Install restic
+### Install Restic
 
-To install restic, use the `--use-restic` flag in the `velero install` command. See the [install overview][2] for more details on other flags for the install command.
+To install Restic, use the `--use-restic` flag in the `velero install` command. See the [install overview][2] for more details on other flags for the install command.
 
 ```
 velero install --use-restic
 ```
 
-When using restic on a storage provider that doesn't have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
+When using Restic on a storage provider that doesn't have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
-### Configure restic DaemonSet spec
+### Configure Restic DaemonSet spec
 
-After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
+After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the Restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
 
 
 **RancherOS**
 
 
-Update the host path for volumes in the restic DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to `/opt/rke/var/lib/kubelet/pods`.
+Update the host path for volumes in the Restic DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to `/opt/rke/var/lib/kubelet/pods`.
 
 ```yaml
 hostPath:
@@ -62,7 +62,7 @@ hostPath:
 **OpenShift**
 
 
-To mount the correct hostpath to pods volumes, run the restic pod in `privileged` mode.
+To mount the correct hostpath to pods volumes, run the Restic pod in `privileged` mode.
 
 1. Add the `velero` ServiceAccount to the `privileged` SCC:
 
@@ -125,7 +125,7 @@ To mount the correct hostpath to pods volumes, run the restic pod in `privileged
     ```
 
 
-If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
+If Restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) to relax the security in your cluster so that Restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
 
 By default a userland openshift namespace will not schedule pods on all nodes in the cluster.
 
@@ -147,7 +147,7 @@ oc create -n <velero namespace> -f ds.yaml
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**
 
-You need to enable the `Allow Privileged` option in your plan configuration so that restic is able to mount the hostpath.
+You need to enable the `Allow Privileged` option in your plan configuration so that Restic is able to mount the hostpath.
 
 The hostPath should be changed from `/var/lib/kubelet/pods` to `/var/vcap/data/kubelet/pods`
 
@@ -172,16 +172,16 @@ kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
 
 ## To back up
 
-Velero supports two approaches of discovering pod volumes that need to be backed up using restic:
+Velero supports two approaches of discovering pod volumes that need to be backed up using Restic:
 
-- Opt-in approach: Where every pod containing a volume to be backed up using restic must be annotated with the volume's name.
-- Opt-out approach: Where all pod volumes are backed up using restic, with the ability to opt-out any volumes that should not be backed up.
+- Opt-in approach: Where every pod containing a volume to be backed up using Restic must be annotated with the volume's name.
+- Opt-out approach: Where all pod volumes are backed up using Restic, with the ability to opt-out any volumes that should not be backed up.
 
 The following sections provide more details on the two approaches.
 
 ### Using the opt-out approach
 
-In this approach, Velero will back up all pod volumes using restic with the exception of:
+In this approach, Velero will back up all pod volumes using Restic with the exception of:
 
 - Volumes mounting the default service account token, kubernetes secrets, and config maps
 - Hostpath volumes
@@ -190,12 +190,12 @@ It is possible to exclude volumes from being backed up using the `backup.velero.
 
 Instructions to back up using this approach are as follows:
 
-1. Run the following command on each pod that contains volumes that should **not** be backed up using restic
+1. Run the following command on each pod that contains volumes that should **not** be backed up using Restic
 
     ```bash
     kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes-excludes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
     ```
-    where the volume names are the names of the volumes in the pod sepc.
+    where the volume names are the names of the volumes in the pod spec.
 
     For example, in the following pod:
 
@@ -221,7 +221,7 @@ Instructions to back up using this approach are as follows:
       - name: pvc2-vm
           claimName: pvc2
     ```
-    to exclude restic backup of volume `pvc1-vm`, you would run:
+    to exclude Restic backup of volume `pvc1-vm`, you would run:
 
     ```bash
     kubectl -n sample annotate pod/app1 backup.velero.io/backup-volumes-excludes=pvc1-vm
@@ -248,7 +248,7 @@ Instructions to back up using this approach are as follows:
 
 ### Using opt-in pod volume backup
 
-Velero, by default, uses this approach to discover pod volumes that need to be backed up using restic, where every pod containing a volume to be backed up using restic must be annotated with the volume's name.
+Velero, by default, uses this approach to discover pod volumes that need to be backed up using Restic, where every pod containing a volume to be backed up using Restic must be annotated with the volume's name.
 
 Instructions to back up using this approach are as follows:
 
@@ -310,7 +310,7 @@ Instructions to back up using this approach are as follows:
 
 ## To restore
 
-Regardless of how volumes are discovered for backup using restic, the process of restoring remains the same.
+Regardless of how volumes are discovered for backup using Restic, the process of restoring remains the same.
 
 1. Restore from your Velero backup:
 
@@ -331,20 +331,20 @@ Regardless of how volumes are discovered for backup using restic, the process of
 
 - `hostPath` volumes are not supported. [Local persistent volumes][4] are supported.
 - Those of you familiar with [restic][1] may know that it encrypts all of its data. Velero uses a static,
-common encryption key for all restic repositories it creates. **This means that anyone who has access to your
-bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
+common encryption key for all Restic repositories it creates. **This means that anyone who has access to your
+bucket can decrypt your Restic backup data**. Make sure that you limit access to the Restic bucket
 appropriately.
 - An incremental backup chain will be maintained across pod reschedules for PVCs. However, for pod volumes that are *not*
 PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (for example, by a ReplicaSet/Deployment), the next backup of those
 volumes will be full rather than incremental, because the pod volume's lifecycle is assumed to be defined by its pod.
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
-- If you plan to use the Velero restic integration to backup 100GB of data or more, you may need to [customize the resource limits](/docs/main/customize-installation/#customize-resource-requests-and-limits) to make sure backups complete successfully.
-- Velero's restic integration backs up data from volumes by accessing the node's filesystem, on which the pod is running. For this reason, restic integration can only backup volumes that are mounted by a pod and not directly from the PVC.
+- If you plan to use Velero's Restic integration to backup 100GB of data or more, you may need to [customize the resource limits](/docs/main/customize-installation/#customize-resource-requests-and-limits) to make sure backups complete successfully.
+- Velero's Restic integration backs up data from volumes by accessing the node's filesystem, on which the pod is running. For this reason, Velero's Restic integration can only backup volumes that are mounted by a pod and not directly from the PVC. For orphan PVC/PV pairs (without running pods), some Velero users overcame this limitation running a staging pod (i.e. a busybox or alpine container with an infinite sleep) to mount these PVC/PV pairs prior taking a Velero backup.
 
 ## Customize Restore Helper Container
 
-Velero uses a helper init container when performing a restic restore. By default, the image for this container is `velero/velero-restic-restore-helper:<VERSION>`,
+Velero uses a helper init container when performing a Restic restore. By default, the image for this container is `velero/velero-restic-restore-helper:<VERSION>`,
 where `VERSION` matches the version/tag of the main Velero image. You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with
 the alternate image.
 
@@ -410,7 +410,7 @@ Are your Velero server and daemonset pods running?
 kubectl get pods -n velero
 ```
 
-Does your restic repository exist, and is it ready?
+Does your Restic repository exist, and is it ready?
 
 ```bash
 velero restic repo get
@@ -446,31 +446,31 @@ kubectl -n velero logs DAEMON_POD_NAME
 **NOTE**: You can increase the verbosity of the pod logs by adding `--log-level=debug` as an argument
 to the container command in the deployment/daemonset pod template spec.
 
-## How backup and restore work with restic
+## How backup and restore work with Restic
 
 Velero has three custom resource definitions and associated controllers:
 
 - `ResticRepository` - represents/manages the lifecycle of Velero's [restic repositories][5]. Velero creates
-a restic repository per namespace when the first restic backup for a namespace is requested. The controller
-for this custom resource executes restic repository lifecycle commands -- `restic init`, `restic check`,
+a Restic repository per namespace when the first Restic backup for a namespace is requested. The controller
+for this custom resource executes Restic repository lifecycle commands -- `restic init`, `restic check`,
 and `restic prune`.
 
-    You can see information about your Velero restic repositories by running `velero restic repo get`.
+    You can see information about your Velero's Restic repositories by running `velero restic repo get`.
 
-- `PodVolumeBackup` - represents a restic backup of a volume in a pod. The main Velero backup process creates
+- `PodVolumeBackup` - represents a Restic backup of a volume in a pod. The main Velero backup process creates
 one or more of these when it finds an annotated pod. Each node in the cluster runs a controller for this
 resource (in a daemonset) that handles the `PodVolumeBackups` for pods on that node. The controller executes
 `restic backup` commands to backup pod volume data.
 
-- `PodVolumeRestore` - represents a restic restore of a pod volume. The main Velero restore process creates one
-or more of these when it encounters a pod that has associated restic backups. Each node in the cluster runs a
+- `PodVolumeRestore` - represents a Restic restore of a pod volume. The main Velero restore process creates one
+or more of these when it encounters a pod that has associated Restic backups. Each node in the cluster runs a
 controller for this resource (in the same daemonset as above) that handles the `PodVolumeRestores` for pods
 on that node. The controller executes `restic restore` commands to restore pod volume data.
 
 ### Backup
 
-1. Based on configuration, the main Velero backup process uses the opt-in or opt-out approach to check each pod that it's backing up for the volumes to be backed up using restic.
-1. When found, Velero first ensures a restic repository exists for the pod's namespace, by:
+1. Based on configuration, the main Velero backup process uses the opt-in or opt-out approach to check each pod that it's backing up for the volumes to be backed up using Restic.
+1. When found, Velero first ensures a Restic repository exists for the pod's namespace, by:
     - checking if a `ResticRepository` custom resource already exists
     - if not, creating a new one, and waiting for the `ResticRepository` controller to init/check it
 1. Velero then creates a `PodVolumeBackup` custom resource per volume listed in the pod annotation
@@ -485,14 +485,14 @@ on that node. The controller executes `restic restore` commands to restore pod v
 ### Restore
 
 1. The main Velero restore process checks each existing `PodVolumeBackup` custom resource in the cluster to backup from.
-1. For each `PodVolumeBackup` found, Velero first ensures a restic repository exists for the pod's namespace, by:
+1. For each `PodVolumeBackup` found, Velero first ensures a Restic repository exists for the pod's namespace, by:
     - checking if a `ResticRepository` custom resource already exists
     - if not, creating a new one, and waiting for the `ResticRepository` controller to init/check it (note that
     in this case, the actual repository should already exist in object storage, so the Velero controller will simply
     check it for integrity)
-1. Velero adds an init container to the pod, whose job is to wait for all restic restores for the pod to complete (more
+1. Velero adds an init container to the pod, whose job is to wait for all Restic restores for the pod to complete (more
 on this shortly)
-1. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API
+1. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API. Then, the Kubernetes scheduler schedules this pod to a worker node, and the pod must be in a running state. If the pod fails to start for some reason (i.e. lack of cluster resources), the Restic restore will not be done.
 1. Velero creates a `PodVolumeRestore` custom resource for each volume to be restored in the pod
 1. The main Velero process now waits for each `PodVolumeRestore` resource to complete or fail
 1. Meanwhile, each `PodVolumeRestore` is handled by the controller on the appropriate node, which:
@@ -512,7 +512,7 @@ on to running other init containers/the main containers.
 
 ### Monitor backup annotation
 
-Velero does not provide a mechanism to detect persistent volume claims that are missing the restic backup annotation.
+Velero does not provide a mechanism to detect persistent volume claims that are missing the Restic backup annotation.
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
