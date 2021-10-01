@@ -12,7 +12,7 @@ params:
   hero:
     backgroundColor: med-blue
   versioning: true
-  latest: v1.6
+  latest: v1.7
   versions:
     - main
     - v1.7
