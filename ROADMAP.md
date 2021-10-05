@@ -15,33 +15,30 @@ We work with and rely on community feedback to focus our efforts to improve Vele
 The following table includes the current roadmap for Velero. If you have any questions or would like to contribute to Velero, please attend a [community meeting](https://velero.io/community/) to discuss with our team. If you don't know where to start, we are always looking for contributors that will help us reduce technical, automation, and documentation debt.
 Please take the timelines & dates as proposals and goals. Priorities and requirements change based on community feedback, roadblocks encountered, community contributions, etc. If you depend on a specific item, we encourage you to attend community meetings to get updated status information, or help us deliver that feature by contributing to Velero.
 
-`Last Updated: July 2021`
+`Last Updated: October 2021`
 
-#### 1.7.0 Roadmap (to be delivered early fall)
+#### 1.8.0 Roadmap (to be delivered January/February 2021)
 The release roadmap is split into Core items that are required for the release and desired items that may slip the release.
 
 ##### Core items
-The top priority of 1.7 is to increase the technical health of Velero and be more efficient with Velero developer time by streamlining the release process and automating and expanding the E2E test suite.
+|Issue|Description|Timeline|Notes|
+|---|---|---|---|
+|[4108](https://github.com/vmware-tanzu/velero/issues/4108), [4109](https://github.com/vmware-tanzu/velero/issues/4109)|Solution for CSI - Azure and AWS|2022 H1|Currently, Velero plugins for AWS and Azure cannot back up persistent volumes that were provisioned using the CSI driver. This will fix that.|
+|[3229](https://github.com/vmware-tanzu/velero/issues/3229),[4112](https://github.com/vmware-tanzu/velero/issues/4112)|Moving data mover functionality from the Velero Plugin for vSphere into Velero proper|2022 H1|This work is a precursor to decoupling the Astrolabe snapshotting infrastructure.|
+|[3533](https://github.com/vmware-tanzu/velero/issues/3533)|Upload Progress Monitoring|2022 H1|Finishing up the work done in the 1.7 timeframe. The data mover work depends on this.|
+|[1975](https://github.com/vmware-tanzu/velero/issues/1975)|Test dual stack mode|2022 H1|We already tested IPv6, but we want to confirm that dual stack mode works as well.|
+|[2082](https://github.com/vmware-tanzu/velero/issues/2082)|Delete Backup CRs on removing target location. |2022 H1||
+|[3516](https://github.com/vmware-tanzu/velero/issues/3516)|Restore issue with MutatingWebhookConfiguration v1beta1 API version|2022 H1||
+|[2308](https://github.com/vmware-tanzu/velero/issues/2308)|Restoring nodePort service that has nodePort preservation always fails if service already exists in the namespace|2022 H1||
+|[4115](https://github.com/vmware-tanzu/velero/issues/4115)|Support for multiple set of credentials for VolumeSnapshotLocations|2022 H1||
+|[1980](https://github.com/vmware-tanzu/velero/issues/1980)|Velero triggers backup immediately for scheduled backups|2022 H1||
+|[4067](https://github.com/vmware-tanzu/velero/issues/4067)|Pre and post backup and restore hooks|2022 H1||
+|[3742](https://github.com/vmware-tanzu/velero/issues/3742)|Carvel packaging for Velero for vSphere|2022 H1|AWS and Azure have been completed already.|
+|[3285](https://github.com/vmware-tanzu/velero/issues/3285)|Design doc for Velero plugin versioning|2022 H1||
+||Technical health (prioritizing giving developers confidence and saving developers time)|2022 H1|More automated tests (especially the pre-release manual tests) and more automation of the running of tests.|
+|[4110](https://github.com/vmware-tanzu/velero/issues/4110)|Solution for CSI - GCP|2022 H1|Currently, the Velero plugin for GCP cannot back up persistent volumes that were provisioned using the CSI driver. This will fix that.|
+|[3742](https://github.com/vmware-tanzu/velero/issues/3742)|Carvel packaging for Velero for restic|2022 H1|AWS and Azure have been completed already.|
+|[3454](https://github.com/vmware-tanzu/velero/issues/3454),[4134](https://github.com/vmware-tanzu/velero/issues/4134),[4135](https://github.com/vmware-tanzu/velero/issues/4135)|Kubebuilder tech debt|2022 H1||
+|[4111](https://github.com/vmware-tanzu/velero/issues/4111)|Ignore items returned by ItemSnapshotter.AlsoHandles during backup|2022 H1|This will enable backup of complex objects, because we can then tell Velero to ignore things that were already backed up when Velero was previously called recursively.|
 
-|Issue|Description|
-|---|---|
-||Streamline release process|
-||Automate the running of the E2E tests|
-||Convert pre-release manual tests to automated E2E tests|
-|[3493](https://github.com/vmware-tanzu/velero/issues/3493)|[Carvel](https://github.com/vmware-tanzu/velero/issues/3493) based installation (in addition to the existing *velero install* CLI).|
-|[675](https://github.com/vmware-tanzu/velero/issues/675)|Velero command to generate debugging information.  Will integrate with [Crashd - Crash Diagnostics](https://github.com/vmware-tanzu/velero/issues/675)|
-|[3285](https://github.com/vmware-tanzu/velero/issues/3285)|Design doc for Velero plugin versioning|
-|[1975](https://github.com/vmware-tanzu/velero/issues/1975)|IPV6 support|
-|[3533](https://github.com/vmware-tanzu/velero/issues/3533)|Upload Progress Monitoring|
-|[3500](https://github.com/vmware-tanzu/velero/issues/3500)|Use distroless containers as a base|
-
-
-
-##### Items formerly in 1.7 that will slip due to staffing changes
-|Issue|Description|
-|---|---|
-|[3536](https://github.com/vmware-tanzu/velero/issues/3536)|Manifest for backup/restore|
-|[2066](https://github.com/vmware-tanzu/velero/issues/2066)|CSI Snapshots GA|
-|[3535](https://github.com/vmware-tanzu/velero/issues/3535)|Design doc for multiple cluster support|
-|[2922](https://github.com/vmware-tanzu/velero/issues/2922)|Plugin timeouts|
-|[3531](https://github.com/vmware-tanzu/velero/issues/3531)|Test plan for Velero|
+Other work may make it into the 1.8 release, but this is the work that will be prioritized first.
