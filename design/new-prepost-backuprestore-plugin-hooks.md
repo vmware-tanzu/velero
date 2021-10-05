@@ -260,7 +260,57 @@ type RestoreStatus struct {
 }
 ```
 
-### New types
+### New Backup and Restore Phases
+
+#### New Backup Phase: FailedPreBackupActions
+
+In case the PreBackupActionsStatuses has at least one `ActionPhase` = `Failed`, it means al least one of the plugins returned an error and consequently, the backup will not move forward. The final status of the Backup object will be set as `FailedPreBackupActions`:
+
+```go
+
+// BackupPhase is a string representation of the lifecycle phase
+// of a Velero backup.
+// +kubebuilder:validation:Enum=New;FailedValidation;FailedPreBackupActions;InProgress;Uploading;UploadingPartialFailure;Completed;PartiallyFailed;Failed;Deleting
+type BackupPhase string
+
+const (
+
+    (...)
+
+    // BackupPhaseFailedPreBackupActions means one or more the Pre Backup Actions has failed
+    // and therefore backup will not run.
+    BackupPhaseFailedPreBackupActions BackupPhase = "FailedPreBackupActions"
+
+    (...)
+)
+
+```
+
+#### New Restore Phase FailedPreRestoreActions
+
+In case the PreRestoreActionsStatuses has at least one `ActionPhase` = `Failed`, it means al least one of the plugins returned an error and consequently, the restore will not move forward. The final status of the Restore object will be set as `FailedPreRestoreActions`:
+
+```go
+
+// RestorePhase is a string representation of the lifecycle phase
+// of a Velero restore
+// +kubebuilder:validation:Enum=New;FailedValidation;FailedPreRestoreActions;InProgress;Completed;PartiallyFailed;Failed
+type RestorePhase string
+
+const (
+
+    (...)
+
+    // RestorePhaseFailedPreRestoreActions means one or more the Pre Restore Actions has failed
+    // and therefore restore will not run.
+    RestorePhaseFailedPreRestoreActions BackupPhase = "FailedPreRestoreActions"
+
+    (...)
+)
+
+```
+
+### New Interface types
 
 #### PreBackupAction
 
@@ -269,8 +319,8 @@ The `PreBackupAction` interface is as follows:
 ```go
 // PreBackupAction provides a hook into the backup process before it begins.
 type PreBackupAction interface {
-	// Execute the PreBackupAction plugin providing it access to the Backup that
-	// is being executed
+    // Execute the PreBackupAction plugin providing it access to the Backup that
+    // is being executed
     Execute(backup *api.Backup) error
 }
 ```
@@ -284,8 +334,8 @@ The `PostBackupAction` interface is as follows:
 ```go
 // PostBackupAction provides a hook into the backup process after it completes.
 type PostBackupAction interface {
-	// Execute the PostBackupAction plugin providing it access to the Backup that
-	// has been completed
+    // Execute the PostBackupAction plugin providing it access to the Backup that
+    // has been completed
     Execute(backup *api.Backup) error
 }
 ```
@@ -299,8 +349,8 @@ The `PreRestoreAction` interface is as follows:
 ```go
 // PreRestoreAction provides a hook into the restore process before it begins.
 type PreRestoreAction interface {
-	// Execute the PreRestoreAction plugin providing it access to the Restore that
-	// is being executed
+    // Execute the PreRestoreAction plugin providing it access to the Restore that
+    // is being executed
     Execute(restore *api.Restore) error
 }
 ```
@@ -314,8 +364,8 @@ The `PostRestoreAction` interface is as follows:
 ```go
 // PostRestoreAction provides a hook into the restore process after it completes.
 type PostRestoreAction interface {
-	// Execute the PostRestoreAction plugin providing it access to the Restore that
-	// has been completed
+    // Execute the PostRestoreAction plugin providing it access to the Restore that
+    // has been completed
     Execute(restore *api.Restore) error
 }
 ```
@@ -333,6 +383,9 @@ type BackupStore interface {
     PutPostRestoreLog(backup, restore string, log io.Reader) error
     (...)
 ```
+
+The implementation of these new two methods will go hand-in-hand with the changes of uploading phases rebase.
+
 
 ### Generate Protobuf Definitions and Client/Servers
 
@@ -542,6 +595,100 @@ type Manager interface {
 `GetPostBackupAction` and `GetPostBackupActions` will invoke the `restartablePostBackupAction` implementations.
 `GetPreRestoreAction` and `GetPreRestoreActions` will invoke the `restartablePreRestoreAction` implementations.
 `GetPostRestoreAction` and `GetPostRestoreActions` will invoke the `restartablePostRestoreAction` implementations.
+
+### How to invoke the Plugins
+
+#### Getting Pre/Post Backup Actions
+
+Getting Actions on `backup_controller.go` in `runBackup`:
+
+```go
+
+    backupLog.Info("Getting PreBackup actions")
+    preBackupActions, err := pluginManager.GetPreBackupActions()
+    if err != nil {
+        return err
+    }
+
+    backupLog.Info("Getting PostBackup actions")
+    postBackupActions, err := pluginManager.GetPostBackupActions()
+    if err != nil {
+        return err
+    }
+```
+
+#### Pre Backup Actions Plugins
+
+Calling the Pre Backup actions:
+
+```go
+    for _, preBackupAction := range preBackupActions {
+        err := preBackupAction.Execute(backup.Backup)
+        if err != nil {
+            backup.Backup.Status.Phase = velerov1api.BackupPhaseFailedPreBackupActions
+            return err
+        }
+    }
+```
+
+#### Post Backup Actions Plugins
+
+Calling the Post Backup actions:
+
+```go
+    for _, postBackupAction := range postBackupActions {
+        err := postBackupAction.Execute(backup.Backup)
+        if err != nil {
+            postBackupLog.Error(err)
+        }
+    }
+```
+
+#### Getting Pre/Post Restore Actions
+
+Getting Actions on `restore_controller.go` in `runValidatedRestore`:
+
+```go
+
+    restoreLog.Info("Getting PreRestore actions")
+    preRestoreActions, err := pluginManager.GetPreRestoreActions()
+    if err != nil {
+        return errors.Wrap(err, "error getting pre-restore actions")
+    }
+
+    restoreLog.Info("Getting PostRestore actions")
+    postRestoreActions, err := pluginManager.GetPostRestoreActions()
+    if err != nil {
+        return errors.Wrap(err, "error getting post-restore actions")
+    }
+```
+
+#### Pre Restore Actions Plugins
+
+Calling the Pre Restore actions:
+
+```go
+    for _, preRestoreAction := range preRestoreActions {
+        err := preRestoreAction.Execute(restoreReq.Restore)
+        if err != nil {
+            restoreReq.Restore.Status.Phase = velerov1api.RestorePhaseFailedPreRestoreActions
+            return errors.Wrap(err, "error executing pre-restore action")
+        }
+    }
+```
+
+#### Post Restore Actions Plugins
+
+Calling the Post Restore actions:
+
+```go
+    for _, postRestoreAction := range postRestoreActions {
+        err := postRestoreAction.Execute(restoreReq.Restore)
+        if err != nil {
+            postRestoreLog.Error(err.Error())
+        }
+    }
+```
 
 ## Alternatives Considered
 
