@@ -486,7 +486,12 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		return errors.WithMessage(err, "error getting volume info")
 	}
 
-	log.Info("Snapshotting persistent volume")
+	claim := pv.Spec.ClaimRef
+	if claim != nil {
+		log.Infof("Snapshotting persistent volume %s (%s/%s)", pv.Name, claim.Namespace, claim.Name)
+	} else {
+		log.Infof("Snapshotting unclaimed persistent volume %s", pv.Name)
+	}
 	snapshot := volumeSnapshot(ib.backupRequest.Backup, pv.Name, volumeID, volumeType, pvFailureDomainZone, location, iops)
 
 	var errs []error
