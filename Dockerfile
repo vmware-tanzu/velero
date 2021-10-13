@@ -22,14 +22,14 @@ ARG REGISTRY
 
 ENV CGO_ENABLED=0 \
     GO111MODULE=on \
-    GOPROXY=${GOPROXY} \
-    LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE} -X ${PKG}/pkg/buildinfo.ImageRegistry=${REGISTRY}"
+    GOPROXY=${GOPROXY}
 
 WORKDIR /go/src/github.com/vmware-tanzu/velero
 
-COPY . /go/src/github.com/vmware-tanzu/velero
-
 RUN apt-get update && apt-get install -y bzip2
+
+COPY go.mod go.sum /go/src/github.com/vmware-tanzu/velero
+RUN go mod download
 
 FROM --platform=$BUILDPLATFORM builder-env as builder
 
@@ -40,13 +40,21 @@ ARG PKG
 ARG BIN
 ARG RESTIC_VERSION
 
+WORKDIR /go/src/github.com/vmware-tanzu/velero
+
+COPY hack /go/src/github.com/vmware-tanzu/velero/hack
+
 ENV GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     GOARM=${TARGETVARIANT}
 
 RUN mkdir -p /output/usr/bin && \
-    bash ./hack/download-restic.sh && \
-    export GOARM=$( echo "${GOARM}" | cut -c2-) && \
+    bash ./hack/download-restic.sh
+
+ENV LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE} -X ${PKG}/pkg/buildinfo.ImageRegistry=${REGISTRY}"
+
+COPY . /go/src/github.com/vmware-tanzu/velero
+RUN export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
