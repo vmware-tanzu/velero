@@ -415,6 +415,10 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	log = log.WithField("persistentVolume", pv.Name)
+	claim := pv.Spec.ClaimRef
+	if claim != nil {
+		log = log.WithField("persistentVolumeClaimNamespace", claim.Namespace).WithField("persistentVolumeClaimName", claim.Name)
+	}
 
 	// If this PV is claimed, see if we've already taken a (restic) snapshot of the contents
 	// of this PV. If so, don't take a snapshot.
@@ -486,27 +490,27 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		return errors.WithMessage(err, "error getting volume info")
 	}
 
-	claim := pv.Spec.ClaimRef
-	if claim != nil {
-		log.Infof("Snapshotting persistent volume %s (%s/%s)", pv.Name, claim.Namespace, claim.Name)
-	} else {
-		log.Infof("Snapshotting unclaimed persistent volume %s", pv.Name)
-	}
-	snapshot := volumeSnapshot(ib.backupRequest.Backup, pv.Name, volumeID, volumeType, pvFailureDomainZone, location, iops)
+	ib.backupRequest.VolumeSnapshotWaitGroup.Add(1)
+	go func() {
+		defer ib.backupRequest.VolumeSnapshotWaitGroup.Done()
 
-	var errs []error
-	snapshotID, err := volumeSnapshotter.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
-	if err != nil {
-		errs = append(errs, errors.Wrap(err, "error taking snapshot of volume"))
-		snapshot.Status.Phase = volume.SnapshotPhaseFailed
-	} else {
-		snapshot.Status.Phase = volume.SnapshotPhaseCompleted
-		snapshot.Status.ProviderSnapshotID = snapshotID
-	}
-	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
+		log.Info("Snapshotting persistent volume")
+		snapshot := volumeSnapshot(ib.backupRequest.Backup, pv.Name, volumeID, volumeType, pvFailureDomainZone, location, iops)
 
-	// nil errors are automatically removed
-	return kubeerrs.NewAggregate(errs)
+		snapshotID, err := volumeSnapshotter.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
+		if err != nil {
+			log.WithError(err).Error("error taking snapshot of volume")
+			snapshot.Status.Phase = volume.SnapshotPhaseFailed
+		} else {
+			snapshot.Status.Phase = volume.SnapshotPhaseCompleted
+			snapshot.Status.ProviderSnapshotID = snapshotID
+		}
+
+		ib.backupRequest.VolumeSnapshotMutex.Lock()
+		defer ib.backupRequest.VolumeSnapshotMutex.Unlock()
+		ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
+	}()
+	return nil
 }
 
 func volumeSnapshot(backup *velerov1api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {

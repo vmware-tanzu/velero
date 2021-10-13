@@ -398,6 +398,10 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
 	}
 
+	log.Info("Waiting for any volume snapshotting to complete")
+	// TODO integrate into progressUpdate
+	backupRequest.VolumeSnapshotWaitGroup.Wait()
+
 	// no more progress updates will be sent on the 'update' channel
 	quit <- struct{}{}
 
