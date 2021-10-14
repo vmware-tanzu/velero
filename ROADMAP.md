@@ -18,9 +18,7 @@ Please take the timelines & dates as proposals and goals. Priorities and require
 `Last Updated: October 2021`
 
 #### 1.8.0 Roadmap (to be delivered January/February 2021)
-The release roadmap is split into Core items that are required for the release and desired items that may slip the release.
 
-##### Core items
 |Issue|Description|Timeline|Notes|
 |---|---|---|---|
 |[4108](https://github.com/vmware-tanzu/velero/issues/4108), [4109](https://github.com/vmware-tanzu/velero/issues/4109)|Solution for CSI - Azure and AWS|2022 H1|Currently, Velero plugins for AWS and Azure cannot back up persistent volumes that were provisioned using the CSI driver. This will fix that.|
@@ -35,7 +33,7 @@ The release roadmap is split into Core items that are required for the release a
 |[4067](https://github.com/vmware-tanzu/velero/issues/4067)|Pre and post backup and restore hooks|2022 H1||
 |[3742](https://github.com/vmware-tanzu/velero/issues/3742)|Carvel packaging for Velero for vSphere|2022 H1|AWS and Azure have been completed already.|
 |[3285](https://github.com/vmware-tanzu/velero/issues/3285)|Design doc for Velero plugin versioning|2022 H1||
-||Technical health (prioritizing giving developers confidence and saving developers time)|2022 H1|More automated tests (especially the pre-release manual tests) and more automation of the running of tests.|
+|[4231](https://github.com/vmware-tanzu/velero/issues/4231)|Technical health (prioritizing giving developers confidence and saving developers time)|2022 H1|More automated tests (especially the pre-release manual tests) and more automation of the running of tests.|
 |[4110](https://github.com/vmware-tanzu/velero/issues/4110)|Solution for CSI - GCP|2022 H1|Currently, the Velero plugin for GCP cannot back up persistent volumes that were provisioned using the CSI driver. This will fix that.|
 |[3742](https://github.com/vmware-tanzu/velero/issues/3742)|Carvel packaging for Velero for restic|2022 H1|AWS and Azure have been completed already.|
 |[3454](https://github.com/vmware-tanzu/velero/issues/3454),[4134](https://github.com/vmware-tanzu/velero/issues/4134),[4135](https://github.com/vmware-tanzu/velero/issues/4135)|Kubebuilder tech debt|2022 H1||
