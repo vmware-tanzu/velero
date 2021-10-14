@@ -15,9 +15,6 @@ FROM --platform=$BUILDPLATFORM golang:1.16 as builder-env
 
 ARG GOPROXY
 ARG PKG
-ARG VERSION
-ARG GIT_SHA
-ARG GIT_TREE_STATE
 ARG REGISTRY
 
 ENV CGO_ENABLED=0 \
@@ -51,6 +48,9 @@ ENV GOOS=${TARGETOS} \
 RUN mkdir -p /output/usr/bin && \
     bash ./hack/download-restic.sh
 
+ARG VERSION
+ARG GIT_SHA
+ARG GIT_TREE_STATE
 ENV LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE} -X ${PKG}/pkg/buildinfo.ImageRegistry=${REGISTRY}"
 
 COPY . /go/src/github.com/vmware-tanzu/velero
