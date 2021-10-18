@@ -164,21 +164,13 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 	excludes := sets.NewString(excludesList...)
 
 	for _, itm := range includes.List() {
-		// Although asterisks is not a valid Kubernetes namespace name, it is
-		// allowed here.
-		if itm != "*" {
-			if nsErrs := validateNamespaceName(itm); nsErrs != nil {
-				errs = append(errs, nsErrs...)
-			}
+		if nsErrs := validateNamespaceName(itm); nsErrs != nil {
+			errs = append(errs, nsErrs...)
 		}
 	}
-
 	for _, itm := range excludes.List() {
-		// Asterisks in excludes list have been checked previously.
-		if itm != "*" {
-			if nsErrs := validateNamespaceName(itm); nsErrs != nil {
-				errs = append(errs, nsErrs...)
-			}
+		if nsErrs := validateNamespaceName(itm); nsErrs != nil {
+			errs = append(errs, nsErrs...)
 		}
 	}
 
@@ -188,7 +180,18 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 func validateNamespaceName(ns string) []error {
 	var errs []error
 
-	if errMsgs := validation.ValidateNamespaceName(ns, false); errMsgs != nil {
+	// Velero interprets empty string as "no namespace", so allow it even though
+	// it is not a valid Kubernetes name.
+	if ns == "" {
+		return nil
+	}
+
+	// Kubernetes does not allow asterisks in namespaces but Velero uses them as
+	// wildcards. Replace asterisks with an arbitrary letter to pass Kubernetes
+	// validation.
+	tmpNamespace := strings.ReplaceAll(ns, "*", "x")
+
+	if errMsgs := validation.ValidateNamespaceName(tmpNamespace, false); errMsgs != nil {
 		for _, msg := range errMsgs {
 			errs = append(errs, errors.Errorf("invalid namespace %q: %s", ns, msg))
 		}
