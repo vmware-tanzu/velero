@@ -232,7 +232,7 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 		{
 			name:     "special characters in name is invalid",
 			includes: []string{"foo?", "foo.bar", "bar_321"},
-			excludes: []string{"$foo", "foo*bar", "bar=321"},
+			excludes: []string{"$foo", "foo>bar", "bar=321"},
 			wantErr:  true,
 		},
 		{
@@ -243,6 +243,18 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 		{
 			name:     "include everything using asterisk is valid",
 			includes: []string{"*"},
+			wantErr:  false,
+		},
+		{
+			name:     "excludes can contain wildcard",
+			includes: []string{"foo", "bar"},
+			excludes: []string{"nginx-ingress-*", "*-bar", "*-ingress-*"},
+			wantErr:  false,
+		},
+		{
+			name:     "includes can contain wildcard",
+			includes: []string{"*-foo", "kube-*", "*kube*"},
+			excludes: []string{"bar"},
 			wantErr:  false,
 		},
 		{
