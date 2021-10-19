@@ -82,7 +82,7 @@ see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-v
 endef
 
 # The version of restic binary to be downloaded for power architecture
-RESTIC_VERSION ?= 0.12.0
+RESTIC_VERSION ?= 0.12.1
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
