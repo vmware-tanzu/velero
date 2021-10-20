@@ -20,11 +20,11 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/gomega v1.15.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_golang v1.11.0
 	github.com/robfig/cron v1.1.0
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
@@ -34,14 +34,14 @@ require (
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	google.golang.org/grpc v1.38.0
 	k8s.io/api v0.22.2
-	k8s.io/apiextensions-apiserver v0.19.12
+	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/cli-runtime v0.22.2
 	k8s.io/client-go v0.22.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.19.12
 	sigs.k8s.io/cluster-api v0.3.11-0.20210106212952-b6c1b5b3db3d
-	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
+	sigs.k8s.io/controller-runtime v0.10.2
 )
 
 replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
