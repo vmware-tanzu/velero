@@ -18,6 +18,7 @@ package clientmgmt
 
 import (
 	"fmt"
+	"io"
 	"log"
 
 	hclog "github.com/hashicorp/go-hclog"
@@ -161,4 +162,38 @@ func (l *logrusAdapter) StandardLogger(opts *hclog.StandardLoggerOptions) *log.L
 // implementation cannot update the level on the fly, it should no-op.
 func (l *logrusAdapter) SetLevel(_ hclog.Level) {
 	return
+}
+
+// ImpliedArgs returns With key/value pairs
+func (l *logrusAdapter) ImpliedArgs() []interface{} {
+	panic("not implemented")
+}
+
+// Args are alternating key, val pairs
+// keys must be strings
+// vals can be any type, but display is implementation specific
+// Emit a message and key/value pairs at a provided log level
+func (l *logrusAdapter) Log(level hclog.Level, msg string, args ...interface{}) {
+	switch level {
+	case hclog.Trace:
+		l.Trace(msg, args...)
+	case hclog.Debug:
+		l.Debug(msg, args...)
+	case hclog.Info:
+		l.Info(msg, args...)
+	case hclog.Warn:
+		l.Warn(msg, args...)
+	case hclog.Error:
+		l.Error(msg, args...)
+	}
+}
+
+// Returns the Name of the logger
+func (l *logrusAdapter) Name() string {
+	return l.name
+}
+
+// Return a value that conforms to io.Writer, which can be passed into log.SetOutput()
+func (l *logrusAdapter) StandardWriter(opts *hclog.StandardLoggerOptions) io.Writer {
+	panic("not implemented")
 }
