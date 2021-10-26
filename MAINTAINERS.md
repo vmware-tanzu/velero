@@ -26,7 +26,8 @@
 
 | Feature Area | Lead |
 | ----------------------------- | :---------------------: |
-| Technical Lead | Dave Smith-Uchida (dsu-igeek) |
+| Architect | Dave Smith-Uchida (dsu-igeek) |
+| Technical Lead | Daniel Jiang (reasonerjt) |
 | Kubernetes CSI Liaison |  |
 | Deployment | JenTing Hsiao (jenting) |
 | Community Management | Jonas Rosland (jonasrosland) |
