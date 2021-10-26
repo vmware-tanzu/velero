@@ -274,7 +274,7 @@ func TestGetNextRunTime(t *testing.T) {
 		{
 			name:                      "first run",
 			schedule:                  defaultSchedule(),
-			expectedDue:               true,
+			expectedDue:               false,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
@@ -319,6 +319,9 @@ func TestGetNextRunTime(t *testing.T) {
 				require.NoError(t, err, "unable to parse test.lastRanOffset: %v", err)
 
 				test.schedule.Status.LastBackup = &metav1.Time{Time: testClock.Now().Add(-offsetDuration)}
+				test.schedule.CreationTimestamp = *test.schedule.Status.LastBackup
+			} else {
+				test.schedule.CreationTimestamp = metav1.Time{Time: testClock.Now()}
 			}
 
 			nextRunTimeOffset, err := time.ParseDuration(test.expectedNextRunTimeOffset)
@@ -326,11 +329,11 @@ func TestGetNextRunTime(t *testing.T) {
 				panic(err)
 			}
 
-			// calculate expected next run time (if the schedule hasn't run yet, this
-			// will be the zero value which will trigger an immediate backup)
 			var baseTime time.Time
 			if test.lastRanOffset != "" {
 				baseTime = test.schedule.Status.LastBackup.Time
+			} else {
+				baseTime = test.schedule.CreationTimestamp.Time
 			}
 			expectedNextRunTime := baseTime.Add(nextRunTimeOffset)
 
