@@ -180,6 +180,12 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 func validateNamespaceName(ns string) []error {
 	var errs []error
 
+	// Velero interprets empty string as "no namespace", so allow it even though
+	// it is not a valid Kubernetes name.
+	if ns == "" {
+		return nil
+	}
+
 	// Kubernetes does not allow asterisks in namespaces but Velero uses them as
 	// wildcards. Replace asterisks with an arbitrary letter to pass Kubernetes
 	// validation.

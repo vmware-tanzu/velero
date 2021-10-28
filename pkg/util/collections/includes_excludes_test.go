@@ -208,11 +208,6 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "empty string is invalid",
-			includes: []string{""},
-			wantErr:  true,
-		},
-		{
 			name:     "asterisk by itself is valid",
 			includes: []string{"*"},
 			wantErr:  false,
@@ -238,6 +233,16 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 		{
 			name:     "empty includes (everything) is valid",
 			includes: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "empty string includes is valid (includes nothing)",
+			includes: []string{""},
+			wantErr:  false,
+		},
+		{
+			name:     "empty string excludes is valid (excludes nothing)",
+			excludes: []string{""},
 			wantErr:  false,
 		},
 		{
