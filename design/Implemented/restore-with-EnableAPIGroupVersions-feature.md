@@ -1,6 +1,6 @@
 # Restore API Group Version by Priority Level When EnableAPIGroupVersions Feature is Set
 
-Status: Draft
+Status: Accepted
 
 ## Abstract
 
