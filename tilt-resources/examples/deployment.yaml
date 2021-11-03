@@ -39,7 +39,7 @@ spec:
               value: /plugins
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
-            - name: AZURE_SHARED_CREDENTIALS_FILE
+            - name: AZURE_CREDENTIALS_FILE
               value: /credentials/cloud
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /credentials/cloud
