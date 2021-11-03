@@ -209,16 +209,18 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 	}
 
 	if cohabitator, found := r.cohabitatingResources[resource.Name]; found {
-		if cohabitator.seen {
-			log.WithFields(
-				logrus.Fields{
-					"cohabitatingResource1": cohabitator.groupResource1.String(),
-					"cohabitatingResource2": cohabitator.groupResource2.String(),
-				},
-			).Infof("Skipping resource because it cohabitates and we've already processed it")
-			return nil, nil
+		if gv.Group == cohabitator.groupResource1.Group || gv.Group == cohabitator.groupResource2.Group {
+			if cohabitator.seen {
+				log.WithFields(
+					logrus.Fields{
+						"cohabitatingResource1": cohabitator.groupResource1.String(),
+						"cohabitatingResource2": cohabitator.groupResource2.String(),
+					},
+				).Infof("Skipping resource because it cohabitates and we've already processed it")
+				return nil, nil
+			}
+			cohabitator.seen = true
 		}
-		cohabitator.seen = true
 	}
 
 	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)

@@ -57,6 +57,7 @@ func NewAPIServer(t *testing.T) *APIServer {
 				{Group: "apiextensions.k8s.io", Version: "v1beta1", Resource: "customresourcedefinitions"}: "CRDList",
 				{Group: "velero.io", Version: "v1", Resource: "volumesnapshotlocations"}:                   "VSLList",
 				{Group: "extensions", Version: "v1", Resource: "deployments"}:                              "ExtDeploymentsList",
+				{Group: "velero.io", Version: "v1", Resource: "deployments"}:                               "VeleroDeploymentsList",
 			})
 		discoveryClient = &DiscoveryClient{FakeDiscovery: kubeClient.Discovery().(*discoveryfake.FakeDiscovery)}
 	)
