@@ -81,8 +81,8 @@ buildx not enabled, refusing to run this recipe
 see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-velero for more info
 endef
 
-# The version of restic binary to be downloaded for power architecture
-RESTIC_VERSION ?= 0.12.0
+# The version of restic binary to be downloaded
+RESTIC_VERSION ?= 0.12.1
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
