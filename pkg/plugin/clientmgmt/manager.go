@@ -145,11 +145,11 @@ func (m *manager) restartableObjectStores() []RestartableObjectStore {
 	return []RestartableObjectStore{
 		{
 			kind: framework.PluginKindObjectStoreV2,
-			Get: newRestartableObjectStoreV2,
+			Get:  newRestartableObjectStoreV2,
 		},
 		{
 			kind: framework.PluginKindObjectStore,
-			Get: newAdaptedV1ObjectStore,	// Adapt v1 plugin to v2
+			Get:  newAdaptedV1ObjectStore, // Adapt v1 plugin to v2
 		},
 	}
 }
@@ -181,11 +181,11 @@ func (m *manager) restartableVolumeSnapshotters() []RestartableVolumeSnapshotter
 	return []RestartableVolumeSnapshotter{
 		{
 			kind: framework.PluginKindVolumeSnapshotterV2,
-			Get: newRestartableVolumeSnapshotterV2,
+			Get:  newRestartableVolumeSnapshotterV2,
 		},
 		{
 			kind: framework.PluginKindVolumeSnapshotter,
-			Get: newAdaptedV1VolumeSnapshotter,	// Adapt v1 plugin to v2
+			Get:  newAdaptedV1VolumeSnapshotter, // Adapt v1 plugin to v2
 		},
 	}
 }
@@ -236,11 +236,11 @@ func (m *manager) restartableBackupItemActions() []RestartableBackupItemAction {
 	return []RestartableBackupItemAction{
 		{
 			kind: framework.PluginKindBackupItemActionV2,
-			Get: newRestartableBackupItemActionV2,
+			Get:  newRestartableBackupItemActionV2,
 		},
 		{
 			kind: framework.PluginKindBackupItemAction,
-			Get: newAdaptedV1BackupItemAction,	// Adapt v1 plugin to v2
+			Get:  newAdaptedV1BackupItemAction, // Adapt v1 plugin to v2
 		},
 	}
 }
@@ -292,11 +292,11 @@ func (m *manager) restartableRestoreItemActions() []RestartableRestoreItemAction
 	return []RestartableRestoreItemAction{
 		{
 			kind: framework.PluginKindRestoreItemActionV2,
-			Get: newRestartableRestoreItemActionV2,
+			Get:  newRestartableRestoreItemActionV2,
 		},
 		{
 			kind: framework.PluginKindRestoreItemAction,
-			Get: newAdaptedV1RestoreItemAction,  // Adapt v1 plugin to v2
+			Get:  newAdaptedV1RestoreItemAction, // Adapt v1 plugin to v2
 		},
 	}
 }
@@ -348,11 +348,11 @@ func (m *manager) restartableDeleteItemActions() []RestartableDeleteItemAction {
 	return []RestartableDeleteItemAction{
 		{
 			kind: framework.PluginKindDeleteItemActionV2,
-			Get: newRestartableDeleteItemActionV2,
+			Get:  newRestartableDeleteItemActionV2,
 		},
 		{
 			kind: framework.PluginKindDeleteItemAction,
-			Get: newAdaptedV1DeleteItemAction, // Adapt v1 plugin to v2
+			Get:  newAdaptedV1DeleteItemAction, // Adapt v1 plugin to v2
 		},
 	}
 }

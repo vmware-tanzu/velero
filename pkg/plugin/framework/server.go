@@ -141,14 +141,14 @@ func NewServer() Server {
 	features := veleroflag.NewStringArray()
 
 	return &server{
-		log:               log,
-		logLevelFlag:      logging.LogLevelFlag(log.Level),
-		featureSet:        &features,
-		backupItemAction:  NewBackupItemActionPlugin(serverLogger(log)),
-		volumeSnapshotter: NewVolumeSnapshotterPlugin(serverLogger(log)),
-		objectStore:       NewObjectStorePlugin(serverLogger(log)),
-		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
-		deleteItemAction:  NewDeleteItemActionPlugin(serverLogger(log)),
+		log:                 log,
+		logLevelFlag:        logging.LogLevelFlag(log.Level),
+		featureSet:          &features,
+		backupItemAction:    NewBackupItemActionPlugin(serverLogger(log)),
+		volumeSnapshotter:   NewVolumeSnapshotterPlugin(serverLogger(log)),
+		objectStore:         NewObjectStorePlugin(serverLogger(log)),
+		restoreItemAction:   NewRestoreItemActionPlugin(serverLogger(log)),
+		deleteItemAction:    NewDeleteItemActionPlugin(serverLogger(log)),
 		backupItemActionV2:  NewBackupItemActionPlugin(serverLogger(log)),
 		volumeSnapshotterV2: NewVolumeSnapshotterPlugin(serverLogger(log)),
 		objectStoreV2:       NewObjectStorePlugin(serverLogger(log)),
