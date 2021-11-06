@@ -686,7 +686,6 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 	serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
 	serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
 	if backup.Status.Progress != nil {
-		serverMetrics.RegisterBackupItemsBackedUpGauge(backupScheduleName, backup.Status.Progress.ItemsBackedUp)
 		serverMetrics.RegisterBackupItemsTotalGauge(backupScheduleName, backup.Status.Progress.TotalItems)
 	}
 	serverMetrics.RegisterBackupItemsErrorsGauge(backupScheduleName, backup.Status.Errors)

@@ -43,7 +43,6 @@ const (
 	backupDeletionSuccessTotal    = "backup_deletion_success_total"
 	backupDeletionFailureTotal    = "backup_deletion_failure_total"
 	backupLastSuccessfulTimestamp = "backup_last_successful_timestamp"
-	backupItemsBackedUpGauge      = "backup_items_backed_up"
 	backupItemsTotalGauge         = "backup_items_total"
 	backupItemsErrorsGauge        = "backup_items_errors"
 	restoreTotal                  = "restore_total"
@@ -179,14 +178,6 @@ func NewServerMetrics() *ServerMetrics {
 						toSeconds(3 * time.Hour),
 						toSeconds(4 * time.Hour),
 					},
-				},
-				[]string{scheduleLabel},
-			),
-			backupItemsBackedUpGauge: prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Namespace: metricNamespace,
-					Name:      backupItemsBackedUpGauge,
-					Help:      "Total number of items backed up successfully",
 				},
 				[]string{scheduleLabel},
 			),
@@ -364,9 +355,6 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
-	if c, ok := m.metrics[backupItemsBackedUpGauge].(*prometheus.GaugeVec); ok {
-		c.WithLabelValues(scheduleName).Add(0)
-	}
 	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
@@ -519,14 +507,6 @@ func (m *ServerMetrics) RegisterBackupDeletionFailed(backupSchedule string) {
 func (m *ServerMetrics) RegisterBackupDeletionSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
-	}
-}
-
-// RegisterBackupItemsBackedUpGauge records the number of items that have actually been written to the
-// backup tarball so far.
-func (m *ServerMetrics) RegisterBackupItemsBackedUpGauge(backupSchedule string, items int) {
-	if c, ok := m.metrics[backupItemsBackedUpGauge].(*prometheus.GaugeVec); ok {
-		c.WithLabelValues(backupSchedule).Set(float64(items))
 	}
 }
 
