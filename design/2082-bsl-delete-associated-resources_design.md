@@ -4,14 +4,14 @@
 
 Issue #2082 requested that with the command `velero backup-location delete <bsl name>` (implemented in Velero 1.6 with #3073), the following will be deleted:
 
-- associated backups
-- associated Restic repositories
+- associated Velero backups (to be clear, these are custom Kubernetes resources called "backups" that are stored in the API server)
+- associated Restic repositories (custom Kubernetes resources called "resticrepositories")
 
 This design doc explains how the request will be implemented.
 
 ## Background
 
-When a BSL resource is deleted from its Velero namespace, the associated backups and Restic repositories can no longer be used.
+When a BSL resource is deleted from its Velero namespace, the associated custom Kubernetes resources, backups and Restic repositories, can no longer be used.
 It makes sense to clean those resources up when a BSL is deleted.
 
 ## Goals
@@ -28,15 +28,13 @@ One is adding a command feature update (this issue) and the other is a bug fix a
 
 Update the `velero backup-location delete <bsl name>` command to do the following:
 
-- look for associated backup resources and Restic repositories in the same Velero namespace from which the BSL was deleted
+- find in the same Velero namespace from which the BSL was deleted the associated backup resources and Restic repositories, called "backups.velero.io" and "resticrepositories.velero.io" respectively
 - delete the resources found
 
-## Detailed Design
-
-The deletion logic for backup-locations is in [pkg/cmd/cli/backuplocation/delete.go](https://github.com/vmware-tanzu/velero/blob/main/pkg/cmd/cli/backuplocation/delete.go).
-I'll add a function in that file that will look for associated backups and Restic repositories and delete them.
+The above logic will be added to [where BSLs are deleted](https://github.com/vmware-tanzu/velero/blob/main/pkg/cmd/cli/backuplocation/delete.go).
 
 ## Alternative Considered
 
 I had considered deleting the backup files (the ones in json format and tarballs) in the BSL itself.
-However, as these backup files can be retained and used to do a restore later, it would be better to keep them.
+However, a standard use case is to back up a cluster and then restore into a new cluster.
+Deleting the backup storage location in either location is not expected to remove all of the backups in the backup storage location and should not be done.
