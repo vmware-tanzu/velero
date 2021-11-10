@@ -449,11 +449,12 @@ func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 			// Canceled - the operation was canceled, the snapshot ID is not valid
 			if len(comps) == 2 {
 				phase := comps[1]
-				if phase == "New" ||
-					phase == "InProgress" ||
-					phase == "Snapshotted" ||
-					phase == "Uploading" {
+				switch phase {
+				case "Uploaded":
+				case "New", "InProgress", "Snapshotted", "Uploading":
 					complete = false
+				default:
+					return false, fmt.Errorf("unexpected snapshot phase: %s", phase)
 				}
 			}
 		}
