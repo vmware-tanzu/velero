@@ -1102,6 +1102,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
+			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+			_, err = remapClaimRefNS(ctx, obj)
+			if err != nil {
+				errs.Add(namespace, err)
+				return warnings, errs
+			}
 			obj = resetVolumeBindingInfo(obj)
 			// We call the pvRestorer here to clear out the PV's claimRef.UID,
 			// so it can be re-claimed when its PVC is restored and gets a new UID.
