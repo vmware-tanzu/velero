@@ -1,0 +1,14 @@
+fix buggy pager func
+
+     fix paging items in to use list options passed by the paging function
+
+     The client-go pager sets the Limit options for the list call
+     to paginate the request[1]. This PR fixes the paging function
+     to use the options passed by the pager instead of shadowed options
+     This is required for the pagination to work correctly.
+
+     - simplify the pager list implementation by using pager.List()
+     The List() function already implements a lot of the logic that was
+     needed for paging here, using it simplifies the code.
+
+     1. https://github.com/kubernetes/kubernetes/blob/3f40906dd8a54fb91650553a6457496181f591bc/staging/src/k8s.io/client-go/tools/pager/pager.go#L219
