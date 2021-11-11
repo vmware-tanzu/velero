@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -395,7 +396,11 @@ func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeS
 // on PVs
 const (
 	zoneLabelDeprecated = "failure-domain.beta.kubernetes.io/zone"
-	zoneLabel           = "topology.kubernetes.io/zone"
+	// this is reused for nodeAffinity requirements
+	zoneLabel = "topology.kubernetes.io/zone"
+
+	awsEbsCsiZoneKey = "topology.ebs.csi.aws.com/zone"
+	azureCsiZoneKey  = "topology.disk.csi.azure.com/zone"
 )
 
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
@@ -432,7 +437,14 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		log.Infof("label %q is not present on PersistentVolume, checking deprecated label...", zoneLabel)
 		pvFailureDomainZone, labelFound = pv.Labels[zoneLabelDeprecated]
 		if !labelFound {
+			var k string
 			log.Infof("label %q is not present on PersistentVolume", zoneLabelDeprecated)
+			k, pvFailureDomainZone = zoneFromPVNodeAffinity(pv, awsEbsCsiZoneKey, azureCsiZoneKey, zoneLabel)
+			if pvFailureDomainZone != "" {
+				log.Infof("zone info from nodeAffinity requirements: %s, key: %s", pvFailureDomainZone, k)
+			} else {
+				log.Infof("zone info not available in nodeAffinity requirements")
+			}
 		}
 	}
 
@@ -534,4 +546,25 @@ func resourceKey(obj runtime.Unstructured) string {
 func resourceVersion(obj runtime.Unstructured) string {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	return gvk.Version
+}
+
+// zoneFromPVNodeAffinity iterates the node affinity requirement of a PV to
+// get its availability zone, it returns the key merely for logging.
+func zoneFromPVNodeAffinity(res *corev1api.PersistentVolume, topologyKeys ...string) (string, string) {
+	nodeAffinity := res.Spec.NodeAffinity
+	if nodeAffinity == nil {
+		return "", ""
+	}
+	keySet := sets.NewString(topologyKeys...)
+	for _, term := range nodeAffinity.Required.NodeSelectorTerms {
+		if term.MatchExpressions == nil {
+			continue
+		}
+		for _, exp := range term.MatchExpressions {
+			if keySet.Has(exp.Key) && exp.Operator == "In" && len(exp.Values) > 0 {
+				return exp.Key, exp.Values[0]
+			}
+		}
+	}
+	return "", ""
 }
