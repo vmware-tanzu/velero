@@ -94,3 +94,11 @@ func (b *PersistentVolumeBuilder) StorageClass(name string) *PersistentVolumeBui
 	b.object.Spec.StorageClassName = name
 	return b
 }
+
+// NodeAffinityRequired sets the PersistentVolume's NodeAffinity Requirement.
+func (b *PersistentVolumeBuilder) NodeAffinityRequired(req *corev1api.NodeSelector) *PersistentVolumeBuilder {
+	b.object.Spec.NodeAffinity = &corev1api.VolumeNodeAffinity{
+		Required: req,
+	}
+	return b
+}
