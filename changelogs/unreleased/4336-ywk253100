@@ -1,0 +1,1 @@
+Ignore the `provided port is already allocated` error when restoring the `NodePort` service

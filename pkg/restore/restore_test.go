@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -3018,6 +3019,100 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := resetVolumeBindingInfo(tc.obj)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestIsAlreadyExistsError(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      *unstructured.Unstructured
+		err      error
+		expected bool
+	}{
+		{
+			name:     "The input error is IsAlreadyExists error",
+			err:      apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
+			expected: true,
+		},
+		{
+			name: "The input obj isn't service",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Pod",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The input error isn't InvalidError",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err:      apierrors.NewBadRequest(""),
+			expected: false,
+		},
+		{
+			name: "The StatusError contains no causes",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The causes contains not only port already allocated error",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+							{Message: "other error"},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The causes contains only port already allocated error",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, isAlreadyExistsError(&restoreContext{
+				log: logrus.StandardLogger(),
+			}, test.obj, test.err))
 		})
 	}
 }
