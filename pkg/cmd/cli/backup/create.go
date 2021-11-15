@@ -290,7 +290,8 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			return nil, err
 		}
 		if o.Name == "" {
-			o.Name = schedule.TimestampedName(time.Now())
+			o.Name = schedule.TimestampedName(time.Now().UTC())
+			//o.Name = schedule.TimestampedName(time.Now())
 		}
 		backupBuilder = builder.ForBackup(namespace, o.Name).
 			FromSchedule(schedule)
