@@ -74,10 +74,9 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 				region, err = getAWSBucketRegion(bucket)
 			}
 			if err != nil {
-				url = "s3.amazonaws.com"
-			} else {
-				url = fmt.Sprintf("s3-%s.amazonaws.com", region)
+				return "", errors.Wrapf(err, "failed to detect the region via bucket: %s", bucket)
 			}
+			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 		}
 
 		return fmt.Sprintf("s3:%s/%s", url, path.Join(bucket, prefix)), nil

@@ -85,7 +85,8 @@ func TestGetRepoIdentifier(t *testing.T) {
 			getAWSBucketRegion: func(string) (string, error) {
 				return "", errors.New("no region found")
 			},
-			expected: "s3:s3.amazonaws.com/bucket/restic/repo-1",
+			expected:    "",
+			expectedErr: "failed to detect the region via bucket: bucket: no region found",
 		},
 		{
 			name: "s3.s3-<region>.amazonaws.com URL format is used if region can be determined for AWS BSL",

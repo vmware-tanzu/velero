@@ -1,0 +1,1 @@
+Return the error if velero failed to detect S3 region for restic repo
