@@ -1,0 +1,16 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+import "ObjectStore.proto";
+
+service ObjectStoreV2 {
+    rpc Init(ObjectStoreInitRequest) returns (Empty);
+    rpc PutObject(stream PutObjectRequest) returns (Empty);
+    rpc ObjectExists(ObjectExistsRequest) returns (ObjectExistsResponse);
+    rpc GetObject(GetObjectRequest) returns (stream Bytes);
+    rpc ListCommonPrefixes(ListCommonPrefixesRequest) returns (ListCommonPrefixesResponse);
+    rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+    rpc DeleteObject(DeleteObjectRequest) returns (Empty);
+    rpc CreateSignedURL(CreateSignedURLRequest) returns (CreateSignedURLResponse);
+}

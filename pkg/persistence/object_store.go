@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velero "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 

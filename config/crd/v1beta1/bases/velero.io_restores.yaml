@@ -1,3 +1,5 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -884,7 +886,6 @@ spec:
                                               type: string
                                           required:
                                           - containerPort
-                                          - protocol
                                           type: object
                                         type: array
                                         x-kubernetes-list-map-keys:

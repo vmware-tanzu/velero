@@ -74,6 +74,11 @@ type Server interface {
 	// RegisterDeleteItemActions registers multiple Delete item actions.
 	RegisterDeleteItemActions(map[string]HandlerInitializer) Server
 
+	// Version 2
+	// RegisterObjectStoreV2 registers an object store. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterObjectStoreV2(pluginName string, initializer HandlerInitializer) Server
+
 	// Server runs the plugin server.
 	Serve()
 }
@@ -89,6 +94,8 @@ type server struct {
 	objectStore       *ObjectStorePlugin
 	restoreItemAction *RestoreItemActionPlugin
 	deleteItemAction  *DeleteItemActionPlugin
+	// Version 2
+	objectStoreV2     *ObjectStoreV2Plugin
 }
 
 // NewServer returns a new Server
@@ -105,6 +112,8 @@ func NewServer() Server {
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
 		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
 		deleteItemAction:  NewDeleteItemActionPlugin(serverLogger(log)),
+		// Version 2
+		objectStoreV2:     NewObjectStoreV2Plugin(serverLogger(log)),
 	}
 }
 
@@ -142,6 +151,7 @@ func (s *server) RegisterVolumeSnapshotters(m map[string]HandlerInitializer) Ser
 }
 
 func (s *server) RegisterObjectStore(name string, initializer HandlerInitializer) Server {
+	s.log.Debugf("Registering ObjectStore %s %v initializer.", name, initializer)
 	s.objectStore.register(name, initializer)
 	return s
 }
@@ -177,6 +187,20 @@ func (s *server) RegisterDeleteItemActions(m map[string]HandlerInitializer) Serv
 	return s
 }
 
+// Version 2
+func (s *server) RegisterObjectStoreV2(name string, initializer HandlerInitializer) Server {
+	s.log.Debugf("Registering ObjectStoreV2 %s %v initializer.", name, initializer)
+	s.objectStoreV2.register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterObjectStoresV2(m map[string]HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterObjectStoreV2(name, m[name])
+	}
+	return s
+}
+
 // getNames returns a list of PluginIdentifiers registered with plugin.
 func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
@@ -206,6 +230,8 @@ func (s *server) Serve() {
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStore, s.objectStore)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindRestoreItemAction, s.restoreItemAction)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindDeleteItemAction, s.deleteItemAction)...)
+	// Version 2
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStoreV2, s.objectStoreV2)...)
 
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
@@ -218,6 +244,8 @@ func (s *server) Serve() {
 			string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
 			string(PluginKindRestoreItemAction): s.restoreItemAction,
 			string(PluginKindDeleteItemAction):  s.deleteItemAction,
+			// Version 2
+			string(PluginKindObjectStoreV2): s.objectStoreV2,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})

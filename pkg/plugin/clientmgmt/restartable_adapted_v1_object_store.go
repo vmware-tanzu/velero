@@ -21,42 +21,36 @@ import (
 	"io"
 	"time"
 
-	objectstore "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
-
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	objectstorev1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v1"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 )
 
-// restartableObjectStoreV2 is an object store for a given implementation (such as "aws"). It is associated with
-// a restartableProcess, which may be shared and used to run multiple plugins. At the beginning of each method
-// call, the restartableObjectStore asks its restartableProcess to restart itself if needed (e.g. if the
-// process terminated for any reason), then it proceeds with the actual call.
-type restartableObjectStore struct {
-	key                 kindAndName
-	sharedPluginProcess RestartableProcess
-	// config contains the data used to initialize the plugin. It is used to reinitialize the plugin in the event its
-	// sharedPluginProcess gets restarted.
-	config map[string]string
+// restartableAdaptedV1ObjectStore is restartableAdaptedV1ObjectStore version 1 adaptive to version 2 plugin
+type restartableAdaptedV1ObjectStore struct {
+	restartableObjectStore
 }
 
-// newRestartableObjectStoreV2 returns a new restartableObjectStore.
-func newRestartableObjectStoreV2(name string, sharedPluginProcess RestartableProcess) objectstore.ObjectStore {
-	key := kindAndName{kind: framework.PluginKindObjectStoreV2, name: name}
-	r := &restartableObjectStore{
-		key:                 key,
-		sharedPluginProcess: sharedPluginProcess,
+// newAdaptedV1ObjectStore returns a new restartableAdaptedV1ObjectStore.
+func newAdaptedV1ObjectStore(name string, sharedPluginProcess RestartableProcess) objectstorev2.ObjectStore {
+	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	r := &restartableAdaptedV1ObjectStore{
+		restartableObjectStore: restartableObjectStore{
+			key:                 key,
+			sharedPluginProcess: sharedPluginProcess,
+		},
 	}
 
 	// Register our reinitializer so we can reinitialize after a restart with r.config.
 	sharedPluginProcess.addReinitializer(key, r)
-
 	return r
 }
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
-func (r *restartableObjectStore) reinitialize(dispensed interface{}) error {
-	objectStore, ok := dispensed.(objectstore.ObjectStore)
+func (r *restartableAdaptedV1ObjectStore) reinitialize(dispensed interface{}) error {
+	objectStore, ok := dispensed.(objectstorev1.ObjectStore)
 	if !ok {
 		return errors.Errorf("%T is not a ObjectStore!", dispensed)
 	}
@@ -64,15 +58,15 @@ func (r *restartableObjectStore) reinitialize(dispensed interface{}) error {
 	return r.init(objectStore, r.config)
 }
 
-// getObjectStore returns the object store for this restartableObjectStore. It does *not* restart the
-// plugin process.
-func (r *restartableObjectStore) getObjectStore() (objectstore.ObjectStore, error) {
+// getObjectStore returns the object store for this restartableObjectStore.
+// It does *not* restart the plugin process.
+func (r *restartableAdaptedV1ObjectStore) getObjectStore() (objectstorev1.ObjectStore, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	objectStore, ok := plugin.(objectstore.ObjectStore)
+	objectStore, ok := plugin.(objectstorev1.ObjectStore)
 	if !ok {
 		return nil, errors.Errorf("%T is not a ObjectStore!", plugin)
 	}
@@ -81,7 +75,7 @@ func (r *restartableObjectStore) getObjectStore() (objectstore.ObjectStore, erro
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the object store for this restartableObjectStore.
-func (r *restartableObjectStore) getDelegate() (objectstore.ObjectStore, error) {
+func (r *restartableAdaptedV1ObjectStore) getDelegate() (objectstorev1.ObjectStore, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -91,7 +85,7 @@ func (r *restartableObjectStore) getDelegate() (objectstore.ObjectStore, error) 
 
 // Init initializes the object store instance using config. If this is the first invocation, r stores config for future
 // reinitialization needs. Init does NOT restart the shared plugin process. Init may only be called once.
-func (r *restartableObjectStore) Init(config map[string]string) error {
+func (r *restartableAdaptedV1ObjectStore) Init(config map[string]string) error {
 	if r.config != nil {
 		return errors.Errorf("already initialized")
 	}
@@ -109,12 +103,12 @@ func (r *restartableObjectStore) Init(config map[string]string) error {
 
 // init calls Init on objectStore with config. This is split out from Init() so that both Init() and reinitialize() may
 // call it using a specific ObjectStore.
-func (r *restartableObjectStore) init(objectStore objectstore.ObjectStore, config map[string]string) error {
+func (r *restartableAdaptedV1ObjectStore) init(objectStore objectstorev1.ObjectStore, config map[string]string) error {
 	return objectStore.Init(config)
 }
 
 // PutObject restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) PutObject(bucket string, key string, body io.Reader) error {
+func (r *restartableAdaptedV1ObjectStore) PutObject(bucket string, key string, body io.Reader) error {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return err
@@ -123,7 +117,7 @@ func (r *restartableObjectStore) PutObject(bucket string, key string, body io.Re
 }
 
 // ObjectExists restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ObjectExists(bucket, key string) (bool, error) {
+func (r *restartableAdaptedV1ObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return false, err
@@ -132,7 +126,7 @@ func (r *restartableObjectStore) ObjectExists(bucket, key string) (bool, error) 
 }
 
 // GetObject restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (r *restartableAdaptedV1ObjectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
@@ -141,7 +135,8 @@ func (r *restartableObjectStore) GetObject(bucket string, key string) (io.ReadCl
 }
 
 // ListCommonPrefixes restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ListCommonPrefixes(bucket string, prefix string, delimiter string) ([]string, error) {
+func (r *restartableAdaptedV1ObjectStore) ListCommonPrefixes(
+	bucket string, prefix string, delimiter string) ([]string, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
@@ -150,7 +145,7 @@ func (r *restartableObjectStore) ListCommonPrefixes(bucket string, prefix string
 }
 
 // ListObjects restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ListObjects(bucket string, prefix string) ([]string, error) {
+func (r *restartableAdaptedV1ObjectStore) ListObjects(bucket string, prefix string) ([]string, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
@@ -159,7 +154,7 @@ func (r *restartableObjectStore) ListObjects(bucket string, prefix string) ([]st
 }
 
 // DeleteObject restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) DeleteObject(bucket string, key string) error {
+func (r *restartableAdaptedV1ObjectStore) DeleteObject(bucket string, key string) error {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return err
@@ -168,7 +163,8 @@ func (r *restartableObjectStore) DeleteObject(bucket string, key string) error {
 }
 
 // CreateSignedURL restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) CreateSignedURL(bucket string, key string, ttl time.Duration) (string, error) {
+func (r *restartableAdaptedV1ObjectStore) CreateSignedURL(
+	bucket string, key string, ttl time.Duration) (string, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return "", err
@@ -176,67 +172,47 @@ func (r *restartableObjectStore) CreateSignedURL(bucket string, key string, ttl 
 	return delegate.CreateSignedURL(bucket, key, ttl)
 }
 
-// Version 2
+// Version 2.  Simply discard ctx.
+func (r *restartableObjectStore) InitContext(ctx context.Context, config map[string]string) error {
+	return r.Init(config)
+}
+
 // PutObjectContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) PutObjectContext(ctx context.Context, bucket string, key string, body io.Reader) error {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return err
-	}
-	return delegate.PutObjectContext(ctx, bucket, key, body)
+func (r *restartableAdaptedV1ObjectStore) PutObjectContext(
+	ctx context.Context, bucket string, key string, body io.Reader) error {
+	return r.PutObject(bucket, key, body)
 }
 
 // ObjectExistsContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ObjectExistsContext(ctx context.Context, bucket, key string) (bool, error) {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return false, err
-	}
-	return delegate.ObjectExistsContext(ctx, bucket, key)
+func (r *restartableAdaptedV1ObjectStore) ObjectExistsContext(ctx context.Context, bucket, key string) (bool, error) {
+	return r.ObjectExists(bucket, key)
 }
 
 // GetObjectContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) GetObjectContext(ctx context.Context, bucket string, key string) (io.ReadCloser, error) {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return nil, err
-	}
-	return delegate.GetObjectContext(ctx, bucket, key)
+func (r *restartableAdaptedV1ObjectStore) GetObjectContext(
+	ctx context.Context, bucket string, key string) (io.ReadCloser, error) {
+	return r.GetObject(bucket, key)
 }
 
 // ListCommonPrefixesContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ListCommonPrefixesContext(
+func (r *restartableAdaptedV1ObjectStore) ListCommonPrefixesContext(
 	ctx context.Context, bucket string, prefix string, delimiter string) ([]string, error) {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return nil, err
-	}
-	return delegate.ListCommonPrefixesContext(ctx, bucket, prefix, delimiter)
+	return r.ListCommonPrefixes(bucket, prefix, delimiter)
 }
 
 // ListObjectsContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ListObjectsContext(ctx context.Context, bucket string, prefix string) ([]string, error) {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return nil, err
-	}
-	return delegate.ListObjectsContext(ctx, bucket, prefix)
+func (r *restartableAdaptedV1ObjectStore) ListObjectsContext(
+	ctx context.Context, bucket string, prefix string) ([]string, error) {
+	return r.ListObjects(bucket, prefix)
 }
 
 // DeleteObjectContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) DeleteObjectContext(ctx context.Context, bucket string, key string) error {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return err
-	}
-	return delegate.DeleteObjectContext(ctx, bucket, key)
+func (r *restartableAdaptedV1ObjectStore) DeleteObjectContext(ctx context.Context, bucket string, key string) error {
+	return r.DeleteObject(bucket, key)
 }
 
 // CreateSignedURLContext restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) CreateSignedURLContext(ctx context.Context, bucket string, key string, ttl time.Duration) (string, error) {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return "", err
-	}
-	return delegate.CreateSignedURLContext(ctx, bucket, key, ttl)
+func (r *restartableAdaptedV1ObjectStore) CreateSignedURLContext(
+	ctx context.Context, bucket string, key string, ttl time.Duration) (string, error) {
+	return r.CreateSignedURL(bucket, key, ttl)
 }

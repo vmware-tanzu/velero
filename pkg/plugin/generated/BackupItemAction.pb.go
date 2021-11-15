@@ -8,6 +8,7 @@ It is generated from these files:
 	BackupItemAction.proto
 	DeleteItemAction.proto
 	ObjectStore.proto
+	ObjectStoreV2.proto
 	PluginLister.proto
 	RestoreItemAction.proto
 	Shared.proto

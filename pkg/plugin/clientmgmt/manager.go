@@ -17,6 +17,8 @@ limitations under the License.
 package clientmgmt
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -24,12 +26,13 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	objectstorev2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/objectstore/v2"
 )
 
 // Manager manages the lifecycles of plugins.
 type Manager interface {
 	// GetObjectStore returns the ObjectStore plugin for name.
-	GetObjectStore(name string) (velero.ObjectStore, error)
+	GetObjectStore(name string) (objectstorev2.ObjectStore, error)
 
 	// GetVolumeSnapshotter returns the VolumeSnapshotter plugin for name.
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
@@ -129,18 +132,41 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 	return restartableProcess, nil
 }
 
+type RestartableObjectStore struct {
+	kind framework.PluginKind
+	// Get returns a restartable ObjectStore for the given name and process, wrapping if necessary
+	Get func(name string, restartableProcess RestartableProcess) objectstorev2.ObjectStore
+}
+
+func (m *manager) restartableObjectStores() []RestartableObjectStore {
+	return []RestartableObjectStore{
+		{
+			kind: framework.PluginKindObjectStoreV2,
+			Get:  newRestartableObjectStoreV2,
+		},
+		{
+			kind: framework.PluginKindObjectStore,
+			Get:  newAdaptedV1ObjectStore, // Adapt v1 plugin to v2
+		},
+	}
+}
+
 // GetObjectStore returns a restartableObjectStore for name.
-func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
+func (m *manager) GetObjectStore(name string) (objectstorev2.ObjectStore, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
-	if err != nil {
-		return nil, err
+	for _, restartableObjStore := range m.restartableObjectStores() {
+		restartableProcess, err := m.getRestartableProcess(restartableObjStore.kind, name)
+		if err != nil {
+			// Check if plugin was not found
+			if errors.Is(err, &pluginNotFoundError{}) {
+				continue
+			}
+			return nil, err
+		}
+		return restartableObjStore.Get(name, restartableProcess), nil
 	}
-
-	r := newRestartableObjectStore(name, restartableProcess)
-
-	return r, nil
+	return nil, fmt.Errorf("unable to get valid ObjectStore for %q", name)
 }
 
 // GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.

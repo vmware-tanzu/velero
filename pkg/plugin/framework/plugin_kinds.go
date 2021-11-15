@@ -43,7 +43,18 @@ const (
 
 	// PluginKindPluginLister represents a plugin lister plugin.
 	PluginKindPluginLister PluginKind = "PluginLister"
+
+	// Version 2
+	// PluginKindObjectStoreV2 represents an object store plugin.
+	PluginKindObjectStoreV2 PluginKind = "ObjectStoreV2"
 )
+
+func ObjectStoreKinds() []PluginKind {
+	return []PluginKind{
+		PluginKindObjectStoreV2,
+		PluginKindObjectStore,
+	}
+}
 
 // AllPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
 // kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).
@@ -54,5 +65,7 @@ func AllPluginKinds() map[string]PluginKind {
 	allPluginKinds[PluginKindBackupItemAction.String()] = PluginKindBackupItemAction
 	allPluginKinds[PluginKindRestoreItemAction.String()] = PluginKindRestoreItemAction
 	allPluginKinds[PluginKindDeleteItemAction.String()] = PluginKindDeleteItemAction
+	// Version 2
+	allPluginKinds[PluginKindObjectStoreV2.String()] = PluginKindObjectStoreV2
 	return allPluginKinds
 }
