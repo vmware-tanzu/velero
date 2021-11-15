@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package k8s
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,26 +28,27 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-func createNamespace(ctx context.Context, client testClient, namespace string) error {
+func CreateNamespace(ctx context.Context, client TestClient, namespace string) error {
 	ns := builder.ForNamespace(namespace).Result()
-	_, err := client.clientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
 	return err
 }
 
-func getNamespace(ctx context.Context, client testClient, namespace string) (*corev1api.Namespace, error) {
-	return client.clientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+func GetNamespace(ctx context.Context, client TestClient, namespace string) (*corev1api.Namespace, error) {
+	return client.ClientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
-func deleteNamespace(ctx context.Context, client testClient, namespace string, wait bool) error {
-	if err := client.clientGo.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
+func DeleteNamespace(ctx context.Context, client TestClient, namespace string, wait bool) error {
+	if err := client.ClientGo.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 	}
 	if !wait {
@@ -55,7 +57,7 @@ func deleteNamespace(ctx context.Context, client testClient, namespace string, w
 
 	return waitutil.PollImmediateInfinite(5*time.Second,
 		func() (bool, error) {
-			if _, err := client.clientGo.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
+			if _, err := client.ClientGo.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
 				}
@@ -64,4 +66,20 @@ func deleteNamespace(ctx context.Context, client testClient, namespace string, w
 			logrus.Debugf("namespace %q is still being deleted...", namespace)
 			return false, nil
 		})
+}
+
+func CleanupNamespaces(ctx context.Context, client TestClient, nsBaseName string) error {
+	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Could not retrieve namespaces")
+	}
+	for _, checkNamespace := range namespaces.Items {
+		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
+			err = client.ClientGo.CoreV1().Namespaces().Delete(ctx, checkNamespace.Name, v1.DeleteOptions{})
+			if err != nil {
+				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
+			}
+		}
+	}
+	return nil
 }

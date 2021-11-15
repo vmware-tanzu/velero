@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package velero
 
 import (
 	"bytes"
@@ -98,7 +98,7 @@ func getProviderVeleroInstallOptions(
 	pluginProvider,
 	credentialsFile,
 	objectStoreBucket,
-	objectStorePrefix string,
+	objectStorePrefix,
 	bslConfig,
 	vslConfig string,
 	plugins []string,
@@ -134,7 +134,7 @@ func getProviderVeleroInstallOptions(
 	return io, nil
 }
 
-// checkBackupPhase uses veleroCLI to inspect the phase of a Velero backup.
+// checkBackupPhase uses VeleroCLI to inspect the phase of a Velero backup.
 func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string,
 	expectedPhase velerov1api.BackupPhase) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "get", "-o", "json",
@@ -178,7 +178,7 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace str
 	return nil
 }
 
-// checkRestorePhase uses veleroCLI to inspect the phase of a Velero restore.
+// checkRestorePhase uses VeleroCLI to inspect the phase of a Velero restore.
 func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string,
 	expectedPhase velerov1api.RestorePhase) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "get", "-o", "json",
@@ -222,8 +222,8 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 	return nil
 }
 
-// veleroBackupNamespace uses the veleroCLI to backup a namespace.
-func veleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string,
+// VeleroBackupNamespace uses the veleroCLI to backup a namespace.
+func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string,
 	useVolumeSnapshots bool) error {
 	args := []string{
 		"--namespace", veleroNamespace,
@@ -246,71 +246,80 @@ func veleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespac
 		args = append(args, "--storage-location", backupLocation)
 	}
 
-	backupCmd := exec.CommandContext(ctx, veleroCLI, args...)
-	backupCmd.Stdout = os.Stdout
-	backupCmd.Stderr = os.Stderr
-	fmt.Printf("backup cmd =%v\n", backupCmd)
-	err := backupCmd.Run()
-	if err != nil {
-		return err
-	}
-	err = checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
-
-	return err
+	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupName, args)
 }
 
-// veleroBackupExcludeNamespaces uses the veleroCLI to backup a namespace.
-func veleroBackupExcludeNamespaces(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, excludeNamespaces []string) error {
+// VeleroBackupExcludeNamespaces uses the veleroCLI to backup a namespace.
+func VeleroBackupExcludeNamespaces(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, excludeNamespaces []string) error {
 	namespaces := strings.Join(excludeNamespaces, ",")
-	backupCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "backup", backupName,
+	args := []string{
+		"--namespace", veleroNamespace, "create", "backup", backupName,
 		"--exclude-namespaces", namespaces,
-		"--default-volumes-to-restic", "--wait")
-	backupCmd.Stdout = os.Stdout
-	backupCmd.Stderr = os.Stderr
-	fmt.Printf("backup cmd =%v\n", backupCmd)
-	err := backupCmd.Run()
-	if err != nil {
-		return err
+		"--default-volumes-to-restic", "--wait",
 	}
-	err = checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
-
-	return err
+	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupName, args)
 }
 
-// veleroRestore uses the veleroCLI to restore from a Velero backup.
-func veleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string, backupName string) error {
-	restoreCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "create", "restore", restoreName,
-		"--from-backup", backupName, "--wait")
+// VeleroBackupIncludeNamespaces uses the veleroCLI to backup a namespace.
+func VeleroBackupIncludeNamespaces(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, includeNamespaces []string) error {
+	namespaces := strings.Join(includeNamespaces, ",")
+	args := []string{
+		"--namespace", veleroNamespace, "create", "backup", backupName,
+		"--include-namespaces", namespaces,
+		"--default-volumes-to-restic", "--wait",
+	}
+	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupName, args)
+}
 
-	restoreCmd.Stdout = os.Stdout
-	restoreCmd.Stderr = os.Stderr
-	fmt.Printf("restore cmd =%v\n", restoreCmd)
-	err := restoreCmd.Run()
-	if err != nil {
+// VeleroRestore uses the VeleroCLI to restore from a Velero backup.
+func VeleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string, backupName string) error {
+	args := []string{
+		"--namespace", veleroNamespace, "create", "restore", restoreName,
+		"--from-backup", backupName, "--wait",
+	}
+	return VeleroRestoreExec(ctx, veleroCLI, veleroNamespace, restoreName, args)
+}
+
+func VeleroRestoreExec(ctx context.Context, veleroCLI, veleroNamespace, restoreName string, args []string) error {
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		return err
 	}
 	return checkRestorePhase(ctx, veleroCLI, veleroNamespace, restoreName, velerov1api.RestorePhaseCompleted)
 }
 
-func veleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
-	describeCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "describe", backupName)
-	describeCmd.Stdout = os.Stdout
-	describeCmd.Stderr = os.Stderr
-	err := describeCmd.Run()
-	if err != nil {
+func VeleroBackupExec(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, args []string) error {
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		return err
 	}
-	logCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "logs", backupName)
-	logCmd.Stdout = os.Stdout
-	logCmd.Stderr = os.Stderr
-	err = logCmd.Run()
-	if err != nil {
-		return err
-	}
-	return nil
+	return checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
 }
 
-func runDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore string) {
+func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
+	cmd := exec.CommandContext(ctx, veleroCLI, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	fmt.Printf("velero cmd =%v\n", cmd)
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
+	args := []string{
+		"--namespace", veleroNamespace, "backup", "describe", backupName,
+	}
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+	args = []string{
+		"--namespace", veleroNamespace, "backup", "logs", backupName,
+	}
+	return VeleroCmdExec(ctx, veleroCLI, args)
+}
+
+func RunDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore string) {
 	output := fmt.Sprintf("debug-bundle-%d.tar.gz", time.Now().UnixNano())
 	args := []string{"debug", "--namespace", veleroNamespace, "--output", output, "--verbose"}
 	if len(backup) > 0 {
@@ -319,26 +328,21 @@ func runDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore s
 	if len(restore) > 0 {
 		args = append(args, "--restore", restore)
 	}
-
-	cmd := exec.CommandContext(ctx, veleroCLI, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	fmt.Printf("debug cmd=%s\n", cmd.String())
 	fmt.Printf("Generating the debug tarball at %s\n", output)
-	if err := cmd.Run(); err != nil {
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		fmt.Println(errors.Wrapf(err, "failed to run the debug command"))
 	}
 }
 
-func veleroCreateBackupLocation(ctx context.Context,
-	veleroCLI string,
-	veleroNamespace string,
-	name string,
-	objectStoreProvider string,
-	bucket string,
-	prefix string,
-	config string,
-	secretName string,
+func VeleroCreateBackupLocation(ctx context.Context,
+	veleroCLI,
+	veleroNamespace,
+	name,
+	objectStoreProvider,
+	bucket,
+	prefix,
+	config,
+	secretName,
 	secretKey string,
 ) error {
 	args := []string{
@@ -359,12 +363,7 @@ func veleroCreateBackupLocation(ctx context.Context,
 	if secretName != "" && secretKey != "" {
 		args = append(args, "--credential", fmt.Sprintf("%s=%s", secretName, secretKey))
 	}
-
-	bslCreateCmd := exec.CommandContext(ctx, veleroCLI, args...)
-	bslCreateCmd.Stdout = os.Stdout
-	bslCreateCmd.Stderr = os.Stderr
-
-	return bslCreateCmd.Run()
+	return VeleroCmdExec(ctx, veleroCLI, args)
 }
 
 func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, providerPlugins string) ([]string, error) {
@@ -385,9 +384,9 @@ func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, pro
 	return plugins, nil
 }
 
-// veleroAddPluginsForProvider determines which plugins need to be installed for a provider and
+// VeleroAddPluginsForProvider determines which plugins need to be installed for a provider and
 // installs them in the current Velero installation, skipping over those that are already installed.
-func veleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins string) error {
+func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins string) error {
 	plugins, err := getProviderPlugins(ctx, veleroCLI, provider, addPlugins)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get plugins")
@@ -417,9 +416,9 @@ func veleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 	return nil
 }
 
-// waitForVSphereUploadCompletion waits for uploads started by the Velero Plug-in for vSphere to complete
+// WaitForVSphereUploadCompletion waits for uploads started by the Velero Plug-in for vSphere to complete
 // TODO - remove after upload progress monitoring is implemented
-func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, namespace string) error {
+func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, namespace string) error {
 	err := wait.PollImmediate(time.Minute, timeout, func() (bool, error) {
 		checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 			"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}'")
@@ -446,6 +445,7 @@ func waitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 			// Canceling - when the SanpshotCancel flag is set, if the Snapshot has not already moved into a terminal state, the
 			//             status will move to Canceling.  The snapshot ID will be removed from the status status if has been filled in
 			//             and the snapshot ID will not longer be valid for a Clone operation
+			// Canceled - the operation was canceled, the snapshot ID is not valid
 			// Canceled - the operation was canceled, the snapshot ID is not valid
 			if len(comps) == 2 {
 				phase := comps[1]
@@ -497,7 +497,7 @@ func getVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (s
 	return versionMatches[1], nil
 }
 
-func checkVeleroVersion(ctx context.Context, veleroCLI string, expectedVer string) error {
+func CheckVeleroVersion(ctx context.Context, veleroCLI string, expectedVer string) error {
 	tag := expectedVer
 	tagInstalled, err := getVeleroVersion(ctx, veleroCLI, false)
 	if err != nil {
@@ -510,7 +510,7 @@ func checkVeleroVersion(ctx context.Context, veleroCLI string, expectedVer strin
 	return nil
 }
 
-func installVeleroCLI(version string) (string, error) {
+func InstallVeleroCLI(version string) (string, error) {
 	name := "velero-" + version + "-" + runtime.GOOS + "-" + runtime.GOARCH
 	postfix := ".tar.gz"
 	tarball := name + postfix
