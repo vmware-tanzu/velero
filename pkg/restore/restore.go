@@ -1238,7 +1238,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
-	if apierrors.IsAlreadyExists(restoreErr) {
+	if isAlreadyExistsError(ctx, obj, restoreErr) {
 		fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			ctx.log.Infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
@@ -1333,6 +1333,38 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	return warnings, errs
+}
+
+func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, err error) bool {
+	if err == nil {
+		return false
+	}
+	if apierrors.IsAlreadyExists(err) {
+		return true
+	}
+	// the "invalid value" error rather than "already exists" error returns when restoring nodePort service
+	// that has nodePort preservation if the same nodePort service already exists.
+	// If this is the case, the function returns true to avoid reporting error.
+	// Refer to https://github.com/vmware-tanzu/velero/issues/2308 for more details
+	if obj.GetKind() != "Service" || !apierrors.IsInvalid(err) {
+		return false
+	}
+	statusErr, ok := err.(*apierrors.StatusError)
+	if !ok || statusErr.Status().Details == nil || len(statusErr.Status().Details.Causes) == 0 {
+		return false
+	}
+	// make sure all the causes are "port allocated" error
+	isAllocatedErr := true
+	for _, cause := range statusErr.Status().Details.Causes {
+		if !strings.Contains(cause.Message, "provided port is already allocated") {
+			isAllocatedErr = false
+			break
+		}
+	}
+	if isAllocatedErr {
+		ctx.log.Infof("ignore the provided port is already allocated error for service %s", kube.NamespaceAndName(obj))
+	}
+	return isAllocatedErr
 }
 
 // shouldRenamePV returns a boolean indicating whether a persistent volume should
