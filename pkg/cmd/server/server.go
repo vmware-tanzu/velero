@@ -73,6 +73,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
@@ -301,6 +302,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
+
+	ctrl.SetLogger(zap.New())
 
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme:    scheme,
