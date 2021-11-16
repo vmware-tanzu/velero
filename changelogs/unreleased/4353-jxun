@@ -1,5 +1,1 @@
 Modify generated from schedule's backup name timestamp to UTC timestamp.
-Fix https://github.com/vmware-tanzu/velero/issues/4279
-When backup is created from schedule, and the backup name is not specified, 
-a containing-timestamp generated name will be used. 
-Due to velero client not set timezone to UTC, a local timezone will be used for the generated name.
