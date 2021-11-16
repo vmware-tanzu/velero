@@ -1,0 +1,94 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message ItemSnapshotterAppliesToRequest {
+    string plugin = 1;
+}
+
+message ItemSnapshotterAppliesToResponse {
+    ResourceSelector ResourceSelector = 1;
+}
+
+message AlsoHandlesRequest {
+    string plugin = 1;
+    bytes item = 2;
+    bytes backup = 3;
+}
+
+message AlsoHandlesResponse {
+    repeated ResourceIdentifier handledItems = 1;
+}
+
+message SnapshotItemRequest {
+    string plugin = 1;
+    bytes item = 2;
+    map<string, string> params = 3;
+    bytes backup = 4;
+}
+
+message SnapshotItemResponse {
+    bytes item = 1;
+    string snapshotID = 2;
+    map<string, string> snapshotMetadata = 3;
+    repeated ResourceIdentifier additionalItems = 4;
+    repeated ResourceIdentifier handledItems = 5;
+}
+
+message ProgressRequest {
+    string plugin = 1;
+    ResourceIdentifier itemID = 2;
+    string snapshotID = 3;
+    bytes backup = 4;
+}
+
+message ProgressResponse {
+	string phase = 1;
+	int64 itemsCompleted = 2;
+	int64 itemsToComplete = 3;
+	int64 started = 4;
+	int64 startedNano = 5;
+	int64 updated = 6;
+	int64 updatedNano = 7;
+	string err = 8;
+}
+
+message DeleteItemSnapshotRequest {
+    string plugin = 1;
+    string snapshotID = 2;
+    bytes itemFromBackup = 3;
+    map<string, string> metadata = 4;
+    map<string, string> params = 5;
+}
+
+message CreateItemFromSnapshotRequest {
+    string plugin = 1;
+    bytes item = 2;
+    string snapshotID = 3;
+    bytes itemFromBackup = 4;
+    map<string, string> snapshotMetadata = 5;
+    map<string, string> params = 6;
+    bytes restore = 7;
+}
+
+message CreateItemFromSnapshotResponse {
+    bytes item = 1;
+    repeated ResourceIdentifier additionalItems = 2;
+    bool skipRestore = 3;
+}
+
+message ItemSnapshotterInitRequest {
+  string plugin = 1;
+  map<string, string> config = 2;
+}
+
+service ItemSnapshotter {
+    rpc Init(ItemSnapshotterInitRequest) returns (Empty);
+    rpc AppliesTo(ItemSnapshotterAppliesToRequest) returns (ItemSnapshotterAppliesToResponse);
+    rpc AlsoHandles(AlsoHandlesRequest) returns (AlsoHandlesResponse);
+    rpc SnapshotItem(SnapshotItemRequest) returns (SnapshotItemResponse);
+    rpc Progress(ProgressRequest) returns (ProgressResponse);
+    rpc DeleteSnapshot(DeleteItemSnapshotRequest) returns (Empty);
+    rpc CreateItemFromSnapshot(CreateItemFromSnapshotRequest) returns (CreateItemFromSnapshotResponse);
+}

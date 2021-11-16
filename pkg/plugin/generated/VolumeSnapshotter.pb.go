@@ -28,7 +28,7 @@ type CreateVolumeRequest struct {
 func (m *CreateVolumeRequest) Reset()                    { *m = CreateVolumeRequest{} }
 func (m *CreateVolumeRequest) String() string            { return proto.CompactTextString(m) }
 func (*CreateVolumeRequest) ProtoMessage()               {}
-func (*CreateVolumeRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
+func (*CreateVolumeRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{0} }
 
 func (m *CreateVolumeRequest) GetPlugin() string {
 	if m != nil {
@@ -72,7 +72,7 @@ type CreateVolumeResponse struct {
 func (m *CreateVolumeResponse) Reset()                    { *m = CreateVolumeResponse{} }
 func (m *CreateVolumeResponse) String() string            { return proto.CompactTextString(m) }
 func (*CreateVolumeResponse) ProtoMessage()               {}
-func (*CreateVolumeResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{1} }
+func (*CreateVolumeResponse) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{1} }
 
 func (m *CreateVolumeResponse) GetVolumeID() string {
 	if m != nil {
@@ -90,7 +90,7 @@ type GetVolumeInfoRequest struct {
 func (m *GetVolumeInfoRequest) Reset()                    { *m = GetVolumeInfoRequest{} }
 func (m *GetVolumeInfoRequest) String() string            { return proto.CompactTextString(m) }
 func (*GetVolumeInfoRequest) ProtoMessage()               {}
-func (*GetVolumeInfoRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{2} }
+func (*GetVolumeInfoRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{2} }
 
 func (m *GetVolumeInfoRequest) GetPlugin() string {
 	if m != nil {
@@ -121,7 +121,7 @@ type GetVolumeInfoResponse struct {
 func (m *GetVolumeInfoResponse) Reset()                    { *m = GetVolumeInfoResponse{} }
 func (m *GetVolumeInfoResponse) String() string            { return proto.CompactTextString(m) }
 func (*GetVolumeInfoResponse) ProtoMessage()               {}
-func (*GetVolumeInfoResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{3} }
+func (*GetVolumeInfoResponse) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{3} }
 
 func (m *GetVolumeInfoResponse) GetVolumeType() string {
 	if m != nil {
@@ -147,7 +147,7 @@ type CreateSnapshotRequest struct {
 func (m *CreateSnapshotRequest) Reset()                    { *m = CreateSnapshotRequest{} }
 func (m *CreateSnapshotRequest) String() string            { return proto.CompactTextString(m) }
 func (*CreateSnapshotRequest) ProtoMessage()               {}
-func (*CreateSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{4} }
+func (*CreateSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{4} }
 
 func (m *CreateSnapshotRequest) GetPlugin() string {
 	if m != nil {
@@ -184,7 +184,7 @@ type CreateSnapshotResponse struct {
 func (m *CreateSnapshotResponse) Reset()                    { *m = CreateSnapshotResponse{} }
 func (m *CreateSnapshotResponse) String() string            { return proto.CompactTextString(m) }
 func (*CreateSnapshotResponse) ProtoMessage()               {}
-func (*CreateSnapshotResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{5} }
+func (*CreateSnapshotResponse) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{5} }
 
 func (m *CreateSnapshotResponse) GetSnapshotID() string {
 	if m != nil {
@@ -201,7 +201,7 @@ type DeleteSnapshotRequest struct {
 func (m *DeleteSnapshotRequest) Reset()                    { *m = DeleteSnapshotRequest{} }
 func (m *DeleteSnapshotRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeleteSnapshotRequest) ProtoMessage()               {}
-func (*DeleteSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{6} }
+func (*DeleteSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{6} }
 
 func (m *DeleteSnapshotRequest) GetPlugin() string {
 	if m != nil {
@@ -225,7 +225,7 @@ type GetVolumeIDRequest struct {
 func (m *GetVolumeIDRequest) Reset()                    { *m = GetVolumeIDRequest{} }
 func (m *GetVolumeIDRequest) String() string            { return proto.CompactTextString(m) }
 func (*GetVolumeIDRequest) ProtoMessage()               {}
-func (*GetVolumeIDRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{7} }
+func (*GetVolumeIDRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{7} }
 
 func (m *GetVolumeIDRequest) GetPlugin() string {
 	if m != nil {
@@ -248,7 +248,7 @@ type GetVolumeIDResponse struct {
 func (m *GetVolumeIDResponse) Reset()                    { *m = GetVolumeIDResponse{} }
 func (m *GetVolumeIDResponse) String() string            { return proto.CompactTextString(m) }
 func (*GetVolumeIDResponse) ProtoMessage()               {}
-func (*GetVolumeIDResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{8} }
+func (*GetVolumeIDResponse) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{8} }
 
 func (m *GetVolumeIDResponse) GetVolumeID() string {
 	if m != nil {
@@ -266,7 +266,7 @@ type SetVolumeIDRequest struct {
 func (m *SetVolumeIDRequest) Reset()                    { *m = SetVolumeIDRequest{} }
 func (m *SetVolumeIDRequest) String() string            { return proto.CompactTextString(m) }
 func (*SetVolumeIDRequest) ProtoMessage()               {}
-func (*SetVolumeIDRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{9} }
+func (*SetVolumeIDRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{9} }
 
 func (m *SetVolumeIDRequest) GetPlugin() string {
 	if m != nil {
@@ -296,7 +296,7 @@ type SetVolumeIDResponse struct {
 func (m *SetVolumeIDResponse) Reset()                    { *m = SetVolumeIDResponse{} }
 func (m *SetVolumeIDResponse) String() string            { return proto.CompactTextString(m) }
 func (*SetVolumeIDResponse) ProtoMessage()               {}
-func (*SetVolumeIDResponse) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{10} }
+func (*SetVolumeIDResponse) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{10} }
 
 func (m *SetVolumeIDResponse) GetPersistentVolume() []byte {
 	if m != nil {
@@ -313,7 +313,7 @@ type VolumeSnapshotterInitRequest struct {
 func (m *VolumeSnapshotterInitRequest) Reset()                    { *m = VolumeSnapshotterInitRequest{} }
 func (m *VolumeSnapshotterInitRequest) String() string            { return proto.CompactTextString(m) }
 func (*VolumeSnapshotterInitRequest) ProtoMessage()               {}
-func (*VolumeSnapshotterInitRequest) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{11} }
+func (*VolumeSnapshotterInitRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{11} }
 
 func (m *VolumeSnapshotterInitRequest) GetPlugin() string {
 	if m != nil {
@@ -614,9 +614,9 @@ var _VolumeSnapshotter_serviceDesc = grpc.ServiceDesc{
 	Metadata: "VolumeSnapshotter.proto",
 }
 
-func init() { proto.RegisterFile("VolumeSnapshotter.proto", fileDescriptor6) }
+func init() { proto.RegisterFile("VolumeSnapshotter.proto", fileDescriptor7) }
 
-var fileDescriptor6 = []byte{
+var fileDescriptor7 = []byte{
 	// 566 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x55, 0xc1, 0x6e, 0xd3, 0x40,
 	0x10, 0xd5, 0xda, 0x6e, 0x44, 0x26, 0xa5, 0x0a, 0x9b, 0xa4, 0x58, 0x16, 0x04, 0xe3, 0x0b, 0x51,
