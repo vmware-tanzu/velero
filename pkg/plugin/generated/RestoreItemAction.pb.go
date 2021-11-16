@@ -28,7 +28,7 @@ func (m *RestoreItemActionExecuteRequest) Reset()         { *m = RestoreItemActi
 func (m *RestoreItemActionExecuteRequest) String() string { return proto.CompactTextString(m) }
 func (*RestoreItemActionExecuteRequest) ProtoMessage()    {}
 func (*RestoreItemActionExecuteRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor4, []int{0}
+	return fileDescriptor5, []int{0}
 }
 
 func (m *RestoreItemActionExecuteRequest) GetPlugin() string {
@@ -69,7 +69,7 @@ func (m *RestoreItemActionExecuteResponse) Reset()         { *m = RestoreItemAct
 func (m *RestoreItemActionExecuteResponse) String() string { return proto.CompactTextString(m) }
 func (*RestoreItemActionExecuteResponse) ProtoMessage()    {}
 func (*RestoreItemActionExecuteResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor4, []int{1}
+	return fileDescriptor5, []int{1}
 }
 
 func (m *RestoreItemActionExecuteResponse) GetItem() []byte {
@@ -101,7 +101,7 @@ func (m *RestoreItemActionAppliesToRequest) Reset()         { *m = RestoreItemAc
 func (m *RestoreItemActionAppliesToRequest) String() string { return proto.CompactTextString(m) }
 func (*RestoreItemActionAppliesToRequest) ProtoMessage()    {}
 func (*RestoreItemActionAppliesToRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor4, []int{2}
+	return fileDescriptor5, []int{2}
 }
 
 func (m *RestoreItemActionAppliesToRequest) GetPlugin() string {
@@ -119,7 +119,7 @@ func (m *RestoreItemActionAppliesToResponse) Reset()         { *m = RestoreItemA
 func (m *RestoreItemActionAppliesToResponse) String() string { return proto.CompactTextString(m) }
 func (*RestoreItemActionAppliesToResponse) ProtoMessage()    {}
 func (*RestoreItemActionAppliesToResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor4, []int{3}
+	return fileDescriptor5, []int{3}
 }
 
 func (m *RestoreItemActionAppliesToResponse) GetResourceSelector() *ResourceSelector {
@@ -241,9 +241,9 @@ var _RestoreItemAction_serviceDesc = grpc.ServiceDesc{
 	Metadata: "RestoreItemAction.proto",
 }
 
-func init() { proto.RegisterFile("RestoreItemAction.proto", fileDescriptor4) }
+func init() { proto.RegisterFile("RestoreItemAction.proto", fileDescriptor5) }
 
-var fileDescriptor4 = []byte{
+var fileDescriptor5 = []byte{
 	// 332 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x52, 0xdd, 0x4e, 0xc2, 0x30,
 	0x14, 0x4e, 0x81, 0x80, 0x1c, 0x88, 0x3f, 0xbd, 0xd0, 0x06, 0x63, 0x9c, 0xbb, 0x30, 0xc4, 0x1f,

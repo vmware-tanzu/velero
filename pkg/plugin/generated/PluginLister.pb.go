@@ -26,7 +26,7 @@ type PluginIdentifier struct {
 func (m *PluginIdentifier) Reset()                    { *m = PluginIdentifier{} }
 func (m *PluginIdentifier) String() string            { return proto.CompactTextString(m) }
 func (*PluginIdentifier) ProtoMessage()               {}
-func (*PluginIdentifier) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (*PluginIdentifier) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 func (m *PluginIdentifier) GetCommand() string {
 	if m != nil {
@@ -56,7 +56,7 @@ type ListPluginsResponse struct {
 func (m *ListPluginsResponse) Reset()                    { *m = ListPluginsResponse{} }
 func (m *ListPluginsResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListPluginsResponse) ProtoMessage()               {}
-func (*ListPluginsResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
+func (*ListPluginsResponse) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 func (m *ListPluginsResponse) GetPlugins() []*PluginIdentifier {
 	if m != nil {
@@ -142,9 +142,9 @@ var _PluginLister_serviceDesc = grpc.ServiceDesc{
 	Metadata: "PluginLister.proto",
 }
 
-func init() { proto.RegisterFile("PluginLister.proto", fileDescriptor3) }
+func init() { proto.RegisterFile("PluginLister.proto", fileDescriptor4) }
 
-var fileDescriptor3 = []byte{
+var fileDescriptor4 = []byte{
 	// 201 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x0a, 0xc8, 0x29, 0x4d,
 	0xcf, 0xcc, 0xf3, 0xc9, 0x2c, 0x2e, 0x49, 0x2d, 0xd2, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2,
