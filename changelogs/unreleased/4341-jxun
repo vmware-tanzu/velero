@@ -1,0 +1,2 @@
+Add init log option for velero controller-runtime manager.
+Fix https://github.com/vmware-tanzu/velero/issues/3737
