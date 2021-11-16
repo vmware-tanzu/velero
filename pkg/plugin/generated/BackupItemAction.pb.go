@@ -7,6 +7,7 @@ Package generated is a generated protocol buffer package.
 It is generated from these files:
 	BackupItemAction.proto
 	DeleteItemAction.proto
+	ItemSnapshotter.proto
 	ObjectStore.proto
 	PluginLister.proto
 	RestoreItemAction.proto
@@ -21,6 +22,18 @@ It has these top-level messages:
 	DeleteItemActionExecuteRequest
 	DeleteItemActionAppliesToRequest
 	DeleteItemActionAppliesToResponse
+	ItemSnapshotterAppliesToRequest
+	ItemSnapshotterAppliesToResponse
+	AlsoHandlesRequest
+	AlsoHandlesResponse
+	SnapshotItemRequest
+	SnapshotItemResponse
+	ProgressRequest
+	ProgressResponse
+	DeleteItemSnapshotRequest
+	CreateItemFromSnapshotRequest
+	CreateItemFromSnapshotResponse
+	ItemSnapshotterInitRequest
 	PutObjectRequest
 	ObjectExistsRequest
 	ObjectExistsResponse

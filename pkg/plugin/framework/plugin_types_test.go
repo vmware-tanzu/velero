@@ -30,6 +30,7 @@ func TestPluginImplementationsAreGRPCPlugins(t *testing.T) {
 		new(ObjectStorePlugin),
 		new(PluginListerPlugin),
 		new(RestoreItemActionPlugin),
+		new(ItemSnapshotterPlugin),
 	}
 
 	for _, impl := range pluginImpls {

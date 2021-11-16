@@ -18,7 +18,7 @@ type Empty struct {
 func (m *Empty) Reset()                    { *m = Empty{} }
 func (m *Empty) String() string            { return proto.CompactTextString(m) }
 func (*Empty) ProtoMessage()               {}
-func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
+func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
 
 type Stack struct {
 	Frames []*StackFrame `protobuf:"bytes,1,rep,name=frames" json:"frames,omitempty"`
@@ -27,7 +27,7 @@ type Stack struct {
 func (m *Stack) Reset()                    { *m = Stack{} }
 func (m *Stack) String() string            { return proto.CompactTextString(m) }
 func (*Stack) ProtoMessage()               {}
-func (*Stack) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1} }
+func (*Stack) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{1} }
 
 func (m *Stack) GetFrames() []*StackFrame {
 	if m != nil {
@@ -45,7 +45,7 @@ type StackFrame struct {
 func (m *StackFrame) Reset()                    { *m = StackFrame{} }
 func (m *StackFrame) String() string            { return proto.CompactTextString(m) }
 func (*StackFrame) ProtoMessage()               {}
-func (*StackFrame) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{2} }
+func (*StackFrame) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{2} }
 
 func (m *StackFrame) GetFile() string {
 	if m != nil {
@@ -78,7 +78,7 @@ type ResourceIdentifier struct {
 func (m *ResourceIdentifier) Reset()                    { *m = ResourceIdentifier{} }
 func (m *ResourceIdentifier) String() string            { return proto.CompactTextString(m) }
 func (*ResourceIdentifier) ProtoMessage()               {}
-func (*ResourceIdentifier) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{3} }
+func (*ResourceIdentifier) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{3} }
 
 func (m *ResourceIdentifier) GetGroup() string {
 	if m != nil {
@@ -119,7 +119,7 @@ type ResourceSelector struct {
 func (m *ResourceSelector) Reset()                    { *m = ResourceSelector{} }
 func (m *ResourceSelector) String() string            { return proto.CompactTextString(m) }
 func (*ResourceSelector) ProtoMessage()               {}
-func (*ResourceSelector) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{4} }
+func (*ResourceSelector) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{4} }
 
 func (m *ResourceSelector) GetIncludedNamespaces() []string {
 	if m != nil {
@@ -164,9 +164,9 @@ func init() {
 	proto.RegisterType((*ResourceSelector)(nil), "generated.ResourceSelector")
 }
 
-func init() { proto.RegisterFile("Shared.proto", fileDescriptor5) }
+func init() { proto.RegisterFile("Shared.proto", fileDescriptor6) }
 
-var fileDescriptor5 = []byte{
+var fileDescriptor6 = []byte{
 	// 294 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x92, 0xc1, 0x4e, 0xb5, 0x30,
 	0x10, 0x85, 0xc3, 0x05, 0xee, 0xff, 0x33, 0xba, 0xd0, 0x46, 0x93, 0xc6, 0xb8, 0x20, 0xac, 0x58,
