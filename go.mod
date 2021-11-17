@@ -9,6 +9,7 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/aws/aws-sdk-go v1.28.2
+	github.com/bombsimon/logrusr v1.1.0
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/fatih/color v1.13.0
 	github.com/gobwas/glob v0.2.3
