@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bombsimon/logrusr"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -301,6 +302,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
+
+	ctrl.SetLogger(logrusr.NewLogger(logger))
 
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme:    scheme,
