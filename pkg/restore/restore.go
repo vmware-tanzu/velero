@@ -20,8 +20,12 @@ import (
 	go_context "context"
 	"encoding/json"
 	"fmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"io"
 	"io/ioutil"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -1224,6 +1228,43 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
+	// change sts volumeClaimTemplates storageClassName
+	if groupResource == kuberesource.StatefulSets {
+		sts := new(appsv1.StatefulSet)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), sts); err != nil {
+			errs.Add(namespace, err)
+			return warnings, errs
+		}
+
+		clientset, err := getClient()
+		if err != nil {
+			errs.Add(namespace, errors.Errorf("try to get change-storage-class configmap clientset failed: %s", err.Error()))
+			return warnings, errs
+		}
+
+		// get new storageClass
+		configMap, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-storage-class", clientset.CoreV1().ConfigMaps("velero"))
+		if err != nil {
+			errs.Add(namespace, err)
+			return warnings, errs
+		}
+
+		if len(sts.Spec.VolumeClaimTemplates) > 0 && configMap != nil && len(configMap.Data) > 0 {
+			for index, pvc := range sts.Spec.VolumeClaimTemplates {
+				if newStorageClass, ok := configMap.Data[*pvc.Spec.StorageClassName]; ok {
+					sts.Spec.VolumeClaimTemplates[index].Spec.StorageClassName = &newStorageClass
+				}
+			}
+
+			newObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sts)
+			if err != nil {
+				errs.Add(namespace, err)
+				return warnings, errs
+			}
+			obj.Object = newObj
+		}
+	}
+
 	// Necessary because we may have remapped the namespace if the namespace is
 	// blank, don't create the key.
 	originalNamespace := obj.GetNamespace()
@@ -1840,4 +1881,16 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs
+}
+
+func getClient() (clientset *kubernetes.Clientset, err error)  {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	clientset, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return clientset, nil
 }
