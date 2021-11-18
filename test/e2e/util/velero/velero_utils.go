@@ -421,7 +421,7 @@ func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, namespace string) error {
 	err := wait.PollImmediate(time.Minute, timeout, func() (bool, error) {
 		checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
-			"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}'")
+			"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}{end}'")
 		fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
 		stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
 		if err != nil {
