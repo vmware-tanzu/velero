@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.3.0
+    controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
   name: restores.velero.io
 spec:
@@ -892,6 +892,7 @@ spec:
                                                   by services.
                                                 type: string
                                               protocol:
+                                                default: TCP
                                                 description: Protocol for port. Must
                                                   be UDP, TCP, or SCTP. Defaults to
                                                   "TCP".

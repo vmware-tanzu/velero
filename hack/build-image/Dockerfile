@@ -24,17 +24,19 @@ ENV GOPROXY=${GOPROXY}
 RUN mkdir -p /go/src/k8s.io
 WORKDIR /go/src/k8s.io
 RUN git config --global advice.detachedHead false
-RUN git clone -b v0.18.4 https://github.com/kubernetes/code-generator
+RUN git clone -b v0.22.2 https://github.com/kubernetes/code-generator
 
-RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_linux_amd64.tar.gz && \
-    tar -zxvf kubebuilder_2.3.1_linux_amd64.tar.gz && \
-    mv kubebuilder_2.3.1_linux_amd64 /usr/local/kubebuilder && \
-    chmod +x /usr/local/kubebuilder && \
-    export PATH=$PATH:/usr/local/kubebuilder/bin && \
-    rm kubebuilder_2.3.1_linux_amd64.tar.gz
+# kubebuilder test bundle is separated from kubebuilder. Need to setup it for CI test.
+RUN curl -sSLo envtest-bins.tar.gz https://go.kubebuilder.io/test-tools/1.22.1/linux/amd64 && \
+    mkdir /usr/local/kubebuilder && \
+    tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
+
+RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.2.0/kubebuilder_linux_amd64 && \
+    mv kubebuilder_linux_amd64 /usr/local/kubebuilder/bin/kubebuilder && \
+    chmod +x /usr/local/kubebuilder/bin/kubebuilder
 
 # get controller-tools
-RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0
+RUN go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
 # get goimports (the revision is pinned so we don't indiscriminately update, but the particular commit
 # is not important)

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
-	v1beta1crds "github.com/vmware-tanzu/velero/config/crd/v1beta1/crds"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -226,11 +225,6 @@ func AllCRDs(perferredAPIVersion string) *unstructured.UnstructuredList {
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
 	switch perferredAPIVersion {
-	case "v1beta1":
-		for _, crd := range v1beta1crds.CRDs {
-			crd.SetLabels(Labels())
-			appendUnstructured(resources, crd)
-		}
 	case "v1":
 		for _, crd := range v1crds.CRDs {
 			crd.SetLabels(Labels())

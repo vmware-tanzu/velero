@@ -26,8 +26,10 @@ import (
 )
 
 // DownloadRequestLister helps list DownloadRequests.
+// All objects returned here must be treated as read-only.
 type DownloadRequestLister interface {
 	// List lists all DownloadRequests in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.DownloadRequest, err error)
 	// DownloadRequests returns an object that can list and get DownloadRequests.
 	DownloadRequests(namespace string) DownloadRequestNamespaceLister
@@ -58,10 +60,13 @@ func (s *downloadRequestLister) DownloadRequests(namespace string) DownloadReque
 }
 
 // DownloadRequestNamespaceLister helps list and get DownloadRequests.
+// All objects returned here must be treated as read-only.
 type DownloadRequestNamespaceLister interface {
 	// List lists all DownloadRequests in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.DownloadRequest, err error)
 	// Get retrieves the DownloadRequest from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.DownloadRequest, error)
 	DownloadRequestNamespaceListerExpansion
 }
