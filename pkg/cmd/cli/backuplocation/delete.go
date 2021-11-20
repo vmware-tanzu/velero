@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -33,6 +32,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
 )
+
+const bslLabelKey = "velero.io/storage-location"
 
 // NewDeleteCommand creates and returns a new cobra command for deleting backup-locations.
 func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
@@ -120,7 +121,65 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 			continue
 		}
 		fmt.Printf("Backup storage location %q deleted successfully.\n", location.Name)
+
+		// Delete backups assciated with the deleted BSL.
+		backupList, err := findAssociatedBackups(kbClient, location.Name, f.Namespace())
+		if err != nil {
+			errs = append(errs, fmt.Errorf("find backups associated with BSL %q: %w", location.Name, err))
+		}
+		if deleteErrs := deleteBackups(kbClient, backupList); deleteErrs != nil {
+			errs = append(errs, deleteErrs...)
+		}
+
+		// Delete Restic repositories assciated with the deleted BSL.
+		resticRepoList, err := findAssociatedResticRepos(kbClient, location.Name, f.Namespace())
+		if err != nil {
+			errs = append(errs, fmt.Errorf("find Restic repositories associated with BSL %q: %w", location.Name, err))
+		}
+		if deleteErrs := deleteResticRepos(kbClient, resticRepoList); deleteErrs != nil {
+			errs = append(errs, deleteErrs...)
+		}
 	}
 
 	return kubeerrs.NewAggregate(errs)
+}
+
+func findAssociatedBackups(client kbclient.Client, bslName, ns string) (velerov1api.BackupList, error) {
+	var backups velerov1api.BackupList
+	err := client.List(context.Background(), &backups, &kbclient.ListOptions{
+		Namespace: ns,
+		Raw:       &metav1.ListOptions{LabelSelector: bslLabelKey + "=" + bslName},
+	})
+	return backups, err
+}
+
+func findAssociatedResticRepos(client kbclient.Client, bslName, ns string) (velerov1api.ResticRepositoryList, error) {
+	var repos velerov1api.ResticRepositoryList
+	err := client.List(context.Background(), &repos, &kbclient.ListOptions{
+		Namespace: ns,
+		Raw:       &metav1.ListOptions{LabelSelector: bslLabelKey + "=" + bslName},
+	})
+	return repos, err
+}
+
+func deleteBackups(client kbclient.Client, backups velerov1api.BackupList) []error {
+	var errs []error
+	for _, backup := range backups.Items {
+		if err := client.Delete(context.Background(), &backup, &kbclient.DeleteOptions{}); err != nil {
+			errs = append(errs, errors.WithStack(fmt.Errorf("delete backup %q associated with deleted BSL: %w", backup.Name, err)))
+		}
+		fmt.Printf("Backup associated with deleted BSL(s) %q deleted successfully.\n", backup.Name)
+	}
+	return errs
+}
+
+func deleteResticRepos(client kbclient.Client, repos velerov1api.ResticRepositoryList) []error {
+	var errs []error
+	for _, repo := range repos.Items {
+		if err := client.Delete(context.Background(), &repo, &kbclient.DeleteOptions{}); err != nil {
+			errs = append(errs, errors.WithStack(fmt.Errorf("delete Restic repository %q associated with deleted BSL: %w", repo.Name, err)))
+		}
+		fmt.Printf("Restic repository associated with deleted BSL(s) %q deleted successfully.\n", repo.Name)
+	}
+	return errs
 }
