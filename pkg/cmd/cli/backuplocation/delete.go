@@ -122,7 +122,7 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 		}
 		fmt.Printf("Backup storage location %q deleted successfully.\n", location.Name)
 
-		// Delete backups assciated with the deleted BSL.
+		// Delete backups associated with the deleted BSL.
 		backupList, err := findAssociatedBackups(kbClient, location.Name, f.Namespace())
 		if err != nil {
 			errs = append(errs, fmt.Errorf("find backups associated with BSL %q: %w", location.Name, err))
@@ -131,7 +131,7 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 			errs = append(errs, deleteErrs...)
 		}
 
-		// Delete Restic repositories assciated with the deleted BSL.
+		// Delete Restic repositories associated with the deleted BSL.
 		resticRepoList, err := findAssociatedResticRepos(kbClient, location.Name, f.Namespace())
 		if err != nil {
 			errs = append(errs, fmt.Errorf("find Restic repositories associated with BSL %q: %w", location.Name, err))
