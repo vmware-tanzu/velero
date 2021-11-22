@@ -55,10 +55,15 @@ about: Tell us about a problem you are experiencing
 
 **What did you expect to happen:**
 
+**The following information will help us better understand what's going on**:
 
-**The output of the following commands will help us better understand what's going on**:
-(Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
+_If you are using velero v1.7.0+:_  
+Please use ` + "`velero debug  --backup <backupname> --restore <restorename>` " +
+		`to generate the support bundle, and attach to this issue, more options please refer to ` +
+		"`velero debug --help` " + `
 
+_If you are using earlier versions:_  
+Please provide the output of the following commands (Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
 - ` + "`kubectl logs deployment/velero -n velero`" + `
 - ` + "`velero backup describe <backupname>` or `kubectl get backup/<backupname> -n velero -o yaml`" + `
 - ` + "`velero backup logs <backupname>`" + `
