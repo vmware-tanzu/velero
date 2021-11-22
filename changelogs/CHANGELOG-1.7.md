@@ -1,3 +1,23 @@
+## v1.7.1
+### 2021-11-22
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.7.1
+
+### Container Image
+`velero/velero:v1.7.1`
+
+### Documentation
+https://velero.io/docs/v1.7/
+
+### Upgrading
+https://velero.io/docs/v1.7/upgrade-to-1.7/
+
+### All changes
+
+* fix buggy pager func (#4358, @alaypatel07)
+* Fix CVE-2020-29652 and CVE-2020-26160 (#4315, @ywk253100)
+
 ## v1.7.0
 ### 2021-09-07
 
