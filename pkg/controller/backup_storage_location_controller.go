@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -59,8 +60,8 @@ func (r *BackupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 
 	locationList, err := storage.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
 	if err != nil {
-		log.WithError(err).Error("No backup storage locations found, at least one is required")
-		return ctrl.Result{}, err
+		return ctrl.Result{},
+			fmt.Errorf("error: %s, no backup storage locations found, at least one is required", err.Error())
 	}
 
 	pluginManager := r.NewPluginManager(log)

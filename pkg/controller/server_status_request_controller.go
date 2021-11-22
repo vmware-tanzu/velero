@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -75,8 +76,8 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 			return ctrl.Result{}, nil
 		}
 
-		log.WithError(err).Error("Error getting ServerStatusRequest")
-		return ctrl.Result{}, err
+		return ctrl.Result{},
+			fmt.Errorf("error: %s, error getting ServerStatusRequest, ", err.Error())
 	}
 
 	log = r.Log.WithFields(logrus.Fields{
@@ -92,8 +93,8 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		// Initialize the patch helper.
 		patchHelper, err := patch.NewHelper(statusRequest, r.Client)
 		if err != nil {
-			log.WithError(err).Error("Error getting a patch helper to update this resource")
-			return ctrl.Result{}, err
+			return ctrl.Result{},
+				fmt.Errorf("error: fail to get a patch helper to update this resource, %s", err.Error())
 		}
 
 		statusRequest.Status.ServerVersion = buildinfo.Version
@@ -102,8 +103,8 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		statusRequest.Status.Plugins = velero.GetInstalledPluginInfo(r.PluginRegistry)
 
 		if err := patchHelper.Patch(r.Ctx, statusRequest); err != nil {
-			log.WithError(err).Error("Error updating ServerStatusRequest status")
-			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod},
+				fmt.Errorf("error: fail to update ServerStatusRequest status, %s", err.Error())
 		}
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")

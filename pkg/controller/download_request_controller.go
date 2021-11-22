@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -49,7 +50,7 @@ type DownloadRequestReconciler struct {
 
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests/status,verbs=get;update;patch
-func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (reconcileResult ctrl.Result, retErr error) {
 	log := r.Log.WithFields(logrus.Fields{
 		"controller":      "download-request",
 		"downloadRequest": req.NamespacedName,
@@ -64,22 +65,23 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 
-		log.WithError(err).Error("Error getting DownloadRequest")
-		return ctrl.Result{}, errors.WithStack(err)
+		return ctrl.Result{},
+			fmt.Errorf("error: %s, error getting DownloadRequest", errors.WithStack(err))
 	}
 
 	// Initialize the patch helper.
 	patchHelper, err := patch.NewHelper(downloadRequest, r.Client)
 	if err != nil {
-		log.WithError(err).Error("Error getting a patch helper to update this resource")
-		return ctrl.Result{}, errors.WithStack(err)
+		return ctrl.Result{},
+			fmt.Errorf("error: %s, error getting a patch helper to update this resource", errors.WithStack(err))
 	}
 
 	defer func() {
 		// Always attempt to Patch the downloadRequest object and status after each reconciliation.
 		if err := patchHelper.Patch(ctx, downloadRequest); err != nil {
 			log.WithError(err).Error("Error updating download request")
-			return
+			reconcileResult = ctrl.Result{}
+			retErr = fmt.Errorf("error: %s, error updating download request", errors.WithStack(err))
 		}
 	}()
 
@@ -91,7 +93,8 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			log.Debug("DownloadRequest has expired - deleting")
 			if err := r.Client.Delete(ctx, downloadRequest); err != nil {
 				log.WithError(err).Error("Error deleting an expired download request")
-				return ctrl.Result{}, errors.WithStack(err)
+				return ctrl.Result{},
+					fmt.Errorf("error :%s, error deleting an expired download request", errors.WithStack(err))
 			}
 			return ctrl.Result{Requeue: false}, nil
 
@@ -145,8 +148,8 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		backupStore, err := r.BackupStoreGetter.Get(location, pluginManager, log)
 		if err != nil {
-			log.WithError(err).Error("Error getting a backup store")
-			return ctrl.Result{}, errors.WithStack(err)
+			return ctrl.Result{},
+				fmt.Errorf("error: %s, error updating download request", errors.WithStack(err))
 		}
 
 		if downloadRequest.Status.DownloadURL, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
