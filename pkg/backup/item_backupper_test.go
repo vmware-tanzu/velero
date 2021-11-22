@@ -51,7 +51,9 @@ func Test_zoneFromPVNodeAffinity(t *testing.T) {
 	keys := []string{
 		awsEbsCsiZoneKey,
 		azureCsiZoneKey,
+		gkeCsiZoneKey,
 		zoneLabel,
+		zoneLabelDeprecated,
 	}
 	tests := []struct {
 		name      string
@@ -80,6 +82,17 @@ func Test_zoneFromPVNodeAffinity(t *testing.T) {
 			).Result(),
 			wantKey:   "topology.disk.csi.azure.com/zone",
 			wantValue: "us-central",
+		},
+		{
+			name: "GCP CSI Volume",
+			pv: builder.ForPersistentVolume("gcpcsi").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-west1-a").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.gke.io/zone",
+			wantValue: "us-west1-a",
 		},
 		{
 			name: "AWS CSI Volume with multiple zone value, returns the first",
