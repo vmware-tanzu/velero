@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package k8s
 
 import (
 	"context"
@@ -33,10 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func waitUntilServiceAccountCreated(ctx context.Context, client testClient, namespace, serviceAccount string, timeout time.Duration) error {
+func WaitUntilServiceAccountCreated(ctx context.Context, client TestClient, namespace, serviceAccount string, timeout time.Duration) error {
 	return wait.PollImmediate(5*time.Second, timeout,
 		func() (bool, error) {
-			if _, err := client.clientGo.CoreV1().ServiceAccounts(namespace).Get(ctx, serviceAccount, metav1.GetOptions{}); err != nil {
+			if _, err := client.ClientGo.CoreV1().ServiceAccounts(namespace).Get(ctx, serviceAccount, metav1.GetOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return false, err
 				}
@@ -46,7 +46,7 @@ func waitUntilServiceAccountCreated(ctx context.Context, client testClient, name
 		})
 }
 
-func patchServiceAccountWithImagePullSecret(ctx context.Context, client testClient, namespace, serviceAccount, dockerCredentialFile string) error {
+func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClient, namespace, serviceAccount, dockerCredentialFile string) error {
 	credential, err := ioutil.ReadFile(dockerCredentialFile)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read the docker credential file %q", dockerCredentialFile)
@@ -54,11 +54,11 @@ func patchServiceAccountWithImagePullSecret(ctx context.Context, client testClie
 	secretName := "image-pull-secret"
 	secret := builder.ForSecret(namespace, secretName).Data(map[string][]byte{".dockerconfigjson": credential}).Result()
 	secret.Type = corev1.SecretTypeDockerConfigJson
-	if _, err = client.clientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+	if _, err = client.ClientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 		return errors.Wrapf(err, "failed to create secret %q under namespace %q", secretName, namespace)
 	}
 
-	if _, err = client.clientGo.CoreV1().ServiceAccounts(namespace).Patch(ctx, serviceAccount, types.StrategicMergePatchType,
+	if _, err = client.ClientGo.CoreV1().ServiceAccounts(namespace).Patch(ctx, serviceAccount, types.StrategicMergePatchType,
 		[]byte(fmt.Sprintf(`{"imagePullSecrets": [{"name": "%s"}]}`, secretName)), metav1.PatchOptions{}); err != nil {
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccount, namespace)
 	}

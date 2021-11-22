@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package kibishii
 
 import (
 	"fmt"
@@ -26,6 +26,8 @@ import (
 	"golang.org/x/net/context"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	k8sutils "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	veleroutils "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 const (
@@ -33,25 +35,24 @@ const (
 	jumpPadPod        = "jump-pad"
 )
 
-// runKibishiiTests runs kibishii tests on the provider.
-func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
+// RunKibishiiTests runs kibishii tests on the provider.
+func RunKibishiiTests(client k8sutils.TestClient, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
 	useVolumeSnapshots bool, registryCredentialFile string) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
-
-	if err := createNamespace(oneHourTimeout, client, kibishiiNamespace); err != nil {
+	if err := k8sutils.CreateNamespace(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
-		if err := deleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
+		if err := k8sutils.DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 		}
 	}()
-	if err := kibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, kibishiiNamespace, registryCredentialFile); err != nil {
+	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, kibishiiNamespace, registryCredentialFile); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
 
-	if err := veleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
-		runDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
+	if err := veleroutils.VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots); err != nil {
+		veleroutils.RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
 
@@ -59,12 +60,12 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 		// Wait for uploads started by the Velero Plug-in for vSphere to complete
 		// TODO - remove after upload progress monitoring is implemented
 		fmt.Println("Waiting for vSphere uploads to complete")
-		if err := waitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
+		if err := veleroutils.WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
 			return errors.Wrapf(err, "Error waiting for uploads to complete")
 		}
 	}
 	fmt.Printf("Simulating a disaster by removing namespace %s\n", kibishiiNamespace)
-	if err := deleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
+	if err := k8sutils.DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
 
@@ -76,12 +77,12 @@ func runKibishiiTests(client testClient, providerName, veleroCLI, veleroNamespac
 		time.Sleep(5 * time.Minute)
 	}
 
-	if err := veleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
-		runDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
+	if err := veleroutils.VeleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
+		veleroutils.RunDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
 
-	if err := kibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout); err != nil {
+	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
 
@@ -144,19 +145,19 @@ func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel
 	return nil
 }
 
-func waitForKibishiiPods(ctx context.Context, client testClient, kibishiiNamespace string) error {
-	return waitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
+func waitForKibishiiPods(ctx context.Context, client k8sutils.TestClient, kibishiiNamespace string) error {
+	return k8sutils.WaitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
 }
 
-func kibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client testClient, providerName, kibishiiNamespace, registryCredentialFile string) error {
+func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client k8sutils.TestClient, providerName, kibishiiNamespace, registryCredentialFile string) error {
 	serviceAccountName := "default"
 
 	// wait until the service account is created before patch the image pull secret
-	if err := waitUntilServiceAccountCreated(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, 10*time.Minute); err != nil {
+	if err := k8sutils.WaitUntilServiceAccountCreated(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, 10*time.Minute); err != nil {
 		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
 	// add the image pull secret to avoid the image pull limit issue of Docker Hub
-	if err := patchServiceAccountWithImagePullSecret(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, registryCredentialFile); err != nil {
+	if err := k8sutils.PatchServiceAccountWithImagePullSecret(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, registryCredentialFile); err != nil {
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
 
@@ -177,7 +178,7 @@ func kibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client testClie
 	return nil
 }
 
-func kibishiiVerifyAfterRestore(client testClient, kibishiiNamespace string, oneHourTimeout context.Context) error {
+func KibishiiVerifyAfterRestore(client k8sutils.TestClient, kibishiiNamespace string, oneHourTimeout context.Context) error {
 	// wait for kibishii pod startup
 	// TODO - Fix kibishii so we can check that it is ready to go
 	fmt.Printf("Waiting for kibishii pods to be ready\n")

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package velero
 
 import (
 	"bytes"
@@ -35,6 +35,8 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	velerexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	. "github.com/vmware-tanzu/velero/test/e2e"
+	k8sutils "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
 // we provide more install options other than the standard install.InstallOptions in E2E test
@@ -44,53 +46,49 @@ type installOptions struct {
 	ResticHelperImage      string
 }
 
-// TODO too many parameters for this function, better to make it a structure, we can introduces a structure `config` for the E2E to hold all configuration items
-func veleroInstall(ctx context.Context, cli, veleroImage, resticHelperImage, providerPlugins, veleroNamespace, cloudProvider, objectStoreProvider string, useVolumeSnapshots bool,
-	cloudCredentialsFile string, bslBucket string, bslPrefix string, bslConfig string, vslConfig string,
-	crdsVersion string, features string, registryCredentialFile string) error {
-
-	if cloudProvider != "kind" {
-		if objectStoreProvider != "" {
+func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features string, useVolumeSnapshots bool) error {
+	if veleroCfg.CloudProvider != "kind" {
+		if veleroCfg.ObjectStoreProvider != "" {
 			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
 		}
-		objectStoreProvider = cloudProvider
+		veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
 	} else {
-		if objectStoreProvider == "" {
+		if veleroCfg.ObjectStoreProvider == "" {
 			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
 		}
 	}
 
-	providerPluginsTmp, err := getProviderPlugins(ctx, cli, objectStoreProvider, providerPlugins)
+	providerPluginsTmp, err := getProviderPlugins(ctx, veleroCfg.VeleroCLI, veleroCfg.ObjectStoreProvider, veleroCfg.Plugins)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
 	// TODO - handle this better
-	if cloudProvider == "vsphere" {
-		// We overrider the objectStoreProvider here for vSphere because we want to use the aws plugin for the
+	if veleroCfg.CloudProvider == "vsphere" {
+		// We overrider the ObjectStoreProvider here for vSphere because we want to use the aws plugin for the
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
-		objectStoreProvider = "aws"
+		veleroCfg.ObjectStoreProvider = "aws"
 	}
-	err = ensureClusterExists(ctx)
+	err = k8sutils.EnsureClusterExists(ctx)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
 	}
 
-	veleroInstallOptions, err := getProviderVeleroInstallOptions(objectStoreProvider, cloudCredentialsFile, bslBucket,
-		bslPrefix, bslConfig, vslConfig, providerPluginsTmp, features)
+	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
+		veleroCfg.BSLPrefix, veleroCfg.BSLConfig, veleroCfg.VSLConfig, providerPluginsTmp, features)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", objectStoreProvider)
+		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 	veleroInstallOptions.UseVolumeSnapshots = useVolumeSnapshots
 	veleroInstallOptions.UseRestic = !useVolumeSnapshots
-	veleroInstallOptions.Image = veleroImage
-	veleroInstallOptions.CRDsVersion = crdsVersion
-	veleroInstallOptions.Namespace = veleroNamespace
+	veleroInstallOptions.Image = veleroCfg.VeleroImage
+	veleroInstallOptions.CRDsVersion = veleroCfg.CRDsVersion
+	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
 
-	err = installVeleroServer(ctx, cli, &installOptions{
+	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
 		InstallOptions:         veleroInstallOptions,
-		RegistryCredentialFile: registryCredentialFile,
-		ResticHelperImage:      resticHelperImage,
+		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
+		ResticHelperImage:      veleroCfg.ResticHelperImage,
 	})
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
@@ -195,7 +193,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to unmarshal the resources: %s", string(stdout))
 	}
 
-	if err = patchResources(ctx, resources, namespace, registryCredentialFile, resticHelperImage); err != nil {
+	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.ResticHelperImage); err != nil {
 		return errors.Wrapf(err, "failed to patch resources")
 	}
 
@@ -261,7 +259,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 	}
 
 	// customize the restic restore helper image
-	if len(resticHelperImage) > 0 {
+	if len(VeleroCfg.ResticHelperImage) > 0 {
 		restoreActionConfig := corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
@@ -276,7 +274,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 				},
 			},
 			Data: map[string]string{
-				"image": resticHelperImage,
+				"image": VeleroCfg.ResticHelperImage,
 			},
 		}
 
@@ -337,7 +335,7 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 	return nil
 }
 
-func veleroUninstall(ctx context.Context, cli, namespace string) error {
+func VeleroUninstall(ctx context.Context, cli, namespace string) error {
 	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, cli, "uninstall", "--force", "-n", namespace))
 	if err != nil {
 		return errors.Wrapf(err, "failed to uninstall velero, stdout=%s, stderr=%s", stdout, stderr)
