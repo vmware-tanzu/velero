@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package k8s
 
 import (
 	"k8s.io/client-go/kubernetes"
@@ -23,10 +23,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
-// testClient contains different API clients that are in use throughout
+// TestClient contains different API clients that are in use throughout
 // the e2e tests.
 
-type testClient struct {
+type TestClient struct {
 	kubebuilder kbclient.Client
 
 	// clientGo returns a client-go API client.
@@ -34,7 +34,7 @@ type testClient struct {
 	// Deprecated, TODO(2.0): presuming all controllers and resources are converted to the
 	// controller runtime framework by v2.0, it is the intent to remove all
 	// client-go API clients. Please use the controller runtime to make API calls for tests.
-	clientGo kubernetes.Interface
+	ClientGo kubernetes.Interface
 
 	// dynamicFactory returns a client-go API client for retrieving dynamic clients
 	// for GroupVersionResources and GroupVersionKinds.
@@ -45,35 +45,35 @@ type testClient struct {
 	dynamicFactory client.DynamicFactory
 }
 
-// newTestClient returns a set of ready-to-use API clients.
-func newTestClient() (testClient, error) {
+// k8sutils.NewTestClient returns a set of ready-to-use API clients.
+func NewTestClient() (TestClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {
-		return testClient{}, err
+		return TestClient{}, err
 	}
 
 	f := client.NewFactory("e2e", config)
 
 	clientGo, err := f.KubeClient()
 	if err != nil {
-		return testClient{}, err
+		return TestClient{}, err
 	}
 
 	kb, err := f.KubebuilderClient()
 	if err != nil {
-		return testClient{}, err
+		return TestClient{}, err
 	}
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return testClient{}, err
+		return TestClient{}, err
 	}
 
 	factory := client.NewDynamicFactory(dynamicClient)
 
-	return testClient{
+	return TestClient{
 		kubebuilder:    kb,
-		clientGo:       clientGo,
+		ClientGo:       clientGo,
 		dynamicFactory: factory,
 	}, nil
 }

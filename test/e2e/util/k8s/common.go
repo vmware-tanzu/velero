@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package k8s
 
 import (
 	"fmt"
@@ -32,11 +32,11 @@ import (
 )
 
 // ensureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
-func ensureClusterExists(ctx context.Context) error {
+func EnsureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
 }
 
-func createSecretFromFiles(ctx context.Context, client testClient, namespace string, name string, files map[string]string) error {
+func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace string, name string, files map[string]string) error {
 	data := make(map[string][]byte)
 
 	for key, filePath := range files {
@@ -49,17 +49,17 @@ func createSecretFromFiles(ctx context.Context, client testClient, namespace str
 	}
 
 	secret := builder.ForSecret(namespace, name).Data(data).Result()
-	_, err := client.clientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	_, err := client.ClientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	return err
 }
 
-// waitForPods waits until all of the pods have gone to PodRunning state
-func waitForPods(ctx context.Context, client testClient, namespace string, pods []string) error {
+// WaitForPods waits until all of the pods have gone to PodRunning state
+func WaitForPods(ctx context.Context, client TestClient, namespace string, pods []string) error {
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		for _, podName := range pods {
-			checkPod, err := client.clientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
 				return false, errors.WithMessage(err, fmt.Sprintf("Failed to verify pod %s/%s is %s", namespace, podName, corev1api.PodRunning))
 			}
