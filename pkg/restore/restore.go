@@ -1562,10 +1562,6 @@ func resetVolumeBindingInfo(obj *unstructured.Unstructured) *unstructured.Unstru
 	// the PV(C) controller to take the two objects and bind them again.
 	delete(annotations, KubeAnnBoundByController)
 
-	// Remove the provisioned-by annotation which signals that the persistent
-	// volume was dynamically provisioned; it is now statically provisioned.
-	delete(annotations, KubeAnnDynamicallyProvisioned)
-
 	// GetAnnotations returns a copy, so we have to set them again.
 	obj.SetAnnotations(annotations)
 

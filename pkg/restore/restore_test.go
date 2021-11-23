@@ -2997,7 +2997,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				"resourceVersion": "1"}).Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
-				WithAnnotations().
+				WithAnnotations(KubeAnnDynamicallyProvisioned).
 				WithSpecField("claimRef", map[string]interface{}{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
@@ -3007,7 +3007,6 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				WithName("pvc-1").WithAnnotations(
 				KubeAnnBindCompleted,
 				KubeAnnBoundByController,
-				KubeAnnDynamicallyProvisioned,
 			).WithSpecField("volumeName", "pv-1").Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations().
