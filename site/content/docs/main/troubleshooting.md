@@ -74,6 +74,35 @@ Here are some things to verify if you receive `SignatureDoesNotMatch` errors:
 Velero cannot resume backups that were interrupted. Backups stuck in the `InProgress` phase can be deleted with `kubectl delete backup <name> -n <velero-namespace>`.
 Backups in the `InProgress` phase have not uploaded any files to object storage.
 
+## Backup is stuck with status InProgress
+
+It may happen that the Velero backup process stucks as `InProgress` on bigger cluster setups or when a lot of cluster resources are backed up simultanously.
+This issue can lead to a restart of the Velero Pod which leads to the `InProgress` state.
+To solve this issue you can increase the memory limit of the Velero deployment:
+
+```yaml
+## Edit the Velero Kubernetes deployment
+kubectl -n velero edit deployment velero
+
+## Default values:
+        resources:
+          limits:
+            cpu: "1"
+            memory: 256Mi
+          requests:
+            cpu: 500m
+            memory: 128Mi
+
+## Double the memory limit
+        resources:
+          limits:
+            cpu: "1"
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 128Mi
+```
+
 ## Velero is not publishing prometheus metrics
 
 Steps to troubleshoot:
