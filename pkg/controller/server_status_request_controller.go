@@ -77,7 +77,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		}
 
 		return ctrl.Result{},
-			fmt.Errorf("error: %s, error getting ServerStatusRequest, ", err.Error())
+			fmt.Errorf("error: %s, error getting ServerStatusRequest, ", errors.WithStack(err))
 	}
 
 	log = r.Log.WithFields(logrus.Fields{
@@ -94,7 +94,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		patchHelper, err := patch.NewHelper(statusRequest, r.Client)
 		if err != nil {
 			return ctrl.Result{},
-				fmt.Errorf("error: fail to get a patch helper to update this resource, %s", err.Error())
+				fmt.Errorf("error: fail to get a patch helper to update this resource, %s", errors.WithStack(err))
 		}
 
 		statusRequest.Status.ServerVersion = buildinfo.Version
@@ -104,7 +104,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 
 		if err := patchHelper.Patch(r.Ctx, statusRequest); err != nil {
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod},
-				fmt.Errorf("error: fail to update ServerStatusRequest status, %s", err.Error())
+				fmt.Errorf("error: fail to update ServerStatusRequest status, %s", errors.WithStack(err))
 		}
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")

@@ -61,7 +61,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 	locationList, err := storage.ListBackupStorageLocations(r.Ctx, r.Client, req.Namespace)
 	if err != nil {
 		return ctrl.Result{},
-			fmt.Errorf("error: %s, no backup storage locations found, at least one is required", err.Error())
+			fmt.Errorf("error: %s, no backup storage locations found, at least one is required", errors.WithStack(err))
 	}
 
 	pluginManager := r.NewPluginManager(log)
