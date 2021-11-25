@@ -74,15 +74,8 @@ func InvokeDeleteActions(ctx *Context) error {
 
 	processdResources := sets.NewString()
 
-	ctx.Log.Debugf("Trying to reconcile resource names with Kube API server.")
-	// Transform resource names based on what's canonical in the API server.
 	for resource := range backupResources {
-		gvr, _, err := ctx.DiscoveryHelper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
-		if err != nil {
-			return errors.Wrapf(err, "failed to resolve resource into complete group/version/resource: %v", resource)
-		}
-
-		groupResource := gvr.GroupResource()
+		groupResource := schema.ParseGroupResource(resource)
 
 		// We've already seen this group/resource, so don't process it again.
 		if processdResources.Has(groupResource.String()) {
@@ -92,8 +85,6 @@ func InvokeDeleteActions(ctx *Context) error {
 		// Get a list of all items that exist for this resource
 		resourceList := backupResources[groupResource.String()]
 		if resourceList == nil {
-			// After canonicalization from the API server, the resources may not exist in the tarball
-			// Skip them if that's the case.
 			continue
 		}
 
