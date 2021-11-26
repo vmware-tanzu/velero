@@ -43,6 +43,16 @@ func CreateNamespace(ctx context.Context, client TestClient, namespace string) e
 	return err
 }
 
+func CreateNamespaceWithLabel(ctx context.Context, client TestClient, namespace string, label map[string]string) error {
+	ns := builder.ForNamespace(namespace).Result()
+	ns.Labels = label
+	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
+}
+
 func GetNamespace(ctx context.Context, client TestClient, namespace string) (*corev1api.Namespace, error) {
 	return client.ClientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
@@ -66,6 +76,22 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 			logrus.Debugf("namespace %q is still being deleted...", namespace)
 			return false, nil
 		})
+}
+
+func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseName string) error {
+	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Could not retrieve namespaces")
+	}
+	for _, checkNamespace := range namespaces.Items {
+		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
+			err := DeleteNamespace(ctx, client, checkNamespace.Name, true)
+			if err != nil {
+				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
+			}
+		}
+	}
+	return nil
 }
 
 func CleanupNamespaces(ctx context.Context, client TestClient, nsBaseName string) error {
