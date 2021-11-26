@@ -41,6 +41,10 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
+const (
+	BackupObjectsPrefix = "backups"
+)
+
 var pluginsMatrix = map[string]map[string][]string{
 	"v1.4": {
 		"aws":     {"velero/velero-plugin-for-aws:v1.1.0"},
@@ -388,6 +392,9 @@ func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, pro
 // installs them in the current Velero installation, skipping over those that are already installed.
 func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins string) error {
 	plugins, err := getProviderPlugins(ctx, veleroCLI, provider, addPlugins)
+	fmt.Printf("addPlugins cmd =%v\n", addPlugins)
+	fmt.Printf("provider cmd = %v\n", provider)
+	fmt.Printf("plugins cmd = %v\n", plugins)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get plugins")
 	}
@@ -396,6 +403,7 @@ func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 		stderrBuf := new(bytes.Buffer)
 
 		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "plugin", "add", plugin)
+		fmt.Printf("installPluginCmd cmd =%v\n", installPluginCmd)
 		installPluginCmd.Stdout = stdoutBuf
 		installPluginCmd.Stderr = stderrBuf
 
@@ -556,4 +564,35 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 	}
 
 	return tmpfile, nil
+}
+func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName string) error {
+	args := []string{"backup", "delete", backupName, "--confirm"}
+
+	cmd := exec.CommandContext(ctx, veleroCLI, args...)
+	fmt.Println("Delete backup Command:" + cmd.String())
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	if err != nil {
+		return errors.Wrapf(err, "Fail to get delete backup, stdout=%s, stderr=%s", stdout, stderr)
+	}
+
+	output := strings.Replace(stdout, "\n", " ", -1)
+	fmt.Println("Backup delete command output:" + output)
+
+	args = []string{"backup", "get", backupName}
+
+	retryTimes := 5
+	for i := 1; i < retryTimes+1; i++ {
+		cmd = exec.CommandContext(ctx, veleroCLI, args...)
+		fmt.Printf("Try %d times to delete backup %s \n", i, cmd.String())
+		stdout, stderr, err = veleroexec.RunCommand(cmd)
+		if err != nil {
+			if strings.Contains(stderr, "not found") {
+				fmt.Printf("|| EXPECTED || - Backup %s was deleted successfully according to message %s\n", backupName, stderr)
+				return nil
+			}
+			return errors.Wrapf(err, "Fail to get delete backup, stdout=%s, stderr=%s", stdout, stderr)
+		}
+		time.Sleep(1 * time.Minute)
+	}
+	return nil
 }
