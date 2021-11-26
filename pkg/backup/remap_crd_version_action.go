@@ -19,7 +19,9 @@ package backup
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -94,7 +96,7 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	switch {
 	case hasSingleVersion(crd), hasNonStructuralSchema(crd), hasPreserveUnknownFields(crd):
 		log.Infof("CustomResourceDefinition %s appears to be v1beta1, fetching the v1beta version", crd.Name)
-		clusterName := backup.Spec.StorageLocation
+		clusterName := strings.Split(backup.Spec.StorageLocation, "-")[0]
 		cluster := client.ObjectKey{
 			Namespace: clusterName,
 			Name:      clusterName,
