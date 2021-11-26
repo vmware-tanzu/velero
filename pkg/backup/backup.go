@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -207,8 +208,8 @@ type VolumeSnapshotterGetter interface {
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
 func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
-	// NOTE: This requires that the BackupStorageLocation must always be named exactly as the target cluster.
-	clusterName := backupRequest.StorageLocation.Name
+	// NOTE: The BackupStorageLocation name must be postfixed by the cluster name, separated by a dash.
+	clusterName := strings.Split(backupRequest.StorageLocation.Name, "-")[0]
 	clientSet, dynamicClient, err := kube.NewClusterClients(context.Background(), kb.client, kbclient.ObjectKey{
 		Namespace: backupRequest.Namespace,
 		Name:      clusterName,

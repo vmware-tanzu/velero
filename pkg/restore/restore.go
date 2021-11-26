@@ -162,8 +162,8 @@ func (kr *kubernetesRestorer) Restore(
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
-	// NOTE: This requires that the BackupStorageLocation must always be named exactly as the target cluster.
-	clusterName := req.Location.Name
+	// NOTE: The BackupStorageLocation name must be postfixed by the cluster name, separated by a dash.
+	clusterName := strings.Split(req.Location.Name, "-")[0]
 	clientSet, dynamicClient, err := kube.NewClusterClients(go_context.Background(), kr.client, kbclient.ObjectKey{
 		Namespace: clusterName,
 		Name:      clusterName,
