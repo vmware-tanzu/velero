@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -1842,16 +1840,4 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs
-}
-
-func getClient() (clientset *kubernetes.Clientset, err error)  {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-	clientset, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return clientset, nil
 }
