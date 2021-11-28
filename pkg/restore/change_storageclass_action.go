@@ -99,7 +99,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 		if len(sts.Spec.VolumeClaimTemplates) > 0 {
 			for index, pvc := range sts.Spec.VolumeClaimTemplates {
 				if newStorageClass, ok := config.Data[*pvc.Spec.StorageClassName]; ok {
-					log.Infof("Updating %s's storage class name to %s",sts.Name, newStorageClass)
+					log.Infof("Updating %s's storage class name to %s", sts.Name, newStorageClass)
 					sts.Spec.VolumeClaimTemplates[index].Spec.StorageClassName = &newStorageClass
 				}
 			}
