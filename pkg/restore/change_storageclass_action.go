@@ -18,10 +18,12 @@ package restore
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -89,7 +91,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 		"name":      obj.GetName(),
 	})
 
-	// change sts volumeClaimTemplates storageClassName
+	// change StatefulSet volumeClaimTemplates storageClassName
 	if obj.GetKind() == "StatefulSet" {
 		sts := new(appsv1.StatefulSet)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), sts); err != nil {
@@ -98,15 +100,21 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 
 		if len(sts.Spec.VolumeClaimTemplates) > 0 {
 			for index, pvc := range sts.Spec.VolumeClaimTemplates {
-				if newStorageClass, ok := config.Data[*pvc.Spec.StorageClassName]; ok {
-					log.Infof("Updating %s's storage class name to %s", sts.Name, newStorageClass)
-					sts.Spec.VolumeClaimTemplates[index].Spec.StorageClassName = &newStorageClass
+				warn, err, newStorageClass := a.isStorageClassExist(*pvc.Spec.StorageClassName, config)
+				if warn != "" && err == nil {
+					log.Debug(warn)
+					continue
+				} else if warn == "" && err != nil {
+					return nil, err
 				}
+
+				log.Infof("Updating item's storage class name to %s", newStorageClass)
+				sts.Spec.VolumeClaimTemplates[index].Spec.StorageClassName = &newStorageClass
 			}
 
 			newObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sts)
 			if err != nil {
-				return nil, errors.Wrap(err, "converts obj to sts failed")
+				return nil, errors.Wrap(err, "convert obj to StatefulSet failed")
 			}
 			obj.Object = newObj
 		}
@@ -117,20 +125,13 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 		if err != nil {
 			return nil, errors.Wrap(err, "error getting item's spec.storageClassName")
 		}
-		if storageClass == "" {
-			log.Debug("Item has no storage class specified")
-			return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
-		}
 
-		newStorageClass, ok := config.Data[storageClass]
-		if !ok {
-			log.Debugf("No mapping found for storage class %s", storageClass)
+		warn, err, newStorageClass := a.isStorageClassExist(storageClass, config)
+		if warn != "" && err == nil {
+			log.Debug(warn)
 			return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
-		}
-
-		// validate that new storage class exists
-		if _, err := a.storageClassClient.Get(context.TODO(), newStorageClass, metav1.GetOptions{}); err != nil {
-			return nil, errors.Wrapf(err, "error getting storage class %s from API", newStorageClass)
+		} else if warn == "" && err != nil {
+			return nil, err
 		}
 
 		log.Infof("Updating item's storage class name to %s", newStorageClass)
@@ -141,4 +142,22 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	}
 
 	return velero.NewRestoreItemActionExecuteOutput(obj), nil
+}
+
+func (a *ChangeStorageClassAction) isStorageClassExist(storageClass string, cm *corev1.ConfigMap) (warn string, err error, newStorageClass string) {
+	if storageClass == "" {
+		return "Item has no storage class specified", nil, ""
+	}
+
+	newStorageClass, ok := cm.Data[storageClass]
+	if !ok {
+		return fmt.Sprintf("No mapping found for storage class %s", storageClass), nil, ""
+	}
+
+	// validate that new storage class exists
+	if _, err := a.storageClassClient.Get(context.TODO(), newStorageClass, metav1.GetOptions{}); err != nil {
+		return "", errors.Wrapf(err, "error getting storage class %s from API", newStorageClass), newStorageClass
+	}
+
+	return "", nil, newStorageClass
 }

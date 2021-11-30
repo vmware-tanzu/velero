@@ -41,16 +41,17 @@ import (
 // desired result.
 func TestChangeStorageClassActionExecute(t *testing.T) {
 	tests := []struct {
-		name         string
-		pvOrPVC      interface{}
-		configMap    *corev1api.ConfigMap
-		storageClass *storagev1api.StorageClass
-		want         interface{}
-		wantErr      error
+		name              string
+		pvOrPvcOrSTS      interface{}
+		configMap         *corev1api.ConfigMap
+		storageClass      *storagev1api.StorageClass
+		storageClassSlice []*storagev1api.StorageClass
+		want              interface{}
+		wantErr           error
 	}{
 		{
-			name:    "a valid mapping for a persistent volume is applied correctly",
-			pvOrPVC: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
+			name:         "a valid mapping for a persistent volume is applied correctly",
+			pvOrPvcOrSTS: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
@@ -59,8 +60,8 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want:         builder.ForPersistentVolume("pv-1").StorageClass("storageclass-2").Result(),
 		},
 		{
-			name:    "a valid mapping for a persistent volume claim is applied correctly",
-			pvOrPVC: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
+			name:         "a valid mapping for a persistent volume claim is applied correctly",
+			pvOrPvcOrSTS: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
@@ -69,8 +70,8 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want:         builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-2").Result(),
 		},
 		{
-			name:    "when no config map exists for the plugin, the item is returned as-is",
-			pvOrPVC: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
+			name:         "when no config map exists for the plugin, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/some-other-plugin", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
@@ -78,16 +79,16 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 		},
 		{
-			name:    "when no storage class mappings exist in the plugin config map, the item is returned as-is",
-			pvOrPVC: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
+			name:         "when no storage class mappings exist in the plugin config map, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Result(),
 			want: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 		},
 		{
-			name:    "when persistent volume has no storage class, the item is returned as-is",
-			pvOrPVC: builder.ForPersistentVolume("pv-1").Result(),
+			name:         "when persistent volume has no storage class, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForPersistentVolume("pv-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
@@ -95,8 +96,8 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want: builder.ForPersistentVolume("pv-1").Result(),
 		},
 		{
-			name:    "when persistent volume claim has no storage class, the item is returned as-is",
-			pvOrPVC: builder.ForPersistentVolumeClaim("velero", "pvc-1").Result(),
+			name:         "when persistent volume claim has no storage class, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForPersistentVolumeClaim("velero", "pvc-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
@@ -104,8 +105,8 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want: builder.ForPersistentVolumeClaim("velero", "pvc-1").Result(),
 		},
 		{
-			name:    "when persistent volume's storage class has no mapping in the config map, the item is returned as-is",
-			pvOrPVC: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
+			name:         "when persistent volume's storage class has no mapping in the config map, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-3", "storageclass-4").
@@ -113,8 +114,8 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 		},
 		{
-			name:    "when persistent volume claim's storage class has no mapping in the config map, the item is returned as-is",
-			pvOrPVC: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
+			name:         "when persistent volume claim's storage class has no mapping in the config map, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-3", "storageclass-4").
@@ -122,8 +123,8 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			want: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
 		},
 		{
-			name:    "when persistent volume's storage class is mapped to a nonexistent storage class, an error is returned",
-			pvOrPVC: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
+			name:         "when persistent volume's storage class is mapped to a nonexistent storage class, an error is returned",
+			pvOrPvcOrSTS: builder.ForPersistentVolume("pv-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "nonexistent-storage-class").
@@ -131,8 +132,81 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			wantErr: errors.New("error getting storage class nonexistent-storage-class from API: storageclasses.storage.k8s.io \"nonexistent-storage-class\" not found"),
 		},
 		{
-			name:    "when persistent volume claim's storage class is mapped to a nonexistent storage class, an error is returned",
-			pvOrPVC: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
+			name:         "when persistent volume claim's storage class is mapped to a nonexistent storage class, an error is returned",
+			pvOrPvcOrSTS: builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Data("storageclass-1", "nonexistent-storage-class").
+				Result(),
+			wantErr: errors.New("error getting storage class nonexistent-storage-class from API: storageclasses.storage.k8s.io \"nonexistent-storage-class\" not found"),
+		},
+		{
+			name:         "when statefulset's VolumeClaimTemplates has only one pvc, a valid mapping for a statefulset is applied correctly",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Data("storageclass-1", "storageclass-2").
+				Result(),
+			storageClass: builder.ForStorageClass("storageclass-2").Result(),
+			want:         builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-2").Result(),
+		},
+		{
+			name:         "when statefulset's VolumeClaimTemplates has more than one same pvc's storageClassName, a valid mapping for a statefulset is applied correctly",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1", "storageclass-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Data("storageclass-1", "storageclass-2", "storageclass-3", "storageclass-4").
+				Result(),
+			storageClass: builder.ForStorageClass("storageclass-2").Result(),
+			want:         builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-2", "storageclass-2").Result(),
+		},
+		{
+			name:         "when statefulset's VolumeClaimTemplates has more than one different pvc's storageClassName, a valid mapping for a statefulset is applied correctly",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1", "storageclass-2", "storageclass-3").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Data("storageclass-1", "storageclass-a", "storageclass-2", "storageclass-b", "storageclass-3", "storageclass-c").
+				Result(),
+			storageClassSlice: builder.ForStorageClassSlice("storageclass-a", "storageclass-b", "storageclass-c").SliceResult(),
+			want:              builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-a", "storageclass-b", "storageclass-c").Result(),
+		},
+		{
+			name:         "when no config map exists for the plugin, the statefulset item is returned as-is",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/some-other-plugin", "RestoreItemAction")).
+				Data("storageclass-1", "storageclass-2").
+				Result(),
+			want: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+		},
+		{
+			name:         "when no storage class mappings exist in the plugin config map, the statefulset item is returned as-is",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Result(),
+			want: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+		},
+		{
+			name:         "when persistent volume claim has no storage class, the statefulset item is returned as-is",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Result(),
+			want: builder.ForStatefulSet("velero", "sts-1").Result(),
+		},
+		{
+			name:         "when statefulset's storage class has no mapping in the config map, the item is returned as-is",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+			configMap: builder.ForConfigMap("velero", "change-storage-classs").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
+				Data("storageclass-3", "storageclass-4").
+				Result(),
+			want: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
+		},
+		{
+			name:         "when statefulset's storage class is mapped to a nonexistent storage class, an error is returned",
+			pvOrPvcOrSTS: builder.ForStatefulSet("velero", "sts-1").StorageClass("storageclass-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-storage-classs").
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "nonexistent-storage-class").
@@ -161,7 +235,14 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvOrPVC)
+			if tc.storageClassSlice != nil {
+				for _, storageClass := range tc.storageClassSlice {
+					_, err := clientset.StorageV1().StorageClasses().Create(context.TODO(), storageClass, metav1.CreateOptions{})
+					require.NoError(t, err)
+				}
+			}
+
+			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvOrPvcOrSTS)
 			require.NoError(t, err)
 
 			input := &velero.RestoreItemActionExecuteInput{
