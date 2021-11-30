@@ -27,11 +27,9 @@ builds:
       - arm64
       - ppc64le
     ignore:
-      # don't build arm/arm64 for darwin or windows
+      # don't build arm for darwin and arm/arm64 for windows
       - goos: darwin
         goarch: arm
-      - goos: darwin
-        goarch: arm64
       - goos: darwin
         goarch: ppc64le
       - goos: windows
