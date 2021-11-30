@@ -126,8 +126,7 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 		backupList, err := findAssociatedBackups(kbClient, location.Name, f.Namespace())
 		if err != nil {
 			errs = append(errs, fmt.Errorf("find backups associated with BSL %q: %w", location.Name, err))
-		}
-		if deleteErrs := deleteBackups(kbClient, backupList); deleteErrs != nil {
+		} else if deleteErrs := deleteBackups(kbClient, backupList); deleteErrs != nil {
 			errs = append(errs, deleteErrs...)
 		}
 
@@ -135,8 +134,7 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 		resticRepoList, err := findAssociatedResticRepos(kbClient, location.Name, f.Namespace())
 		if err != nil {
 			errs = append(errs, fmt.Errorf("find Restic repositories associated with BSL %q: %w", location.Name, err))
-		}
-		if deleteErrs := deleteResticRepos(kbClient, resticRepoList); deleteErrs != nil {
+		} else if deleteErrs := deleteResticRepos(kbClient, resticRepoList); deleteErrs != nil {
 			errs = append(errs, deleteErrs...)
 		}
 	}
@@ -167,6 +165,7 @@ func deleteBackups(client kbclient.Client, backups velerov1api.BackupList) []err
 	for _, backup := range backups.Items {
 		if err := client.Delete(context.Background(), &backup, &kbclient.DeleteOptions{}); err != nil {
 			errs = append(errs, errors.WithStack(fmt.Errorf("delete backup %q associated with deleted BSL: %w", backup.Name, err)))
+			continue
 		}
 		fmt.Printf("Backup associated with deleted BSL(s) %q deleted successfully.\n", backup.Name)
 	}
@@ -178,6 +177,7 @@ func deleteResticRepos(client kbclient.Client, repos velerov1api.ResticRepositor
 	for _, repo := range repos.Items {
 		if err := client.Delete(context.Background(), &repo, &kbclient.DeleteOptions{}); err != nil {
 			errs = append(errs, errors.WithStack(fmt.Errorf("delete Restic repository %q associated with deleted BSL: %w", repo.Name, err)))
+			continue
 		}
 		fmt.Printf("Restic repository associated with deleted BSL(s) %q deleted successfully.\n", repo.Name)
 	}
