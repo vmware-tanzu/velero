@@ -63,6 +63,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
@@ -97,6 +98,8 @@ type backupController struct {
 	volumeSnapshotClient        *snapshotterClientSet.Clientset
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
 	volumeSnapshotClassLister   snapshotv1listers.VolumeSnapshotClassLister
+	uploadProgressCheckInterval time.Duration
+	finalizeBackupsInterval     time.Duration
 }
 
 func NewBackupController(
@@ -121,6 +124,8 @@ func NewBackupController(
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	volumesnapshotClassLister snapshotv1listers.VolumeSnapshotClassLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
+	uploadProgressCheckInterval time.Duration,
+	finalizeBackupsInterval time.Duration,
 ) Interface {
 	c := &backupController{
 		genericController:           newGenericController(Backup, logger),
@@ -145,6 +150,8 @@ func NewBackupController(
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
 		volumeSnapshotClassLister:   volumesnapshotClassLister,
 		backupStoreGetter:           backupStoreGetter,
+		uploadProgressCheckInterval: uploadProgressCheckInterval,
+		finalizeBackupsInterval:     finalizeBackupsInterval,
 	}
 
 	c.syncHandler = c.processBackup
@@ -157,7 +164,27 @@ func NewBackupController(
 				backup := obj.(*velerov1api.Backup)
 
 				switch backup.Status.Phase {
+<<<<<<< HEAD
 				case "", velerov1api.BackupPhaseNew, velerov1api.BackupPhaseInProgress:
+=======
+				case "", velerov1api.BackupPhaseNew:
+					// only process new backups
+				case velerov1api.BackupPhaseUploading, velerov1api.BackupPhaseUploadingPartialFailure:
+					if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+						c.logger.WithFields(logrus.Fields{
+							"backup": kubeutil.NamespaceAndName(backup),
+							"phase":  backup.Status.Phase,
+						}).Info("Found uploading backup on restart, tracking upload progress")
+						request := c.prepareBackupRequest(backup)
+						c.backupTracker.Add(request.Namespace, request.Name, request)
+					} else {
+						// TODO - temporary to get existing behavior (leave it alone and log) if the phase is not "New"
+						c.logger.WithFields(logrus.Fields{
+							"backup": kubeutil.NamespaceAndName(backup),
+							"phase":  backup.Status.Phase,
+						}).Debug("Backup is not new, skipping")
+					}
+>>>>>>> ca95d5ee... Adding basic item snapshotter support
 				default:
 					c.logger.WithFields(logrus.Fields{
 						"backup": kubeutil.NamespaceAndName(backup),
@@ -176,6 +203,10 @@ func NewBackupController(
 		},
 	)
 
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		// Start the background task that checks upload progress and finalizes backups
+		go c.checkAndFinalizeBackupsLoop(c.finalizeBackupsInterval)
+	}
 	return c
 }
 
@@ -219,6 +250,9 @@ func getLastSuccessBySchedule(backups []*velerov1api.Backup) map[string]time.Tim
 
 	return lastSuccessBySchedule
 }
+
+// Value of time to use as "don't process" indicator (not a const because of Golang/Time ugliness)
+var dontProcessTime = time.Unix(0, 0)
 
 func (c *backupController) processBackup(key string) error {
 	log := c.logger.WithField("key", key)
@@ -294,8 +328,19 @@ func (c *backupController) processBackup(key string) error {
 		return nil
 	}
 
-	c.backupTracker.Add(request.Namespace, request.Name)
-	defer c.backupTracker.Delete(request.Namespace, request.Name)
+	// Set NextCheckTime to dontProcessTime so that checkAndFinalizeBackupsLoop does not process it after being added to
+	// the tracker
+	request.NextCheckTime = dontProcessTime
+	c.backupTracker.Add(request.Namespace, request.Name, request)
+
+	// If upload progress tracking will continue after exit we do not want to remove from the tracker, but normal
+	// case is to remove if we exit for any reason
+	removeFromTracker := true
+	defer func() {
+		if removeFromTracker {
+			c.backupTracker.Delete(request.Namespace, request.Name)
+		}
+	}()
 
 	log.Debug("Running backup")
 
@@ -331,7 +376,123 @@ func (c *backupController) processBackup(key string) error {
 		log.WithError(err).Error("error updating backup's final status")
 	}
 
+	if request.Status.Phase == velerov1api.BackupPhaseUploading || request.Status.Phase == velerov1api.BackupPhaseUploadingPartialFailure {
+		removeFromTracker = false // Leave it in the tracker so it gets checked
+		// Set NextCheckTime here so that checkAndFinalizeBackupsLoop will pick it up now, after everything has been
+		// persisted otherwise we have a race
+		request.NextCheckTime = time.Now().Add(c.uploadProgressCheckInterval)
+	}
+
 	return nil
+}
+
+// Execute periodically to check upload progress for backups that are in Uploading or UploadingPartialFailure phase
+func (c *backupController) checkAndFinalizeBackupsLoop(wakeupInterval time.Duration) {
+	for {
+		time.Sleep(time.Second) // Wake up frequently so that we will process any backups moving into Upload phase quickly
+		// This wakeup is pretty lightweight as it just looks for things to process, we actually
+		// check progress less frequently, by default once per minute per backup
+		uploadingBackups := c.backupTracker.GetByPhase(velerov1api.BackupPhaseUploading)
+		uploadingBackups = append(uploadingBackups, c.backupTracker.GetByPhase(velerov1api.BackupPhaseUploadingPartialFailure)...)
+		for _, curBackup := range uploadingBackups {
+			if curBackup.NextCheckTime != dontProcessTime && curBackup.NextCheckTime.After(time.Now()) {
+				snapshotsInProgress := checkAndUpdateItemSnapshotsProgress(curBackup.ItemSnapshots, c.logger)
+				if !snapshotsInProgress {
+					c.completeBackupWithUploadedSnapshots(curBackup)
+				} else {
+					curBackup.NextCheckTime = time.Now().Add(c.uploadProgressCheckInterval)
+				}
+			}
+		}
+	}
+}
+
+func (c *backupController) completeBackupWithUploadedSnapshots(curBackup *pkgbackup.Request) {
+	c.backupTracker.Delete(curBackup.Namespace, curBackup.Name)
+	log := c.logger.WithField(Backup, kubeutil.NamespaceAndName(curBackup))
+	original := *curBackup.Backup
+
+	if curBackup.Status.Phase == velerov1api.BackupPhaseUploading {
+		curBackup.Status.Phase = velerov1api.BackupPhaseCompleted
+	}
+	if curBackup.Status.Phase == velerov1api.BackupPhaseUploadingPartialFailure {
+		curBackup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+	}
+	backupScheduleName := curBackup.GetLabels()[velerov1api.ScheduleNameLabel]
+
+	// Mark completion timestamp before serializing and uploading.
+	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
+	curBackup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
+	recordBackupDurationMetric(curBackup.Backup, c.metrics)
+
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		updateBackupStatusForSnapshotState(curBackup, log)
+	}
+
+	log.Debug("Updating backup's final status")
+	if _, err := patchBackup(&original, curBackup.Backup, c.client); err != nil {
+		log.WithError(err).Error("error updating backup's final status after upload completion")
+	}
+
+	switch curBackup.Status.Phase {
+	case velerov1api.BackupPhaseCompleted:
+		c.metrics.RegisterBackupSuccess(backupScheduleName)
+	case velerov1api.BackupPhasePartiallyFailed:
+		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
+	case velerov1api.BackupPhaseFailed:
+		c.metrics.RegisterBackupFailed(backupScheduleName)
+	case velerov1api.BackupPhaseFailedValidation:
+		c.metrics.RegisterBackupValidationFailure(backupScheduleName)
+	}
+
+	curBackup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
+
+	pluginManager := c.newPluginManager(c.logger)
+	defer pluginManager.CleanupClients()
+	backupStore, err := c.backupStoreGetter.Get(curBackup.StorageLocation, pluginManager, c.logger)
+	if err != nil {
+		log.WithError(err).Error("error getting backup store after upload completion")
+	}
+	if errs := persistBackupFinal(curBackup, backupStore); len(errs) > 0 {
+		for _, err := range errs {
+			log.WithError(err).Error("error persisting backup after upload completion")
+		}
+		// Set the phase to partially failed.  Unclear what part of the backup did not persist properly,
+		// but probably the backup objects in the object store are not usable.  It's possible for the metadata
+		// to be persisted properly with BackupPhaseCompleted and something else to have failed which will wind
+		// up with the object store and the Backup resource in the API server being out of sync, but this is
+		// unlikely enough to not worry about for now
+		curBackup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+		log.Debug("Updating backup's final status after persist failure")
+		if _, err := patchBackup(&original, curBackup.Backup, c.client); err != nil {
+			// If this failed we're in pretty bad shape
+			log.WithError(err).Error("error updating backup's final status after upload completion")
+		}
+		log.Error("Backup completed after upload completion, errors persisting backup")
+	} else {
+		log.Info("Backup completed after upload completion")
+	}
+}
+
+func updateBackupStatusForSnapshotState(curBackup *pkgbackup.Request, log logrus.FieldLogger) {
+	// Update number of snapshots completed.  If any of the snapshot uploads failed we change the backup state to
+	// BackupPhasePartiallyFailed
+	curBackup.Status.ItemSnapshotsAttempted = len(curBackup.ItemSnapshots)
+	for _, snap := range curBackup.ItemSnapshots {
+		switch snap.Status.Phase {
+		case isv1.SnapshotPhaseCompleted:
+			curBackup.Status.ItemSnapshotsCompleted++
+		case isv1.SnapshotPhaseInProgress:
+			// This should never happen, but rather than panic we log an error
+			log.WithFields(logrus.Fields{
+				"item":       snap.Spec.ResourceIdentifier,
+				"snapshotID": snap.Status.ProviderSnapshotID}).Error("Snapshot found with phase SnapshotInProgress and backup is in completed state")
+		case isv1.SnapshotPhaseFailed:
+			// We can only get here if the backup is either BackupPhaseCompleted or BackupPhasePartiallyFailed so
+			// setting it here won't lose the status if it completely failed (BackupPhaseFailed)
+			curBackup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+		}
+	}
 }
 
 func patchBackup(original, updated *velerov1api.Backup, client velerov1client.BackupsGetter) (*velerov1api.Backup, error) {
@@ -637,7 +798,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		fatalErrs = append(fatalErrs, err)
 	}
 
-	// Empty slices here so that they can be passed in to the persistBackup call later, regardless of whether or not CSI's enabled.
+	// Empty slices here so that they can be passed in to the persistBackupBeforeUploadComplete call later, regardless of whether or not CSI's enabled.
 	// This way, we only make the Lister call if the feature flag's on.
 	var volumeSnapshots []*snapshotv1api.VolumeSnapshot
 	var volumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent
@@ -690,10 +851,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	}
 
-	// Mark completion timestamp before serializing and uploading.
-	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
-	backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
 	for _, snap := range backup.VolumeSnapshots {
 		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
@@ -738,17 +895,100 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)), volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses); len(errs) > 0 {
+	if errs := persistBackupBeforeUploadComplete(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
 
-	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup completed")
+	snapshotInProgress := false
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		snapshotInProgress = checkAndUpdateItemSnapshotsProgress(backup.ItemSnapshots, logger)
+	}
 
+	if snapshotInProgress {
+		// Prepare for upload progress monitoring
+		switch {
+		case len(fatalErrs) > 0:
+			// If we had fatal errors in the backup, we will just fail here and not monitor upload progress
+			// ItemSnapshotsAttempted/Completed may be incorrect
+			backup.Status.Phase = velerov1api.BackupPhaseFailed
+		case logCounter.GetCount(logrus.ErrorLevel) > 0:
+			backup.Status.Phase = velerov1api.BackupPhaseUploadingPartialFailure
+			c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup partially failed but snapshot uploads outstanding, will complete in background")
+		default:
+			backup.Status.Phase = velerov1api.BackupPhaseUploading
+			c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Snapshot uploads outstanding, will complete in background")
+		}
+	} else {
+		updateBackupStatusForSnapshotState(backup, c.logger)
+
+		switch {
+		case len(fatalErrs) > 0:
+			backup.Status.Phase = velerov1api.BackupPhaseFailed
+		case logCounter.GetCount(logrus.ErrorLevel) > 0:
+			backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+		default:
+			backup.Status.Phase = velerov1api.BackupPhaseCompleted
+		}
+	}
+
+	if backup.Status.Phase != velerov1api.BackupPhaseUploading &&
+		backup.Status.Phase != velerov1api.BackupPhaseUploadingPartialFailure {
+		// We're done so set the CompletionTimestamp now
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
+		recordBackupDurationMetric(backup.Backup, c.metrics)
+		if errs := persistBackupFinal(backup, backupStore); len(errs) > 0 {
+			fatalErrs = append(fatalErrs, errs...)
+		}
+		c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup completed")
+	} else {
+		c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup completed, snapshots uploading in the background")
+	}
 	// if we return a non-nil error, the calling function will update
 	// the backup's phase to Failed.
 	return kerrors.NewAggregate(fatalErrs)
 }
 
+// Checks the list of snapshots to see if they have completed by calling the appropriate ItemSnapshotter.  Returns
+// true if any snapshots are still in progress.  Updates status for snapshots that have completed or failed
+func checkAndUpdateItemSnapshotsProgress(itemSnapshots []*pkgbackup.ItemSnapshotInfo, logger logrus.FieldLogger) bool {
+	snapshotsInProgress := false
+	for _, checkSnapshot := range itemSnapshots {
+		if checkSnapshot.Status.Phase == isv1.SnapshotPhaseInProgress {
+			sipi := isv1.ProgressInput{
+				ItemID:     checkSnapshot.Spec.ResourceIdentifier,
+				SnapshotID: checkSnapshot.Status.ProviderSnapshotID,
+				Backup:     checkSnapshot.Spec.Backup,
+			}
+			log := logger.WithFields(logrus.Fields{
+				"backup":     kubeutil.NamespaceAndName(checkSnapshot.Spec.Backup),
+				"item":       checkSnapshot.Spec.ResourceIdentifier,
+				"snapshotID": checkSnapshot.Status.ProviderSnapshotID})
+			up, err := checkSnapshot.ItemSnapshotter.Progress(&sipi)
+			if err != nil {
+				// If we can't retrieve the status, mark the snapshot as failed.  Might be worthwhile later to retry some
+				// number of times before failing
+				checkSnapshot.Status.Phase = isv1.SnapshotPhaseFailed
+				checkSnapshot.Status.Error = fmt.Sprintf("Could not retrieve snapshot progress err = %v", err)
+				log.WithError(err).Error("Error retrieving snapshot progress")
+			} else {
+				checkSnapshot.Status.Phase = up.Phase
+				switch checkSnapshot.Status.Phase {
+				case isv1.SnapshotPhaseInProgress:
+					snapshotsInProgress = true
+				case isv1.SnapshotPhaseCompleted:
+				// Do nothing
+				case isv1.SnapshotPhaseFailed:
+					checkSnapshot.Status.Error = up.Err
+					log.Errorf("Snapshot upload failed err=%s", checkSnapshot.Status.Error)
+					// We will fail the backup when we check the statuses of all the snapshots later
+				}
+			}
+		}
+	}
+	return snapshotsInProgress
+}
+
+// Record backup metrics including tarball size, and volume snapshot attempts and failures
 func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) {
 	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 
@@ -760,9 +1000,6 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 	}
 	serverMetrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
 
-	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
-	backupDurationSeconds := float64(backupDuration / time.Second)
-	serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
 	serverMetrics.RegisterVolumeSnapshotAttempts(backupScheduleName, backup.Status.VolumeSnapshotsAttempted)
 	serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
 	serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
@@ -779,20 +1016,29 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 	serverMetrics.RegisterBackupItemsErrorsGauge(backupScheduleName, backup.Status.Errors)
 }
 
-func persistBackup(backup *pkgbackup.Request,
+// Record the final backup metrics including backup duration and item snapshot metrics.  These are handled
+// separately because they will not be available until all uploads have completed.
+
+func recordBackupDurationMetric(backup *velerov1api.Backup, serverMetrics *metrics.ServerMetrics) {
+	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
+	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
+	backupDurationSeconds := float64(backupDuration / time.Second)
+	serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		serverMetrics.RegisterItemSnapshotAttempts(backupScheduleName, backup.Status.ItemSnapshotsAttempted)
+		serverMetrics.RegisterItemSnapshotSuccesses(backupScheduleName, backup.Status.ItemSnapshotsCompleted)
+		serverMetrics.RegisterItemSnapshotFailures(backupScheduleName, backup.Status.ItemSnapshotsAttempted-backup.Status.ItemSnapshotsCompleted)
+	}
+}
+
+func persistBackupBeforeUploadComplete(backup *pkgbackup.Request,
 	backupContents, backupLog *os.File,
 	backupStore persistence.BackupStore,
-	log logrus.FieldLogger,
 	csiVolumeSnapshots []*snapshotv1api.VolumeSnapshot,
 	csiVolumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent,
 	csiVolumesnapshotClasses []*snapshotv1api.VolumeSnapshotClass,
 ) []error {
 	persistErrs := []error{}
-	backupJSON := new(bytes.Buffer)
-
-	if err := encode.EncodeTo(backup.Backup, "json", backupJSON); err != nil {
-		persistErrs = append(persistErrs, errors.Wrap(err, "error encoding backup"))
-	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
 	nativeVolumeSnapshots, errs := encodeToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
@@ -826,7 +1072,6 @@ func persistBackup(backup *pkgbackup.Request,
 
 	if len(persistErrs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
-		backupJSON = nil
 		backupContents = nil
 		nativeVolumeSnapshots = nil
 		backupResourceList = nil
@@ -837,7 +1082,6 @@ func persistBackup(backup *pkgbackup.Request,
 
 	backupInfo := persistence.BackupInfo{
 		Name:                      backup.Name,
-		Metadata:                  backupJSON,
 		Contents:                  backupContents,
 		Log:                       backupLog,
 		PodVolumeBackups:          podVolumeBackups,
@@ -854,6 +1098,43 @@ func persistBackup(backup *pkgbackup.Request,
 	return persistErrs
 }
 
+func persistBackupFinal(backup *pkgbackup.Request, backupStore persistence.BackupStore) []error {
+	persistErrs := []error{}
+
+	backupJSON := new(bytes.Buffer)
+
+	if err := encode.EncodeTo(backup.Backup, "json", backupJSON); err != nil {
+		persistErrs = append(persistErrs, errors.Wrap(err, "error encoding backup"))
+	}
+
+	// Item snapshots - CSI and other Astrolabe objects are here
+	extItemSnapshots := []volume.ItemSnapshot{}
+	for _, isi := range backup.ItemSnapshots {
+		extIS, err := isi.GetItemSnapshot()
+		if err != nil {
+			persistErrs = append(persistErrs, err)
+		} else {
+			extItemSnapshots = append(extItemSnapshots, extIS)
+		}
+	}
+	itemSnapshots, errs := encodeToJSONGzip(extItemSnapshots, "item snapshots list")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
+
+	if len(persistErrs) == 0 {
+
+		backupInfo := persistence.BackupInfo{
+			Name:          backup.Name,
+			Metadata:      backupJSON,
+			ItemSnapshots: itemSnapshots,
+		}
+		if err := backupStore.PutBackup(backupInfo); err != nil {
+			persistErrs = append(persistErrs, err)
+		}
+	}
+	return persistErrs
+}
 func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
 	if file == nil {
 		log.Debug("Skipping removal of file due to nil file pointer")

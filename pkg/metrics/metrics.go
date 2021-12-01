@@ -57,6 +57,9 @@ const (
 	csiSnapshotAttemptTotal       = "csi_snapshot_attempt_total"
 	csiSnapshotSuccessTotal       = "csi_snapshot_success_total"
 	csiSnapshotFailureTotal       = "csi_snapshot_failure_total"
+	itemSnapshotAttemptTotal      = "item_snapshot_attempt_total"
+	itemSnapshotSuccessTotal      = "item_snapshot_success_total"
+	itemSnapshotFailureTotal      = "item_snapshot_failure_total"
 
 	// Restic metrics
 	podVolumeBackupEnqueueTotal        = "pod_volume_backup_enqueue_count"
@@ -646,5 +649,26 @@ func (m *ServerMetrics) RegisterCSISnapshotSuccesses(backupSchedule, backupName 
 func (m *ServerMetrics) RegisterCSISnapshotFailures(backupSchedule, backupName string, csiSnapshotsFailed int) {
 	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsFailed))
+	}
+}
+
+// RegisterItemSnapshotAttempts records attempts to snapshot items
+func (m *ServerMetrics) RegisterItemSnapshotAttempts(backupSchedule string, itemSnapshotsAttempted int) {
+	if c, ok := m.metrics[itemSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Add(float64(itemSnapshotsAttempted))
+	}
+}
+
+// RegisterItemSnapshotSuccesses records successful item snapshots (uploads may happen separately)
+func (m *ServerMetrics) RegisterItemSnapshotSuccesses(backupSchedule string, itemSnapshotsCompleted int) {
+	if c, ok := m.metrics[itemSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Add(float64(itemSnapshotsCompleted))
+	}
+}
+
+// RegisterItemSnapshotFailures records item snapshot failures
+func (m *ServerMetrics) RegisterItemSnapshotFailures(backupSchedule string, itemSnapshotFailures int) {
+	if c, ok := m.metrics[itemSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Add(float64(itemSnapshotFailures))
 	}
 }

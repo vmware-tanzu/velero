@@ -28,6 +28,10 @@ import (
 	"sort"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/features"
+	v1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	"github.com/vmware-tanzu/velero/pkg/volume"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -462,13 +466,16 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	if err != nil {
 		return errors.Wrap(err, "error getting restore item actions")
 	}
-	actionsResolver := framework.NewRestoreItemActionResolver(actions)
+	restoreItemActionResolver := framework.NewRestoreItemActionResolver(actions)
 
-	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
-	if err != nil {
-		return errors.Wrap(err, "error getting item snapshotters")
+	var itemSnapshotters []v1.ItemSnapshotter
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		itemSnapshotters, err = pluginManager.GetItemSnapshotters()
+		if err != nil {
+			return errors.Wrap(err, "error getting item snapshotters")
+		}
 	}
-	snapshotItemResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
+	itemSnapshotterResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, restoreLog)
 	if err != nil {
@@ -488,6 +495,14 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
+	var itemSnapshots []*volume.ItemSnapshot
+
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		itemSnapshots, err = info.backupStore.GetItemSnapshots(restore.Spec.BackupName)
+		if err != nil {
+			return errors.Wrap(err, "error fetching item snapshots metadata")
+		}
+	}
 	restoreLog.Info("starting restore")
 
 	var podVolumeBackups []*velerov1api.PodVolumeBackup
@@ -498,11 +513,12 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		Log:              restoreLog,
 		Restore:          restore,
 		Backup:           info.backup,
+		ItemSnapshots:    itemSnapshots,
 		PodVolumeBackups: podVolumeBackups,
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
-	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
+	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, restoreItemActionResolver, itemSnapshotterResolver,
 		c.snapshotLocationLister, pluginManager)
 
 	// log errors and warnings to the restore log

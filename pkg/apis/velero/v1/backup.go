@@ -207,7 +207,7 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;Completed;PartiallyFailed;Failed;Deleting
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;Uploading;UploadingPartialFailure;Completed;PartiallyFailed;Failed;Deleting
 type BackupPhase string
 
 const (
@@ -304,6 +304,16 @@ type BackupStatus struct {
 	// FailureReason is an error that caused the entire backup to fail.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// ItemSnapshotsAttempted is the total number of attempted
+	// item snapshots for this backup.
+	// +optional
+	ItemSnapshotsAttempted int `json:"itemSnapshotsAttempted,omitempty"`
+
+	// ItemSnapshotsCompleted is the total number of successfully
+	// completed item snapshots for this backup.
+	// +optional
+	ItemSnapshotsCompleted int `json:"itemSnapshotsCompleted,omitempty"`
 
 	// Warnings is a count of all warning messages that were generated during
 	// execution of the backup. The actual warnings are in the backup's log

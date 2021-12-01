@@ -27,6 +27,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
+// LocalItemSnapshotter is used so we can identify plugins by name internally.  This is defined locally so that we
+// don't need to add it to the GRPC APIs or do a GRPC call to retrieve
+type LocalItemSnapshotter interface {
+	GetName() string
+	isv1.ItemSnapshotter
+}
+
 type restartableItemSnapshotter struct {
 	key                 kindAndName
 	sharedPluginProcess RestartableProcess
@@ -39,6 +46,10 @@ func newRestartableItemSnapshotter(name string, sharedPluginProcess RestartableP
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r
+}
+
+func (r *restartableItemSnapshotter) GetName() string {
+	return r.key.name
 }
 
 // getItemSnapshotter returns the item snapshotter for this restartableItemSnapshotter. It does *not* restart the

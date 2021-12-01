@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package backup
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
@@ -48,9 +49,11 @@ type Request struct {
 	ResolvedActions           []framework.BackupItemResolvedAction
 	ResolvedItemSnapshotters  []framework.ItemSnapshotterResolvedAction
 	VolumeSnapshots           []*volume.Snapshot
+	ItemSnapshots             []*ItemSnapshotInfo
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             map[itemKey]struct{}
 	CSISnapshots              []*snapshotv1api.VolumeSnapshot
+	NextCheckTime             time.Time // Next time to check snapshot progress - if 0, don't check
 }
 
 // BackupResourceList returns the list of backed up resources grouped by the API

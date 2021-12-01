@@ -183,12 +183,18 @@ func (recv ItemSnapshotterGRPCClient) Progress(input *isv1.ProgressInput) (*isv1
 }
 
 func (recv ItemSnapshotterGRPCClient) DeleteSnapshot(ctx context.Context, input *isv1.DeleteSnapshotInput) error {
-	req := &proto.DeleteItemSnapshotRequest{
-		Plugin:     recv.plugin,
-		Params:     input.Params,
-		SnapshotID: input.SnapshotID,
+	itemJSON, err := json.Marshal(input.ItemFromBackup.UnstructuredContent())
+	if err != nil {
+		return errors.WithStack(err)
 	}
-	_, err := recv.grpcClient.DeleteSnapshot(ctx, req) // Returns Empty as first arg so just ignore
+
+	req := &proto.DeleteItemSnapshotRequest{
+		Plugin:         recv.plugin,
+		ItemFromBackup: itemJSON,
+		Params:         input.Params,
+		SnapshotID:     input.SnapshotID,
+	}
+	_, err = recv.grpcClient.DeleteSnapshot(ctx, req) // Returns Empty as first arg so just ignore
 
 	if err != nil {
 		return errors.WithStack(err)

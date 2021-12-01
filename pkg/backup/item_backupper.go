@@ -18,6 +18,7 @@ package backup
 
 import (
 	"archive/tar"
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -41,7 +42,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -169,7 +172,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	// Used on filepath to backup up all groups and versions
 	version := resourceVersion(obj)
 
-	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
+	updatedObj, itemSnapshotInfo, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
 
@@ -181,6 +184,9 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 
 		return false, kubeerrs.NewAggregate(backupErrs)
 	}
+	if itemSnapshotInfo != nil {
+		ib.backupRequest.ItemSnapshots = append(ib.backupRequest.ItemSnapshots, itemSnapshotInfo)
+	}
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
 		return false, errors.WithStack(err)
@@ -189,7 +195,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	name = metadata.GetName()
 	namespace = metadata.GetNamespace()
 
-	if groupResource == kuberesource.PersistentVolumes {
+	if groupResource == kuberesource.PersistentVolumes && itemSnapshotInfo == nil {
 		if err := ib.takePVSnapshot(obj, log); err != nil {
 			backupErrs = append(backupErrs, err)
 		}
@@ -304,7 +310,32 @@ func (ib *itemBackupper) executeActions(
 	groupResource schema.GroupResource,
 	name, namespace string,
 	metadata metav1.Object,
-) (runtime.Unstructured, error) {
+) (runtime.Unstructured, *ItemSnapshotInfo, error) {
+	var isi *ItemSnapshotInfo
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		for _, resolvedItem := range ib.backupRequest.ResolvedItemSnapshotters {
+			if !resolvedItem.ShouldUse(groupResource, namespace, metadata, log) {
+				continue
+			}
+			log.Info("Executing item snapshotter")
+			sii := isv1.SnapshotItemInput{
+				Item:   obj,
+				Params: nil,
+				Backup: ib.backupRequest.Backup,
+			}
+			sio, err := resolvedItem.ItemSnapshotter.SnapshotItem(context.TODO(), &sii)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "error executing item snapshotter (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
+			}
+			isi = itemSnapshotInfo(resolvedItem.ItemSnapshotter, ib.backupRequest.Backup, groupResource, namespace, name,
+				obj, isv1.SnapshotPhaseInProgress, sio.SnapshotID, sio.SnapshotMetadata)
+			if err := ib.handleAdditionalItems(log, sio.AdditionalItems); err != nil {
+				return sio.UpdatedItem, nil, err
+			}
+			// TODO - Remove handled items from the list of things to do somehow (PR #4111)
+			break // Shouldn't be more than one item snapshotter for this type, but exit anyhow
+		}
+	}
 	for _, action := range ib.backupRequest.ResolvedActions {
 		if !action.ShouldUse(groupResource, namespace, metadata, log) {
 			continue
@@ -313,41 +344,49 @@ func (ib *itemBackupper) executeActions(
 
 		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
+			return nil, nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
 		obj = updatedItem
 
-		for _, additionalItem := range additionalItemIdentifiers {
-			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
-			if err != nil {
-				return nil, err
-			}
-
-			client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
-			if err != nil {
-				return nil, err
-			}
-
-			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				log.WithFields(logrus.Fields{
-					"groupResource": additionalItem.GroupResource,
-					"namespace":     additionalItem.Namespace,
-					"name":          additionalItem.Name,
-				}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
-				continue
-			}
-			if err != nil {
-				return nil, errors.WithStack(err)
-			}
-
-			if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr); err != nil {
-				return nil, err
-			}
+		if err := ib.handleAdditionalItems(log, additionalItemIdentifiers); err != nil {
+			return nil, nil, err
 		}
+
 	}
 
-	return obj, nil
+	return obj, isi, nil
+}
+
+func (ib *itemBackupper) handleAdditionalItems(log logrus.FieldLogger, additionalItemIdentifiers []velero.ResourceIdentifier) error {
+	for _, additionalItem := range additionalItemIdentifiers {
+		gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
+		if err != nil {
+			return err
+		}
+
+		client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
+		if err != nil {
+			return err
+		}
+
+		item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			log.WithFields(logrus.Fields{
+				"groupResource": additionalItem.GroupResource,
+				"namespace":     additionalItem.Namespace,
+				"name":          additionalItem.Name,
+			}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
+			continue
+		}
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
@@ -522,6 +561,33 @@ func volumeSnapshot(backup *velerov1api.Backup, volumeName, volumeID, volumeType
 		},
 		Status: volume.SnapshotStatus{
 			Phase: volume.SnapshotPhaseNew,
+		},
+	}
+}
+
+func itemSnapshotInfo(itemSnapshotter isv1.ItemSnapshotter, backup *velerov1api.Backup, groupResource schema.GroupResource,
+	namespace string, name string, item runtime.Unstructured, phase isv1.SnapshotPhase, snapshotID string,
+	snapshotMetadata map[string]string) *ItemSnapshotInfo {
+	localCheckItemSnapshotter := itemSnapshotter.(clientmgmt.LocalItemSnapshotter)
+
+	return &ItemSnapshotInfo{
+		ItemSnapshotter: itemSnapshotter,
+		Spec: ItemSnapshotInfoSpec{
+			ItemSnapshotter: localCheckItemSnapshotter.GetName(),
+			Backup:          backup,
+			BackupName:      backup.Name,
+			BackupUID:       backup.UID,
+			ResourceIdentifier: velero.ResourceIdentifier{
+				GroupResource: groupResource,
+				Namespace:     namespace,
+				Name:          name,
+			},
+			Location: velerov1api.VolumeSnapshotLocation{},
+		},
+		Status: ItemSnapshotInfoStatus{
+			Phase:              phase,
+			ProviderSnapshotID: snapshotID,
+			Metadata:           snapshotMetadata,
 		},
 	}
 }

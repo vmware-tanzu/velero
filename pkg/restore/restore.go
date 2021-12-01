@@ -56,8 +56,10 @@ import (
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -76,6 +78,7 @@ type Request struct {
 
 	Log              logrus.FieldLogger
 	Backup           *velerov1api.Backup
+	ItemSnapshots    []*volume.ItemSnapshot
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
 	VolumeSnapshots  []*volume.Snapshot
 	BackupReader     io.Reader
@@ -287,6 +290,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		resticErrs:                 make(chan error),
 		pvsToProvision:             sets.NewString(),
 		pvRestorer:                 pvRestorer,
+		itemSnapshots:              req.ItemSnapshots,
 		volumeSnapshots:            req.VolumeSnapshots,
 		podVolumeBackups:           req.PodVolumeBackups,
 		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
@@ -345,6 +349,7 @@ type restoreContext struct {
 	waitExecHookHandler        hook.WaitExecHookHandler
 	hooksContext               go_context.Context
 	hooksCancelFunc            go_context.CancelFunc
+	itemSnapshots              []*volume.ItemSnapshot
 }
 
 type resourceClientKey struct {
@@ -715,17 +720,6 @@ func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResour
 	return actions
 }
 
-func (ctx *restoreContext) getApplicableItemSnapshotters(groupResource schema.GroupResource, namespace string) []framework.ItemSnapshotterResolvedAction {
-	var actions []framework.ItemSnapshotterResolvedAction
-	for _, action := range ctx.itemSnapshotterActions {
-		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
-			actions = append(actions, action)
-		}
-	}
-
-	return actions
-}
-
 func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (bool, error) {
 	pvLogger := ctx.log.WithField("pvName", name)
 
@@ -992,122 +986,167 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs
 	}
 
-	if groupResource == kuberesource.PersistentVolumes {
-		switch {
-		case hasSnapshot(name, ctx.volumeSnapshots):
-			oldName := obj.GetName()
-			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
+	var itemSnapshot *volume.ItemSnapshot
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) { // Use the ResourceIdentifier for the original item to match for snapshots
+		itemRID := velero.ResourceIdentifier{
+			GroupResource: groupResource,
+			Namespace:     obj.GetNamespace(),
+			Name:          name,
+		}
+		itemSnapshot, err = getItemSnapshot(itemRID, ctx.itemSnapshots)
+		if err != nil {
+			errs.Add(namespace, err)
+			return warnings, errs
+		}
+	}
+	if itemSnapshot != nil {
+		itemSnapshotter := clientmgmt.ItemSnapshotterForSnapshotFromResolved(itemSnapshot, ctx.itemSnapshotterActions)
+		if itemSnapshotter != nil {
+			cii := isv1.CreateItemInput{
+				SnapshottedItem:  obj,
+				SnapshotID:       itemSnapshot.Status.ProviderSnapshotID,
+				ItemFromBackup:   obj,
+				SnapshotMetadata: itemSnapshot.Status.Metadata,
+				Params:           nil, // TBD
+				Restore:          ctx.restore,
+			}
+			cio, err := itemSnapshotter.CreateItemFromSnapshot(go_context.TODO(), &cii)
 			if err != nil {
 				errs.Add(namespace, err)
 				return warnings, errs
 			}
-
-			// Check to see if the claimRef.namespace field needs to be remapped,
-			// and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
-			if err != nil {
-				errs.Add(namespace, err)
+			unstructuredObj, ok := cio.UpdatedItem.(*unstructured.Unstructured)
+			if !ok {
+				errs.Add(namespace, fmt.Errorf("%s: unexpected type %T", resourceID, cio.UpdatedItem))
 				return warnings, errs
 			}
 
-			var shouldRestoreSnapshot bool
-			if !shouldRenamePV {
-				// Check if the PV exists in the cluster before attempting to create
-				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
+			obj = unstructuredObj
+			w, e := handleAdditionalItems(ctx, namespace, cio.AdditionalItems)
+			warnings.Merge(&w)
+			errs.Merge(&e)
+		} else {
+			errs.Add(namespace, fmt.Errorf("could not find ItemSnapshotter %s needed for snapshot of item %s, snapshot ID %s",
+				itemSnapshot.Spec.ItemSnapshotter, itemSnapshot.Spec.ResourceIdentifier, itemSnapshot.Status.ProviderSnapshotID))
+		}
+	} else {
+		if groupResource == kuberesource.PersistentVolumes {
+			switch {
+			case hasSnapshot(name, ctx.volumeSnapshots):
+				oldName := obj.GetName()
+				shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
 				if err != nil {
-					errs.Add(namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+					errs.Add(namespace, err)
 					return warnings, errs
 				}
-			} else {
-				// If we're renaming the PV, we're going to give it a new random name,
-				// so we can assume it doesn't already exist in the cluster and therefore
-				// we should proceed with restoring from snapshot.
-				shouldRestoreSnapshot = true
-			}
 
-			if shouldRestoreSnapshot {
-				// Reset the PV's binding status so that Kubernetes can properly
-				// associate it with the restored PVC.
+				// Check to see if the claimRef.namespace field needs to be remapped,
+				// and do so if necessary.
+				_, err = remapClaimRefNS(ctx, obj)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs
+				}
+
+				var shouldRestoreSnapshot bool
+				if !shouldRenamePV {
+					// Check if the PV exists in the cluster before attempting to create
+					// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+					shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
+					if err != nil {
+						errs.Add(namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+						return warnings, errs
+					}
+				} else {
+					// If we're renaming the PV, we're going to give it a new random name,
+					// so we can assume it doesn't already exist in the cluster and therefore
+					// we should proceed with restoring from snapshot.
+					shouldRestoreSnapshot = true
+				}
+
+				if shouldRestoreSnapshot {
+					// Reset the PV's binding status so that Kubernetes can properly
+					// associate it with the restored PVC.
+					obj = resetVolumeBindingInfo(obj)
+
+					// Even if we're renaming the PV, obj still has the old name here, because the pvRestorer
+					// uses the original name to look up metadata about the snapshot.
+					ctx.log.Infof("Restoring persistent volume from snapshot.")
+					updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+					if err != nil {
+						errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+						return warnings, errs
+					}
+					obj = updatedObj
+
+					// VolumeSnapshotter has modified the PV name, we should rename the PV.
+					if oldName != obj.GetName() {
+						shouldRenamePV = true
+					}
+				}
+
+				if shouldRenamePV {
+					var pvName string
+					if oldName == obj.GetName() {
+						// pvRestorer hasn't modified the PV name, we need to rename the PV.
+						pvName, err = ctx.pvRenamer(oldName)
+						if err != nil {
+							errs.Add(namespace, errors.Wrapf(err, "error renaming PV"))
+							return warnings, errs
+						}
+					} else {
+						// VolumeSnapshotter could have modified the PV name through
+						// function `SetVolumeID`,
+						pvName = obj.GetName()
+					}
+
+					ctx.renamedPVs[oldName] = pvName
+					obj.SetName(pvName)
+
+					// Add the original PV name as an annotation.
+					annotations := obj.GetAnnotations()
+					if annotations == nil {
+						annotations = map[string]string{}
+					}
+					annotations["velero.io/original-pv-name"] = oldName
+					obj.SetAnnotations(annotations)
+				}
+
+			case hasResticBackup(obj, ctx):
+				ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs
+
+			case hasDeleteReclaimPolicy(obj.Object):
+				ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs
+
+			default:
+				ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
+
+				// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+				_, err = remapClaimRefNS(ctx, obj)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs
+				}
 				obj = resetVolumeBindingInfo(obj)
-
-				// Even if we're renaming the PV, obj still has the old name here, because the pvRestorer
-				// uses the original name to look up metadata about the snapshot.
-				ctx.log.Infof("Restoring persistent volume from snapshot.")
+				// We call the pvRestorer here to clear out the PV's claimRef.UID,
+				// so it can be re-claimed when its PVC is restored and gets a new UID.
 				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 				if err != nil {
 					errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
 					return warnings, errs
 				}
 				obj = updatedObj
-
-				// VolumeSnapshotter has modified the PV name, we should rename the PV.
-				if oldName != obj.GetName() {
-					shouldRenamePV = true
-				}
 			}
-
-			if shouldRenamePV {
-				var pvName string
-				if oldName == obj.GetName() {
-					// pvRestorer hasn't modified the PV name, we need to rename the PV.
-					pvName, err = ctx.pvRenamer(oldName)
-					if err != nil {
-						errs.Add(namespace, errors.Wrapf(err, "error renaming PV"))
-						return warnings, errs
-					}
-				} else {
-					// VolumeSnapshotter could have modified the PV name through
-					// function `SetVolumeID`,
-					pvName = obj.GetName()
-				}
-
-				ctx.renamedPVs[oldName] = pvName
-				obj.SetName(pvName)
-
-				// Add the original PV name as an annotation.
-				annotations := obj.GetAnnotations()
-				if annotations == nil {
-					annotations = map[string]string{}
-				}
-				annotations["velero.io/original-pv-name"] = oldName
-				obj.SetAnnotations(annotations)
-			}
-
-		case hasResticBackup(obj, ctx):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
-			ctx.pvsToProvision.Insert(name)
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs
-
-		case hasDeleteReclaimPolicy(obj.Object):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
-			ctx.pvsToProvision.Insert(name)
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs
-
-		default:
-			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
-
-			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
-			if err != nil {
-				errs.Add(namespace, err)
-				return warnings, errs
-			}
-			obj = resetVolumeBindingInfo(obj)
-			// We call the pvRestorer here to clear out the PV's claimRef.UID,
-			// so it can be re-claimed when its PVC is restored and gets a new UID.
-			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-			if err != nil {
-				errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
-				return warnings, errs
-			}
-			obj = updatedObj
 		}
 	}
 
@@ -1146,37 +1185,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 		obj = unstructuredObj
 
-		for _, additionalItem := range executeOutput.AdditionalItems {
-			itemPath := archive.GetItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
-
-			if _, err := ctx.fileSystem.Stat(itemPath); err != nil {
-				ctx.log.WithError(err).WithFields(logrus.Fields{
-					"additionalResource":          additionalItem.GroupResource.String(),
-					"additionalResourceNamespace": additionalItem.Namespace,
-					"additionalResourceName":      additionalItem.Name,
-				}).Warn("unable to restore additional item")
-				warnings.Add(additionalItem.Namespace, err)
-
-				continue
-			}
-
-			additionalResourceID := getResourceID(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
-			additionalObj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
-			if err != nil {
-				errs.Add(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
-			}
-
-			additionalItemNamespace := additionalItem.Namespace
-			if additionalItemNamespace != "" {
-				if remapped, ok := ctx.restore.Spec.NamespaceMapping[additionalItemNamespace]; ok {
-					additionalItemNamespace = remapped
-				}
-			}
-
-			w, e := ctx.restoreItem(additionalObj, additionalItem.GroupResource, additionalItemNamespace)
-			warnings.Merge(&w)
-			errs.Merge(&e)
-		}
+		w, e := handleAdditionalItems(ctx, namespace, executeOutput.AdditionalItems)
+		warnings.Merge(&w)
+		errs.Merge(&e)
 	}
 
 	// This comes after running item actions because we have built-in actions that restore
@@ -1377,6 +1388,42 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	return warnings, errs
 }
 
+func handleAdditionalItems(ctx *restoreContext, namespace string, additionalItems []velero.ResourceIdentifier) (Result, Result) {
+	warnings, errs := Result{}, Result{}
+	for _, additionalItem := range additionalItems {
+		itemPath := archive.GetItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
+
+		if _, err := ctx.fileSystem.Stat(itemPath); err != nil {
+			ctx.log.WithError(err).WithFields(logrus.Fields{
+				"additionalResource":          additionalItem.GroupResource.String(),
+				"additionalResourceNamespace": additionalItem.Namespace,
+				"additionalResourceName":      additionalItem.Name,
+			}).Warn("unable to restore additional item")
+			warnings.Add(additionalItem.Namespace, err)
+
+			continue
+		}
+
+		additionalResourceID := getResourceID(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
+		additionalObj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
+		if err != nil {
+			errs.Add(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
+		}
+
+		additionalItemNamespace := additionalItem.Namespace
+		if additionalItemNamespace != "" {
+			if remapped, ok := ctx.restore.Spec.NamespaceMapping[additionalItemNamespace]; ok {
+				additionalItemNamespace = remapped
+			}
+		}
+
+		w, e := ctx.restoreItem(additionalObj, additionalItem.GroupResource, additionalItemNamespace)
+		warnings.Merge(&w)
+		errs.Merge(&e)
+	}
+	return warnings, errs
+}
+
 func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, err error, client client.Dynamic) (bool, error) {
 	if err == nil {
 		return false, nil
@@ -1572,6 +1619,19 @@ func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
 	}
 
 	return false
+}
+
+func getItemSnapshot(resourceIdentifier velero.ResourceIdentifier, itemSnapshots []*volume.ItemSnapshot) (*volume.ItemSnapshot, error) {
+	for _, snapshot := range itemSnapshots {
+		snapshotRID := velero.ResourceIdentifier{}
+		if err := json.Unmarshal([]byte(snapshot.Spec.ResourceIdentifier), &snapshotRID); err != nil {
+			return nil, err
+		}
+		if snapshotRID == resourceIdentifier {
+			return snapshot, nil
+		}
+	}
+	return nil, nil
 }
 
 func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {

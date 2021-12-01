@@ -19,6 +19,9 @@ package controller
 import (
 	"bytes"
 	"fmt"
+
+	"io/ioutil"
+	"testing"
 	"time"
 
 	"context"
@@ -40,19 +43,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
-	"github.com/vmware-tanzu/velero/pkg/volume"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
-	"github.com/vmware-tanzu/velero/pkg/builder"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type backupDeletionControllerTestData struct {
@@ -125,6 +124,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.True(t, strings.HasPrefix(err.Error(), "error getting the backup store"))
 	})
 
+func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	t.Run("missing spec.backupName", func(t *testing.T) {
 		dbr := defaultTestDbr()
 		dbr.Spec.BackupName = ""
@@ -147,7 +147,11 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		// add the backup to the tracker so the execution of reconcile doesn't progress
 		// past checking for an in-progress backup. this makes validation easier.
-		td.controller.backupTracker.Add(td.req.Namespace, input.Spec.BackupName)
+
+		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName, &pkgbackup.Request{})
+
+		require.NoError(t, td.sharedInformers.Velero().V1().DeleteBackupRequests().Informer().GetStore().Add(td.req))
+
 		existing := &velerov1api.DeleteBackupRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: td.req.Namespace,
@@ -196,6 +200,8 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 	t.Run("deleting an in progress backup isn't allowed", func(t *testing.T) {
 		dbr := defaultTestDbr()
 		td := setupBackupDeletionControllerTest(t, dbr)
+
+		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName, &pkgbackup.Request{})
 
 		td.controller.backupTracker.Add(td.req.Namespace, dbr.Spec.BackupName)
 		_, err := td.controller.Reconcile(context.TODO(), td.req)

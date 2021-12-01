@@ -1,0 +1,26 @@
+Added Upload Progress Monitoring and ItemSnapshotters.  This enables monitoring
+of snapshots that need additional processing such as an upload to an object 
+store after the snapshot is taken.  Backups are now split into two phases with
+the new uploading phase happening after the main part of the backup is complete.
+Once a backup has entered the uploading phase, another backup can be executed.
+On restart of the server, any backups that are in an Uploading phase will
+continue to be monitored.
+
+Added metrics for Item Snapshots in a backup
+
+    item_snapshot_attempt_total - number of item snapshots attempted in a backup
+    item_snapshot_success_total - number of successful item snapshots in a backup
+    item_snapshot_failure_total - number of failed item snapshots in a backup
+
+    Success requires that both the snapshot and the upload succeeded.  These stats
+    are set when the backup moves to a terminal phase.
+
+Added upload-progress-check-interval flag to control how often snapshots are checked for upload progress - defaults to 1 minute
+
+This feature is currently enabled with the EnableUploadProgress flag.  It
+also requires ItemSnapshot plugins.
+
+Fixes #3756
+Fixes #3757
+Fixes #3759
+

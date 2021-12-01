@@ -22,6 +22,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/volume"
+
+	"github.com/vmware-tanzu/velero/pkg/features"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -41,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -240,30 +246,53 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, errors.Wrap(err, "error getting the backup store")
 	}
 
-	actions, err := pluginManager.GetDeleteItemActions()
-	log.Debugf("%d actions before invoking actions", len(actions))
+	deleteItemActions, err := pluginManager.GetDeleteItemActions()
+	log.Debugf("%d deleteItemActions before invoking deleteItemActions", len(deleteItemActions))
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error getting delete item actions")
 	}
-	// don't defer CleanupClients here, since it was already called above.
+	deleteItemActionResolver := framework.NewDeleteItemActionResolver(deleteItemActions)
 
-	if len(actions) > 0 {
+	var itemSnapshots []*volume.ItemSnapshot
+	var itemSnapshotters []isv1.ItemSnapshotter
+
+	if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+		itemSnapshots, err = backupStore.GetItemSnapshots(backup.Name)
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error getting backup's item itemSnapshots").Error())
+		}
+		itemSnapshotters, err = pluginManager.GetItemSnapshotters()
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "error getting item snapshotters")
+		}
+	}
+
+	if len(deleteItemActions) > 0 || len(itemSnapshots) > 0 {
+		var deleteItemResolvedActions []framework.DeleteItemResolvedAction
 		// Download the tarball
 		backupFile, err := downloadToTempFile(backup.Name, backupStore, log)
 
 		if err != nil {
 			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
 		} else {
-			defer closeAndRemoveFile(backupFile, r.logger)
-			ctx := &delete.Context{
-				Backup:          backup,
-				BackupReader:    backupFile,
-				Actions:         actions,
-				Log:             r.logger,
-				DiscoveryHelper: r.discoveryHelper,
-				Filesystem:      filesystem.NewFileSystem(),
+			defer closeAndRemoveFile(backupFile, c.logger)
+
+			deleteItemResolvedActions, err = deleteItemActionResolver.ResolveActions(c.helper)
+			if err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "error resolving delete item deleteItemActions")
 			}
 
+			ctx := &delete.Context{
+				Backup:                    backup,
+				BackupReader:              backupFile,
+				Actions:                   actions,
+				Log:                       c.logger,
+				DiscoveryHelper:           c.helper,
+				Filesystem:                filesystem.NewFileSystem(),
+				DeleteItemResolvedActions: deleteItemResolvedActions,
+				ItemSnapshots:             itemSnapshots,
+				ItemSnapshotters:          itemSnapshotters,
+			}
 			// Optimization: wrap in a gofunc? Would be useful for large backups with lots of objects.
 			// but what do we do with the error returned? We can't just swallow it as that may lead to dangling resources.
 			err = delete.InvokeDeleteActions(ctx)

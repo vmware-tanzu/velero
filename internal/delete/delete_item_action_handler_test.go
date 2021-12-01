@@ -22,6 +22,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -165,16 +167,20 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 				actions = append(actions, action)
 			}
 
+			deleteItemActionResolver := framework.NewDeleteItemActionResolver(actions)
+			deleteItemResolvedActions, err := deleteItemActionResolver.ResolveActions(h.discoveryHelper)
+			require.NoError(t, err)
+
 			c := &Context{
-				Backup:          tc.backup,
-				BackupReader:    tc.tarball,
-				Filesystem:      fs,
-				DiscoveryHelper: h.discoveryHelper,
-				Actions:         actions,
-				Log:             log,
+				Backup:                    tc.backup,
+				BackupReader:              tc.tarball,
+				Filesystem:                fs,
+				DiscoveryHelper:           h.discoveryHelper,
+				DeleteItemResolvedActions: deleteItemResolvedActions,
+				Log:                       log,
 			}
 
-			err := InvokeDeleteActions(c)
+			err = InvokeDeleteActions(c)
 			require.NoError(t, err)
 
 			// Compare the plugins against the ids that we wanted.

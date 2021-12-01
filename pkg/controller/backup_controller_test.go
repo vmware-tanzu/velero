@@ -865,12 +865,19 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
 			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.
-			// Failures will display the bytes in buf.
+			// Failures will display the bytes in buf.  Only check this on the second PutBackup because the first will
+			// be before uploads have completed and will not have metadata
+			putBackupCalledAlready := false
+
 			hasNameAndCompletionTimestamp := func(info persistence.BackupInfo) bool {
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(info.Metadata)
-				return info.Name == test.backup.Name &&
-					strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
+				if putBackupCalledAlready {
+					buf := new(bytes.Buffer)
+					buf.ReadFrom(info.Metadata)
+					return info.Name == test.backup.Name &&
+						strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
+				}
+				putBackupCalledAlready = true
+				return true
 			}
 			backupStore.On("PutBackup", mock.MatchedBy(hasNameAndCompletionTimestamp)).Return(nil)
 

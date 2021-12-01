@@ -191,7 +191,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 			// Verify additional items
 			var expectedAdditionalItems []*proto.ResourceIdentifier
 			for _, item := range test.implAdditionalItems {
-				expectedAdditionalItems = append(expectedAdditionalItems, backupResourceIdentifierToProto(item))
+				expectedAdditionalItems = append(expectedAdditionalItems, resourceIdentifierToProto(item))
 			}
 			assert.Equal(t, expectedAdditionalItems, resp.AdditionalItems)
 		})

@@ -104,6 +104,12 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
+
+	// the default interval to check upload progress per backup
+	defaultUploadProgressCheckInterval = time.Minute
+
+	// the default interval to check upload progress for backups that are in Uploading or UploadingPartialFailure phase
+	defaultFinalizeBackupsInterval = time.Second
 )
 
 type serverConfig struct {
@@ -123,6 +129,8 @@ type serverConfig struct {
 	defaultResticMaintenanceFrequency                                       time.Duration
 	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
+	uploadProgressCheckInterval                                             time.Duration
+	finalizeBackupsInterval                                                 time.Duration
 }
 
 type controllerRunInfo struct {
@@ -152,6 +160,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
 			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
+			uploadProgressCheckInterval:       defaultUploadProgressCheckInterval,
+			finalizeBackupsInterval:           defaultFinalizeBackupsInterval,
 		}
 	)
 
@@ -217,7 +227,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
-
+	command.Flags().DurationVar(&config.uploadProgressCheckInterval, "upload-progress-check-interval", config.uploadProgressCheckInterval, "How long to wait between checking upload progress for a backup.")
+	command.Flags().DurationVar(&config.finalizeBackupsInterval, "finalize-backups-interval", config.finalizeBackupsInterval, "How long to wait between checking backups for completion when snapshots have uploaded.")
 	return command
 }
 
@@ -656,6 +667,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			csiVSCLister,
 			csiVSClassLister,
 			backupStoreGetter,
+			s.config.uploadProgressCheckInterval,
+			s.config.finalizeBackupsInterval,
 		)
 
 		return controllerRunInfo{

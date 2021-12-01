@@ -435,12 +435,22 @@ spec:
                 description: FormatVersion is the backup format version, including
                   major, minor, and patch version.
                 type: string
+              itemSnapshotsAttempted:
+                description: ItemSnapshotsAttempted is the total number of attempted
+                  item snapshots for this backup.
+                type: integer
+              itemSnapshotsCompleted:
+                description: ItemSnapshotsCompleted is the total number of successfully
+                  completed item snapshots for this backup.
+                type: integer
               phase:
                 description: Phase is the current state of the Backup.
                 enum:
                 - New
                 - FailedValidation
                 - InProgress
+                - Uploading
+                - UploadingPartialFailure
                 - Completed
                 - PartiallyFailed
                 - Failed

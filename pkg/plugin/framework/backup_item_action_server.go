@@ -120,17 +120,8 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 	}
 
 	for _, item := range additionalItems {
-		res.AdditionalItems = append(res.AdditionalItems, backupResourceIdentifierToProto(item))
+		res.AdditionalItems = append(res.AdditionalItems, resourceIdentifierToProto(item))
 	}
 
 	return res, nil
-}
-
-func backupResourceIdentifierToProto(id velero.ResourceIdentifier) *proto.ResourceIdentifier {
-	return &proto.ResourceIdentifier{
-		Group:     id.Group,
-		Resource:  id.Resource,
-		Namespace: id.Namespace,
-		Name:      id.Name,
-	}
 }

@@ -54,4 +54,7 @@ type ItemSnapshotStatus struct {
 
 	// Phase is the current state of the ItemSnapshot.
 	Phase isv1.SnapshotPhase `json:"phase,omitempty"`
+
+	// Error is the error message if the Phase is SnapshotPhaseFailed
+	Error string `json:"error,omitempty"`
 }

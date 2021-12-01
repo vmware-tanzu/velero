@@ -19,6 +19,11 @@ package controller
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/backup"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,12 +32,27 @@ func TestBackupTracker(t *testing.T) {
 
 	assert.False(t, bt.Contains("ns", "name"))
 
-	bt.Add("ns", "name")
+	name1Backup := &backup.Request{
+		Backup: &velerov1api.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: "name"},
+		},
+	}
+	bt.Add("ns", "name", name1Backup)
 	assert.True(t, bt.Contains("ns", "name"))
+	assert.Equal(t, name1Backup, bt.Get("ns", "name"))
 
-	bt.Add("ns2", "name2")
+	name2Backup := &backup.Request{
+		Backup: &velerov1api.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: "name2"},
+		},
+	}
+
+	bt.Add("ns2", "name2", name2Backup)
 	assert.True(t, bt.Contains("ns", "name"))
 	assert.True(t, bt.Contains("ns2", "name2"))
+
+	assert.Equal(t, name1Backup, bt.Get("ns", "name"))
+	assert.Equal(t, name2Backup, bt.Get("ns2", "name2"))
 
 	bt.Delete("ns", "name")
 	assert.False(t, bt.Contains("ns", "name"))
@@ -40,4 +60,20 @@ func TestBackupTracker(t *testing.T) {
 
 	bt.Delete("ns2", "name2")
 	assert.False(t, bt.Contains("ns2", "name2"))
+
+	assert.Equal(t, 0, len(bt.GetByPhase(velerov1api.BackupPhaseUploading)))
+	name3PhaseUploading := &backup.Request{
+		Backup: &velerov1api.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: "name3"},
+			Status: velerov1api.BackupStatus{
+				Phase: velerov1api.BackupPhaseUploading,
+			},
+		},
+	}
+	bt.Add("ns", "name3", name3PhaseUploading)
+	reqs := bt.GetByPhase(velerov1api.BackupPhaseUploading)
+	assert.Equal(t, 1, len(reqs))
+	assert.Equal(t, reqs[0].Name, "name3")
+	assert.Equal(t, velerov1api.BackupPhaseUploading, reqs[0].Status.Phase)
+
 }

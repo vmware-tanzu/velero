@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 	mock "github.com/stretchr/testify/mock"
-	v1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 
 	velero "github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -16,11 +16,11 @@ type ItemSnapshotter struct {
 }
 
 // AlsoHandles provides a mock function with given fields: input
-func (_m *ItemSnapshotter) AlsoHandles(input *v1.AlsoHandlesInput) ([]velero.ResourceIdentifier, error) {
+func (_m *ItemSnapshotter) AlsoHandles(input *isv1.AlsoHandlesInput) ([]velero.ResourceIdentifier, error) {
 	ret := _m.Called(input)
 
 	var r0 []velero.ResourceIdentifier
-	if rf, ok := ret.Get(0).(func(*v1.AlsoHandlesInput) []velero.ResourceIdentifier); ok {
+	if rf, ok := ret.Get(0).(func(*isv1.AlsoHandlesInput) []velero.ResourceIdentifier); ok {
 		r0 = rf(input)
 	} else {
 		if ret.Get(0) != nil {
@@ -29,7 +29,7 @@ func (_m *ItemSnapshotter) AlsoHandles(input *v1.AlsoHandlesInput) ([]velero.Res
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*v1.AlsoHandlesInput) error); ok {
+	if rf, ok := ret.Get(1).(func(*isv1.AlsoHandlesInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)
@@ -60,20 +60,20 @@ func (_m *ItemSnapshotter) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 // CreateItemFromSnapshot provides a mock function with given fields: ctx, input
-func (_m *ItemSnapshotter) CreateItemFromSnapshot(ctx context.Context, input *v1.CreateItemInput) (*v1.CreateItemOutput, error) {
+func (_m *ItemSnapshotter) CreateItemFromSnapshot(ctx context.Context, input *isv1.CreateItemInput) (*isv1.CreateItemOutput, error) {
 	ret := _m.Called(ctx, input)
 
-	var r0 *v1.CreateItemOutput
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.CreateItemInput) *v1.CreateItemOutput); ok {
+	var r0 *isv1.CreateItemOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *isv1.CreateItemInput) *isv1.CreateItemOutput); ok {
 		r0 = rf(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.CreateItemOutput)
+			r0 = ret.Get(0).(*isv1.CreateItemOutput)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.CreateItemInput) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *isv1.CreateItemInput) error); ok {
 		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
@@ -83,11 +83,11 @@ func (_m *ItemSnapshotter) CreateItemFromSnapshot(ctx context.Context, input *v1
 }
 
 // DeleteSnapshot provides a mock function with given fields: ctx, input
-func (_m *ItemSnapshotter) DeleteSnapshot(ctx context.Context, input *v1.DeleteSnapshotInput) error {
+func (_m *ItemSnapshotter) DeleteSnapshot(ctx context.Context, input *isv1.DeleteSnapshotInput) error {
 	ret := _m.Called(ctx, input)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.DeleteSnapshotInput) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *isv1.DeleteSnapshotInput) error); ok {
 		r0 = rf(ctx, input)
 	} else {
 		r0 = ret.Error(0)
@@ -111,20 +111,20 @@ func (_m *ItemSnapshotter) Init(config map[string]string) error {
 }
 
 // Progress provides a mock function with given fields: input
-func (_m *ItemSnapshotter) Progress(input *v1.ProgressInput) (*v1.ProgressOutput, error) {
+func (_m *ItemSnapshotter) Progress(input *isv1.ProgressInput) (*isv1.ProgressOutput, error) {
 	ret := _m.Called(input)
 
-	var r0 *v1.ProgressOutput
-	if rf, ok := ret.Get(0).(func(*v1.ProgressInput) *v1.ProgressOutput); ok {
+	var r0 *isv1.ProgressOutput
+	if rf, ok := ret.Get(0).(func(*isv1.ProgressInput) *isv1.ProgressOutput); ok {
 		r0 = rf(input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.ProgressOutput)
+			r0 = ret.Get(0).(*isv1.ProgressOutput)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*v1.ProgressInput) error); ok {
+	if rf, ok := ret.Get(1).(func(*isv1.ProgressInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)
@@ -134,20 +134,20 @@ func (_m *ItemSnapshotter) Progress(input *v1.ProgressInput) (*v1.ProgressOutput
 }
 
 // SnapshotItem provides a mock function with given fields: ctx, input
-func (_m *ItemSnapshotter) SnapshotItem(ctx context.Context, input *v1.SnapshotItemInput) (*v1.SnapshotItemOutput, error) {
+func (_m *ItemSnapshotter) SnapshotItem(ctx context.Context, input *isv1.SnapshotItemInput) (*isv1.SnapshotItemOutput, error) {
 	ret := _m.Called(ctx, input)
 
-	var r0 *v1.SnapshotItemOutput
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.SnapshotItemInput) *v1.SnapshotItemOutput); ok {
+	var r0 *isv1.SnapshotItemOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *isv1.SnapshotItemInput) *isv1.SnapshotItemOutput); ok {
 		r0 = rf(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1.SnapshotItemOutput)
+			r0 = ret.Get(0).(*isv1.SnapshotItemOutput)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *v1.SnapshotItemInput) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *isv1.SnapshotItemInput) error); ok {
 		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)

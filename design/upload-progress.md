@@ -24,9 +24,7 @@ Restic - Does not go through the volume snapshot path.  Restic backups will bloc
 - Enable monitoring of operations that continue after snapshotting operations have completed
 - Keep non-usable backups (upload/persistence has not finished) from appearing as completed
 - Minimize change to volume snapshot and BackupItemAction plug-ins
-
-## Non-goals
-- Unification of BackupItemActions and VolumeSnapshotters
+- Introduce the ItemSnapshotter interface to supersede VolumeSnapshotter
 
 ## Models
 
@@ -148,85 +146,70 @@ do not have a `velero-backup.json` object in the object store will be ignored.
 
 ## Plug-in API changes
 
-### UploadProgress struct
-
-    type UploadProgress struct {
-        completed bool                          // True when the operation has completed, either successfully or with a failure
-        err error                               // Set when the operation has failed
-        itemsCompleted, itemsToComplete int64   // The number of items that have been completed and the items to complete
-                                                // For a disk, an item would be a byte and itemsToComplete would be the
-                                                // total size to transfer (may be less than the size of a volume if
-                                                // performing an incremental) and itemsCompleted is the number of bytes
-                                                // transferred.  On successful completion, itemsCompleted and itemsToComplete
-                                                // should be the same
-        started, updated time.Time              // When the upload was started and when the last update was seen.  Not all
-                                                // systems retain when the upload was begun, return Time 0 (time.Unix(0, 0))
-                                                // if unknown.
-    }
-
-### VolumeSnapshotter changes
-
-A new method will be added to the VolumeSnapshotter interface (details depending on plug-in versioning spec)
-
-    UploadProgress(snapshotID string) (UploadProgress, error)
-
-UploadProgress will report the current status of a snapshot upload.  This should be callable at any time after the snapshot
-has been taken.  In the event a plug-in is restarted, if the snapshotID continues to be valid it should be possible to
-retrieve the progress.
-
-`error` is set if there is an issue retrieving progress.  If the snapshot is has encountered an error during the upload,
-the error should be return in UploadProgress and error should be nil.
-
-### SnapshotItemAction plug-in
+### ItemSnapshotter plug-in
 
 Currently CSI snapshots and the Velero Plug-in for vSphere are implemented as BackupItemAction plugins.  The majority of
 BackupItemAction plugins do not take snapshots or upload data so rather than modify BackupItemAction we introduce a new
-plug-ins, SnapshotItemAction.  SnapshotItemAction will be used in place of BackupItemAction for
-the CSI snapshots and the Velero Plug-in for vSphere and will return a snapshot ID in addition to the item itself.
+plug-ins, SnapshotItemAction.  ItemSnapshotter will be used in place of BackupItemAction for
+the CSI snapshots and the Velero Plug-in for vSphere and will return a snapshot ID in addition to the item itself.  The existing
+VolumeSnapshotter plugins will be converted into ItemSnapshotter plugins as well.
 
-The SnapshotItemAction plugin identifier as well as the Item and Snapshot ID will be stored in the 
+The ItemSnapshotter plugin identifier as well as the Item and Snapshot ID will be stored in the
 `<backup-name>-itemsnapshots.json.gz`.  When checking for progress, this info will be used to select the appropriate
-SnapshotItemAction plugin to query for progress.
+ItemSnapshotter plugin to query for progress.
 
-_NotApplicable_ should only be returned if the SnapshotItemAction plugin should not be handling the item.  If the
-SnapshotItemAction plugin should handle the item but, for example, the item/snapshot ID cannot be found to report progress, a
-UploadProgress struct with the error set appropriately (in this case _NotFound_) should be returned.
+_NotApplicable_ should only be returned if the ItemSnapshotter plugin should not be handling the item.  If the
+ItemSnapshotter plugin should handle the item but, for example, the item/snapshot ID cannot be found to report progress, a
+SnapshotItemProgressOutput struct with the error set appropriately (in this case _NotFound_) should be returned.
 
-    // SnapshotItemAction is an actor that snapshots an individual item being backed up (it may also do other
-    operations on the item that is returned).
+    // ItemSnapshotter handles snapshots on an individual item being backed up.
+    type ItemSnapshotter interface {
     
-    type SnapshotItemAction interface {
+    	// Init prepares the ItemSnapshotter for usage using the provided map of
+    	// configuration key-value pairs. It returns an error if the ItemSnapshotter
+    	// cannot be initialized from the provided config.
+    	Init(config map[string]string) error
+    
     	// AppliesTo returns information about which resources this action should be invoked for.
-    	// A BackupItemAction's Execute function will only be invoked on items that match the returned
+    	// An ItemSnapshotter's SnapshotItem method will only be invoked on items that match the returned
     	// selector. A zero-valued ResourceSelector matches all resources.
-    	AppliesTo() (ResourceSelector, error)
+    	AppliesTo() (velero.ResourceSelector, error)
     
-    	// Execute allows the ItemAction to perform arbitrary logic with the item being backed up,
-    	// including mutating the item itself prior to backup. The item (unmodified or modified)
-    	// should be returned, along with an optional slice of ResourceIdentifiers specifying
+    	// AlsoHandles is called for each item this ItemSnapshotter should handle and returns any items
+    	// which will be handled by this plugin when snapshotting the item.  These items will be excluded from the
+    	// items being backed up.  AlsoHandles will be called before SnapshotItem is called.  For example, a database may expose
+    	// a database resource that can be snapshotted. If the database uses a PVC that will be snapshotted/backed up as
+    	// part of the database snapshot, that PVC should be returned when AlsoHandles is invoked.  This is different from
+    	// AdditionalItems (returned in SnapshotItemOutput and CreateItemOutput) which are specifying additional resources
+    	// that Velero should store in the backup or create.
+    	AlsoHandles(input *AlsoHandlesInput) ([]velero.ResourceIdentifier, error)
+    
+    	// SnapshotItem causes the ItemSnapshotter to snapshot the specified item.  It may also
+    	// perform arbitrary logic with the item being backed up, including mutating the item itself prior to backup.
+    	// The item (unmodified or modified) should be returned, along with an optional slice of ResourceIdentifiers specifying
     	// additional related items that should be backed up.
-    	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, snapshotID string,
-    	    []ResourceIdentifier, error)
-    	
-    	// Progress  
-    	Progress(input *SnapshotItemProgressInput) (UploadProgress, error)
-    }
+    	// A caller can pass a context that includes a timeout.  If the time to take the snapshot exceeds the
+    	// time in the context, the plugin may abort the snapshot.  The context timeout does not apply to upload
+    	// time that occurs after SnapshotItem returns
+    	SnapshotItem(ctx context.Context, input *SnapshotItemInput) (*SnapshotItemOutput, error)
     
-    // SnapshotItemProgressInput contains the input parameters for the SnapshotItemAction's Progress function.
-    type SnapshotItemProgressInput struct {
-    	// Item is the item that was stored in the backup
-    	Item runtime.Unstructured
-    	// SnapshotID is the snapshot ID returned by SnapshotItemAction
-    	SnapshotID string
-    	// Backup is the representation of the restore resource processed by Velero.
-    	Backup *velerov1api.Backup
+    	// Progress will return the progress of a snapshot that is being uploaded
+    	Progress(input *ProgressInput) (*ProgressOutput, error)
+    
+    	// DeleteSnapshot removes a snapshot
+    	DeleteSnapshot(ctx context.Context, input *DeleteSnapshotInput) error
+    
+    	// CreateItemFromSnapshot creates a new item from the snapshot.  The item to restore from the
+        // backup is passed in and may be modified during CreateItemFromSnapshot and the modified item
+        // returned in CreateItemOutput.  This allows operations such as restoring a PVC to return a PVC
+        // that points to a newly created PV.  AdditionalItems to restore may also be returned in CreateItemOutput
+    	CreateItemFromSnapshot(ctx context.Context, input *CreateItemInput) (*CreateItemOutput, error)
     }
-
 
 ## Changes in Velero backup format
 
 No changes to the existing format are introduced by this change.  A `<backup-name>-itemsnapshots.json.gz` file will be 
-added that contains the items and snapshot IDs returned by ItemSnapshotAction.  Also, the creation of the 
+added that contains the items and snapshot IDs returned by ItemSnapshotter.SnapshotItem.  Also, the creation of the
 `velero-backup.json` object will not occur until the backup moves to one of the terminal phases (_Completed_, 
 _PartiallyFailed_, or _Failed_).  Reconciliation should ignore backups that do not have a `velero-backup.json` object.
 
@@ -238,8 +221,8 @@ If the Backup resource is removed (e.g. Velero is uninstalled) before a backup c
 can currently happen but the current window is much smaller.
 
 ### `<backup-name>-itemsnapshots.json.gz`
-The itemsnapshots file is similar to the existing `<backup-name>-itemsnapshots.json.gz`  Each snapshot taken via
-SnapshotItemAction will have a JSON record in the file.  Exact format TBD.
+The itemsnapshots file is similar to the existing `<backup-name>-volumesnapshots.json.gz`  Each snapshot taken via
+_ItemSnapshotter_ will have a JSON record in the file.  Exact format TBD.
 
 ## CSI snapshots
 
@@ -256,56 +239,55 @@ it will check the status of the Upload records for the snapshot and return progr
 ## Backup workflow changes
 
 The backup workflow remains the same until we get to the point where the `velero-backup.json` object is written.
-At this point, we will queue the backup to a finalization go-routine.  The next backup may then begin.  The finalization
-routine will run across all of the volume snapshots and call the _UploadProgress_ method on each of them.  It will
-then run across all items and call _BackupItemProgress.Progress_ for any that match with a BackupItemProgress.
+At this point, we will queue the backup to a finalization go-routine.  The next backup may then begin.  It will
+then run across all items and call _ItemSnapshotter.Progress_ for any that match with a BackupItemProgress.
 
-If all snapshots and backup items have finished uploading (either successfully or failed), the backup will be completed
+If all backup items have finished uploading (either successfully or failed), the backup will be completed
 and the backup will move to the appropriate terminal phase and upload the `velero-backup.json` object to the object store
 and the backup will be complete.
 
 If any of the snapshots or backup items are still being processed, the phase of the backup will be set to the appropriate
-phase (_Uploading_ or _UploadingPartialFailure_).  In the event of any of the upload progress checks return an error, the 
+phase (_Uploading_ or _UploadingPartialFailure_).  In the event that any of the upload progress checks return an error, the
 phase will move to _UploadingPartialFailure_.  The backup will then be requeued and will be rechecked again after some 
 time has passed.
 
 ## Restart workflow
 On restart, the Velero server will scan all Backup resources.  Any Backup resources which are in the _InProgress_ phase
-will be moved to the _Failed_ phase.  Any Backup resources in the _Oploading_ or _OploadingPartialFailure_ phase will
+will be moved to the _Failed_ phase.  Any Backup resources in the _Uploading_ or _UploadingPartialFailure_ phase will
 be treated as if they have been requeued and progress checked and the backup will be requeued or moved to a terminal
 phase as appropriate.
 
 # Implementation tasks
 
-VolumeSnapshotter new plugin APIs  
-BackupItemProgress new plugin interface  
+ItemSnapshotter new plugin interface  
 New backup phases  
 Defer uploading `velero-backup.json`  
 AWS EBS plug-in UploadProgress implementation  
 Upload monitoring  
 Implementation of `<backup-name>-itemsnapshots.json.gz` file  
 Restart logic  
-Change in reconciliation logic to ignore backups that have not completed  
-CSI plug-in BackupItemProgress implementation  
-vSphere plug-in BackupItemProgress implementation (vSphere plug-in team)  
+CSI plug-in ItemSnapshotter implementation  
+vSphere plug-in ItemSnapshotter implementation (vSphere plug-in team)  
 
-# Future Fragile/Durable snapshot tracking
+# Future Ephemeral/Durable snapshot tracking
 Futures are here for reference, they may change radically when actually implemented.
 
-Some storage systems have the ability to provide different levels of protection for snapshots.  These are termed "Fragile"
+Some storage systems have the ability to provide different levels of protection for snapshots.  These are termed "Ephemeral"
 and "Durable".  Currently, Velero expects snapshots to be Durable (they should be able to survive the destruction of the
 cluster and the storage it is using).  In the future we would like the ability to take advantage of snapshots that are
-Fragile.  For example, vSphere snapshots are Fragile (they reside in the same datastore as the virtual disk).  The Velero
-Plug-in for vSphere uses a vSphere local/fragile snapshot to get a consistent snapshot, then uploads the data to S3 to
+Ephemeral.  For example, vSphere snapshots are Ephemeral (they reside in the same datastore as the virtual disk).  The Velero
+Plug-in for vSphere uses a vSphere local/ephemeral snapshot to get a consistent snapshot, then uploads the data to S3 to
 make it Durable.  In the current design, upload progress will not be complete until the snapshot is ready to use and
 Durable.  It is possible, however, to restore data from a vSphere snapshot before it has been made Durable, and this is a
 capability we'd like to expose in the future.  Other storage systems implement this functionality as well.  We will be moving
 the control of the data movement from the vSphere plug-in into Velero.
 
-Some storage system, such as EBS, are only capable of creating Durable snapshots.  There is no usable intermediate Fragile stage.
+Some storage system, such as EBS, are only capable of creating Durable snapshots.  There is no usable intermediate
+Ephemeral stage, however there is a time when a snapshot has been taken but is not yet
+usable.
 
-For a Velero backup, users should be able to specify whether they want a Durable backup or a Fragile backup (Fragile backups
+For a Velero backup, users should be able to specify whether they want a Durable backup or a Ephemeral backup (Ephemeral backups
 may consume less resources, be quicker to restore from and are suitable for things like backing up a cluster before upgrading
-software).  We can introduce three snapshot states - Creating, Fragile and Durable.  A snapshot would be created with a
-desired state, Fragile or Durable.  When the snapshot reaches the desired or higher state (e.g. request was for Fragile but
+software).  We can introduce three snapshot states - Creating, Ephemeral and Durable.  A snapshot would be created with a
+desired state, Ephemeral or Durable.  When the snapshot reaches the desired or higher state (e.g. request was for Ephemeral but
 snapshot went to Durable as on EBS), then the snapshot would be completed.

@@ -21,6 +21,11 @@ import (
 	"os"
 	"path/filepath"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/features"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -92,6 +97,50 @@ func (r *registry) discoverPlugins(commands []string) error {
 			return err
 		}
 
+		// For backwards compatibility, some plugins will export both ItemSnapshotter plugins and
+		// BackupItemActions for Persistent Volume Claims (CSI and vSphere plugin do this).  Look for
+		// ItemSnapshotters for PVCs and if found, discard the BackupItemActions.  We leave alternates like
+		// RestoreItemActions and DeleteItemActions as well as VolumeSnapshotters to handle restores from old backups.
+		if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
+			updatedPlugins := plugins // Default list is everything
+			for _, plugin := range plugins {
+				if plugin.Kind == framework.PluginKindItemSnapshotter {
+					updatedPlugins = []framework.PluginIdentifier{} // We'll build a new list and skip any BackupItemActions for PVCs
+					appliesTo, err := r.appliesTo(command, plugin)
+					if err != nil {
+						return err
+					}
+					for _, includedResource := range appliesTo.IncludedResources {
+						if includedResource == "persistentvolumeclaims" {
+							for _, plugin := range plugins {
+								use := true
+								if plugin.Kind == framework.PluginKindBackupItemAction {
+									biaAppliesTo, err := r.appliesTo(command, plugin)
+									if err != nil {
+										return err
+									}
+									for _, biaResource := range biaAppliesTo.IncludedResources {
+										if biaResource == "persistentvolumeclaims" {
+											r.logger.WithFields(logrus.Fields{
+												"kind":    plugin.Kind,
+												"name":    plugin.Name,
+												"command": command,
+											}).Info("Plugin exports ItemSnapshotter and BackupItemAction, only using ItemSnapshotter")
+											use = false
+										}
+									}
+								}
+								if use {
+									updatedPlugins = append(updatedPlugins, plugin)
+								}
+							}
+							break // Once we've found persistentvolumeclaims we won't find it again
+						}
+					}
+				}
+			}
+			plugins = updatedPlugins
+		}
 		for _, plugin := range plugins {
 			r.logger.WithFields(logrus.Fields{
 				"kind":    plugin.Kind,
@@ -193,6 +242,30 @@ func (r *registry) listPlugins(command string) ([]framework.PluginIdentifier, er
 	}
 
 	return lister.ListPlugins()
+}
+
+// appliesTo returns the list of ResourceSelectors that this plugin can be applied to
+func (r *registry) appliesTo(command string, pluginID framework.PluginIdentifier) (velero.ResourceSelector, error) {
+	process, err := r.processFactory.newProcess(command, r.logger, r.logLevel)
+	if err != nil {
+		return velero.ResourceSelector{}, err
+	}
+	defer process.kill()
+
+	plugin, err := process.dispense(kindAndName{
+		kind: pluginID.Kind,
+		name: pluginID.Name,
+	})
+	if err != nil {
+		return velero.ResourceSelector{}, err
+	}
+
+	applicable, ok := plugin.(velero.Applicable)
+	if !ok {
+		return velero.ResourceSelector{}, errors.Errorf("%T does not implement AppliesTo", plugin)
+	}
+
+	return applicable.AppliesTo()
 }
 
 // register registers a PluginIdentifier with the registry.

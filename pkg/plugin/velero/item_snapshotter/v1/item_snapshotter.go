@@ -192,6 +192,9 @@ type ItemSnapshotter interface {
 	// DeleteSnapshot removes a snapshot
 	DeleteSnapshot(ctx context.Context, input *DeleteSnapshotInput) error
 
-	// CreateItemFromSnapshot creates a new item from the snapshot
+	// CreateItemFromSnapshot creates a new item from the snapshot.  The item to restore from the
+	// backup is passed in and may be modified during CreateItemFromSnapshot and the modified item
+	// returned in CreateItemOutput.  This allows operations such as restoring a PVC to return a PVC
+	// that points to a newly created PV.  AdditionalItems to restore may also be returned in CreateItemOutput
 	CreateItemFromSnapshot(ctx context.Context, input *CreateItemInput) (*CreateItemOutput, error)
 }
