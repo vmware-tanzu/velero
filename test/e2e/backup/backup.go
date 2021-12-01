@@ -170,7 +170,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			podList, err := GetPod(client.ClientGo, testNameSpace)
 			Expect(err).To(Succeed(),
 				"Failed to get info about pod with downward api volumn")
-			By("Cehcking downward api")
+			By("Checking downward api")
 			gomega.Eventually(func() (string, error) {
 				return GetPodLogs(client.ClientGo, testNameSpace, podList.Items[0].Name, "client-container")
 			}, time.Minute, 2*time.Second).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
