@@ -24,8 +24,8 @@ import (
 
 	"github.com/google/uuid"
 
-	k8sutils "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	veleroutils "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -37,7 +37,7 @@ import (
 
 func BasicBackupRestore() {
 
-	client, err := k8sutils.NewTestClient()
+	client, err := NewTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
 
 	BeforeEach(func() {
@@ -46,13 +46,13 @@ func BasicBackupRestore() {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if VeleroCfg.InstallVelero {
-			Expect(veleroutils.VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			err := veleroutils.VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+			err := VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 			Expect(err).To(Succeed())
 		}
 
@@ -71,7 +71,7 @@ func BasicBackupRestore() {
 
 func MultiNSBackupRestore() {
 
-	client, err := k8sutils.NewTestClient()
+	client, err := NewTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for multiple namespace tests")
 
 	BeforeEach(func() {
@@ -80,13 +80,13 @@ func MultiNSBackupRestore() {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if VeleroCfg.InstallVelero {
-			Expect(veleroutils.VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			err := veleroutils.VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+			err := VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 			Expect(err).To(Succeed())
 		}
 
@@ -103,8 +103,8 @@ func MultiNSBackupRestore() {
 	})
 }
 
-func RunMultipleNamespaceTest(ctx context.Context, client k8sutils.TestClient, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
-	defer k8sutils.CleanupNamespaces(context.Background(), client, nsBaseName) // Run at exit for final cleanup
+func RunMultipleNamespaceTest(ctx context.Context, client TestClient, nsBaseName string, numberOfNamespaces int, backupName string, restoreName string) error {
+	defer CleanupNamespaces(context.Background(), client, nsBaseName) // Run at exit for final cleanup
 	var excludeNamespaces []string
 
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
@@ -121,30 +121,30 @@ func RunMultipleNamespaceTest(ctx context.Context, client k8sutils.TestClient, n
 	fmt.Printf("Creating namespaces ...\n")
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
-		if err := k8sutils.CreateNamespace(ctx, client, createNSName); err != nil {
+		if err := CreateNamespace(ctx, client, createNSName); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
-	if err := veleroutils.VeleroBackupExcludeNamespaces(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, excludeNamespaces); err != nil {
-		veleroutils.RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, "")
+	if err := VeleroBackupExcludeNamespaces(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, excludeNamespaces); err != nil {
+		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup backup namespaces %s-*", nsBaseName)
 	}
 
-	err = k8sutils.CleanupNamespaces(ctx, client, nsBaseName)
+	err = CleanupNamespaces(ctx, client, nsBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}
 
-	err = veleroutils.VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restoreName, backupName)
+	err = VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restoreName, backupName)
 	if err != nil {
-		veleroutils.RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", restoreName)
+		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", restoreName)
 		return errors.Wrap(err, "Restore failed")
 	}
 
 	// Verify that we got back all of the namespaces we created
 	for nsNum := 0; nsNum < numberOfNamespaces; nsNum++ {
 		checkNSName := fmt.Sprintf("%s-%00000d", nsBaseName, nsNum)
-		checkNS, err := k8sutils.GetNamespace(ctx, client, checkNSName)
+		checkNS, err := GetNamespace(ctx, client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}

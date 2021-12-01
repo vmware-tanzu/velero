@@ -36,8 +36,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	k8sutils "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	veleroutils "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 func APIGropuVersionsTest() {
@@ -47,7 +47,7 @@ func APIGropuVersionsTest() {
 		ctx             = context.Background()
 	)
 
-	client, err := k8sutils.NewTestClient()
+	client, err := NewTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
 
 	BeforeEach(func() {
@@ -59,7 +59,7 @@ func APIGropuVersionsTest() {
 		// TODO: install Velero once for the test suite once feature flag is
 		// removed and velero installation becomes the same as other e2e tests.
 		if VeleroCfg.InstallVelero {
-			err = veleroutils.VeleroInstall(context.Background(), &VeleroCfg, "EnableAPIGroupVersions", false)
+			err = VeleroInstall(context.Background(), &VeleroCfg, "EnableAPIGroupVersions", false)
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})
@@ -75,7 +75,7 @@ func APIGropuVersionsTest() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if VeleroCfg.InstallVelero {
-			err = veleroutils.VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+			err = VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 			Expect(err).NotTo(HaveOccurred())
 		}
 
@@ -93,7 +93,7 @@ func APIGropuVersionsTest() {
 	})
 }
 
-func runEnableAPIGroupVersionsTests(ctx context.Context, client k8sutils.TestClient, resource, group string) error {
+func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, resource, group string) error {
 	tests := []struct {
 		name       string
 		namespaces []string
@@ -210,11 +210,11 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client k8sutils.TestCli
 		for version, cr := range tc.srcCRs {
 			ns := resource + "-src-" + version
 
-			if err := k8sutils.CreateNamespace(ctx, client, ns); err != nil {
+			if err := CreateNamespace(ctx, client, ns); err != nil {
 				return errors.Wrapf(err, "create %s namespace", ns)
 			}
 			defer func(namespace string) {
-				if err = k8sutils.DeleteNamespace(ctx, client, namespace, true); err != nil {
+				if err = DeleteNamespace(ctx, client, namespace, true); err != nil {
 					fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", ns))
 				}
 			}(ns)
@@ -236,9 +236,9 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client k8sutils.TestCli
 		backup := "backup-rockbands-" + UUIDgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
 
-		err = veleroutils.VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, namespacesStr, "", false)
+		err = VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, namespacesStr, "", false)
 		if err != nil {
-			veleroutils.RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, "")
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, "")
 			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)
 		}
 
@@ -247,7 +247,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client k8sutils.TestCli
 		}
 
 		for _, ns := range tc.namespaces {
-			if err := k8sutils.DeleteNamespace(ctx, client, ns, true); err != nil {
+			if err := DeleteNamespace(ctx, client, ns, true); err != nil {
 				return errors.Wrapf(err, "delete %s namespace from source cluster", ns)
 			}
 		}
@@ -276,8 +276,8 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client k8sutils.TestCli
 		restore := "restore-rockbands-" + UUIDgen.String() + "-" + strconv.Itoa(i)
 
 		if tc.want != nil {
-			if err := veleroutils.VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup); err != nil {
-				veleroutils.RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", restore)
+			if err := VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup); err != nil {
+				RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", restore)
 				return errors.Wrapf(err, "restore %s namespaces on target cluster", namespacesStr)
 			}
 
@@ -315,7 +315,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client k8sutils.TestCli
 		} else {
 			// No custom resource should have been restored. Expect "no resource found"
 			// error during restore.
-			err := veleroutils.VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup)
+			err := VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup)
 
 			if err.Error() != "Unexpected restore phase got PartiallyFailed, expecting Completed" {
 				return errors.New("expected error but not none")

@@ -43,6 +43,16 @@ func CreateNamespace(ctx context.Context, client TestClient, namespace string) e
 	return err
 }
 
+func CreateNamespaceWithLabel(ctx context.Context, client TestClient, namespace string, label map[string]string) error {
+	ns := builder.ForNamespace(namespace).Result()
+	ns.Labels = label
+	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
+}
+
 func GetNamespace(ctx context.Context, client TestClient, namespace string) (*corev1api.Namespace, error) {
 	return client.ClientGo.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }

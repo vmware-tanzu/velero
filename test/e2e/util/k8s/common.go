@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
@@ -76,4 +78,24 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for pods in namespace %s to start running", namespace))
 	}
 	return nil
+}
+
+func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
+	request := c.CoreV1().RESTClient().Get().
+		Resource("pods").
+		Namespace(namespace).
+		Name(podName).SubResource("log").
+		Param("container", containerName)
+	logs, err := request.Do(context.TODO()).Raw()
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(string(logs), "Internal Error") {
+		return "", fmt.Errorf("fetched log contains \"Internal Error\": %q", string(logs))
+	}
+	return string(logs), err
+}
+
+func GetPod(c clientset.Interface, ns string) (*corev1api.PodList, error) {
+	return c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 }

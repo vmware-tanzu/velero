@@ -19,15 +19,17 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	k8sutils "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	kibishiiutils "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
-	veleroutils "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 func BackupRestoreWithSnapshots() {
@@ -43,7 +45,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		backupName, restoreName string
 	)
 
-	client, err := k8sutils.NewTestClient()
+	client, err := NewTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
@@ -55,13 +57,13 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if VeleroCfg.InstallVelero {
-			Expect(veleroutils.VeleroInstall(context.Background(), &VeleroCfg, "", useVolumeSnapshots)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, "", useVolumeSnapshots)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			err = veleroutils.VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+			err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 			Expect(err).To(Succeed())
 		}
 	})
@@ -72,7 +74,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			restoreName = "restore-" + UUIDgen.String()
 			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
-			Expect(kibishiiutils.RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile)).To(Succeed(),
+			Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
@@ -89,7 +91,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
-			Expect(veleroutils.VeleroAddPluginsForProvider(context.TODO(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, VeleroCfg.AdditionalBSLProvider, VeleroCfg.AddBSLPlugins)).To(Succeed())
+			Expect(VeleroAddPluginsForProvider(context.TODO(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, VeleroCfg.AdditionalBSLProvider, VeleroCfg.AddBSLPlugins)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", UUIDgen)
@@ -98,11 +100,11 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				secretKey: VeleroCfg.AdditionalBSLCredentials,
 			}
 
-			Expect(k8sutils.CreateSecretFromFiles(context.TODO(), client, VeleroCfg.VeleroNamespace, secretName, files)).To(Succeed())
+			Expect(CreateSecretFromFiles(context.TODO(), client, VeleroCfg.VeleroNamespace, secretName, files)).To(Succeed())
 
 			// Create additional BSL using credential
 			additionalBsl := fmt.Sprintf("bsl-%s", UUIDgen)
-			Expect(veleroutils.VeleroCreateBackupLocation(context.TODO(),
+			Expect(VeleroCreateBackupLocation(context.TODO(),
 				VeleroCfg.VeleroCLI,
 				VeleroCfg.VeleroNamespace,
 				additionalBsl,
@@ -125,9 +127,54 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 					backupName = fmt.Sprintf("%s-%s", backupName, UUIDgen)
 					restoreName = fmt.Sprintf("%s-%s", restoreName, UUIDgen)
 				}
-				Expect(kibishiiutils.RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots, VeleroCfg.RegistryCredentialFile)).To(Succeed(),
+				Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots, VeleroCfg.RegistryCredentialFile)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
 			}
 		})
+	})
+
+	When("pod with downward api volumn is the sample workload", func() {
+		It("should be successfully backed up and restored with downward api volumn", func() {
+			labels := map[string]string{}
+			labels["key1"] = "value1"
+			labels["key2"] = "value2"
+			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+			backupName = fmt.Sprintf("%s-%s", "backup-downward-api-test", UUIDgen)
+			restoreName = fmt.Sprintf("%s-%s", "restore-downward-api-test", UUIDgen)
+			testNameSpace := "downward-api"
+			defer func() {
+				DeleteNamespace(oneHourTimeout, client, testNameSpace, true)
+			}()
+			By("Creating namespace " + testNameSpace)
+			Expect(CreateNamespaceWithLabel(oneHourTimeout, client, testNameSpace, labels)).To(Succeed(),
+				"Failed to create namespace %s", testNameSpace)
+			By("Creating the downward api deployment")
+			deploy := DownwardAPIVolumeBaseDeployment("downward-api-test", testNameSpace, 1, labels)
+			deploy, err := CreateDeployment(client.ClientGo, testNameSpace, deploy)
+			Expect(err).To(Succeed(), "Failed to create deployment with downward api volumn")
+			Expect(WaitForReadyDeployment(client.ClientGo, testNameSpace, deploy.Name)).To(Succeed(),
+				"Wait for deployment with downward api volumn ready failed")
+			args := []string{"--namespace", VeleroCfg.VeleroNamespace, "create", "backup", backupName,
+				"--include-namespaces", deploy.GetNamespace(), "--wait"}
+			By("Begin backup " + backupName)
+			Expect(VeleroBackupExec(oneHourTimeout, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, args)).To(Succeed(),
+				"Failed to backup deployment with downward api volumn")
+			By("Deleting namespace " + testNameSpace)
+			Expect(DeleteNamespace(oneHourTimeout, client, testNameSpace, true)).To(Succeed(),
+				"Failed to delete namespace %s", testNameSpace)
+			args = []string{"--namespace", VeleroCfg.VeleroNamespace, "create", "restore", restoreName,
+				"--from-backup", backupName, "--wait"}
+			By("Begin restore " + restoreName)
+			Expect(VeleroRestoreExec(oneHourTimeout, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restoreName, args)).To(Succeed(),
+				"Failed to restore deployment with downward api volumn")
+			podList, err := GetPod(client.ClientGo, testNameSpace)
+			Expect(err).To(Succeed(),
+				"Failed to get info about pod with downward api volumn")
+			By("Cehcking downward api")
+			gomega.Eventually(func() (string, error) {
+				return GetPodLogs(client.ClientGo, testNameSpace, podList.Items[0].Name, "client-container")
+			}, time.Minute, 2*time.Second).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
+		})
+
 	})
 }

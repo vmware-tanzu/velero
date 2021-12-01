@@ -45,7 +45,7 @@ type TestClient struct {
 	dynamicFactory client.DynamicFactory
 }
 
-// k8sutils.NewTestClient returns a set of ready-to-use API clients.
+// NewTestClient returns a set of ready-to-use API clients.
 func NewTestClient() (TestClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {
