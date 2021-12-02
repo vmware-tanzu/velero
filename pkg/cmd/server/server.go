@@ -603,29 +603,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
-	backupSyncControllerRunInfo := func() controllerRunInfo {
-		backupSyncContoller := controller.NewBackupSyncController(
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			csiVSLister,
-			s.config.backupSyncPeriod,
-			s.namespace,
-			s.csiSnapshotClient,
-			s.kubeClient,
-			s.config.defaultBackupLocation,
-			newPluginManager,
-			backupStoreGetter,
-			s.logger,
-		)
-
-		return controllerRunInfo{
-			controller: backupSyncContoller,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	backupTracker := controller.NewBackupTracker()
 
 	backupControllerRunInfo := func() controllerRunInfo {
@@ -728,7 +705,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
 		controller.Restore:           restoreControllerRunInfo,
@@ -737,6 +713,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	enabledRuntimeControllers := make(map[string]struct{})
 	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
 	enabledRuntimeControllers[controller.DownloadRequest] = struct{}{}
+	enabledRuntimeControllers[controller.BackupSync] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -845,6 +822,25 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.BackupSync]; ok {
+		syncPeriod := s.config.backupSyncPeriod
+		if syncPeriod <= 0 {
+			syncPeriod = time.Minute
+		}
+
+		r := controller.BackupSyncReconciler{
+			Client:                  s.mgr.GetClient(),
+			Namespace:               s.namespace,
+			DefaultBackupSyncPeriod: syncPeriod,
+			NewPluginManager:        newPluginManager,
+			BackupStoreGetter:       backupStoreGetter,
+			Logger:                  s.logger,
+		}
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, " unable to create controller ", "controller ", controller.BackupSync)
 		}
 	}
 
