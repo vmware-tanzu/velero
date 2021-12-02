@@ -74,6 +74,10 @@ type Server interface {
 	// RegisterDeleteItemActions registers multiple Delete item actions.
 	RegisterDeleteItemActions(map[string]HandlerInitializer) Server
 
+	RegisterItemSnapshotter(pluginName string, initializer HandlerInitializer) Server
+
+	// RegisterItemSnapshotters registers multiple Item Snapshotters
+	RegisterItemSnapshotters(map[string]HandlerInitializer) Server
 	// Server runs the plugin server.
 	Serve()
 }
@@ -89,6 +93,7 @@ type server struct {
 	objectStore       *ObjectStorePlugin
 	restoreItemAction *RestoreItemActionPlugin
 	deleteItemAction  *DeleteItemActionPlugin
+	itemSnapshotter   *ItemSnapshotterPlugin
 }
 
 // NewServer returns a new Server
@@ -105,6 +110,7 @@ func NewServer() Server {
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
 		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
 		deleteItemAction:  NewDeleteItemActionPlugin(serverLogger(log)),
+		itemSnapshotter:   NewItemSnapshotterPlugin(serverLogger(log)),
 	}
 }
 
@@ -177,6 +183,17 @@ func (s *server) RegisterDeleteItemActions(m map[string]HandlerInitializer) Serv
 	return s
 }
 
+func (s *server) RegisterItemSnapshotter(name string, initializer HandlerInitializer) Server {
+	s.itemSnapshotter.register(name, initializer)
+	return s
+}
+func (s *server) RegisterItemSnapshotters(m map[string]HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterItemSnapshotter(name, m[name])
+	}
+	return s
+}
+
 // getNames returns a list of PluginIdentifiers registered with plugin.
 func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
@@ -206,6 +223,7 @@ func (s *server) Serve() {
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStore, s.objectStore)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindRestoreItemAction, s.restoreItemAction)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindDeleteItemAction, s.deleteItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindItemSnapshotter, s.itemSnapshotter)...)
 
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
@@ -218,6 +236,7 @@ func (s *server) Serve() {
 			string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
 			string(PluginKindRestoreItemAction): s.restoreItemAction,
 			string(PluginKindDeleteItemAction):  s.deleteItemAction,
+			string(PluginKindItemSnapshotter):   s.itemSnapshotter,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})
