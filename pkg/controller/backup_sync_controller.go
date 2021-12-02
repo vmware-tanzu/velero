@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,14 +20,12 @@ import (
 	"context"
 	"time"
 
-	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -38,114 +36,50 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type backupSyncController struct {
-	*genericController
-
-	backupClient            velerov1client.BackupsGetter
-	kbClient                client.Client
-	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
-	backupLister            velerov1listers.BackupLister
-	csiSnapshotClient       *snapshotterClientSet.Clientset
-	kubeClient              kubernetes.Interface
-	namespace               string
-	defaultBackupLocation   string
-	defaultBackupSyncPeriod time.Duration
-	newPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
-	backupStoreGetter       persistence.ObjectBackupStoreGetter
+type BackupSyncReconciler struct {
+	Ctx                     context.Context
+	Client                  client.Client
+	PodVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
+	BackupLister            velerov1listers.BackupLister
+	BackupClient            velerov1client.BackupsGetter
+	Namespace               string
+	DefaultBackupLocation   string
+	DefaultBackupSyncPeriod time.Duration
+	NewPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
+	BackupStoreGetter       persistence.ObjectBackupStoreGetter
+	Logger                  logrus.FieldLogger
 }
 
-func NewBackupSyncController(
-	backupClient velerov1client.BackupsGetter,
-	kbClient client.Client,
-	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
-	backupLister velerov1listers.BackupLister,
-	syncPeriod time.Duration,
-	namespace string,
-	csiSnapshotClient *snapshotterClientSet.Clientset,
-	kubeClient kubernetes.Interface,
-	defaultBackupLocation string,
-	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
-	backupStoreGetter persistence.ObjectBackupStoreGetter,
-	logger logrus.FieldLogger,
-) Interface {
-	if syncPeriod <= 0 {
-		syncPeriod = time.Minute
-	}
-	logger.Infof("Backup sync period is %v", syncPeriod)
+func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := b.Logger.WithField("controller", BackupSync)
+	log.Debug("Checking for existing backup storage locations to sync into cluster.")
 
-	c := &backupSyncController{
-		genericController:       newGenericController(BackupSync, logger),
-		backupClient:            backupClient,
-		kbClient:                kbClient,
-		podVolumeBackupClient:   podVolumeBackupClient,
-		namespace:               namespace,
-		defaultBackupLocation:   defaultBackupLocation,
-		defaultBackupSyncPeriod: syncPeriod,
-		backupLister:            backupLister,
-		csiSnapshotClient:       csiSnapshotClient,
-		kubeClient:              kubeClient,
-
-		// use variables to refer to these functions so they can be
-		// replaced with fakes for testing.
-		newPluginManager:  newPluginManager,
-		backupStoreGetter: backupStoreGetter,
-	}
-
-	c.resyncFunc = c.run
-	c.resyncPeriod = 30 * time.Second
-
-	return c
-}
-
-// orderedBackupLocations returns a new slice with the default backup location first (if it exists),
-// followed by the rest of the locations in no particular order.
-func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList, defaultLocationName string) []velerov1api.BackupStorageLocation {
-	var result []velerov1api.BackupStorageLocation
-
-	for i := range locationList.Items {
-		if locationList.Items[i].Name == defaultLocationName {
-			// put the default location first
-			result = append(result, locationList.Items[i])
-			// append everything before the default
-			result = append(result, locationList.Items[:i]...)
-			// append everything after the default
-			result = append(result, locationList.Items[i+1:]...)
-
-			return result
-		}
-	}
-
-	return locationList.Items
-}
-
-func (c *backupSyncController) run() {
-	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
-
-	locationList, err := storage.ListBackupStorageLocations(context.Background(), c.kbClient, c.namespace)
+	locationList, err := storage.ListBackupStorageLocations(ctx, b.Client, b.Namespace)
 	if err != nil {
-		c.logger.WithError(err).Error("No backup storage locations found, at least one is required")
-		return
+		log.WithError(err).Error("No backup storage locations found, at least one is required")
+		return ctrl.Result{}, err
 	}
 
 	// sync the default backup storage location first, if it exists
 	for _, location := range locationList.Items {
 		if location.Spec.Default {
-			c.defaultBackupLocation = location.Name
+			b.DefaultBackupLocation = location.Name
 			break
 		}
 	}
-	locations := orderedBackupLocations(&locationList, c.defaultBackupLocation)
+	locations := orderedBackupLocations(&locationList, b.DefaultBackupLocation)
 
-	pluginManager := c.newPluginManager(c.logger)
+	pluginManager := b.NewPluginManager(log)
 	defer pluginManager.CleanupClients()
 
 	for _, location := range locations {
-		log := c.logger.WithField("backupLocation", location.Name)
+		log := log.WithField("backupLocation", location.Name)
 
-		syncPeriod := c.defaultBackupSyncPeriod
+		syncPeriod := b.DefaultBackupSyncPeriod
 		if location.Spec.BackupSyncPeriod != nil {
 			syncPeriod = location.Spec.BackupSyncPeriod.Duration
 			if syncPeriod == 0 {
@@ -155,7 +89,7 @@ func (c *backupSyncController) run() {
 
 			if syncPeriod < 0 {
 				log.Debug("Backup sync period must be non-negative")
-				syncPeriod = c.defaultBackupSyncPeriod
+				syncPeriod = b.DefaultBackupSyncPeriod
 			}
 		}
 
@@ -170,7 +104,7 @@ func (c *backupSyncController) run() {
 
 		log.Debug("Checking backup location for backups to sync into cluster")
 
-		backupStore, err := c.backupStoreGetter.Get(&location, pluginManager, log)
+		backupStore, err := b.BackupStoreGetter.Get(&location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting backup store for this location")
 			continue
@@ -186,7 +120,7 @@ func (c *backupSyncController) run() {
 		log.WithField("backupCount", len(backupStoreBackups)).Debug("Got backups from backup store")
 
 		// get a list of all the backups that exist as custom resources in the cluster
-		clusterBackups, err := c.backupLister.Backups(c.namespace).List(labels.Everything())
+		clusterBackups, err := b.BackupLister.Backups(b.Namespace).List(labels.Everything())
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error getting backups from cluster, proceeding with sync into cluster")
 		} else {
@@ -217,7 +151,7 @@ func (c *backupSyncController) run() {
 				continue
 			}
 
-			backup.Namespace = c.namespace
+			backup.Namespace = b.Namespace
 			backup.ResourceVersion = ""
 
 			// update the StorageLocation field and label since the name of the location
@@ -230,7 +164,7 @@ func (c *backupSyncController) run() {
 			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 			// attempt to create backup custom resource via API
-			backup, err = c.backupClient.Backups(backup.Namespace).Create(context.TODO(), backup, metav1.CreateOptions{})
+			backup, err = b.BackupClient.Backups(backup.Namespace).Create(b.Ctx, backup, metav1.CreateOptions{})
 			switch {
 			case err != nil && kuberrs.IsAlreadyExists(err):
 				log.Debug("Backup already exists in cluster")
@@ -267,7 +201,7 @@ func (c *backupSyncController) run() {
 				podVolumeBackup.Namespace = backup.Namespace
 				podVolumeBackup.ResourceVersion = ""
 
-				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(context.TODO(), podVolumeBackup, metav1.CreateOptions{})
+				_, err = b.PodVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(b.Ctx, podVolumeBackup, metav1.CreateOptions{})
 				switch {
 				case err != nil && kuberrs.IsAlreadyExists(err):
 					log.Debug("Pod volume backup already exists in cluster")
@@ -294,7 +228,7 @@ func (c *backupSyncController) run() {
 				for _, snapCont := range snapConts {
 					// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
 					snapCont.ResourceVersion = ""
-					created, err := c.csiSnapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Create(context.TODO(), snapCont, metav1.CreateOptions{})
+					err := b.Client.Create(b.Ctx, snapCont, &client.CreateOptions{})
 					switch {
 					case err != nil && kuberrs.IsAlreadyExists(err):
 						log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
@@ -303,36 +237,45 @@ func (c *backupSyncController) run() {
 						log.WithError(errors.WithStack(err)).Errorf("Error syncing volumesnapshotcontent %s into cluster", snapCont.Name)
 						continue
 					default:
-						log.Infof("Created CSI volumesnapshotcontent %s", created.Name)
+						log.Infof("Created CSI volumesnapshotcontent %s", snapCont.Name)
 					}
 				}
 			}
 		}
 
-		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
+		b.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
 		// update the location's last-synced time field
 		statusPatch := client.MergeFrom(location.DeepCopy())
 		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := c.kbClient.Status().Patch(context.Background(), &location, statusPatch); err != nil {
+		if err := b.Client.Status().Patch(b.Ctx, &location, statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}
 	}
+
+	return ctrl.Result{Requeue: true}, nil
+}
+
+func (b *BackupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&velerov1api.Backup{}).
+		Complete(b)
 }
 
 // deleteOrphanedBackups deletes backup objects (CRDs) from Kubernetes that have the specified location
 // and a phase of Completed, but no corresponding backup in object storage.
-func (c *backupSyncController) deleteOrphanedBackups(locationName string, backupStoreBackups sets.String, log logrus.FieldLogger) {
+func (b *BackupSyncReconciler) deleteOrphanedBackups(locationName string, backupStoreBackups sets.String, log logrus.FieldLogger) {
 	locationSelector := labels.Set(map[string]string{
 		velerov1api.StorageLocationLabel: label.GetValidName(locationName),
 	}).AsSelector()
 
-	backups, err := c.backupLister.Backups(c.namespace).List(locationSelector)
+	backups, err := b.BackupLister.Backups(b.Namespace).List(locationSelector)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error listing backups from cluster")
 		return
 	}
+
 	if len(backups) == 0 {
 		return
 	}
@@ -343,10 +286,31 @@ func (c *backupSyncController) deleteOrphanedBackups(locationName string, backup
 			continue
 		}
 
-		if err := c.backupClient.Backups(backup.Namespace).Delete(context.TODO(), backup.Name, metav1.DeleteOptions{}); err != nil {
+		if err := b.BackupClient.Backups(backup.Namespace).Delete(b.Ctx, backup.Name, metav1.DeleteOptions{}); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")
 		}
 	}
+}
+
+// orderedBackupLocations returns a new slice with the default backup location first (if it exists),
+// followed by the rest of the locations in no particular order.
+func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList, defaultLocationName string) []velerov1api.BackupStorageLocation {
+	var result []velerov1api.BackupStorageLocation
+
+	for i := range locationList.Items {
+		if locationList.Items[i].Name == defaultLocationName {
+			// put the default location first
+			result = append(result, locationList.Items[i])
+			// append everything before the default
+			result = append(result, locationList.Items[:i]...)
+			// append everything after the default
+			result = append(result, locationList.Items[i+1:]...)
+
+			return result
+		}
+	}
+
+	return locationList.Items
 }

@@ -589,28 +589,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
 
-	backupSyncControllerRunInfo := func() controllerRunInfo {
-		backupSyncContoller := controller.NewBackupSyncController(
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.config.backupSyncPeriod,
-			s.namespace,
-			s.csiSnapshotClient,
-			s.kubeClient,
-			s.config.defaultBackupLocation,
-			newPluginManager,
-			backupStoreGetter,
-			s.logger,
-		)
-
-		return controllerRunInfo{
-			controller: backupSyncContoller,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	backupTracker := controller.NewBackupTracker()
 
 	backupControllerRunInfo := func() controllerRunInfo {
@@ -769,7 +747,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.BackupSync:        backupSyncControllerRunInfo,
+		//controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
 		controller.Schedule:          scheduleControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
@@ -781,6 +759,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	enabledRuntimeControllers := make(map[string]struct{})
 	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
 	enabledRuntimeControllers[controller.DownloadRequest] = struct{}{}
+	enabledRuntimeControllers[controller.BackupSync] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -868,6 +847,25 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.BackupSync]; ok {
+		r := controller.BackupSyncReconciler{
+			Ctx:                     s.ctx,
+			Client:                  s.mgr.GetClient(),
+			PodVolumeBackupClient:   s.veleroClient.VeleroV1(),
+			BackupLister:            s.sharedInformerFactory.Velero().V1().Backups().Lister(),
+			BackupClient:            s.veleroClient.VeleroV1(),
+			Namespace:               s.namespace,
+			DefaultBackupLocation:   s.config.defaultBackupLocation,
+			DefaultBackupSyncPeriod: s.config.backupSyncPeriod,
+			NewPluginManager:        newPluginManager,
+			BackupStoreGetter:       backupStoreGetter,
+			Logger:                  s.logger,
+		}
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, " unable to create controller ", "controller ", controller.BackupSync)
 		}
 	}
 
