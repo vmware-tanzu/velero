@@ -23,7 +23,7 @@ If you want to perform your own testing of Velero on Windows, you must deploy Ve
 
 ## Install the CLI
 
-### Option 1: macOS - Homebrew
+### Option 1: MacOS - Homebrew
 
 On macOS, you can use [Homebrew](https://brew.sh) to install the `velero` client:
 
