@@ -36,7 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	velerexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	k8sutils "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
 // we provide more install options other than the standard install.InstallOptions in E2E test
@@ -69,7 +69,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features strin
 		// Snapshot location specified
 		veleroCfg.ObjectStoreProvider = "aws"
 	}
-	err = k8sutils.EnsureClusterExists(ctx)
+	err = EnsureClusterExists(ctx)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
 	}
