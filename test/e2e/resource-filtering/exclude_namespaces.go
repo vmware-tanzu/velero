@@ -50,7 +50,7 @@ type ExcludeNamespaces struct {
 var BackupWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringCase: testInBackup})
 var RestoreWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringCase: testInRestore})
 
-func (e *ExcludeNamespaces) Init() {
+func (e *ExcludeNamespaces) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	e.FilteringCase.Init()
@@ -102,6 +102,7 @@ func (e *ExcludeNamespaces) Init() {
 			"--from-backup", e.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (e *ExcludeNamespaces) CreateResources() error {

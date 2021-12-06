@@ -47,7 +47,7 @@ type IncludeResources struct {
 var BackupWithIncludeResources func() = TestFunc(&IncludeResources{testInBackup})
 var RestoreWithIncludeResources func() = TestFunc(&IncludeResources{testInRestore})
 
-func (i *IncludeResources) Init() {
+func (i *IncludeResources) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	i.FilteringCase.Init()
@@ -88,6 +88,7 @@ func (i *IncludeResources) Init() {
 			"--from-backup", i.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (i *IncludeResources) Verify() error {

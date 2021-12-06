@@ -43,7 +43,7 @@ type LabelSelector struct {
 
 var BackupWithLabelSelector func() = TestFunc(&LabelSelector{testInBackup})
 
-func (l *LabelSelector) Init() {
+func (l *LabelSelector) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	l.FilteringCase.Init()
@@ -69,6 +69,7 @@ func (l *LabelSelector) Init() {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", l.RestoreName,
 		"--from-backup", l.BackupName, "--wait",
 	}
+	return nil
 }
 
 func (l *LabelSelector) CreateResources() error {
@@ -85,23 +86,10 @@ func (l *LabelSelector) CreateResources() error {
 		if err := CreateNamespaceWithLabel(l.Ctx, l.Client, namespace, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-
-		//Create deployment
-		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-
-		deployment := NewDeployment(l.NSBaseName, namespace, l.replica, labels)
-		deployment, err := CreateDeployment(l.Client.ClientGo, namespace, deployment)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
-		}
-		err = WaitForReadyDeployment(l.Client.ClientGo, namespace, deployment.Name)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
-		}
 		//Create Secret
 		secretName := l.NSBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
-		_, err = CreateSecret(l.Client.ClientGo, namespace, secretName, l.labels)
+		_, err := CreateSecret(l.Client.ClientGo, namespace, secretName, l.labels)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to create secret in the namespace %q", namespace))
 		}
@@ -109,6 +97,28 @@ func (l *LabelSelector) CreateResources() error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
 		}
+		serviceAccountName := "default"
+		// wait until the service account is created before patch the image pull secret
+		if err := WaitUntilServiceAccountCreated(l.Ctx, l.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
+		}
+		// add the image pull secret to avoid the image pull limit issue of Docker Hub
+		if err := PatchServiceAccountWithImagePullSecret(l.Ctx, l.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", secretName, namespace)
+		}
+		//Create deployment
+		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
+
+		deployment := NewDeployment(l.NSBaseName, namespace, l.replica, labels)
+		deployment, err = CreateDeployment(l.Client.ClientGo, namespace, deployment)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
+		}
+		err = WaitForReadyDeployment(l.Client.ClientGo, namespace, deployment.Name)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
+		}
+
 	}
 	return nil
 }

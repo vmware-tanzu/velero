@@ -49,7 +49,7 @@ type ExcludeResources struct {
 var BackupWithExcludeResources func() = TestFunc(&ExcludeResources{testInBackup})
 var RestoreWithExcludeResources func() = TestFunc(&ExcludeResources{testInRestore})
 
-func (e *ExcludeResources) Init() {
+func (e *ExcludeResources) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	e.FilteringCase.Init()
@@ -90,6 +90,7 @@ func (e *ExcludeResources) Init() {
 			"--from-backup", e.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (e *ExcludeResources) Verify() error {

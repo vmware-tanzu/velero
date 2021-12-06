@@ -68,22 +68,10 @@ func (f *FilteringCase) CreateResources() error {
 		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-
-		//Create deployment
-		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels)
-		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
-		}
-		err = WaitForReadyDeployment(f.Client.ClientGo, namespace, deployment.Name)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
-		}
 		//Create Secret
 		secretName := f.NSBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
-		_, err = CreateSecret(f.Client.ClientGo, namespace, secretName, f.labels)
+		_, err := CreateSecret(f.Client.ClientGo, namespace, secretName, f.labels)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to create secret in the namespace %q", namespace))
 		}
@@ -91,6 +79,27 @@ func (f *FilteringCase) CreateResources() error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
 		}
+		serviceAccountName := "default"
+		// wait until the service account is created before patch the image pull secret
+		if err := WaitUntilServiceAccountCreated(f.Ctx, f.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
+		}
+		// add the image pull secret to avoid the image pull limit issue of Docker Hub
+		if err := PatchServiceAccountWithImagePullSecret(f.Ctx, f.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
+		}
+		//Create deployment
+		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
+		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels)
+		deployment, err = CreateDeployment(f.Client.ClientGo, namespace, deployment)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
+		}
+		err = WaitForReadyDeployment(f.Client.ClientGo, namespace, deployment.Name)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
+		}
+
 		//Create Configmap
 		configmaptName := f.NSBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)

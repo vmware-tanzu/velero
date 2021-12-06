@@ -42,7 +42,7 @@ type ExcludeFromBackup struct {
 
 var ExcludeFromBackupTest func() = TestFunc(&ExcludeFromBackup{testInBackup})
 
-func (e *ExcludeFromBackup) Init() {
+func (e *ExcludeFromBackup) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	e.FilteringCase.Init()
@@ -67,6 +67,7 @@ func (e *ExcludeFromBackup) Init() {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
 		"--from-backup", e.BackupName, "--wait",
 	}
+	return nil
 }
 
 func (e *ExcludeFromBackup) CreateResources() error {
@@ -83,12 +84,31 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		if err := CreateNamespaceWithLabel(e.Ctx, e.Client, namespace, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-
+		//Create Secret
+		secretName := e.NSBaseName
+		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
+		_, err := CreateSecret(e.Client.ClientGo, namespace, secretName, e.labels)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to create secret in the namespace %q", namespace))
+		}
+		err = WaitForSecretsComplete(e.Client.ClientGo, namespace, secretName)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
+		}
+		serviceAccountName := "default"
+		// wait until the service account is created before patch the image pull secret
+		if err := WaitUntilServiceAccountCreated(e.Ctx, e.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
+		}
+		// add the image pull secret to avoid the image pull limit issue of Docker Hub
+		if err := PatchServiceAccountWithImagePullSecret(e.Ctx, e.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
+		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 
 		deployment := NewDeployment(e.NSBaseName, namespace, e.replica, labels)
-		deployment, err := CreateDeployment(e.Client.ClientGo, namespace, deployment)
+		deployment, err = CreateDeployment(e.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 		}

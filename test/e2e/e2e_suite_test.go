@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
@@ -61,21 +60,22 @@ func init() {
 	flag.StringVar(&VeleroCfg.CRDsVersion, "crds-version", "v1", "CRD apiVersion for velero CRD creation.")
 }
 
-var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", APIGropuVersionsTest)
-
+/*** Basic E2E Test ***/
 // Test backup and restore of Kibishi using restic
-var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
+var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
+var _ = Describe("[Basic][APIGroup] Velero tests with various CRD API group versions", APIGropuVersionsTest)
+var _ = Describe("[Basic][Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+var _ = Describe("[Basic][MultiNamespaces] Backup/restore of 2 namespaces", BasicBackupRestore)
 
-var _ = Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+/*** Scale E2E Test ***/
+var _ = Describe("[Scale][MultiNamespaces] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
 
-var _ = Describe("[Basic] Backup/restore of 2 namespaces", BasicBackupRestore)
-
-var _ = Describe("[Scale] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
-
+/*** Upgrade E2E Test ***/
 // Upgrade test by Kibishi using restic
 var _ = Describe("[Upgrade][Restic] Velero upgrade tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupUpgradeRestoreWithRestic)
 var _ = Describe("[Upgrade][Snapshot] Velero upgrade tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupUpgradeRestoreWithSnapshots)
 
+/*** ResourceFiltering E2E Test ***/
 // test filter objects by namespace, type, or labels when backup or restore.
 var _ = Describe("[ResourceFiltering][ExcludeFromBackup] Resources with the label velero.io/exclude-from-backup=true are not included in backup", ExcludeFromBackupTest)
 var _ = Describe("[ResourceFiltering][ExcludeNamespaces][Backup] Velero test on exclude namespace from the cluster backup", BackupWithExcludeNamespaces)

@@ -51,7 +51,7 @@ type IncludeNamespaces struct {
 var BackupWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInBackup})
 var RestoreWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInRestore})
 
-func (i *IncludeNamespaces) Init() {
+func (i *IncludeNamespaces) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	i.FilteringCase.Init()
@@ -103,6 +103,7 @@ func (i *IncludeNamespaces) Init() {
 			"--from-backup", i.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (i *IncludeNamespaces) CreateResources() error {
