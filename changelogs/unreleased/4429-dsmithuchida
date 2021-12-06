@@ -1,0 +1,8 @@
+Added `<backup name>`-itemsnapshots.json.gz to the backup format.  This file exists
+when item snapshots are taken and contains an array of volume.Itemsnapshots 
+containing the information about the snapshots.  This will not be used unless 
+upload progress monitoring and item snapshots are enabled and an ItemSnapshot 
+plugin is used to take snapshots.
+
+Also added DownloadTargetKindBackupItemSnapshots for retrieving the signed URL to download only the `<backup name>`-itemsnapshots.json.gz part of a backup for use by 
+`velero backup describe`.

@@ -283,3 +283,7 @@ func (_m *BackupStore) GetCSIVolumeSnapshotContents(backup string) ([]*snapshotv
 	panic("Not implemented")
 	return nil, nil
 }
+
+func (_m *BackupStore) GetItemSnapshots(name string) ([]*volume.ItemSnapshot, error) {
+	panic("implement me")
+}

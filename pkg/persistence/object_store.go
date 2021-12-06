@@ -44,6 +44,7 @@ type BackupInfo struct {
 	Log,
 	PodVolumeBackups,
 	VolumeSnapshots,
+	ItemSnapshots,
 	BackupResourceList,
 	CSIVolumeSnapshots,
 	CSIVolumeSnapshotContents io.Reader
@@ -58,6 +59,7 @@ type BackupStore interface {
 
 	PutBackup(info BackupInfo) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
+	GetItemSnapshots(name string) ([]*volume.ItemSnapshot, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
@@ -225,50 +227,51 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 }
 
 func (s *objectBackupStore) PutBackup(info BackupInfo) error {
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(info.Name), info.Log); err != nil {
-		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
-		// backup's status.
-		s.logger.WithError(err).WithField("backup", info.Name).Error("Error uploading log file")
+	if info.Log != nil {
+		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(info.Name), info.Log); err != nil {
+			// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
+			// backup's status.
+			s.logger.WithError(err).WithField("backup", info.Name).Error("Error uploading log file")
+		}
 	}
 
-	if info.Metadata == nil {
-		// If we don't have metadata, something failed, and there's no point in continuing. An object
-		// storage bucket that is missing the metadata file can't be restored, nor can its logs be
-		// viewed.
-		return nil
+	if info.Metadata != nil {
+		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(info.Name), info.Metadata); err != nil {
+			// failure to upload metadata file is a hard-stop
+			return err
+		}
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(info.Name), info.Metadata); err != nil {
-		// failure to upload metadata file is a hard-stop
-		return err
+	if info.Contents != nil {
+		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(info.Name), info.Contents); err != nil {
+			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+			return kerrors.NewAggregate([]error{err, deleteErr})
+		}
 	}
-
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(info.Name), info.Contents); err != nil {
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		return kerrors.NewAggregate([]error{err, deleteErr})
-	}
-
 	// Since the logic for all of these files is the exact same except for the name and the contents,
 	// use a map literal to iterate through them and write them to the bucket.
 	var backupObjs = map[string]io.Reader{
 		s.layout.getPodVolumeBackupsKey(info.Name):          info.PodVolumeBackups,
 		s.layout.getBackupVolumeSnapshotsKey(info.Name):     info.VolumeSnapshots,
+		s.layout.getItemSnapshotsKey(info.Name):             info.ItemSnapshots,
 		s.layout.getBackupResourceListKey(info.Name):        info.BackupResourceList,
 		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
 		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
 	}
 
 	for key, reader := range backupObjs {
-		if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
-			errs := []error{err}
+		if reader != nil {
+			if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
+				errs := []error{err}
 
-			// attempt to clean up the backup contents and metadata if we fail to upload and of the extra files.
-			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-			errs = append(errs, deleteErr)
+				// attempt to clean up the backup contents and metadata if we fail to upload and of the extra files.
+				deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
+				errs = append(errs, deleteErr)
 
-			deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-			errs = append(errs, deleteErr)
-			return kerrors.NewAggregate(errs)
+				deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+				errs = append(errs, deleteErr)
+				return kerrors.NewAggregate(errs)
+			}
 		}
 	}
 
@@ -322,6 +325,27 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 	}
 
 	return volumeSnapshots, nil
+}
+
+func (s *objectBackupStore) GetItemSnapshots(name string) ([]*volume.ItemSnapshot, error) {
+	// if the itemsnapshots file doesn't exist, we don't want to return an error, since
+	// a legacy backup or a backup with no snapshots would not have this file, so check for
+	// its existence before attempting to get its contents.
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getItemSnapshotsKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, nil
+	}
+	defer res.Close()
+
+	var itemSnapshots []*volume.ItemSnapshot
+	if err := decode(res, &itemSnapshots); err != nil {
+		return nil, err
+	}
+
+	return itemSnapshots, nil
 }
 
 // tryGet returns the object with the given key if it exists, nil if it does not exist,
@@ -473,6 +497,8 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupLogKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindBackupVolumeSnapshots:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupVolumeSnapshotsKey(target.Name), DownloadURLTTL)
+	case velerov1api.DownloadTargetKindBackupItemSnapshots:
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getItemSnapshotsKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindBackupResourceList:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupResourceListKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindRestoreLog:
