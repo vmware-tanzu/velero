@@ -367,8 +367,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 
 			pluginManager.On("CleanupClients").Return(nil)
 			r := BackupSyncReconciler{
-				Ctx: ctx,
-				//Client:                  ctrlfake.NewFakeClientWithScheme(scheme.Scheme),
+				Ctx:                     ctx,
 				Client:                  ctrlfake.NewClientBuilder().Build(),
 				BackupClient:            client.VeleroV1(),
 				PodVolumeBackupClient:   client.VeleroV1(),
@@ -378,7 +377,6 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				NewPluginManager:        func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				BackupStoreGetter:       NewFakeObjectBackupStoreGetter(backupStores),
 				Logger:                  velerotest.NewLogger(),
-				//DefaultBackupLocation:   "location-1",
 			}
 
 			for _, location := range test.locations {
@@ -418,7 +416,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				NamespacedName: types.NamespacedName{Namespace: "ns-1"},
 			})
 
-			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{Requeue: true}))
+			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{Requeue: true, RequeueAfter: 30 * time.Second}))
 			Expect(err).To(BeNil())
 
 			for bucket, backupDataSet := range test.cloudBuckets {

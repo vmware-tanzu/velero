@@ -47,7 +47,6 @@ type BackupSyncReconciler struct {
 	BackupLister            velerov1listers.BackupLister
 	BackupClient            velerov1client.BackupsGetter
 	Namespace               string
-	DefaultBackupLocation   string
 	DefaultBackupSyncPeriod time.Duration
 	NewPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
 	BackupStoreGetter       persistence.ObjectBackupStoreGetter
@@ -58,20 +57,21 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log := b.Logger.WithField("controller", BackupSync)
 	log.Debug("Checking for existing backup storage locations to sync into cluster.")
 
-	locationList, err := storage.ListBackupStorageLocations(ctx, b.Client, b.Namespace)
+	locationList, err := storage.ListBackupStorageLocations(b.Ctx, b.Client, b.Namespace)
 	if err != nil {
 		log.WithError(err).Error("No backup storage locations found, at least one is required")
 		return ctrl.Result{}, err
 	}
 
 	// sync the default backup storage location first, if it exists
+	defaultBackupLocationName := ""
 	for _, location := range locationList.Items {
 		if location.Spec.Default {
-			b.DefaultBackupLocation = location.Name
+			defaultBackupLocationName = location.Name
 			break
 		}
 	}
-	locations := orderedBackupLocations(&locationList, b.DefaultBackupLocation)
+	locations := orderedBackupLocations(&locationList, defaultBackupLocationName)
 
 	pluginManager := b.NewPluginManager(log)
 	defer pluginManager.CleanupClients()
@@ -254,7 +254,7 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	return ctrl.Result{Requeue: true}, nil
+	return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 30}, nil
 }
 
 func (b *BackupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {

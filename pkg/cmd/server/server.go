@@ -747,7 +747,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	enabledControllers := map[string]func() controllerRunInfo{
-		//controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
 		controller.Schedule:          scheduleControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
@@ -851,6 +850,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.BackupSync]; ok {
+		syncPeriod := s.config.backupSyncPeriod
+		if syncPeriod <= 0 {
+			syncPeriod = time.Minute
+		}
+
 		r := controller.BackupSyncReconciler{
 			Ctx:                     s.ctx,
 			Client:                  s.mgr.GetClient(),
@@ -858,8 +862,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			BackupLister:            s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			BackupClient:            s.veleroClient.VeleroV1(),
 			Namespace:               s.namespace,
-			DefaultBackupLocation:   s.config.defaultBackupLocation,
-			DefaultBackupSyncPeriod: s.config.backupSyncPeriod,
+			DefaultBackupSyncPeriod: syncPeriod,
 			NewPluginManager:        newPluginManager,
 			BackupStoreGetter:       backupStoreGetter,
 			Logger:                  s.logger,
