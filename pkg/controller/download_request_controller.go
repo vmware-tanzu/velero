@@ -79,7 +79,6 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	defer func() {
 		// Always attempt to Patch the downloadRequest object and status after each reconciliation.
 		if err := patchHelper.Patch(ctx, downloadRequest); err != nil {
-			log.WithError(err).Error("Error updating download request")
 			reconcileResult = ctrl.Result{}
 			retErr = fmt.Errorf("error: %s, error updating download request", errors.WithStack(err))
 		}
@@ -92,7 +91,6 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// worth proceeding and trying/retrying to find it.
 			log.Debug("DownloadRequest has expired - deleting")
 			if err := r.Client.Delete(ctx, downloadRequest); err != nil {
-				log.WithError(err).Error("Error deleting an expired download request")
 				return ctrl.Result{},
 					fmt.Errorf("error :%s, error deleting an expired download request", errors.WithStack(err))
 			}
