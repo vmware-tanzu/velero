@@ -37,13 +37,15 @@ of namespaces and resources present in the backup to be matched against.  These 
 decide whether or not the ResolvedAction should be used for a particular resource.
 */
 
+// ResolvedAction is an action that has had the namespaces, resources names and labels to include or exclude resolved
 type ResolvedAction interface {
-	GetApplicable() velero.Applicable
-	GetSelector() labels.Selector
+	// ShouldUse returns true if the resolved namespaces, resource names and labels match those passed in the parameters.
+	// metadata is optional and may be nil
 	ShouldUse(groupResource schema.GroupResource, namespace string, metadata metav1.Object,
 		log logrus.FieldLogger) bool
 }
 
+// resolvedAction is a core struct that holds the resolved namespaces, resource names and labels
 type resolvedAction struct {
 	ResourceIncludesExcludes  *collections.IncludesExcludes
 	NamespaceIncludesExcludes *collections.IncludesExcludes
@@ -74,9 +76,7 @@ func (recv resolvedAction) ShouldUse(groupResource schema.GroupResource, namespa
 	return true
 }
 
-/*
-Resolves the resources, namespaces and selector into fully-qualified versions
-*/
+// resolveAction resolves the resources, namespaces and selector into fully-qualified versions
 func resolveAction(helper discovery.Helper, action velero.Applicable) (resources *collections.IncludesExcludes,
 	namespaces *collections.IncludesExcludes, selector labels.Selector, err error) {
 	resourceSelector, err := action.AppliesTo()
@@ -97,21 +97,9 @@ func resolveAction(helper discovery.Helper, action velero.Applicable) (resources
 	return
 }
 
-func (recv resolvedAction) GetSelector() labels.Selector {
-	return recv.Selector
-}
-
 type BackupItemResolvedAction struct {
 	velero.BackupItemAction
 	resolvedAction
-}
-
-func (recv BackupItemResolvedAction) GetApplicable() velero.Applicable {
-	return recv.BackupItemAction
-}
-
-func (recv BackupItemResolvedAction) GetBackupItemAction() velero.BackupItemAction {
-	return recv.BackupItemAction
 }
 
 func NewBackupItemActionResolver(actions []velero.BackupItemAction) BackupItemActionResolver {
@@ -171,14 +159,6 @@ type RestoreItemResolvedAction struct {
 	resolvedAction
 }
 
-func (recv RestoreItemResolvedAction) GetApplicable() velero.Applicable {
-	return recv.RestoreItemAction
-}
-
-func (recv RestoreItemResolvedAction) GetRestoreItemAction() velero.RestoreItemAction {
-	return recv.RestoreItemAction
-}
-
 type RestoreItemActionResolver struct {
 	actions []velero.RestoreItemAction
 }
@@ -208,14 +188,6 @@ type DeleteItemResolvedAction struct {
 	resolvedAction
 }
 
-func (recv DeleteItemResolvedAction) GetApplicable() velero.Applicable {
-	return recv.DeleteItemAction
-}
-
-func (recv DeleteItemResolvedAction) GetRestoreItemAction() velero.DeleteItemAction {
-	return recv.DeleteItemAction
-}
-
 type DeleteItemActionResolver struct {
 	actions []velero.DeleteItemAction
 }
@@ -243,14 +215,6 @@ func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper) ([]
 type ItemSnapshotterResolvedAction struct {
 	isv1.ItemSnapshotter
 	resolvedAction
-}
-
-func (recv ItemSnapshotterResolvedAction) GetApplicable() velero.Applicable {
-	return recv.ItemSnapshotter
-}
-
-func (recv ItemSnapshotterResolvedAction) GetRestoreItemAction() isv1.ItemSnapshotter {
-	return recv.ItemSnapshotter
 }
 
 type ItemSnapshotterResolver struct {

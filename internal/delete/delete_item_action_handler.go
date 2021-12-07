@@ -19,6 +19,8 @@ package delete
 import (
 	"io"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -41,7 +42,6 @@ type Context struct {
 	Filesystem      filesystem.Interface
 	Log             logrus.FieldLogger
 	DiscoveryHelper discovery.Helper
-
 	resolvedActions []framework.DeleteItemResolvedAction
 }
 
@@ -119,10 +119,10 @@ func InvokeDeleteActions(ctx *Context) error {
 				itemLog.Infof("invoking DeleteItemAction plugins")
 
 				for _, action := range actions {
-					if !action.GetSelector().Matches(labels.Set(obj.GetLabels())) {
+					if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
 						continue
 					}
-					err = action.Execute(&velero.DeleteItemActionExecuteInput{
+					err = action.DeleteItemAction.Execute(&velero.DeleteItemActionExecuteInput{
 						Item:   obj,
 						Backup: ctx.Backup,
 					})

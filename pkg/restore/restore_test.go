@@ -545,7 +545,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -626,7 +626,7 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -708,7 +708,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		}
 		warnings, errs := h.restorer.Restore(
 			data,
-			nil, // actions
+			nil, // restoreItemActions
 			nil, // snapshot location lister
 			nil, // volume snapshotter getter
 		)
@@ -785,7 +785,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -1000,7 +1000,7 @@ func TestRestoreItems(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -2510,7 +2510,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				vslInformer.Lister(),
 				tc.volumeSnapshotterGetter,
 			)
@@ -2646,7 +2646,7 @@ func TestRestoreWithRestic(t *testing.T) {
 
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)

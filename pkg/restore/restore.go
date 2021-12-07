@@ -99,7 +99,7 @@ type Restorer interface {
 	) (Result, Result)
 	RestoreWithResolvers(
 		req Request,
-		resolver framework.RestoreItemActionResolver,
+		restoreItemActionResolver framework.RestoreItemActionResolver,
 		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -276,7 +276,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		dynamicFactory:             kr.dynamicFactory,
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
-		actions:                    resolvedActions,
+		restoreItemActions:         resolvedActions,
 		itemSnapshotterActions:     resolvedItemSnapshotterActions,
 		volumeSnapshotterGetter:    volumeSnapshotterGetter,
 		resticRestorer:             resticRestorer,
@@ -317,7 +317,7 @@ type restoreContext struct {
 	dynamicFactory             client.DynamicFactory
 	fileSystem                 filesystem.Interface
 	namespaceClient            corev1.NamespaceInterface
-	actions                    []framework.RestoreItemResolvedAction
+	restoreItemActions         []framework.RestoreItemResolvedAction
 	itemSnapshotterActions     []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter    VolumeSnapshotterGetter
 	resticRestorer             restic.Restorer
@@ -702,7 +702,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 
 func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.RestoreItemResolvedAction {
 	var actions []framework.RestoreItemResolvedAction
-	for _, action := range ctx.actions {
+	for _, action := range ctx.restoreItemActions {
 		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
 			actions = append(actions, action)
 		}
@@ -1113,13 +1113,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
-		if !action.GetSelector().Matches(labels.Set(obj.GetLabels())) {
+		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
 			return warnings, errs
 		}
 
 		ctx.log.Infof("Executing item action for %v", &groupResource)
 
-		executeOutput, err := action.Execute(&velero.RestoreItemActionExecuteInput{
+		executeOutput, err := action.RestoreItemAction.Execute(&velero.RestoreItemActionExecuteInput{
 			Item:           obj,
 			ItemFromBackup: itemFromBackup,
 			Restore:        ctx.restore,

@@ -63,7 +63,7 @@ type Backupper interface {
 	// to the given writers.
 	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
-		backupItemActions framework.BackupItemActionResolver, itemSnapshotters framework.ItemSnapshotterResolver,
+		backupItemActionResolver framework.BackupItemActionResolver, itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
@@ -176,8 +176,11 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		volumeSnapshotterGetter)
 }
 
-func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
-	backupItemActions framework.BackupItemActionResolver, itemSnapshotters framework.ItemSnapshotterResolver,
+func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
+	backupRequest *Request,
+	backupFile io.Writer,
+	backupItemActionResolver framework.BackupItemActionResolver,
+	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
@@ -205,12 +208,12 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger, backu
 		return err
 	}
 
-	backupRequest.ResolvedActions, err = backupItemActions.ResolveActions(kb.discoveryHelper)
+	backupRequest.ResolvedActions, err = backupItemActionResolver.ResolveActions(kb.discoveryHelper)
 	if err != nil {
 		return err
 	}
 
-	backupRequest.ResolvedItemSnapshotters, err = itemSnapshotters.ResolveActions(kb.discoveryHelper)
+	backupRequest.ResolvedItemSnapshotters, err = itemSnapshotterResolver.ResolveActions(kb.discoveryHelper)
 	if err != nil {
 		return err
 	}
