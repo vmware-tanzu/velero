@@ -19,11 +19,9 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -43,7 +41,7 @@ velero restore create <backup-name> --include-namespaces <namespace1>,<namespace
 */
 
 type IncludeNamespaces struct {
-	nsIncluded         *[]string
+	allTestNamespaces  *[]string
 	namespacesIncluded int
 	FilteringCase
 }
@@ -51,18 +49,17 @@ type IncludeNamespaces struct {
 var BackupWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInBackup})
 var RestoreWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInRestore})
 
-func (i *IncludeNamespaces) Init() {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+func (i *IncludeNamespaces) Init() error {
 	i.FilteringCase.Init()
 	i.namespacesIncluded = i.NamespacesTotal / 2
-	i.nsIncluded = &[]string{}
+	i.allTestNamespaces = &[]string{}
 	i.NSBaseName = "include-namespaces-" + UUIDgen.String()
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
 		if nsNum < i.namespacesIncluded {
-			*i.nsIncluded = append(*i.nsIncluded, createNSName)
+			*i.NSIncluded = append(*i.NSIncluded, createNSName)
 		}
+		*i.allTestNamespaces = append(*i.allTestNamespaces, createNSName)
 	}
 
 	if i.IsTestInBackup {
@@ -75,7 +72,7 @@ func (i *IncludeNamespaces) Init() {
 		}
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
-			"--include-namespaces", strings.Join(*i.nsIncluded, ","),
+			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
 			"--default-volumes-to-restic", "--wait",
 		}
 
@@ -94,15 +91,17 @@ func (i *IncludeNamespaces) Init() {
 		}
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
+			"--include-namespaces", strings.Join(*i.allTestNamespaces, ","),
 			"--default-volumes-to-restic", "--wait",
 		}
 
 		i.RestoreArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
-			"--include-namespaces", strings.Join(*i.nsIncluded, ","),
+			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
 			"--from-backup", i.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (i *IncludeNamespaces) CreateResources() error {
@@ -112,9 +111,6 @@ func (i *IncludeNamespaces) CreateResources() error {
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
 		if err := CreateNamespace(i.Ctx, i.Client, createNSName); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
-		}
-		if nsNum <= i.namespacesIncluded {
-			*i.nsIncluded = append(*i.nsIncluded, createNSName)
 		}
 	}
 	return nil

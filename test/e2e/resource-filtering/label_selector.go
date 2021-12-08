@@ -19,10 +19,9 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,13 +42,15 @@ type LabelSelector struct {
 
 var BackupWithLabelSelector func() = TestFunc(&LabelSelector{testInBackup})
 
-func (l *LabelSelector) Init() {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+func (l *LabelSelector) Init() error {
 	l.FilteringCase.Init()
 	l.BackupName = "backup-label-selector-" + UUIDgen.String()
-	l.RestoreName = "restore-label-selector-" + UUIDgen.String()
+	l.RestoreName = "restore-" + UUIDgen.String()
 	l.NSBaseName = "backup-label-selector-" + UUIDgen.String()
+	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		*l.NSIncluded = append(*l.NSIncluded, createNSName)
+	}
 	l.TestMsg = &TestMSG{
 		Desc:      "Backup with the label selector test",
 		Text:      "Should backup resources with selected label resource",
@@ -62,6 +63,7 @@ func (l *LabelSelector) Init() {
 	l.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", l.BackupName,
 		"--selector", "resourcefiltering=true",
+		"--include-namespaces", strings.Join(*l.NSIncluded, ","),
 		"--default-volumes-to-restic", "--wait",
 	}
 
@@ -69,6 +71,7 @@ func (l *LabelSelector) Init() {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", l.RestoreName,
 		"--from-backup", l.BackupName, "--wait",
 	}
+	return nil
 }
 
 func (l *LabelSelector) CreateResources() error {
@@ -86,6 +89,15 @@ func (l *LabelSelector) CreateResources() error {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 
+		serviceAccountName := "default"
+		// wait until the service account is created before patch the image pull secret
+		if err := WaitUntilServiceAccountCreated(l.Ctx, l.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
+		}
+		// add the image pull secret to avoid the image pull limit issue of Docker Hub
+		if err := PatchServiceAccountWithImagePullSecret(l.Ctx, l.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
+		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 

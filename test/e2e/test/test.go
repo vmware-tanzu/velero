@@ -31,8 +31,14 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
-type VeleroTest interface {
-	Init()
+/*
+The VeleroBackupRestoreTest interface is just could be suit for the cases that follow the test flow of
+create resources, backup, delete test resource, restore and verify.
+And the cases have similar execute function and similar data. it's both fine for you to use it or not which
+depends on your test patterns.
+*/
+type VeleroBackupRestoreTest interface {
+	Init() error
 	CreateResources() error
 	Backup() error
 	Destroy() error
@@ -58,11 +64,13 @@ type TestCase struct {
 	TestMsg         *TestMSG
 	Client          TestClient
 	Ctx             context.Context
+	NSIncluded      *[]string
 }
 
 var TestClientInstance TestClient
+var isVeleroInstalled bool = false
 
-func TestFunc(test VeleroTest) func() {
+func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		var err error
 		TestClientInstance, err = NewTestClient()
@@ -70,16 +78,10 @@ func TestFunc(test VeleroTest) func() {
 		test.Init()
 		BeforeEach(func() {
 			flag.Parse()
-			if VeleroCfg.InstallVelero {
+			if VeleroCfg.InstallVelero && !isVeleroInstalled {
+				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
 				Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
-			}
-
-		})
-
-		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				err := VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-				Expect(err).To(Succeed())
+				isVeleroInstalled = true
 			}
 		})
 
@@ -132,7 +134,7 @@ func (t *TestCase) GetTestMsg() *TestMSG {
 	return t.TestMsg
 }
 
-func RunTestCase(test VeleroTest) error {
+func RunTestCase(test VeleroBackupRestoreTest) error {
 	fmt.Printf("Running test case %s\n", test.GetTestMsg().Desc)
 	if test == nil {
 		return errors.New("No case should be tested")
