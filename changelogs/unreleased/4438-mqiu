@@ -1,0 +1,1 @@
+Fix e2e test failures for the inappropriate optimaze of velero install

@@ -68,30 +68,32 @@ type TestCase struct {
 }
 
 var TestClientInstance TestClient
-var isVeleroInstalled bool = false
 
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		var err error
 		TestClientInstance, err = NewTestClient()
 		Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
-		test.Init()
+		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		BeforeEach(func() {
 			flag.Parse()
-			if VeleroCfg.InstallVelero && !isVeleroInstalled {
-				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+			if VeleroCfg.InstallVelero {
 				Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
-				isVeleroInstalled = true
 			}
 		})
-
+		AfterEach(func() {
+			if VeleroCfg.InstallVelero {
+				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+			}
+		})
 		It(test.GetTestMsg().Text, func() {
 			Expect(RunTestCase(test)).To(Succeed(), test.GetTestMsg().FailedMSG)
 		})
 	}
 }
 
-func (t *TestCase) Init() {
+func (t *TestCase) Init() error {
+	return nil
 }
 
 func (t *TestCase) CreateResources() error {
