@@ -19,10 +19,8 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"time"
+	"strings"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,11 +45,13 @@ type IncludeResources struct {
 var BackupWithIncludeResources func() = TestFunc(&IncludeResources{testInBackup})
 var RestoreWithIncludeResources func() = TestFunc(&IncludeResources{testInRestore})
 
-func (i *IncludeResources) Init() {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+func (i *IncludeResources) Init() error {
 	i.FilteringCase.Init()
 	i.NSBaseName = "include-resources-" + UUIDgen.String()
+	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
+		*i.NSIncluded = append(*i.NSIncluded, createNSName)
+	}
 	if i.IsTestInBackup { // testing case backup with include-resources option
 		i.TestMsg = &TestMSG{
 			Desc:      "Backup resources with resources included test",
@@ -80,6 +80,7 @@ func (i *IncludeResources) Init() {
 		i.RestoreName = "restore-include-resources-" + UUIDgen.String()
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
+			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
 			"--default-volumes-to-restic", "--wait",
 		}
 		i.RestoreArgs = []string{
@@ -88,6 +89,7 @@ func (i *IncludeResources) Init() {
 			"--from-backup", i.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (i *IncludeResources) Verify() error {

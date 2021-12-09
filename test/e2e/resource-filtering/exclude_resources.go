@@ -19,10 +19,8 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"time"
+	"strings"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,11 +47,13 @@ type ExcludeResources struct {
 var BackupWithExcludeResources func() = TestFunc(&ExcludeResources{testInBackup})
 var RestoreWithExcludeResources func() = TestFunc(&ExcludeResources{testInRestore})
 
-func (e *ExcludeResources) Init() {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+func (e *ExcludeResources) Init() error {
 	e.FilteringCase.Init()
 	e.NSBaseName = "exclude-resources-" + UUIDgen.String()
+	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
+		*e.NSIncluded = append(*e.NSIncluded, createNSName)
+	}
 	if e.IsTestInBackup { // testing case backup with exclude-resources option
 		e.TestMsg = &TestMSG{
 			Desc:      "Backup resources with resources included test",
@@ -64,6 +64,7 @@ func (e *ExcludeResources) Init() {
 		e.RestoreName = "restore-" + UUIDgen.String()
 		e.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
+			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
 			"--exclude-resources", "secrets",
 			"--default-volumes-to-restic", "--wait",
 		}
@@ -73,15 +74,18 @@ func (e *ExcludeResources) Init() {
 			"--from-backup", e.BackupName, "--wait",
 		}
 	} else { // testing case restore with exclude-resources option
+		e.BackupName = "backup-" + UUIDgen.String()
+		e.RestoreName = "restore-exclude-resources-" + UUIDgen.String()
 		e.TestMsg = &TestMSG{
 			Desc:      "Restore resources with resources included test",
 			Text:      "Should not restore resources which is excluded others should be backup",
 			FailedMSG: "Failed to restore with resource exclude",
 		}
-		e.BackupName = "backup-" + UUIDgen.String()
+		e.BackupName = "backup-exclude-resources-" + UUIDgen.String()
 		e.RestoreName = "restore-exclude-resources-" + UUIDgen.String()
 		e.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
+			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
 			"--default-volumes-to-restic", "--wait",
 		}
 		e.RestoreArgs = []string{
@@ -90,6 +94,7 @@ func (e *ExcludeResources) Init() {
 			"--from-backup", e.BackupName, "--wait",
 		}
 	}
+	return nil
 }
 
 func (e *ExcludeResources) Verify() error {

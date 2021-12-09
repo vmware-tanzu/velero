@@ -19,6 +19,7 @@ package filtering
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,14 +42,15 @@ type FilteringCase struct {
 var testInBackup = FilteringCase{IsTestInBackup: true}
 var testInRestore = FilteringCase{IsTestInBackup: false}
 
-func (f *FilteringCase) Init() {
+func (f *FilteringCase) Init() error {
+	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}
 	f.labelSelector = "resourcefiltering"
 	f.Client = TestClientInstance
 
-	f.NamespacesTotal = 5
+	f.NamespacesTotal = 3
 	f.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", f.BackupName,
 		"--default-volumes-to-restic", "--wait",
@@ -58,6 +60,9 @@ func (f *FilteringCase) Init() {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", f.RestoreName,
 		"--from-backup", f.BackupName, "--wait",
 	}
+
+	f.NSIncluded = &[]string{}
+	return nil
 }
 
 func (f *FilteringCase) CreateResources() error {
@@ -68,7 +73,15 @@ func (f *FilteringCase) CreateResources() error {
 		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-
+		serviceAccountName := "default"
+		// wait until the service account is created before patch the image pull secret
+		if err := WaitUntilServiceAccountCreated(f.Ctx, f.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
+		}
+		// add the image pull secret to avoid the image pull limit issue of Docker Hub
+		if err := PatchServiceAccountWithImagePullSecret(f.Ctx, f.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
+		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels)
