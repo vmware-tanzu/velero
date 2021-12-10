@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -305,26 +304,9 @@ func (ib *itemBackupper) executeActions(
 	metadata metav1.Object,
 ) (runtime.Unstructured, error) {
 	for _, action := range ib.backupRequest.ResolvedActions {
-		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-			log.Debug("Skipping action because it does not apply to this resource")
+		if !action.ShouldUse(groupResource, namespace, metadata, log) {
 			continue
 		}
-
-		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			log.Debug("Skipping action because it does not apply to this namespace")
-			continue
-		}
-
-		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
-			log.Debug("Skipping action because resource is cluster-scoped and action only applies to specific namespaces")
-			continue
-		}
-
-		if !action.selector.Matches(labels.Set(metadata.GetLabels())) {
-			log.Debug("Skipping action because label selector does not match")
-			continue
-		}
-
 		log.Info("Executing custom action")
 
 		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backupRequest.Backup)

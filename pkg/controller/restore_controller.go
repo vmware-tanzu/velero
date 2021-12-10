@@ -47,6 +47,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -443,6 +444,13 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	if err != nil {
 		return errors.Wrap(err, "error getting restore item actions")
 	}
+	actionsResolver := framework.NewRestoreItemActionResolver(actions)
+
+	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
+	if err != nil {
+		return errors.Wrap(err, "error getting item snapshotters")
+	}
+	snapshotItemResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, restoreLog)
 	if err != nil {
@@ -476,7 +484,8 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
-	restoreWarnings, restoreErrors := c.restorer.Restore(restoreReq, actions, c.snapshotLocationLister, pluginManager)
+	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
+		c.snapshotLocationLister, pluginManager)
 	restoreLog.Info("restore completed")
 
 	// re-instantiate the backup store because credentials could have changed since the original

@@ -44,8 +44,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -505,7 +507,8 @@ func TestProcessQueueItem(t *testing.T) {
 			if test.expectedRestorerCall != nil {
 				backupStore.On("GetBackupContents", test.backup.Name).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 
-				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+				restorer.On("RestoreWithResolvers", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+					mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
 
 				backupStore.On("PutRestoreLog", test.backup.Name, test.restore.Name, mock.Anything).Return(test.putRestoreLogErr)
 
@@ -545,6 +548,7 @@ func TestProcessQueueItem(t *testing.T) {
 
 			if test.restore != nil {
 				pluginManager.On("GetRestoreItemActions").Return(nil, nil)
+				pluginManager.On("GetItemSnapshotters").Return([]isv1.ItemSnapshotter{}, nil)
 				pluginManager.On("CleanupClients")
 			}
 
@@ -855,6 +859,20 @@ func (r *fakeRestorer) Restore(
 	res := r.Called(info.Log, info.Restore, info.Backup, info.BackupReader, actions)
 
 	r.calledWithArg = *info.Restore
+
+	return res.Get(0).(pkgrestore.Result), res.Get(1).(pkgrestore.Result)
+}
+
+func (r *fakeRestorer) RestoreWithResolvers(req pkgrestore.Request,
+	resolver framework.RestoreItemActionResolver,
+	itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
+) (pkgrestore.Result, pkgrestore.Result) {
+	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver, itemSnapshotterResolver,
+		snapshotLocationLister, volumeSnapshotterGetter)
+
+	r.calledWithArg = *req.Restore
 
 	return res.Get(0).(pkgrestore.Result), res.Get(1).(pkgrestore.Result)
 }

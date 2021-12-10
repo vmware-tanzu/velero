@@ -19,6 +19,8 @@ package delete
 import (
 	"io"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,7 +31,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
@@ -41,14 +42,13 @@ type Context struct {
 	Filesystem      filesystem.Interface
 	Log             logrus.FieldLogger
 	DiscoveryHelper discovery.Helper
-
-	resolvedActions []resolvedAction
+	resolvedActions []framework.DeleteItemResolvedAction
 }
 
 func InvokeDeleteActions(ctx *Context) error {
 	var err error
-	ctx.resolvedActions, err = resolveActions(ctx.Actions, ctx.DiscoveryHelper)
-
+	resolver := framework.NewDeleteItemActionResolver(ctx.Actions)
+	ctx.resolvedActions, err = resolver.ResolveActions(ctx.DiscoveryHelper)
 	// No actions installed and no error means we don't have to continue;
 	// just do the backup deletion without worrying about plugins.
 	if len(ctx.resolvedActions) == 0 && err == nil {
@@ -119,10 +119,10 @@ func InvokeDeleteActions(ctx *Context) error {
 				itemLog.Infof("invoking DeleteItemAction plugins")
 
 				for _, action := range actions {
-					if !action.selector.Matches(labels.Set(obj.GetLabels())) {
+					if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
 						continue
 					}
-					err = action.Execute(&velero.DeleteItemActionExecuteInput{
+					err = action.DeleteItemAction.Execute(&velero.DeleteItemActionExecuteInput{
 						Item:   obj,
 						Backup: ctx.Backup,
 					})
@@ -139,65 +139,12 @@ func InvokeDeleteActions(ctx *Context) error {
 }
 
 // getApplicableActions takes resolved DeleteItemActions and filters them for a given group/resource and namespace.
-func (ctx *Context) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
-	var actions []resolvedAction
-
+func (ctx *Context) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.DeleteItemResolvedAction {
+	var actions []framework.DeleteItemResolvedAction
 	for _, action := range ctx.resolvedActions {
-		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-			continue
+		if action.ShouldUse(groupResource, namespace, nil, ctx.Log) {
+			actions = append(actions, action)
 		}
-
-		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			continue
-		}
-
-		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
-			continue
-		}
-
-		actions = append(actions, action)
 	}
-
 	return actions
-}
-
-// resolvedActions are DeleteItemActions decorated with resource/namespace include/exclude collections, as well as label selectors for easy comparison.
-type resolvedAction struct {
-	velero.DeleteItemAction
-
-	resourceIncludesExcludes  *collections.IncludesExcludes
-	namespaceIncludesExcludes *collections.IncludesExcludes
-	selector                  labels.Selector
-}
-
-// resolveActions resolves the AppliesTo ResourceSelectors of DeleteItemActions plugins against the Kubernetes discovery API for fully-qualified names.
-func resolveActions(actions []velero.DeleteItemAction, helper discovery.Helper) ([]resolvedAction, error) {
-	var resolved []resolvedAction
-
-	for _, action := range actions {
-		resourceSelector, err := action.AppliesTo()
-		if err != nil {
-			return nil, err
-		}
-
-		resources := collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
-		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
-
-		selector := labels.Everything()
-		if resourceSelector.LabelSelector != "" {
-			if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
-				return nil, err
-			}
-		}
-
-		res := resolvedAction{
-			DeleteItemAction:          action,
-			resourceIncludesExcludes:  resources,
-			namespaceIncludesExcludes: namespaces,
-			selector:                  selector,
-		}
-		resolved = append(resolved, res)
-	}
-
-	return resolved, nil
 }
