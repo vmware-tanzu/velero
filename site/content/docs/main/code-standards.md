@@ -11,7 +11,7 @@ When opening a pull request, please fill out the checklist supplied the template
 ## Adding a changelog
 
 Authors are expected to include a changelog file with their pull requests. The changelog file
-should be a new file created in the `changelogs/unreleased` folder. The file should follow the
+should be a new file created in the `changelogs/unreleased` folder. If your PR is for a released version of Velero, create the new file in the `changelogs/unreleased` folder in the release branch instead of on the main branch. The file should follow the
 naming convention of `pr-username` and the contents of the file should be your text for the
 changelog.
 
@@ -22,9 +22,9 @@ Add that to the PR.
 
 If a PR does not warrant a changelog, the CI check for a changelog can be skipped by applying a `changelog-not-required` label on the PR.
 
-## Copyright header 
+## Copyright header
 
-Whenever a source code file is being modified, the copyright notice should be updated to our standard copyright notice. That is, it should read “Copyright the Velero contributors.” 
+Whenever a source code file is being modified, the copyright notice should be updated to our standard copyright notice. That is, it should read “Copyright the Velero contributors.”
 
 For new files, the entire copyright and license header must be added.
 
@@ -61,7 +61,7 @@ Example:
     	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
     	corev1listers "k8s.io/client-go/listers/core/v1"
-       
+
         velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
         velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
     )
