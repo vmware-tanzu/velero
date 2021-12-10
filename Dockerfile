@@ -41,12 +41,10 @@ ARG BIN
 ARG RESTIC_VERSION
 
 ENV GOOS=${TARGETOS} \
-    GOARCH=${TARGETARCH} \
-    GOARM=${TARGETVARIANT}
+    GOARCH=${TARGETARCH} 
 
 RUN mkdir -p /output/usr/bin && \
     bash ./hack/download-restic.sh && \
-    export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 

@@ -23,6 +23,8 @@ import (
 	"io/ioutil"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -60,17 +62,49 @@ type kubernetesResource struct {
 
 // getAllItems gets all relevant items from all API groups.
 func (r *itemCollector) getAllItems() []*kubernetesResource {
+	start := time.Now()
 	var resources []*kubernetesResource
-	for _, group := range r.discoveryHelper.Resources() {
-		groupItems, err := r.getGroupItems(r.log, group)
-		if err != nil {
-			r.log.WithError(err).WithField("apiGroup", group.String()).Error("Error collecting resources from API group")
-			continue
-		}
+	wg := sync.WaitGroup{}
+	resourceChan := make(chan []*kubernetesResource)
 
-		resources = append(resources, groupItems...)
+	type chanError struct {
+		group *metav1.APIResourceList
+		err   error
 	}
+	errorChan := make(chan chanError)
 
+	for _, group := range r.discoveryHelper.Resources() {
+		wg.Add(1)
+		go func(group *metav1.APIResourceList) {
+			groupItems, err := r.getGroupItems(r.log, group)
+			if err != nil {
+				errorChan <- chanError{err: err, group: group}
+				return
+			}
+			resourceChan <- groupItems
+		}(group)
+	}
+	quit := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case rs := <-resourceChan:
+				resources = append(resources, rs...)
+				wg.Done()
+			case e := <-errorChan:
+				r.log.WithError(e.err).WithField("apiGroup", e.group.String()).Error("Error collecting resources from API group")
+				wg.Done()
+			case <-quit:
+				return
+			}
+		}
+	}()
+	// wait for everything to complete
+	wg.Wait()
+	// Quit the select loop
+	quit <- true
+	r.log.Infof("time taken is: %v", time.Since(start))
 	return resources
 }
 
