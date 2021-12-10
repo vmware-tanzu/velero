@@ -29,9 +29,11 @@ import (
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	velerexec "github.com/vmware-tanzu/velero/pkg/util/exec"
@@ -62,16 +64,20 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features strin
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
+	err = EnsureClusterExists(ctx)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
+	}
+
 	// TODO - handle this better
 	if veleroCfg.CloudProvider == "vsphere" {
 		// We overrider the ObjectStoreProvider here for vSphere because we want to use the aws plugin for the
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
 		veleroCfg.ObjectStoreProvider = "aws"
-	}
-	err = EnsureClusterExists(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
+		if err := configvSpherePlugin(); err != nil {
+			return errors.WithMessagef(err, "Failed to config vsphere plugin")
+		}
 	}
 
 	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
@@ -94,6 +100,64 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features strin
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
 
+	return nil
+}
+
+//configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
+func configvSpherePlugin() error {
+	cli, err := NewTestClient()
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to instantiate cluster client to config vsphere plugin")
+	}
+	vsphereSecret := "velero-vsphere-config-secret"
+	configmaptName := "velero-vsphere-plugin-config"
+	if err := clearupvSpherePluginConfig(cli.ClientGo, VeleroCfg.VeleroNamespace, vsphereSecret, configmaptName); err != nil {
+		return errors.WithMessagef(err, "Failed to clear up vsphere plugin config %s namespace", VeleroCfg.VeleroNamespace)
+	}
+	if err := CreateNamespace(context.Background(), cli, VeleroCfg.VeleroNamespace); err != nil {
+		return errors.WithMessagef(err, "Failed to create Velero %s namespace", VeleroCfg.VeleroNamespace)
+	}
+	if err := CreateVCCredentialSecret(cli.ClientGo, VeleroCfg.VeleroNamespace); err != nil {
+		return errors.WithMessagef(err, "Failed to create virtual center credential secret in %s namespace", VeleroCfg.VeleroNamespace)
+	}
+	if err := WaitForSecretsComplete(cli.ClientGo, VeleroCfg.VeleroNamespace, vsphereSecret); err != nil {
+		return errors.Wrap(err, "Failed to ensure velero-vsphere-config-secret secret completion in namespace kube-system")
+	}
+	_, err = CreateConfigMap(cli.ClientGo, VeleroCfg.VeleroNamespace, configmaptName, map[string]string{
+		"cluster_flavor":           "VANILLA",
+		"vsphere_secret_name":      vsphereSecret,
+		"vsphere_secret_namespace": VeleroCfg.VeleroNamespace,
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to create velero-vsphere-plugin-config configmap in %s namespace", VeleroCfg.VeleroNamespace)
+	}
+	err = WaitForConfigMapComplete(cli.ClientGo, VeleroCfg.VeleroNamespace, configmaptName)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Failed to ensure configmap %s completion in namespace: %s", configmaptName, VeleroCfg.VeleroNamespace))
+	}
+	return nil
+}
+
+func clearupvSpherePluginConfig(c clientset.Interface, ns, secretName, configMapName string) error {
+	//clear secret
+	_, err := GetSecret(c, ns, secretName)
+	if err == nil { //exist
+		if err := WaitForSecretDelete(c, ns, secretName); err != nil {
+			return errors.WithMessagef(err, "Failed to clear up vsphere plugin secret in %s namespace", ns)
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return errors.WithMessagef(err, "Failed to retrieve vsphere plugin secret in %s namespace", ns)
+	}
+
+	//clear configmap
+	_, err = GetConfigmap(c, ns, configMapName)
+	if err == nil {
+		if err := WaitForConfigmapDelete(c, ns, configMapName); err != nil {
+			return errors.WithMessagef(err, "Failed to clear up vsphere plugin configmap in %s namespace", ns)
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return errors.WithMessagef(err, "Failed to retrieve vsphere plugin configmap in %s namespace", ns)
+	}
 	return nil
 }
 

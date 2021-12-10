@@ -17,10 +17,17 @@ limitations under the License.
 package k8s
 
 import (
+	"fmt"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	waitutil "k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -44,4 +51,25 @@ func WaitForConfigMapComplete(c clientset.Interface, ns, configmapName string) e
 		}
 		return true, nil
 	})
+}
+
+func GetConfigmap(c clientset.Interface, ns, secretName string) (*v1.ConfigMap, error) {
+	return c.CoreV1().ConfigMaps(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
+}
+
+func WaitForConfigmapDelete(c clientset.Interface, ns, name string) error {
+	if err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to delete  configmap in namespace %q", ns))
+	}
+	return waitutil.PollImmediateInfinite(5*time.Second,
+		func() (bool, error) {
+			if _, err := c.CoreV1().ConfigMaps(ns).Get(context.TODO(), ns, metav1.GetOptions{}); err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return false, err
+			}
+			logrus.Debugf("configmap %q in namespace %q is still being deleted...", name, ns)
+			return false, nil
+		})
 }
