@@ -227,27 +227,22 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 }
 
 func (s *objectBackupStore) PutBackup(info BackupInfo) error {
-	if info.Log != nil {
-		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(info.Name), info.Log); err != nil {
-			// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
-			// backup's status.
-			s.logger.WithError(err).WithField("backup", info.Name).Error("Error uploading log file")
-		}
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(info.Name), info.Log); err != nil {
+		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
+		// backup's status.
+		s.logger.WithError(err).WithField("backup", info.Name).Error("Error uploading log file")
 	}
 
-	if info.Metadata != nil {
-		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(info.Name), info.Metadata); err != nil {
-			// failure to upload metadata file is a hard-stop
-			return err
-		}
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(info.Name), info.Metadata); err != nil {
+		// failure to upload metadata file is a hard-stop
+		return err
 	}
 
-	if info.Contents != nil {
-		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(info.Name), info.Contents); err != nil {
-			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-			return kerrors.NewAggregate([]error{err, deleteErr})
-		}
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(info.Name), info.Contents); err != nil {
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
+
 	// Since the logic for all of these files is the exact same except for the name and the contents,
 	// use a map literal to iterate through them and write them to the bucket.
 	var backupObjs = map[string]io.Reader{
@@ -260,18 +255,16 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 	}
 
 	for key, reader := range backupObjs {
-		if reader != nil {
-			if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
-				errs := []error{err}
+		if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
+			errs := []error{err}
 
-				// attempt to clean up the backup contents and metadata if we fail to upload and of the extra files.
-				deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-				errs = append(errs, deleteErr)
+			// attempt to clean up the backup contents and metadata if we fail to upload and of the extra files.
+			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
+			errs = append(errs, deleteErr)
 
-				deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-				errs = append(errs, deleteErr)
-				return kerrors.NewAggregate(errs)
-			}
+			deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+			errs = append(errs, deleteErr)
+			return kerrors.NewAggregate(errs)
 		}
 	}
 
