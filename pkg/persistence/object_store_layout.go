@@ -88,6 +88,10 @@ func (l *ObjectStoreLayout) getBackupVolumeSnapshotsKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-volumesnapshots.json.gz", backup))
 }
 
+func (l *ObjectStoreLayout) getItemSnapshotsKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-itemsnapshots.json.gz", backup))
+}
+
 func (l *ObjectStoreLayout) getBackupResourceListKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-resource-list.json.gz", backup))
 }
