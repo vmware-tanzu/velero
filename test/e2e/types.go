@@ -36,7 +36,6 @@ type VerleroConfig struct {
 	CloudProvider            string
 	ObjectStoreProvider      string
 	VeleroNamespace          string
-	CRDsVersion              string
 	AdditionalBSLProvider    string
 	AdditionalBSLBucket      string
 	AdditionalBSLPrefix      string

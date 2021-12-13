@@ -54,7 +54,6 @@ RESTIC_HELPER_IMAGE ?=
 #Released version only
 UPGRADE_FROM_VELERO_CLI ?=
 UPGRADE_FROM_VELERO_VERSION ?= v1.6.3
-CRDS_VERSION ?= v1
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
 BSL_BUCKET ?=
@@ -94,7 +93,6 @@ run: ginkgo
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
 		-upgrade-from-velero-version=$(UPGRADE_FROM_VELERO_VERSION) \
 		-velero-namespace=$(VELERO_NAMESPACE) \
-		-crds-version=$(CRDS_VERSION) \
 		-credentials-file=$(CREDS_FILE) \
 		-bucket=$(BSL_BUCKET) \
 		-prefix=$(BSL_PREFIX) \

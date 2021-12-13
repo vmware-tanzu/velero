@@ -82,7 +82,6 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features strin
 	veleroInstallOptions.UseVolumeSnapshots = useVolumeSnapshots
 	veleroInstallOptions.UseRestic = !useVolumeSnapshots
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
-	veleroInstallOptions.CRDsVersion = veleroCfg.CRDsVersion
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
@@ -103,9 +102,6 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	if len(options.Namespace) > 0 {
 		args = append(args, "--namespace", options.Namespace)
 		namespace = options.Namespace
-	}
-	if len(options.CRDsVersion) > 0 {
-		args = append(args, "--crds-version", options.CRDsVersion)
 	}
 	if len(options.Image) > 0 {
 		args = append(args, "--image", options.Image)

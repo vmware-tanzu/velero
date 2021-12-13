@@ -78,7 +78,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 			tmpCfg.VeleroImage = ""
 			tmpCfg.ResticHelperImage = ""
 			tmpCfg.Plugins = ""
-			tmpCfg.CRDsVersion = ""
 			Expect(VeleroInstall(context.Background(), &tmpCfg, "", useVolumeSnapshots)).To(Succeed())
 			Expect(CheckVeleroVersion(context.Background(), upgradeFromVeleroCLI, tmpCfg.UpgradeFromVeleroVersion)).To(Succeed())
 		} else {
