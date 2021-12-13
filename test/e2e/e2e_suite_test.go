@@ -58,7 +58,6 @@ func init() {
 	flag.StringVar(&VeleroCfg.AdditionalBSLPrefix, "additional-bsl-prefix", "", "prefix under which all Velero data should be stored within the bucket for additional backup storage location. Optional.")
 	flag.StringVar(&VeleroCfg.AdditionalBSLConfig, "additional-bsl-config", "", "configuration to use for the additional backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&VeleroCfg.AdditionalBSLCredentials, "additional-bsl-credentials-file", "", "file containing credentials for additional backup storage location provider. Required if testing multiple credentials support.")
-	flag.StringVar(&VeleroCfg.CRDsVersion, "crds-version", "v1", "CRD apiVersion for velero CRD creation.")
 }
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", APIGropuVersionsTest)
