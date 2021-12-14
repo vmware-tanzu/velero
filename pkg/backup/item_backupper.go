@@ -49,7 +49,7 @@ import (
 // itemBackupper can back up individual items to a tar writer.
 type itemBackupper struct {
 	backupRequest           *Request
-	tarWriter               tarWriter
+	tarWriter               Writer
 	dynamicFactory          client.DynamicFactory
 	discoveryHelper         discovery.Helper
 	resticBackupper         restic.Backupper
@@ -244,13 +244,17 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		ModTime:  time.Now(),
 	}
 
-	if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+	if _, err := ib.tarWriter.Write(hdr, itemBytes); err != nil {
 		return false, errors.WithStack(err)
 	}
 
-	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
-		return false, errors.WithStack(err)
-	}
+	// if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+	// 	return false, errors.WithStack(err)
+	// }
+
+	// if _, err := ib.tarWriter.Write(itemBytes); err != nil {
+	// 	return false, errors.WithStack(err)
+	// }
 
 	// backing up the preferred version backup without API Group version on path -  this is for backward compatibility
 
@@ -269,14 +273,17 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			Mode:     0755,
 			ModTime:  time.Now(),
 		}
-
-		if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+		if _, err := ib.tarWriter.Write(hdr, itemBytes); err != nil {
 			return false, errors.WithStack(err)
 		}
 
-		if _, err := ib.tarWriter.Write(itemBytes); err != nil {
-			return false, errors.WithStack(err)
-		}
+		// if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+		// 	return false, errors.WithStack(err)
+		// }
+
+		// if _, err := ib.tarWriter.Write(itemBytes); err != nil {
+		// 	return false, errors.WithStack(err)
+		// }
 	}
 
 	return true, nil

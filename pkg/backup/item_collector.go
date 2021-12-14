@@ -65,45 +65,45 @@ func (r *itemCollector) getAllItems() []*kubernetesResource {
 	start := time.Now()
 	var resources []*kubernetesResource
 	wg := sync.WaitGroup{}
-	resourceChan := make(chan []*kubernetesResource)
+	groupChannel := make(chan *metav1.APIResourceList)
+	stop := make(chan bool)
+	mu := sync.Mutex{}
 
-	type chanError struct {
-		group *metav1.APIResourceList
-		err   error
-	}
-	errorChan := make(chan chanError)
-
-	for _, group := range r.discoveryHelper.Resources() {
-		wg.Add(1)
-		go func(group *metav1.APIResourceList) {
-			groupItems, err := r.getGroupItems(r.log, group)
-			if err != nil {
-				errorChan <- chanError{err: err, group: group}
-				return
-			}
-			resourceChan <- groupItems
-		}(group)
-	}
-	quit := make(chan bool)
-
-	go func() {
+	groupItemCollectorFunc := func() {
 		for {
 			select {
-			case rs := <-resourceChan:
-				resources = append(resources, rs...)
+			case g := <-groupChannel:
+				groupItems, err := r.getGroupItems(r.log, g)
+				if err != nil {
+					r.log.WithError(err).WithField("apiGroup", g.String()).Error("Error collecting resources from API group")
+					wg.Done()
+					break
+				}
+				mu.Lock()
+				resources = append(resources, groupItems...)
+				mu.Unlock()
 				wg.Done()
-			case e := <-errorChan:
-				r.log.WithError(e.err).WithField("apiGroup", e.group.String()).Error("Error collecting resources from API group")
-				wg.Done()
-			case <-quit:
+			case <-stop:
 				return
 			}
 		}
+	}
+
+	for i := 0; i < 10; i++ {
+		go groupItemCollectorFunc()
+	}
+
+	go func() {
+		for _, group := range r.discoveryHelper.Resources() {
+			wg.Add(1)
+			groupChannel <- group
+		}
 	}()
+
 	// wait for everything to complete
 	wg.Wait()
 	// Quit the select loop
-	quit <- true
+	stop <- true
 	r.log.Infof("time taken is: %v", time.Since(start))
 	return resources
 }

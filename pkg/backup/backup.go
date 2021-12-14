@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -278,6 +279,8 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		pageSize:              kb.clientPageSize,
 	}
 
+	// Do not feed this to itemBackupper, we want to get as close to instant
+	// bakcups on disk as possible.
 	items := collector.getAllItems()
 	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
 
@@ -287,9 +290,14 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress.totalItems")
 	}
 
+	w := Writer{
+		mu:     &sync.Mutex{},
+		writer: *tw,
+	}
+
 	itemBackupper := &itemBackupper{
 		backupRequest:           backupRequest,
-		tarWriter:               tw,
+		tarWriter:               w,
 		dynamicFactory:          kb.dynamicFactory,
 		discoveryHelper:         kb.discoveryHelper,
 		resticBackupper:         resticBackupper,
@@ -349,36 +357,56 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	backedUpGroupResources := map[schema.GroupResource]bool{}
 	totalItems := len(items)
 
+	itemChannel := make(chan *kubernetesResource, 10)
+
+	handleItemFunc := func() {
+		for {
+			select {
+			case item := <-itemChannel:
+				log.WithFields(map[string]interface{}{
+					"progress":  "",
+					"resource":  item.groupResource.String(),
+					"namespace": item.namespace,
+					"name":      item.name,
+				}).Infof("Processing item")
+				var unstructured unstructured.Unstructured
+
+				f, err := os.Open(item.path)
+				if err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error opening file containing item")
+					return
+				}
+				defer f.Close()
+				defer os.Remove(f.Name())
+
+				if err := json.NewDecoder(f).Decode(&unstructured); err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error decoding JSON from file")
+					return
+				}
+
+				//TODO: USE ENCAPSULATED TAR WRITER
+				if backedUp := kb.backupItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR); backedUp {
+					backedUpGroupResources[item.groupResource] = true
+				}
+				log.WithFields(map[string]interface{}{
+					"progress":  "",
+					"resource":  item.groupResource.String(),
+					"namespace": item.namespace,
+					"name":      item.name,
+				}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
+			case <-quit:
+				return
+			}
+		}
+	}
+
+	// start Handlers
+	for i := 0; i < 10; i++ {
+		go handleItemFunc()
+	}
+
 	for i, item := range items {
-		log.WithFields(map[string]interface{}{
-			"progress":  "",
-			"resource":  item.groupResource.String(),
-			"namespace": item.namespace,
-			"name":      item.name,
-		}).Infof("Processing item")
-
-		// use an anonymous func so we can defer-close/remove the file
-		// as soon as we're done with it
-		func() {
-			var unstructured unstructured.Unstructured
-
-			f, err := os.Open(item.path)
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error opening file containing item")
-				return
-			}
-			defer f.Close()
-			defer os.Remove(f.Name())
-
-			if err := json.NewDecoder(f).Decode(&unstructured); err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error decoding JSON from file")
-				return
-			}
-
-			if backedUp := kb.backupItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR); backedUp {
-				backedUpGroupResources[item.groupResource] = true
-			}
-		}()
+		itemChannel <- item
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
@@ -390,12 +418,6 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 			itemsBackedUp: len(backupRequest.BackedUpItems),
 		}
 
-		log.WithFields(map[string]interface{}{
-			"progress":  "",
-			"resource":  item.groupResource.String(),
-			"namespace": item.namespace,
-			"name":      item.name,
-		}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
 	}
 
 	// no more progress updates will be sent on the 'update' channel
@@ -500,6 +522,22 @@ func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
 		return errors.WithStack(err)
 	}
 	return nil
+}
+
+type Writer struct {
+	mu     *sync.Mutex
+	writer tar.Writer
+}
+
+func (w *Writer) Write(t *tar.Header, b []byte) (int, error) {
+	w.mu.Lock()
+	if err := w.writer.WriteHeader(t); err != nil {
+		return 0, err
+	}
+
+	n, err := w.writer.Write(b)
+	w.mu.Unlock()
+	return n, err
 }
 
 type tarWriter interface {
