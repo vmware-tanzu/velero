@@ -367,7 +367,6 @@ var _ = Describe("Backup Sync Reconciler", func() {
 
 			pluginManager.On("CleanupClients").Return(nil)
 			r := BackupSyncReconciler{
-				Ctx:                     ctx,
 				Client:                  ctrlfake.NewClientBuilder().Build(),
 				BackupClient:            client.VeleroV1(),
 				PodVolumeBackupClient:   client.VeleroV1(),
@@ -618,7 +617,6 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			)
 
 			r := BackupSyncReconciler{
-				Ctx:                     ctx,
 				Client:                  ctrlfake.NewClientBuilder().Build(),
 				BackupClient:            client.VeleroV1(),
 				PodVolumeBackupClient:   client.VeleroV1(),
@@ -655,7 +653,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			if test.useLongBSLName {
 				bslName = longLabelName
 			}
-			r.deleteOrphanedBackups(bslName, test.cloudBackups, velerotest.NewLogger())
+			r.deleteOrphanedBackups(ctx, bslName, test.cloudBackups, velerotest.NewLogger())
 
 			numBackups, err := numBackups(client, r.Namespace)
 			Expect(err).ShouldNot(HaveOccurred())

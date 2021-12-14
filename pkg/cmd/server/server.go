@@ -856,7 +856,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 
 		r := controller.BackupSyncReconciler{
-			Ctx:                     s.ctx,
 			Client:                  s.mgr.GetClient(),
 			PodVolumeBackupClient:   s.veleroClient.VeleroV1(),
 			BackupLister:            s.sharedInformerFactory.Velero().V1().Backups().Lister(),

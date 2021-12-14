@@ -41,7 +41,6 @@ import (
 )
 
 type BackupSyncReconciler struct {
-	Ctx                     context.Context
 	Client                  client.Client
 	PodVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
 	BackupLister            velerov1listers.BackupLister
@@ -57,7 +56,7 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log := b.Logger.WithField("controller", BackupSync)
 	log.Debug("Checking for existing backup storage locations to sync into cluster.")
 
-	locationList, err := storage.ListBackupStorageLocations(b.Ctx, b.Client, b.Namespace)
+	locationList, err := storage.ListBackupStorageLocations(ctx, b.Client, b.Namespace)
 	if err != nil {
 		log.WithError(err).Error("No backup storage locations found, at least one is required")
 		return ctrl.Result{}, err
@@ -164,7 +163,7 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 			// attempt to create backup custom resource via API
-			backup, err = b.BackupClient.Backups(backup.Namespace).Create(b.Ctx, backup, metav1.CreateOptions{})
+			backup, err = b.BackupClient.Backups(backup.Namespace).Create(ctx, backup, metav1.CreateOptions{})
 			switch {
 			case err != nil && kuberrs.IsAlreadyExists(err):
 				log.Debug("Backup already exists in cluster")
@@ -201,7 +200,7 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				podVolumeBackup.Namespace = backup.Namespace
 				podVolumeBackup.ResourceVersion = ""
 
-				_, err = b.PodVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(b.Ctx, podVolumeBackup, metav1.CreateOptions{})
+				_, err = b.PodVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(ctx, podVolumeBackup, metav1.CreateOptions{})
 				switch {
 				case err != nil && kuberrs.IsAlreadyExists(err):
 					log.Debug("Pod volume backup already exists in cluster")
@@ -228,7 +227,7 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				for _, snapCont := range snapConts {
 					// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
 					snapCont.ResourceVersion = ""
-					err := b.Client.Create(b.Ctx, snapCont, &client.CreateOptions{})
+					err := b.Client.Create(ctx, snapCont, &client.CreateOptions{})
 					switch {
 					case err != nil && kuberrs.IsAlreadyExists(err):
 						log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
@@ -243,12 +242,12 @@ func (b *BackupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 
-		b.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
+		b.deleteOrphanedBackups(ctx, location.Name, backupStoreBackups, log)
 
 		// update the location's last-synced time field
 		statusPatch := client.MergeFrom(location.DeepCopy())
 		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := b.Client.Status().Patch(b.Ctx, &location, statusPatch); err != nil {
+		if err := b.Client.Status().Patch(ctx, &location, statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}
@@ -265,7 +264,7 @@ func (b *BackupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // deleteOrphanedBackups deletes backup objects (CRDs) from Kubernetes that have the specified location
 // and a phase of Completed, but no corresponding backup in object storage.
-func (b *BackupSyncReconciler) deleteOrphanedBackups(locationName string, backupStoreBackups sets.String, log logrus.FieldLogger) {
+func (b *BackupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locationName string, backupStoreBackups sets.String, log logrus.FieldLogger) {
 	locationSelector := labels.Set(map[string]string{
 		velerov1api.StorageLocationLabel: label.GetValidName(locationName),
 	}).AsSelector()
@@ -286,7 +285,7 @@ func (b *BackupSyncReconciler) deleteOrphanedBackups(locationName string, backup
 			continue
 		}
 
-		if err := b.BackupClient.Backups(backup.Namespace).Delete(b.Ctx, backup.Name, metav1.DeleteOptions{}); err != nil {
+		if err := b.BackupClient.Backups(backup.Namespace).Delete(ctx, backup.Name, metav1.DeleteOptions{}); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")
