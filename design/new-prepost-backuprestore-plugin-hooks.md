@@ -690,6 +690,28 @@ Calling the Post Restore actions:
     }
 ```
 
+### Giving the User the Option to Skip the Execution of the Plugins
+
+Velero plugins are loaded as init containers. If plugins are unloaded, they trigger a restart of the Velero controller.
+Not mentioning if one plugin does get loaded for any reason (i.e., docker hub image pace limit), Velero does not start.
+In other words, the constant load/unload of plugins can disrupt the Velero controller, and they cannot be the only method to run the actions from these plugins selectively.
+As part of this proposal, we want to give the velero user the ability to skip the execution of the plugins via annotations on the Velero CR backup and restore objects.
+If one of these exists, the given plugin, referenced below as `plugin-name`, will be skipped.
+
+Backup Object Annotations:
+
+```
+   <plugin-name>/prebackup=skip
+   <plugin-name>/postbackup=skip
+```
+
+Restore Object Annotations:
+
+```
+   <plugin-name>/prerestore=skip
+   <plugin-name>/postrestore=skip
+```
+
 ## Alternatives Considered
 
 An alternative to these plugin hooks is to implement all the pre/post backup/restore logic _outside_ Velero.
