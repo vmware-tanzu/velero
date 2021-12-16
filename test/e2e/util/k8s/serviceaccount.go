@@ -64,3 +64,23 @@ func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClie
 	}
 	return nil
 }
+
+func CreateServiceAccount(ctx context.Context, client TestClient, namespace string, serviceaccount string) error {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceaccount,
+		},
+		AutomountServiceAccountToken: nil,
+	}
+
+	_, err = client.ClientGo.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
+
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func GetServiceAccount(ctx context.Context, client TestClient, namespace string, serviceAccount string) (*corev1.ServiceAccount, error) {
+	return client.ClientGo.CoreV1().ServiceAccounts(namespace).Get(ctx, serviceAccount, metav1.GetOptions{})
+}

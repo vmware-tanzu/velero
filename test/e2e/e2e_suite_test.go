@@ -27,6 +27,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
+	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
@@ -67,7 +68,7 @@ var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for
 
 var _ = Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
 
-var _ = Describe("[Basic] Backup/restore of 2 namespaces", BasicBackupRestore)
+var _ = Describe("[Basic] Backup/restore of cluster resources", ResourcesCheckTest)
 
 var _ = Describe("[Scale] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
 
