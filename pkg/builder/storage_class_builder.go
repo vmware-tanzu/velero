@@ -23,7 +23,8 @@ import (
 
 // StorageClassBuilder builds StorageClass objects.
 type StorageClassBuilder struct {
-	object *storagev1api.StorageClass
+	object      *storagev1api.StorageClass
+	objectSlice []*storagev1api.StorageClass
 }
 
 // ForStorageClass is the constructor for a StorageClassBuilder.
@@ -53,4 +54,30 @@ func (b *StorageClassBuilder) ObjectMeta(opts ...ObjectMetaOpt) *StorageClassBui
 	}
 
 	return b
+}
+
+// ForStorageClassSlice is the constructor for a storageClassSlice in StorageClassBuilder.
+func ForStorageClassSlice(names ...string) *StorageClassBuilder {
+	var storageClassSlice []*storagev1api.StorageClass
+	for _, name := range names {
+		storageClass := &storagev1api.StorageClass{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: storagev1api.SchemeGroupVersion.String(),
+				Kind:       "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+		storageClassSlice = append(storageClassSlice, storageClass)
+	}
+
+	return &StorageClassBuilder{
+		objectSlice: storageClassSlice,
+	}
+}
+
+// SliceResult returns the built StorageClass slice.
+func (b *StorageClassBuilder) SliceResult() []*storagev1api.StorageClass {
+	return b.objectSlice
 }
