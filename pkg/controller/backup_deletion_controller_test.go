@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,19 +37,20 @@ import (
 	core "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
+	"github.com/vmware-tanzu/velero/pkg/volume"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
-	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
@@ -183,6 +185,29 @@ func setupBackupDeletionControllerTest(t *testing.T, objects ...runtime.Object) 
 }
 
 func TestBackupDeletionControllerProcessRequest(t *testing.T) {
+	t.Run("failed to get backup store", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := &velerov1api.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Spec.StorageLocation,
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "objStoreProvider",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "bucket",
+					},
+				},
+			},
+		}
+		td := setupBackupDeletionControllerTest(t, location, backup)
+		td.controller.backupStoreGetter = &fakeErrorBackupStoreGetter{}
+		err := td.controller.processRequest(td.req)
+		assert.NotNil(t, err)
+		assert.True(t, strings.HasPrefix(err.Error(), "error getting the backup store"))
+	})
+
 	t.Run("missing spec.backupName", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t)
 		td.req.Spec.BackupName = ""
