@@ -1328,11 +1328,12 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 	if apierrors.IsAlreadyExists(err) {
 		return true
 	}
-	// the "invalid value" error rather than "already exists" error returns when restoring nodePort service
-	// that has nodePort preservation if the same nodePort service already exists.
+	// The "invalid value error" or "internal error" rather than "already exists" error returns when restoring nodePort service in the following two cases:
+	// 1. For NodePort service, the service has nodePort preservation while the same nodePort service already exists. - Get invalid value error
+	// 2. For LoadBalancer service, the "healthCheckNodePort" already exists. - Get internal error
 	// If this is the case, the function returns true to avoid reporting error.
 	// Refer to https://github.com/vmware-tanzu/velero/issues/2308 for more details
-	if obj.GetKind() != "Service" || !apierrors.IsInvalid(err) {
+	if obj.GetKind() != "Service" {
 		return false
 	}
 	statusErr, ok := err.(*apierrors.StatusError)

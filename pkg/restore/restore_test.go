@@ -3045,16 +3045,6 @@ func TestIsAlreadyExistsError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "The input error isn't InvalidError",
-			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"kind": "Service",
-				},
-			},
-			err:      apierrors.NewBadRequest(""),
-			expected: false,
-		},
-		{
 			name: "The StatusError contains no causes",
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
