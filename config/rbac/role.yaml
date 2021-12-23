@@ -7,6 +7,24 @@ metadata:
   name: velero-perms
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - persistentvolumerclaims
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+- apiGroups:
   - velero.io
   resources:
   - backups
@@ -89,6 +107,26 @@ rules:
   - velero.io
   resources:
   - podvolumebackups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumerestores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumerestores/status
   verbs:
   - get
   - patch
