@@ -17,6 +17,7 @@ limitations under the License.
 package kube
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeinformers "k8s.io/client-go/informers"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -202,22 +202,18 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 	csiDriver := storagev1api.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{Name: "csi.test.com"},
 	}
-	kbClient := fake.NewClientBuilder().WithLists(&storagev1api.CSIDriverList{Items: []storagev1api.CSIDriver{csiDriver}}).Build()
 	for _, tc := range tests {
-		h := newHarness(t)
-
-		pvcInformer := kubeinformers.NewSharedInformerFactoryWithOptions(h.KubeClient, 0, kubeinformers.WithNamespace("ns-1")).Core().V1().PersistentVolumeClaims()
-		pvInformer := kubeinformers.NewSharedInformerFactory(h.KubeClient, 0).Core().V1().PersistentVolumes()
+		clientBuilder := fake.NewClientBuilder().WithLists(&storagev1api.CSIDriverList{Items: []storagev1api.CSIDriver{csiDriver}})
 
 		if tc.pvc != nil {
-			require.NoError(t, pvcInformer.Informer().GetStore().Add(tc.pvc))
+			clientBuilder = clientBuilder.WithObjects(tc.pvc)
 		}
 		if tc.pv != nil {
-			require.NoError(t, pvInformer.Informer().GetStore().Add(tc.pv))
+			clientBuilder = clientBuilder.WithObjects(tc.pv)
 		}
 
 		// Function under test
-		dir, err := GetVolumeDirectory(logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, pvcInformer.Lister(), pvInformer.Lister(), kbClient)
+		dir, err := GetVolumeDirectory(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, clientBuilder.Build())
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)

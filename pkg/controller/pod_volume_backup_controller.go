@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	corev1listers "k8s.io/client-go/listers/core/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,9 +59,6 @@ type PodVolumeBackupReconciler struct {
 	FileSystem     filesystem.Interface
 	ResticExec     BackupExecuter
 	Log            logrus.FieldLogger
-
-	PvLister  corev1listers.PersistentVolumeLister
-	PvcLister corev1listers.PersistentVolumeClaimLister
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
@@ -302,7 +298,7 @@ type resticDetails struct {
 }
 
 func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log *logrus.Entry, pvb *velerov1api.PodVolumeBackup, pod *corev1.Pod, details *resticDetails) (*restic.Command, error) {
-	volDir, err := kube.GetVolumeDirectory(log, pod, pvb.Spec.Volume, r.PvcLister, r.PvLister, r.Client)
+	volDir, err := kube.GetVolumeDirectory(ctx, log, pod, pvb.Spec.Volume, r.Client)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting volume directory name")
 	}
