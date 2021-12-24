@@ -3,7 +3,10 @@ module github.com/vmware-tanzu/velero
 go 1.17
 
 require (
+	cloud.google.com/go/storage v1.10.0
+	github.com/Azure/azure-pipeline-go v0.2.3
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
+	github.com/Azure/azure-storage-blob-go v0.14.0
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
 	github.com/Azure/go-autorest/autorest/to v0.3.0
@@ -14,12 +17,12 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/protobuf v1.5.2
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.2.0
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
 	github.com/joho/godotenv v1.3.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
-	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.16.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
@@ -32,6 +35,7 @@ require (
 	github.com/vmware-tanzu/crash-diagnostics v0.3.7
 	golang.org/x/mod v0.4.2
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
+	google.golang.org/api v0.56.0
 	google.golang.org/grpc v1.40.0
 	k8s.io/api v0.22.2
 	k8s.io/apiextensions-apiserver v0.22.2
@@ -67,6 +71,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.1.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -75,6 +80,7 @@ require (
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
+	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -90,6 +96,7 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/vladimirvivien/gexe v0.1.1 // indirect
+	go.opencensus.io v0.23.0 // indirect
 	go.starlark.net v0.0.0-20201006213952-227f4aabceb5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
