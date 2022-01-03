@@ -18,10 +18,8 @@ package restore
 
 import (
 	go_context "context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -575,32 +573,15 @@ func (ctx *restoreContext) processSelectedResource(
 			// (in order to get any backed-up metadata), but if we don't find it there,
 			// create a blank one.
 			if namespace != "" && !existingNamespaces.Has(selectedItem.targetNamespace) {
-				logger := ctx.log.WithField("namespace", namespace)
-
-				ns := getNamespace(
-					logger,
-					archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", namespace),
-					selectedItem.targetNamespace,
-				)
-				_, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(
-					ns,
-					ctx.namespaceClient,
-					ctx.resourceTerminatingTimeout,
-				)
+				obj, err := ctx.getNamespace(namespace, selectedItem.targetNamespace)
 				if err != nil {
 					errs.AddVeleroError(err)
 					continue
 				}
-
-				// Add the newly created namespace to the list of restored items.
-				if nsCreated {
-					itemKey := velero.ResourceIdentifier{
-						GroupResource: kuberesource.Namespaces,
-						Namespace:     ns.Namespace,
-						Name:          ns.Name,
-					}
-					ctx.restoredItems[itemKey] = struct{}{}
-				}
+				w, e := ctx.restoreItem(obj, kuberesource.Namespaces, "", true)
+				warnings.Merge(&w)
+				errs.Merge(&e)
+				processedItems++
 
 				// Keep track of namespaces that we know exist so we don't
 				// have to try to create them multiple times.
@@ -620,7 +601,7 @@ func (ctx *restoreContext) processSelectedResource(
 				continue
 			}
 
-			w, e := ctx.restoreItem(obj, groupResource, selectedItem.targetNamespace)
+			w, e := ctx.restoreItem(obj, groupResource, selectedItem.targetNamespace, false)
 			warnings.Merge(&w)
 			errs.Merge(&e)
 			processedItems++
@@ -656,40 +637,34 @@ func (ctx *restoreContext) processSelectedResource(
 	return processedItems, warnings, errs
 }
 
-// getNamespace returns a namespace API object that we should attempt to
+// getNamespace returns a namespace Unstructured object that we should attempt to
 // create before restoring anything into it. It will come from the backup
 // tarball if it exists, else will be a new one. If from the tarball, it
 // will retain its labels, annotations, and spec.
-func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Namespace {
-	var nsBytes []byte
-	var err error
-
-	if nsBytes, err = ioutil.ReadFile(path); err != nil {
-		return &v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: remappedName,
-			},
+func (ctx *restoreContext) getNamespace(namespace, remappedName string) (*unstructured.Unstructured, error) {
+	path := archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", namespace)
+	obj, err := archive.Unmarshal(ctx.fileSystem, path)
+	if err != nil {
+		name := namespace
+		if remappedName != "" {
+			name = remappedName
 		}
-	}
-
-	var backupNS v1.Namespace
-	if err := json.Unmarshal(nsBytes, &backupNS); err != nil {
-		logger.Warnf("Error unmarshalling namespace from backup, creating new one.")
-		return &v1.Namespace{
+		ns, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: remappedName,
+				Name: name,
 			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf(
+				"error decoding %q: %v",
+				strings.Replace(path, ctx.restoreDir+"/", "", -1),
+				err,
+			)
 		}
+		return &unstructured.Unstructured{Object: ns}, err
 	}
 
-	return &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        remappedName,
-			Labels:      backupNS.Labels,
-			Annotations: backupNS.Annotations,
-		},
-		Spec: backupNS.Spec,
-	}
+	return obj, nil
 }
 
 func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.RestoreItemResolvedAction {
@@ -877,14 +852,14 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 	return fmt.Sprintf("%s/%s/%s", groupResource.String(), namespace, name)
 }
 
-func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (Result, Result) {
+func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string, bypassIncludesExcludes bool) (Result, Result) {
 	warnings, errs := Result{}, Result{}
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
 
 	// Check if group/resource should be restored. We need to do this here since
 	// this method may be getting called for an additional item which is a group/resource
 	// that's excluded.
-	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+	if !bypassIncludesExcludes && !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 		ctx.log.WithFields(logrus.Fields{
 			"namespace":     obj.GetNamespace(),
 			"name":          obj.GetName(),
@@ -900,7 +875,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// via obj.GetNamespace()) instead of the namespace parameter, because we want
 	// to check the *original* namespace, not the remapped one if it's been remapped.
 	if namespace != "" {
-		if !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) {
+		if !bypassIncludesExcludes && !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) {
 			ctx.log.WithFields(logrus.Fields{
 				"namespace":     obj.GetNamespace(),
 				"name":          obj.GetName(),
@@ -912,23 +887,16 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// If the namespace scoped resource should be restored, ensure that the
 		// namespace into which the resource is being restored into exists.
 		// This is the *remapped* namespace that we are ensuring exists.
-		nsToEnsure := getNamespace(ctx.log, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
-		if _, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+		nsObj, err := ctx.getNamespace(namespace, "")
+		if err != nil {
 			errs.AddVeleroError(err)
-			return warnings, errs
-		} else {
-			// Add the newly created namespace to the list of restored items.
-			if nsCreated {
-				itemKey := velero.ResourceIdentifier{
-					GroupResource: kuberesource.Namespaces,
-					Namespace:     nsToEnsure.Namespace,
-					Name:          nsToEnsure.Name,
-				}
-				ctx.restoredItems[itemKey] = struct{}{}
-			}
 		}
+
+		w, e := ctx.restoreItem(nsObj, kuberesource.Namespaces, "", true)
+		warnings.Merge(&w)
+		errs.Merge(&e)
 	} else {
-		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
+		if !bypassIncludesExcludes && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
 			ctx.log.WithFields(logrus.Fields{
 				"namespace":     obj.GetNamespace(),
 				"name":          obj.GetName(),
@@ -1160,7 +1128,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				}
 			}
 
-			w, e := ctx.restoreItem(additionalObj, additionalItem.GroupResource, additionalItemNamespace)
+			w, e := ctx.restoreItem(additionalObj, additionalItem.GroupResource, additionalItemNamespace, false)
 			warnings.Merge(&w)
 			errs.Merge(&e)
 		}

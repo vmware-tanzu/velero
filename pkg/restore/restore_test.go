@@ -77,6 +77,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -87,12 +91,14 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
-				test.PVs():  {"/pv-1", "/pv-2"},
+				test.Namespaces(): {"/ns-1", "/ns-2"},
+				test.Pods():       {"ns-1/pod-1", "ns-2/pod-2"},
+				test.PVs():        {"/pv-1", "/pv-2"},
 			},
 		},
 		{
@@ -100,6 +106,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedResources("pods").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -110,11 +120,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Namespaces(): {"/ns-1", "/ns-2"},
+				test.Pods():       {"ns-1/pod-1", "ns-2/pod-2"},
 			},
 		},
 		{
@@ -122,6 +134,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().ExcludedResources("pvs").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -132,11 +148,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Namespaces(): {"/ns-1", "/ns-2"},
+				test.Pods():       {"ns-1/pod-1", "ns-2/pod-2"},
 			},
 		},
 		{
@@ -144,6 +162,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -158,11 +180,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1"},
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-1/deploy-1"},
 			},
@@ -172,6 +196,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().ExcludedNamespaces("ns-2").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -186,11 +214,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1"},
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-1/deploy-1"},
 			},
@@ -200,6 +230,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -214,11 +248,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1", "/ns-2"},
 				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
 				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
 			},
@@ -228,6 +264,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -242,11 +282,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1", "/ns-2"},
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-2/deploy-2"},
 				test.PVs():         {"/pv-1"},
@@ -257,6 +299,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(true).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -271,11 +317,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1"},
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-1/deploy-1"},
 				test.PVs():         {"/pv-1", "/pv-2"},
@@ -286,6 +334,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -300,11 +352,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1"},
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-1/deploy-1"},
 				test.PVs():         {},
@@ -315,6 +369,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -329,11 +387,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1"},
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-1/deploy-1"},
 				test.PVs():         {},
@@ -344,6 +404,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludeClusterResources(true).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -358,11 +422,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1", "/ns-2"},
 				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
 				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
 				test.PVs():         {"/pv-1", "/pv-2"},
@@ -373,6 +439,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -387,11 +457,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1", "/ns-2"},
 				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
 				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
 			},
@@ -401,6 +473,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedResources("*", "pods").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -415,11 +491,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1", "/ns-2"},
 				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
 				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
 				test.PVs():         {"/pv-1", "/pv-2"},
@@ -430,6 +508,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().ExcludedResources("*").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -444,11 +526,13 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
+				test.Namespaces():  {"/ns-1", "/ns-2"},
 				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
 				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
 				test.PVs():         {"/pv-1", "/pv-2"},
@@ -459,6 +543,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().IncludedResources("pods", "unresolvable").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -473,12 +561,14 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Namespaces(): {"/ns-1", "/ns-2"},
+				test.Pods():       {"ns-1/pod-1", "ns-2/pod-2"},
 			},
 		},
 		{
@@ -486,6 +576,10 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			restore: defaultRestore().ExcludedResources("deployments", "unresolvable").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -500,13 +594,15 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 				test.Deployments(),
 				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
-				test.PVs():  {"/pv-1", "/pv-2"},
+				test.Namespaces(): {"/ns-1", "/ns-2"},
+				test.Pods():       {"ns-1/pod-1", "ns-2/pod-2"},
+				test.PVs():        {"/pv-1", "/pv-2"},
 			},
 		},
 		{
@@ -575,9 +671,15 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			restore: defaultRestore().NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Result(),
 			backup:  defaultBackup().Result(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 			},
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+					builder.ForNamespace("ns-3").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -585,7 +687,8 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 				).
 				Done(),
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
+				test.Namespaces(): {"/mapped-ns-1", "/mapped-ns-2", "/ns-3"},
+				test.Pods():       {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
 			},
 		},
 		{
@@ -593,9 +696,15 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			restore: defaultRestore().IncludedNamespaces("ns-1", "ns-2").NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Result(),
 			backup:  defaultBackup().Result(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 			},
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+					builder.ForNamespace("ns-3").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").Result(),
@@ -603,7 +712,8 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 				).
 				Done(),
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2"},
+				test.Namespaces(): {"/mapped-ns-1", "/mapped-ns-2"},
+				test.Pods():       {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2"},
 			},
 		},
 	}
@@ -627,7 +737,7 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // restoreItemActions
+				[]velero.RestoreItemAction{NewNamespaceAction(h.log)}, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -814,6 +924,9 @@ func TestRestoreItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").
 						ObjectMeta(
@@ -826,9 +939,17 @@ func TestRestoreItems(t *testing.T) {
 				).
 				Done(),
 			apiResources: []*test.APIResource{
+				test.Namespaces(),
 				test.Pods(),
 			},
 			want: []*test.APIResource{
+				test.Namespaces(
+					builder.ForNamespace("ns-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						Result(),
+				),
 				test.Pods(
 					builder.ForPod("ns-1", "pod-1").
 						ObjectMeta(
@@ -1079,12 +1200,26 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
-				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
-				new(recordResourcesAction): {"ns-1/pod-1", "ns-2/pod-2", "pv-1", "pv-2"},
+				new(recordResourcesAction): {"ns-1", "ns-1/pod-1", "ns-2", "ns-2/pod-2", "pv-1", "pv-2"},
 			},
 		},
 		{
@@ -1092,10 +1227,24 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
-				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForResource("pods"): {"ns-1/pod-1", "ns-2/pod-2"},
 			},
@@ -1105,10 +1254,24 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
-				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForResource("persistentvolumes"): {"pv-1", "pv-2"},
 			},
@@ -1118,11 +1281,29 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
-				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVCs(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1"},
 			},
@@ -1132,11 +1313,29 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
-				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVCs(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("pods"): {"ns-1/pod-1"},
 			},
@@ -1146,13 +1345,20 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods",
 					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("restore-resource", "true")).Result(),
 					builder.ForPod("ns-1", "pod-2").ObjectMeta(builder.WithLabels("do-not-restore-resource", "true")).Result(),
 					builder.ForPod("ns-2", "pod-1").Result(),
 					builder.ForPod("ns-2", "pod-2").ObjectMeta(builder.WithLabels("restore-resource")).Result(),
 				).Done(),
-			apiResources: []*test.APIResource{test.Pods()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+			},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForResource("pods").ForLabelSelector("restore-resource"): {"ns-1/pod-1", "ns-2/pod-2"},
 			},
@@ -1162,12 +1368,31 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
-				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
-				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVCs(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("ns"): {"ns-1", "ns-2"},
 				new(recordResourcesAction).ForResource("po"): {"ns-1/pod-1", "ns-2/pod-2"},
 				new(recordResourcesAction).ForResource("pv"): {"pv-1", "pv-2"},
 			},
@@ -1177,10 +1402,19 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
 				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
 				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVCs(),
+				test.PVs(),
+			},
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
 				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
@@ -1282,11 +1516,17 @@ func TestRestoreActionModifications(t *testing.T) {
 		want         []*test.APIResource
 	}{
 		{
-			name:         "action that adds a label to item gets restored",
-			restore:      defaultRestore().Result(),
-			backup:       defaultBackup().Result(),
-			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
-			apiResources: []*test.APIResource{test.Pods()},
+			name:    "action that adds a label to item gets restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("namespaces", builder.ForNamespace("ns-1").Result()).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+			},
 			actions: []velero.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(map[string]string{"updated": "true"})
@@ -1299,11 +1539,20 @@ func TestRestoreActionModifications(t *testing.T) {
 			},
 		},
 		{
-			name:         "action that removes a label to item gets restored",
-			restore:      defaultRestore().Result(),
-			backup:       defaultBackup().Result(),
-			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result()).Done(),
-			apiResources: []*test.APIResource{test.Pods()},
+			name:    "action that removes a label to item gets restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("namespaces", builder.ForNamespace("ns-1").Result()).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+			},
 			actions: []velero.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(nil)
@@ -1375,11 +1624,23 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 		want         map[*test.APIResource][]string
 	}{
 		{
-			name:         "additional items that are already being restored are not restored twice",
-			restore:      defaultRestore().Result(),
-			backup:       defaultBackup().Result(),
-			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
-			apiResources: []*test.APIResource{test.Pods()},
+			name:    "additional items that are already being restored are not restored twice",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+			},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
 					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
@@ -1394,15 +1655,28 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				},
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Namespaces(): {"/ns-1", "/ns-2"},
+				test.Pods():       {"ns-1/pod-1", "ns-2/pod-2"},
 			},
 		},
 		{
-			name:         "when using a restore namespace filter, additional items that are in a non-included namespace are not restored",
-			restore:      defaultRestore().IncludedNamespaces("ns-1").Result(),
-			backup:       defaultBackup().Result(),
-			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
-			apiResources: []*test.APIResource{test.Pods()},
+			name:    "when using a restore namespace filter, additional items that are in a non-included namespace are not restored",
+			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("namespaces",
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
+				).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+			},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1416,7 +1690,8 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				},
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1"},
+				test.Namespaces(): {"/ns-1"},
+				test.Pods():       {"ns-1/pod-1"},
 			},
 		},
 		{
@@ -1424,10 +1699,15 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces", builder.ForNamespace("ns-1").Result()).
 				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVs(),
+			},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1441,8 +1721,9 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				},
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1"},
-				test.PVs():  {"/pv-1"},
+				test.Namespaces(): {"/ns-1"},
+				test.Pods():       {"ns-1/pod-1"},
+				test.PVs():        {"/pv-1"},
 			},
 		},
 		{
@@ -1450,10 +1731,15 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces", builder.ForNamespace("ns-1").Result()).
 				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVs(),
+			},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1467,8 +1753,9 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				},
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1"},
-				test.PVs():  nil,
+				test.Namespaces(): {"/ns-1"},
+				test.Pods():       {"ns-1/pod-1"},
+				test.PVs():        nil,
 			},
 		},
 		{
@@ -1476,10 +1763,15 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			restore: defaultRestore().IncludedResources("pods").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
+				AddItems("namespaces", builder.ForNamespace("ns-1").Result()).
 				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
-			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+				test.Pods(),
+				test.PVs(),
+			},
 			actions: []velero.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1493,8 +1785,9 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				},
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1"},
-				test.PVs():  nil,
+				test.Namespaces(): {"/ns-1"},
+				test.Pods():       {"ns-1/pod-1"},
+				test.PVs():        nil,
 			},
 		},
 	}
@@ -2121,7 +2414,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						ObjectMeta(
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+							// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
 						).ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),
@@ -2815,6 +3108,13 @@ func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, crea
 	// we saw created. Once we've seen a resource in 'resourcePriorities', we should
 	// never see another instance of a prior resource.
 	lastSeen := 0
+
+	// Remove namespaces from 'createdResources' as those are restored lazily.
+	for i, resource := range createdResources {
+		if resource.groupResource == "namespaces" {
+			createdResources = append(createdResources[:i], createdResources[i+1:]...)
+		}
+	}
 
 	// Find the index in 'resourcePriorities' of the resource type for
 	// the current item, if it exists. This index ('current') *must*

@@ -56,6 +56,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
 				RegisterRestoreItemAction("velero.io/apiservice", newAPIServiceRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/admission-webhook-configuration", newAdmissionWebhookConfigurationAction).
+				RegisterRestoreItemAction("velero.io/namespaces", newNamespaceItemAction).
 				Serve()
 		},
 	}
@@ -215,4 +216,8 @@ func newAPIServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, err
 
 func newAdmissionWebhookConfigurationAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewAdmissionWebhookConfigurationAction(logger), nil
+}
+
+func newNamespaceItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewNamespaceAction(logger), nil
 }
