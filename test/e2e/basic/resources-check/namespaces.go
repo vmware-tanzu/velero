@@ -92,9 +92,12 @@ func (m *MultiNSBackup) Init() error {
 func (m *MultiNSBackup) CreateResources() error {
 	m.Ctx, _ = context.WithTimeout(context.Background(), m.TimeoutDuration)
 	fmt.Printf("Creating namespaces ...\n")
+	labels := map[string]string{
+		"ns-test": "true",
+	}
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
-		if err := CreateNamespace(m.Ctx, m.Client, createNSName); err != nil {
+		if err := CreateNamespaceWithLabel(m.Ctx, m.Client, createNSName, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
@@ -108,10 +111,17 @@ func (m *MultiNSBackup) Verify() error {
 		checkNS, err := GetNamespace(m.Ctx, m.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
-		}
-		if checkNS.Name != checkNSName {
+		} else if checkNS.Name != checkNSName {
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", checkNSName, checkNS.Name)
 		}
 	}
 	return nil
+}
+
+func (m *MultiNSBackup) Destroy() error {
+	err := CleanupNamespaces(m.Ctx, m.Client, m.NSBaseName)
+	if err != nil {
+		return errors.Wrap(err, "Could cleanup retrieve namespaces")
+	}
+	return WaitAllSelectedNSDeleted(m.Ctx, m.Client, "ns-test=true")
 }

@@ -28,7 +28,6 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -89,7 +88,7 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 }
 
 func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseName string) error {
-	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
+	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
@@ -105,17 +104,33 @@ func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseNam
 }
 
 func CleanupNamespaces(ctx context.Context, client TestClient, nsBaseName string) error {
-	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, v1.ListOptions{})
+	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 	for _, checkNamespace := range namespaces.Items {
 		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
-			err = client.ClientGo.CoreV1().Namespaces().Delete(ctx, checkNamespace.Name, v1.DeleteOptions{})
+			err = client.ClientGo.CoreV1().Namespaces().Delete(ctx, checkNamespace.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
 			}
 		}
 	}
 	return nil
+}
+
+func WaitAllSelectedNSDeleted(ctx context.Context, client TestClient, label string) error {
+	return waitutil.PollImmediateInfinite(5*time.Second,
+		func() (bool, error) {
+			if ns, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: label}); err != nil {
+				return false, err
+			} else if ns == nil {
+				return true, nil
+			} else if len(ns.Items) == 0 {
+				return true, nil
+			} else {
+				logrus.Debugf("%d namespaces is still being deleted...\n", len(ns.Items))
+				return false, nil
+			}
+		})
 }
