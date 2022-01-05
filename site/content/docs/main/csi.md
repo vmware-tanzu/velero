@@ -1,26 +1,25 @@
 ---
-title: "Container Storage Interface Snapshot Support in Velero"
+title: "Beta Container Storage Interface Snapshot Support in Velero"
 layout: docs
 ---
 
-_This feature is under development. Documentation may not be up-to-date and features may not work as expected._
+Integrating Container Storage Interface (CSI) snapshot support into Velero enables Velero to backup and restore CSI-backed volumes using the [Kubernetes CSI Snapshot APIs](https://kubernetes.io/docs/concepts/storage/volume-snapshots/).
 
-Integrating Container Storage Interface (CSI) snapshot support into Velero enables Velero to backup and restore CSI-backed volumes using the [Kubernetes CSI Snapshot Beta APIs](https://kubernetes.io/docs/concepts/storage/volume-snapshots/).
+By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available. This page gives an overview of how to add support for CSI snapshots to Velero  through CSI plugins. For more information about specific components, see the [plugin repo](https://github.com/vmware-tanzu/velero-plugin-for-csi/).
 
-By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available.
+The Velero Container Storage Interface (CSI) plugins are in beta. It's not recommended for use in a production environment and the `EnableCSI` feature flag is disabled by default. The Velero team plans to follow the upstream Kubernetes support level for CSI volume snapshotting, and the Velero CSI plugins will reach general availability sometime after volume snapshotting is GA in upstream Kubernetes.
+
+**Note:** The AWS, Microsoft Azure, and Google Cloud Platform (GCP) Velero plugins version 1.4 and later are able snapshot and restore persistent volume provisioned by the CSI driver via the APIs of the cloud provider, without having to install Velero CSI plugins.  
 
 ## Prerequisites
 
-The following are the prerequisites for using Velero to take Container Storage Interface (CSI) snapshots:
-
- 1. The cluster is Kubernetes version 1.17 or greater.
- 1. The cluster is running a CSI driver capable of support volume snapshots at the [v1beta1 API level](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
- 1. When restoring CSI volumesnapshots across clusters, the name of the CSI driver in the destination cluster is the same as that on the source cluster to ensure cross cluster portability of CSI volumesnapshots
+ 1. Your cluster is Kubernetes version 1.17 or greater.
+ 1. Your cluster is running a CSI driver capable of support volume snapshots at the [v1beta1 API level](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
+ 1. When restoring CSI VolumeSnapshots across clusters, the name of the CSI driver in the destination cluster is the same as that on the source cluster to ensure cross cluster portability of CSI VolumeSnapshots
 
 ## Installing Velero with CSI support
 
-Ensure that the Velero server is running with the `EnableCSI` feature flag. See [Enabling Features][1] for more information.
-Also, the Velero [CSI plugin][2] ([Docker Hub][3]) is necessary to integrate with the CSI volume snapshot APIs.
+To integrate Velero with the CSI volume snapshot APIs, you must enable the `EnableCSI` feature flag and install the Velero [CSI plugins][2] on the Velero server.
 
 Both of these can be added with the `velero install` command.
 
@@ -32,23 +31,18 @@ velero install \
 ```
 
 To include the status of CSI objects associated with a Velero backup in `velero backup describe` output, run `velero client config set features=EnableCSI`.
-See [Enabling Features][1] for more information about managing client-side feature flags.
+See [Enabling Features][1] for more information about managing client-side feature flags. You can also view the image on [Docker Hub][3].
 
 ## Implementation Choices
 
-This section documents some of the choices made during implementation of the Velero [CSI plugin][2]:
+This section documents some of the choices made during implementation of the Velero [CSI plugins][2]:
 
-1. Volumesnapshots created by the plugin will be retained only for the lifetime of the backup even if the `DeletionPolicy` on the volumesnapshotclass is set to `Retain`. To accomplish this, during deletion of the backup the prior to deleting the volumesnapshot, volumesnapshotcontent object will be patched to set its `DeletionPolicy` to `Delete`. Thus deleting volumesnapshot object will result in cascade delete of the volumesnapshotcontent and the snapshot in the storage provider.
-1. Volumesnapshotcontent objects created during a velero backup that are dangling, unbound to a volumesnapshot object, will also be discovered, through labels, and deleted on backup deletion.
-1. The Velero CSI plugin, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster that has the same driver name and also has the `velero.io/csi-volumesnapshot-class` label set on it, like
+1. VolumeSnapshots created by the Velero CSI plugins are retained only for the lifetime of the backup even if the `DeletionPolicy` on the VolumeSnapshotClass is set to `Retain`. To accomplish this, during deletion of the backup the prior to deleting the VolumeSnapshot, VolumeSnapshotContent object is patched to set its `DeletionPolicy` to `Delete`. Deleting the VolumeSnapshot object will result in cascade delete of the VolumeSnapshotContent and the snapshot in the storage provider.
+1. VolumeSnapshotContent objects created during a `velero backup` that are dangling, unbound to a VolumeSnapshot object, will be discovered, using labels, and deleted on backup deletion.
+1. The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster that has the same driver name and also has the `velero.io/csi-volumesnapshot-class` label set on it, like
 ```yaml
 velero.io/csi-volumesnapshot-class: "true"
 ```
-
-## Roadmap
-
-Velero's support level for CSI volume snapshotting will follow upstream Kubernetes support for the feature, and will reach general availability sometime
-after volume snapshotting is GA in upstream Kubernetes. Beta support is expected to launch in Velero v1.4.
 
 ## How it Works - Overview
 
@@ -64,6 +58,9 @@ The external-snapshotter plugin will call the CSI driver's snapshot method, and 
 Once an ID is generated and the storage system marks the snapshot as usable for restore, the VolumeSnapshotContent object will be updated with a `status.snapshotHandle` and the `status.readyToUse` field will be set.
 
 Velero will include the generated VolumeSnapshot and VolumeSnapshotContent objects in the backup tarball, as well as upload all VolumeSnapshots and VolumeSnapshotContents objects in a JSON file to the object storage system.
+
+**NOTE:** Not all cloud provider's CSI drivers guarantee snapshot durability, meaning that the VolumeSnapshot and VolumeSnapshotContent objects may be stored in the same object storage system location as the original PersistentVolume and may be vulnerable to data loss. You should refer to your cloud provider's documentation for more information on configuring snapshot durability.
+
 When Velero synchronizes backups into a new cluster, VolumeSnapshotContent objects will be synced into the cluster as well, so that Velero can manage backup expiration appropriately.
 
 The `DeletionPolicy` on the VolumeSnapshotContent will be the same as the `DeletionPolicy` on the VolumeSnapshotClass that was used to create the VolumeSnapshot. Setting a `DeletionPolicy` of `Retain` on the VolumeSnapshotClass will preserve the volume snapshot in the storage system for the lifetime of the Velero backup and will prevent the deletion of the volume snapshot, in the storage system, in the event of a disaster where the namespace with the VolumeSnapshot object may be lost.
