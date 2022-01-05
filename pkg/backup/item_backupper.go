@@ -112,12 +112,15 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 		name:      name,
 	}
 
+	ib.backupRequest.Mu.Lock()
 	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
 		log.Info("Skipping item because it's already been backed up.")
 		// returning true since this item *is* in the backup, even though we're not backing it up here
+		ib.backupRequest.Mu.Unlock()
 		return true, nil
 	}
 	ib.backupRequest.BackedUpItems[key] = struct{}{}
+	ib.backupRequest.Mu.Unlock()
 
 	log.Info("Backing up item")
 

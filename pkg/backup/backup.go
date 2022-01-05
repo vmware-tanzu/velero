@@ -355,11 +355,12 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	}()
 
 	backedUpGroupResources := map[schema.GroupResource]bool{}
+	mu := sync.Mutex{}
 	totalItems := len(items)
 
 	itemChannel := make(chan *kubernetesResource, 10)
 
-	handleItemFunc := func() {
+	handleItemFunc := func(i int) {
 		for {
 			select {
 			case item := <-itemChannel:
@@ -368,6 +369,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 					"resource":  item.groupResource.String(),
 					"namespace": item.namespace,
 					"name":      item.name,
+					"thread":    fmt.Sprintf("%v", i),
 				}).Infof("Processing item")
 				var unstructured unstructured.Unstructured
 
@@ -386,13 +388,16 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 
 				//TODO: USE ENCAPSULATED TAR WRITER
 				if backedUp := kb.backupItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR); backedUp {
+					mu.Lock()
 					backedUpGroupResources[item.groupResource] = true
+					mu.Unlock()
 				}
 				log.WithFields(map[string]interface{}{
 					"progress":  "",
 					"resource":  item.groupResource.String(),
 					"namespace": item.namespace,
 					"name":      item.name,
+					"thread":    fmt.Sprintf("%v", i),
 				}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
 			case <-quit:
 				return
@@ -402,7 +407,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 
 	// start Handlers
 	for i := 0; i < 10; i++ {
-		go handleItemFunc()
+		go handleItemFunc(i)
 	}
 
 	for i, item := range items {

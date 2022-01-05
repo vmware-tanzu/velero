@@ -69,20 +69,22 @@ func (r *itemCollector) getAllItems() []*kubernetesResource {
 	stop := make(chan bool)
 	mu := sync.Mutex{}
 
-	groupItemCollectorFunc := func() {
+	groupItemCollectorFunc := func(i int) {
 		for {
 			select {
 			case g := <-groupChannel:
+				s := time.Now()
 				groupItems, err := r.getGroupItems(r.log, g)
 				if err != nil {
-					r.log.WithError(err).WithField("apiGroup", g.String()).Error("Error collecting resources from API group")
+					r.log.WithError(err).WithField("apiGroup", g.String()).WithField("thread", i).Error("Error collecting resources from API group")
 					wg.Done()
-					break
+					continue
 				}
 				mu.Lock()
 				resources = append(resources, groupItems...)
 				mu.Unlock()
 				wg.Done()
+				r.log.Infof("thread: %v done with group: %v time: %v", i, g.GroupVersion, time.Since(s))
 			case <-stop:
 				return
 			}
@@ -90,21 +92,21 @@ func (r *itemCollector) getAllItems() []*kubernetesResource {
 	}
 
 	for i := 0; i < 10; i++ {
-		go groupItemCollectorFunc()
+		go groupItemCollectorFunc(i)
 	}
 
-	go func() {
-		for _, group := range r.discoveryHelper.Resources() {
-			wg.Add(1)
-			groupChannel <- group
-		}
-	}()
+	wg.Add(1)
+	for _, group := range r.discoveryHelper.Resources() {
+		wg.Add(1)
+		groupChannel <- group
+	}
+	wg.Done()
 
 	// wait for everything to complete
 	wg.Wait()
 	// Quit the select loop
 	stop <- true
-	r.log.Infof("time taken is: %v", time.Since(start))
+	r.log.Infof("time taken is: %v for %v", time.Since(start), resources)
 	return resources
 }
 

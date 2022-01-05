@@ -19,6 +19,7 @@ package backup
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -46,6 +47,7 @@ type Request struct {
 
 	VolumeSnapshots  []*volume.Snapshot
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
+	Mu               sync.Mutex
 	BackedUpItems    map[itemKey]struct{}
 }
 

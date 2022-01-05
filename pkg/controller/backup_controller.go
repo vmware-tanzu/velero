@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -328,6 +329,7 @@ func patchBackup(original, updated *velerov1api.Backup, client velerov1client.Ba
 func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkgbackup.Request {
 	request := &pkgbackup.Request{
 		Backup: backup.DeepCopy(), // don't modify items in the cache
+		Mu:     sync.Mutex{},
 	}
 
 	// set backup major version - deprecated, use Status.FormatVersion
