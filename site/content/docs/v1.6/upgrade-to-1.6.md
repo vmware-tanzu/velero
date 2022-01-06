@@ -15,6 +15,8 @@ If you're not yet running at least Velero v1.5, see the following:
 - [Upgrading to v1.4][4]
 - [Upgrading to v1.5][5]
 
+Before upgrading, check the [Velero compatibility matrix](https://github.com/vmware-tanzu/velero#velero-compatabilty-matrix) to make sure your version of Kubernetes is supported by the new version of Velero.
+
 ## Instructions
 
 1. Install the Velero v1.6 command-line interface (CLI) by following the [instructions here][0].
@@ -73,7 +75,7 @@ If you're not yet running at least Velero v1.5, see the following:
 
 ## Notes
 ### Default backup storage location
-We have deprecated the way to indicate the default backup storage location. Previously, that was indicated according to the backup storage location name set on the velero server-side via the flag `velero server --default-backup-storage-location`. Now we configure the default backup storage location on the velero client-side. Please refer to the [About locations][9] on how to indicate which backup storage location is the default one. 
+We have deprecated the way to indicate the default backup storage location. Previously, that was indicated according to the backup storage location name set on the velero server-side via the flag `velero server --default-backup-storage-location`. Now we configure the default backup storage location on the velero client-side. Please refer to the [About locations][9] on how to indicate which backup storage location is the default one.
 
 After upgrading, if there is a previously created backup storage location with the name that matches what was defined on the server side as the default, it will be automatically set as the `default`.
 
