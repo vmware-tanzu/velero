@@ -1,0 +1,1 @@
+Initialize the labels field of `velero backup-location create` option to avoid #4484
