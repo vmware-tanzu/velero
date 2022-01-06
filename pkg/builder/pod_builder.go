@@ -17,6 +17,8 @@ limitations under the License.
 package builder
 
 import (
+	"strconv"
+
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -38,6 +40,28 @@ func ForPod(ns, name string) *PodBuilder {
 				Namespace: ns,
 				Name:      name,
 			},
+		},
+	}
+}
+
+// ForPodWithImage is the constructor for a PodBuilder with container image.
+func ForPodWithImage(ns, name string, images ...string) *PodBuilder {
+	containers := []corev1api.Container{}
+	for i, image := range images {
+		containers = append(containers, corev1api.Container{Name: strconv.Itoa(i), Image: image})
+	}
+	spec := corev1api.PodSpec{Containers: containers}
+	return &PodBuilder{
+		object: &corev1api.Pod{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1api.SchemeGroupVersion.String(),
+				Kind:       "Pod",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Spec: spec,
 		},
 	}
 }

@@ -56,6 +56,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
 				RegisterRestoreItemAction("velero.io/apiservice", newAPIServiceRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/admission-webhook-configuration", newAdmissionWebhookConfigurationAction).
+				RegisterRestoreItemAction("velero.io/change-image-registry", newChangeImageRegistryRestoreItemAction(f)).
 				Serve()
 		},
 	}
@@ -206,4 +207,18 @@ func newAPIServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, err
 
 func newAdmissionWebhookConfigurationAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewAdmissionWebhookConfigurationAction(logger), nil
+}
+
+func newChangeImageRegistryRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewChangeImageRegistryAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+		), nil
+	}
 }

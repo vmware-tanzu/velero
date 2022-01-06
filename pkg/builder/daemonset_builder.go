@@ -1,12 +1,9 @@
 /*
-Copyright 2019 the Velero contributors.
-
+Copyright 2022 the Velero contributors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,18 +21,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DeploymentBuilder builds Deployment objects.
-type DeploymentBuilder struct {
-	object *appsv1api.Deployment
+// DaemonsetBuilder builds Daemonset objects.
+type DaemonsetBuilder struct {
+	object *appsv1api.DaemonSet
 }
 
-// ForDeployment is the constructor for a DeploymentBuilder.
-func ForDeployment(ns, name string) *DeploymentBuilder {
-	return &DeploymentBuilder{
-		object: &appsv1api.Deployment{
+// ForDaemonset is the constructor for a DaemonsetBuilder.
+func ForDaemonset(ns, name string) *DaemonsetBuilder {
+	return &DaemonsetBuilder{
+		object: &appsv1api.DaemonSet{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: appsv1api.SchemeGroupVersion.String(),
-				Kind:       "Deployment",
+				Kind:       "DaemonSet",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
@@ -45,38 +42,29 @@ func ForDeployment(ns, name string) *DeploymentBuilder {
 	}
 }
 
-// ForDeploymentWithImage is the constructor for a DeploymentBuilder with container image.
-func ForDeploymentWithImage(ns, name string, images ...string) *DeploymentBuilder {
+// ForDaemonsetWithImage is the constructor for a DaemonsetBuilder with container image.
+func ForDaemonsetWithImage(ns, name string, images ...string) *DaemonsetBuilder {
 	containers := []corev1api.Container{}
 	for i, image := range images {
 		containers = append(containers, corev1api.Container{Name: strconv.Itoa(i), Image: image})
 	}
 	spec := corev1api.PodSpec{Containers: containers}
-	return &DeploymentBuilder{
-		object: &appsv1api.Deployment{
+	return &DaemonsetBuilder{
+		object: &appsv1api.DaemonSet{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: appsv1api.SchemeGroupVersion.String(),
-				Kind:       "Deployment",
+				Kind:       "DaemonSet",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      name,
 			},
-			Spec: appsv1api.DeploymentSpec{Template: corev1api.PodTemplateSpec{Spec: spec}},
+			Spec: appsv1api.DaemonSetSpec{Template: corev1api.PodTemplateSpec{Spec: spec}},
 		},
 	}
 }
 
-// Result returns the built Deployment.
-func (b *DeploymentBuilder) Result() *appsv1api.Deployment {
+// Result returns the built DaemonSet.
+func (b *DaemonsetBuilder) Result() *appsv1api.DaemonSet {
 	return b.object
-}
-
-// ObjectMeta applies functional options to the Deployment's ObjectMeta.
-func (b *DeploymentBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DeploymentBuilder {
-	for _, opt := range opts {
-		opt(b.object)
-	}
-
-	return b
 }

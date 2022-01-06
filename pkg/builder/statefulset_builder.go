@@ -17,6 +17,8 @@ limitations under the License.
 package builder
 
 import (
+	"strconv"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +44,28 @@ func ForStatefulSet(ns, name string) *StatefulSetBuilder {
 			Spec: appsv1.StatefulSetSpec{
 				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{},
 			},
+		},
+	}
+}
+
+// ForStatefulSetWithImage is the constructor for a StatefulSetBuilder with container image.
+func ForStatefulSetWithImage(ns, name string, images ...string) *StatefulSetBuilder {
+	containers := []corev1.Container{}
+	for i, image := range images {
+		containers = append(containers, corev1.Container{Name: strconv.Itoa(i), Image: image})
+	}
+	spec := corev1.PodSpec{Containers: containers}
+	return &StatefulSetBuilder{
+		object: &appsv1.StatefulSet{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+				Kind:       "StatefulSet",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Spec: appsv1.StatefulSetSpec{Template: corev1.PodTemplateSpec{Spec: spec}},
 		},
 	}
 }

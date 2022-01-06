@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2022 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,18 +24,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DeploymentBuilder builds Deployment objects.
-type DeploymentBuilder struct {
-	object *appsv1api.Deployment
+// ReplicaSetBuilder builds ReplicaSet objects.
+type ReplicaSetBuilder struct {
+	object *appsv1api.ReplicaSet
 }
 
-// ForDeployment is the constructor for a DeploymentBuilder.
-func ForDeployment(ns, name string) *DeploymentBuilder {
-	return &DeploymentBuilder{
-		object: &appsv1api.Deployment{
+// ForReplicaSet is the constructor for a ReplicaSetBuilder.
+func ForReplicaSet(ns, name string) *ReplicaSetBuilder {
+	return &ReplicaSetBuilder{
+		object: &appsv1api.ReplicaSet{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: appsv1api.SchemeGroupVersion.String(),
-				Kind:       "Deployment",
+				Kind:       "ReplicaSet",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
@@ -45,35 +45,35 @@ func ForDeployment(ns, name string) *DeploymentBuilder {
 	}
 }
 
-// ForDeploymentWithImage is the constructor for a DeploymentBuilder with container image.
-func ForDeploymentWithImage(ns, name string, images ...string) *DeploymentBuilder {
+// ForReplicaSetWithImage is the constructor for a ReplicaSetBuilder with container image.
+func ForReplicaSetWithImage(ns, name string, images ...string) *ReplicaSetBuilder {
 	containers := []corev1api.Container{}
 	for i, image := range images {
 		containers = append(containers, corev1api.Container{Name: strconv.Itoa(i), Image: image})
 	}
 	spec := corev1api.PodSpec{Containers: containers}
-	return &DeploymentBuilder{
-		object: &appsv1api.Deployment{
+	return &ReplicaSetBuilder{
+		object: &appsv1api.ReplicaSet{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: appsv1api.SchemeGroupVersion.String(),
-				Kind:       "Deployment",
+				Kind:       "ReplicaSet",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      name,
 			},
-			Spec: appsv1api.DeploymentSpec{Template: corev1api.PodTemplateSpec{Spec: spec}},
+			Spec: appsv1api.ReplicaSetSpec{Template: corev1api.PodTemplateSpec{Spec: spec}},
 		},
 	}
 }
 
-// Result returns the built Deployment.
-func (b *DeploymentBuilder) Result() *appsv1api.Deployment {
+// Result returns the built ReplicaSet.
+func (b *ReplicaSetBuilder) Result() *appsv1api.ReplicaSet {
 	return b.object
 }
 
-// ObjectMeta applies functional options to the Deployment's ObjectMeta.
-func (b *DeploymentBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DeploymentBuilder {
+// ObjectMeta applies functional options to the ReplicaSet's ObjectMeta.
+func (b *ReplicaSetBuilder) ObjectMeta(opts ...ObjectMetaOpt) *ReplicaSetBuilder {
 	for _, opt := range opts {
 		opt(b.object)
 	}
