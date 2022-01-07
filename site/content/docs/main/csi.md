@@ -9,7 +9,7 @@ By supporting CSI snapshot APIs, Velero can support any volume provider that has
 
 The Velero Container Storage Interface (CSI) plugins are in beta. It's not recommended for use in a production environment and the `EnableCSI` feature flag is disabled by default. The Velero team plans to follow the upstream Kubernetes support level for CSI volume snapshotting, and the Velero CSI plugins will reach general availability sometime after volume snapshotting is GA in upstream Kubernetes.
 
-**Note:** The AWS, Microsoft Azure, and Google Cloud Platform (GCP) Velero plugins version 1.4 and later are able to snapshot and restore persistent volumes provisioned by a CSI driver via the APIs of the cloud provider, without having to install Velero CSI plugins.  
+**Note:** The AWS, Microsoft Azure, and Google Cloud Platform (GCP) Velero plugins version 1.4 and later are able to snapshot and restore persistent volumes provisioned by a CSI driver via the APIs of the cloud provider, without having to install Velero CSI plugins. See the [AWS](https://github.com/vmware-tanzu/velero-plugin-for-aws), [Microsoft Azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure), and [Google Cloud Platform (GCP)](https://github.com/vmware-tanzu/velero-plugin-for-gcp) Velero plugin repo for more information on supported CSI drivers.
 
 ## Prerequisites
 
