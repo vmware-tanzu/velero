@@ -78,6 +78,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Credential: flag.NewMap(),
 		Config:     flag.NewMap(),
+		Labels:     flag.NewMap(),
 		AccessMode: flag.NewEnum(
 			string(velerov1api.BackupStorageLocationAccessModeReadWrite),
 			string(velerov1api.BackupStorageLocationAccessModeReadWrite),

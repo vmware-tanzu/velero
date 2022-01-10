@@ -76,3 +76,14 @@ func TestBuildBackupStorageLocationSetsCredential(t *testing.T) {
 		Key:                  "key-from-secret",
 	}, bsl.Spec.Credential)
 }
+
+func TestBuildBackupStorageLocationSetsLabels(t *testing.T) {
+	o := NewCreateOptions()
+
+	err := o.Labels.Set("key=value")
+	assert.NoError(t, err)
+
+	bsl, err := o.BuildBackupStorageLocation("velero-test-ns", false, false)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"key": "value"}, bsl.Labels)
+}
