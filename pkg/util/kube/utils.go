@@ -21,8 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +37,14 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 )
+
+// These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
+// They cannot be directly importing because they are part of the kubernetes/kubernetes package, and importing that package is unsupported.
+// Their values are well-known and slow changing. They're duplicated here as constants to provide compile-time checking.
+// Originals can be found in kubernetes/kubernetes/pkg/controller/volume/persistentvolume/util/util.go.
+const KubeAnnBindCompleted = "pv.kubernetes.io/bind-completed"
+const KubeAnnBoundByController = "pv.kubernetes.io/bound-by-controller"
+const KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
 func NamespaceAndName(objMeta metav1.Object) string {
@@ -105,7 +117,8 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 // GetVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
 // where the specified volume lives.
 // For volumes with a CSIVolumeSource, append "/mount" to the directory name.
-func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1listers.PersistentVolumeClaimLister, pvLister corev1listers.PersistentVolumeLister) (string, error) {
+func GetVolumeDirectory(log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, pvcLister corev1listers.PersistentVolumeClaimLister,
+	pvLister corev1listers.PersistentVolumeLister, client client.Client) (string, error) {
 	var volume *corev1api.Volume
 
 	for _, item := range pod.Spec.Volumes {
@@ -140,11 +153,39 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	}
 
 	// PV's been created with a CSI source.
-	if pv.Spec.CSI != nil {
+	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, client)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	if isProvisionedByCSI {
 		return pvc.Spec.VolumeName + "/mount", nil
 	}
 
 	return pvc.Spec.VolumeName, nil
+}
+
+func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, kbClient client.Client) (bool, error) {
+	if pv.Spec.CSI != nil {
+		return true, nil
+	}
+	// Although the pv.Spec.CSI is nil, the volume could be provisioned by a CSI driver when enabling the CSI migration
+	// Refer to https://github.com/vmware-tanzu/velero/issues/4496 for more details
+	if pv.Annotations != nil {
+		driverName := pv.Annotations[KubeAnnDynamicallyProvisioned]
+		if len(driverName) > 0 {
+			list := &storagev1api.CSIDriverList{}
+			if err := kbClient.List(context.TODO(), list); err != nil {
+				return false, err
+			}
+			for _, driver := range list.Items {
+				if driverName == driver.Name {
+					log.Debugf("the annotation %s=%s indicates the volume is provisioned by a CSI driver", KubeAnnDynamicallyProvisioned, driverName)
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }
 
 // IsV1CRDReady checks a v1 CRD to see if it's ready, with both the Established and NamesAccepted conditions.

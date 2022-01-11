@@ -52,6 +52,7 @@ import (
 	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -2987,9 +2988,9 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
 			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").WithAnnotations(
-				KubeAnnBindCompleted,
-				KubeAnnBoundByController,
-				KubeAnnDynamicallyProvisioned,
+				kube.KubeAnnBindCompleted,
+				kube.KubeAnnBoundByController,
+				kube.KubeAnnDynamicallyProvisioned,
 			).WithSpecField("claimRef", map[string]interface{}{
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
@@ -2997,7 +2998,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				"resourceVersion": "1"}).Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
-				WithAnnotations(KubeAnnDynamicallyProvisioned).
+				WithAnnotations(kube.KubeAnnDynamicallyProvisioned).
 				WithSpecField("claimRef", map[string]interface{}{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
@@ -3005,8 +3006,8 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
 			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations(
-				KubeAnnBindCompleted,
-				KubeAnnBoundByController,
+				kube.KubeAnnBindCompleted,
+				kube.KubeAnnBoundByController,
 			).WithSpecField("volumeName", "pv-1").Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations().

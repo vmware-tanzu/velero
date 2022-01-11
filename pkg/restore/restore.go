@@ -67,14 +67,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
-// These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
-// They cannot be directly importing because they are part of the kubernetes/kubernetes package, and importing that package is unsupported.
-// Their values are well-known and slow changing. They're duplicated here as constants to provide compile-time checking.
-// Originals can be found in kubernetes/kubernetes/pkg/controller/volume/persistentvolume/util/util.go.
-const KubeAnnBindCompleted = "pv.kubernetes.io/bind-completed"
-const KubeAnnBoundByController = "pv.kubernetes.io/bound-by-controller"
-const KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
-
 type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
@@ -1570,10 +1562,10 @@ func resetVolumeBindingInfo(obj *unstructured.Unstructured) *unstructured.Unstru
 	// Upon restore, this new PV will look like a statically provisioned, manually-
 	// bound volume rather than one bound by the controller, so remove the annotation
 	// that signals that a controller bound it.
-	delete(annotations, KubeAnnBindCompleted)
+	delete(annotations, kube.KubeAnnBindCompleted)
 	// Remove the annotation that signals that the PV is already bound; we want
 	// the PV(C) controller to take the two objects and bind them again.
-	delete(annotations, KubeAnnBoundByController)
+	delete(annotations, kube.KubeAnnBoundByController)
 
 	// GetAnnotations returns a copy, so we have to set them again.
 	obj.SetAnnotations(annotations)
