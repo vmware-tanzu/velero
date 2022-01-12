@@ -29,7 +29,7 @@ import (
 // the e2e tests.
 
 type TestClient struct {
-	kubebuilder kbclient.Client
+	Kubebuilder kbclient.Client
 
 	// clientGo returns a client-go API client.
 	//
@@ -87,7 +87,7 @@ func InitTestClient() (TestClient, error) {
 	factory := client.NewDynamicFactory(dynamicClient)
 
 	return TestClient{
-		kubebuilder:    kb,
+		Kubebuilder:    kb,
 		ClientGo:       clientGo,
 		dynamicFactory: factory,
 	}, nil
