@@ -160,7 +160,6 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		Spec: velerov1api.ResticRepositorySpec{
 			VolumeNamespace:       volumeNamespace,
 			BackupStorageLocation: backupLocation,
-			MaintenanceFrequency:  metav1.Duration{Duration: DefaultMaintenanceFrequency},
 		},
 	}
 
