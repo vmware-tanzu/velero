@@ -162,3 +162,14 @@ func VSLs(items ...metav1.Object) *APIResource {
 		Items:      items,
 	}
 }
+
+func Services(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "",
+		Version:    "v1",
+		Name:       "services",
+		ShortName:  "svc",
+		Namespaced: true,
+		Items:      items,
+	}
+}

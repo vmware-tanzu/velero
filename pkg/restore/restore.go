@@ -1224,7 +1224,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
-	if isAlreadyExistsError(ctx, obj, restoreErr) {
+	isAlreadyExistsError, err := isAlreadyExistsError(ctx, obj, restoreErr, resourceClient)
+	if err != nil {
+		errs.Add(namespace, err)
+		return warnings, errs
+	}
+	if isAlreadyExistsError {
 		fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			ctx.log.Infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
@@ -1274,7 +1279,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
-				e := errors.Errorf("could not restore, %s. Warning: the in-cluster version is different than the backed-up version.", restoreErr)
+				e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
+					obj.GetKind(), obj.GetName())
 				warnings.Add(namespace, e)
 			}
 			return warnings, errs
@@ -1321,12 +1327,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	return warnings, errs
 }
 
-func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, err error) bool {
+func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, err error, client client.Dynamic) (bool, error) {
 	if err == nil {
-		return false
+		return false, nil
 	}
 	if apierrors.IsAlreadyExists(err) {
-		return true
+		return true, nil
 	}
 	// The "invalid value error" or "internal error" rather than "already exists" error returns when restoring nodePort service in the following two cases:
 	// 1. For NodePort service, the service has nodePort preservation while the same nodePort service already exists. - Get invalid value error
@@ -1334,24 +1340,30 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 	// If this is the case, the function returns true to avoid reporting error.
 	// Refer to https://github.com/vmware-tanzu/velero/issues/2308 for more details
 	if obj.GetKind() != "Service" {
-		return false
+		return false, nil
 	}
 	statusErr, ok := err.(*apierrors.StatusError)
 	if !ok || statusErr.Status().Details == nil || len(statusErr.Status().Details.Causes) == 0 {
-		return false
+		return false, nil
 	}
 	// make sure all the causes are "port allocated" error
-	isAllocatedErr := true
 	for _, cause := range statusErr.Status().Details.Causes {
 		if !strings.Contains(cause.Message, "provided port is already allocated") {
-			isAllocatedErr = false
-			break
+			return false, nil
 		}
 	}
-	if isAllocatedErr {
-		ctx.log.Infof("ignore the provided port is already allocated error for service %s", kube.NamespaceAndName(obj))
+
+	// the "already allocated" error may caused by other services, check whether the expected service exists or not
+	if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			ctx.log.Debugf("Service %s not found", kube.NamespaceAndName(obj))
+			return false, nil
+		}
+		return false, errors.Wrapf(err, "Unable to get the service %s while checking the NodePort is already allocated error", kube.NamespaceAndName(obj))
 	}
-	return isAllocatedErr
+
+	ctx.log.Infof("Service %s exists, ignore the provided port is already allocated error", kube.NamespaceAndName(obj))
+	return true, nil
 }
 
 // shouldRenamePV returns a boolean indicating whether a persistent volume should

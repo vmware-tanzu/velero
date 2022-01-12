@@ -3024,10 +3024,11 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 
 func TestIsAlreadyExistsError(t *testing.T) {
 	tests := []struct {
-		name     string
-		obj      *unstructured.Unstructured
-		err      error
-		expected bool
+		name        string
+		apiResource *test.APIResource
+		obj         *unstructured.Unstructured
+		err         error
+		expected    bool
 	}{
 		{
 			name:     "The input error is IsAlreadyExists error",
@@ -3078,10 +3079,40 @@ func TestIsAlreadyExistsError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "The causes contains only port already allocated error",
+			name: "Get already allocated error but the service doesn't exist",
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"kind": "Service",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Get already allocated error and the service exists",
+			apiResource: test.Services(
+				builder.ForService("default", "test").Result(),
+			),
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
 				},
 			},
 			err: &apierrors.StatusError{
@@ -3098,10 +3129,30 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		h := newHarness(t)
+
+		ctx := &restoreContext{
+			log:             h.log,
+			dynamicFactory:  client.NewDynamicFactory(h.DynamicClient),
+			namespaceClient: h.KubeClient.CoreV1().Namespaces(),
+		}
+
+		if test.apiResource != nil {
+			h.AddItems(t, test.apiResource)
+		}
+
+		client, err := ctx.dynamicFactory.ClientForGroupVersionResource(
+			schema.GroupVersion{Group: "", Version: "v1"},
+			metav1.APIResource{Name: "services"},
+			"default",
+		)
+		require.NoError(t, err)
+
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, isAlreadyExistsError(&restoreContext{
-				log: logrus.StandardLogger(),
-			}, test.obj, test.err))
+			result, err := isAlreadyExistsError(ctx, test.obj, test.err, client)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expected, result)
 		})
 	}
 }
