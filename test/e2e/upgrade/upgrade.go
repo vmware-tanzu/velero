@@ -59,12 +59,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
 		}
-		//Assume tag of velero server image is identical to velero CLI version
-		//Download velero CLI if it's empty according to velero CLI version
-		if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
-			upgradeFromVeleroCLI, err = InstallVeleroCLI(VeleroCfg.UpgradeFromVeleroVersion)
-			Expect(err).To(Succeed())
-		}
 
 		var err error
 		flag.Parse()
@@ -74,12 +68,18 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 			//Set VeleroImage and ResticHelperImage to blank
 			//VeleroImage and ResticHelperImage should be the default value in originalCli
 			tmpCfg := VeleroCfg
-			tmpCfg.VeleroCLI = upgradeFromVeleroCLI
 			tmpCfg.VeleroImage = ""
 			tmpCfg.ResticHelperImage = ""
 			tmpCfg.Plugins = ""
+			//Assume tag of velero server image is identical to velero CLI version
+			//Download velero CLI if it's empty according to velero CLI version
+			if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
+				tmpCfg.VeleroCLI, err = InstallVeleroCLI(VeleroCfg.UpgradeFromVeleroVersion)
+				upgradeFromVeleroCLI = tmpCfg.VeleroCLI
+				Expect(err).To(Succeed())
+			}
 			Expect(VeleroInstall(context.Background(), &tmpCfg, "", useVolumeSnapshots)).To(Succeed())
-			Expect(CheckVeleroVersion(context.Background(), upgradeFromVeleroCLI, tmpCfg.UpgradeFromVeleroVersion)).To(Succeed())
+			Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI, tmpCfg.UpgradeFromVeleroVersion)).To(Succeed())
 		} else {
 			Skip("Upgrade test is skipped since user don't want to install any other velero")
 		}
@@ -96,14 +96,19 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
 			backupName = "backup-" + UUIDgen.String()
 			restoreName = "restore-" + UUIDgen.String()
-			Expect(runUpgradeTests(client, &VeleroCfg, upgradeFromVeleroCLI, backupName, restoreName, "", useVolumeSnapshots)).To(Succeed(),
+			tmpCfg := VeleroCfg
+			if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
+				tmpCfg.UpgradeFromVeleroCLI = upgradeFromVeleroCLI
+				Expect(err).To(Succeed())
+			}
+			Expect(runUpgradeTests(client, &tmpCfg, backupName, restoreName, "", useVolumeSnapshots)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 	})
 }
 
 // runUpgradeTests runs upgrade test on the provider by kibishii.
-func runUpgradeTests(client TestClient, veleroCfg *VerleroConfig, upgradeFromVeleroCLI, backupName, restoreName, backupLocation string,
+func runUpgradeTests(client TestClient, veleroCfg *VerleroConfig, backupName, restoreName, backupLocation string,
 	useVolumeSnapshots bool) error {
 	if veleroCfg.VeleroCLI == "" {
 		return errors.New("empty")
@@ -121,10 +126,10 @@ func runUpgradeTests(client TestClient, veleroCfg *VerleroConfig, upgradeFromVel
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", upgradeNamespace)
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, upgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName, upgradeNamespace, backupLocation, useVolumeSnapshots); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName, upgradeNamespace, backupLocation, useVolumeSnapshots); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 		// TODO move to "RunDebug" after we bump up to 1.7 in the upgrade case
-		VeleroBackupLogs(context.Background(), upgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName)
+		VeleroBackupLogs(context.Background(), veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName)
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", upgradeNamespace)
 	}
 
