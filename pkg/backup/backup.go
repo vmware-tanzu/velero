@@ -291,9 +291,11 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	}
 
 	w := Writer{
-		mu:     &sync.Mutex{},
 		writer: *tw,
+		log:    log,
 	}
+
+	go w.Start()
 
 	itemBackupper := &itemBackupper{
 		backupRequest:           backupRequest,
@@ -359,6 +361,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	totalItems := len(items)
 
 	itemChannel := make(chan *kubernetesResource, 10)
+	workgroup := sync.WaitGroup{}
 
 	handleItemFunc := func(i int) {
 		for {
@@ -399,6 +402,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 					"name":      item.name,
 					"thread":    fmt.Sprintf("%v", i),
 				}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
+				workgroup.Done()
 			case <-quit:
 				return
 			}
@@ -410,6 +414,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		go handleItemFunc(i)
 	}
 
+	workgroup.Add(1)
 	for i, item := range items {
 		itemChannel <- item
 
@@ -422,8 +427,11 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 			totalItems:    totalItems,
 			itemsBackedUp: len(backupRequest.BackedUpItems),
 		}
-
+		workgroup.Add(1)
 	}
+	workgroup.Done()
+	workgroup.Wait()
+	w.Wait()
 
 	// no more progress updates will be sent on the 'update' channel
 	quit <- struct{}{}
@@ -530,19 +538,54 @@ func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
 }
 
 type Writer struct {
-	mu     *sync.Mutex
-	writer tar.Writer
+	writer    tar.Writer
+	log       logrus.FieldLogger
+	channel   chan writeObj
+	errors    []error
+	waitgroup sync.WaitGroup
+}
+
+type writeObj struct {
+	t *tar.Header
+	b []byte
+}
+
+func (w *Writer) Start() {
+	w.log.Info("!!!!!!!HEREHEREHEHEHHEHE!!!!!!")
+	for {
+		select {
+		case obj := <-w.channel:
+			if obj.t == nil {
+				w.log.Info("!!!!!!!HEREHEREHEHEHHEHE!!!!!!")
+				return
+			}
+			err := w.writer.WriteHeader(obj.t)
+			if err != nil {
+				w.errors = append(w.errors, err)
+			}
+			n, err := w.writer.Write(obj.b)
+			if err != nil {
+				w.errors = append(w.errors, err)
+			}
+			w.log.Infof("wrote %v bytes to tar file", n)
+			w.waitgroup.Done()
+		}
+	}
 }
 
 func (w *Writer) Write(t *tar.Header, b []byte) (int, error) {
-	w.mu.Lock()
-	if err := w.writer.WriteHeader(t); err != nil {
-		return 0, err
+	w.waitgroup.Add(1)
+	w.channel <- writeObj{
+		t: t,
+		b: b,
 	}
 
-	n, err := w.writer.Write(b)
-	w.mu.Unlock()
-	return n, err
+	// just so things don't break this is bad.
+	return 4, nil
+}
+
+func (w *Writer) Wait() {
+	w.waitgroup.Wait()
 }
 
 type tarWriter interface {
