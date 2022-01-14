@@ -1,1 +1,0 @@
-Fix statefulsets volumeClaimTemplates storageClassName when use Changing PV/PVC Storage Classes
