@@ -1,2 +1,0 @@
-Added BackupWithResolvers and RestoreWithResolvers calls.  Will eventually replace Backup and Restore methods.
-Adds ItemSnapshotters to Backup and Restore workflows.

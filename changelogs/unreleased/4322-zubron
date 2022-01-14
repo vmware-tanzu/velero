@@ -1,1 +1,0 @@
-Fixed an issue with the `backup-location create` command where the BSL Credential field would be set to an invalid empty SecretKeySelector when no credential details were provided.
