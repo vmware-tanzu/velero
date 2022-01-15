@@ -16,7 +16,40 @@ spec:
     singular: podvolumebackup
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Pod Volume Backup status such as New/InProgress
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: Time when this backup was started
+      jsonPath: .status.startTimestamp
+      name: Created
+      type: date
+    - description: Namespace of the pod containing the volume to be backed up
+      jsonPath: .spec.pod.namespace
+      name: Namespace
+      type: string
+    - description: Name of the pod containing the volume to be backed up
+      jsonPath: .spec.pod.name
+      name: Pod
+      type: string
+    - description: Name of the volume to be backed up
+      jsonPath: .spec.volume
+      name: Volume
+      type: string
+    - description: Restic repository identifier for this backup
+      jsonPath: .spec.repoIdentifier
+      name: Restic Repo
+      type: string
+    - description: Name of the Backup Storage Location where this backup should be
+        stored
+      jsonPath: .spec.backupStorageLocation
+      name: Storage Location
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
@@ -153,6 +186,8 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""
