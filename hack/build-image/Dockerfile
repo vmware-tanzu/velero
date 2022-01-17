@@ -51,11 +51,25 @@ RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v
     chmod +x /usr/bin/protoc
 RUN go get github.com/golang/protobuf/protoc-gen-go@v1.0.0
 
-# get goreleaser
-RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v0.120.8/goreleaser_Linux_x86_64.tar.gz && \
-    tar xvf goreleaser_Linux_x86_64.tar.gz && \
-    mv goreleaser /usr/bin/goreleaser && \
-    chmod +x /usr/bin/goreleaser
+# install cosign
+COPY --from=gcr.io/projectsigstore/cosign:v1.4.1@sha256:502d5130431e45f28c51d2c24a05ef5ccd3fd916bcc91db0c8bee3a81e09a0bb /ko-app/cosign /usr/local/bin/cosign
+
+# install goreleaser
+ARG GORELEASER_VERSION=1.5.0
+ARG GORELEASER_SHA=a7bd4f76a495ed91f087dbf86fdbfa5f1bb594e86c1ec953e6b2dd46f596563b
+RUN  \
+	wget https://github.com/goreleaser/goreleaser/releases/download/v$GORELEASER_VERSION/checksums.txt.pem && \
+	GORELEASER_DOWNLOAD_FILE=goreleaser_Linux_x86_64.tar.gz && \
+	GORELEASER_DOWNLOAD_URL=https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/${GORELEASER_DOWNLOAD_FILE} && \
+	cosign verify-blob --cert checksums.txt.pem \
+	--signature https://github.com/goreleaser/goreleaser/releases/download/v$GORELEASER_VERSION/checksums.txt.sig \
+	https://github.com/goreleaser/goreleaser/releases/download/v$GORELEASER_VERSION/checksums.txt && \
+	wget ${GORELEASER_DOWNLOAD_URL} && \
+	echo "$GORELEASER_SHA $GORELEASER_DOWNLOAD_FILE" | sha256sum -c - || exit 1 && \
+	tar -xzf $GORELEASER_DOWNLOAD_FILE -C /usr/bin/ goreleaser && \
+	rm $GORELEASER_DOWNLOAD_FILE && \
+	rm checksums.txt.pem && \
+	goreleaser -v
 
 # get golangci-lint
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.27.0
