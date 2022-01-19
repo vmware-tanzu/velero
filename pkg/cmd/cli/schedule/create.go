@@ -111,9 +111,18 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
+	var orders map[string]string
+
 	veleroClient, err := f.Client()
 	if err != nil {
 		return err
+	}
+
+	if len(o.BackupOptions.OrderedResources) > 0 {
+		orders, err = backup.ParseOrderedResources(o.BackupOptions.OrderedResources)
+		if err != nil {
+			return err
+		}
 	}
 
 	schedule := &api.Schedule{
@@ -135,6 +144,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				StorageLocation:         o.BackupOptions.StorageLocation,
 				VolumeSnapshotLocations: o.BackupOptions.SnapshotLocations,
 				DefaultVolumesToRestic:  o.BackupOptions.DefaultVolumesToRestic.Value,
+				OrderedResources:        orders,
 			},
 			Schedule:                   o.Schedule,
 			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,

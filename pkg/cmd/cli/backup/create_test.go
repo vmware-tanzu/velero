@@ -34,7 +34,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	o := NewCreateOptions()
 	o.Labels.Set("velero.io/test=true")
 	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
-	orders, err := parseOrderedResources(o.OrderedResources)
+	orders, err := ParseOrderedResources(o.OrderedResources)
 	assert.NoError(t, err)
 
 	backup, err := o.BuildBackup(testNamespace)
@@ -100,10 +100,10 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 }
 
 func TestCreateOptions_OrderedResources(t *testing.T) {
-	orderedResources, err := parseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
+	orderedResources, err := ParseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
 	assert.NotNil(t, err)
 
-	orderedResources, err = parseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
+	orderedResources, err = ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
 	assert.NoError(t, err)
 
 	expectedResources := map[string]string{
@@ -112,7 +112,7 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 	}
 	assert.Equal(t, orderedResources, expectedResources)
 
-	orderedResources, err = parseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumes=pv1,pv2")
+	orderedResources, err = ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumes=pv1,pv2")
 	assert.NoError(t, err)
 
 	expectedMixedResources := map[string]string{
