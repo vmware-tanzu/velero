@@ -596,3 +596,35 @@ func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName stri
 	}
 	return nil
 }
+
+func GetBackup(ctx context.Context, veleroCLI string, backupName string) (string, string, error) {
+	args := []string{"backup", "get", backupName}
+	cmd := exec.CommandContext(ctx, veleroCLI, args...)
+	return veleroexec.RunCommand(cmd)
+}
+
+func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bool, error) {
+	if _, outerr, err := GetBackup(ctx, veleroCLI, backupName); err != nil {
+		if err != nil {
+			if strings.Contains(outerr, "not found") {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
+			return false, err
+		} else {
+			if exist {
+				return false, nil
+			} else {
+				return true, nil
+			}
+		}
+	})
+}
