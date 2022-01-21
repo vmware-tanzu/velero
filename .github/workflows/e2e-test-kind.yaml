@@ -123,3 +123,8 @@ jobs:
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
               GINKGO_FOCUS=Basic VELERO_IMAGE=velero:pr-test \
               make -C test/e2e run
+      - name: Upload debug bundle
+        uses: actions/upload-artifact@v2
+        with:
+          name: DebugBundle
+          path: /home/runner/work/velero/velero/test/e2e/debug-bundle*
