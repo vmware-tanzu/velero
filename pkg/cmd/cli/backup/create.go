@@ -291,7 +291,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	return nil
 }
 
-// parseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
+// ParseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
 // Resource names in the list are in format 'namespace/resourcename' and separated by commas.
 // Key-value pairs in the mapping are separated by semi-colon.
 // Ex: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.
