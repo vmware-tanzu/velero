@@ -51,8 +51,8 @@ jobs:
       - name: Build Velero Image
         if: steps.image-cache.outputs.cache-hit != 'true'
         run: |
-          IMAGE=velero VERSION=pr-test make container
-          docker save velero:pr-test -o ./velero.tar
+          make all-containers
+          docker save velero/velero:main velero/velero-restic-restore-helper:main -o ./velero.tar
   # Run E2E test against all kubernetes versions on kind
   run-e2e-test:
     needs: build
@@ -121,8 +121,9 @@ jobs:
               CREDS_FILE=/tmp/credential BSL_BUCKET=bucket \
               ADDITIONAL_OBJECT_STORE_PROVIDER=aws ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
-              GINKGO_FOCUS=Basic VELERO_IMAGE=velero:pr-test \
+              GINKGO_FOCUS=Basic VELERO_IMAGE=velero/velero:main RESTIC_HELPER_IMAGE=velero/velero-restic-restore-helper:main \
               make -C test/e2e run
+        timeout-minutes: 10
       - name: Upload debug bundle
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
