@@ -19,6 +19,7 @@ package velero
 import (
 	"bytes"
 	"context"
+	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,9 +42,8 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
-const (
-	BackupObjectsPrefix = "backups"
-)
+const BackupObjectsPrefix = "backups"
+const PluginsObjectsPrefix = "plugins"
 
 var pluginsMatrix = map[string]map[string][]string{
 	"v1.4": {
@@ -476,6 +476,36 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 	})
 
 	return err
+}
+
+func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace string) ([]string, error) {
+	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
+		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.snapshotID}{\"\\n\"}{end}'")
+	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
+	stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
+	if err != nil {
+		fmt.Print(stdout)
+		fmt.Print(stderr)
+		return nil, errors.Wrap(err, "failed to verify")
+	}
+	stdout = strings.Replace(stdout, "'", "", -1)
+	lines := strings.Split(stdout, "\n")
+	var result []string
+
+	for _, curLine := range lines {
+		fmt.Println("curLine:" + curLine)
+		curLine = strings.Replace(curLine, "\n", "", -1)
+		if len(curLine) == 0 {
+			continue
+		}
+		snapshotID := curLine[strings.LastIndex(curLine, ":")+1:]
+		fmt.Println("snapshotID:" + snapshotID)
+		snapshotIDDec, _ := b64.StdEncoding.DecodeString(snapshotID)
+		fmt.Println("snapshotIDDec:" + string(snapshotIDDec))
+		result = append(result, string(snapshotIDDec))
+	}
+	fmt.Println(result)
+	return result, nil
 }
 
 func getVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (string, error) {
