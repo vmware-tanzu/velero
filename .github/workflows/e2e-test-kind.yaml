@@ -124,6 +124,7 @@ jobs:
               GINKGO_FOCUS=Basic VELERO_IMAGE=velero:pr-test \
               make -C test/e2e run
       - name: Upload debug bundle
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v2
         with:
           name: DebugBundle
