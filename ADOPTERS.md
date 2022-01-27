@@ -58,6 +58,9 @@ Okteto integrates Velero in [Okteto Cloud][94] and [Okteto Enterprise][95] to pe
 **[Replicated][100]**<br>
 Replicated uses the Velero open source project to enable snapshots in [KOTS][101] to backup Kubernetes manifests & persistent volumes. In addition to the default functionality that Velero provides, [KOTS][101] provides a detailed interface in the [Admin Console][102] that can be used to manage the storage destination and schedule, and to perform and monitor the backup and restore process.
 ​
+**[CloudCasa][103]**  
+[Catalogic Software][104] integrates Velero with [CloudCasa][103] - A Smart Home in the Cloud for Backups. CloudCasa is a simple, scalable, cloud-native solution providing data protection and disaster recovery as a service. This solution is built using Kubernetes for protecting Kubernetes clusters.
+
 ## Adding your organization to the list of Velero Adopters
 
 If you are using Velero and would like to be included in the list of `Velero Adopters`, add an SVG version of your logo to the `site/static/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
@@ -110,3 +113,6 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 [100]: https://www.replicated.com
 [101]: https://kots.io
 [102]: https://kots.io/kotsadm/snapshots/overview/
+
+[103]: https://cloudcasa.io/
+[104]: https://www.catalogicsoftware.com/
