@@ -25,7 +25,7 @@ For more information on how to run the website locally, please see our [jekyll d
 
 ## Adding a blog post
 
-The `author_name` value must also be included in the tags field so the page that lists the author's posts will work properly (Ex: https://velero.io/tags/carlisia%20campos/). 
+The `author_name` value must also be included in the tags field so the page that lists the author's posts will work properly (Ex: /tags/carlisia%20campos/). 
 
 Note that the tags field can have multiple values. 
 

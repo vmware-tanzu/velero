@@ -37,7 +37,7 @@ aws_secret_access_key=<SecretKey>
 
 ## Install Velero Resources
 
-You need to install the Velero CLI first, see [Install the CLI](https://velero.io/docs/v1.5/basic-install/#install-the-cli)  for how to install.
+You need to install the Velero CLI first, see [Install the CLI](/docs/v1.5/basic-install/#install-the-cli)  for how to install.
 
 Follow the Velero installation command below to create velero and restic workloads and other necessary resource objects.
 
@@ -60,7 +60,7 @@ Description of the parameters:
 
 - `--secret-file`: Access tencent cloud COS access credential file for the "credentials-velero" credential file created above.
 
-- `--use-restic`: Back up and restore persistent volume data using the open source free backup tool [restic](https://github.com/restic/restic).  However, 'hostPath' volumes are not supported, see the [restic limit](https://velero.io/docs/v1.5/restic/#limitations) for details), an integration 		that complements Velero's backup capabilities and is recommended to be turned on.
+- `--use-restic`: Back up and restore persistent volume data using the open source free backup tool [restic](https://github.com/restic/restic).  However, 'hostPath' volumes are not supported, see the [restic limit](/docs/v1.5/restic/#limitations) for details), an integration 		that complements Velero's backup capabilities and is recommended to be turned on.
 
 - `--default-volumes-to-restic`: Enable the use of Restic to back up all Pod volumes, provided that the `--use-restic`parameter needs to be turned on.
 
@@ -84,7 +84,7 @@ Executing the 'velero backup-location get' command to view the storage location 
 
 {{< figure src="/docs/v1.5/contributions/img-for-tencent/69194157ccd5e377d1e7d914fd8c0336.png" width="100%">}}
 
-At this point, The installation using Tencent Cloud COS as Velero storage location is complete, If you need more installation information about Velero, You can see the official website [Velero documentation](https://velero.io/docs/) .
+At this point, The installation using Tencent Cloud COS as Velero storage location is complete, If you need more installation information about Velero, You can see the official website [Velero documentation](/docs/) .
 
 ## Velero backup and restore example
 
@@ -164,5 +164,5 @@ kubectl delete crds -l component=velero
 
 ## Additional Reading
 
-- [Official Velero Documentation](https://velero.io/docs/)
+- [Official Velero Documentation](/docs/)
 - [Tencent Cloud Documentation](https://cloud.tencent.com/document/product)

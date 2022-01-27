@@ -73,10 +73,10 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     ```
 
 [0]: basic-install.md#install-the-cli
-[1]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/
-[2]: https://velero.io/docs/v1.2.0/upgrade-to-1.2/
-[3]: https://velero.io/docs/v1.3.2/upgrade-to-1.3/
-[4]: https://velero.io/docs/v1.4/upgrade-to-1.4/
+[1]: /docs/v1.1.0/upgrade-to-1.1/
+[2]: /docs/v1.2.0/upgrade-to-1.2/
+[3]: /docs/v1.3.2/upgrade-to-1.3/
+[4]: /docs/v1.4/upgrade-to-1.4/
 [5]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
 [6]: https://github.com/vmware-tanzu/velero/issues/2077
 [7]: https://github.com/vmware-tanzu/velero/issues/2311

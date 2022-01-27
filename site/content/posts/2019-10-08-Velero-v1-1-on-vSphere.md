@@ -254,6 +254,6 @@ Backups and Restores are now working on Kubernetes deployed on vSphere using Vel
 
 ## Feedback and Participation
 
-As always, we welcome feedback and participation in the development of Velero. [All information on how to contact us or become active can be found here](https://velero.io/community/)
+As always, we welcome feedback and participation in the development of Velero. [All information on how to contact us or become active can be found here](/community/)
 
 You can find us on [Kubernetes Slack in the #velero channel](https://kubernetes.slack.com/messages/C6VCGP4MT), and follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero).

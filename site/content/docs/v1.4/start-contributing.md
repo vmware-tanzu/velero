@@ -14,9 +14,9 @@ You may join the Velero community and contribute in many different ways, includi
 
 You can also vote on issues using :+1: and :-1:, as explained in our [Feature enhancement request][3] and [Bug issue][4] templates. This will help us quantify importance and prioritize issues.
 
-For information on how to connect with our maintainers and community, join our online meetings, or find good first issues, start on our [Velero community](https://velero.io/community/) page.
+For information on how to connect with our maintainers and community, join our online meetings, or find good first issues, start on our [Velero community](/community/) page.
 
-Please browse our list of resources, including a playlist of past online community meetings, blog posts, and other resources to help you get familiar with our project: [Velero resources](https://velero.io/resources/).
+Please browse our list of resources, including a playlist of past online community meetings, blog posts, and other resources to help you get familiar with our project: [Velero resources](/resources/).
 
 ## Contributing
 

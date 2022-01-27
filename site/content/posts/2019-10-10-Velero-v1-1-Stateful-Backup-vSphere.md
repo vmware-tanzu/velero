@@ -24,7 +24,7 @@ Velero version 1.1 provides support to backup applications orchestrated on upstr
 ## What this post does not show
 
 * This tutorial does not show how to deploy Velero v1.1 on vSphere. This is available in other tutorials.
-* For this backup to be successful, Velero needs to be installed with the `use-restic` flag. [More details on using Restic for stateful backups can be found in the docs here](https://velero.io/docs/v1.1.0/restic/#Setup)
+* For this backup to be successful, Velero needs to be installed with the `use-restic` flag. [More details on using Restic for stateful backups can be found in the docs here](/docs/v1.1.0/restic/#Setup)
 * The assumption is that the Kubernetes nodes in your cluster have internet access in order to pull the necessary Velero images. This guide does not show how to pull images using a local repository.
 
 ## Download and Deploy Cassandra
@@ -463,6 +463,6 @@ It looks like the restore has been successful. Velero v1.1 has successfully rest
 
 ## Feedback and Participation
 
-As always, we welcome feedback and participation in the development of Velero. [All information on how to contact us or become active can be found here](https://velero.io/community/)
+As always, we welcome feedback and participation in the development of Velero. [All information on how to contact us or become active can be found here](/community/)
 
 You can find us on [Kubernetes Slack in the #velero channel](https://kubernetes.slack.com/messages/C6VCGP4MT), and follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero).

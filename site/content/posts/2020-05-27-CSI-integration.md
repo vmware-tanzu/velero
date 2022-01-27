@@ -43,7 +43,7 @@ This script will deploy the following CSI components, CRDs, and necessary RBAC:
 
 The CSI volume snapshot capability is currently, as of Velero 1.4, a beta feature behind the `EnableCSI` feature flag and is not enabled by default.
 
-Following instructions from our [docs website](https://velero.io/docs/csi/), install Velero with the [velero-plugin-for-csi](https://github.com/vmware-tanzu/velero-plugin-for-csi) and using the Azure Blob Store as our BackupStorageLocation. Please refer to our [velero-plugin-for-microsoft-azure documentation](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure) for instructions on setting up the BackupStorageLocation. Please note that the BackupStorageLocation should be set up before installing Velero.
+Following instructions from our [docs website](/docs/csi/), install Velero with the [velero-plugin-for-csi](https://github.com/vmware-tanzu/velero-plugin-for-csi) and using the Azure Blob Store as our BackupStorageLocation. Please refer to our [velero-plugin-for-microsoft-azure documentation](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure) for instructions on setting up the BackupStorageLocation. Please note that the BackupStorageLocation should be set up before installing Velero.
 
 Install Velero by running the below command
 
@@ -189,7 +189,7 @@ And that's all it takes to backup and restore a stateful application that uses C
 
 Please try out the CSI support in Velero 1.4. Feature requests, suggestions, bug reports, PRs are all welcome.
 
-Get in touch with us on [Kubernetes Slack #velero](https://kubernetes.slack.com/archives/C6VCGP4MT), [Twitter](https://twitter.com/projectvelero), or [Our weekly community calls](https://velero.io/community/)
+Get in touch with us on [Kubernetes Slack #velero](https://kubernetes.slack.com/archives/C6VCGP4MT), [Twitter](https://twitter.com/projectvelero), or [Our weekly community calls](/community/)
 
 
 ## Resources
@@ -197,6 +197,6 @@ Get in touch with us on [Kubernetes Slack #velero](https://kubernetes.slack.com/
 More details about CSI volume snapshotting and its support in Velero may be found in the following links:
 
 - [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/) for more information on the CSI beta snapshot APIs.
-- Prerequisites to use this feature is available [on our website](https://velero.io/docs/csi).
+- Prerequisites to use this feature is available [on our website](/docs/csi).
 - [Kubernetes CSI docs](https://kubernetes-csi.github.io/docs/sidecar-containers.html): To understand components in a CSI environment
 - [Velero plugin for CSI snapshots](https://github.com/vmware-tanzu/velero-plugin-for-csi) for implementation details of the CSI plugin.

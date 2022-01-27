@@ -46,7 +46,7 @@ For each major or minor release, create and publish a blog post to let folks kno
     - Delete the pre-release docs table of contents file, i.e. `site/data/docs/<pre-release-version>-toc.yml`.
     - Remove the pre-release docs table of contents mapping entry from `site/data/toc-mapping.yml`.
     - Remove all references to the pre-release docs from `site/config.yml`.
-1. Create the "Upgrade to $major.minor" page if it does not already exist ([example](https://velero.io/docs/v1.5/upgrade-to-1.5/)).
+1. Create the "Upgrade to $major.minor" page if it does not already exist ([example](/docs/v1.5/upgrade-to-1.5/)).
    If it already exists, update any usage of the previous version string within this file to use the new version string instead ([example](https://github.com/vmware-tanzu/velero/pull/2941/files#diff-d594f8fd0901fed79c39aab4b348193d)).
    This needs to be done in both the versioned and the `main` folders.
 1. Review and submit PR
@@ -122,5 +122,5 @@ What to include:
 * A brief list of highlights in the release
 * Link to the release blog post, release notes, and/or github release page
 
-[1]: https://velero.io/blog
+[1]: /blog
 [2]: website-guidelines.md

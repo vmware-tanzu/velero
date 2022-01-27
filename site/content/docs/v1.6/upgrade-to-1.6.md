@@ -80,12 +80,12 @@ We have deprecated the way to indicate the default backup storage location. Prev
 After upgrading, if there is a previously created backup storage location with the name that matches what was defined on the server side as the default, it will be automatically set as the `default`.
 
 [0]: basic-install.md#install-the-cli
-[1]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/
-[2]: https://velero.io/docs/v1.2.0/upgrade-to-1.2/
-[3]: https://velero.io/docs/v1.3.2/upgrade-to-1.3/
-[4]: https://velero.io/docs/v1.4/upgrade-to-1.4/
-[5]: https://velero.io/docs/v1.5/upgrade-to-1.5
+[1]: /docs/v1.1.0/upgrade-to-1.1/
+[2]: /docs/v1.2.0/upgrade-to-1.2/
+[3]: /docs/v1.3.2/upgrade-to-1.3/
+[4]: /docs/v1.4/upgrade-to-1.4/
+[5]: /docs/v1.5/upgrade-to-1.5
 [6]: https://github.com/vmware-tanzu/velero/releases/tag/v1.4.2
 [7]: https://github.com/vmware-tanzu/velero/issues/2077
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
-[9]: https://velero.io/docs/v1.6/locations
+[9]: /docs/v1.6/locations

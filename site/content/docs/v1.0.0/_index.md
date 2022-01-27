@@ -77,7 +77,7 @@ See [the list of releases][6] to find out about feature changes.
 
 
 [28]: install-overview.md
-[29]: https://velero.io/docs/v1.0.0/
+[29]: /docs/v1.0.0/
 [30]: troubleshooting.md
 
 [99]: support-matrix.md

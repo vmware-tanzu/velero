@@ -67,5 +67,5 @@ See [the list of releases][6] to find out about feature changes.
 [25]: https://kubernetes.slack.com/messages/ark-dr
 
 
-[29]: https://velero.io/docs/v0.9.0/
+[29]: /docs/v0.9.0/
 [30]: /troubleshooting.md

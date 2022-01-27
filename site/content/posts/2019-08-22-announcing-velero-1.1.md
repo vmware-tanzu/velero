@@ -28,7 +28,7 @@ A big focus of our work this cycle was continuing to improve support for restic.
 
 Along with our bug fixes, we’ve provided an easier way to move restic backups between storage providers. Different providers often have different StorageClasses, requiring user intervention to make restores successfully complete.
 
-To make cross-provider moves simpler, we’ve introduced a StorageClass remapping plug-in. It allows you to automatically translate one StorageClass on PersistentVolumeClaims and PersistentVolumes to another. You can read more about it in our [documentation](https://velero.io/docs/v1.1.0/restore-reference/#changing-pv-pvc-storage-classes).
+To make cross-provider moves simpler, we’ve introduced a StorageClass remapping plug-in. It allows you to automatically translate one StorageClass on PersistentVolumeClaims and PersistentVolumes to another. You can read more about it in our [documentation](/docs/v1.1.0/restore-reference/#changing-pv-pvc-storage-classes).
 
 ## Quality-of-Life Improvements
 
@@ -50,13 +50,13 @@ Velero has previously used a restore-only flag on the server to control whether 
 
 We appreciate all community contributions, whether they be pull requests, bug reports, feature requests, or just questions. With this release, we wanted to draw attention to a few contributions in particular:
 
-For users of node-based IAM authentication systems such as kube2iam, `velero install` now supports the `--pod-annotations` argument for applying necessary annotations at install time. This support should make `velero install` more flexible for scenarios that do not use Secrets for access to their cloud buckets and volumes. You can read more about how to use this new argument in our [AWS documentation](https://velero.io/docs/v1.1.0/aws-config/#alternative-setup-permissions-using-kube2iam). Huge thanks to [Traci Kamp](https://github.com/tlkamp) for this contribution.
+For users of node-based IAM authentication systems such as kube2iam, `velero install` now supports the `--pod-annotations` argument for applying necessary annotations at install time. This support should make `velero install` more flexible for scenarios that do not use Secrets for access to their cloud buckets and volumes. You can read more about how to use this new argument in our [AWS documentation](/docs/v1.1.0/aws-config/#alternative-setup-permissions-using-kube2iam). Huge thanks to [Traci Kamp](https://github.com/tlkamp) for this contribution.
 
 Structured logging is important for any application, and Velero is no different. Starting with version 1.1, the Velero server can now output its logs in a JSON format, allowing easier parsing and ingestion. Thank you to [Donovan Carthew](https://github.com/carthewd) for this feature.
 
 AWS supports multiple profiles for accessing object storage, but in the past Velero only used the default. With v.1.1, you can set the `profile` key on yourBackupStorageLocation to specify an alternate profile. If no profile is set, the default one is used, making this change backward compatible. Thanks [Pranav Gaikwad](https://github.com/pranavgaikwad) for this change.
 
-Finally, thanks to testing by [Dylan Murray](https://github.com/dymurray) and [Scott Seago](https://github.com/sseago), an issue with running Velero in non-default namespaces was found in our beta version for this release. If you’re running Velero in a namespace other than `velero`, please follow the [upgrade instructions](https://velero.io/docs/v1.1.0/upgrade-to-1.1/).
+Finally, thanks to testing by [Dylan Murray](https://github.com/dymurray) and [Scott Seago](https://github.com/sseago), an issue with running Velero in non-default namespaces was found in our beta version for this release. If you’re running Velero in a namespace other than `velero`, please follow the [upgrade instructions](/docs/v1.1.0/upgrade-to-1.1/).
 
 ## Help Us Build the Future
 
@@ -68,7 +68,7 @@ The team has also been discussing different approaches to concurrent backup jobs
 
 ## Take the Survey
 
-Finally, we’re running [a survey](https://velero.io/survey) for our users. Let us know how you use Velero and what you’d like the community to address in the future. We’ll be using this feedback to guide our roadmap planning. Anonymized results will be shared back with the community shortly after the survey closes.
+Finally, we’re running [a survey](/survey) for our users. Let us know how you use Velero and what you’d like the community to address in the future. We’ll be using this feedback to guide our roadmap planning. Anonymized results will be shared back with the community shortly after the survey closes.
 
 ## Join the Movement – Contribute!
 

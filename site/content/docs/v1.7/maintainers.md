@@ -17,8 +17,8 @@ Please be sure to also go through the guidance under the entire [Contribute](sta
 - Be familiar with the [lazy consensus](https://github.com/vmware-tanzu/velero/blob/v1.7.0/GOVERNANCE.md#lazy-consensus) policy for the project.
 
 Some tips for doing reviews:
-- There are some [code standards and general guidelines](https://velero.io/docs/v1.7/code-standards) we aim for
-- We have [guidelines for writing and reviewing documentation](https://velero.io/docs/v1.7/style-guide/)
+- There are some [code standards and general guidelines](/docs/v1.7/code-standards) we aim for
+- We have [guidelines for writing and reviewing documentation](/docs/v1.7/style-guide/)
 - When reviewing a design document, ensure it follows [our format and guidelines]( https://github.com/vmware-tanzu/velero/blob/v1.7.0/design/_template.md). Also, when reviewing a PR that implements a previously accepted design, ensure the associated design doc is moved to the [design/implemented](https://github.com/vmware-tanzu/velero/tree/main/design/implemented) folder.
 
 

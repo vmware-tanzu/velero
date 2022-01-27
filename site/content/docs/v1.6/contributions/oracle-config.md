@@ -5,7 +5,7 @@ layout: docs
 
 ## Introduction
 
-[Velero](https://velero.io/) is a tool used to backup and migrate Kubernetes applications. Here are the steps to use [Oracle Cloud Object Storage](https://docs.cloud.oracle.com/iaas/Content/Object/Concepts/objectstorageoverview.htm) as a destination for Velero backups.
+[Velero](/) is a tool used to backup and migrate Kubernetes applications. Here are the steps to use [Oracle Cloud Object Storage](https://docs.cloud.oracle.com/iaas/Content/Object/Concepts/objectstorageoverview.htm) as a destination for Velero backups.
 
 1. [Download Velero](#download-velero)
 2. [Create A Customer Secret Key](#create-a-customer-secret-key)
@@ -244,5 +244,5 @@ After creating the Velero server in your cluster, try this example:
 
 ## Additional Reading
 
-* [Official Velero Documentation](https://velero.io/docs/v1.6/)
+* [Official Velero Documentation](/docs/v1.6/)
 * [Oracle Cloud Infrastructure Documentation](https://docs.cloud.oracle.com/)

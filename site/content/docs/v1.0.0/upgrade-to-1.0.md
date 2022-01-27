@@ -142,6 +142,6 @@ _*backups created prior to v0.10 stored snapshot metadata in the `status.volumeB
     kubectl -n velero set image daemonset/restic  restic=gcr.io/heptio-images/velero:v1.0.0
     ```
 
-[0]: https://velero.io/docs/v0.11.0/migrating-to-velero
+[0]: /docs/v0.11.0/migrating-to-velero
 [1]: https://github.com/vmware-tanzu/velero/releases/tag/v0.11.1
 [2]: https://github.com/vmware-tanzu/velero/releases/tag/v1.0.0

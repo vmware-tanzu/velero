@@ -9,6 +9,6 @@ Velero uses plugins to integrate with a variety of storage systems and Kubernete
 
 Read more about how to use and create plugins [in our docs][1], a detailed list of [supported providers][2], and check out our [plugin-example repo][3].
 
-[1]: https://velero.io/docs
-[2]: https://velero.io/docs/supported-providers/
+[1]: /docs
+[2]: /docs/supported-providers/
 [3]: https://github.com/vmware-tanzu/velero-plugin-example

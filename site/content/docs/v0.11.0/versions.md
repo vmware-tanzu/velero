@@ -25,5 +25,5 @@ Not all Velero versions support all versions of Kubernetes. You should be aware 
 - Restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. See [Restic Integration][3].
 
 [1]: https://github.com/heptio/velero/releases
-[2]: https://velero.io/docs/v0.10.0/upgrading-to-v0.10
+[2]: /docs/v0.10.0/upgrading-to-v0.10
 [3]: restic.md

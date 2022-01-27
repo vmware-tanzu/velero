@@ -199,4 +199,4 @@ See [the list of releases][6] to find out about feature changes.
 [26]: https://github.com/heptio/ark/releases
 [27]: /hooks.md
 [28]: /plugins.md
-[29]: https://velero.io/docs/v0.7.0/
+[29]: /docs/v0.7.0/

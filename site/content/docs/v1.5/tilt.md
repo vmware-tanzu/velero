@@ -24,7 +24,7 @@ files in this directory are gitignored so you may configure your setup according
 1. Clone the [Velero project](https://github.com/vmware-tanzu/velero) repository
    locally
 1. Access to an S3 object storage
-1. Clone any [provider plugin(s)](https://velero.io/plugins/) you want to make changes to and deploy (optional, must be configured to be deployed by the Velero Tilt's setup, [more info below](#provider-plugins))
+1. Clone any [provider plugin(s)](/plugins/) you want to make changes to and deploy (optional, must be configured to be deployed by the Velero Tilt's setup, [more info below](#provider-plugins))
 
 Note: To properly configure any plugin you use, please follow the plugin's documentation.
 
@@ -107,7 +107,7 @@ storage location. A sample file is provided that needs to be modified with the s
 configuration for your object storage. See the next sub-section for more details on this.
 
 ### Configure a backup storage location
-You will have to configure the `velero/tilt-resources/velero_v1_backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](https://velero.io/plugins/)
+You will have to configure the `velero/tilt-resources/velero_v1_backupstoragelocation.yaml` with the proper values according to your storage provider. Read the [plugin documentation](/plugins/)
 to learn what field/value pairs are required for your particular provider's backup storage location configuration.
 
 Below are some ways to configure a backup storage location for Velero.
@@ -146,7 +146,7 @@ necessary to expose MinIO outside the cluster.
 Please see our [locations documentation](locations/) to learn more how backup locations work.
 
 ### Configure the provider credentials (secret)
-Whatever object storage provider you use, configure the credentials for in the `velero/tilt-resources/cloud` file. Read the [plugin documentation](https://velero.io/plugins/)
+Whatever object storage provider you use, configure the credentials for in the `velero/tilt-resources/cloud` file. Read the [plugin documentation](/plugins/)
 to learn what field/value pairs are required for your provider's credentials. The Tilt file will invoke Kustomize to create the secret under the hard-coded key `secret.cloud-credentials.data.cloud` in the Velero namespace.
 
 There is a sample credentials file properly formatted for a MinIO storage credentials in `velero/tilt-resources/examples/cloud`.

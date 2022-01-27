@@ -61,7 +61,7 @@ If you're not yet running at least Velero v1.2, see the following:
     ```
 
 [0]: basic-install.md#install-the-cli
-[1]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/
-[2]: https://velero.io/docs/v1.2.0/upgrade-to-1.2/
+[1]: /docs/v1.1.0/upgrade-to-1.1/
+[2]: /docs/v1.2.0/upgrade-to-1.2/
 [3]: https://github.com/vmware-tanzu/velero/releases/tag/v1.2.0
 [4]: https://github.com/vmware-tanzu/velero/releases/tag/v1.3.0

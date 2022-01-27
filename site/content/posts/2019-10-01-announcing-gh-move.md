@@ -37,10 +37,10 @@ Instructions for upgrading to version 1.2 and installing Velero and its plugins 
 
 ## Feedback
 
-As always, we welcome feedback and participation in the development of Velero. All information on how to contact us or become involved can be found here: https://velero.io/community/
+As always, we welcome feedback and participation in the development of Velero. All information on how to contact us or become involved can be found here: /community/
 
 [1]: https://github.com/vmware-tanzu
 [2]: https://blogs.vmware.com/cloudnative/2019/10/01/open-source-in-vmware-tanzu/
 [3]: ../docs/main/supported-providers
-[4]: https://velero.io/docs/main/
+[4]: /docs/main/
 [5]: https://github.com/vmware-tanzu/velero/issues#workspaces/velero-5c59c15e39d47b774b5864e3/board?milestones=v1.2%232019-10-31&filterLogic=any&repos=99143276&showPipelineDescriptions=false
