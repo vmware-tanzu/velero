@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -89,6 +90,21 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	log.Info("PodVolumeBackup starting")
+
+	// Initialize the patch helper.
+	patchHelper, err := patch.NewHelper(&pvb, r.Client)
+	if err != nil {
+		log.WithError(err).Error("getting patch helper to update this resource")
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	defer func() {
+		// Always attempt to patch the PVB object and status after each reconciliation.
+		if err := patchHelper.Patch(ctx, &pvb); err != nil {
+			log.WithError(err).Error("updating PodVolumeBackup resource")
+			return
+		}
+	}()
 
 	// Only process items for this node.
 	if pvb.Spec.Node != r.NodeName {
@@ -161,11 +177,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	r.Metrics.ObserveResticOpLatency(r.NodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
 	r.Metrics.RegisterResticOpLatencyGauge(r.NodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
 	r.Metrics.RegisterPodVolumeBackupDequeue(r.NodeName)
-	log.Info("PodVolumeBackup completed")
 
-	if err := r.Client.Update(ctx, &pvb); err != nil {
-		log.WithError(err).Error("updating PodVolumeBackup resource")
-	}
+	log.Info("PodVolumeBackup completed")
 	return ctrl.Result{}, nil
 }
 
@@ -256,10 +269,6 @@ func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pv
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 	pvb.Status.Message = msg
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-
-	if err := r.Client.Update(ctx, pvb); err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "updating PodVolumeBackup resource with failed status")
-	}
 	return ctrl.Result{}, errors.Wrap(err, msg)
 }
 
