@@ -31,6 +31,8 @@ Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Ku
 
 ### All changes
 
+* E2E SSR test add retry mechanism and logs  (#4594, @mqiu)
+* Update doc for v1.8 (#4517, @reasonerjt)
 * E2E test on ssr object with controller namespace mix-ups (#4521, @mqiu)
 * Check whether the volume is provisioned by CSI driver or not by the annotation as well (#4513, @ywk253100)
 * Initialize the labels field of `velero backup-location create` option to avoid #4484 (#4491, @ywk253100)
