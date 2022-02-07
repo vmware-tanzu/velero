@@ -6,7 +6,6 @@
 
 | Maintainer | GitHub ID | Affiliation |
 | --------------- | --------- | ----------- |
-| Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
 | Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [Kasten](https://github.com/kastenhq/) |
 | JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/)
 | Scott Seago | [sseago](https://github.com/sseago) | [OpenShift](https://github.com/openshift)
@@ -23,6 +22,7 @@
 * Nolan Brubaker ([nrb](https://github.com/nrb))
 * Ashish Amarnath ([ashish-amarnath](https://github.com/ashish-amarnath))
 * Carlisia Thompson ([carlisia](https://github.com/carlisia))
+* Bridget McErlean ([zubron](https://github.com/zubron))
 
 ## Velero Contributors & Stakeholders
 
