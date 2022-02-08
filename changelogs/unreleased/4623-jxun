@@ -1,0 +1,1 @@
+Add pushing image to GCR in github workflow to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
