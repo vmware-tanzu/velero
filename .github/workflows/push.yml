@@ -6,6 +6,22 @@ on:
     tags:
       - '*'
 
+# id-token is added to enable OIDC token generation. All the others are copied from "Set up job" GITHUB_TOKEN Permissions
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  deployments: write
+  discussions: write
+  issues: write
+  packages: write
+  pages: write
+  pull-requests: write
+  repository-projects: write
+  security-events: write
+  statuses: write
+  id-token: write
+
 jobs:
 
   build:
@@ -47,21 +63,27 @@ jobs:
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         ./hack/docker-push.sh
 
+    # actions/checkout MUST come before auth
+    - uses: 'actions/checkout@v2'
+
+    # auth to GCP with OIDC token from GCP Workload Identity Provider. Output auth result to access token.
     - id: 'auth'
       name: 'Authenticate to Google Cloud'
       uses: 'google-github-actions/auth@v0.6.0'
       with:
         workload_identity_provider: 'projects/298797809281/locations/global/workloadIdentityPools/velero-pool/providers/velero-provider'
         service_account: 'gcraccount@velero-gcp.iam.gserviceaccount.com'
+        token_format: 'access_token'
 
-    - name: Set up gCloud SDK
-      uses: 'google-github-actions/setup-gcloud@v0.5.0'
-
-    - name: Configure docker for GCR
-      run: |
-        gcloud auth configure-docker --quiet
+    # Use access_token generated above to login gcr.io
+    - uses: 'docker/login-action@v1'
+      with:
+        registry: 'gcr.io' # or REGION.docker.pkg.dev
+        username: 'oauth2accesstoken'
+        password: '${{ steps.auth.outputs.access_token }}'
 
     # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
     - name: Publish container image to GCR
+      if: github.repository == 'vmware-tanzu/velero'
       run: |
         REGISTRY=gcr.io/velero-gcp ./hack/docker-push.sh
