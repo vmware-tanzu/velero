@@ -73,6 +73,9 @@ spec:
   # to restore from. If specified, and BackupName is empty, Velero will
   # restore from the most recent successful backup created from this schedule.
   scheduleName: my-scheduled-backup-name
+  # ExistingResourcePolicy specifies the restore behaviour
+  # for the kubernetes resource to be restored. Optional
+  existingResourcePolicy: none
   # Actions to perform during or post restore. The only hooks currently supported are
   # adding an init container to a pod before it can be restored and executing a command in a
   # restored pod's container. Optional.

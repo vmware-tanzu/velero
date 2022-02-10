@@ -149,6 +149,13 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 
 		d.Println()
+		s = "<none>"
+		if restore.Spec.ExistingResourcePolicy != "" {
+			s = string(restore.Spec.ExistingResourcePolicy)
+		}
+		d.Printf("Existing Resource Policy: \t%s\n", s)
+
+		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
 	})
