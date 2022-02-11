@@ -52,7 +52,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	)
 
 	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup deletion tests")
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup deletion tests with error %v", err)
 
 	BeforeEach(func() {
 		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
@@ -61,24 +61,25 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 		var err error
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
-		Expect(err).To(Succeed())
+		Expect(err).To(Succeed(), "Failed to generate uuid with error %v", err)
 		if VeleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &VeleroCfg, "", useVolumeSnapshots)).To(Succeed())
+			err = VeleroInstall(context.Background(), &VeleroCfg, "", useVolumeSnapshots)
+			Expect(err).To(Succeed(), "Failed to install velero with error %v", err)
 		}
 	})
 
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
 			err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-			Expect(err).To(Succeed())
+			Expect(err).To(Succeed(), "Failed to uninstall velero with error %v", err)
 		}
 	})
 
 	When("kibishii is the sample workload", func() {
 		It("Deleted backups are deleted from object storage and backups deleted from object storage can be deleted locally", func() {
 			backupName = "backup-" + UUIDgen.String()
-			Expect(runBackupDeletionTests(client, VeleroCfg.VeleroCLI, VeleroCfg.CloudProvider, VeleroCfg.VeleroNamespace, backupName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig)).To(Succeed(),
-				"Failed to run backup deletion test")
+			err = runBackupDeletionTests(client, VeleroCfg.VeleroCLI, VeleroCfg.CloudProvider, VeleroCfg.VeleroNamespace, backupName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig)
+			Expect(err).To(Succeed(), "Failed to run backup deletion test with error %v", err)
 		})
 	})
 }

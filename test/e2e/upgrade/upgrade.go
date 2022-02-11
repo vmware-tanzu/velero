@@ -50,7 +50,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 	)
 
 	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests with error %v", err)
 
 	BeforeEach(func() {
 		if (len(VeleroCfg.UpgradeFromVeleroVersion)) == 0 {
@@ -63,7 +63,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 		var err error
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
-		Expect(err).To(Succeed())
+		Expect(err).To(Succeed(), "Failed to generate uuid with error %v", err)
 		if VeleroCfg.InstallVelero {
 			//Set VeleroImage and ResticHelperImage to blank
 			//VeleroImage and ResticHelperImage should be the default value in originalCli
@@ -76,10 +76,12 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 			if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
 				tmpCfg.VeleroCLI, err = InstallVeleroCLI(VeleroCfg.UpgradeFromVeleroVersion)
 				upgradeFromVeleroCLI = tmpCfg.VeleroCLI
-				Expect(err).To(Succeed())
+				Expect(err).To(Succeed(), "Failed to upgrade velero with error %v", err)
 			}
-			Expect(VeleroInstall(context.Background(), &tmpCfg, "", useVolumeSnapshots)).To(Succeed())
-			Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI, tmpCfg.UpgradeFromVeleroVersion)).To(Succeed())
+			err = VeleroInstall(context.Background(), &tmpCfg, "", useVolumeSnapshots)
+			Expect(err).To(Succeed(), "Failed to install velero with error %v", err)
+			err = CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI, tmpCfg.UpgradeFromVeleroVersion)
+			Expect(err).To(Succeed(), "Failed to check velero version with error %v", err)
 		} else {
 			Skip("Upgrade test is skipped since user don't want to install any other velero")
 		}
@@ -88,7 +90,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
 			err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-			Expect(err).To(Succeed())
+			Expect(err).To(Succeed(), "Failed to uninstall velero with error %v", err)
 		}
 	})
 
@@ -99,10 +101,9 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
 			tmpCfg := VeleroCfg
 			if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
 				tmpCfg.UpgradeFromVeleroCLI = upgradeFromVeleroCLI
-				Expect(err).To(Succeed())
 			}
-			Expect(runUpgradeTests(client, &tmpCfg, backupName, restoreName, "", useVolumeSnapshots)).To(Succeed(),
-				"Failed to successfully backup and restore Kibishii namespace")
+			err = runUpgradeTests(client, &tmpCfg, backupName, restoreName, "", useVolumeSnapshots)
+			Expect(err).To(Succeed(), "Failed to successfully backup and restore Kibishii namespace with error %v", err)
 		})
 	})
 }

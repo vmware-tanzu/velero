@@ -48,7 +48,7 @@ func APIGropuVersionsTest() {
 	)
 
 	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
+	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests with error %v", err)
 
 	BeforeEach(func() {
 		resource = "rockbands"
@@ -60,7 +60,7 @@ func APIGropuVersionsTest() {
 		// removed and velero installation becomes the same as other e2e tests.
 		if VeleroCfg.InstallVelero {
 			err = VeleroInstall(context.Background(), &VeleroCfg, "EnableAPIGroupVersions", false)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to install velero with error %v", err)
 		}
 	})
 
@@ -72,11 +72,11 @@ func APIGropuVersionsTest() {
 			fmt.Printf("Ignore error: %v\n", stderr)
 			err = nil
 		}
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to clean up resource with error %v", err)
 
 		if VeleroCfg.InstallVelero {
 			err = VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to install velero with error %v", err)
 		}
 
 	})

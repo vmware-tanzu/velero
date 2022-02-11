@@ -73,21 +73,25 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		var err error
 		TestClientInstance, err = NewTestClient()
-		Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
-		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
+		Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests with error %v", err)
+		err = test.Init()
+		Expect(err).To(Succeed(), "Failed to instantiate test cases with error %v", err)
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
-				Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+				err = VeleroInstall(context.Background(), &VeleroCfg, "", false)
+				Expect(err).To(Succeed(), "Failed to install velero with error %v", err)
 			}
 		})
 		AfterEach(func() {
 			if VeleroCfg.InstallVelero {
-				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+				err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+				Expect(err).To(Succeed(), "Failed to install velero with error %v", err)
 			}
 		})
 		It(test.GetTestMsg().Text, func() {
-			Expect(RunTestCase(test)).To(Succeed(), test.GetTestMsg().FailedMSG)
+			err = RunTestCase(test)
+			Expect(err).To(Succeed(), fmt.Sprintf("%s with error %v", test.GetTestMsg().FailedMSG, err))
 		})
 	}
 }
@@ -99,14 +103,16 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		TestClientInstance, err = NewTestClient()
 		Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 		for k := range tests {
-			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
+			err = tests[k].Init()
+			Expect(err).To(Succeed(), "Failed to instantiate test %s case with error %v", tests[k].GetTestMsg().Desc, err)
 		}
 
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
 				if countIt == 0 {
-					Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+					err = VeleroInstall(context.Background(), &VeleroCfg, "", false)
+					Expect(err).To(Succeed(), "Failed to install velero with error %v", err)
 				}
 				countIt++
 			}
@@ -115,7 +121,8 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		AfterEach(func() {
 			if VeleroCfg.InstallVelero {
 				if countIt == len(tests) {
-					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+					err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+					Expect(err).To(Succeed(), "Failed to uninstall velero with error %v", err)
 				}
 			}
 		})
@@ -123,7 +130,8 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		for k := range tests {
 			curTest := tests[k]
 			It(curTest.GetTestMsg().Text, func() {
-				Expect(RunTestCase(curTest)).To(Succeed(), curTest.GetTestMsg().FailedMSG)
+				err = RunTestCase(curTest)
+				Expect(err).To(Succeed(), fmt.Sprintf("%s with error %v", curTest.GetTestMsg().FailedMSG, err))
 			})
 		}
 	}
