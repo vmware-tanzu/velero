@@ -46,23 +46,3 @@ jobs:
       run: |
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         ./hack/docker-push.sh
-        
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0.6.0'
-      with:
-        workload_identity_provider: 'projects/298797809281/locations/global/workloadIdentityPools/velero-pool/providers/velero-provider'
-        service_account: 'gcraccount@velero-gcp.iam.gserviceaccount.com'
-
-    - name: Set up gCloud SDK
-      uses: 'google-github-actions/setup-gcloud@v0.5.0'
-
-    - name: Configure docker for GCR
-      run: |
-        gcloud auth configure-docker --quiet
-
-    # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
-    - name: Publish container image to GCR
-      run: |
-        REGISTRY=gcr.io/velero-gcp ./hack/docker-push.sh
-
