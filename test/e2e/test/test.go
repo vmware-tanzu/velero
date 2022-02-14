@@ -39,6 +39,7 @@ depends on your test patterns.
 */
 type VeleroBackupRestoreTest interface {
 	Init() error
+	StartRun() error
 	CreateResources() error
 	Backup() error
 	Destroy() error
@@ -137,6 +138,10 @@ func (t *TestCase) CreateResources() error {
 	return nil
 }
 
+func (t *TestCase) StartRun() error {
+	return nil
+}
+
 func (t *TestCase) Backup() error {
 	if err := VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.BackupArgs); err != nil {
 		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
@@ -180,8 +185,11 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 	}
 
 	defer test.Clean()
-
-	err := test.CreateResources()
+	err := test.StartRun()
+	if err != nil {
+		return err
+	}
+	err = test.CreateResources()
 	if err != nil {
 		return err
 	}
