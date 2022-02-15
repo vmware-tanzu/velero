@@ -62,7 +62,7 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string) *a
 					Containers: []v1.Container{
 						{
 							Name:    name,
-							Image:   "busybox:latest",
+							Image:   "gcr.io/velero-gcp/busybox:latest",
 							Command: []string{"sleep", "1000000"},
 						},
 					},

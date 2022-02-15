@@ -48,17 +48,6 @@ func (m *MultiNSBackup) Init() error {
 	m.Client = TestClientInstance
 	m.NSExcluded = &[]string{}
 
-	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
-	// we will exclude all of the namespaces that existed prior to the test from the backup
-	namespaces, err := m.Client.ClientGo.CoreV1().Namespaces().List(context.Background(), v1.ListOptions{})
-	if err != nil {
-		return errors.Wrap(err, "Could not retrieve namespaces")
-	}
-
-	for _, excludeNamespace := range namespaces.Items {
-		*m.NSExcluded = append(*m.NSExcluded, excludeNamespace.Name)
-	}
-
 	if m.IsScalTest {
 		m.NamespacesTotal = 2500
 		m.TimeoutDuration = time.Hour * 2
@@ -74,6 +63,20 @@ func (m *MultiNSBackup) Init() error {
 			FailedMSG: "Failed to successfully backup and restore multiple namespaces",
 		}
 	}
+	return nil
+}
+
+func (m *MultiNSBackup) StartRun() error {
+	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
+	// we will exclude all of the namespaces that existed prior to the test from the backup
+	namespaces, err := m.Client.ClientGo.CoreV1().Namespaces().List(context.Background(), v1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Could not retrieve namespaces")
+	}
+
+	for _, excludeNamespace := range namespaces.Items {
+		*m.NSExcluded = append(*m.NSExcluded, excludeNamespace.Name)
+	}
 
 	m.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", m.BackupName,
@@ -85,7 +88,6 @@ func (m *MultiNSBackup) Init() error {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", m.RestoreName,
 		"--from-backup", m.BackupName, "--wait",
 	}
-
 	return nil
 }
 

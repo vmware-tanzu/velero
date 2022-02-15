@@ -38,6 +38,9 @@
 # This script is meant to be a combination of documentation and executable.
 # If you have questions at any point, please stop and ask!
 
+# Fail on any error.
+set -eo pipefail
+
 # Directory in which the script itself resides, so we can use it for calling programs that are in the same directory.
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
