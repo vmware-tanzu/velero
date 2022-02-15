@@ -461,6 +461,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
+	// validate that only one exists orLabelSelector or just labelSelector (singular)
+	if request.Spec.OrLabelSelectors != nil && request.Spec.LabelSelector != nil {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
+	}
+
 	return request
 }
 

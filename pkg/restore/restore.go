@@ -183,6 +183,17 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		ls = &metav1.LabelSelector{}
 	}
 
+	var OrSelectors []labels.Selector
+	if req.Restore.Spec.OrLabelSelectors != nil {
+		for _, s := range req.Restore.Spec.OrLabelSelectors {
+			labelAsSelector, err := metav1.LabelSelectorAsSelector(s)
+			if err != nil {
+				return Result{}, Result{Velero: []string{err.Error()}}
+			}
+			OrSelectors = append(OrSelectors, labelAsSelector)
+		}
+	}
+
 	selector, err := metav1.LabelSelectorAsSelector(ls)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
@@ -264,6 +275,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		namespaceIncludesExcludes:  namespaceIncludesExcludes,
 		chosenGrpVersToRestore:     make(map[string]ChosenGroupVersion),
 		selector:                   selector,
+		OrSelectors:                OrSelectors,
 		log:                        req.Log,
 		dynamicFactory:             kr.dynamicFactory,
 		fileSystem:                 kr.fileSystem,
@@ -305,6 +317,7 @@ type restoreContext struct {
 	namespaceIncludesExcludes  *collections.IncludesExcludes
 	chosenGrpVersToRestore     map[string]ChosenGroupVersion
 	selector                   labels.Selector
+	OrSelectors                []labels.Selector
 	log                        logrus.FieldLogger
 	dynamicFactory             client.DynamicFactory
 	fileSystem                 filesystem.Interface
@@ -1859,6 +1872,27 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 		}
 
 		if !ctx.selector.Matches(labels.Set(obj.GetLabels())) {
+			continue
+		}
+
+		// Processing OrLabelSelectors when specified in the restore request. LabelSelectors as well as OrLabelSelectors
+		// cannot co-exist, only one of them can be specified
+		var skipItem = false
+		var skip = 0
+		ctx.log.Debugf("orSelectors specified: %s for item: %s", ctx.OrSelectors, item)
+		for _, s := range ctx.OrSelectors {
+			if !s.Matches(labels.Set(obj.GetLabels())) {
+				skip++
+			}
+
+			if len(ctx.OrSelectors) == skip && skip > 0 {
+				ctx.log.Infof("setting skip flag to true for item: %s", item)
+				skipItem = true
+			}
+		}
+
+		if skipItem {
+			ctx.log.Infof("restore orSelector labels did not match, skipping restore of item: %s", skipItem, item)
 			continue
 		}
 

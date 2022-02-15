@@ -253,6 +253,36 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "OrLabelSelectors only restores matching resources",
+			restore: defaultRestore().OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
+				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup: defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a1", "b1")).Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a3", "b3")).Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a5", "b5")).Result(),
+					builder.ForPersistentVolume("pv-2").ObjectMeta(builder.WithLabels("a4", "b4")).Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-2/deploy-2"},
+				test.PVs():         {"/pv-2"},
+			},
+		},
+		{
 			name:    "should include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=true",
 			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(true).Result(),
 			backup:  defaultBackup().Result(),

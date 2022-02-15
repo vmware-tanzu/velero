@@ -113,6 +113,12 @@ func (b *RestoreBuilder) LabelSelector(selector *metav1.LabelSelector) *RestoreB
 	return b
 }
 
+// OrLabelSelector sets the Restore's orLabelSelector set.
+func (b *RestoreBuilder) OrLabelSelector(orSelectors []*metav1.LabelSelector) *RestoreBuilder {
+	b.object.Spec.OrLabelSelectors = orSelectors
+	return b
+}
+
 // NamespaceMappings sets the Restore's namespace mappings.
 func (b *RestoreBuilder) NamespaceMappings(mapping ...string) *RestoreBuilder {
 	if b.object.Spec.NamespaceMapping == nil {

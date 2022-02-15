@@ -71,6 +71,15 @@ type RestoreSpec struct {
 	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
+	// OrLabelSelectors is list of metav1.LabelSelector to filter with
+	// when restoring individual objects from the backup. If multiple provided
+	// they will be joined by the OR operator. LabelSelector as well as
+	// OrLabelSelectors cannot co-exist in restore request, only one of them
+	// can be used
+	// +optional
+	// +nullable
+	OrLabelSelectors []*metav1.LabelSelector `json:"orLabelSelectors,omitempty"`
+
 	// RestorePVs specifies whether to restore all included
 	// PVs from snapshot (via the cloudprovider).
 	// +optional
