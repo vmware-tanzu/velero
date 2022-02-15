@@ -110,7 +110,7 @@ func newRemapCRDVersionAction(f client.Factory) veleroplugin.HandlerInitializer 
 			return nil, err
 		}
 
-		return backup.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions()), nil
+		return backup.NewRemapCRDVersionAction(logger, client.ApiextensionsV1().CustomResourceDefinitions()), nil
 	}
 }
 

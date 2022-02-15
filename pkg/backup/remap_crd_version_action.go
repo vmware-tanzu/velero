@@ -25,7 +25,7 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 
-	apiextv1beta1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	apiextv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,11 +38,11 @@ import (
 // CRD that needs to be backed up as v1beta1.
 type RemapCRDVersionAction struct {
 	logger        logrus.FieldLogger
-	betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface
+	betaCRDClient apiextv1client.CustomResourceDefinitionInterface
 }
 
 // NewRemapCRDVersionAction instantiates a new RemapCRDVersionAction plugin.
-func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
+func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1client.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
 	return &RemapCRDVersionAction{logger: logger, betaCRDClient: betaCRDClient}
 }
 
@@ -100,7 +100,7 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	return item, nil, nil
 }
 
-func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) (*unstructured.Unstructured, error) {
+func fetchV1beta1CRD(name string, betaCRDClient apiextv1client.CustomResourceDefinitionInterface) (*unstructured.Unstructured, error) {
 	betaCRD, err := betaCRDClient.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", name)
