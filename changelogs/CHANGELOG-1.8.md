@@ -15,7 +15,7 @@ https://velero.io/docs/v1.8/upgrade-to-1.8/
 
 ### Highlights
 
-#### The plugins to support handling volumes created by the AWS CSI driver
+#### The plugins to support handling volumes created by the CSI drivers of cloud providers
 The new versions of plugins for AWS, Azure and GCP will be released with the support of snapshotting and restoring the persistent volumes provisioned by CSI driver via the APIs of the cloud providers.  With this enhancement, users can backup and restore the persistent volumes on these could providers without using the CSI plugin, which will remain beta and the feature flag `EnableCSI` will be disabled by default.
 
 For the version of the plugins and the CSI drivers they support respectively please see the table:
@@ -25,6 +25,13 @@ For the version of the plugins and the CSI drivers they support respectively ple
 | velero-plugin-for-aws | v1.4.0 | ebs.csi.aws.com |
 | velero-plugin-for-microsoft-azure | v1.4.0 | disk.csi.azure.com |
 | velero-plugin-for-gcp | v1.4.0 | pd.csi.storage.gke.io |
+
+#### IPv6 dual stack support
+By successfully running the E2E test on IPv6 dual stack environment, we've verfied the functionality of velero on IPv6 dual stack. 
+#### Refactor the controllers using Kubebuilder v3 
+Continuing the code modernization work.  Some controllers have been reworked using Kubebuilder v3.  We'll continue the work to using Kubebuilder to rewrite the controllers in future releases.
+#### Enhancements to E2E test cases
+More test cases have been added to the E2E test suite to improve the release health.
 
 #### Break change
 Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Kubernetes v1.16+
