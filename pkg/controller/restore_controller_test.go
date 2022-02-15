@@ -309,6 +309,15 @@ func TestProcessQueueItem(t *testing.T) {
 			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
 		},
 		{
+			name:                     "new restore with labelSelector as well as orLabelSelector fails validation",
+			location:                 defaultStorageLocation,
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}}, {MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup:                   defaultBackup().StorageLocation("default").Result(),
+			expectedErr:              false,
+			expectedValidationErrors: []string{"encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"},
+			expectedPhase:            string(velerov1api.RestorePhaseFailedValidation),
+		},
+		{
 			name:                  "valid restore with schedule name gets executed",
 			location:              defaultStorageLocation,
 			restore:               NewRestore("foo", "bar", "", "ns-1", "", velerov1api.RestorePhaseNew).Schedule("sched-1").Result(),

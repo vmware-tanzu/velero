@@ -326,6 +326,11 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
+	// validate that only one exists orLabelSelector or just labelSelector (singular)
+	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"))
+	}
+
 	// validate that exactly one of BackupName and ScheduleName have been specified
 	if !backupXorScheduleProvided(restore) {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Either a backup or schedule must be specified as a source for the restore, but not both")
