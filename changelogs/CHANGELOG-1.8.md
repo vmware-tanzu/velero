@@ -26,7 +26,11 @@ For the version of the plugins and the CSI drivers they support respectively ple
 | velero-plugin-for-microsoft-azure | v1.4.0 | disk.csi.azure.com |
 | velero-plugin-for-gcp | v1.4.0 | pd.csi.storage.gke.io |
 
-#### Break change
+#### Deleting BSLs also cleans up related resources
+
+When a Backup Storage Location (BSL) is deleted, backup and Restic repository resources will also be deleted.
+
+#### Breaking changes
 Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Kubernetes v1.16+
 
 ### All changes
@@ -89,4 +93,3 @@ Also added DownloadTargetKindBackupItemSnapshots for retrieving the signed URL t
   Part of the Upload Progress enhancement (#3533) (#4077, @dsmithuchida)
 * Add upgrade test in E2E test (#4058, @danfengliu)
 * Handle namespace mapping for PVs without snapshots on restore (#3708, @sseago)
-
