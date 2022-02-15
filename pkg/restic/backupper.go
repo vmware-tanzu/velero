@@ -153,6 +153,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
+		// ignore non-running pods
+		if pod.Status.Phase != corev1api.PodRunning {
+			log.Warnf("Skipping volume %s in pod %s/%s - pod not running", volumeName, pod.Namespace, pod.Name)
+			continue
+		}
 		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
 		// daemonset pod has no way to access their data.
 		isHostPath, err := isHostPathVolume(&volume, pvc, b.pvClient.PersistentVolumes())
@@ -162,11 +167,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 		if isHostPath {
 			log.Warnf("Volume %s in pod %s/%s is a hostPath volume which is not supported for restic backup, skipping", volumeName, pod.Namespace, pod.Name)
-			continue
-		}
-
-		// emptyDir volumes on finished pods are not supported because the volume is already gone and would result in an error
-		if (pod.Status.Phase == corev1api.PodSucceeded || pod.Status.Phase == corev1api.PodFailed) && volume.EmptyDir != nil {
 			continue
 		}
 
