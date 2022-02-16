@@ -32,6 +32,8 @@ By successfully running the E2E test on IPv6 dual stack environment, we've verfi
 Continuing the code modernization work.  Some controllers have been reworked using Kubebuilder v3.  We'll continue the work to using Kubebuilder to rewrite the controllers in future releases.
 #### Enhancements to E2E test cases
 More test cases have been added to the E2E test suite to improve the release health.
+#### Respect the cron setting of schedule
+The creation time is taken into account to calculate the next run for scheduled backup.  
 
 #### Break change
 Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Kubernetes v1.16+
