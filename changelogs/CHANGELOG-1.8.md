@@ -15,8 +15,8 @@ https://velero.io/docs/v1.8/upgrade-to-1.8/
 
 ### Highlights
 
-#### The plugins to support handling volumes created by the CSI drivers of cloud providers
-The new versions of plugins for AWS, Azure and GCP will be released with the support of snapshotting and restoring the persistent volumes provisioned by CSI driver via the APIs of the cloud providers.  With this enhancement, users can backup and restore the persistent volumes on these could providers without using the CSI plugin, which will remain beta and the feature flag `EnableCSI` will be disabled by default.
+#### Velero plugins now support handling volumes created by the CSI drivers of cloud providers
+Versions 1.4 of the Velero plugins for AWS, Azure and GCP now support snapshotting and restoring the persistent volumes provisioned by CSI driver via the APIs of the cloud providers. With this enhancement, users can backup and restore the persistent volumes on these cloud providers without using the Velero CSI plugin. The CSI plugin will remain beta and the feature flag `EnableCSI` will be disabled by default.
 
 For the version of the plugins and the CSI drivers they support respectively please see the table:
 
@@ -27,13 +27,13 @@ For the version of the plugins and the CSI drivers they support respectively ple
 | velero-plugin-for-gcp | v1.4.0 | pd.csi.storage.gke.io |
 
 #### IPv6 dual stack support
-By successfully running the E2E test on IPv6 dual stack environment, we've verfied the functionality of velero on IPv6 dual stack. 
-#### Refactor the controllers using Kubebuilder v3 
-Continuing the code modernization work.  Some controllers have been reworked using Kubebuilder v3.  We'll continue the work to using Kubebuilder to rewrite the controllers in future releases.
+We've verified the functionality of Velero on IPv6 dual stack by successfully running the E2E test on IPv6 dual stack environment.
+#### Refactor the controllers using Kubebuilder v3
+In this release we continued our code modernization work, rewriting some controllers using Kubebuilder v3. This work is ongoing and we will continue to make progress in future releases.
 #### Enhancements to E2E test cases
 More test cases have been added to the E2E test suite to improve the release health.
-#### Respect the cron setting of schedule
-The creation time is taken into account to calculate the next run for scheduled backup.  
+#### Respect the cron setting of scheduled backup
+The creation time is now taken into account to calculate the next run for scheduled backup.
 
 #### Deleting BSLs also cleans up related resources
 
@@ -41,7 +41,7 @@ When a Backup Storage Location (BSL) is deleted, backup and Restic repository re
 
 #### Breaking changes
 
-Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Kubernetes v1.16+
+Starting in v1.8, Velero will only support Kubernetes v1 CRD meaning that Velero v1.8+ will only run on Kubernetes v1.16+. Before upgrading, make sure you are running a supported Kubernetes version. For more information, see our [compatibility matrix](https://github.com/vmware-tanzu/velero#velero-compatibility-matrix).
 
 ### All changes
 
