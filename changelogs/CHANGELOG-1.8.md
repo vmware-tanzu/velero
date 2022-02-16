@@ -33,7 +33,12 @@ Continuing the code modernization work.  Some controllers have been reworked usi
 #### Enhancements to E2E test cases
 More test cases have been added to the E2E test suite to improve the release health.
 
-#### Break change
+#### Deleting BSLs also cleans up related resources
+
+When a Backup Storage Location (BSL) is deleted, backup and Restic repository resources will also be deleted.
+
+#### Breaking changes
+
 Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Kubernetes v1.16+
 
 ### All changes
@@ -96,4 +101,3 @@ Also added DownloadTargetKindBackupItemSnapshots for retrieving the signed URL t
   Part of the Upload Progress enhancement (#3533) (#4077, @dsmithuchida)
 * Add upgrade test in E2E test (#4058, @danfengliu)
 * Handle namespace mapping for PVs without snapshots on restore (#3708, @sseago)
-
