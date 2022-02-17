@@ -43,6 +43,11 @@ When a Backup Storage Location (BSL) is deleted, backup and Restic repository re
 
 Starting v1.8 velero will only support v1 CRD, therefore, it will only run on Kubernetes v1.16+
 
+#### Upload Progress Monitoring and Item Snapshotter
+Item Snapshotter plugin API was merged.  This will support both Upload Progress
+monitoring and the planned Data Mover.  Upload Progress monitoring PRs are
+in progress for 1.9.
+
 ### All changes
 
 * E2E test on ssr object with controller namespace mix-ups (#4521, @mqiu)
