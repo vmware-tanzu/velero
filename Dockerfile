@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM --platform=$BUILDPLATFORM golang:1.16.8 as builder-env
+FROM --platform=$BUILDPLATFORM golang:1.17.7 as builder-env
 
 ARG GOPROXY
 ARG PKG

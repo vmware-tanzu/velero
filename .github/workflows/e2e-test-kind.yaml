@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.17
         id: go
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
@@ -74,7 +74,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.17
         id: go
       - name: Check out the code
         uses: actions/checkout@v2
