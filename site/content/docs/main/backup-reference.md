@@ -61,6 +61,20 @@ velero backup create --from-schedule example-schedule
 
 This command will immediately trigger a new backup based on your template for `example-schedule`. This will not affect the backup schedule, and another backup will trigger at the scheduled time.
 
+
+### Limitation
+Backups created from schedule can have owner reference to the schedule. This can be achieved by command:
+
+```
+velero schedule create --use-owner-references-in-backup <backup-name>
+```
+By this way, schedule is the owner of it created backups. This is useful for some GitOps scenarios, or the resource tree of k8s synchronized from other places.
+
+Please do notice there is also side effect that may not be expected. Because schedule is the owner, when the schedule is deleted, the related backups CR (Just backup CR is deleted. Backup data still exists in object store and snapshots) will be deleted by k8s GC controller, too, but Velero controller will sync these backups from object store's metadata into k8s. Then k8s GC controller and Velero controller will fight over whether these backups should exist all through.
+
+If there is possibility the schedule will be disable to not create backup anymore, and the created backups are still useful. Please do not enable this option. For detail, please reference to [Backups created by a schedule with useOwnerReferenceInBackup set do not get synced properly](https://github.com/vmware-tanzu/velero/issues/4093).
+
+
 ## Kubernetes API Pagination
 
 By default, Velero will paginate the LIST API call for each resource type in the Kubernetes API when collecting items into a backup. The `--client-page-size` flag for the Velero server configures the size of each page. 
