@@ -20,4 +20,3 @@ You can follow the work we do, see our milestones, and our backlog on our [GitHu
   * Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
   * See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
   * Have a question to discuss in the community meeting? Please add it to our [Q&A Discussion board](https://github.com/vmware-tanzu/velero/discussions/categories/community-support-q-a)
-* Have a question about "how do I configure Velero to do X?", or "how can I backup X with Velero?", or "how do I start to contribute to Velero?" and would like to chat with us face to face, come join the [Velero Office Hours](https://hackmd.io/I3u1x0u9T46KhuYZN4LX-A?view) that's held twice per month.
