@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -384,6 +385,7 @@ const (
 	awsEbsCsiZoneKey = "topology.ebs.csi.aws.com/zone"
 	azureCsiZoneKey  = "topology.disk.csi.azure.com/zone"
 	gkeCsiZoneKey    = "topology.gke.io/zone"
+	zoneSeparator    = "__"
 )
 
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
@@ -539,15 +541,27 @@ func zoneFromPVNodeAffinity(res *corev1api.PersistentVolume, topologyKeys ...str
 		return "", ""
 	}
 	keySet := sets.NewString(topologyKeys...)
+	providerGke := false
+	zones := make([]string, 0)
 	for _, term := range nodeAffinity.Required.NodeSelectorTerms {
 		if term.MatchExpressions == nil {
 			continue
 		}
 		for _, exp := range term.MatchExpressions {
 			if keySet.Has(exp.Key) && exp.Operator == "In" && len(exp.Values) > 0 {
-				return exp.Key, exp.Values[0]
+				if exp.Key == gkeCsiZoneKey {
+					providerGke = true
+					zones = append(zones, exp.Values[0])
+				} else {
+					return exp.Key, exp.Values[0]
+				}
 			}
 		}
 	}
+
+	if providerGke {
+		return gkeCsiZoneKey, strings.Join(zones, zoneSeparator)
+	}
+
 	return "", ""
 }

@@ -131,6 +131,21 @@ func Test_zoneFromPVNodeAffinity(t *testing.T) {
 			wantKey:   "topology.disk.csi.azure.com/zone",
 			wantValue: "us-central",
 		},
+		{
+			name: "Volume with multiple valid keys, and provider is gke, returns the all match", // it should never happen
+			pv: builder.ForPersistentVolume("multi-matching-pv").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-central1-c").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-east-2c", "us-east-2b").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "europe-north1-a").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.gke.io/zone",
+			wantValue: "us-central1-c__us-east-2c__europe-north1-a",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
