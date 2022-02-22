@@ -385,7 +385,7 @@ const (
 	awsEbsCsiZoneKey = "topology.ebs.csi.aws.com/zone"
 	azureCsiZoneKey  = "topology.disk.csi.azure.com/zone"
 	gkeCsiZoneKey    = "topology.gke.io/zone"
-	zoneSeparator    = "__"
+	gkeZoneSeparator = "__"
 )
 
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
@@ -560,7 +560,7 @@ func zoneFromPVNodeAffinity(res *corev1api.PersistentVolume, topologyKeys ...str
 	}
 
 	if providerGke {
-		return gkeCsiZoneKey, strings.Join(zones, zoneSeparator)
+		return gkeCsiZoneKey, strings.Join(zones, gkeZoneSeparator)
 	}
 
 	return "", ""
