@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
+
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -37,13 +39,14 @@ import (
 // RemapCRDVersionAction inspects CustomResourceDefinition and decides if it is a v1
 // CRD that needs to be backed up as v1beta1.
 type RemapCRDVersionAction struct {
-	logger        logrus.FieldLogger
-	betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface
+	logger          logrus.FieldLogger
+	betaCRDClient   apiextv1beta1client.CustomResourceDefinitionInterface
+	discoveryHelper velerodiscovery.Helper
 }
 
 // NewRemapCRDVersionAction instantiates a new RemapCRDVersionAction plugin.
-func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
-	return &RemapCRDVersionAction{logger: logger, betaCRDClient: betaCRDClient}
+func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface, discoveryHelper velerodiscovery.Helper) *RemapCRDVersionAction {
+	return &RemapCRDVersionAction{logger: logger, betaCRDClient: betaCRDClient, discoveryHelper: discoveryHelper}
 }
 
 // AppliesTo selects the resources the plugin should run against. In this case, CustomResourceDefinitions.
@@ -68,7 +71,26 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		return item, nil, nil
 	}
 
-	// We've got a v1 CRD, so proceed.
+	// This plugin will exit if the CRD was installed via v1beta1 but the cluster does not support v1beta1 CRD
+	supportv1b1 := false
+CheckVersion:
+	for _, g := range a.discoveryHelper.APIGroups() {
+		if g.Name == apiextv1.GroupName {
+			for _, v := range g.Versions {
+				if v.Version == apiextv1beta1.SchemeGroupVersion.Version {
+					supportv1b1 = true
+					break CheckVersion
+				}
+			}
+
+		}
+	}
+	if !supportv1b1 {
+		a.logger.Info("Exiting RemapCRDVersionAction, the cluster does not support v1beta1 CRD")
+		return item, nil, nil
+	}
+
+	// We've got a v1 CRD and the cluster supports v1beta1 CRD, so proceed.
 	var crd apiextv1.CustomResourceDefinition
 
 	// Do not use runtime.DefaultUnstructuredConverter.FromUnstructured here because it has a bug when converting integers/whole
