@@ -56,6 +56,7 @@ import (
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -65,14 +66,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
-
-// These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
-// They cannot be directly importing because they are part of the kubernetes/kubernetes package, and importing that package is unsupported.
-// Their values are well-known and slow changing. They're duplicated here as constants to provide compile-time checking.
-// Originals can be found in kubernetes/kubernetes/pkg/controller/volume/persistentvolume/util/util.go.
-const KubeAnnBindCompleted = "pv.kubernetes.io/bind-completed"
-const KubeAnnBoundByController = "pv.kubernetes.io/bound-by-controller"
-const KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
 type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
@@ -93,6 +86,13 @@ type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
 	Restore(req Request,
 		actions []velero.RestoreItemAction,
+		snapshotLocationLister listers.VolumeSnapshotLocationLister,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
+	) (Result, Result)
+	RestoreWithResolvers(
+		req Request,
+		restoreItemActionResolver framework.RestoreItemActionResolver,
+		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
@@ -162,6 +162,18 @@ func (kr *kubernetesRestorer) Restore(
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
+	resolver := framework.NewRestoreItemActionResolver(actions)
+	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
+	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, snapshotLocationLister, volumeSnapshotterGetter)
+}
+
+func (kr *kubernetesRestorer) RestoreWithResolvers(
+	req Request,
+	restoreItemActionResolver framework.RestoreItemActionResolver,
+	itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
+) (Result, Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -188,7 +200,12 @@ func (kr *kubernetesRestorer) Restore(
 		Includes(req.Restore.Spec.IncludedNamespaces...).
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
-	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
+	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper)
+	if err != nil {
+		return Result{}, Result{Velero: []string{err.Error()}}
+	}
+
+	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -251,7 +268,8 @@ func (kr *kubernetesRestorer) Restore(
 		dynamicFactory:             kr.dynamicFactory,
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
-		actions:                    resolvedActions,
+		restoreItemActions:         resolvedActions,
+		itemSnapshotterActions:     resolvedItemSnapshotterActions,
 		volumeSnapshotterGetter:    volumeSnapshotterGetter,
 		resticRestorer:             resticRestorer,
 		resticErrs:                 make(chan error),
@@ -277,46 +295,6 @@ func (kr *kubernetesRestorer) Restore(
 	return restoreCtx.execute()
 }
 
-type resolvedAction struct {
-	velero.RestoreItemAction
-
-	resourceIncludesExcludes  *collections.IncludesExcludes
-	namespaceIncludesExcludes *collections.IncludesExcludes
-	selector                  labels.Selector
-}
-
-func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper) ([]resolvedAction, error) {
-	var resolved []resolvedAction
-
-	for _, action := range actions {
-		resourceSelector, err := action.AppliesTo()
-		if err != nil {
-			return nil, err
-		}
-
-		resources := collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
-		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
-
-		selector := labels.Everything()
-		if resourceSelector.LabelSelector != "" {
-			if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
-				return nil, err
-			}
-		}
-
-		res := resolvedAction{
-			RestoreItemAction:         action,
-			resourceIncludesExcludes:  resources,
-			namespaceIncludesExcludes: namespaces,
-			selector:                  selector,
-		}
-
-		resolved = append(resolved, res)
-	}
-
-	return resolved, nil
-}
-
 type restoreContext struct {
 	backup                     *velerov1api.Backup
 	backupReader               io.Reader
@@ -331,7 +309,8 @@ type restoreContext struct {
 	dynamicFactory             client.DynamicFactory
 	fileSystem                 filesystem.Interface
 	namespaceClient            corev1.NamespaceInterface
-	actions                    []resolvedAction
+	restoreItemActions         []framework.RestoreItemResolvedAction
+	itemSnapshotterActions     []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter    VolumeSnapshotterGetter
 	resticRestorer             restic.Restorer
 	resticWaitGroup            sync.WaitGroup
@@ -713,23 +692,22 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 }
 
-// TODO: this should be combined with DeleteItemActions at some point.
-func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
-	var actions []resolvedAction
-	for _, action := range ctx.actions {
-		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-			continue
+func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.RestoreItemResolvedAction {
+	var actions []framework.RestoreItemResolvedAction
+	for _, action := range ctx.restoreItemActions {
+		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
+			actions = append(actions, action)
 		}
+	}
+	return actions
+}
 
-		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			continue
+func (ctx *restoreContext) getApplicableItemSnapshotters(groupResource schema.GroupResource, namespace string) []framework.ItemSnapshotterResolvedAction {
+	var actions []framework.ItemSnapshotterResolvedAction
+	for _, action := range ctx.itemSnapshotterActions {
+		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
+			actions = append(actions, action)
 		}
-
-		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
-			continue
-		}
-
-		actions = append(actions, action)
 	}
 
 	return actions
@@ -842,12 +820,7 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 		if err != nil {
 			return true, err
 		}
-
-		// TODO: Due to upstream conversion issues in runtime.FromUnstructured,
-		// we use the unstructured object here. Once the upstream conversion
-		// functions are fixed, we should convert to the CRD types and use
-		// IsCRDReady.
-		available, err = kube.IsUnstructuredCRDReady(unstructuredCRD)
+		available, err = kube.IsCRDReady(unstructuredCRD)
 		if err != nil {
 			return true, err
 		}
@@ -1107,6 +1080,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
+			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+			_, err = remapClaimRefNS(ctx, obj)
+			if err != nil {
+				errs.Add(namespace, err)
+				return warnings, errs
+			}
 			obj = resetVolumeBindingInfo(obj)
 			// We call the pvRestorer here to clear out the PV's claimRef.UID,
 			// so it can be re-claimed when its PVC is restored and gets a new UID.
@@ -1126,13 +1105,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
-		if !action.selector.Matches(labels.Set(obj.GetLabels())) {
+		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
 			return warnings, errs
 		}
 
 		ctx.log.Infof("Executing item action for %v", &groupResource)
 
-		executeOutput, err := action.Execute(&velero.RestoreItemActionExecuteInput{
+		executeOutput, err := action.RestoreItemAction.Execute(&velero.RestoreItemActionExecuteInput{
 			Item:           obj,
 			ItemFromBackup: itemFromBackup,
 			Restore:        ctx.restore,
@@ -1237,7 +1216,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
-	if apierrors.IsAlreadyExists(restoreErr) {
+	isAlreadyExistsError, err := isAlreadyExistsError(ctx, obj, restoreErr, resourceClient)
+	if err != nil {
+		errs.Add(namespace, err)
+		return warnings, errs
+	}
+	if isAlreadyExistsError {
 		fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			ctx.log.Infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
@@ -1287,7 +1271,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
-				e := errors.Errorf("could not restore, %s. Warning: the in-cluster version is different than the backed-up version.", restoreErr)
+				e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
+					obj.GetKind(), obj.GetName())
 				warnings.Add(namespace, e)
 			}
 			return warnings, errs
@@ -1332,6 +1317,45 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	return warnings, errs
+}
+
+func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, err error, client client.Dynamic) (bool, error) {
+	if err == nil {
+		return false, nil
+	}
+	if apierrors.IsAlreadyExists(err) {
+		return true, nil
+	}
+	// The "invalid value error" or "internal error" rather than "already exists" error returns when restoring nodePort service in the following two cases:
+	// 1. For NodePort service, the service has nodePort preservation while the same nodePort service already exists. - Get invalid value error
+	// 2. For LoadBalancer service, the "healthCheckNodePort" already exists. - Get internal error
+	// If this is the case, the function returns true to avoid reporting error.
+	// Refer to https://github.com/vmware-tanzu/velero/issues/2308 for more details
+	if obj.GetKind() != "Service" {
+		return false, nil
+	}
+	statusErr, ok := err.(*apierrors.StatusError)
+	if !ok || statusErr.Status().Details == nil || len(statusErr.Status().Details.Causes) == 0 {
+		return false, nil
+	}
+	// make sure all the causes are "port allocated" error
+	for _, cause := range statusErr.Status().Details.Causes {
+		if !strings.Contains(cause.Message, "provided port is already allocated") {
+			return false, nil
+		}
+	}
+
+	// the "already allocated" error may caused by other services, check whether the expected service exists or not
+	if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			ctx.log.Debugf("Service %s not found", kube.NamespaceAndName(obj))
+			return false, nil
+		}
+		return false, errors.Wrapf(err, "Unable to get the service %s while checking the NodePort is already allocated error", kube.NamespaceAndName(obj))
+	}
+
+	ctx.log.Infof("Service %s exists, ignore the provided port is already allocated error", kube.NamespaceAndName(obj))
+	return true, nil
 }
 
 // shouldRenamePV returns a boolean indicating whether a persistent volume should
@@ -1538,14 +1562,10 @@ func resetVolumeBindingInfo(obj *unstructured.Unstructured) *unstructured.Unstru
 	// Upon restore, this new PV will look like a statically provisioned, manually-
 	// bound volume rather than one bound by the controller, so remove the annotation
 	// that signals that a controller bound it.
-	delete(annotations, KubeAnnBindCompleted)
+	delete(annotations, kube.KubeAnnBindCompleted)
 	// Remove the annotation that signals that the PV is already bound; we want
 	// the PV(C) controller to take the two objects and bind them again.
-	delete(annotations, KubeAnnBoundByController)
-
-	// Remove the provisioned-by annotation which signals that the persistent
-	// volume was dynamically provisioned; it is now statically provisioned.
-	delete(annotations, KubeAnnDynamicallyProvisioned)
+	delete(annotations, kube.KubeAnnBoundByController)
 
 	// GetAnnotations returns a copy, so we have to set them again.
 	obj.SetAnnotations(annotations)

@@ -47,6 +47,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -60,6 +61,13 @@ type fakeBackupper struct {
 
 func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
 	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
+	return args.Error(0)
+}
+
+func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
+	backupItemActionResolver framework.BackupItemActionResolver, itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	args := b.Called(logger, backup, backupFile, backupItemActionResolver, itemSnapshotterResolver, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 
@@ -825,7 +833,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
+			pluginManager.On("GetItemSnapshotters").Return(nil, nil)
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
+			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolver{}, framework.ItemSnapshotterResolver{}, pluginManager).Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
 			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.

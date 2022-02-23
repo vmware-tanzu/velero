@@ -100,15 +100,18 @@ func isPVBMatchPod(pvb *velerov1api.PodVolumeBackup, podName string, namespace s
 	return podName == pvb.Spec.Pod.Name && namespace == pvb.Spec.Pod.Namespace
 }
 
-// volumeIsProjected checks if the given volume exists in the list of podVolumes
-// and returns true if the volume has a projected source
-func volumeIsProjected(volumeName string, podVolumes []corev1api.Volume) bool {
-	for _, volume := range podVolumes {
-		if volume.Name == volumeName && volume.Projected != nil {
-			return true
+// volumeHasNonRestorableSource checks if the given volume exists in the list of podVolumes
+// and returns true if the volume's source is not restorable. This is true for volumes with
+// a Projected or DownwardAPI source.
+func volumeHasNonRestorableSource(volumeName string, podVolumes []corev1api.Volume) bool {
+	var volume corev1api.Volume
+	for _, v := range podVolumes {
+		if v.Name == volumeName {
+			volume = v
+			break
 		}
 	}
-	return false
+	return volume.Projected != nil || volume.DownwardAPI != nil
 }
 
 // GetVolumeBackupsForPod returns a map, of volume name -> snapshot id,
@@ -127,10 +130,10 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 			continue
 		}
 
-		// If the volume came from a projected source, skip its restore.
+		// If the volume came from a projected or DownwardAPI source, skip its restore.
 		// This allows backups affected by https://github.com/vmware-tanzu/velero/issues/3863
-		// to be restored successfully.
-		if volumeIsProjected(pvb.Spec.Volume, pod.Spec.Volumes) {
+		// or https://github.com/vmware-tanzu/velero/issues/4053 to be restored successfully.
+		if volumeHasNonRestorableSource(pvb.Spec.Volume, pod.Spec.Volumes) {
 			continue
 		}
 
@@ -203,6 +206,10 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 		}
 		// don't backup volumes mounted as projected volumes, all data in those come from kube state.
 		if pv.Projected != nil {
+			continue
+		}
+		// don't backup DownwardAPI volumes, all data in those come from kube state.
+		if pv.DownwardAPI != nil {
 			continue
 		}
 		// don't backup volumes that are included in the exclude list.

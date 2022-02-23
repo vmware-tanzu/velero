@@ -82,6 +82,12 @@ For each major or minor release, create and publish a blog post to let folks kno
 	- Do a review of the diffs, and/or run `make serve-docs` and review the site.
 	- Submit a PR containing the changelog and the version-tagged docs.
 
+### Pin the base image 
+The image of velero is built based on [Distroless docker image](https://github.com/GoogleContainerTools/distroless).  
+For the reproducibility of the release, before the release candidate is tagged, we need to make sure the in the Dockerfile 
+on the release branch, the base image is referenced by digest, such as
+https://github.com/vmware-tanzu/velero/blob/release-1.7/Dockerfile#L53-L54
+
 ## Velero release
 ### Notes
 - Pre-requisite: PR with the changelog and docs is merged, so that it's included in the release tag.

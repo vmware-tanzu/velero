@@ -43,6 +43,16 @@ func (m *FakeMapper) ResourceFor(input schema.GroupVersionResource) (schema.Grou
 	if gr, found := m.Resources[input]; found {
 		return gr, nil
 	}
+	if input.Version == "" {
+		input.Version = "v1"
+		if gr, found := m.Resources[input]; found {
+			return gr, nil
+		}
+		input.Version = "v1beta1"
+		if gr, found := m.Resources[input]; found {
+			return gr, nil
+		}
+	}
 
 	return schema.GroupVersionResource{}, errors.Errorf("invalid resource %q", input.String())
 }

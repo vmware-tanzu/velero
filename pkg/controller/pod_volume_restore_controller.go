@@ -297,7 +297,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 		return c.failRestore(req, errors.Wrap(err, "error getting pod").Error(), log)
 	}
 
-	volumeDir, err := kube.GetVolumeDirectory(pod, req.Spec.Volume, c.pvcLister, c.pvLister)
+	volumeDir, err := kube.GetVolumeDirectory(log, pod, req.Spec.Volume, c.pvcLister, c.pvLister, c.kbClient)
 	if err != nil {
 		log.WithError(err).Error("Error getting volume directory name")
 		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)

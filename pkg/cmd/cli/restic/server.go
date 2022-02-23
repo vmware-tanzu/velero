@@ -32,6 +32,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -151,6 +152,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 
 	velerov1api.AddToScheme(scheme)
 	v1.AddToScheme(scheme)
+	storagev1api.AddToScheme(scheme)
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme: scheme,
 	})

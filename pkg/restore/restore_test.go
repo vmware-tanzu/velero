@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -51,6 +52,7 @@ import (
 	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -544,7 +546,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -625,7 +627,7 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -707,7 +709,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		}
 		warnings, errs := h.restorer.Restore(
 			data,
-			nil, // actions
+			nil, // restoreItemActions
 			nil, // snapshot location lister
 			nil, // volume snapshotter getter
 		)
@@ -784,7 +786,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -999,7 +1001,7 @@ func TestRestoreItems(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -1811,6 +1813,8 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
 		volumeSnapshotterGetter volumeSnapshotterGetter
 		want                    []*test.APIResource
+		wantError               bool
+		wantWarning             bool
 	}{
 		{
 			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
@@ -2192,6 +2196,95 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 		},
 		{
+			name:    "when a PV without a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is not replaced and there is a restore warning",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+			wantWarning: true,
+		},
+		{
+			name:    "when a PV without a snapshot is used by a PVC in a namespace that's being remapped, and the original PV does not exist in-cluster, the PV is not renamed",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+						ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("source-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+		},
+		{
 			name:    "when a PV is renamed and the original PV does not exist in-cluster, the PV should be renamed",
 			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
 			backup:  defaultBackup().Result(),
@@ -2418,12 +2511,21 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				vslInformer.Lister(),
 				tc.volumeSnapshotterGetter,
 			)
 
-			assertEmptyResults(t, warnings, errs)
+			if tc.wantWarning {
+				assertNonEmptyResults(t, "warning", warnings)
+			} else {
+				assertEmptyResults(t, warnings)
+			}
+			if tc.wantError {
+				assertNonEmptyResults(t, "error", errs)
+			} else {
+				assertEmptyResults(t, errs)
+			}
 			assertAPIContents(t, h, wantIDs)
 			assertRestoredItems(t, h, tc.want)
 		})
@@ -2545,7 +2647,7 @@ func TestRestoreWithRestic(t *testing.T) {
 
 			warnings, errs := h.restorer.Restore(
 				data,
-				nil, // actions
+				nil, // restoreItemActions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
@@ -2804,6 +2906,17 @@ func assertEmptyResults(t *testing.T, res ...Result) {
 	}
 }
 
+func assertNonEmptyResults(t *testing.T, typeMsg string, res ...Result) {
+	t.Helper()
+	total := 0
+	for _, r := range res {
+		total += len(r.Cluster)
+		total += len(r.Namespaces)
+		total += len(r.Velero)
+	}
+	assert.Greater(t, total, 0, "Expected at least one "+typeMsg)
+}
+
 type harness struct {
 	*test.APIServer
 
@@ -2875,9 +2988,9 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
 			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").WithAnnotations(
-				KubeAnnBindCompleted,
-				KubeAnnBoundByController,
-				KubeAnnDynamicallyProvisioned,
+				kube.KubeAnnBindCompleted,
+				kube.KubeAnnBoundByController,
+				kube.KubeAnnDynamicallyProvisioned,
 			).WithSpecField("claimRef", map[string]interface{}{
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
@@ -2885,7 +2998,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				"resourceVersion": "1"}).Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
-				WithAnnotations().
+				WithAnnotations(kube.KubeAnnDynamicallyProvisioned).
 				WithSpecField("claimRef", map[string]interface{}{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
@@ -2893,9 +3006,8 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
 			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations(
-				KubeAnnBindCompleted,
-				KubeAnnBoundByController,
-				KubeAnnDynamicallyProvisioned,
+				kube.KubeAnnBindCompleted,
+				kube.KubeAnnBoundByController,
 			).WithSpecField("volumeName", "pv-1").Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations().
@@ -2907,6 +3019,141 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := resetVolumeBindingInfo(tc.obj)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestIsAlreadyExistsError(t *testing.T) {
+	tests := []struct {
+		name        string
+		apiResource *test.APIResource
+		obj         *unstructured.Unstructured
+		err         error
+		expected    bool
+	}{
+		{
+			name:     "The input error is IsAlreadyExists error",
+			err:      apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
+			expected: true,
+		},
+		{
+			name: "The input obj isn't service",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Pod",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The StatusError contains no causes",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The causes contains not only port already allocated error",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+							{Message: "other error"},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Get already allocated error but the service doesn't exist",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Get already allocated error and the service exists",
+			apiResource: test.Services(
+				builder.ForService("default", "test").Result(),
+			),
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+	for _, test := range tests {
+		h := newHarness(t)
+
+		ctx := &restoreContext{
+			log:             h.log,
+			dynamicFactory:  client.NewDynamicFactory(h.DynamicClient),
+			namespaceClient: h.KubeClient.CoreV1().Namespaces(),
+		}
+
+		if test.apiResource != nil {
+			h.AddItems(t, test.apiResource)
+		}
+
+		client, err := ctx.dynamicFactory.ClientForGroupVersionResource(
+			schema.GroupVersion{Group: "", Version: "v1"},
+			metav1.APIResource{Name: "services"},
+			"default",
+		)
+		require.NoError(t, err)
+
+		t.Run(test.name, func(t *testing.T) {
+			result, err := isAlreadyExistsError(ctx, test.obj, test.err, client)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expected, result)
 		})
 	}
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -118,14 +119,21 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	b.resultsLock.Unlock()
 
 	var (
-		errs             []error
-		podVolumeBackups []*velerov1api.PodVolumeBackup
-		podVolumes       = make(map[string]corev1api.Volume)
+		errs              []error
+		podVolumeBackups  []*velerov1api.PodVolumeBackup
+		podVolumes        = make(map[string]corev1api.Volume)
+		mountedPodVolumes = sets.String{}
 	)
 
 	// put the pod's volumes in a map for efficient lookup below
 	for _, podVolume := range pod.Spec.Volumes {
 		podVolumes[podVolume.Name] = podVolume
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for _, volumeMount := range container.VolumeMounts {
+			mountedPodVolumes.Insert(volumeMount.Name)
+		}
 	}
 
 	var numVolumeSnapshots int
@@ -145,6 +153,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
+		// ignore non-running pods
+		if pod.Status.Phase != corev1api.PodRunning {
+			log.Warnf("Skipping volume %s in pod %s/%s - pod not running", volumeName, pod.Namespace, pod.Name)
+			continue
+		}
 		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
 		// daemonset pod has no way to access their data.
 		isHostPath, err := isHostPathVolume(&volume, pvc, b.pvClient.PersistentVolumes())
@@ -157,8 +170,10 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		// emptyDir volumes on finished pods are not supported because the volume is already gone and would result in an error
-		if (pod.Status.Phase == corev1api.PodSucceeded || pod.Status.Phase == corev1api.PodFailed) && volume.EmptyDir != nil {
+		// volumes that are not mounted by any container should not be backed up, because
+		// its directory is not created
+		if !mountedPodVolumes.Has(volumeName) {
+			log.Warnf("Volume %s is declared in pod %s/%s but not mounted by any container, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
 		}
 

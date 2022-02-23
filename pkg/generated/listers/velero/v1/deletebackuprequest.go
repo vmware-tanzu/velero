@@ -26,8 +26,10 @@ import (
 )
 
 // DeleteBackupRequestLister helps list DeleteBackupRequests.
+// All objects returned here must be treated as read-only.
 type DeleteBackupRequestLister interface {
 	// List lists all DeleteBackupRequests in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.DeleteBackupRequest, err error)
 	// DeleteBackupRequests returns an object that can list and get DeleteBackupRequests.
 	DeleteBackupRequests(namespace string) DeleteBackupRequestNamespaceLister
@@ -58,10 +60,13 @@ func (s *deleteBackupRequestLister) DeleteBackupRequests(namespace string) Delet
 }
 
 // DeleteBackupRequestNamespaceLister helps list and get DeleteBackupRequests.
+// All objects returned here must be treated as read-only.
 type DeleteBackupRequestNamespaceLister interface {
 	// List lists all DeleteBackupRequests in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.DeleteBackupRequest, err error)
 	// Get retrieves the DeleteBackupRequest from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.DeleteBackupRequest, error)
 	DeleteBackupRequestNamespaceListerExpansion
 }

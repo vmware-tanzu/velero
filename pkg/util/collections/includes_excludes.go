@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -148,6 +149,51 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 	for _, itm := range excludes.List() {
 		if includes.Has(itm) {
 			errs = append(errs, errors.Errorf("excludes list cannot contain an item in the includes list: %v", itm))
+		}
+	}
+
+	return errs
+}
+
+// ValidateNamespaceIncludesExcludes checks provided lists of included and
+// excluded namespaces to ensure they are a valid set of IncludesExcludes data.
+func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []error {
+	errs := ValidateIncludesExcludes(includesList, excludesList)
+
+	includes := sets.NewString(includesList...)
+	excludes := sets.NewString(excludesList...)
+
+	for _, itm := range includes.List() {
+		if nsErrs := validateNamespaceName(itm); nsErrs != nil {
+			errs = append(errs, nsErrs...)
+		}
+	}
+	for _, itm := range excludes.List() {
+		if nsErrs := validateNamespaceName(itm); nsErrs != nil {
+			errs = append(errs, nsErrs...)
+		}
+	}
+
+	return errs
+}
+
+func validateNamespaceName(ns string) []error {
+	var errs []error
+
+	// Velero interprets empty string as "no namespace", so allow it even though
+	// it is not a valid Kubernetes name.
+	if ns == "" {
+		return nil
+	}
+
+	// Kubernetes does not allow asterisks in namespaces but Velero uses them as
+	// wildcards. Replace asterisks with an arbitrary letter to pass Kubernetes
+	// validation.
+	tmpNamespace := strings.ReplaceAll(ns, "*", "x")
+
+	if errMsgs := validation.ValidateNamespaceName(tmpNamespace, false); errMsgs != nil {
+		for _, msg := range errMsgs {
+			errs = append(errs, errors.Errorf("invalid namespace %q: %s", ns, msg))
 		}
 	}
 

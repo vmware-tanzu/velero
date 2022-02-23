@@ -11,7 +11,7 @@ You can deploy Velero on Tencent [TKE](https://cloud.tencent.com/document/produc
 
 - Registered [Tencent Cloud Account](https://cloud.tencent.com/register).
 -  [Tencent Cloud COS](https://console.cloud.tencent.com/cos) service, referred to as COS, has been launched
-- A Kubernetes cluster has been created, cluster version v1.10 or later, and the cluster can use DNS and Internet services normally. If you need to create a TKE cluster, refer to the Tencent [create a cluster](https://cloud.tencent.com/document/product/457/32189) documentation.
+- A Kubernetes cluster has been created, cluster version v1.12-v1.21, and the cluster can use DNS and Internet services normally. If you need to create a TKE cluster, refer to the Tencent [create a cluster](https://cloud.tencent.com/document/product/457/32189) documentation.
 
 ## Create a Tencent Cloud COS bucket
 
@@ -21,7 +21,7 @@ Set access to the bucket through the object storage console, the bucket needs to
 
 ## Get bucket access credentials
 
-Velero uses an AWS S3-compatible API to access Tencent Cloud COS storage, which requires authentication using a pair of access key IDs and key-created signatures. 
+Velero uses an AWS S3-compatible API to access Tencent Cloud COS storage, which requires authentication using a pair of access key IDs and key-created signatures.
 
 In the S3 API parameter, the "access_key_id" field is the access key ID and the "secret_access_key" field is the key.
 
@@ -116,7 +116,7 @@ After deleting the MinIO resource, use your backup to restore the deleted MinIO 
 kubectl patch backupstoragelocation default --namespace velero \
     --type merge \
     --patch '{"spec":{"accessMode":"ReadOnly"}}'
-   
+
 ```
 
 Modifying access to Velero's storage location is "ReadOnly," as shown in the following image:

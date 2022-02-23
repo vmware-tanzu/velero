@@ -34,6 +34,18 @@ If you are ready to jump in and test, add code, or help with documentation, foll
 
 See [the list of releases][6] to find out about feature changes.
 
+### Velero compatibility matrix
+
+The following is a list of the supported Kubernetes versions for each Velero version.
+
+| Velero version | Kubernetes versions|
+|----------------|--------------------|
+| 1.8            | 1.16-latest        |
+| 1.6.3-1.7.1    | 1.12-latest        |
+| 1.60-1.6.2     | 1.12-1.21          |
+| 1.5            | 1.12-1.21          |
+| 1.4            | 1.10-1.21          |
+
 [1]: https://github.com/vmware-tanzu/velero/workflows/Main%20CI/badge.svg
 [2]: https://github.com/vmware-tanzu/velero/actions?query=workflow%3A"Main+CI"
 [4]: https://github.com/vmware-tanzu/velero/issues

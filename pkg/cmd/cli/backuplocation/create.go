@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -78,6 +78,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Credential: flag.NewMap(),
 		Config:     flag.NewMap(),
+		Labels:     flag.NewMap(),
 		AccessMode: flag.NewEnum(
 			string(velerov1api.BackupStorageLocationAccessModeReadWrite),
 			string(velerov1api.BackupStorageLocationAccessModeReadWrite),
@@ -133,39 +134,22 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 	return nil
 }
 
-func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	var backupSyncPeriod, validationFrequency *metav1.Duration
-
+func (o *CreateOptions) BuildBackupStorageLocation(namespace string, setBackupSyncPeriod, setValidationFrequency bool) (*velerov1api.BackupStorageLocation, error) {
 	var caCertData []byte
 	if o.CACertFile != "" {
 		realPath, err := filepath.Abs(o.CACertFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		caCertData, err = ioutil.ReadFile(realPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
-	}
-
-	if c.Flags().Changed("backup-sync-period") {
-		backupSyncPeriod = &metav1.Duration{Duration: o.BackupSyncPeriod}
-	}
-
-	if c.Flags().Changed("validation-frequency") {
-		validationFrequency = &metav1.Duration{Duration: o.ValidationFrequency}
-	}
-
-	var secretName, secretKey string
-	for k, v := range o.Credential.Data() {
-		secretName = k
-		secretKey = v
-		break
 	}
 
 	backupStorageLocation := &velerov1api.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace(),
+			Namespace: namespace,
 			Name:      o.Name,
 			Labels:    o.Labels.Data(),
 		},
@@ -178,13 +162,35 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					CACert: caCertData,
 				},
 			},
-			Config:              o.Config.Data(),
-			Credential:          builder.ForSecretKeySelector(secretName, secretKey).Result(),
-			Default:             o.DefaultBackupStorageLocation,
-			AccessMode:          velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
-			BackupSyncPeriod:    backupSyncPeriod,
-			ValidationFrequency: validationFrequency,
+			Config:     o.Config.Data(),
+			Default:    o.DefaultBackupStorageLocation,
+			AccessMode: velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
 		},
+	}
+
+	if setBackupSyncPeriod {
+		backupStorageLocation.Spec.BackupSyncPeriod = &metav1.Duration{Duration: o.BackupSyncPeriod}
+	}
+
+	if setValidationFrequency {
+		backupStorageLocation.Spec.ValidationFrequency = &metav1.Duration{Duration: o.ValidationFrequency}
+	}
+
+	for secretName, secretKey := range o.Credential.Data() {
+		backupStorageLocation.Spec.Credential = builder.ForSecretKeySelector(secretName, secretKey).Result()
+		break
+	}
+
+	return backupStorageLocation, nil
+}
+
+func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
+	setBackupSyncPeriod := c.Flags().Changed("backup-sync-period")
+	setValidationFrequency := c.Flags().Changed("validation-frequency")
+
+	backupStorageLocation, err := o.BuildBackupStorageLocation(f.Namespace(), setBackupSyncPeriod, setValidationFrequency)
+	if err != nil {
+		return err
 	}
 
 	if printed, err := output.PrintWithFormat(c, backupStorageLocation); printed || err != nil {

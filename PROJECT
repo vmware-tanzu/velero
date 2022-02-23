@@ -1,7 +1,0 @@
-domain: io
-repo: github.com/vmware-tanzu/velero
-resources:
-- group: velero
-  kind: BackupStorageLocation
-  version: v1
-version: "2"

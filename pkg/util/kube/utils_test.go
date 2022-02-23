@@ -17,6 +17,7 @@ limitations under the License.
 package kube
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeinformers "k8s.io/client-go/informers"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/test"
@@ -187,8 +190,19 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").Result()).Result(),
 			want: "my-vol",
 		},
+		{
+			name: "Volume with CSI annotation appends '/mount' to the volume name",
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").ObjectMeta(builder.WithAnnotations(KubeAnnDynamicallyProvisioned, "csi.test.com")).Result(),
+			want: "a-pv/mount",
+		},
 	}
 
+	csiDriver := storagev1api.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{Name: "csi.test.com"},
+	}
+	kbClient := fake.NewClientBuilder().WithLists(&storagev1api.CSIDriverList{Items: []storagev1api.CSIDriver{csiDriver}}).Build()
 	for _, tc := range tests {
 		h := newHarness(t)
 
@@ -203,7 +217,7 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 		}
 
 		// Function under test
-		dir, err := GetVolumeDirectory(tc.pod, tc.pod.Spec.Volumes[0].Name, pvcInformer.Lister(), pvInformer.Lister())
+		dir, err := GetVolumeDirectory(logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, pvcInformer.Lister(), pvInformer.Lister(), kbClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
@@ -288,31 +302,31 @@ func TestIsV1CRDReady(t *testing.T) {
 	}
 }
 
-func TestIsUnstructuredCRDReady(t *testing.T) {
-	tests := []struct {
+func TestIsCRDReady(t *testing.T) {
+	v1beta1tests := []struct {
 		name string
 		crd  *apiextv1beta1.CustomResourceDefinition
 		want bool
 	}{
 		{
-			name: "CRD is not established & not accepting names - not ready",
+			name: "v1beta1CRD is not established & not accepting names - not ready",
 			crd:  builder.ForCustomResourceDefinitionV1Beta1("MyCRD").Result(),
 			want: false,
 		},
 		{
-			name: "CRD is established & not accepting names - not ready",
+			name: "v1beta1CRD is established & not accepting names - not ready",
 			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
 				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
-			name: "CRD is not established & accepting names - not ready",
+			name: "v1beta1CRD is not established & accepting names - not ready",
 			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
 				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
 			want: false,
 		},
 		{
-			name: "CRD is established & accepting names - ready",
+			name: "v1beta1CRD is established & accepting names - ready",
 			crd: builder.ForCustomResourceDefinitionV1Beta1("MyCRD").
 				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
 				Condition(builder.ForCustomResourceDefinitionV1Beta1Condition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
@@ -321,66 +335,97 @@ func TestIsUnstructuredCRDReady(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
+	for _, tc := range v1beta1tests {
 		m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.crd)
 		require.NoError(t, err)
-		result, err := IsUnstructuredCRDReady(&unstructured.Unstructured{Object: m})
+		result, err := IsCRDReady(&unstructured.Unstructured{Object: m})
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, result)
 	}
-}
 
-// TestFromUnstructuredIntToFloatBug tests for a bug where runtime.DefaultUnstructuredConverter.FromUnstructured can't take a whole number into a float.
-// This test should fail when https://github.com/kubernetes/kubernetes/issues/87675 is fixed upstream, letting us know we can remove the IsUnstructuredCRDReady function.
-/*
-func TestFromUnstructuredIntToFloatBug(t *testing.T) {
-	b := []byte(`
+	v1tests := []struct {
+		name string
+		crd  *apiextv1.CustomResourceDefinition
+		want bool
+	}{
+		{
+			name: "v1CRD is not established & not accepting names - not ready",
+			crd:  builder.ForV1CustomResourceDefinition("MyCRD").Result(),
+			want: false,
+		},
+		{
+			name: "v1CRD is established & not accepting names - not ready",
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "v1CRD is not established & accepting names - not ready",
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "v1CRD is established & accepting names - ready",
+			crd: builder.ForV1CustomResourceDefinition("MyCRD").
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.Established).Status(apiextv1.ConditionTrue).Result()).
+				Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NamesAccepted).Status(apiextv1.ConditionTrue).Result()).
+				Result(),
+			want: true,
+		},
+	}
+
+	for _, tc := range v1tests {
+		m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.crd)
+		require.NoError(t, err)
+		result, err := IsCRDReady(&unstructured.Unstructured{Object: m})
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, result)
+	}
+
+	// input param is unrecognized
+	resBytes := []byte(`
 {
-	"apiVersion": "apiextensions.k8s.io/v1beta1",
+	"apiVersion": "apiextensions.k8s.io/v9",
 	"kind": "CustomResourceDefinition",
 	"metadata": {
-	  "name": "foos.example.foo.com"
+		"name": "foos.example.foo.com"
 	},
 	"spec": {
-	  "group": "example.foo.com",
-	  "version": "v1alpha1",
-	  "scope": "Namespaced",
-	  "names": {
-		"plural": "foos",
-		"singular": "foo",
-		"kind": "Foo"
-	  },
-	  "validation": {
-		"openAPIV3Schema": {
-		  "required": [
-			"spec"
-		  ],
-		  "properties": {
-			"spec": {
-			  "required": [
-				"bar"
-			  ],
-			  "properties": {
-				"bar": {
-				  "type": "integer",
-				  "minimum": 1
+		"group": "example.foo.com",
+		"version": "v1alpha1",
+		"scope": "Namespaced",
+		"names": {
+			"plural": "foos",
+			"singular": "foo",
+			"kind": "Foo"
+		},
+		"validation": {
+			"openAPIV3Schema": {
+				"required": [
+					"spec"
+				],
+				"properties": {
+					"spec": {
+						"required": [
+							"bar"
+						],
+						"properties": {
+							"bar": {
+								"type": "integer",
+								"minimum": 1
+							}
+						}
+					}
 				}
-			  }
 			}
-		  }
 		}
-	  }
 	}
-  }
-`)
-
-	var obj unstructured.Unstructured
-	err := json.Unmarshal(b, &obj)
-	require.NoError(t, err)
-
-	var newCRD apiextv1beta1.CustomResourceDefinition
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &newCRD)
-	// If there's no error, then the upstream issue is fixed, and we need to remove our workarounds.
-	require.Error(t, err)
 }
-*/
+`)
+	obj := &unstructured.Unstructured{}
+	err := json.Unmarshal(resBytes, obj)
+	require.NoError(t, err)
+	_, err = IsCRDReady(obj)
+	assert.NotNil(t, err)
+}

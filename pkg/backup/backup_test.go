@@ -970,6 +970,30 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
+		{
+			name:   "when deployments exist that are not in the cohabitating groups those are backed up along with apps/deployments",
+			backup: defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.VeleroDeployments(
+					builder.ForTestCR("Deployment", "foo", "bar").Result(),
+					builder.ForTestCR("Deployment", "zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.velero.io/namespaces/foo/bar.json",
+				"resources/deployments.velero.io/namespaces/zoo/raz.json",
+				"resources/deployments.velero.io/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.velero.io/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
 	}
 
 	for _, tc := range tests {

@@ -38,6 +38,9 @@
 # This script is meant to be a combination of documentation and executable.
 # If you have questions at any point, please stop and ask!
 
+# Fail on any error.
+set -eo pipefail
+
 # Directory in which the script itself resides, so we can use it for calling programs that are in the same directory.
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -89,18 +92,31 @@ fi
 # Since we're past the validation of the VELERO_VERSION, parse the version's individual components.
 eval $(go run $DIR/chk_version.go)
 
-
 printf "To clarify, you've provided a version string of $VELERO_VERSION.\n"
 printf "Based on this, the following assumptions have been made: \n"
 
-[[ "$VELERO_PATCH" != 0 ]] && printf "*\t This is a patch release.\n"
+# $VELERO_PATCH gets populated by the chk_version.go scrip that parses and verifies the given version format
+# If we've got a patch release, we assume the tag is on release branch.
+if [[ "$VELERO_PATCH" != 0 ]]; then
+    printf "*\t This is a patch release.\n"
+    ON_RELEASE_BRANCH=TRUE
+fi
 
-# $VELERO_PRERELEASE gets populated by the chk_version.go script that parses and verifies the given version format 
+# $VELERO_PRERELEASE gets populated by the chk_version.go script that parses and verifies the given version format
+# If we've got a GA release, we assume the tag is on release branch.
 # -n is "string is non-empty"
 [[ -n $VELERO_PRERELEASE ]] && printf "*\t This is a pre-release.\n"
 
 # -z is "string is empty"
-[[ -z $VELERO_PRERELEASE ]] && printf "*\t This is a GA release.\n"
+if [[ -z $VELERO_PRERELEASE ]]; then
+    printf "*\t This is a GA release.\n"
+    ON_RELEASE_BRANCH=TRUE
+fi
+
+if [[ "$ON_RELEASE_BRANCH" == "TRUE" ]]; then
+   release_branch_name=release-$VELERO_MAJOR.$VELERO_MINOR
+   printf "*\t The commit to tag is on branch: %s.  Please make sure this branch has been created.\n" $release_branch_name
+fi
 
 if [[ $publish == "TRUE" ]]; then
     echo "If this is all correct, press enter/return to proceed to TAG THE RELEASE and UPLOAD THE TAG TO GITHUB."
@@ -117,55 +133,29 @@ echo "Alright, let's go."
 echo "Pulling down all git tags and branches before doing any work."
 git fetch "$remote" --tags
 
-# $VELERO_PATCH gets populated by the chk_version.go scrip that parses and verifies the given version format 
-# If we've got a patch release, we'll need to create a release branch for it.
-if [[ "$VELERO_PATCH" > 0 ]]; then
-    release_branch_name=release-$VELERO_MAJOR.$VELERO_MINOR
+if [[ -n $release_branch_name ]]; then
+    # Tag on release branch
     remote_release_branch_name="$remote/$release_branch_name"
 
     # Determine whether the local and remote release branches already exist
     local_branch=$(git branch | grep "$release_branch_name")
     remote_branch=$(git branch -r | grep "$remote_release_branch_name")
-
-    if [[ -n $remote_branch ]]; then
-      if [[ -z $local_branch ]]; then
+    if [[ -z $remote_branch ]]; then
+        echo "The branch $remote_release_branch_name must be created before you tag the release."
+        exit 1
+    fi
+    if [[ -z $local_branch ]]; then
         # Remote branch exists, but does not exist locally. Checkout and track the remote branch.
         git checkout --track "$remote_release_branch_name"
-      else
+    else
         # Checkout the local release branch and ensure it is up to date with the remote
         git checkout "$release_branch_name"
         git pull --set-upstream "$remote" "$release_branch_name"
-      fi
-    else
-      if [[ -z $local_branch ]]; then
-        # Neither the remote or local release branch exists, create it
-        git checkout -b $release_branch_name
-      else
-        # The local branch exists so check it out.
-        git checkout $release_branch_name
-      fi
     fi
-
-    echo "Now you'll need to cherry-pick any relevant git commits into this release branch."
-    echo "Either pause this script with ctrl-z, or open a new terminal window and do the cherry-picking."
-    if [[ $publish == "TRUE" ]]; then
-        read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO $remote"
-    else
-        read -p "Press enter when you're done cherry-picking."
-    fi
-
-    # TODO can/should we add a way to review the cherry-picked commits before the push?
-
-    if [[ $publish == "TRUE" ]]; then
-        echo "Pushing $release_branch_name to \"$remote\" remote"
-        git push --set-upstream "$remote" $release_branch_name
-    fi
-
     tag_and_push
 else
     echo "Checking out $remote/main."
     git checkout "$remote"/main
-
     tag_and_push
 fi
 

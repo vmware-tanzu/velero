@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
-	v1beta1crds "github.com/vmware-tanzu/velero/config/crd/v1beta1/crds"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -216,26 +215,17 @@ type VeleroOptions struct {
 	NoDefaultBackupLocation           bool
 	CACertData                        []byte
 	Features                          []string
-	CRDsVersion                       string
 	DefaultVolumesToRestic            bool
 }
 
-func AllCRDs(perferredAPIVersion string) *unstructured.UnstructuredList {
+func AllCRDs() *unstructured.UnstructuredList {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
-	switch perferredAPIVersion {
-	case "v1beta1":
-		for _, crd := range v1beta1crds.CRDs {
-			crd.SetLabels(Labels())
-			appendUnstructured(resources, crd)
-		}
-	case "v1":
-		for _, crd := range v1crds.CRDs {
-			crd.SetLabels(Labels())
-			appendUnstructured(resources, crd)
-		}
+	for _, crd := range v1crds.CRDs {
+		crd.SetLabels(Labels())
+		appendUnstructured(resources, crd)
 	}
 
 	return resources
@@ -244,7 +234,7 @@ func AllCRDs(perferredAPIVersion string) *unstructured.UnstructuredList {
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
 func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
-	resources := AllCRDs(o.CRDsVersion)
+	resources := AllCRDs()
 
 	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)

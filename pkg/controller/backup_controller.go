@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
@@ -424,7 +425,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// validate the included/excluded namespaces
-	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
+	for _, err := range collections.ValidateNamespaceIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
@@ -569,6 +570,10 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	if err != nil {
 		return err
 	}
+	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
+	if err != nil {
+		return err
+	}
 
 	backupLog.Info("Setting up backup store to check for backup existence")
 	backupStore, err := c.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
@@ -586,8 +591,12 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return errors.Errorf("backup already exists in object storage")
 	}
 
+	backupItemActionsResolver := framework.NewBackupItemActionResolver(actions)
+	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
+
 	var fatalErrs []error
-	if err := c.backupper.Backup(backupLog, backup, backupFile, actions, pluginManager); err != nil {
+	if err := c.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver,
+		itemSnapshottersResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 

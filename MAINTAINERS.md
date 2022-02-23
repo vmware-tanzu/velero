@@ -6,12 +6,13 @@
 
 | Maintainer | GitHub ID | Affiliation |
 | --------------- | --------- | ----------- |
-| Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
-| Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [VMware](https://www.github.com/vmware/) |
+| Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [Kasten](https://github.com/kastenhq/) |
 | JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/)
 | Scott Seago | [sseago](https://github.com/sseago) | [OpenShift](https://github.com/openshift)
 | Daniel Jiang | [reasonerjt](https://github.com/reasonerjt) | [VMware](https://www.github.com/vmware/)
 | Wenkai Yin | [ywk253100](https://github.com/ywk253100) | [VMware](https://www.github.com/vmware/) |
+| Xun Jiang | [blackpiglet](https://github.com/blackpiglet) | [VMware](https://www.github.com/vmware/) |
+| Ming Qiu | [qiuming-best](https://github.com/qiuming-best) | [VMware](https://www.github.com/vmware/) |
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
@@ -21,12 +22,14 @@
 * Nolan Brubaker ([nrb](https://github.com/nrb))
 * Ashish Amarnath ([ashish-amarnath](https://github.com/ashish-amarnath))
 * Carlisia Thompson ([carlisia](https://github.com/carlisia))
+* Bridget McErlean ([zubron](https://github.com/zubron))
 
 ## Velero Contributors & Stakeholders
 
 | Feature Area | Lead |
 | ----------------------------- | :---------------------: |
-| Technical Lead | Dave Smith-Uchida (dsu-igeek) |
+| Architect | Dave Smith-Uchida (dsu-igeek) |
+| Technical Lead | Daniel Jiang (reasonerjt) |
 | Kubernetes CSI Liaison |  |
 | Deployment | JenTing Hsiao (jenting) |
 | Community Management | Jonas Rosland (jonasrosland) |

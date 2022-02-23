@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -74,6 +75,16 @@ func (c *FakeNamespaceClient) Update(ctx context.Context, namespace *corev1api.N
 }
 
 func (c *FakeNamespaceClient) UpdateStatus(ctx context.Context, namespace *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
+	args := c.Called(namespace)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
+}
+
+func (c *FakeNamespaceClient) Apply(ctx context.Context, namespace *v1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *corev1api.Namespace, err error) {
+	args := c.Called(namespace)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
+}
+
+func (c *FakeNamespaceClient) ApplyStatus(ctx context.Context, namespace *v1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *corev1api.Namespace, err error) {
 	args := c.Called(namespace)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }

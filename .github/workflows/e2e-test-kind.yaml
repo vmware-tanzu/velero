@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.17
         id: go
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
@@ -69,8 +69,14 @@ jobs:
           - 1.20.2
           - 1.21.1
           - 1.22.0
+          - 1.23.0
       fail-fast: false
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+        id: go
       - name: Check out the code
         uses: actions/checkout@v2
       - name: Install MinIO
@@ -117,3 +123,10 @@ jobs:
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
               GINKGO_FOCUS=Basic VELERO_IMAGE=velero:pr-test \
               make -C test/e2e run
+        timeout-minutes: 30
+      - name: Upload debug bundle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: DebugBundle
+          path: /home/runner/work/velero/velero/test/e2e/debug-bundle*

@@ -22,7 +22,17 @@ If you encounter issues with installing or configuring, see [Debugging Installat
 * Sufficient disk space to store backups in Minio.  You will need sufficient disk space available to handle any
 backups plus at least 1GB additional.  Minio will not operate if less than 1GB of free disk space is available.
 
-## Download Velero
+## Install the CLI
+
+### Option 1: MacOS - Homebrew
+
+On macOS, you can use [Homebrew](https://brew.sh) to install the `velero` client:
+
+```bash
+brew install velero
+```
+
+### Option 2: GitHub release
 
 1. Download the [latest official release's](https://github.com/vmware-tanzu/velero/releases) tarball for your client platform.
 
@@ -40,19 +50,11 @@ of the Velero repository is under active development and is not guaranteed to be
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
-### MacOS Installation
-
-On Mac, you can use [HomeBrew](https://brew.sh) to install the `velero` client:
-
-```bash
-brew install velero
-```
-
 ## Set up server
 
-These instructions start the Velero server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster][31] for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `velero describe` commands.
+These instructions start the Velero server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster](#expose-minio-outside-your-cluster-with-a-service) for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `velero describe` commands.
 
-1. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
+1. Create a Velero-specific credentials file (`credentials-velero`) in your Velero directory:
 
     ```
     [default]
@@ -83,6 +85,7 @@ These instructions start the Velero server and a Minio instance that is accessib
 
     Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
+    This example also assumes you have named your Minio bucket "velero".
 
 1. Deploy the example nginx application:
 

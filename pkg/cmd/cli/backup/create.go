@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
 const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
@@ -162,6 +164,11 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return fmt.Errorf("A backup name is required, unless you are creating based on a schedule.")
 	}
 
+	errs := collections.ValidateNamespaceIncludesExcludes(o.IncludeNamespaces, o.ExcludeNamespaces)
+	if len(errs) > 0 {
+		return kubeerrs.NewAggregate(errs)
+	}
+
 	if o.StorageLocation != "" {
 		location := &velerov1api.BackupStorageLocation{}
 		if err := client.Get(context.Background(), kbclient.ObjectKey{
@@ -284,11 +291,11 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	return nil
 }
 
-// parseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
+// ParseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
 // Resource names in the list are in format 'namespace/resourcename' and separated by commas.
 // Key-value pairs in the mapping are separated by semi-colon.
 // Ex: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.
-func parseOrderedResources(orderMapStr string) (map[string]string, error) {
+func ParseOrderedResources(orderMapStr string) (map[string]string, error) {
 	entries := strings.Split(orderMapStr, ";")
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("Invalid OrderedResources '%s'.", orderMapStr)
@@ -315,7 +322,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			return nil, err
 		}
 		if o.Name == "" {
-			o.Name = schedule.TimestampedName(time.Now())
+			o.Name = schedule.TimestampedName(time.Now().UTC())
 		}
 		backupBuilder = builder.ForBackup(namespace, o.Name).
 			FromSchedule(schedule)
@@ -330,7 +337,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...)
 		if len(o.OrderedResources) > 0 {
-			orders, err := parseOrderedResources(o.OrderedResources)
+			orders, err := ParseOrderedResources(o.OrderedResources)
 			if err != nil {
 				return nil, err
 			}

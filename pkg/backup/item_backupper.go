@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -29,10 +30,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -304,26 +305,9 @@ func (ib *itemBackupper) executeActions(
 	metadata metav1.Object,
 ) (runtime.Unstructured, error) {
 	for _, action := range ib.backupRequest.ResolvedActions {
-		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-			log.Debug("Skipping action because it does not apply to this resource")
+		if !action.ShouldUse(groupResource, namespace, metadata, log) {
 			continue
 		}
-
-		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			log.Debug("Skipping action because it does not apply to this namespace")
-			continue
-		}
-
-		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
-			log.Debug("Skipping action because resource is cluster-scoped and action only applies to specific namespaces")
-			continue
-		}
-
-		if !action.selector.Matches(labels.Set(metadata.GetLabels())) {
-			log.Debug("Skipping action because label selector does not match")
-			continue
-		}
-
 		log.Info("Executing custom action")
 
 		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backupRequest.Backup)
@@ -395,7 +379,13 @@ func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeS
 // on PVs
 const (
 	zoneLabelDeprecated = "failure-domain.beta.kubernetes.io/zone"
-	zoneLabel           = "topology.kubernetes.io/zone"
+	// this is reused for nodeAffinity requirements
+	zoneLabel = "topology.kubernetes.io/zone"
+
+	awsEbsCsiZoneKey = "topology.ebs.csi.aws.com/zone"
+	azureCsiZoneKey  = "topology.disk.csi.azure.com/zone"
+	gkeCsiZoneKey    = "topology.gke.io/zone"
+	gkeZoneSeparator = "__"
 )
 
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
@@ -432,7 +422,14 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		log.Infof("label %q is not present on PersistentVolume, checking deprecated label...", zoneLabel)
 		pvFailureDomainZone, labelFound = pv.Labels[zoneLabelDeprecated]
 		if !labelFound {
+			var k string
 			log.Infof("label %q is not present on PersistentVolume", zoneLabelDeprecated)
+			k, pvFailureDomainZone = zoneFromPVNodeAffinity(pv, awsEbsCsiZoneKey, azureCsiZoneKey, gkeCsiZoneKey, zoneLabel, zoneLabelDeprecated)
+			if pvFailureDomainZone != "" {
+				log.Infof("zone info from nodeAffinity requirements: %s, key: %s", pvFailureDomainZone, k)
+			} else {
+				log.Infof("zone info not available in nodeAffinity requirements")
+			}
 		}
 	}
 
@@ -534,4 +531,37 @@ func resourceKey(obj runtime.Unstructured) string {
 func resourceVersion(obj runtime.Unstructured) string {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	return gvk.Version
+}
+
+// zoneFromPVNodeAffinity iterates the node affinity requirement of a PV to
+// get its availability zone, it returns the key merely for logging.
+func zoneFromPVNodeAffinity(res *corev1api.PersistentVolume, topologyKeys ...string) (string, string) {
+	nodeAffinity := res.Spec.NodeAffinity
+	if nodeAffinity == nil {
+		return "", ""
+	}
+	keySet := sets.NewString(topologyKeys...)
+	providerGke := false
+	zones := make([]string, 0)
+	for _, term := range nodeAffinity.Required.NodeSelectorTerms {
+		if term.MatchExpressions == nil {
+			continue
+		}
+		for _, exp := range term.MatchExpressions {
+			if keySet.Has(exp.Key) && exp.Operator == "In" && len(exp.Values) > 0 {
+				if exp.Key == gkeCsiZoneKey {
+					providerGke = true
+					zones = append(zones, exp.Values[0])
+				} else {
+					return exp.Key, exp.Values[0]
+				}
+			}
+		}
+	}
+
+	if providerGke {
+		return gkeCsiZoneKey, strings.Join(zones, gkeZoneSeparator)
+	}
+
+	return "", ""
 }

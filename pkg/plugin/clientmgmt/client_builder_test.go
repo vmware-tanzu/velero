@@ -66,6 +66,7 @@ func TestClientConfig(t *testing.T) {
 			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
 			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(logger)),
 			string(framework.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(framework.ClientLogger(logger)),
+			string(framework.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(framework.ClientLogger(logger)),
 		},
 		Logger: cb.pluginLogger,
 		Cmd:    exec.Command(cb.commandName, cb.commandArgs...),

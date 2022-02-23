@@ -291,7 +291,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 
 	backupStore, err := c.backupStoreGetter.Get(location, pluginManager, log)
 	if err != nil {
-		errs = append(errs, err.Error())
+		return errors.Wrap(err, "error getting the backup store")
 	}
 
 	actions, err := pluginManager.GetDeleteItemActions()

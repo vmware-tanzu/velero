@@ -276,11 +276,11 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 }
 
 func getNextRunTime(schedule *api.Schedule, cronSchedule cron.Schedule, asOf time.Time) (bool, time.Time) {
-	// get the latest run time (if the schedule hasn't run yet, this will be the zero value which will trigger
-	// an immediate backup)
 	var lastBackupTime time.Time
 	if schedule.Status.LastBackup != nil {
 		lastBackupTime = schedule.Status.LastBackup.Time
+	} else {
+		lastBackupTime = schedule.CreationTimestamp.Time
 	}
 
 	nextRunTime := cronSchedule.Next(lastBackupTime)

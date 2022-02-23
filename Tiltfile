@@ -16,7 +16,7 @@ k8s_yaml([
 
 # default values
 settings = {
-    "default_registry": "",
+    "default_registry": "docker.io/velero",
     "enable_restic": False,
     "enable_debug": False,
     "debug_continue_on_start": True,  # Continue the velero process by default when in debug mode
@@ -50,7 +50,7 @@ git_sha = str(local("git rev-parse HEAD", quiet = True, echo_off = True)).strip(
 
 tilt_helper_dockerfile_header = """
 # Tilt image
-FROM golang:1.16.6 as tilt-helper
+FROM golang:1.17 as tilt-helper
 
 # Support live reloading with Tilt
 RUN wget --output-document /restart.sh --quiet https://raw.githubusercontent.com/windmilleng/rerun-process-wrapper/master/restart.sh  && \
@@ -90,20 +90,20 @@ def get_debug_flag():
 # Set up a local_resource build of the Velero binary. The binary is written to _tiltbuild/velero.
 local_resource(
     "velero_server_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild;PKG=. BIN=velero GOOS=linux GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild ' + get_debug_flag() + ' ./hack/build.sh',
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild;PKG=. BIN=velero GOOS=linux GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild ' + get_debug_flag() + ' REGISTRY=' + settings.get("default_registry") + ' ./hack/build.sh',
     deps = ["cmd", "internal", "pkg"],
     ignore = ["pkg/cmd"],
 )
 
 local_resource(
     "velero_local_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/local;PKG=. BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild/local ' + get_debug_flag() + ' ./hack/build.sh',
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/local;PKG=. BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 GIT_SHA=' + git_sha + ' VERSION=main GIT_TREE_STATE=dirty OUTPUT_DIR=_tiltbuild/local ' + get_debug_flag() + ' REGISTRY=' + settings.get("default_registry") + ' ./hack/build.sh',
     deps = ["internal", "pkg/cmd"],
 )
 
 local_resource(
     "restic_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/restic; BIN=velero GOOS=' + local_goos + ' GOARCH=amd64 RESTIC_VERSION=0.12.0 OUTPUT_DIR=_tiltbuild/restic ./hack/download-restic.sh',
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/restic; BIN=velero GOOS=linux GOARCH=amd64 RESTIC_VERSION=0.12.0 OUTPUT_DIR=_tiltbuild/restic ./hack/download-restic.sh',
 )
 
 # Note: we need a distro with a bash shell to exec into the Velero container

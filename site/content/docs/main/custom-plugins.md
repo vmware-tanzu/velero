@@ -99,8 +99,7 @@ data:
   # add your configuration data here as key-value pairs
 ```
 
-Then, in your plugin's implementation, you can read this ConfigMap to fetch the necessary configuration. See the [restic restore action][3]
-for an example of this -- in particular, the `getPluginConfig(...)` function.
+Then, in your plugin's implementation, you can read this ConfigMap to fetch the necessary configuration. 
 
 ## Feature Flags
 
@@ -114,4 +113,3 @@ Velero adds the `LD_LIBRARY_PATH` into the list of environment variables to prov
 
 [1]: https://github.com/vmware-tanzu/velero-plugin-example
 [2]: https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/logger.go
-[3]: https://github.com/vmware-tanzu/velero/blob/main/pkg/restore/restic_restore_action.go

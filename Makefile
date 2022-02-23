@@ -81,10 +81,10 @@ buildx not enabled, refusing to run this recipe
 see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-velero for more info
 endef
 
-# The version of restic binary to be downloaded for power architecture
-RESTIC_VERSION ?= 0.12.0
+# The version of restic binary to be downloaded
+RESTIC_VERSION ?= 0.12.1
 
-CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
+CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
 BUILDX_OUTPUT_TYPE ?= docker
 
@@ -338,9 +338,9 @@ changelog:
 #		PUBLISH=false \
 #		make release
 #
-# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero 
+# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero
 # (you still need to review/publish the GitHub release manually):
-#		GITHUB_TOKEN=your-github-token \ 
+#		GITHUB_TOKEN=your-github-token \
 #		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \
 #		PUBLISH=true \
 #		make release
@@ -359,11 +359,11 @@ serve-docs: build-image-hugo
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
 	hugo server --bind=0.0.0.0 --enableGitInfo=false
-# gen-docs generates a new versioned docs directory under site/content/docs. 
+# gen-docs generates a new versioned docs directory under site/content/docs.
 # Please read the documentation in the script for instructions on how to use it.
 gen-docs:
 	@hack/release-tools/gen-docs.sh
 
 .PHONY: test-e2e
 test-e2e: local
-	$(MAKE) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
