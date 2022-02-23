@@ -36,6 +36,7 @@ type podTemplateConfig struct {
 	envVars                           []corev1.EnvVar
 	restoreOnly                       bool
 	annotations                       map[string]string
+	labels                            map[string]string
 	resources                         corev1.ResourceRequirements
 	withSecret                        bool
 	defaultResticMaintenanceFrequency time.Duration
@@ -53,6 +54,12 @@ func WithImage(image string) podTemplateOption {
 func WithAnnotations(annotations map[string]string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.annotations = annotations
+	}
+}
+
+func WithLabels(labels map[string]string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.labels = labels
 	}
 }
 
@@ -141,9 +148,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, "--default-volumes-to-restic=true")
 	}
 
-	containerLabels := Labels()
-	containerLabels["deploy"] = "velero"
-
 	deployment := &appsv1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
 		TypeMeta: metav1.TypeMeta{
@@ -154,7 +158,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"deploy": "velero"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      containerLabels,
+					Labels:      podLabels(c.labels, map[string]string{"deploy": "velero"}),
 					Annotations: podAnnotations(c.annotations),
 				},
 				Spec: corev1.PodSpec{
