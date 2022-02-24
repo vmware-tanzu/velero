@@ -91,6 +91,7 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
 		Namespace: namespace,
+		Labels:    Labels(),
 	}
 }
 
