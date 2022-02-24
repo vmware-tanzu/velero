@@ -67,7 +67,7 @@ capabilities:
     add:
     - cap1
     - cap2
-sELinuxOptions:
+seLinuxOptions:
     user: userLabel
     role: roleLabel
     type: typeLabel
@@ -99,6 +99,46 @@ allowPrivilegeEscalation: false`},
 			},
 		},
 		{
+			"valid securityContext with comments only secCtx key check seLinuxOptions is correctly parsed",
+			args{"", "", "", `
+capabilities:
+    drop:
+    - ALL
+    add:
+    - cap1
+    - cap2
+seLinuxOptions:
+    user: userLabelFail
+    role: roleLabel
+    type: typeLabel
+    level: levelLabel
+# user www-data
+runAsUser: 3333
+# group www-data
+runAsGroup: 3333
+runAsNonRoot: true
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false`},
+			true,
+			&corev1.SecurityContext{
+				RunAsUser:  pointInt64(3333),
+				RunAsGroup: pointInt64(3333),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+					Add:  []corev1.Capability{"cap1", "cap2"},
+				},
+				SELinuxOptions: &corev1.SELinuxOptions{
+					User:  "userLabel",
+					Role:  "roleLabel",
+					Type:  "typeLabel",
+					Level: "levelLabel",
+				},
+				RunAsNonRoot:             boolptr.True(),
+				ReadOnlyRootFilesystem:   boolptr.True(),
+				AllowPrivilegeEscalation: boolptr.False(),
+			},
+		},
+		{
 			"valid securityContext with secCtx key override runAsUser runAsGroup and allowPrivilegeEscalation",
 			args{"1001", "999", "true", `
 capabilities:
@@ -107,7 +147,7 @@ capabilities:
     add:
     - cap1
     - cap2
-sELinuxOptions:
+seLinuxOptions:
     user: userLabel
     role: roleLabel
     type: typeLabel
@@ -216,7 +256,7 @@ allowPrivilegeEscalation: false`},
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseSecurityContext(tt.args.runAsUser, tt.args.runAsGroup, tt.args.allowPrivilegeEscalation, tt.args.secCtx)
-			if tt.wantErr {
+			if err != nil && tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
@@ -226,6 +266,10 @@ allowPrivilegeEscalation: false`},
 				tt.expected = &corev1.SecurityContext{}
 			}
 
+			if tt.wantErr {
+				assert.NotEqual(t, *tt.expected, got)
+				return
+			}
 			assert.Equal(t, *tt.expected, got)
 		})
 	}
