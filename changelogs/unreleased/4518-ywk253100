@@ -1,0 +1,1 @@
+Fix bug to make the restic prune frequency configurable
