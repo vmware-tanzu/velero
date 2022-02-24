@@ -47,6 +47,7 @@ type InstallOptions struct {
 	Prefix                            string
 	ProviderName                      string
 	PodAnnotations                    flag.Map
+	PodLabels                         flag.Map
 	ServiceAccountAnnotations         flag.Map
 	VeleroPodCPURequest               string
 	VeleroPodMemRequest               string
@@ -84,6 +85,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
+	flags.Var(&o.PodLabels, "pod-labels", "Labels to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "Annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
 	flags.StringVar(&o.VeleroPodCPURequest, "velero-pod-cpu-request", o.VeleroPodCPURequest, `CPU request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, `Memory request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
@@ -116,6 +118,7 @@ func NewInstallOptions() *InstallOptions {
 		BackupStorageConfig:       flag.NewMap(),
 		VolumeSnapshotConfig:      flag.NewMap(),
 		PodAnnotations:            flag.NewMap(),
+		PodLabels:                 flag.NewMap(),
 		ServiceAccountAnnotations: flag.NewMap(),
 		VeleroPodCPURequest:       install.DefaultVeleroPodCPURequest,
 		VeleroPodMemRequest:       install.DefaultVeleroPodMemRequest,
@@ -173,6 +176,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		Bucket:                            o.BucketName,
 		Prefix:                            o.Prefix,
 		PodAnnotations:                    o.PodAnnotations.Data(),
+		PodLabels:                         o.PodLabels.Data(),
 		ServiceAccountAnnotations:         o.ServiceAccountAnnotations.Data(),
 		VeleroPodResources:                veleroPodResources,
 		ResticPodResources:                resticPodResources,

@@ -68,10 +68,9 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"name":      "restic",
-						"component": "velero",
-					},
+					Labels: podLabels(c.labels, map[string]string{
+						"name": "restic",
+					}),
 					Annotations: c.annotations,
 				},
 				Spec: corev1.PodSpec{
