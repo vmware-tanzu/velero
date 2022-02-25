@@ -23,8 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -95,37 +95,45 @@ func (r *BackupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 			continue
 		}
 
-		backupStore, err := r.BackupStoreGetter.Get(location, pluginManager, log)
-		if err != nil {
-			log.WithError(err).Error("Error getting a backup store")
-			continue
-		}
-
-		// Initialize the patch helper.
-		patchHelper, err := patch.NewHelper(location, r.Client)
-		if err != nil {
-			log.WithError(err).Error("Error getting a patch helper to update this resource")
-			continue
-		}
-
-		// updates the default backup location
-		location.Spec.Default = isDefault
-
-		log.Info("Validating backup storage location")
 		anyVerified = true
-		if err := backupStore.IsValid(); err != nil {
-			log.Info("Backup storage location is invalid, marking as unavailable")
-			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "Backup storage location %q is unavailable", location.Name).Error())
-			location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
-		} else {
-			log.Info("Backup storage location valid, marking as available")
-			location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
-		}
-		location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 
-		if err := patchHelper.Patch(r.Ctx, location); err != nil {
-			log.WithError(err).Error("Error updating backup storage location phase")
-		}
+		func() {
+			// Initialize the patch helper.
+			patchHelper, err := patch.NewHelper(location, r.Client)
+			if err != nil {
+				log.WithError(err).Error("Error getting a patch helper to update this resource")
+				return
+			}
+			defer func() {
+				location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
+				if err != nil {
+					log.Info("Backup storage location is invalid, marking as unavailable")
+					err = errors.Wrapf(err, "Backup storage location %q is unavailable", location.Name)
+					unavailableErrors = append(unavailableErrors, err.Error())
+					location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
+					location.Status.Message = err.Error()
+				} else {
+					log.Info("Backup storage location valid, marking as available")
+					location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
+					location.Status.Message = ""
+				}
+				if err := patchHelper.Patch(r.Ctx, location); err != nil {
+					log.WithError(err).Error("Error updating backup storage location phase")
+				}
+			}()
+
+			backupStore, err := r.BackupStoreGetter.Get(location, pluginManager, log)
+			if err != nil {
+				err = errors.Wrapf(err, "Error getting a backup store")
+				return
+			}
+
+			// updates the default backup location
+			location.Spec.Default = isDefault
+
+			log.Info("Validating backup storage location")
+			err = backupStore.IsValid()
+		}()
 	}
 
 	if !anyVerified {
