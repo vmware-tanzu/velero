@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
+
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -48,8 +50,7 @@ func TestRemapCRDVersionAction(t *testing.T) {
 	c := b.Result()
 	_, err := betaClient.Create(context.TODO(), c, metav1.CreateOptions{})
 	require.NoError(t, err)
-
-	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient)
+	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient, fakeDiscoveryHelper())
 
 	t.Run("Test a v1 CRD without any Schema information", func(t *testing.T) {
 		b := builder.ForV1CustomResourceDefinition("test.velero.io")
@@ -109,6 +110,33 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
 	})
+
+	t.Run("When the cluster only supports v1 CRD, v1 CRD will be returned even the input has Spec.PreserveUnknownFields set to true (issue 4080)", func(t *testing.T) {
+		a.discoveryHelper = &velerotest.FakeDiscoveryHelper{
+			APIGroupsList: []metav1.APIGroup{
+				{
+					Name: apiextv1.GroupName,
+					Versions: []metav1.GroupVersionForDiscovery{
+						{
+							Version: apiextv1.SchemeGroupVersion.Version,
+						},
+					},
+				},
+			},
+		}
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		b.PreserveUnknownFields(true)
+		c := b.Result()
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
+		require.NoError(t, err)
+
+		item, _, err := a.Execute(&unstructured.Unstructured{Object: obj}, backup)
+		require.NoError(t, err)
+		assert.Equal(t, "apiextensions.k8s.io/v1", item.UnstructuredContent()["apiVersion"])
+		// set it back to the default one
+		a.discoveryHelper = fakeDiscoveryHelper()
+	})
+
 }
 
 // TestRemapCRDVersionActionData tests the RemapCRDVersionAction plugin against actual CRD to confirm that the v1beta1 version is returned when the v1 version is passed in to the plugin.
@@ -116,8 +144,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 	backup := &v1.Backup{}
 	clientset := apiextfakes.NewSimpleClientset()
 	betaClient := clientset.ApiextensionsV1beta1().CustomResourceDefinitions()
-
-	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient)
+	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient, fakeDiscoveryHelper())
 
 	tests := []struct {
 		crd                     string
@@ -191,4 +218,22 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 		})
 	}
 
+}
+
+func fakeDiscoveryHelper() velerodiscovery.Helper {
+	return &velerotest.FakeDiscoveryHelper{
+		APIGroupsList: []metav1.APIGroup{
+			{
+				Name: apiextv1.GroupName,
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						Version: apiextv1beta1.SchemeGroupVersion.Version,
+					},
+					{
+						Version: apiextv1.SchemeGroupVersion.Version,
+					},
+				},
+			},
+		},
+	}
 }
