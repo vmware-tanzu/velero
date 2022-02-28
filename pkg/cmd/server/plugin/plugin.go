@@ -110,7 +110,16 @@ func newRemapCRDVersionAction(f client.Factory) veleroplugin.HandlerInitializer 
 			return nil, err
 		}
 
-		return backup.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions()), nil
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		if err != nil {
+			return nil, err
+		}
+
+		return backup.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions(), discoveryHelper), nil
 	}
 }
 
