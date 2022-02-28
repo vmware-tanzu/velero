@@ -223,8 +223,12 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 				validationErrors = append(validationErrors, fmt.Sprintf("invalid schedule: %v", r))
 			}
 		}()
+		var scheduleStr = itm.Spec.Schedule
+		if itm.Spec.Schedule == "@once" {
+			scheduleStr = "@every 876000h"
+		}
 
-		if res, err := cron.ParseStandard(itm.Spec.Schedule); err != nil {
+		if res, err := cron.ParseStandard(scheduleStr); err != nil {
 			log.WithError(errors.WithStack(err)).WithField("schedule", itm.Spec.Schedule).Debug("Error parsing schedule")
 			validationErrors = append(validationErrors, fmt.Sprintf("invalid schedule: %v", err))
 		} else {

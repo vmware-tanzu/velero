@@ -116,6 +116,12 @@ func TestProcessSchedule(t *testing.T) {
 			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
+		{
+			name:          "schedule that just run once time",
+			schedule:      newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@once").LastBackupTime("2000-01-01 00:00:00").Result(),
+			fakeClockTime: "2027-01-01 12:00:00",
+			expectedErr:   false,
+		},
 	}
 
 	for _, test := range tests {
