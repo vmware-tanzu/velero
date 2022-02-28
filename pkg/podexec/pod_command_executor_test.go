@@ -109,7 +109,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 			podName:      "pod",
 			hookName:     "hook",
 			hook: &v1.ExecHook{
-				Container: "bar",
+				Container: "",
 			},
 		},
 	}
@@ -127,6 +127,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 
 			e := &defaultPodCommandExecutor{}
 			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
+
 			if hookPodContainerNotSame && test.hook.Container == pod.Spec.Containers[0].Name {
 				assert.Error(t, fmt.Errorf("hook exec container is overwritten"))
 			}
