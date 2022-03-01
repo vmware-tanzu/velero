@@ -47,23 +47,12 @@ jobs:
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         ./hack/docker-push.sh
 
-    # actions/checkout MUST come before auth
-    - uses: 'actions/checkout@v2'
-
-    # auth to GCP with OIDC token from GCP Workload Identity Provider. Output auth result to access token.
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0.6.0'
-      with:
-        credentials_json: '${{ secrets.GCR_SA_KEY }}'
-        token_format: 'access_token'
-
-    # Use access_token generated above to login gcr.io
+    # Use the JSON key in secret to login gcr.io
     - uses: 'docker/login-action@v1'
       with:
         registry: 'gcr.io' # or REGION.docker.pkg.dev
-        username: 'oauth2accesstoken'
-        password: '${{ steps.auth.outputs.access_token }}'
+        username: '_json_key'
+        password: '${{ secrets.GCR_SA_KEY }}'
 
     # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
     - name: Publish container image to GCR
