@@ -1,0 +1,1 @@
+Avoid overwritten hook's exec.container parameter when running pod command executor.
