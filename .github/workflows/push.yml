@@ -6,22 +6,6 @@ on:
     tags:
       - '*'
 
-# id-token is added to enable OIDC token generation. All the others are copied from "Set up job" GITHUB_TOKEN Permissions
-permissions:
-  actions: write
-  checks: write
-  contents: write
-  deployments: write
-  discussions: write
-  issues: write
-  packages: write
-  pages: write
-  pull-requests: write
-  repository-projects: write
-  security-events: write
-  statuses: write
-  id-token: write
-
 jobs:
 
   build:
@@ -71,8 +55,7 @@ jobs:
       name: 'Authenticate to Google Cloud'
       uses: 'google-github-actions/auth@v0.6.0'
       with:
-        workload_identity_provider: 'projects/298797809281/locations/global/workloadIdentityPools/velero-pool/providers/velero-provider'
-        service_account: 'gcraccount@velero-gcp.iam.gserviceaccount.com'
+        credentials_json: '${{ secrets.GCR_SA_KEY }}'
         token_format: 'access_token'
 
     # Use access_token generated above to login gcr.io
