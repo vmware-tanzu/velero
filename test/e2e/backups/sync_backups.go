@@ -29,7 +29,6 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
@@ -83,7 +82,7 @@ func BackupsSyncTest() {
 		}()
 
 		By(fmt.Sprintf("Backup the workload in %s namespace", test.testNS), func() {
-			if err = VeleroBackupNamespace(test.ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, test.testNS, "", false); err != nil {
+			if err = VeleroBackupNamespace(test.ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, test.testNS, "", false, ""); err != nil {
 				RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, "")
 			}
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to backup %s namespace", test.testNS))
@@ -116,7 +115,7 @@ func BackupsSyncTest() {
 		}()
 
 		By(fmt.Sprintf("Backup the workload in %s namespace", test.testNS), func() {
-			if err = VeleroBackupNamespace(test.ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, test.testNS, "", false); err != nil {
+			if err = VeleroBackupNamespace(test.ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, test.testNS, "", false, ""); err != nil {
 				RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, "")
 			}
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to backup %s namespace", test.testNS))
@@ -141,15 +140,5 @@ func BackupsSyncTest() {
 }
 
 func (b *SyncBackups) IsBackupsSynced() error {
-	return wait.PollImmediate(10*time.Second, 10*time.Minute, func() (bool, error) {
-		if exist, err := IsBackupExist(b.ctx, VeleroCfg.VeleroCLI, b.backupName); err != nil {
-			return false, err
-		} else {
-			if exist {
-				return true, nil
-			} else {
-				return false, nil
-			}
-		}
-	})
+	return WaitForBackupCreated(b.ctx, VeleroCfg.VeleroCLI, b.backupName, 10*time.Minute)
 }

@@ -40,6 +40,7 @@ import (
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	common "github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
 
 const BackupObjectsPrefix = "backups"
@@ -233,13 +234,16 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
-func VeleroBackupNamespace(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string, namespace string, backupLocation string,
-	useVolumeSnapshots bool) error {
+func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace, backupName, namespace, backupLocation string,
+	useVolumeSnapshots bool, selector string) error {
 	args := []string{
 		"--namespace", veleroNamespace,
 		"create", "backup", backupName,
 		"--include-namespaces", namespace,
 		"--wait",
+	}
+	if selector != "" {
+		args = append(args, "--selector", selector)
 	}
 
 	if useVolumeSnapshots {
@@ -478,7 +482,7 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 	return err
 }
 
-func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace string) ([]string, error) {
+func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace, podName string) ([]string, error) {
 	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.snapshotID}{\"\\n\"}{end}'")
 	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -496,6 +500,9 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 		fmt.Println("curLine:" + curLine)
 		curLine = strings.Replace(curLine, "\n", "", -1)
 		if len(curLine) == 0 {
+			continue
+		}
+		if podName != "" && !strings.Contains(curLine, podName) {
 			continue
 		}
 		snapshotID := curLine[strings.LastIndex(curLine, ":")+1:]
@@ -626,7 +633,7 @@ func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName stri
 				fmt.Printf("|| EXPECTED || - Backup %s was deleted successfully according to message %s\n", backupName, stderr)
 				return nil
 			}
-			return errors.Wrapf(err, "Fail to get delete backup, stdout=%s, stderr=%s", stdout, stderr)
+			return errors.Wrapf(err, "Fail to perform get backup, stdout=%s, stderr=%s", stdout, stderr)
 		}
 		time.Sleep(1 * time.Minute)
 	}
@@ -640,7 +647,8 @@ func GetBackup(ctx context.Context, veleroCLI string, backupName string) (string
 }
 
 func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bool, error) {
-	if _, outerr, err := GetBackup(ctx, veleroCLI, backupName); err != nil {
+	out, outerr, err := GetBackup(ctx, veleroCLI, backupName)
+	if err != nil {
 		if err != nil {
 			if strings.Contains(outerr, "not found") {
 				return false, nil
@@ -648,6 +656,7 @@ func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bo
 			return false, err
 		}
 	}
+	fmt.Printf("Backup %s exist locally according to output %s", backupName, out)
 	return true, nil
 }
 
@@ -663,4 +672,119 @@ func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string,
 			}
 		}
 	})
+}
+
+func WaitForBackupCreated(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
+			return false, err
+		} else {
+			if exist {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		}
+	})
+}
+func GetBackupsFromBsl(ctx context.Context, veleroCLI, bslName string) ([]string, error) {
+	args1 := []string{"get", "backups"}
+	if strings.TrimSpace(bslName) != "" {
+		args1 = append(args1, "-l", "velero.io/storage-location="+bslName)
+	}
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  veleroCLI,
+		Args: args1,
+	}
+
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "tail",
+		Args: []string{"-n", "+2"},
+	}
+
+	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+}
+
+func GetAllBackups(ctx context.Context, veleroCLI string) ([]string, error) {
+	return GetBackupsFromBsl(ctx, veleroCLI, "")
+}
+func DeleteBslResource(ctx context.Context, veleroCLI string, bslName string) error {
+	args := []string{"backup-location", "delete", bslName, "--confirm"}
+
+	cmd := exec.CommandContext(ctx, veleroCLI, args...)
+	fmt.Println("Delete backup location Command:" + cmd.String())
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	if err != nil {
+		return errors.Wrapf(err, "Fail to get delete location, stdout=%s, stderr=%s", stdout, stderr)
+	}
+
+	output := strings.Replace(stdout, "\n", " ", -1)
+	fmt.Println("Backup location delete command output:" + output)
+
+	fmt.Println(stdout)
+	fmt.Println(stderr)
+	return nil
+}
+
+func SnapshotCRsCountShouldBe(ctx context.Context, namespace, backupName string, expectedCount int) error {
+
+	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
+		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.metadata.labels.velero\\.io\\/backup-name}{\"\\n\"}{end}'")
+	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
+	stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
+	if err != nil {
+		fmt.Print(stdout)
+		fmt.Print(stderr)
+		return errors.Wrap(err, fmt.Sprintf("Failed getting snapshot CR of backup %s in namespace %d", backupName, expectedCount))
+	}
+	count := 0
+	stdout = strings.Replace(stdout, "'", "", -1)
+	arr := strings.Split(stdout, "\n")
+	for _, bn := range arr {
+		fmt.Println("Snapshot CR:" + bn)
+		if strings.Contains(bn, backupName) {
+			count++
+		}
+	}
+	if count == expectedCount {
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("SnapshotCR count %d of backup %s in namespace %s is not as expected %d", count, backupName, namespace, expectedCount))
+	}
+}
+
+func ResticRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targetNamespace string, expectedCount int) error {
+	resticArr, err := GetResticRepositories(ctx, veleroNamespace, targetNamespace)
+	if err != nil {
+		return errors.Wrapf(err, "Fail to get GetResticRepositories")
+	}
+	if len(resticArr) == expectedCount {
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("Resticrepositories count %d in namespace %s is not as expected %d", len(resticArr), targetNamespace, expectedCount))
+	}
+}
+
+func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace string) ([]string, error) {
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "-n", veleroNamespace, "resticrepositories"},
+	}
+
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{targetNamespace},
+	}
+
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+
+	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
 }

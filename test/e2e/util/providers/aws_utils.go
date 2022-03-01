@@ -29,7 +29,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	. "github.com/vmware-tanzu/velero/test/e2e"
+	e2e "github.com/vmware-tanzu/velero/test/e2e"
 )
 
 type AWSStorage string
@@ -62,10 +62,7 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	if bslPrefix != "" {
 		objectsInput.Prefix = aws.String(bslPrefix)
 	}
-	s3Config := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewSharedCredentials(cloudCredentialsFile, ""),
-	}
+	var s3Config *aws.Config
 	if region == "minio" {
 		s3url = config.Data()["s3Url"]
 		s3Config = &aws.Config{
@@ -75,8 +72,12 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 			DisableSSL:       aws.Bool(true),
 			S3ForcePathStyle: aws.Bool(true),
 		}
+	} else {
+		s3Config = &aws.Config{
+			Region:      aws.String(region),
+			Credentials: credentials.NewSharedCredentials(cloudCredentialsFile, ""),
+		}
 	}
-
 	sess, err := session.NewSession(s3Config)
 
 	if err != nil {
@@ -97,7 +98,7 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 		fmt.Println("item:")
 		fmt.Println(item)
 		backupNameInStorage = strings.TrimPrefix(*item.Prefix, strings.Trim(bslPrefix, "/")+"/")
-		fmt.Println("backupNameInStorage:" + backupNameInStorage)
+		fmt.Println("backupNameInStorage:" + backupNameInStorage + " backupObject:" + backupObject)
 		if strings.Contains(backupNameInStorage, backupObject) {
 			fmt.Printf("Backup %s was found under prefix %s \n", backupObject, bslPrefix)
 			return true, nil
@@ -144,7 +145,7 @@ func (s AWSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	return nil
 }
 
-func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
+func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck e2e.SnapshotCheckPoint) error {
 
 	config := flag.NewMap()
 	config.Set(bslConfig)
@@ -172,9 +173,15 @@ func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix
 			},
 		},
 	}
+
 	result, err := svc.DescribeSnapshots(params)
 	if err != nil {
 		fmt.Println(err)
+	}
+
+	for _, n := range result.Snapshots {
+		fmt.Println(n.SnapshotId)
+		fmt.Println(n.Tags)
 	}
 	if len(result.Snapshots) != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count is not as expected %d", snapshotCheck.ExpectCount))

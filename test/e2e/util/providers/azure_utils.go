@@ -317,18 +317,9 @@ func mapLookup(data map[string]string) func(string) string {
 		return data[key]
 	}
 }
-func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
+func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
 
 	ctx := context.Background()
-	config := flag.NewMap()
-	config.Set(bslConfig)
-	if err := validateConfigKeys(config.Data(),
-		resourceGroupConfigKey,
-		subscriptionIDConfigKey,
-		storageAccount,
-	); err != nil {
-		return err
-	}
 
 	if err := loadCredentialsIntoEnv(cloudCredentialsFile); err != nil {
 		return err
@@ -348,13 +339,7 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPref
 
 	// set a different subscriptionId for snapshots if specified
 	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
-	if val := config.Data()[subscriptionIDConfigKey]; val != "" {
-		// if subscription was set in config, it is required to also set the resource group
-		if _, err := getRequiredValues(mapLookup(config.Data()), resourceGroupConfigKey); err != nil {
-			return errors.Wrap(err, "resourceGroup not specified, but is a requirement when backing up to a different subscription")
-		}
-		snapshotsSubscriptionID = val
-	}
+
 	// set up clients
 	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
 	snapsClient.PollingDelay = 5 * time.Second

@@ -54,4 +54,5 @@ type SnapshotCheckPoint struct {
 	NamespaceBackedUp string
 	SnapshotIDList    []string
 	ExpectCount       int
+	PodName           string
 }

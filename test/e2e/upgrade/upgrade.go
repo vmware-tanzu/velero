@@ -126,7 +126,7 @@ func runUpgradeTests(client TestClient, veleroCfg *VerleroConfig, backupName, re
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", upgradeNamespace)
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName, upgradeNamespace, backupLocation, useVolumeSnapshots); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName, upgradeNamespace, backupLocation, useVolumeSnapshots, ""); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 		// TODO move to "RunDebug" after we bump up to 1.7 in the upgrade case
 		VeleroBackupLogs(context.Background(), veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName)
