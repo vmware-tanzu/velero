@@ -5,7 +5,7 @@ go 1.17
 require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/Azure/azure-pipeline-go v0.2.3
-	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
+	github.com/Azure/azure-sdk-for-go v61.4.0+incompatible
 	github.com/Azure/azure-storage-blob-go v0.14.0
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
@@ -35,6 +35,7 @@ require (
 	github.com/vmware-tanzu/crash-diagnostics v0.3.7
 	golang.org/x/mod v0.4.2
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	google.golang.org/api v0.56.0
 	google.golang.org/grpc v1.40.0
 	k8s.io/api v0.22.2
@@ -103,7 +104,6 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
-	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect
 	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654 // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 	golang.org/x/text v0.3.7 // indirect

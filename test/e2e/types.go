@@ -49,3 +49,9 @@ type VerleroConfig struct {
 	AddBSLPlugins            string
 	InstallVelero            bool
 }
+
+type SnapshotCheckPoint struct {
+	NamespaceBackedUp string
+	SnapshotIDList    []string
+	ExpectCount       int
+}

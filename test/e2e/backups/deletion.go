@@ -33,17 +33,15 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
-const (
-	deletionTest = "deletion-workload"
-)
+const deletionTest = "deletion-workload"
 
 // Test backup and restore of Kibishi using restic
 
-func Backup_deletion_with_snapshots() {
+func BackupDeletionWithSnapshots() {
 	backup_deletion_test(true)
 }
 
-func Backup_deletion_with_restic() {
+func BackupDeletionWithRestic() {
 	backup_deletion_test(false)
 }
 func backup_deletion_test(useVolumeSnapshots bool) {
@@ -86,7 +84,6 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 // runUpgradeTests runs upgrade test on the provider by kibishii.
 func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNamespace, backupName, backupLocation string,
 	useVolumeSnapshots bool, registryCredentialFile, bslPrefix, bslConfig string) error {
-
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 
 	if err := CreateNamespace(oneHourTimeout, client, deletionTest); err != nil {
@@ -124,15 +121,31 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 	if err != nil {
 		return err
 	}
+	if useVolumeSnapshots {
+		var snapshotCheckPoint SnapshotCheckPoint
+		snapshotCheckPoint.ExpectCount = 2
+		snapshotCheckPoint.NamespaceBackedUp = deletionTest
+		err = SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, snapshotCheckPoint)
+		if err != nil {
+			return err
+		}
+	}
 	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
 	if err != nil {
 		return err
 	}
+
 	err = ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 5)
 	if err != nil {
-		fmt.Println(errors.Wrapf(err, "Failed to get object from bucket %q", backupName))
 		return err
 	}
+	if useVolumeSnapshots {
+		err = SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
+		if err != nil {
+			return err
+		}
+	}
+
 	backupName = "backup-1-" + UUIDgen.String()
 	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
@@ -142,7 +155,6 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 	}
 	err = DeleteObjectsInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
 	if err != nil {
-		fmt.Println(errors.Wrapf(err, "Failed to delete object in bucket %q", backupName))
 		return err
 	}
 	err = ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 1)
@@ -151,8 +163,9 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 	}
 	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
 	if err != nil {
-		fmt.Println(errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName))
-		return err
+		return errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName)
+	} else {
+		fmt.Printf("|| EXPECTED || - Success to delete backup %s locally\n", backupName)
 	}
 	fmt.Printf("|| EXPECTED || - Backup deletion test completed successfully\n")
 	return nil

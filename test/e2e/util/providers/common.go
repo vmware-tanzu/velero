@@ -17,16 +17,21 @@ limitations under the License.
 package providers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+
+	. "github.com/vmware-tanzu/velero/test/e2e"
+	velero "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 type ObjectsInStorage interface {
 	IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error)
 	DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error
+	IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error
 }
 
 func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
@@ -92,7 +97,7 @@ func IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix
 
 func DeleteObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
 	bslPrefix = getFullPrefix(bslPrefix, subPrefix)
-	fmt.Printf("|| VERIFICATION || - Delete backup %s in storage %s", backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - Delete backup %s in storage %s\n", backupName, bslPrefix)
 	s, err := getProvider(cloudProvider)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
@@ -100,6 +105,70 @@ func DeleteObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPr
 	err = s.DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Fail to delete %s", bslPrefix))
+	}
+	return nil
+}
+
+func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
+	fmt.Printf("|| VERIFICATION || - Snapshots should not exist in cloud, backup %s\n", backupName)
+	var snapshotCheckPoint SnapshotCheckPoint
+	snapshotCheckPoint.ExpectCount = 0
+	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix, snapshotCheckPoint)
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s is existed in cloud after backup as expected", backupName))
+	}
+	fmt.Printf("|| EXPECTED || - Snapshots are not existed in cloud, backup %s\n", backupName)
+	return nil
+}
+
+func SnapshotsShouldBeCreatedInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string, snapshotCheckPoint SnapshotCheckPoint) error {
+	fmt.Printf("|| VERIFICATION || - Snapshots should exist in cloud, backup %s\n", backupName)
+	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix, snapshotCheckPoint)
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s are not existed in cloud after backup as expected", backupName))
+	}
+	fmt.Printf("|| EXPECTED || - Snapshots are existed in cloud, backup %s\n", backupName)
+	return nil
+}
+
+func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string, snapshotCheck SnapshotCheckPoint) error {
+	bslPrefix = getFullPrefix(bslPrefix, subPrefix)
+	s, err := getProvider(cloudProvider)
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
+	}
+	if cloudProvider == "vsphere" {
+		var retSnapshotIDs []string
+		ctx, _ := context.WithTimeout(context.Background(), time.Minute*2)
+		retSnapshotIDs, err = velero.GetVsphereSnapshotIDs(ctx, time.Hour, snapshotCheck.NamespaceBackedUp)
+		if err != nil {
+			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot CRs of backup%s", backupName))
+		}
+		bslPrefix = "plugins"
+		subPrefix = "vsphere-astrolabe-repo/ivd/data"
+		if snapshotCheck.ExpectCount == 0 {
+			for _, snapshotID := range retSnapshotIDs {
+				err := ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, snapshotID, subPrefix, 5)
+				if err != nil {
+					return errors.Wrapf(err, "|| UNEXPECTED || - Snapshot %s of backup %s exist in object store", snapshotID, backupName)
+				}
+			}
+		} else {
+			if snapshotCheck.ExpectCount != len(retSnapshotIDs) {
+				return errors.New(fmt.Sprintf("Snapshot CRs count %d is not equal to expected %d", len(retSnapshotIDs), snapshotCheck.ExpectCount))
+			}
+			for _, snapshotID := range retSnapshotIDs {
+				err := ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, snapshotID, subPrefix)
+				if err != nil {
+					return errors.Wrapf(err, "|| UNEXPECTED || - Snapshot %s of backup %s does not exist in object store", snapshotID, backupName)
+				}
+			}
+		}
+	} else {
+		err = s.IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, snapshotCheck)
+		if err != nil {
+			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot of backup%s", backupName))
+		}
 	}
 	return nil
 }
