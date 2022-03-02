@@ -1,0 +1,14 @@
+name: Auto Comment
+on: [issues, pull_request]
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: wow-actions/auto-comment@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pullRequestOpened: |
+            👋 @{{ author }}
+            Velero maintainers review PRs on a weekly basis. So, if you haven’t heard anything from us within 5 business days,
+
+            please post on [\#velero-dev](https://kubernetes.slack.com/archives/C021GPR1L3S). If your PR is more urgent, feel free to ping us sooner on this channel and let us know.
