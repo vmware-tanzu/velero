@@ -74,6 +74,10 @@ type BackupStorageLocationStatus struct {
 	// +nullable
 	LastValidationTime *metav1.Time `json:"lastValidationTime,omitempty"`
 
+	// Message is a message about the backup storage location's status.
+	// +optional
+	Message string `json:"message,omitempty"`
+
 	// LastSyncedRevision is the value of the `metadata/revision` file in the backup
 	// storage location the last time the BSL's contents were synced into the cluster.
 	//
