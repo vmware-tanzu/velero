@@ -77,7 +77,8 @@ Velero treats object storage as the source of truth. It continuously checks to s
 
 This allows restore functionality to work in a cluster migration scenario, where the original backup objects do not exist in the new cluster.
 
-Likewise, if a backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
+Likewise, if a `Completed` backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
+`Failed` or `PartiallyFailed` backup will not be removed by object storage sync.
 
 [10]: backup-hooks.md
 [11]: restore-hooks.md
