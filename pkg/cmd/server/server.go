@@ -654,22 +654,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	scheduleControllerRunInfo := func() controllerRunInfo {
-		scheduleController := controller.NewScheduleController(
-			s.namespace,
-			s.veleroClient.VeleroV1(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Schedules(),
-			s.logger,
-			s.metrics,
-		)
-
-		return controllerRunInfo{
-			controller: scheduleController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	gcControllerRunInfo := func() controllerRunInfo {
 		gcController := controller.NewGCController(
 			s.logger,
@@ -771,7 +755,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	enabledControllers := map[string]func() controllerRunInfo{
 		controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
-		controller.Schedule:          scheduleControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
 		controller.BackupDeletion:    deletionControllerRunInfo,
 		controller.Restore:           restoreControllerRunInfo,
@@ -841,6 +824,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
+	}
+
+	if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {

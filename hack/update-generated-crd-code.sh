@@ -49,6 +49,7 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
 controller-gen \
   crd:crdVersions=v1\
   paths=./pkg/apis/velero/v1/... \
+  rbac:roleName=velero-perms \
   paths=./pkg/controller/... \
   output:crd:artifacts:config=config/crd/v1/bases
 

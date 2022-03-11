@@ -4,8 +4,14 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: velero-perms
 rules:
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - create
 - apiGroups:
   - velero.io
   resources:
@@ -42,6 +48,26 @@ rules:
   - velero.io
   resources:
   - downloadrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - schedules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - schedules/status
   verbs:
   - get
   - patch

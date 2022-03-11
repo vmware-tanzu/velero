@@ -16,7 +16,27 @@ spec:
     singular: schedule
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Name of the schedule
+      jsonPath: .metadata.name
+      name: Name
+      type: string
+    - description: Status of the schedule
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: A Cron expression defining when to run the Backup
+      jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - description: The last time a Backup was run for this schedule
+      jsonPath: .status.lastBackup
+      name: LastBackup
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: Schedule is a Velero resource that represents a pre-scheduled
@@ -393,6 +413,8 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""
