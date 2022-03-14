@@ -56,12 +56,20 @@ func (a *PodAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		return nil, nil, errors.WithStack(err)
 	}
 
-	if len(pod.Spec.Volumes) == 0 {
-		a.log.Info("pod has no volumes")
-		return item, nil, nil
+	var additionalItems []velero.ResourceIdentifier
+	if pod.Spec.PriorityClassName > "" {
+		a.log.Infof("Adding priorityclass %s to additionalItems", pod.Spec.PriorityClassName)
+		additionalItems = append(additionalItems, velero.ResourceIdentifier{
+			GroupResource: kuberesource.PriorityClasses,
+			Name:          pod.Spec.PriorityClassName,
+		})
 	}
 
-	var additionalItems []velero.ResourceIdentifier
+	if len(pod.Spec.Volumes) == 0 {
+		a.log.Info("pod has no volumes")
+		return item, additionalItems, nil
+	}
+
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {
 			a.log.Infof("Adding pvc %s to additionalItems", volume.PersistentVolumeClaim.ClaimName)
