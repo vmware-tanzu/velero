@@ -486,6 +486,30 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
 		c.snapshotLocationLister, pluginManager)
+
+	// log errors and warnings to the restore log
+	for _, msg := range restoreErrors.Velero {
+		restoreLog.Errorf("Velero restore error: %v", msg)
+	}
+	for _, msg := range restoreErrors.Cluster {
+		restoreLog.Errorf("Cluster resource restore error: %v", msg)
+	}
+	for ns, errs := range restoreErrors.Namespaces {
+		for _, msg := range errs {
+			restoreLog.Errorf("Namespace %v, resource restore error: %v", ns, msg)
+		}
+	}
+	for _, msg := range restoreWarnings.Velero {
+		restoreLog.Warnf("Velero restore warning: %v", msg)
+	}
+	for _, msg := range restoreWarnings.Cluster {
+		restoreLog.Warnf("Cluster resource restore warning: %v", msg)
+	}
+	for ns, errs := range restoreWarnings.Namespaces {
+		for _, msg := range errs {
+			restoreLog.Warnf("Namespace %v, resource restore warning: %v", ns, msg)
+		}
+	}
 	restoreLog.Info("restore completed")
 
 	// re-instantiate the backup store because credentials could have changed since the original
