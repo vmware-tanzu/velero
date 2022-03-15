@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2019, 2022 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package restore
 
 import (
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	//"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,10 +36,11 @@ func TestPodActionExecute(t *testing.T) {
 	var priority int32 = 1
 
 	tests := []struct {
-		name        string
-		obj         corev1api.Pod
-		expectedErr bool
-		expectedRes corev1api.Pod
+		name            string
+		obj             corev1api.Pod
+		expectedErr     bool
+		expectedRes     corev1api.Pod
+		additionalItems []velero.ResourceIdentifier
 	}{
 		{
 			name: "nodeName (only) should be deleted from spec",
@@ -189,6 +192,35 @@ func TestPodActionExecute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test priority class",
+			obj: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+				Spec: corev1api.PodSpec{
+					ServiceAccountName: "foo",
+					PriorityClassName:  "testPriorityClass",
+					Volumes: []corev1api.Volume{
+						{Name: "foo"},
+						{Name: "foo-token-foo"},
+					},
+				},
+			},
+			expectedRes: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+				Spec: corev1api.PodSpec{
+					ServiceAccountName: "foo",
+					PriorityClassName:  "testPriorityClass",
+					Volumes: []corev1api.Volume{
+						{Name: "foo"},
+					},
+				},
+			},
+			additionalItems: []velero.ResourceIdentifier{
+				{GroupResource: kuberesource.PriorityClasses,
+					Name: "testPriorityClass",
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -214,6 +246,7 @@ func TestPodActionExecute(t *testing.T) {
 			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &pod))
 
 			assert.Equal(t, test.expectedRes, pod)
+			assert.Equal(t, test.additionalItems, res.AdditionalItems)
 		})
 	}
 }
