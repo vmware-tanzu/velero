@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2022 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ func (a *PodAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	}
 
 	var additionalItems []velero.ResourceIdentifier
-	if pod.Spec.PriorityClassName > "" {
+	if pod.Spec.PriorityClassName != "" {
 		a.log.Infof("Adding priorityclass %s to additionalItems", pod.Spec.PriorityClassName)
 		additionalItems = append(additionalItems, velero.ResourceIdentifier{
 			GroupResource: kuberesource.PriorityClasses,
