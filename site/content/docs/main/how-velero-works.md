@@ -71,6 +71,15 @@ When you create a backup, you can specify a TTL (time to live) by adding the fla
 
 The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied.
 
+If backup fails to delete, a label `velero.io/gc-failure=<Reason>` will be added to the backup custom resource.
+
+You can use this label to filter and select backups that failed to delete.
+
+Implemented reasons are:
+- BSLNotFound: Backup storage location not found
+- BSLCannotGet: Backup storage location cannot be retrieved from the API server for reasons other than not found
+- BSLReadOnly: Backup storage location is read-only
+
 ## Object storage sync
 
 Velero treats object storage as the source of truth. It continuously checks to see that the correct backup resources are always present. If there is a properly formatted backup file in the storage bucket, but no corresponding backup resource in the Kubernetes API, Velero synchronizes the information from object storage to Kubernetes.

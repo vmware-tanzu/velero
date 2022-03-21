@@ -39,7 +39,11 @@ import (
 )
 
 const (
-	GCSyncPeriod = 60 * time.Minute
+	GCSyncPeriod             = 60 * time.Minute
+	garbageCollectionFailure = "velero.io/gc-failure"
+	gcFailureBSLNotFound     = "BSLNotFound"
+	gcFailureBSLCannotGet    = "BSLCannotGet"
+	gcFailureBSLReadOnly     = "BSLReadOnly"
 )
 
 // gcController creates DeleteBackupRequests for expired backups.
@@ -141,12 +145,22 @@ func (c *gcController) processQueueItem(key string) error {
 	}, loc); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Warnf("Backup cannot be garbage-collected because backup storage location %s does not exist", backup.Spec.StorageLocation)
+			backup.Labels[garbageCollectionFailure] = gcFailureBSLNotFound
+		} else {
+			backup.Labels[garbageCollectionFailure] = gcFailureBSLCannotGet
+		}
+		if err := c.kbClient.Update(context.Background(), backup); err != nil {
+			log.WithError(err).Error("error updating backup labels")
 		}
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
 	if loc.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		log.Infof("Backup cannot be garbage-collected because backup storage location %s is currently in read-only mode", loc.Name)
+		backup.Labels[garbageCollectionFailure] = gcFailureBSLReadOnly
+		if err := c.kbClient.Update(context.Background(), backup); err != nil {
+			log.WithError(err).Error("error updating backup labels")
+		}
 		return nil
 	}
 
