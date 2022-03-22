@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -113,6 +113,25 @@ func TestPodActionExecute(t *testing.T) {
 			expected: []velero.ResourceIdentifier{
 				{GroupResource: kuberesource.PersistentVolumeClaims, Namespace: "foo", Name: "claim1"},
 				{GroupResource: kuberesource.PersistentVolumeClaims, Namespace: "foo", Name: "claim2"},
+			},
+		},
+		{
+			name: "test priority class",
+			pod: velerotest.UnstructuredOrDie(`
+			{
+				"apiVersion": "v1",
+				"kind": "Pod",
+				"metadata": {
+					"namespace": "foo",
+					"name": "bar"
+				},
+				"spec": {
+					"priorityClassName": "testPriorityClass"
+				}
+			}
+			`),
+			expected: []velero.ResourceIdentifier{
+				{GroupResource: kuberesource.PriorityClasses, Name: "testPriorityClass"},
 			},
 		},
 	}
