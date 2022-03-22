@@ -13,6 +13,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
 
     - name: Set up Go
@@ -58,13 +60,30 @@ jobs:
 
     # Use the JSON key in secret to login gcr.io
     - uses: 'docker/login-action@v1'
+      id: gcr-login
       with:
         registry: 'gcr.io' # or REGION.docker.pkg.dev
         username: '_json_key'
         password: '${{ secrets.GCR_SA_KEY }}'
+      continue-on-error: true
 
     # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
     - name: Publish container image to GCR
-      if: github.repository == 'vmware-tanzu/velero'
+      if: github.repository == 'vmware-tanzu/velero' && steps.gcr-login.outcome == 'success'
       run: |
         REGISTRY=gcr.io/velero-gcp ./hack/docker-push.sh
+
+    - name: Login to GitHub registry if it's a fork
+      if: github.event_name != 'pull_request' && github.repository != 'vmware-tanzu/velero'
+      id: ghcr-login
+      uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish container image to GitHub registry if it's a fork
+      if: github.event_name != 'pull_request' && github.repository != 'vmware-tanzu/velero' && steps.ghcr-login.outcome == 'success'
+      run: |
+        REGISTRY=ghcr.io/${{ github.actor }} ./hack/docker-push.sh
+
