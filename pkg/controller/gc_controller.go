@@ -138,6 +138,10 @@ func (c *gcController) processQueueItem(key string) error {
 
 	log.Info("Backup has expired")
 
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+
 	loc := &velerov1api.BackupStorageLocation{}
 	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
 		Namespace: ns,
