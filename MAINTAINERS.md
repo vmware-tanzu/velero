@@ -32,5 +32,5 @@
 | Technical Lead | Daniel Jiang (reasonerjt) |
 | Kubernetes CSI Liaison |  |
 | Deployment | JenTing Hsiao (jenting) |
-| Community Management | Jonas Rosland (jonasrosland) |
+| Community Management | Orlin Vasilev (OrlinVasilev) |
 | Product Management | Eleanor Millman (eleanor-millman) |
