@@ -54,8 +54,14 @@ VELERO_VERSION ?= $(VERSION)
 PLUGINS ?=
 RESTIC_HELPER_IMAGE ?=
 #Released version only
+UPGRADE_FROM_VELERO_VERSION ?= v1.7.1,v1.8.1
+# UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
+# Upgrade tests will be executed sequently according to the list by UPGRADE_FROM_VELERO_VERSION
+# So although length of UPGRADE_FROM_VELERO_CLI list is not equal with UPGRADE_FROM_VELERO_VERSION
+# Script will still read UPGRADE_FROM_VELERO_CLI list to match UPGRADE_FROM_VELERO_VERSION list from beginning
+# to the end, nil string will be set if UPGRADE_FROM_VELERO_CLI is shorter than UPGRADE_FROM_VELERO_VERSION
 UPGRADE_FROM_VELERO_CLI ?=
-UPGRADE_FROM_VELERO_VERSION ?= v1.7.1
+
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
 BSL_BUCKET ?=
