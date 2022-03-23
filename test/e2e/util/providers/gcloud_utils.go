@@ -105,7 +105,7 @@ func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	}
 }
 
-func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
+func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
 	ctx := context.Background()
 	data, err := ioutil.ReadFile(cloudCredentialsFile)
 	if err != nil {
@@ -137,7 +137,8 @@ func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslBucket, bslPrefix
 	}); err != nil {
 		return errors.Wrapf(err, "Failed listing snapshot pages")
 	}
-	if snapshotCountFound != len(snapshotCheck.SnapshotIDList) {
+
+	if snapshotCountFound != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d\n", snapshotCountFound, len(snapshotCheck.SnapshotIDList)))
 	} else {
 		fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, len(snapshotCheck.SnapshotIDList))

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	common "github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
 
 // ensureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
@@ -76,4 +77,62 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for pods in namespace %s to start running", namespace))
 	}
 	return nil
+}
+
+func GetPvcByPodName(ctx context.Context, namespace, podName string) ([]string, error) {
+	// Example:
+	//    NAME                                  STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS             AGE
+	//    kibishii-data-kibishii-deployment-0   Bound    pvc-94b9fdf2-c30f-4a7b-87bf-06eadca0d5b6   1Gi        RWO            kibishii-storage-class   115s
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "pvc", "-n", namespace},
+	}
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{podName},
+	}
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+
+	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+}
+
+func GetPvByPvc(ctx context.Context, pvc string) ([]string, error) {
+	// Example:
+	// 	  NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                              STORAGECLASS             REASON   AGE
+	//    pvc-3f784366-58db-40b2-8fec-77307807e74b   1Gi        RWO            Delete           Bound    bsl-deletion/kibishii-data-kibishii-deployment-0   kibishii-storage-class            6h41m
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "pv"},
+	}
+
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{pvc},
+	}
+
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+
+	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+}
+
+func AddLabelToPv(ctx context.Context, pv, label string) error {
+	return exec.CommandContext(ctx, "kubectl", "label", "pv", pv, label).Run()
+}
+
+func AddLabelToPvc(ctx context.Context, pvc, namespace, label string) error {
+	args := []string{"label", "pvc", pvc, "-n", namespace, label}
+	fmt.Println(args)
+	return exec.CommandContext(ctx, "kubectl", args...).Run()
+}
+
+func AddLabelToPod(ctx context.Context, podName, namespace, label string) error {
+	args := []string{"label", "pod", podName, "-n", namespace, label}
+	fmt.Println(args)
+	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }

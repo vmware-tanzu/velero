@@ -102,7 +102,7 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 	if err != nil {
 		return err
 	}
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots, ""); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
 		VeleroBackupLogs(context.Background(), VeleroCfg.UpgradeFromVeleroCLI, veleroNamespace, backupName)
@@ -125,7 +125,7 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 		var snapshotCheckPoint SnapshotCheckPoint
 		snapshotCheckPoint.ExpectCount = 2
 		snapshotCheckPoint.NamespaceBackedUp = deletionTest
-		err = SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, snapshotCheckPoint)
+		err = SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslConfig, backupName, snapshotCheckPoint)
 		if err != nil {
 			return err
 		}
@@ -140,14 +140,14 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 		return err
 	}
 	if useVolumeSnapshots {
-		err = SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
+		err = SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslConfig, backupName)
 		if err != nil {
 			return err
 		}
 	}
 
 	backupName = "backup-1-" + UUIDgen.String()
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots, ""); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
 		VeleroBackupLogs(context.Background(), VeleroCfg.UpgradeFromVeleroCLI, veleroNamespace, backupName)
