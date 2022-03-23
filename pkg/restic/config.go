@@ -113,14 +113,14 @@ func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string)
 func getBucketRegion(bucket string) (string, error) {
 	var region string
 
-	session, err := session.NewSession()
+	sess, err := session.NewSession()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	for _, partition := range endpoints.DefaultPartitions() {
 		for regionHint := range partition.Regions() {
-			region, _ = s3manager.GetBucketRegion(context.Background(), session, bucket, regionHint)
+			region, _ = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
 
 			// we only need to try a single region hint per partition, so break after the first
 			break
