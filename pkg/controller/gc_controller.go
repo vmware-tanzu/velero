@@ -168,6 +168,12 @@ func (c *gcController) processQueueItem(key string) error {
 		return nil
 	}
 
+	// remove gc fail error label after this point
+	delete(backup.Labels, garbageCollectionFailure)
+	if err := c.kbClient.Update(context.Background(), backup); err != nil {
+		log.WithError(err).Error("error updating backup labels")
+	}
+
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 		velerov1api.BackupUIDLabel:  string(backup.UID),
