@@ -43,6 +43,8 @@ const (
 	backupDeletionSuccessTotal    = "backup_deletion_success_total"
 	backupDeletionFailureTotal    = "backup_deletion_failure_total"
 	backupLastSuccessfulTimestamp = "backup_last_successful_timestamp"
+	backupItemsTotalGauge         = "backup_items_total"
+	backupItemsErrorsGauge        = "backup_items_errors"
 	restoreTotal                  = "restore_total"
 	restoreAttemptTotal           = "restore_attempt_total"
 	restoreValidationFailedTotal  = "restore_validation_failed_total"
@@ -176,6 +178,22 @@ func NewServerMetrics() *ServerMetrics {
 						toSeconds(3 * time.Hour),
 						toSeconds(4 * time.Hour),
 					},
+				},
+				[]string{scheduleLabel},
+			),
+			backupItemsTotalGauge: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupItemsTotalGauge,
+					Help:      "Total number of items backed up",
+				},
+				[]string{scheduleLabel},
+			),
+			backupItemsErrorsGauge: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupItemsErrorsGauge,
+					Help:      "Total number of errors encountered during backup",
 				},
 				[]string{scheduleLabel},
 			),
@@ -337,6 +355,12 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
+	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
@@ -483,6 +507,21 @@ func (m *ServerMetrics) RegisterBackupDeletionFailed(backupSchedule string) {
 func (m *ServerMetrics) RegisterBackupDeletionSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupItemsTotalGauge records the number of items to be backed up.
+func (m *ServerMetrics) RegisterBackupItemsTotalGauge(backupSchedule string, items int) {
+	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(backupSchedule).Set(float64(items))
+	}
+}
+
+// RegisterBackupItemsErrorsGauge records the number of all error messages that were generated during
+// execution of the backup.
+func (m *ServerMetrics) RegisterBackupItemsErrorsGauge(backupSchedule string, items int) {
+	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(backupSchedule).Set(float64(items))
 	}
 }
 
