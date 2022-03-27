@@ -48,6 +48,7 @@ type VerleroConfig struct {
 	Plugins                  string
 	AddBSLPlugins            string
 	InstallVelero            bool
+	KibishiiDirectory        string
 }
 
 type SnapshotCheckPoint struct {

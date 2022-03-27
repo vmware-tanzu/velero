@@ -122,7 +122,7 @@ func runUpgradeTests(client TestClient, veleroCfg *VerleroConfig, backupName, re
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", upgradeNamespace))
 		}
 	}()
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, veleroCfg.CloudProvider, upgradeNamespace, veleroCfg.RegistryCredentialFile); err != nil {
+	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, veleroCfg.CloudProvider, upgradeNamespace, veleroCfg.RegistryCredentialFile, veleroCfg.KibishiiDirectory); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", upgradeNamespace)
 	}
 
