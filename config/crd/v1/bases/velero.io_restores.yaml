@@ -1773,6 +1773,26 @@ spec:
                   PVs from snapshot (via the cloudprovider).
                 nullable: true
                 type: boolean
+              restoreStatus:
+                description: RestoreStatus specifies which resources we should restore
+                  the status field. If nil, no objects are included. Optional.
+                nullable: true
+                properties:
+                  excludedResources:
+                    description: ExcludedResources specifies the resources to which
+                      will not restore the status.
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  includedResources:
+                    description: IncludedResources specifies the resources to which
+                      will restore the status. If empty, it applies to all resources.
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                type: object
               scheduleName:
                 description: ScheduleName is the unique name of the Velero schedule
                   to restore from. If specified, and BackupName is empty, Velero will
