@@ -1009,6 +1009,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
+		resetStatus(obj)
 		switch {
 		case hasSnapshot(name, ctx.volumeSnapshots):
 			oldName := obj.GetName()
