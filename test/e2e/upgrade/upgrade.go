@@ -77,20 +77,22 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 	)
 
 	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
-
-	if !VeleroCfg.InstallVelero {
-		Skip("Upgrade test should not be triggered if VeleroCfg.InstallVelero is set to false")
-	}
-	if (len(VeleroCfg.UpgradeFromVeleroVersion)) == 0 {
-		Skip("An original velero version is required to run upgrade test, please run test with upgrade-from-velero-version=<version>")
-	}
-	if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
-		Skip("Volume snapshots not supported on kind")
-	}
-	if VeleroCfg.VeleroCLI == "" {
-		Skip("VeleroCLI should be provide")
-	}
+	fmt.Println(err)
+	//Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+	BeforeEach(func() {
+		if !VeleroCfg.InstallVelero {
+			Skip("Upgrade test should not be triggered if VeleroCfg.InstallVelero is set to false")
+		}
+		if (len(VeleroCfg.UpgradeFromVeleroVersion)) == 0 {
+			Skip("An original velero version is required to run upgrade test, please run test with upgrade-from-velero-version=<version>")
+		}
+		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
+			Skip("Volume snapshots not supported on kind")
+		}
+		if VeleroCfg.VeleroCLI == "" {
+			Skip("VeleroCLI should be provide")
+		}
+	})
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
 			By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {

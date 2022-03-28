@@ -48,7 +48,7 @@ func APIGropuVersionsTest() {
 	)
 
 	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
+	//Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
 
 	BeforeEach(func() {
 		resource = "rockbands"
