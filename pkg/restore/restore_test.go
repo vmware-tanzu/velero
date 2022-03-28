@@ -1867,6 +1867,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 			// empty in the structured objects. Remove them to make comparison easier.
 			unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
 			unstructured.RemoveNestedField(want.Object, "status")
+			unstructured.RemoveNestedField(res.Object, "status")
 
 			assert.Equal(t, want, res)
 		}
@@ -2805,7 +2806,7 @@ func TestRestoreWithRestic(t *testing.T) {
 	}
 }
 
-func TestResetMetadataAndStatus(t *testing.T) {
+func TestResetMetadata(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         *unstructured.Unstructured
@@ -2824,7 +2825,39 @@ func TestResetMetadataAndStatus(t *testing.T) {
 			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
 		},
 		{
-			name:        "don't keep status",
+			name:        "keep status",
+			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := resetMetadata(test.obj)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestResetStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		obj         *unstructured.Unstructured
+		expectedErr bool
+		expectedRes *unstructured.Unstructured
+	}{
+		{
+			name:        "no metadata don't cause error",
+			obj:         &unstructured.Unstructured{},
+			expectedErr: false,
+			expectedRes: &unstructured.Unstructured{},
+		},
+		{
+			name:        "remove status",
 			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
@@ -2833,7 +2866,7 @@ func TestResetMetadataAndStatus(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := resetMetadataAndStatus(test.obj)
+			res, err := resetStatus(test.obj)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)
