@@ -1127,10 +1127,22 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
-	// Clear out non-core metadata fields and status.
-	if obj, err = resetMetadataAndStatus(obj); err != nil {
+	// Clear out non-core metadata fields.
+	if obj, err = resetMetadata(obj); err != nil {
 		errs.Add(namespace, err)
 		return warnings, errs
+	}
+
+	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
+
+	ctx.log.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
+	// Clear out status.
+	if !shouldRestoreStatus {
+		ctx.log.Infof("Resetting status for obj %s/%s", obj.GetKind(), obj.GetName())
+		if obj, err = resetStatus(obj); err != nil {
+			errs.Add(namespace, err)
+			return warnings, errs
+		}
 	}
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
@@ -1139,7 +1151,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 
 		ctx.log.Infof("Executing item action for %v", &groupResource)
-
 		executeOutput, err := action.RestoreItemAction.Execute(&velero.RestoreItemActionExecuteInput{
 			Item:           obj,
 			ItemFromBackup: itemFromBackup,
@@ -1270,9 +1281,15 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs
 		}
 		// Remove insubstantial metadata.
-		fromCluster, err = resetMetadataAndStatus(fromCluster)
+		fromCluster, err = resetMetadata(fromCluster)
 		if err != nil {
 			ctx.log.Infof("Error trying to reset metadata for %s: %v", kube.NamespaceAndName(obj), err)
+			warnings.Add(namespace, err)
+			return warnings, errs
+		}
+		fromCluster, err = resetStatus(fromCluster)
+		if err != nil {
+			ctx.log.Infof("Error trying to reset status for %s: %v", kube.NamespaceAndName(obj), err)
 			warnings.Add(namespace, err)
 			return warnings, errs
 		}
@@ -1373,7 +1390,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	// if it should restore status, run a UpdateStatus
-	if ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String()) {
+	if shouldRestoreStatus {
+		obj.SetResourceVersion(createdObj.GetResourceVersion())
 		updated, err := resourceClient.UpdateStatus(obj, metav1.UpdateOptions{})
 		if err != nil {
 			warnings.Add(namespace, err)
@@ -1669,7 +1687,7 @@ func resetVolumeBindingInfo(obj *unstructured.Unstructured) *unstructured.Unstru
 	return obj
 }
 
-func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func resetMetadata(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	res, ok := obj.Object["metadata"]
 	if !ok {
 		return nil, errors.New("metadata not found")
@@ -1687,9 +1705,11 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 		}
 	}
 
-	// Never restore status
-	delete(obj.UnstructuredContent(), "status")
+	return obj, nil
+}
 
+func resetStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	delete(obj.UnstructuredContent(), "status")
 	return obj, nil
 }
 
