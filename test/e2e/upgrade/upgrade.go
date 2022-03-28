@@ -149,7 +149,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 
 			By("Deploy sample workload of Kibishii", func() {
 				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, client, tmpCfg1.CloudProvider,
-					upgradeNamespace, tmpCfg1.RegistryCredentialFile, tmpCfg1.KibishiiDirectory)).To(Succeed())
+					upgradeNamespace, tmpCfg1.RegistryCredentialFile, tmpCfg1.Features, tmpCfg1.KibishiiDirectory)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup namespace %s", upgradeNamespace), func() {

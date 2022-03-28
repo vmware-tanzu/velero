@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -199,6 +200,14 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	}
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
+		if strings.EqualFold(options.Features, "EnableCSI") {
+			if strings.EqualFold(options.ProviderName, "Azure") {
+				if err := KubectlApplyByFile(ctx, "util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
+					return err
+				}
+			}
+
+		}
 	}
 
 	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.ResticHelperImage); err != nil {
