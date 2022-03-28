@@ -90,7 +90,7 @@ type RestoreSpec struct {
 	// field. If nil, no objects are included. Optional.
 	// +optional
 	// +nullable
-	RestoreStatus *RestoreStatusSpec
+	RestoreStatus *RestoreStatusSpec `json:"restoreStatus,omitempty"`
 
 	// PreserveNodePorts specifies whether to restore old nodePorts from backup.
 	// +optional
