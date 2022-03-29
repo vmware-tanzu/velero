@@ -104,6 +104,7 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
 	resourceRestoreHooks []ResourceRestoreHook,
+	namespaceMapping map[string]string,
 ) (runtime.Unstructured, error) {
 	// We only support hooks on pods right now
 	if groupResource != kuberesource.Pods {
@@ -141,6 +142,13 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 		namespace := metadata.GetNamespace()
 		labels := labels.Set(metadata.GetLabels())
 
+		// Apply the hook according to the target namespace in which the pod will be restored
+		// more details see https://github.com/vmware-tanzu/velero/issues/4720
+		if namespaceMapping != nil {
+			if n, ok := namespaceMapping[namespace]; ok {
+				namespace = n
+			}
+		}
 		for _, rh := range resourceRestoreHooks {
 			if !rh.Selector.applicableTo(groupResource, namespace, labels) {
 				continue

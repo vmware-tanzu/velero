@@ -1395,11 +1395,12 @@ func TestGetRestoreHooksFromSpec(t *testing.T) {
 
 func TestHandleRestoreHooks(t *testing.T) {
 	testCases := []struct {
-		name          string
-		podInput      corev1api.Pod
-		restoreHooks  []ResourceRestoreHook
-		expectedPod   *corev1api.Pod
-		expectedError error
+		name             string
+		podInput         corev1api.Pod
+		restoreHooks     []ResourceRestoreHook
+		namespaceMapping map[string]string
+		expectedPod      *corev1api.Pod
+		expectedError    error
 	}{
 		{
 			name: "should handle hook from annotation no hooks in spec on pod with no init containers",
@@ -1840,6 +1841,87 @@ func TestHandleRestoreHooks(t *testing.T) {
 			},
 			restoreHooks: []ResourceRestoreHook{},
 		},
+		{
+			name: "should not apply init container when the namespace mapping is provided and the hook points to the original namespace",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("default"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceMapping: map[string]string{"default": "new"},
+		},
+		{
+			name: "should apply init container when the namespace mapping is provided and the hook points to the new namespace",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{},
+			},
+			expectedError: nil,
+			expectedPod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{
+						*builder.ForContainer("restore-init-container-1", "nginx").
+							Command([]string{"a", "b", "c"}).Result(),
+					},
+				},
+			},
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("new"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []corev1api.Container{
+									*builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).Result(),
+								},
+							},
+						},
+					},
+				},
+			},
+			namespaceMapping: map[string]string{"default": "new"},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1847,7 +1929,7 @@ func TestHandleRestoreHooks(t *testing.T) {
 			handler := InitContainerRestoreHookHandler{}
 			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.podInput)
 			assert.NoError(t, err)
-			actual, err := handler.HandleRestoreHooks(velerotest.NewLogger(), kuberesource.Pods, &unstructured.Unstructured{Object: podMap}, tc.restoreHooks)
+			actual, err := handler.HandleRestoreHooks(velerotest.NewLogger(), kuberesource.Pods, &unstructured.Unstructured{Object: podMap}, tc.restoreHooks, tc.namespaceMapping)
 			assert.Equal(t, tc.expectedError, err)
 			actualPod := new(corev1api.Pod)
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(actual.UnstructuredContent(), actualPod)
