@@ -75,7 +75,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	When("kibishii is the sample workload", func() {
 		It("Deleted backups are deleted from object storage and backups deleted from object storage can be deleted locally", func() {
 			backupName = "backup-" + UUIDgen.String()
-			Expect(runBackupDeletionTests(client, VeleroCfg.VeleroCLI, VeleroCfg.CloudProvider, VeleroCfg.VeleroNamespace, backupName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig)).To(Succeed(),
+			Expect(runBackupDeletionTests(client, VeleroCfg.VeleroCLI, VeleroCfg.CloudProvider, VeleroCfg.VeleroNamespace, backupName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, VeleroCfg.KibishiiDirectory)).To(Succeed(),
 				"Failed to run backup deletion test")
 		})
 	})
@@ -83,7 +83,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 
 // runUpgradeTests runs upgrade test on the provider by kibishii.
 func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNamespace, backupName, backupLocation string,
-	useVolumeSnapshots bool, registryCredentialFile, bslPrefix, bslConfig string) error {
+	useVolumeSnapshots bool, registryCredentialFile, bslPrefix, bslConfig, kibishiiDirectory string) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 
 	if err := CreateNamespace(oneHourTimeout, client, deletionTest); err != nil {
@@ -95,7 +95,7 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 		}
 	}()
 
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest, registryCredentialFile); err != nil {
+	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest, registryCredentialFile, kibishiiDirectory); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
 	err := ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)

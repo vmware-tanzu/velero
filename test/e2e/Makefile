@@ -66,6 +66,7 @@ CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
+KIBISHII_DIRECTORY ?=
 
 # Flags to create an additional BSL for multiple credentials tests
 ADDITIONAL_BSL_PLUGINS ?=
@@ -109,7 +110,8 @@ run: ginkgo
 		-additional-bsl-prefix=$(ADDITIONAL_BSL_PREFIX) \
 		-additional-bsl-config=$(ADDITIONAL_BSL_CONFIG) \
 		-install-velero=$(INSTALL_VELERO) \
-		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE)
+		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
+		-kibishii-directory=$(KIBISHII_DIRECTORY)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

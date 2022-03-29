@@ -72,7 +72,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			restoreName = "restore-" + UUIDgen.String()
 			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
-			Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile)).To(Succeed(),
+			Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.KibishiiDirectory)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
@@ -125,7 +125,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 					backupName = fmt.Sprintf("%s-%s", backupName, UUIDgen)
 					restoreName = fmt.Sprintf("%s-%s", restoreName, UUIDgen)
 				}
-				Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots, VeleroCfg.RegistryCredentialFile)).To(Succeed(),
+				Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.KibishiiDirectory)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
 			}
 		})
