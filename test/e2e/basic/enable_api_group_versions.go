@@ -59,7 +59,8 @@ func APIGropuVersionsTest() {
 		// TODO: install Velero once for the test suite once feature flag is
 		// removed and velero installation becomes the same as other e2e tests.
 		if VeleroCfg.InstallVelero {
-			err = VeleroInstall(context.Background(), &VeleroCfg, "EnableAPIGroupVersions", false)
+			VeleroCfg.Features = "EnableAPIGroupVersions"
+			err = VeleroInstall(context.Background(), &VeleroCfg, false)
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})

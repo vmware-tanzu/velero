@@ -55,7 +55,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if VeleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &VeleroCfg, "EnableCSI", useVolumeSnapshots)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, useVolumeSnapshots)).To(Succeed())
 		}
 	})
 
@@ -79,7 +79,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
-		XIt("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
+		It("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
 			if VeleroCfg.AdditionalBSLProvider == "" {
 				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
@@ -92,7 +92,9 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
-			Expect(VeleroAddPluginsForProvider(context.TODO(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, VeleroCfg.AdditionalBSLProvider, VeleroCfg.AddBSLPlugins)).To(Succeed())
+			Expect(VeleroAddPluginsForProvider(context.TODO(), VeleroCfg.VeleroCLI,
+				VeleroCfg.VeleroNamespace, VeleroCfg.AdditionalBSLProvider,
+				VeleroCfg.AddBSLPlugins, VeleroCfg.Features)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", UUIDgen)

@@ -49,7 +49,7 @@ type installOptions struct {
 	ResticHelperImage      string
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features string, useVolumeSnapshots bool) error {
+func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnapshots bool) error {
 	if veleroCfg.CloudProvider != "kind" {
 		if veleroCfg.ObjectStoreProvider != "" {
 			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
@@ -61,7 +61,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features strin
 		}
 	}
 
-	providerPluginsTmp, err := getProviderPlugins(ctx, veleroCfg.VeleroCLI, veleroCfg.ObjectStoreProvider, veleroCfg.Plugins)
+	providerPluginsTmp, err := getProviderPlugins(ctx, veleroCfg.VeleroCLI, veleroCfg.ObjectStoreProvider, veleroCfg.Plugins, veleroCfg.Features)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
@@ -82,7 +82,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, features strin
 	}
 
 	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
-		veleroCfg.BSLPrefix, veleroCfg.BSLConfig, veleroCfg.VSLConfig, providerPluginsTmp, features)
+		veleroCfg.BSLPrefix, veleroCfg.BSLConfig, veleroCfg.VSLConfig, providerPluginsTmp, veleroCfg.Features)
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
@@ -200,7 +200,7 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	}
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if strings.EqualFold(options.Features, "EnableCSI") {
+		if strings.EqualFold(options.Features, "EnableCSI") && options.UseVolumeSnapshots {
 			if strings.EqualFold(options.ProviderName, "Azure") {
 				if err := KubectlApplyByFile(ctx, "util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
 					return err

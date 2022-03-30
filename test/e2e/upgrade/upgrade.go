@@ -118,6 +118,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 					Expect(err).To(Succeed())
 				})
 			}
+
 			By(fmt.Sprintf("Install the expected old version Velero (%s) for upgrade",
 				upgradeFromVelero.UpgradeFromVeleroVersion), func() {
 				//Set VeleroImage and ResticHelperImage to blank
@@ -129,17 +130,17 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 				tmpCfgForOldVeleroInstall.ResticHelperImage = ""
 				tmpCfgForOldVeleroInstall.Plugins = ""
 
-				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall, "",
-					false)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall,
+					useVolumeSnapshots)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,
 					tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion)).To(Succeed())
 			})
 
 			backupName = "backup-" + UUIDgen.String()
 			restoreName = "restore-" + UUIDgen.String()
-			tmpCfg1 := VeleroCfg
-			tmpCfg1.UpgradeFromVeleroCLI = upgradeFromVelero.UpgradeFromVeleroCLI
-			tmpCfg1.UpgradeFromVeleroVersion = upgradeFromVelero.UpgradeFromVeleroVersion
+			tmpCfg := VeleroCfg
+			tmpCfg.UpgradeFromVeleroCLI = upgradeFromVelero.UpgradeFromVeleroCLI
+			tmpCfg.UpgradeFromVeleroVersion = upgradeFromVelero.UpgradeFromVeleroVersion
 			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 
 			By("Create namespace for sample workload", func() {
@@ -148,16 +149,17 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 			})
 
 			By("Deploy sample workload of Kibishii", func() {
-				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, client, tmpCfg1.CloudProvider,
-					upgradeNamespace, tmpCfg1.RegistryCredentialFile, tmpCfg1.Features, tmpCfg1.KibishiiDirectory)).To(Succeed())
+				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, client, tmpCfg.CloudProvider,
+					upgradeNamespace, tmpCfg.RegistryCredentialFile, tmpCfg.Features,
+					tmpCfg.KibishiiDirectory, useVolumeSnapshots)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup namespace %s", upgradeNamespace), func() {
-				Expect(VeleroBackupNamespace(oneHourTimeout, tmpCfg1.UpgradeFromVeleroCLI,
-					tmpCfg1.VeleroNamespace, backupName, upgradeNamespace, "",
+				Expect(VeleroBackupNamespace(oneHourTimeout, tmpCfg.UpgradeFromVeleroCLI,
+					tmpCfg.VeleroNamespace, backupName, upgradeNamespace, "",
 					useVolumeSnapshots, "")).ShouldNot(HaveOccurred(), func() string {
-					err = VeleroBackupLogs(context.Background(), tmpCfg1.UpgradeFromVeleroCLI,
-						tmpCfg1.VeleroNamespace, backupName)
+					err = VeleroBackupLogs(context.Background(), tmpCfg.UpgradeFromVeleroCLI,
+						tmpCfg.VeleroNamespace, backupName)
 					return "Get backup logs"
 				})
 			})
@@ -178,22 +180,22 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-			if tmpCfg1.CloudProvider == "aws" && useVolumeSnapshots {
+			if tmpCfg.CloudProvider == "aws" && useVolumeSnapshots {
 				fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 				time.Sleep(5 * time.Minute)
 			}
 
-			By(fmt.Sprintf("Upgrade Velero by CLI %s", tmpCfg1.VeleroCLI), func() {
-				Expect(VeleroInstall(context.Background(), &tmpCfg1, "", useVolumeSnapshots)).To(Succeed())
-				Expect(CheckVeleroVersion(context.Background(), tmpCfg1.VeleroCLI,
-					tmpCfg1.VeleroVersion)).To(Succeed())
+			By(fmt.Sprintf("Upgrade Velero by CLI %s", tmpCfg.VeleroCLI), func() {
+				Expect(VeleroInstall(context.Background(), &tmpCfg, useVolumeSnapshots)).To(Succeed())
+				Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
+					tmpCfg.VeleroVersion)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Restore %s", upgradeNamespace), func() {
-				Expect(VeleroRestore(oneHourTimeout, tmpCfg1.VeleroCLI,
-					tmpCfg1.VeleroNamespace, restoreName, backupName)).To(Succeed(), func() string {
-					RunDebug(context.Background(), tmpCfg1.VeleroCLI,
-						tmpCfg1.VeleroNamespace, "", restoreName)
+				Expect(VeleroRestore(oneHourTimeout, tmpCfg.VeleroCLI,
+					tmpCfg.VeleroNamespace, restoreName, backupName)).To(Succeed(), func() string {
+					RunDebug(context.Background(), tmpCfg.VeleroCLI,
+						tmpCfg.VeleroNamespace, "", restoreName)
 					return "Fail to restore workload"
 				})
 			})
