@@ -114,6 +114,10 @@ all:
 	@$(MAKE) build
 	@$(MAKE) build BIN=velero-restic-restore-helper
 
+a:
+	echo $(BUILDER_IMAGE_DOCKERFILE_REALPATH)
+	echo $(shell git log -1 --pretty=%h $(BUILDER_IMAGE_DOCKERFILE))
+
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
 	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restic-restore-helper
