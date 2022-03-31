@@ -26,7 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	"github.com/fatih/color"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,7 +45,7 @@ func DescribeBackup(
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
-	volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent,
+	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
 	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
@@ -513,7 +513,7 @@ func (v *volumesByPod) Sorted() []*podVolumeGroup {
 	return v.volumesByPodSlice
 }
 
-func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent) {
+func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent) {
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		return
 	}
@@ -535,7 +535,7 @@ func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotConten
 	}
 }
 
-func DescribeVSC(d *Describer, details bool, vsc snapshotv1beta1api.VolumeSnapshotContent) {
+func DescribeVSC(d *Describer, details bool, vsc snapshotv1api.VolumeSnapshotContent) {
 	if vsc.Status == nil {
 		d.Printf("Volume Snapshot Content %s cannot be described because its status is nil\n", vsc.Name)
 		return

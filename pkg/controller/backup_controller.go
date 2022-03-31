@@ -38,8 +38,8 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
-	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -83,8 +83,8 @@ type backupController struct {
 	metrics                     *metrics.ServerMetrics
 	backupStoreGetter           persistence.ObjectBackupStoreGetter
 	formatFlag                  logging.Format
-	volumeSnapshotLister        snapshotv1beta1listers.VolumeSnapshotLister
-	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
+	volumeSnapshotLister        snapshotv1listers.VolumeSnapshotLister
+	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
 }
 
 func NewBackupController(
@@ -104,8 +104,8 @@ func NewBackupController(
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
 	formatFlag logging.Format,
-	volumeSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
-	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
+	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
+	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 ) Interface {
 	c := &backupController{
@@ -602,8 +602,8 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	// Empty slices here so that they can be passed in to the persistBackup call later, regardless of whether or not CSI's enabled.
 	// This way, we only make the Lister call if the feature flag's on.
-	var volumeSnapshots []*snapshotv1beta1api.VolumeSnapshot
-	var volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent
+	var volumeSnapshots []*snapshotv1api.VolumeSnapshot
+	var volumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
 
@@ -700,8 +700,8 @@ func persistBackup(backup *pkgbackup.Request,
 	backupContents, backupLog *os.File,
 	backupStore persistence.BackupStore,
 	log logrus.FieldLogger,
-	csiVolumeSnapshots []*snapshotv1beta1api.VolumeSnapshot,
-	csiVolumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
+	csiVolumeSnapshots []*snapshotv1api.VolumeSnapshot,
+	csiVolumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent,
 ) []error {
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
