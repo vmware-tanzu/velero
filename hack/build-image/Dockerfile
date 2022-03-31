@@ -16,6 +16,7 @@ FROM golang:1.17
 
 ARG GOPROXY
 
+
 ENV GO111MODULE=on
 # Use a proxy for go modules to reduce the likelihood of various hosts being down and breaking the build
 ENV GOPROXY=${GOPROXY}
