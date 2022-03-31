@@ -535,10 +535,11 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) getCSISnapshotListers() (snapshotv1listers.VolumeSnapshotLister, snapshotv1listers.VolumeSnapshotContentLister) {
+func (s *server) getCSISnapshotListers() (snapshotv1listers.VolumeSnapshotLister, snapshotv1listers.VolumeSnapshotContentLister, snapshotv1listers.VolumeSnapshotClassLister) {
 	// Make empty listers that will only be populated if CSI is properly enabled.
 	var vsLister snapshotv1listers.VolumeSnapshotLister
 	var vscLister snapshotv1listers.VolumeSnapshotContentLister
+	var vsClassLister snapshotv1listers.VolumeSnapshotClassLister
 	var err error
 
 	// If CSI is enabled, check for the CSI groups and generate the listers
@@ -556,11 +557,12 @@ func (s *server) getCSISnapshotListers() (snapshotv1listers.VolumeSnapshotLister
 			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
 			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshots().Lister()
 			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotContents().Lister()
+			vsClassLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotClasses().Lister()
 		case err != nil:
 			cmd.CheckError(err)
 		}
 	}
-	return vsLister, vscLister
+	return vsLister, vscLister, vsClassLister
 }
 
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
@@ -587,7 +589,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	backupStoreGetter := persistence.NewObjectBackupStoreGetter(s.credentialFileStore)
 
-	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
+	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
@@ -645,6 +647,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.formatFlag.Parse(),
 			csiVSLister,
 			csiVSCLister,
+			csiVSClassLister,
 			backupStoreGetter,
 		)
 

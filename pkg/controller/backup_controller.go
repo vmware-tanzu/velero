@@ -36,7 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/vmware-tanzu/velero/pkg/util/csi"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
@@ -85,6 +88,7 @@ type backupController struct {
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1listers.VolumeSnapshotLister
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
+	volumeSnapshotClassLister   snapshotv1listers.VolumeSnapshotClassLister
 }
 
 func NewBackupController(
@@ -106,6 +110,7 @@ func NewBackupController(
 	formatFlag logging.Format,
 	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
+	volumesnapshotClassLister snapshotv1listers.VolumeSnapshotClassLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 ) Interface {
 	c := &backupController{
@@ -128,6 +133,7 @@ func NewBackupController(
 		formatFlag:                  formatFlag,
 		volumeSnapshotLister:        volumeSnapshotLister,
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
+		volumeSnapshotClassLister:   volumesnapshotClassLister,
 		backupStoreGetter:           backupStoreGetter,
 	}
 
@@ -604,9 +610,9 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// This way, we only make the Lister call if the feature flag's on.
 	var volumeSnapshots []*snapshotv1api.VolumeSnapshot
 	var volumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent
+	var volumeSnapshotClasses []*snapshotv1api.VolumeSnapshotClass
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
-
 		// Listers are wrapped in a nil check out of caution, since they may not be populated based on the
 		// EnableCSI feature flag. This is more to guard against programmer error, as they shouldn't be nil
 		// when EnableCSI is on.
@@ -620,6 +626,23 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		if c.volumeSnapshotContentLister != nil {
 			volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
 			if err != nil {
+				backupLog.Error(err)
+			}
+		}
+		vsClassSet := sets.NewString()
+		for _, vsc := range volumeSnapshotContents {
+			// persist the volumesnapshotclasses referenced by vsc
+			if c.volumeSnapshotClassLister != nil &&
+				vsc.Spec.VolumeSnapshotClassName != nil &&
+				!vsClassSet.Has(*vsc.Spec.VolumeSnapshotClassName) {
+				if vsClass, err := c.volumeSnapshotClassLister.Get(*vsc.Spec.VolumeSnapshotClassName); err != nil {
+					backupLog.Error(err)
+				} else {
+					vsClassSet.Insert(*vsc.Spec.VolumeSnapshotClassName)
+					volumeSnapshotClasses = append(volumeSnapshotClasses, vsClass)
+				}
+			}
+			if err := csi.ResetVolumeSnapshotContent(vsc); err != nil {
 				backupLog.Error(err)
 			}
 		}
@@ -666,7 +689,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)), volumeSnapshots, volumeSnapshotContents); len(errs) > 0 {
+	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)), volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
 
@@ -706,6 +729,7 @@ func persistBackup(backup *pkgbackup.Request,
 	log logrus.FieldLogger,
 	csiVolumeSnapshots []*snapshotv1api.VolumeSnapshot,
 	csiVolumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent,
+	csiVolumesnapshotClasses []*snapshotv1api.VolumeSnapshotClass,
 ) []error {
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
@@ -734,6 +758,10 @@ func persistBackup(backup *pkgbackup.Request,
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
+	csiSnapshotClassesJSON, errs := encodeToJSONGzip(csiVolumesnapshotClasses, "csi volume snapshot classes list")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
 
 	backupResourceList, errs := encodeToJSONGzip(backup.BackupResourceList(), "backup resources list")
 	if errs != nil {
@@ -748,6 +776,7 @@ func persistBackup(backup *pkgbackup.Request,
 		backupResourceList = nil
 		csiSnapshotJSON = nil
 		csiSnapshotContentsJSON = nil
+		csiSnapshotClassesJSON = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
@@ -760,6 +789,7 @@ func persistBackup(backup *pkgbackup.Request,
 		BackupResourceList:        backupResourceList,
 		CSIVolumeSnapshots:        csiSnapshotJSON,
 		CSIVolumeSnapshotContents: csiSnapshotContentsJSON,
+		CSIVolumeSnapshotClasses:  csiSnapshotClassesJSON,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		persistErrs = append(persistErrs, err)

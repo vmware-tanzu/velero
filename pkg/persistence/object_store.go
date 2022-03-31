@@ -47,7 +47,8 @@ type BackupInfo struct {
 	ItemSnapshots,
 	BackupResourceList,
 	CSIVolumeSnapshots,
-	CSIVolumeSnapshotContents io.Reader
+	CSIVolumeSnapshotContents,
+	CSIVolumeSnapshotClasses io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -65,6 +66,7 @@ type BackupStore interface {
 	GetBackupContents(name string) (io.ReadCloser, error)
 	GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error)
 	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
+	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -252,6 +254,7 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		s.layout.getBackupResourceListKey(info.Name):        info.BackupResourceList,
 		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
 		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
+		s.layout.getCSIVolumeSnapshotClassesKey(info.Name):  info.CSIVolumeSnapshotClasses,
 	}
 
 	for key, reader := range backupObjs {
@@ -369,6 +372,25 @@ func decode(jsongzReader io.Reader, into interface{}) error {
 	}
 
 	return nil
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error) {
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotClassesKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// this indicates that the no CSI volumesnapshots were prensent in the backup
+		return nil, nil
+	}
+	defer res.Close()
+
+	var csiVSClasses []*snapshotv1api.VolumeSnapshotClass
+	if err := decode(res, &csiVSClasses); err != nil {
+		return nil, err
+	}
+	return csiVSClasses, nil
+
 }
 
 func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error) {
