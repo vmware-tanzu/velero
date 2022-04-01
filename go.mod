@@ -123,4 +123,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 )
 
-replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+replace (
+	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+	golang.org/x/net => golang.org/x/net v0.0.0-20211209124913-491a49abca63 // CVE-2021-44716
+)
