@@ -24,7 +24,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
-	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,8 +69,8 @@ type backupDeletionController struct {
 	podvolumeBackupLister     velerov1listers.PodVolumeBackupLister
 	kbClient                  client.Client
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
-	csiSnapshotLister         snapshotv1beta1listers.VolumeSnapshotLister
-	csiSnapshotContentLister  snapshotv1beta1listers.VolumeSnapshotContentLister
+	csiSnapshotLister         snapshotv1listers.VolumeSnapshotLister
+	csiSnapshotContentLister  snapshotv1listers.VolumeSnapshotContentLister
 	csiSnapshotClient         *snapshotterClientSet.Clientset
 	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
@@ -93,8 +93,8 @@ func NewBackupDeletionController(
 	podvolumeBackupLister velerov1listers.PodVolumeBackupLister,
 	kbClient client.Client,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
-	csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
-	csiSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
+	csiSnapshotLister snapshotv1listers.VolumeSnapshotLister,
+	csiSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	csiSnapshotClient *snapshotterClientSet.Clientset,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,

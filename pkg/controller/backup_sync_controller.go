@@ -294,7 +294,7 @@ func (c *backupSyncController) run() {
 				for _, snapCont := range snapConts {
 					// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
 					snapCont.ResourceVersion = ""
-					created, err := c.csiSnapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Create(context.TODO(), snapCont, metav1.CreateOptions{})
+					created, err := c.csiSnapshotClient.SnapshotV1().VolumeSnapshotContents().Create(context.TODO(), snapCont, metav1.CreateOptions{})
 					switch {
 					case err != nil && kuberrs.IsAlreadyExists(err):
 						log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)

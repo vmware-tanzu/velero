@@ -45,10 +45,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
-	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
-	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
-	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/backup"
@@ -230,7 +230,7 @@ type server struct {
 	dynamicClient                       dynamic.Interface
 	sharedInformerFactory               informers.SharedInformerFactory
 	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
-	csiSnapshotClient                   *snapshotv1beta1client.Clientset
+	csiSnapshotClient                   *snapshotv1client.Clientset
 	ctx                                 context.Context
 	cancelFunc                          context.CancelFunc
 	logger                              logrus.FieldLogger
@@ -290,9 +290,9 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	var csiSnapClient *snapshotv1beta1client.Clientset
+	var csiSnapClient *snapshotv1client.Clientset
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		csiSnapClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
+		csiSnapClient, err = snapshotv1client.NewForConfig(clientConfig)
 		if err != nil {
 			cancelFunc()
 			return nil, err
@@ -535,27 +535,27 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) getCSISnapshotListers() (snapshotv1beta1listers.VolumeSnapshotLister, snapshotv1beta1listers.VolumeSnapshotContentLister) {
+func (s *server) getCSISnapshotListers() (snapshotv1listers.VolumeSnapshotLister, snapshotv1listers.VolumeSnapshotContentLister) {
 	// Make empty listers that will only be populated if CSI is properly enabled.
-	var vsLister snapshotv1beta1listers.VolumeSnapshotLister
-	var vscLister snapshotv1beta1listers.VolumeSnapshotContentLister
+	var vsLister snapshotv1listers.VolumeSnapshotLister
+	var vscLister snapshotv1listers.VolumeSnapshotContentLister
 	var err error
 
 	// If CSI is enabled, check for the CSI groups and generate the listers
 	// If CSI isn't enabled, return empty listers.
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
+		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
 		switch {
 		case apierrors.IsNotFound(err):
 			// CSI is enabled, but the required CRDs aren't installed, so halt.
-			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
+			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
 		case err == nil:
 			// CSI is enabled, and the resources were found.
 			// Instantiate the listers fully
 			s.logger.Debug("Creating CSI listers")
 			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
-			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshots().Lister()
+			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotContents().Lister()
 		case err != nil:
 			cmd.CheckError(err)
 		}
@@ -929,16 +929,16 @@ func (s *server) runProfiler() {
 
 // CSIInformerFactoryWrapper is a proxy around the CSI SharedInformerFactory that checks the CSI feature flag before performing operations.
 type CSIInformerFactoryWrapper struct {
-	factory snapshotv1beta1informers.SharedInformerFactory
+	factory snapshotv1informers.SharedInformerFactory
 }
 
-func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInformerFactoryWrapper {
+func NewCSIInformerFactoryWrapper(c snapshotv1client.Interface) *CSIInformerFactoryWrapper {
 	// If no namespace is specified, all namespaces are watched.
 	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
 	w := &CSIInformerFactoryWrapper{}
 
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		w.factory = snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(c, 0)
+		w.factory = snapshotv1informers.NewSharedInformerFactoryWithOptions(c, 0)
 	}
 	return w
 }
