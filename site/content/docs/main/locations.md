@@ -26,8 +26,10 @@ This configuration design enables a number of different use cases, including:
   All [plugins maintained by the Velero team][5] support this feature.
   If you are using a plugin from another provider, please check their documentation to determine if this feature is supported.
 
-- Velero only supports a single set of credentials for `VolumeSnapshotLocations`.
-  Velero will always use the credentials provided at install time (stored in the `cloud-credentials` secret) for volume snapshots.
+- Velero supports multiple credentials for `VolumeSnapshotLocations`, allowing you to specify the credentials to use with any `VolumeSnapshotLocation`.
+  However, use of this feature requires support within the plugin for the object storage provider you wish to use.
+  All [plugins maintained by the Velero team][5] support this feature.
+  If you are using a plugin from another provider, please check their documentation to determine if this feature is supported.
 
 - Volume snapshots are still limited by where your provider allows you to create snapshots. For example, AWS and Azure do not allow you to create a volume snapshot in a different region than where the volume is. If you try to take a Velero backup using a volume snapshot location with a different region than where your cluster's volumes are, the backup will fail.
 
