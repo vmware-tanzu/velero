@@ -20,38 +20,45 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 const (
-	kibishiiNamespace = "kibishii-workload"
-	jumpPadPod        = "jump-pad"
+	jumpPadPod = "jump-pad"
 )
 
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(client TestClient, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
-	useVolumeSnapshots bool, registryCredentialFile string, kibishiiDirectory string) error {
+func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
+	useVolumeSnapshots bool) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+	veleroCLI := VeleroCfg.VeleroCLI
+	providerName := VeleroCfg.CloudProvider
+	veleroNamespace := VeleroCfg.VeleroNamespace
+	registryCredentialFile := VeleroCfg.RegistryCredentialFile
+	veleroFeatures := VeleroCfg.Features
+	kibishiiDirectory := VeleroCfg.KibishiiDirectory
+
 	if err := CreateNamespace(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
-	defer func() {
-		if err := DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
-			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
-		}
-	}()
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, kibishiiNamespace, registryCredentialFile, kibishiiDirectory); err != nil {
+
+	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName,
+		kibishiiNamespace, registryCredentialFile, veleroFeatures,
+		kibishiiDirectory, useVolumeSnapshots); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots, ""); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName,
+		kibishiiNamespace, backupLocation, useVolumeSnapshots, ""); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
@@ -90,11 +97,19 @@ func RunKibishiiTests(client TestClient, providerName, veleroCLI, veleroNamespac
 	return nil
 }
 
-func installKibishii(ctx context.Context, namespace string, cloudPlatform string, kibishiiDirectory string) error {
+func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
+	kibishiiDirectory string, useVolumeSnapshots bool) error {
+	if strings.EqualFold(cloudPlatform, "azure") &&
+		strings.EqualFold(veleroFeatures, "EnableCSI") &&
+		useVolumeSnapshots {
+		cloudPlatform = "azure-csi"
+	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
 		kibishiiDirectory+cloudPlatform)
+
 	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
+	fmt.Printf("Install Kibishii cmd: %s\n", kibishiiInstallCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
@@ -149,7 +164,9 @@ func waitForKibishiiPods(ctx context.Context, client TestClient, kibishiiNamespa
 	return WaitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
 }
 
-func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient, providerName, kibishiiNamespace, registryCredentialFile, kibishiiDirectory string) error {
+func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient,
+	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
+	kibishiiDirectory string, useVolumeSnapshots bool) error {
 	serviceAccountName := "default"
 
 	// wait until the service account is created before patch the image pull secret
@@ -161,7 +178,8 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
 
-	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, kibishiiDirectory); err != nil {
+	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, veleroFeatures,
+		kibishiiDirectory, useVolumeSnapshots); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
 	}
 

@@ -136,3 +136,8 @@ func AddLabelToPod(ctx context.Context, podName, namespace, label string) error 
 	fmt.Println(args)
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }
+
+func KubectlApplyByFile(ctx context.Context, file string) error {
+	args := []string{"apply", "-f", file, "--force=true"}
+	return exec.CommandContext(ctx, "kubectl", args...).Run()
+}

@@ -1,0 +1,8 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: velero
+  labels:
+    velero.io/csi-volumesnapshot-class: "true"
+driver: disk.csi.azure.com
+deletionPolicy: Delete

@@ -79,7 +79,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
-				Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
 			}
 		})
 		AfterEach(func() {
@@ -107,7 +107,7 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
 				if countIt == 0 {
-					Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+					Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
 				}
 				countIt++
 			}

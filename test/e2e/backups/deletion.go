@@ -61,7 +61,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if VeleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &VeleroCfg, "", useVolumeSnapshots)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, useVolumeSnapshots)).To(Succeed())
 		}
 	})
 
@@ -75,16 +75,23 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	When("kibishii is the sample workload", func() {
 		It("Deleted backups are deleted from object storage and backups deleted from object storage can be deleted locally", func() {
 			backupName = "backup-" + UUIDgen.String()
-			Expect(runBackupDeletionTests(client, VeleroCfg.VeleroCLI, VeleroCfg.CloudProvider, VeleroCfg.VeleroNamespace, backupName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, VeleroCfg.KibishiiDirectory)).To(Succeed(),
+			Expect(runBackupDeletionTests(client, VeleroCfg, backupName, "", useVolumeSnapshots, VeleroCfg.KibishiiDirectory)).To(Succeed(),
 				"Failed to run backup deletion test")
 		})
 	})
 }
 
 // runUpgradeTests runs upgrade test on the provider by kibishii.
-func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNamespace, backupName, backupLocation string,
-	useVolumeSnapshots bool, registryCredentialFile, bslPrefix, bslConfig, kibishiiDirectory string) error {
+func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupName, backupLocation string,
+	useVolumeSnapshots bool, kibishiiDirectory string) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+	veleroCLI := VeleroCfg.VeleroCLI
+	providerName := VeleroCfg.CloudProvider
+	veleroNamespace := VeleroCfg.VeleroNamespace
+	registryCredentialFile := VeleroCfg.RegistryCredentialFile
+	bslPrefix := VeleroCfg.BSLPrefix
+	bslConfig := VeleroCfg.BSLConfig
+	veleroFeatures := VeleroCfg.Features
 
 	if err := CreateNamespace(oneHourTimeout, client, deletionTest); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", deletionTest)
@@ -95,7 +102,8 @@ func runBackupDeletionTests(client TestClient, veleroCLI, providerName, veleroNa
 		}
 	}()
 
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest, registryCredentialFile, kibishiiDirectory); err != nil {
+	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest,
+		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
 	err := ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)

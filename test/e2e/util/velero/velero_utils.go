@@ -48,44 +48,50 @@ const PluginsObjectsPrefix = "plugins"
 
 var pluginsMatrix = map[string]map[string][]string{
 	"v1.4": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.1.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.1.2"},
-		"vsphere": {"velero/velero-plugin-for-aws:v1.1.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.0.2"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.1.0"},
+		"aws":       {"velero/velero-plugin-for-aws:v1.1.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.1.2"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.1.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.0.2"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.1.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.1.2", "velero/velero-plugin-for-csi:v0.1.1 "},
 	},
 	"v1.5": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.1.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.1.2"},
-		"vsphere": {"velero/velero-plugin-for-aws:v1.1.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.1.0"},
+		"aws":       {"velero/velero-plugin-for-aws:v1.1.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.1.2"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.1.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.1.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.1.2", "velero/velero-plugin-for-csi:v0.1.2 "},
 	},
 	"v1.6": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.2.1"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.2.1"},
-		"vsphere": {"velero/velero-plugin-for-aws:v1.2.1", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.2.1"},
+		"aws":       {"velero/velero-plugin-for-aws:v1.2.1"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.2.1"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.2.1", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.1.1"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.2.1"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.3.0", "velero/velero-plugin-for-csi:v0.1.2 "},
 	},
 	"v1.7": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.3.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.3.0"},
-		"vsphere": {"velero/velero-plugin-for-aws:v1.3.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.0"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.3.0"},
+		"aws":       {"velero/velero-plugin-for-aws:v1.3.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.3.0"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.3.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.0"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.3.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.3.0", "velero/velero-plugin-for-csi:v0.2.0"},
 	},
 	"v1.8": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.4.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.4.0"},
-		"vsphere": {"velero/velero-plugin-for-aws:v1.4.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.4.0"},
+		"aws":       {"velero/velero-plugin-for-aws:v1.4.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.4.0"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.4.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.1"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.4.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.4.0", "velero/velero-plugin-for-csi:v0.2.0"},
 	},
 	"main": {
-		"aws":     {"velero/velero-plugin-for-aws:main"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:main"},
-		"vsphere": {"velero/velero-plugin-for-aws:main", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:main"},
+		"aws":       {"velero/velero-plugin-for-aws:main"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
+		"vsphere":   {"velero/velero-plugin-for-aws:main", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.1"},
+		"gcp":       {"velero/velero-plugin-for-gcp:main"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:main", "velero/velero-plugin-for-csi:main"},
 	},
 }
 
-func getProviderPluginsByVersion(version, providerName string) ([]string, error) {
+func GetProviderPluginsByVersion(version, providerName, feature string) ([]string, error) {
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
@@ -96,6 +102,9 @@ func getProviderPluginsByVersion(version, providerName string) ([]string, error)
 		if len(cloudMap) == 0 {
 			return nil, errors.Errorf("fail to get plugins by version: main")
 		}
+	}
+	if strings.EqualFold(providerName, "azure") && strings.EqualFold(feature, "EnableCSI") {
+		providerName = "azure-csi"
 	}
 	plugins, ok := cloudMap[providerName]
 	if !ok {
@@ -380,7 +389,7 @@ func VeleroCreateBackupLocation(ctx context.Context,
 	return VeleroCmdExec(ctx, veleroCLI, args)
 }
 
-func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, providerPlugins string) ([]string, error) {
+func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, providerPlugins, feature string) ([]string, error) {
 	// Fetch the plugins for the provider before checking for the object store provider below.
 	var plugins []string
 	if len(providerPlugins) > 0 {
@@ -390,7 +399,7 @@ func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, pro
 		if err != nil {
 			return nil, errors.WithMessage(err, "failed to get velero version")
 		}
-		plugins, err = getProviderPluginsByVersion(version, objectStoreProvider)
+		plugins, err = GetProviderPluginsByVersion(version, objectStoreProvider, feature)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
 		}
@@ -400,8 +409,8 @@ func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, pro
 
 // VeleroAddPluginsForProvider determines which plugins need to be installed for a provider and
 // installs them in the current Velero installation, skipping over those that are already installed.
-func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins string) error {
-	plugins, err := getProviderPlugins(ctx, veleroCLI, provider, addPlugins)
+func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins, feature string) error {
+	plugins, err := getProviderPlugins(ctx, veleroCLI, provider, addPlugins, feature)
 	fmt.Printf("addPlugins cmd =%v\n", addPlugins)
 	fmt.Printf("provider cmd = %v\n", provider)
 	fmt.Printf("plugins cmd = %v\n", plugins)

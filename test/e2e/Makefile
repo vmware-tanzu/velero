@@ -72,7 +72,8 @@ CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
-KIBISHII_DIRECTORY ?=
+KIBISHII_DIRECTORY ?= github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/
+
 
 # Flags to create an additional BSL for multiple credentials tests
 ADDITIONAL_BSL_PLUGINS ?=
@@ -81,6 +82,8 @@ ADDITIONAL_CREDS_FILE ?=
 ADDITIONAL_BSL_BUCKET ?=
 ADDITIONAL_BSL_PREFIX ?=
 ADDITIONAL_BSL_CONFIG ?=
+
+FEATURES ?=
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -115,6 +118,7 @@ run: ginkgo
 		-additional-bsl-bucket=$(ADDITIONAL_BSL_BUCKET) \
 		-additional-bsl-prefix=$(ADDITIONAL_BSL_PREFIX) \
 		-additional-bsl-config=$(ADDITIONAL_BSL_CONFIG) \
+		-features=$(FEATURES) \
 		-install-velero=$(INSTALL_VELERO) \
 		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
 		-kibishii-directory=$(KIBISHII_DIRECTORY)

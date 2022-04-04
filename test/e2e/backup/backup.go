@@ -42,7 +42,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 	var (
 		backupName, restoreName string
 	)
-
+	kibishiiNamespace := "kibishii-workload"
 	client, err := NewTestClient()
 	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
@@ -55,11 +55,14 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if VeleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &VeleroCfg, "", useVolumeSnapshots)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, useVolumeSnapshots)).To(Succeed())
 		}
 	})
 
 	AfterEach(func() {
+		DeleteNamespace(context.Background(), client, kibishiiNamespace, true)
+		Expect(err).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q", kibishiiNamespace))
+
 		if VeleroCfg.InstallVelero {
 			err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 			Expect(err).To(Succeed())
@@ -72,7 +75,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			restoreName = "restore-" + UUIDgen.String()
 			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
-			Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, "", useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.KibishiiDirectory)).To(Succeed(),
+			Expect(RunKibishiiTests(client, VeleroCfg, backupName, restoreName, "", kibishiiNamespace, useVolumeSnapshots)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
@@ -89,7 +92,9 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
 
-			Expect(VeleroAddPluginsForProvider(context.TODO(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, VeleroCfg.AdditionalBSLProvider, VeleroCfg.AddBSLPlugins)).To(Succeed())
+			Expect(VeleroAddPluginsForProvider(context.TODO(), VeleroCfg.VeleroCLI,
+				VeleroCfg.VeleroNamespace, VeleroCfg.AdditionalBSLProvider,
+				VeleroCfg.AddBSLPlugins, VeleroCfg.Features)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", UUIDgen)
@@ -125,7 +130,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 					backupName = fmt.Sprintf("%s-%s", backupName, UUIDgen)
 					restoreName = fmt.Sprintf("%s-%s", restoreName, UUIDgen)
 				}
-				Expect(RunKibishiiTests(client, VeleroCfg.CloudProvider, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backupName, restoreName, bsl, useVolumeSnapshots, VeleroCfg.RegistryCredentialFile, VeleroCfg.KibishiiDirectory)).To(Succeed(),
+				Expect(RunKibishiiTests(client, VeleroCfg, backupName, restoreName, bsl, kibishiiNamespace, useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
 			}
 		})
