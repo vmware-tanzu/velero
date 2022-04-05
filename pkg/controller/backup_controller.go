@@ -164,11 +164,7 @@ func NewBackupController(
 				backup := obj.(*velerov1api.Backup)
 
 				switch backup.Status.Phase {
-<<<<<<< HEAD
 				case "", velerov1api.BackupPhaseNew, velerov1api.BackupPhaseInProgress:
-=======
-				case "", velerov1api.BackupPhaseNew:
-					// only process new backups
 				case velerov1api.BackupPhaseUploading, velerov1api.BackupPhaseUploadingPartialFailure:
 					if features.IsEnabled(velerov1api.UploadProgressFeatureFlag) {
 						c.logger.WithFields(logrus.Fields{
@@ -184,12 +180,11 @@ func NewBackupController(
 							"phase":  backup.Status.Phase,
 						}).Debug("Backup is not new, skipping")
 					}
->>>>>>> ca95d5ee... Adding basic item snapshotter support
 				default:
 					c.logger.WithFields(logrus.Fields{
 						"backup": kubeutil.NamespaceAndName(backup),
 						"phase":  backup.Status.Phase,
-					}).Debug("Backup is not new or in-progress, skipping")
+					}).Debug("Backup is not new, uploading or in-progress, skipping")
 					return
 				}
 
@@ -360,16 +355,7 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.FailureReason = err.Error()
 	}
 
-	switch request.Status.Phase {
-	case velerov1api.BackupPhaseCompleted:
-		c.metrics.RegisterBackupSuccess(backupScheduleName)
-	case velerov1api.BackupPhasePartiallyFailed:
-		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
-	case velerov1api.BackupPhaseFailed:
-		c.metrics.RegisterBackupFailed(backupScheduleName)
-	case velerov1api.BackupPhaseFailedValidation:
-		c.metrics.RegisterBackupValidationFailure(backupScheduleName)
-	}
+	c.updateMetrics(request.Status.Phase, backupScheduleName)
 
 	log.Debug("Updating backup's final status")
 	if _, err := patchBackup(original, request.Backup, c.client); err != nil {
@@ -384,6 +370,19 @@ func (c *backupController) processBackup(key string) error {
 	}
 
 	return nil
+}
+
+func (c *backupController) updateMetrics(phase velerov1api.BackupPhase, backupScheduleName string) {
+	switch phase {
+	case velerov1api.BackupPhaseCompleted:
+		c.metrics.RegisterBackupSuccess(backupScheduleName)
+	case velerov1api.BackupPhasePartiallyFailed:
+		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
+	case velerov1api.BackupPhaseFailed:
+		c.metrics.RegisterBackupFailed(backupScheduleName)
+	case velerov1api.BackupPhaseFailedValidation:
+		c.metrics.RegisterBackupValidationFailure(backupScheduleName)
+	}
 }
 
 // Execute periodically to check upload progress for backups that are in Uploading or UploadingPartialFailure phase
@@ -429,20 +428,10 @@ func (c *backupController) completeBackupWithUploadedSnapshots(curBackup *pkgbac
 		updateBackupStatusForSnapshotState(curBackup, log)
 	}
 
+	c.updateMetrics(curBackup.Status.Phase, backupScheduleName)
 	log.Debug("Updating backup's final status")
 	if _, err := patchBackup(&original, curBackup.Backup, c.client); err != nil {
 		log.WithError(err).Error("error updating backup's final status after upload completion")
-	}
-
-	switch curBackup.Status.Phase {
-	case velerov1api.BackupPhaseCompleted:
-		c.metrics.RegisterBackupSuccess(backupScheduleName)
-	case velerov1api.BackupPhasePartiallyFailed:
-		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
-	case velerov1api.BackupPhaseFailed:
-		c.metrics.RegisterBackupFailed(backupScheduleName)
-	case velerov1api.BackupPhaseFailedValidation:
-		c.metrics.RegisterBackupValidationFailure(backupScheduleName)
 	}
 
 	curBackup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
