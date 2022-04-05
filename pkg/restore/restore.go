@@ -95,7 +95,7 @@ type Restorer interface {
 	RestoreWithResolvers(
 		req Request,
 		restoreItemActionResolver framework.RestoreItemActionResolver,
-		itemSnapshotterResolver framework.ItemSnapshotterResolver,
+		itemSnapshotters []isv1.ItemSnapshotter,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
@@ -166,14 +166,14 @@ func (kr *kubernetesRestorer) Restore(
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	resolver := framework.NewRestoreItemActionResolver(actions)
-	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
-	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, snapshotLocationLister, volumeSnapshotterGetter)
+	itemSnapshotters := []isv1.ItemSnapshotter{}
+	return kr.RestoreWithResolvers(req, resolver, itemSnapshotters, snapshotLocationLister, volumeSnapshotterGetter)
 }
 
 func (kr *kubernetesRestorer) RestoreWithResolvers(
 	req Request,
 	restoreItemActionResolver framework.RestoreItemActionResolver,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	itemSnapshotters []isv1.ItemSnapshotter,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
@@ -215,11 +215,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
 	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper)
-	if err != nil {
-		return Result{}, Result{Velero: []string{err.Error()}}
-	}
-
-	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -284,7 +279,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
 		restoreItemActions:         resolvedActions,
-		itemSnapshotterActions:     resolvedItemSnapshotterActions,
+		itemSnapshotters:           itemSnapshotters,
 		volumeSnapshotterGetter:    volumeSnapshotterGetter,
 		resticRestorer:             resticRestorer,
 		resticErrs:                 make(chan error),
@@ -327,7 +322,7 @@ type restoreContext struct {
 	fileSystem                 filesystem.Interface
 	namespaceClient            corev1.NamespaceInterface
 	restoreItemActions         []framework.RestoreItemResolvedAction
-	itemSnapshotterActions     []framework.ItemSnapshotterResolvedAction
+	itemSnapshotters           []isv1.ItemSnapshotter
 	volumeSnapshotterGetter    VolumeSnapshotterGetter
 	resticRestorer             restic.Restorer
 	resticWaitGroup            sync.WaitGroup
@@ -1000,7 +995,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 	if itemSnapshot != nil {
-		itemSnapshotter := clientmgmt.ItemSnapshotterForSnapshotFromResolved(itemSnapshot, ctx.itemSnapshotterActions)
+		itemSnapshotter := clientmgmt.ItemSnapshotterForSnapshot(itemSnapshot, ctx.itemSnapshotters)
 		if itemSnapshotter != nil {
 			cii := isv1.CreateItemInput{
 				SnapshottedItem:  obj,

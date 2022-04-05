@@ -20,18 +20,20 @@ import (
 	"bytes"
 	"fmt"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+
 	"io/ioutil"
 	"testing"
 	"time"
 
 	"context"
-	"io/ioutil"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"strings"
-	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -123,7 +125,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.True(t, strings.HasPrefix(err.Error(), "error getting the backup store"))
 	})
-
+}
 func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	t.Run("missing spec.backupName", func(t *testing.T) {
 		dbr := defaultTestDbr()
@@ -148,9 +150,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		// add the backup to the tracker so the execution of reconcile doesn't progress
 		// past checking for an in-progress backup. this makes validation easier.
 
-		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName, &pkgbackup.Request{})
-
-		require.NoError(t, td.sharedInformers.Velero().V1().DeleteBackupRequests().Informer().GetStore().Add(td.req))
+		td.controller.backupTracker.Add(td.req.Namespace, input.Spec.BackupName, &pkgbackup.Request{})
 
 		existing := &velerov1api.DeleteBackupRequest{
 			ObjectMeta: metav1.ObjectMeta{
@@ -201,9 +201,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		dbr := defaultTestDbr()
 		td := setupBackupDeletionControllerTest(t, dbr)
 
-		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName, &pkgbackup.Request{})
-
-		td.controller.backupTracker.Add(td.req.Namespace, dbr.Spec.BackupName)
+		td.controller.backupTracker.Add(td.req.Namespace, dbr.Spec.BackupName, &pkgbackup.Request{})
 		_, err := td.controller.Reconcile(context.TODO(), td.req)
 		require.NoError(t, err)
 

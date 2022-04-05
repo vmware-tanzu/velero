@@ -475,7 +475,6 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 			return errors.Wrap(err, "error getting item snapshotters")
 		}
 	}
-	itemSnapshotterResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, restoreLog)
 	if err != nil {
@@ -518,7 +517,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
-	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, restoreItemActionResolver, itemSnapshotterResolver,
+	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, restoreItemActionResolver, itemSnapshotters,
 		c.snapshotLocationLister, pluginManager)
 
 	// log errors and warnings to the restore log

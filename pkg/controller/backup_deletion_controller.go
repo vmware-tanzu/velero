@@ -238,6 +238,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 	r.metrics.RegisterBackupDeletionAttempt(backupScheduleName)
 
+	var errs []string
+
 	pluginManager := r.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
@@ -275,9 +277,9 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err != nil {
 			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
 		} else {
-			defer closeAndRemoveFile(backupFile, c.logger)
+			defer closeAndRemoveFile(backupFile, r.logger)
 
-			deleteItemResolvedActions, err = deleteItemActionResolver.ResolveActions(c.helper)
+			deleteItemResolvedActions, err = deleteItemActionResolver.ResolveActions(r.discoveryHelper)
 			if err != nil {
 				return ctrl.Result{}, errors.Wrap(err, "error resolving delete item deleteItemActions")
 			}
@@ -285,9 +287,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			ctx := &delete.Context{
 				Backup:                    backup,
 				BackupReader:              backupFile,
-				Actions:                   actions,
-				Log:                       c.logger,
-				DiscoveryHelper:           c.helper,
+				Log:                       r.logger,
+				DiscoveryHelper:           r.discoveryHelper,
 				Filesystem:                filesystem.NewFileSystem(),
 				DeleteItemResolvedActions: deleteItemResolvedActions,
 				ItemSnapshots:             itemSnapshots,
@@ -301,8 +302,6 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 		}
 	}
-
-	var errs []string
 
 	if backupStore != nil {
 		log.Info("Removing PV snapshots")

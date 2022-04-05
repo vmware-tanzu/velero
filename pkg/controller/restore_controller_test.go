@@ -895,11 +895,11 @@ func (r *fakeRestorer) Restore(
 
 func (r *fakeRestorer) RestoreWithResolvers(req pkgrestore.Request,
 	resolver framework.RestoreItemActionResolver,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	itemSnapshotters []isv1.ItemSnapshotter,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (pkgrestore.Result, pkgrestore.Result) {
-	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver, itemSnapshotterResolver,
+	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver, itemSnapshotters,
 		snapshotLocationLister, volumeSnapshotterGetter)
 
 	r.calledWithArg = *req.Restore
