@@ -5,27 +5,41 @@ toc:
         url: /index.html
       - page: How Velero works
         url: /how-velero-works
-      - page: About locations
+      - page: Backup storage locations and volume snapstot locations
         url: /locations
   - title: Install
     subfolderitems:
+      - page: Quickstart install with Minio
+        url: /contributions/minio
       - page: Basic Install
         url: /basic-install
       - page: Customize Installation
         url: /customize-installation
-      - page: Upgrade to 1.8
-        url: /upgrade-to-1.8
       - page: Supported providers
         url: /supported-providers
-      - page: Evaluation install
-        url: /contributions/minio
+      - page: Backup and restore examples
+        url: /examples
       - page: Restic integration
         url: /restic
-      - page: Examples
-        url: /examples
+      - page: Upgrade to 1.8
+        url: /upgrade-to-1.8
       - page: Uninstalling
         url: /uninstalling
-  - title: Use
+  - title: Backup
+    subfolderitems:
+      - page: Backup reference
+        url: /backup-reference
+      - page: Backup hooks
+        url: /backup-hooks
+      - page: Backup file format
+        url: /output-file-format
+  - title: Restore
+    subfolderitems:
+      - page: Restore reference
+        url: /restore-reference
+      - page: Restore hooks
+        url: /restore-hooks
+  - title: Use cases
     subfolderitems:
       - page: Disaster recovery
         url: /disaster-case
@@ -35,22 +49,20 @@ toc:
         url: /enable-api-group-versions-feature
       - page: Resource filtering
         url: /resource-filtering
-      - page: Backup reference
-        url: /backup-reference
-      - page: Backup hooks
-        url: /backup-hooks
-      - page: Restore reference
-        url: /restore-reference
-      - page: Restore hooks
-        url: /restore-hooks
       - page: Run in any namespace
         url: /namespace
+      - page: Verify Self-signed Certificates
+        url: /self-signed-certificates
+      - page: Change RBAC permissions
+        url: /rbac
       - page: CSI Support (beta)
         url: /csi
-      - page: Verifying Self-signed Certificates
-        url: /self-signed-certificates
-      - page: Changing RBAC permissions
-        url: /rbac
+      - page: Use IBM Cloud Object Storage
+        url: /contributions/ibm-config
+      - page: Use Tencent Cloud Object Storage
+        url: /contributions/tencent-config
+      - page: Use Oracle Cloud as a Backup Storage Provider
+        url: /contributions/oracle-config
   - title: Plugins
     subfolderitems:
       - page: Overview
@@ -67,6 +79,18 @@ toc:
         url: /debugging-restores
       - page: Troubleshoot Restic
         url: /restic#troubleshooting
+  - title: API types
+    subfolderitems:
+      - page: Backup
+        url: /api-types/backup
+      - page: Restore
+        url: /api-types/restore
+      - page: Schedule
+        url: /api-types/schedule
+      - page: BackupStorageLocation
+        url: /api-types/backupstoragelocation
+      - page: VolumeSnapshotLocation
+        url: /api-types/volumesnapshotlocation
   - title: Contribute
     subfolderitems:
       - page: Start Contributing
@@ -81,17 +105,11 @@ toc:
         url: /run-locally
       - page: Code standards
         url: /code-standards
-      - page: Website guidelines
-        url: /website-guidelines
-      - page: Documentation style guide
-        url: /style-guide
-  - title: More information
-    subfolderitems:
-      - page: Backup file format
-        url: /output-file-format
-      - page: API types
-        url: /api-types
       - page: Support process
         url: /support-process
       - page: For maintainers
         url: /maintainers
+      - page: Website guidelines
+        url: /website-guidelines
+      - page: Documentation style guide
+        url: /style-guide
