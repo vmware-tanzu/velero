@@ -84,6 +84,7 @@ ADDITIONAL_BSL_PREFIX ?=
 ADDITIONAL_BSL_CONFIG ?=
 
 FEATURES ?=
+DEBUG_E2E_TEST ?= false
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -121,7 +122,8 @@ run: ginkgo
 		-features=$(FEATURES) \
 		-install-velero=$(INSTALL_VELERO) \
 		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
-		-kibishii-directory=$(KIBISHII_DIRECTORY)
+		-kibishii-directory=$(KIBISHII_DIRECTORY) \
+		-debug-e2e-test=$(DEBUG_E2E_TEST)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

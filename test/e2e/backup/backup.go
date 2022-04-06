@@ -60,12 +60,11 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		DeleteNamespace(context.Background(), client, kibishiiNamespace, true)
-		Expect(err).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q", kibishiiNamespace))
-
 		if VeleroCfg.InstallVelero {
-			err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-			Expect(err).To(Succeed())
+			if !VeleroCfg.Debug {
+				err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+				Expect(err).To(Succeed())
+			}
 		}
 	})
 

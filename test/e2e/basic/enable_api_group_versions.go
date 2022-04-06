@@ -76,8 +76,10 @@ func APIGropuVersionsTest() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if VeleroCfg.InstallVelero {
-			err = VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-			Expect(err).NotTo(HaveOccurred())
+			if !VeleroCfg.Debug {
+				err = VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+				Expect(err).NotTo(HaveOccurred())
+			}
 		}
 
 	})
