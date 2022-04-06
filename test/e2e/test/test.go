@@ -84,7 +84,9 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 		})
 		AfterEach(func() {
 			if VeleroCfg.InstallVelero {
-				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+				if !VeleroCfg.Debug {
+					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+				}
 			}
 		})
 		It(test.GetTestMsg().Text, func() {
@@ -115,7 +117,7 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 
 		AfterEach(func() {
 			if VeleroCfg.InstallVelero {
-				if countIt == len(tests) {
+				if countIt == len(tests) && !VeleroCfg.Debug {
 					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
 				}
 			}

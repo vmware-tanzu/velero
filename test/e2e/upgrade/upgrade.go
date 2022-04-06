@@ -94,13 +94,15 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 	})
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
-				DeleteNamespace(context.Background(), client, upgradeNamespace, true)
-			})
-			By("Uninstall Velero", func() {
-				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace)).To(Succeed())
-			})
+			if !VeleroCfg.Debug {
+				By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
+					DeleteNamespace(context.Background(), client, upgradeNamespace, true)
+				})
+				By("Uninstall Velero", func() {
+					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
+						VeleroCfg.VeleroNamespace)).To(Succeed())
+				})
+			}
 		}
 	})
 	When("kibishii is the sample workload", func() {

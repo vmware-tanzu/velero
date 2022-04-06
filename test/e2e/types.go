@@ -50,6 +50,7 @@ type VerleroConfig struct {
 	InstallVelero            bool
 	KibishiiDirectory        string
 	Features                 string
+	Debug                    bool
 }
 
 type SnapshotCheckPoint struct {

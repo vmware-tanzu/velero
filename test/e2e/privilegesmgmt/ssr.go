@@ -51,7 +51,9 @@ func SSRTest() {
 
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+			if !VeleroCfg.Debug {
+				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+			}
 		}
 	})
 

@@ -70,11 +70,13 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			Expect(DeleteNamespace(context.Background(), client, bslDeletionTestNs,
-				true)).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q",
-				bslDeletionTestNs))
-			Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
-				VeleroCfg.VeleroNamespace)).To(Succeed())
+			if !VeleroCfg.Debug {
+				Expect(DeleteNamespace(context.Background(), client, bslDeletionTestNs,
+					true)).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q",
+					bslDeletionTestNs))
+				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
+					VeleroCfg.VeleroNamespace)).To(Succeed())
+			}
 		}
 	})
 
