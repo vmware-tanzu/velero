@@ -740,7 +740,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			tarball: test.NewTarWriter(t).
 				Done(),
 			wantErrs: Result{
-				Velero: []string{"error parsing backup contents: directory \"resources\" does not exist"},
+				Velero: []string{archive.ErrNotExist.Error()},
 			},
 		},
 		{
@@ -761,7 +761,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			},
 			wantErrs: Result{
 				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"resources/pods/namespaces/ns-1/pod-1.json\": invalid character 'i' looking for beginning of value"},
+					"ns-1": {"error decoding"},
 				},
 			},
 		},
@@ -792,9 +792,31 @@ func TestInvalidTarballContents(t *testing.T) {
 			)
 
 			assertEmptyResults(t, warnings)
-			assert.Equal(t, tc.wantErrs, errs)
+			assertWantErrs(t, tc.wantErrs, errs)
 			assertAPIContents(t, h, tc.want)
 		})
+	}
+}
+
+func assertWantErrs(t *testing.T, wantErrRes Result, errRes Result) {
+	t.Helper()
+	if wantErrRes.Velero != nil {
+		assert.Equal(t, len(wantErrRes.Velero), len(errRes.Velero))
+		for i := range errRes.Velero {
+			assert.Contains(t, errRes.Velero[i], wantErrRes.Velero[i])
+		}
+	}
+	if wantErrRes.Namespaces != nil {
+		assert.Equal(t, len(wantErrRes.Namespaces), len(errRes.Namespaces))
+		for ns := range errRes.Namespaces {
+			assert.Equal(t, len(wantErrRes.Namespaces[ns]), len(errRes.Namespaces[ns]))
+			for i := range errRes.Namespaces[ns] {
+				assert.Contains(t, errRes.Namespaces[ns][i], wantErrRes.Namespaces[ns][i])
+			}
+		}
+	}
+	if wantErrRes.Cluster != nil {
+		assert.Equal(t, wantErrRes.Cluster, errRes.Cluster)
 	}
 }
 
