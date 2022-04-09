@@ -311,20 +311,15 @@ type BackupStatus struct {
 	// +nullable
 	Progress *BackupProgress `json:"progress,omitempty"`
 
-	// CsiVolumeSnapshotsAttempted is the total number of attempted
+	// CSIVolumeSnapshotsAttempted is the total number of attempted
 	// CSI VolumeSnapshots for this backup.
 	// +optional
-	CsiVolumeSnapshotsAttempted int `json:"csiVolumeSnapshotsAttempted,omitempty"`
+	CSIVolumeSnapshotsAttempted int `json:"csiVolumeSnapshotsAttempted,omitempty"`
 
-	// CsiVolumeSnapshotsCompleted is the total number of successfully
+	// CSIVolumeSnapshotsCompleted is the total number of successfully
 	// completed CSI VolumeSnapshots for this backup.
 	// +optional
-	CsiVolumeSnapshotsCompleted int `json:"csiVolumeSnapshotsCompleted,omitempty"`
-
-	// CsiVolumeSnapshotsStorageTotal is the total storage size of created
-	// snapshots for this backup.
-	// +optional
-	CsiVolumeSnapshotsStorageTotal int64 `json:"csiVolumeSnapshotsStorageTotal,omitempty"`
+	CSIVolumeSnapshotsCompleted int `json:"csiVolumeSnapshotsCompleted,omitempty"`
 }
 
 // BackupProgress stores information about the progress of a Backup's execution.

@@ -28,7 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,7 +39,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -407,25 +405,6 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		c.metrics.RegisterBackupDeletionSuccess(backupScheduleName)
 	} else {
 		c.metrics.RegisterBackupDeletionFailed(backupScheduleName)
-	}
-
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		vss, err := backupStore.GetCSIVolumeSnapshots(backup.Name)
-		if err != nil {
-			errs = append(errs, err.Error())
-		}
-
-		var restoreSizeTotal resource.Quantity
-		for _, vs := range vss {
-			restoreSizeTotal.Add(*vs.Status.RestoreSize)
-		}
-
-		storageSize, ret := restoreSizeTotal.AsInt64()
-		if !ret {
-			log.WithError(fmt.Errorf("fail to convert CSI snapshot size: %v to int64", backup.Status.CsiVolumeSnapshotsStorageTotal))
-			storageSize = 0
-		}
-		c.metrics.RegisterCsiStorageSizeSub(backupScheduleName, backup.Name, storageSize)
 	}
 
 	// Update status to processed and record errors

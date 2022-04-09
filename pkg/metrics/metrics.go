@@ -57,7 +57,6 @@ const (
 	csiSnapshotAttemptTotal       = "csi_snapshot_attempt_total"
 	csiSnapshotSuccessTotal       = "csi_snapshot_success_total"
 	csiSnapshotFailureTotal       = "csi_snapshot_failure_total"
-	csiSnapshotStorageTotal       = "csi_snapshot_storage_total"
 
 	// Restic metrics
 	podVolumeBackupEnqueueTotal        = "pod_volume_backup_enqueue_count"
@@ -291,14 +290,6 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      csiSnapshotFailureTotal,
 					Help:      "Total number of CSI failed volume snapshots",
-				},
-				[]string{scheduleLabel, backupNameLabel},
-			),
-			csiSnapshotStorageTotal: prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Namespace: metricNamespace,
-					Name:      csiSnapshotStorageTotal,
-					Help:      "Total size of CSI volume snapshots storage size",
 				},
 				[]string{scheduleLabel, backupNameLabel},
 			),
@@ -628,37 +619,23 @@ func (m *ServerMetrics) RegisterVolumeSnapshotFailures(backupSchedule string, vo
 	}
 }
 
-// RegisterCsiSnapshotAttempts records an attempt to snapshot a volume by CSI plugin.
-func (m *ServerMetrics) RegisterCsiSnapshotAttempts(backupSchedule, backupName string, csiSnapshotsAttempted int) {
+// RegisterCSISnapshotAttempts records an attempt to snapshot a volume by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotAttempts(backupSchedule, backupName string, csiSnapshotsAttempted int) {
 	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsAttempted))
 	}
 }
 
-// RegisterCsiSnapshotSuccesses records a completed volume snapshot by CSI plugin.
-func (m *ServerMetrics) RegisterCsiSnapshotSuccesses(backupSchedule, backupName string, csiSnapshotCompleted int) {
+// RegisterCSISnapshotSuccesses records a completed volume snapshot by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotSuccesses(backupSchedule, backupName string, csiSnapshotCompleted int) {
 	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotCompleted))
 	}
 }
 
-// RegisterCsiSnapshotFailures records a failed volume snapshot by CSI plugin.
-func (m *ServerMetrics) RegisterCsiSnapshotFailures(backupSchedule, backupName string, csiSnapshotsFailed int) {
+// RegisterCSISnapshotFailures records a failed volume snapshot by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotFailures(backupSchedule, backupName string, csiSnapshotsFailed int) {
 	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsFailed))
-	}
-}
-
-// RegisterCsiStorageSizeAdd records volume snapshot's storage size increase created by CSI plugin.
-func (m *ServerMetrics) RegisterCsiStorageSizeAdd(backupSchedule, backupName string, csiStorageSize int64) {
-	if g, ok := m.metrics[csiSnapshotStorageTotal].(*prometheus.GaugeVec); ok {
-		g.WithLabelValues(backupSchedule, backupName).Add(float64(csiStorageSize))
-	}
-}
-
-// RegisterCsiStorageSizeSub records volume snapshot's storage size decrease created by CSI plugin.
-func (m *ServerMetrics) RegisterCsiStorageSizeSub(backupSchedule, backupName string, csiStorageSize int64) {
-	if g, ok := m.metrics[csiSnapshotStorageTotal].(*prometheus.GaugeVec); ok {
-		g.WithLabelValues(backupSchedule, backupName).Sub(float64(csiStorageSize))
 	}
 }
