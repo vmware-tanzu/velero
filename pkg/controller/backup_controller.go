@@ -640,7 +640,12 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	for _, vs := range backup.CsiSnapshots {
 		if *vs.Status.ReadyToUse {
 			backup.Status.CsiVolumeSnapshotsCompleted++
-			backup.Status.CsiVolumeSnapshotsStorageTotal.Add(*vs.Status.RestoreSize)
+			storageSize, ret := vs.Status.RestoreSize.AsInt64()
+			if !ret {
+				backupLog.WithError(fmt.Errorf("fail to convert CSI snapshot size: %v to int64", backup.Status.CsiVolumeSnapshotsStorageTotal))
+				storageSize = 0
+			}
+			backup.Status.CsiVolumeSnapshotsStorageTotal += storageSize
 		}
 	}
 
@@ -707,12 +712,7 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 		serverMetrics.RegisterCsiSnapshotAttempts(backupScheduleName, backup.Name, backup.Status.CsiVolumeSnapshotsAttempted)
 		serverMetrics.RegisterCsiSnapshotSuccesses(backupScheduleName, backup.Name, backup.Status.CsiVolumeSnapshotsCompleted)
 		serverMetrics.RegisterCsiSnapshotFailures(backupScheduleName, backup.Name, backup.Status.CsiVolumeSnapshotsAttempted-backup.Status.CsiVolumeSnapshotsCompleted)
-		storageSize, ret := backup.Status.CsiVolumeSnapshotsStorageTotal.AsInt64()
-		if !ret {
-			log.WithError(fmt.Errorf("fail to convert CSI snapshot size: %v to int64", backup.Status.CsiVolumeSnapshotsStorageTotal))
-			storageSize = 0
-		}
-		serverMetrics.RegisterCsiStorageSizeAdd(backupScheduleName, backup.Name, storageSize)
+		serverMetrics.RegisterCsiStorageSizeAdd(backupScheduleName, backup.Name, backup.Status.CsiVolumeSnapshotsStorageTotal)
 	}
 
 	if backup.Status.Progress != nil {

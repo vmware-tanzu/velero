@@ -419,18 +419,6 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
-	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Add(0)
-	}
-	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Add(0)
-	}
-	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Add(0)
-	}
-	if c, ok := m.metrics[csiSnapshotStorageTotal].(*prometheus.GaugeVec); ok {
-		c.WithLabelValues(scheduleName).Add(0)
-	}
 }
 
 // InitSchedule initializes counter metrics for a node.

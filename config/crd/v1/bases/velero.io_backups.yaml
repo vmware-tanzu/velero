@@ -354,6 +354,19 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              csiVolumeSnapshotsAttempted:
+                description: CsiVolumeSnapshotsAttempted is the total number of attempted
+                  CSI VolumeSnapshots for this backup.
+                type: integer
+              csiVolumeSnapshotsCompleted:
+                description: CsiVolumeSnapshotsCompleted is the total number of successfully
+                  completed CSI VolumeSnapshots for this backup.
+                type: integer
+              csiVolumeSnapshotsStorageTotal:
+                description: CsiVolumeSnapshotsStorageTotal is the total storage size
+                  of created snapshots for this backup.
+                format: int64
+                type: integer
               errors:
                 description: Errors is a count of all error messages that were generated
                   during execution of the backup.  The actual errors are in the backup's

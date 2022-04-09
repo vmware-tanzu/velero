@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -325,7 +324,7 @@ type BackupStatus struct {
 	// CsiVolumeSnapshotsStorageTotal is the total storage size of created
 	// snapshots for this backup.
 	// +optional
-	CsiVolumeSnapshotsStorageTotal resource.Quantity `json:"csiVolumeSnapshotsStorageTotal,omitempty"`
+	CsiVolumeSnapshotsStorageTotal int64 `json:"csiVolumeSnapshotsStorageTotal,omitempty"`
 }
 
 // BackupProgress stores information about the progress of a Backup's execution.
