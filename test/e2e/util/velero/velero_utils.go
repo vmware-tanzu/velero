@@ -40,7 +40,10 @@ import (
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	. "github.com/vmware-tanzu/velero/test/e2e"
 	common "github.com/vmware-tanzu/velero/test/e2e/util/common"
+	util "github.com/vmware-tanzu/velero/test/e2e/util/csi"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
 const BackupObjectsPrefix = "backups"
@@ -491,7 +494,7 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 	return err
 }
 
-func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace, podName string) ([]string, error) {
+func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace string, podNameList []string) ([]string, error) {
 	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.snapshotID}{\"\\n\"}{end}'")
 	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -504,14 +507,20 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 	stdout = strings.Replace(stdout, "'", "", -1)
 	lines := strings.Split(stdout, "\n")
 	var result []string
-
 	for _, curLine := range lines {
 		fmt.Println("curLine:" + curLine)
 		curLine = strings.Replace(curLine, "\n", "", -1)
 		if len(curLine) == 0 {
 			continue
 		}
-		if podName != "" && !strings.Contains(curLine, podName) {
+		var Exist bool
+		for _, podName := range podNameList {
+			if podName != "" && strings.Contains(curLine, podName) {
+				Exist = true
+				break
+			}
+		}
+		if !Exist {
 			continue
 		}
 		snapshotID := curLine[strings.LastIndex(curLine, ":")+1:]
@@ -519,6 +528,7 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 		snapshotIDDec, _ := b64.StdEncoding.DecodeString(snapshotID)
 		fmt.Println("snapshotIDDec:" + string(snapshotIDDec))
 		result = append(result, string(snapshotIDDec))
+		fmt.Println(result)
 	}
 	fmt.Println(result)
 	return result, nil
@@ -796,4 +806,29 @@ func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace
 	}
 
 	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+}
+
+func GetSnapshotCheckPoint(client TestClient, VeleroCfg VerleroConfig, expectCount int, namespaceBackedUp, backupName string, kibishiiPodNameList []string) (SnapshotCheckPoint, error) {
+	var snapshotCheckPoint SnapshotCheckPoint
+
+	snapshotCheckPoint.ExpectCount = expectCount
+	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
+	snapshotCheckPoint.PodName = kibishiiPodNameList
+	if strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+		snapshotCheckPoint.EnableCSI = true
+		if err := util.CheckVolumeSnapshotCR(client, kibishiiPodNameList, namespaceBackedUp, backupName); err != nil {
+			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
+		}
+		var err error
+		snapshotCheckPoint.SnapshotIDList, err = util.GetCsiSnapshotHandle(client, backupName)
+		if err != nil {
+			return snapshotCheckPoint, errors.New(fmt.Sprintf("Fail to get CSI SnapshotHandle for backup %s", backupName))
+		}
+		fmt.Println(snapshotCheckPoint)
+		if len(snapshotCheckPoint.SnapshotIDList) != expectCount {
+			return snapshotCheckPoint, errors.New(fmt.Sprintf("Length of SnapshotIDList is not as expected %d", expectCount))
+		}
+	}
+	fmt.Println(snapshotCheckPoint)
+	return snapshotCheckPoint, nil
 }

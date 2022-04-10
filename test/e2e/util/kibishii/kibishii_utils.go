@@ -28,13 +28,17 @@ import (
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
+	util "github.com/vmware-tanzu/velero/test/e2e/util/csi"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 const (
 	jumpPadPod = "jump-pad"
 )
+
+var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
 
 // RunKibishiiTests runs kibishii tests on the provider.
 func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
@@ -47,7 +51,7 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 	veleroFeatures := VeleroCfg.Features
 	kibishiiDirectory := VeleroCfg.KibishiiDirectory
 	if _, err := GetNamespace(context.Background(), client, kibishiiNamespace); err == nil {
-		fmt.Printf("Workload namespace %s exists, delete it first.", kibishiiNamespace)
+		fmt.Printf("Workload namespace %s exists, delete it first.\n", kibishiiNamespace)
 		if err = DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 		}
@@ -73,19 +77,46 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
-
-	if providerName == "vsphere" && useVolumeSnapshots {
-		// Wait for uploads started by the Velero Plug-in for vSphere to complete
-		// TODO - remove after upload progress monitoring is implemented
-		fmt.Println("Waiting for vSphere uploads to complete")
-		if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
-			return errors.Wrapf(err, "Error waiting for uploads to complete")
+	var snapshotCheckPoint SnapshotCheckPoint
+	var err error
+	if useVolumeSnapshots {
+		if providerName == "vsphere" {
+			// Wait for uploads started by the Velero Plug-in for vSphere to complete
+			// TODO - remove after upload progress monitoring is implemented
+			fmt.Println("Waiting for vSphere uploads to complete")
+			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
+				return errors.Wrapf(err, "Error waiting for uploads to complete")
+			}
+		} else if providerName == "azure" && strings.EqualFold(veleroFeatures, "EnableCSI") {
+			if err := util.CheckVolumeSnapshotCR(client, KibishiiPodNameList, kibishiiNamespace, backupName); err != nil {
+				return errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
+			}
+		}
+		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 2, kibishiiNamespace, backupName, KibishiiPodNameList)
+		if err != nil {
+			return errors.Wrap(err, "Fail to get snapshot checkpoint")
+		}
+		err = WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
+			backupName, snapshotCheckPoint)
+		if err != nil {
+			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
+
 	fmt.Printf("Simulating a disaster by removing namespace %s\n", kibishiiNamespace)
 	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
+	if useVolumeSnapshots && providerName == "azure" && strings.EqualFold(veleroFeatures, "EnableCSI") {
+		err = WaitUntilSnapshotsNotExistInCloud(VeleroCfg.CloudProvider,
+			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
+			backupName, snapshotCheckPoint)
+		if err != nil {
+			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
+		}
+	}
+	time.Sleep(5 * time.Minute)
 
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799

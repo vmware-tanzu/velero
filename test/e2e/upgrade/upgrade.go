@@ -27,8 +27,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
+	util "github.com/vmware-tanzu/velero/test/e2e/util/csi"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
@@ -74,10 +76,13 @@ func BackupUpgradeRestoreWithRestic() {
 func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero UpgradeFromVelero) {
 	var (
 		backupName, restoreName string
+		client                  TestClient
+		err                     error
 	)
-
-	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+	By("Create test client instance", func() {
+		client, err = NewTestClient()
+		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+	})
 	BeforeEach(func() {
 		if !VeleroCfg.InstallVelero {
 			Skip("Upgrade test should not be triggered if VeleroCfg.InstallVelero is set to false")
@@ -166,11 +171,27 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 				})
 			})
 
-			if useVolumeSnapshots && VeleroCfg.CloudProvider == "vsphere" {
-				// TODO - remove after upload progress monitoring is implemented
-				By("Waiting for vSphere uploads to complete", func() {
-					Expect(WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour,
-						upgradeNamespace)).To(Succeed())
+			if useVolumeSnapshots {
+				if VeleroCfg.CloudProvider == "vsphere" {
+					// TODO - remove after upload progress monitoring is implemented
+					By("Waiting for vSphere uploads to complete", func() {
+						Expect(WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour,
+							upgradeNamespace)).To(Succeed())
+					})
+				} else if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+					By("CSI VolumeSnapshotContent CR should be created", func() {
+						Expect(util.CheckVolumeSnapshotCR(client, KibishiiPodNameList, upgradeNamespace, backupName)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot content")
+					})
+				}
+				var snapshotCheckPoint SnapshotCheckPoint
+				snapshotCheckPoint.NamespaceBackedUp = upgradeNamespace
+				By("Snapshot should be created in cloud object store", func() {
+					snapshotCheckPoint, err := GetSnapshotCheckPoint(client, VeleroCfg, 2,
+						upgradeNamespace, backupName, KibishiiPodNameList)
+					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
+					Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+						VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+						VeleroCfg.BSLConfig, backupName, snapshotCheckPoint)).To(Succeed())
 				})
 			}
 
@@ -179,6 +200,20 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero Upgrade
 					fmt.Sprintf("failed to delete namespace %s", upgradeNamespace))
 			})
 
+			if useVolumeSnapshots && VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+				// Upgrade test is not running daily since no CSI plugin v1.0 released, because builds before
+				//   v1.0 have issues to fail upgrade case.
+				By("Sleep 5 minutes to avoid snapshot recreated by unknown reason ", func() {
+					time.Sleep(5 * time.Minute)
+				})
+				// TODO: add WaitUntilSnapshotsNotExistInCloud verification when Upgrade test is enabled in nightly
+				// err = WaitUntilSnapshotsNotExistInCloud(VeleroCfg.CloudProvider,
+				// 	VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
+				// 	backupName, snapshotCheckPoint)
+				// if err != nil {
+				// 	return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
+				// }
+			}
 			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed

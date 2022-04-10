@@ -39,13 +39,17 @@ func BackupRestoreWithRestic() {
 }
 
 func BackupRestoreTest(useVolumeSnapshots bool) {
+	kibishiiNamespace := "kibishii-workload"
 	var (
 		backupName, restoreName string
+		client                  TestClient
+		err                     error
 	)
-	kibishiiNamespace := "kibishii-workload"
-	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
+	By("Create test client instance", func() {
+		client, err = NewTestClient()
+		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+	})
 	BeforeEach(func() {
 		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")

@@ -45,10 +45,13 @@ func APIGropuVersionsTest() {
 		resource, group string
 		err             error
 		ctx             = context.Background()
+		client          TestClient
 	)
 
-	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for group version tests")
+	By("Create test client instance", func() {
+		client, err = NewTestClient()
+		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+	})
 
 	BeforeEach(func() {
 		resource = "rockbands"

@@ -36,11 +36,15 @@ import (
 
 func SSRTest() {
 	testNS := "ssr-test"
-	client, err := NewTestClient()
-	if err != nil {
-		println(err.Error())
-	}
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+	var (
+		client TestClient
+		err    error
+	)
+
+	By("Create test client instance", func() {
+		client, err = NewTestClient()
+		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+	})
 
 	BeforeEach(func() {
 		flag.Parse()
