@@ -265,6 +265,14 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	}
 	cmd.Env = env
 
+	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
+	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
+	// is not enable for Restic command.
+	skipTLSRet := GetInsecureSkipTLSVerifyFromBSLForRestic(loc, rm.log)
+	if len(skipTLSRet) > 0 {
+		cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
+	}
+
 	stdout, stderr, err := veleroexec.RunCommand(cmd.Cmd())
 	rm.log.WithFields(logrus.Fields{
 		"repository": cmd.RepoName(),
