@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -184,7 +185,15 @@ func getSummaryLine(b []byte) ([]byte, error) {
 // RunRestore runs a `restic restore` command and monitors the volume size to
 // provide progress updates to the caller.
 func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
-	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env)
+	insecureTLSFlag := ""
+
+	for _, extraFlag := range restoreCmd.ExtraFlags {
+		if strings.Contains(extraFlag, resticInsecureTLSFlag) {
+			insecureTLSFlag = extraFlag
+		}
+	}
+
+	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env, insecureTLSFlag)
 	if err != nil {
 		return "", "", errors.Wrap(err, "error getting snapshot size")
 	}
@@ -230,10 +239,14 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 	return stdout, stderr, err
 }
 
-func getSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string) (int64, error) {
+func getSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error) {
 	cmd := StatsCommand(repoIdentifier, passwordFile, snapshotID)
 	cmd.Env = env
 	cmd.CACertFile = caCertFile
+
+	if len(insecureTLS) > 0 {
+		cmd.ExtraFlags = append(cmd.ExtraFlags, insecureTLS)
+	}
 
 	stdout, stderr, err := exec.RunCommand(cmd.Cmd())
 	if err != nil {
@@ -245,7 +258,7 @@ func getSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string
 	}
 
 	if err := json.Unmarshal([]byte(stdout), &snapshotStats); err != nil {
-		return 0, errors.Wrap(err, "error unmarshalling restic stats result")
+		return 0, errors.Wrapf(err, "error unmarshalling restic stats result, stdout=%s", stdout)
 	}
 
 	return snapshotStats.TotalSize, nil
