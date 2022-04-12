@@ -191,10 +191,10 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) e
 	defer rm.repoLocker.Unlock(repo.Name)
 
 	snapshotsCmd := SnapshotsCommand(repo.Spec.ResticIdentifier)
-	// use the '--last' flag to minimize the amount of data fetched since
+	// use the '--latest=1' flag to minimize the amount of data fetched since
 	// we're just validating that the repo exists and can be authenticated
 	// to.
-	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--last")
+	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--latest=1")
 
 	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
 }
@@ -275,7 +275,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
 	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
 	// is not enable for Restic command.
-	skipTLSRet := getInsecureSkipTLSVerifyFromBSL(loc, rm.log)
+	skipTLSRet := GetInsecureSkipTLSVerifyFromBSL(loc, rm.log)
 	if len(skipTLSRet) > 0 {
 		cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
 	}
@@ -296,7 +296,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 // getInsecureSkipTLSVerifyFromBSL get insecureSkipTLSVerify flag from BSL configuration,
 // Then return --insecure-tls flag with boolean value as result.
-func getInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
+func GetInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
 	result := ""
 
 	if backupLocation == nil {

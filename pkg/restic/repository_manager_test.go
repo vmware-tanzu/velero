@@ -113,7 +113,7 @@ func TestGetInsecureSkipTLSVerifyFromBSL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := getInsecureSkipTLSVerifyFromBSL(test.backupLocation, test.logger)
+			res := GetInsecureSkipTLSVerifyFromBSL(test.backupLocation, test.logger)
 
 			assert.Equal(t, test.expected, res)
 		})

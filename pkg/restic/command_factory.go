@@ -64,7 +64,7 @@ func GetSnapshotCommand(repoIdentifier, passwordFile string, tags map[string]str
 		Command:        "snapshots",
 		RepoIdentifier: repoIdentifier,
 		PasswordFile:   passwordFile,
-		ExtraFlags:     []string{"--json", "--last", getSnapshotTagFlag(tags)},
+		ExtraFlags:     []string{"--json", "--latest=1", getSnapshotTagFlag(tags)},
 	}
 }
 

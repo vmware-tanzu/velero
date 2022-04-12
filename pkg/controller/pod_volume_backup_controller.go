@@ -281,6 +281,14 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		}
 	}
 
+	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
+	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
+	// is not enable for Restic command.
+	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(backupLocation, log)
+	if len(skipTLSRet) > 0 {
+		resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, skipTLSRet)
+	}
+
 	var stdout, stderr string
 
 	var emptySnapshot bool
@@ -299,6 +307,11 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		cmd := restic.GetSnapshotCommand(req.Spec.RepoIdentifier, credentialsFile, req.Spec.Tags)
 		cmd.Env = env
 		cmd.CACertFile = caCertFile
+
+		// #4820: also apply the insecureTLS flag to Restic snapshots command
+		if len(skipTLSRet) > 0 {
+			cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
+		}
 
 		snapshotID, err = restic.GetSnapshotID(cmd)
 		if err != nil {
