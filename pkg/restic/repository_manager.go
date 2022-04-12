@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -94,6 +95,12 @@ type repositoryManager struct {
 	pvClient             corev1client.PersistentVolumesGetter
 	credentialsFileStore credentials.FileStore
 }
+
+const (
+	// insecureSkipTLSVerifyKey is the flag in BackupStorageLocation's config
+	// to indicate whether to skip TLS verify to setup insecure HTTPS connection.
+	insecureSkipTLSVerifyKey = "insecureSkipTLSVerify"
+)
 
 // NewRepositoryManager constructs a RepositoryManager.
 func NewRepositoryManager(
@@ -268,7 +275,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
 	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
 	// is not enable for Restic command.
-	skipTLSRet := GetInsecureSkipTLSVerifyFromBSLForRestic(loc, rm.log)
+	skipTLSRet := getInsecureSkipTLSVerifyFromBSL(loc, rm.log)
 	if len(skipTLSRet) > 0 {
 		cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
 	}
@@ -285,4 +292,34 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	}
 
 	return nil
+}
+
+// getInsecureSkipTLSVerifyFromBSL get insecureSkipTLSVerify flag from BSL configuration,
+// Then return --insecure-tls flag with boolean value as result.
+func getInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
+	result := ""
+
+	if backupLocation == nil {
+		logger.Info("bsl is nil. return empty.")
+		return result
+	}
+
+	backendType := getBackendType(backupLocation.Spec.Provider)
+
+	// Only check insecureSkipTLSVerifyKey for AWS compatible backend.
+	// Due to this is only possible for on-premise environment. On-premise
+	// environment use velero AWS plugin as object store plugin.
+	if backendType == AWSBackend {
+		if strRet, ok := backupLocation.Spec.Config[insecureSkipTLSVerifyKey]; ok {
+			_, err := strconv.ParseBool(strRet)
+			if err == nil {
+				result = "--insecure-tls" + "=" + strRet
+				return result
+			} else {
+				logger.Infof("Fail to convert string to bool for insecureSkipTLSVerifyKey flag: %s.", err.Error())
+			}
+		}
+	}
+
+	return result
 }

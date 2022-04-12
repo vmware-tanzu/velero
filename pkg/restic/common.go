@@ -19,12 +19,10 @@ package restic
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -72,10 +70,6 @@ const (
 	//
 	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
-
-	// insecureSkipTLSVerifyKey is the flag in BackupStorageLocation's config
-	// to indicate whether to skip TLS verify to setup insecure HTTPS connection.
-	insecureSkipTLSVerifyKey = "insecureSkipTLSVerify"
 )
 
 // getPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
@@ -352,28 +346,4 @@ func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileSto
 	}
 
 	return env, nil
-}
-
-// GetInsecureSkipTLSVerifyFromBSLForRestic get insecureSkipTLSVerify flag from BSL configuration,
-// Then return --insecure-tls flag with boolean value as result.
-func GetInsecureSkipTLSVerifyFromBSLForRestic(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
-	backendType := getBackendType(backupLocation.Spec.Provider)
-	result := ""
-
-	// Only check insecureSkipTLSVerifyKey for AWS compatible backend.
-	// Due to this is only possible for on-premise environment. On-premise
-	// environment use velero AWS plugin as object store plugin.
-	if backendType == AWSBackend {
-		if strRet, ok := backupLocation.Spec.Config[insecureSkipTLSVerifyKey]; ok {
-			_, err := strconv.ParseBool(strRet)
-			if err == nil {
-				result = "--insecure-tls" + "=" + strRet
-				return result
-			} else {
-				logger.Infof("Fail to convert string to bool for insecureSkipTLSVerifyKey flag: %s.", err.Error())
-			}
-		}
-	}
-
-	return result
 }
