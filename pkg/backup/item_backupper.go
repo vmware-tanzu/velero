@@ -39,6 +39,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -413,6 +414,12 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 			log.Info("Skipping snapshot of persistent volume because volume is being backed up with restic.")
 			return nil
 		}
+	}
+
+	// #4758 Do not take snapshot for CSI PV to avoid duplicated snapshotting, when CSI feature is enabled.
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) && pv.Spec.CSI != nil {
+		log.Infof("Skipping snapshot of persistent volume %s, because it's handled by CSI plugin.", pv.Name)
+		return nil
 	}
 
 	// TODO: -- once failure-domain.beta.kubernetes.io/zone is no longer
