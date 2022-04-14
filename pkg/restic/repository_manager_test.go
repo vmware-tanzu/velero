@@ -40,7 +40,7 @@ func TestGetInsecureSkipTLSVerifyFromBSL(t *testing.T) {
 			"",
 		},
 		{
-			"Test with none AWS BSL. Should return empty string.",
+			"Test BSL with no configuration. Should return empty string.",
 			&velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "azure",
@@ -60,7 +60,7 @@ func TestGetInsecureSkipTLSVerifyFromBSL(t *testing.T) {
 				},
 			},
 			log,
-			"--insecure-tls=false",
+			"",
 		},
 		{
 			"Test with AWS BSL's insecureSkipTLSVerify set to true.",
@@ -76,10 +76,10 @@ func TestGetInsecureSkipTLSVerifyFromBSL(t *testing.T) {
 			"--insecure-tls=true",
 		},
 		{
-			"Test with AWS BSL's insecureSkipTLSVerify set to invalid.",
+			"Test with Azure BSL's insecureSkipTLSVerify set to invalid.",
 			&velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "aws",
+					Provider: "azure",
 					Config: map[string]string{
 						"insecureSkipTLSVerify": "invalid",
 					},
@@ -89,10 +89,10 @@ func TestGetInsecureSkipTLSVerifyFromBSL(t *testing.T) {
 			"",
 		},
 		{
-			"Test with AWS without insecureSkipTLSVerify.",
+			"Test with GCP without insecureSkipTLSVerify.",
 			&velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "aws",
+					Provider: "gcp",
 					Config:   map[string]string{},
 				},
 			},

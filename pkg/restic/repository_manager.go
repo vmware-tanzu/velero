@@ -304,21 +304,10 @@ func GetInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLo
 		return result
 	}
 
-	backendType := getBackendType(backupLocation.Spec.Provider)
-
-	// Only check insecureSkipTLSVerifyKey for AWS compatible backend.
-	// Due to this is only possible for on-premise environment. On-premise
-	// environment use velero AWS plugin as object store plugin.
-	if backendType == AWSBackend {
-		if strRet, ok := backupLocation.Spec.Config[insecureSkipTLSVerifyKey]; ok {
-			_, err := strconv.ParseBool(strRet)
-			if err == nil {
-				result = "--insecure-tls" + "=" + strRet
-				return result
-			} else {
-				logger.Infof("Fail to convert string to bool for insecureSkipTLSVerifyKey flag: %s.", err.Error())
-			}
-		}
+	if insecure, _ := strconv.ParseBool(backupLocation.Spec.Config[insecureSkipTLSVerifyKey]); insecure {
+		logger.Debugf("set --insecure-tls=true for Restic command according to BSL %s config", backupLocation.Name)
+		result = "--insecure-tls=true"
+		return result
 	}
 
 	return result
