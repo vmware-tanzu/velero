@@ -95,11 +95,6 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseFailedValidation).Result(),
 		},
 		{
-			name:   "InProgress backup is not processed",
-			key:    "velero/backup-1",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseInProgress).Result(),
-		},
-		{
 			name:   "Completed backup is not processed",
 			key:    "velero/backup-1",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseCompleted).Result(),
@@ -138,6 +133,28 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 			// is what we expect.
 		})
 	}
+}
+
+func TestMarkInProgressBackupAsFailed(t *testing.T) {
+	backup := defaultBackup().Phase(velerov1api.BackupPhaseInProgress).Result()
+	clientset := fake.NewSimpleClientset(backup)
+	sharedInformers := informers.NewSharedInformerFactory(clientset, 0)
+	logger := logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
+
+	c := &backupController{
+		genericController: newGenericController("backup-test", logger),
+		client:            clientset.VeleroV1(),
+		lister:            sharedInformers.Velero().V1().Backups().Lister(),
+		clock:             &clock.RealClock{},
+	}
+	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup))
+
+	err := c.processBackup(fmt.Sprintf("%s/%s", backup.Namespace, backup.Name))
+	require.Nil(t, err)
+
+	res, err := clientset.VeleroV1().Backups(backup.Namespace).Get(context.TODO(), backup.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, velerov1api.BackupPhaseFailed, res.Status.Phase)
 }
 
 func TestProcessBackupValidationFailures(t *testing.T) {
@@ -729,6 +746,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
+					FailureReason:       "backup already exists in object storage",
 					Version:             1,
 					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
@@ -766,6 +784,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
+					FailureReason:       "error checking if backup already exists in object storage: Backup already exists in object storage",
 					Version:             1,
 					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
