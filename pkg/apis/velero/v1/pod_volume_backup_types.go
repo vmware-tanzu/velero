@@ -48,6 +48,7 @@ type PodVolumeBackupSpec struct {
 
 // PodVolumeBackupPhase represents the lifecycle phase of a PodVolumeBackup.
 // +kubebuilder:validation:Enum=New;InProgress;Completed;Failed
+// +kubebuilder:default=New
 type PodVolumeBackupPhase string
 
 const (
@@ -102,6 +103,11 @@ type PodVolumeBackupStatus struct {
 // the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=pvb
+// +kubebuilder:object:generate=true
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Pod Volume Backup status such as New/InProgress"
 // +kubebuilder:printcolumn:name="Created",type="date",JSONPath=".status.startTimestamp",description="Time when this backup was started"
 // +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".spec.pod.namespace",description="Namespace of the pod containing the volume to be backed up"
@@ -110,9 +116,6 @@ type PodVolumeBackupStatus struct {
 // +kubebuilder:printcolumn:name="Restic Repo",type="string",JSONPath=".spec.repoIdentifier",description="Restic repository identifier for this backup"
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where this backup should be stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
-// +kubebuilder:object:root=true
-// +kubebuilder:object:generate=true
-// +kubebuilder:subresource:status
 
 type PodVolumeBackup struct {
 	metav1.TypeMeta `json:",inline"`

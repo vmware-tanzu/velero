@@ -55,6 +55,26 @@ rules:
 - apiGroups:
   - velero.io
   resources:
+  - podvolumebackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumebackups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
   - schedules
   verbs:
   - create
@@ -88,26 +108,6 @@ rules:
   - velero.io
   resources:
   - serverstatusrequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - velero.io
-  resources:
-  - podvolumebackup
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - velero.io
-  resources:
-  - podvolumebackup/status
   verbs:
   - get
   - patch
