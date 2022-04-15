@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -183,8 +184,16 @@ func getSummaryLine(b []byte) ([]byte, error) {
 
 // RunRestore runs a `restic restore` command and monitors the volume size to
 // provide progress updates to the caller.
-func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress), insecureTLS string) (string, string, error) {
-	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env, insecureTLS)
+func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+	insecureTLSFlag := ""
+
+	for _, extraFlag := range restoreCmd.ExtraFlags {
+		if strings.Contains(extraFlag, resticInsecureTLSFlag) {
+			insecureTLSFlag = extraFlag
+		}
+	}
+
+	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env, insecureTLSFlag)
 	if err != nil {
 		return "", "", errors.Wrap(err, "error getting snapshot size")
 	}

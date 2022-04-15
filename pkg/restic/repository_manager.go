@@ -100,6 +100,10 @@ const (
 	// insecureSkipTLSVerifyKey is the flag in BackupStorageLocation's config
 	// to indicate whether to skip TLS verify to setup insecure HTTPS connection.
 	insecureSkipTLSVerifyKey = "insecureSkipTLSVerify"
+
+	// resticInsecureTLSFlag is the flag for Restic command line to indicate
+	// skip TLS verify on https connection.
+	resticInsecureTLSFlag = "--insecure-tls"
 )
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -194,6 +198,7 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) e
 	// use the '--latest=1' flag to minimize the amount of data fetched since
 	// we're just validating that the repo exists and can be authenticated
 	// to.
+	// "--last" is replaced by "--latest=1" in restic v0.12.1
 	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--latest=1")
 
 	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
@@ -306,7 +311,7 @@ func GetInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLo
 
 	if insecure, _ := strconv.ParseBool(backupLocation.Spec.Config[insecureSkipTLSVerifyKey]); insecure {
 		logger.Debugf("set --insecure-tls=true for Restic command according to BSL %s config", backupLocation.Name)
-		result = "--insecure-tls=true"
+		result = resticInsecureTLSFlag + "=true"
 		return result
 	}
 

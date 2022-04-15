@@ -64,7 +64,8 @@ func GetSnapshotCommand(repoIdentifier, passwordFile string, tags map[string]str
 		Command:        "snapshots",
 		RepoIdentifier: repoIdentifier,
 		PasswordFile:   passwordFile,
-		ExtraFlags:     []string{"--json", "--latest=1", getSnapshotTagFlag(tags)},
+		// "--last" is replaced by "--latest=1" in restic v0.12.1
+		ExtraFlags: []string{"--json", "--latest=1", getSnapshotTagFlag(tags)},
 	}
 }
 
