@@ -11,7 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM --platform=$BUILDPLATFORM golang:1.17.8 as builder-env
+FROM --platform=$BUILDPLATFORM ghcr.io/oracle/oraclelinux:7-slim as builder-env
+
+
+RUN yum-config-manager --enable ol7_optional_latest && \
+    yum-config-manager --enable ol7_addons &&\
+    yum update -y && \
+    # software collections repo needed for git 2.x on OL7
+    yum-config-manager --add-repo=http://yum.oracle.com/repo/OracleLinux/OL7/SoftwareCollections/x86_64 && \
+    yum install -y bash rh-git227 docker-cli bzip2 && \
+    # Set up needed to ensure git 2.27 from rh-git227 is on the path
+    ln /opt/rh/rh-git227/enable /etc/profile.d/git.sh && \
+    source /etc/profile.d/git.sh && \
+    git version
+
+# Update PATH to make sure git 2.27 is on the path
+ENV PATH="/opt/rh/rh-git227/root/usr/bin:${PATH}"
+
+RUN yum install -y oracle-golang-release-el7 \
+    && yum install -y golang-1.17.5-1.el7.x86_64 \
+    && yum clean all \
+    && go version
 
 ARG GOPROXY
 ARG PKG
@@ -28,8 +48,6 @@ ENV CGO_ENABLED=0 \
 WORKDIR /go/src/github.com/vmware-tanzu/velero
 
 COPY . /go/src/github.com/vmware-tanzu/velero
-
-RUN apt-get update && apt-get install -y bzip2
 
 FROM --platform=$BUILDPLATFORM builder-env as builder
 
@@ -50,10 +68,7 @@ RUN mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
-# The digest for tag 'nonroot' at the time of the release
-FROM gcr.io/distroless/base-debian10@sha256:6dc8ca7c3bbdb1a00fd8f1229b1b8c88986a5818b830e3a42d4946982dbbf18b
-
-LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
+FROM ghcr.io/oracle/oraclelinux:7-slim
 
 COPY --from=builder /output /
 
