@@ -29,6 +29,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
+var ErrNotExist = errors.New("does not exist")
+
 // Parser traverses an extracted archive on disk to validate
 // it and provide a helpful representation of it to consumers.
 type Parser struct {
@@ -66,17 +68,9 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 	// ensure top-level "resources" directory exists, and read subdirectories
 	// of it, where each one is expected to correspond to a resource.
 	resourcesDir := filepath.Join(dir, velerov1api.ResourcesDir)
-	exists, err := p.fs.DirExists(resourcesDir)
+	resourceDirs, err := p.checkAndReadDir(resourcesDir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error checking for existence of directory %q", strings.TrimPrefix(resourcesDir, dir+"/"))
-	}
-	if !exists {
-		return nil, errors.Errorf("directory %q does not exist", strings.TrimPrefix(resourcesDir, dir+"/"))
-	}
-
-	resourceDirs, err := p.fs.ReadDir(resourcesDir)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error reading contents of directory %q", strings.TrimPrefix(resourcesDir, dir+"/"))
+		return nil, err
 	}
 
 	// loop through each subdirectory (one per resource) and assemble
@@ -173,15 +167,15 @@ func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string) ([]string,
 func (p *Parser) checkAndReadDir(dir string) ([]os.FileInfo, error) {
 	exists, err := p.fs.DirExists(dir)
 	if err != nil {
-		return []os.FileInfo{}, errors.Wrapf(err, "finding %q", dir)
+		return nil, errors.Wrapf(err, "error checking for existence of directory %q", filepath.ToSlash(dir))
 	}
 	if !exists {
-		return []os.FileInfo{}, errors.Errorf("%q not found", dir)
+		return nil, errors.Wrapf(ErrNotExist, "directory %q", filepath.ToSlash(dir))
 	}
 
 	contents, err := p.fs.ReadDir(dir)
 	if err != nil {
-		return []os.FileInfo{}, errors.Wrapf(err, "reading contents of %q", dir)
+		return nil, errors.Wrapf(err, "reading contents of %q", filepath.ToSlash(dir))
 	}
 
 	return contents, nil

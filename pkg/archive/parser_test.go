@@ -32,13 +32,13 @@ func TestParse(t *testing.T) {
 		name       string
 		files      []string
 		dir        string
-		wantErrMsg string
+		wantErrMsg error
 		want       map[string]*ResourceItems
 	}{
 		{
 			name:       "when there is no top-level resources directory, an error is returned",
 			dir:        "root-dir",
-			wantErrMsg: "directory \"resources\" does not exist",
+			wantErrMsg: ErrNotExist,
 		},
 		{
 			name:  "when there are no directories under the resources directory, an empty map is returned",
@@ -109,8 +109,8 @@ func TestParse(t *testing.T) {
 			}
 
 			res, err := p.Parse(tc.dir)
-			if tc.wantErrMsg != "" {
-				assert.EqualError(t, err, tc.wantErrMsg)
+			if tc.wantErrMsg != nil {
+				assert.ErrorIs(t, err, tc.wantErrMsg, "Error should be: %v, got: %v", tc.wantErrMsg, err)
 			} else {
 				assert.Nil(t, err)
 				assert.Equal(t, tc.want, res)
@@ -124,13 +124,13 @@ func TestParseGroupVersions(t *testing.T) {
 		name       string
 		files      []string
 		backupDir  string
-		wantErrMsg string
+		wantErrMsg error
 		want       map[string]metav1.APIGroup
 	}{
 		{
 			name:       "when there is no top-level resources directory, an error is returned",
 			backupDir:  "/var/folders",
-			wantErrMsg: "\"/var/folders/resources\" not found",
+			wantErrMsg: ErrNotExist,
 		},
 		{
 			name:      "when there are no directories under the resources directory, an empty map is returned",
@@ -223,8 +223,8 @@ func TestParseGroupVersions(t *testing.T) {
 			}
 
 			res, err := p.ParseGroupVersions(tc.backupDir)
-			if tc.wantErrMsg != "" {
-				assert.EqualError(t, err, tc.wantErrMsg)
+			if tc.wantErrMsg != nil {
+				assert.ErrorIs(t, err, tc.wantErrMsg, "Error should be: %v, got: %v", tc.wantErrMsg, err)
 			} else {
 				assert.Nil(t, err)
 				assert.Equal(t, tc.want, res)
