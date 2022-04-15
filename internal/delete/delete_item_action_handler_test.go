@@ -138,6 +138,17 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 				new(recordResourcesAction).ForLabelSelector("app=app1"): {"ns-1/pod-1", "ns-2/pvc-2"},
 			},
 		},
+		{
+			name:   "success if resources dir does not exist",
+			backup: builder.ForBackup("velero", "velero").Result(),
+			tarball: test.NewTarWriter(t).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
+				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -149,7 +160,7 @@ func TestInvokeDeleteItemActionsRunForCorrectItems(t *testing.T) {
 			}
 
 			// Get the plugins out of the map in order to use them.
-			actions := []velero.DeleteItemAction{}
+			var actions []velero.DeleteItemAction
 			for action := range tc.actions {
 				actions = append(actions, action)
 			}

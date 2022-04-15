@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -321,6 +321,19 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	log.Info("Restore completed")
 
 	return nil
+}
+
+func singlePathMatch(path string) (string, error) {
+	matches, err := filepath.Glob(path)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if len(matches) != 1 {
+		return "", errors.Errorf("expected one matching path, got %d", len(matches))
+	}
+
+	return matches[0], nil
 }
 
 func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, volumeDir string, log logrus.FieldLogger) error {
