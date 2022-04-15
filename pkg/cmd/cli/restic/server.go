@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package restic
 
 import (
@@ -22,28 +23,27 @@ import (
 	"os"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -51,11 +51,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 var (
@@ -209,18 +208,23 @@ func (s *resticServer) run() {
 		s.logger.Fatalf("Failed to create credentials file store: %v", err)
 	}
 
-	backupController := controller.NewPodVolumeBackupController(
-		s.logger,
-		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
-		s.veleroClient.VeleroV1(),
-		s.podInformer,
-		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
-		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		s.metrics,
-		s.mgr.GetClient(),
-		os.Getenv("NODE_NAME"),
-		credentialFileStore,
-	)
+	pvbReconciler := controller.PodVolumeBackupReconciler{
+		Scheme:         s.mgr.GetScheme(),
+		Client:         s.mgr.GetClient(),
+		Clock:          clock.RealClock{},
+		Metrics:        s.metrics,
+		CredsFileStore: credentialFileStore,
+		NodeName:       os.Getenv("NODE_NAME"),
+		FileSystem:     filesystem.NewFileSystem(),
+		ResticExec:     restic.BackupExec{},
+		Log:            s.logger,
+
+		PvLister:  s.kubeInformerFactory.Core().V1().PersistentVolumes().Lister(),
+		PvcLister: s.kubeInformerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+	}
+	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
+	}
 
 	restoreController := controller.NewPodVolumeRestoreController(
 		s.logger,
@@ -245,7 +249,6 @@ func (s *resticServer) run() {
 
 	// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
 	// so the manager will ensure the cache is started and ready before all controller are started
-	s.mgr.Add(managercontroller.Runnable(backupController, 1))
 	s.mgr.Add(managercontroller.Runnable(restoreController, 1))
 
 	s.logger.Info("Controllers starting...")

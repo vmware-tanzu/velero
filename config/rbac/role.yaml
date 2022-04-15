@@ -92,3 +92,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumebackup
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumebackup/status
+  verbs:
+  - get
+  - patch
+  - update
