@@ -11,34 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM --platform=$BUILDPLATFORM ghcr.io/oracle/oraclelinux:7-slim as builder-env
+FROM --platform=$BUILDPLATFORM ghcr.io/oracle/oraclelinux:8-slim as builder-env
 
-#ENV GOPATH=/root/go
-#ENV PATH=$PATH:/usr/local/go/bin/
-#ENV PATH=$PATH:${GOPATH}/bin/
-#
-#RUN mkdir -p ${GOPATH}/src && mkdir -p ${GOPATH}/bin && \
-#    microdnf update -y && \
-#    microdnf clean all && \
-#    rm -rf /var/cache/yum/*
-#
-#RUN microdnf install git wget tar gzip bzip2
-#
-#RUN wget https://go.dev/dl/go1.17.5.linux-amd64.tar.gz \
-#    && rm -rf /usr/local/go \
-#    && tar -C /usr/local -xzf go1.17.5.linux-amd64.tar.gz
+ENV GOPATH=/root/go
+ENV PATH=$PATH:/usr/local/go/bin/
+ENV PATH=$PATH:${GOPATH}/bin/
 
-RUN yum-config-manager --enable ol7_optional_latest && \
-    yum-config-manager --enable ol7_addons &&\
-    yum update -y && \
-    # software collections repo needed for git 2.x on OL7
-    yum-config-manager --add-repo=http://yum.oracle.com/repo/OracleLinux/OL7/SoftwareCollections/x86_64 && \
-    yum-config-manager --enable ol7_developer_golang116 &&\
-    yum install -y rh-git227 oracle-golang-release-el7 golang-1.17.5 bzip2 && \
-    # Set up needed to ensure git 2.27 from rh-git227 is on the path
-    ln /opt/rh/rh-git227/enable /etc/profile.d/git.sh && \
-    source /etc/profile.d/git.sh && \
-    git version
+RUN mkdir -p ${GOPATH}/src && mkdir -p ${GOPATH}/bin && \
+    microdnf update -y && \
+    microdnf clean all && \
+    rm -rf /var/cache/yum/*
+
+RUN microdnf install git wget tar gzip bzip2
+
+RUN wget https://go.dev/dl/go1.17.5.linux-amd64.tar.gz \
+    && rm -rf /usr/local/go \
+    && tar -C /usr/local -xzf go1.17.5.linux-amd64.tar.gz
 
 ARG GOPROXY
 ARG PKG
@@ -75,11 +63,10 @@ RUN mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
-FROM ghcr.io/oracle/oraclelinux:7-slim
+FROM ghcr.io/oracle/oraclelinux:8-slim
 COPY --from=builder /output /
-#RUN  microdnf update -y && \
-#     microdnf clean all && \
-#     rm -rf /var/cache/yum/* \
-RUN yum update -y
+RUN  microdnf update -y && \
+     microdnf clean all && \
+     rm -rf /var/cache/yum/*
 USER nonroot:nonroot
 
