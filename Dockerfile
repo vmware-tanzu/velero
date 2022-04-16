@@ -64,8 +64,9 @@ RUN mkdir -p /output/usr/bin && \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
 FROM ghcr.io/oracle/oraclelinux:8-slim
-
 COPY --from=builder /output /
-
+RUN  microdnf update -y && \
+     microdnf clean all && \
+     rm -rf /var/cache/yum/*
 USER nonroot:nonroot
 
