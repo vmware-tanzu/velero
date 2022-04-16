@@ -299,7 +299,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	return nil
 }
 
-// getInsecureSkipTLSVerifyFromBSL get insecureSkipTLSVerify flag from BSL configuration,
+// GetInsecureSkipTLSVerifyFromBSL get insecureSkipTLSVerify flag from BSL configuration,
 // Then return --insecure-tls flag with boolean value as result.
 func GetInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
 	result := ""
