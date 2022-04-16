@@ -33,7 +33,7 @@ RUN yum-config-manager --enable ol7_optional_latest && \
     yum update -y && \
     # software collections repo needed for git 2.x on OL7
     yum-config-manager --add-repo=http://yum.oracle.com/repo/OracleLinux/OL7/SoftwareCollections/x86_64 && \
-    yum-config-manager --enable ol7_developer_golang117 &&\
+    yum-config-manager --enable ol7_developer_golang116 &&\
     yum install -y rh-git227 oracle-golang-release-el7 golang-1.17.5 bzip2 && \
     # Set up needed to ensure git 2.27 from rh-git227 is on the path
     ln /opt/rh/rh-git227/enable /etc/profile.d/git.sh && \
