@@ -88,7 +88,7 @@ spec:
       # Array of namespaces to which this hook does not apply. Optional.
       excludedNamespaces:
       - ns3
-      # Array of resources to which this hook applies. If empty, it applies to all supported resources.
+      # Array of resources to which this hook applies. If unspecified, the hook applies to all resources in the backup. Optional.
       # The only resource supported at this time is pods.
       includedResources:
       - pods
