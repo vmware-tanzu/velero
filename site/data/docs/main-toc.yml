@@ -5,7 +5,7 @@ toc:
         url: /index.html
       - page: How Velero works
         url: /how-velero-works
-      - page: Backup storage locations and volume snapstot locations
+      - page: Backup storage locations and volume snapshot locations
         url: /locations
   - title: Install
     subfolderitems:
@@ -69,16 +69,6 @@ toc:
         url: /overview-plugins
       - page: Custom plugins
         url: /custom-plugins
-  - title: Troubleshoot
-    subfolderitems:
-      - page: Troubleshooting
-        url: /troubleshooting
-      - page: Troubleshoot an install or setup
-        url: /debugging-install
-      - page: Troubleshoot a restore
-        url: /debugging-restores
-      - page: Troubleshoot Restic
-        url: /restic#troubleshooting
   - title: API types
     subfolderitems:
       - page: Backup
@@ -91,6 +81,16 @@ toc:
         url: /api-types/backupstoragelocation
       - page: VolumeSnapshotLocation
         url: /api-types/volumesnapshotlocation
+  - title: Troubleshoot
+    subfolderitems:
+      - page: Troubleshooting
+        url: /troubleshooting
+      - page: Troubleshoot an install or setup
+        url: /debugging-install
+      - page: Troubleshoot a restore
+        url: /debugging-restores
+      - page: Troubleshoot Restic
+        url: /restic#troubleshooting
   - title: Contribute
     subfolderitems:
       - page: Start Contributing
