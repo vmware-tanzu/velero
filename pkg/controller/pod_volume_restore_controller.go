@@ -385,6 +385,14 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 	}
 	resticCmd.Env = env
 
+	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
+	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
+	// is not enable for Restic command.
+	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(backupLocation, log)
+	if len(skipTLSRet) > 0 {
+		resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, skipTLSRet)
+	}
+
 	var stdout, stderr string
 
 	if stdout, stderr, err = restic.RunRestore(resticCmd, log, c.updateRestoreProgressFunc(req, log)); err != nil {

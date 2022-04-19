@@ -139,8 +139,26 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	defer os.Remove(resticDetails.credsFile)
 
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvb.Namespace,
+		Name:      pvb.Spec.BackupStorageLocation,
+	}, backupLocation); err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
+	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
+	// is not enable for Restic command.
+	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(backupLocation, log)
+	if len(skipTLSRet) > 0 {
+		resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, skipTLSRet)
+	}
+
+	var stdout, stderr string
+
 	var emptySnapshot bool
-	stdout, stderr, err := r.ResticExec.RunBackup(resticCmd, log, r.updateBackupProgressFunc(&pvb, log))
+	stdout, stderr, err = r.ResticExec.RunBackup(resticCmd, log, r.updateBackupProgressFunc(&pvb, log))
 	if err != nil {
 		if strings.Contains(stderr, "snapshot is empty") {
 			emptySnapshot = true
@@ -155,6 +173,11 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		cmd := restic.GetSnapshotCommand(pvb.Spec.RepoIdentifier, resticDetails.credsFile, pvb.Spec.Tags)
 		cmd.Env = resticDetails.envs
 		cmd.CACertFile = resticDetails.caCertFile
+
+		// #4820: also apply the insecureTLS flag to Restic snapshots command
+		if len(skipTLSRet) > 0 {
+			cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
+		}
 
 		snapshotID, err = r.ResticExec.GetSnapshotID(cmd)
 		if err != nil {
