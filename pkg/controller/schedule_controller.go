@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -82,8 +83,11 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.Debug("Getting schedule")
 	schedule := &velerov1.Schedule{}
 	if err := c.Get(ctx, req.NamespacedName, schedule); err != nil {
-		log.WithError(err).Error("error getting schedule")
-		return ctrl.Result{}, nil
+		if apierrors.IsNotFound(err) {
+			log.WithError(err).Error("schedule not found")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, errors.Wrapf(err, "error getting schedule %s", req.String())
 	}
 
 	if schedule.Status.Phase != "" &&
@@ -97,8 +101,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	patchHelper, err := patch.NewHelper(schedule, c.Client)
 	if err != nil {
-		log.WithError(err).Error("error new patch helper")
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, errors.Wrapf(err, "error new patch helper for schedule %s", req.String())
 	}
 
 	// validation - even if the item is Enabled, we can't trust it
@@ -116,8 +119,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// update status if it's changed
 	if currentPhase != schedule.Status.Phase {
 		if err = patchHelper.Patch(ctx, schedule); err != nil {
-			log.WithError(err).Errorf("error updating schedule phase to %s", schedule.Status.Phase)
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, errors.Wrapf(err, "error updating phase of schedule %s to %s", req.String(), schedule.Status.Phase)
 		}
 	}
 
@@ -128,7 +130,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// check for the schedule being due to run, and submit a Backup if so
 	if err := c.submitBackupIfDue(ctx, schedule, cronSchedule); err != nil {
-		log.WithError(err).Error("error running submitBackupIfDue")
+		return ctrl.Result{}, errors.Wrapf(err, "error running submitBackupIfDue for schedule %s", req.String())
 	}
 
 	return ctrl.Result{}, nil
