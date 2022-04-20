@@ -283,6 +283,22 @@ func (c *backupSyncController) run() {
 			if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 				// we are syncing these objects only to ensure that the storage snapshots are cleaned up
 				// on backup deletion or expiry.
+				log.Info("Syncing CSI volumesnapshotclasses in backup")
+				vsClasses, err := backupStore.GetCSIVolumeSnapshotClasses(backupName)
+				if err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error getting CSI volumesnapclasses for this backup from backup store")
+					continue
+				}
+				for _, vsClass := range vsClasses {
+					vsClass.ResourceVersion = ""
+					created, err := c.csiSnapshotClient.SnapshotV1().VolumeSnapshotClasses().Create(context.TODO(), vsClass, metav1.CreateOptions{})
+					if err != nil {
+						log.WithError(errors.WithStack(err)).Errorf("Error syncing volumesnapshotclass %s into cluster", vsClass.Name)
+						continue
+					}
+					log.Infof("Created CSI volumesnapshotclass %s", created.Name)
+				}
+
 				log.Info("Syncing CSI volumesnapshotcontents in backup")
 				snapConts, err := backupStore.GetCSIVolumeSnapshotContents(backupName)
 				if err != nil {
