@@ -74,6 +74,11 @@ Here are some things to verify if you receive `SignatureDoesNotMatch` errors:
 Velero cannot resume backups that were interrupted. Backups stuck in the `InProgress` phase can be deleted with `kubectl delete backup <name> -n <velero-namespace>`.
 Backups in the `InProgress` phase have not uploaded any files to object storage.
 
+## Backups stuck in `Deleting` phase
+
+You can force delete backups stuck in the `Deleting` phase with `kubectl delete backup <name> -n <velero-namespace>`.
+
+
 ## Velero is not publishing prometheus metrics
 
 Steps to troubleshoot:
