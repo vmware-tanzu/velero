@@ -621,6 +621,8 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 			if err != nil {
 				backupLog.Error(err)
 			}
+
+			backup.CSISnapshots = volumeSnapshots
 		}
 
 		if c.volumeSnapshotContentLister != nil {
