@@ -77,8 +77,16 @@ If there is possibility the schedule will be disable to not create backup anymor
 
 ## Kubernetes API Pagination
 
-By default, Velero will paginate the LIST API call for each resource type in the Kubernetes API when collecting items into a backup. The `--client-page-size` flag for the Velero server configures the size of each page. 
+By default, Velero will paginate the LIST API call for each resource type in the Kubernetes API when collecting items into a backup. The `--client-page-size` flag for the Velero server configures the size of each page.
 
 Depending on the cluster's scale, tuning the page size can improve backup performance. You can experiment with higher values, noting their impact on the relevant `apiserver_request_duration_seconds_*` metrics from the Kubernetes apiserver.
 
 Pagination can be entirely disabled by setting `--client-page-size` to `0`. This will request all items in a single unpaginated LIST call.
+
+## Deleting Backups
+
+Use the following commands to delete Velero backups and data:
+
+* `kubectl delete backup <backupName> -n <veleroNamespace>` will delete the backup custom resource only and will not delete any associated data from object/block storage
+* `velero backup delete <backupName>` will delete the backup resource including all data in object/block storage
+* Creating a `DeleteBackupRequest` will delete the backup resource including all data in object/block storage. You can use kubectl to create a `DeleteBackupRequest`.
