@@ -16,7 +16,16 @@ spec:
     singular: deletebackuprequest
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: The name of the backup to be deleted
+      jsonPath: .spec.backupName
+      name: BackupName
+      type: string
+    - description: The status of the deletion request
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: DeleteBackupRequest is a request to delete one or more backups.
@@ -63,6 +72,8 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""

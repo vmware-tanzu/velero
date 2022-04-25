@@ -17,6 +17,7 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -26,10 +27,10 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -242,18 +243,21 @@ type SnapshotIdentifier struct {
 
 // GetSnapshotsInBackup returns a list of all restic snapshot ids associated with
 // a given Velero backup.
-func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister velerov1listers.PodVolumeBackupLister) ([]SnapshotIdentifier, error) {
-	selector := labels.Set(map[string]string{
-		velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
-	}).AsSelector()
+func GetSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbClient client.Client) ([]SnapshotIdentifier, error) {
+	podVolumeBackups := &velerov1api.PodVolumeBackupList{}
+	options := &client.ListOptions{
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
+		}).AsSelector(),
+	}
 
-	podVolumeBackups, err := podVolumeBackupLister.List(selector)
+	err := kbClient.List(ctx, podVolumeBackups, options)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var res []SnapshotIdentifier
-	for _, item := range podVolumeBackups {
+	for _, item := range podVolumeBackups.Items {
 		if item.Status.SnapshotID == "" {
 			continue
 		}

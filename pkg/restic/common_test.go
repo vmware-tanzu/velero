@@ -17,6 +17,7 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"os"
 	"sort"
 	"testing"
@@ -28,8 +29,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -369,10 +368,8 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				client          = fake.NewSimpleClientset()
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				pvbInformer     = sharedInformers.Velero().V1().PodVolumeBackups()
-				veleroBackup    = &velerov1api.Backup{}
+				clientBuilder = velerotest.NewFakeControllerRuntimeClientBuilder(t)
+				veleroBackup  = &velerov1api.Backup{}
 			)
 
 			veleroBackup.Name = "backup-1"
@@ -380,12 +377,11 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			if test.longBackupNameEnabled {
 				veleroBackup.Name = "the-really-long-backup-name-that-is-much-more-than-63-characters"
 			}
+			clientBuilder.WithLists(&velerov1api.PodVolumeBackupList{
+				Items: test.podVolumeBackups,
+			})
 
-			for _, pvb := range test.podVolumeBackups {
-				require.NoError(t, pvbInformer.Informer().GetStore().Add(pvb.DeepCopy()))
-			}
-
-			res, err := GetSnapshotsInBackup(veleroBackup, pvbInformer.Lister())
+			res, err := GetSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
 			assert.NoError(t, err)
 
 			// sort to ensure good compare of slices

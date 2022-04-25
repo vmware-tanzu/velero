@@ -669,34 +669,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	deletionControllerRunInfo := func() controllerRunInfo {
-		deletionController := controller.NewBackupDeletionController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
-			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
-			s.veleroClient.VeleroV1(), // backupClient
-			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.veleroClient.VeleroV1(), // restoreClient
-			backupTracker,
-			s.resticManager,
-			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-			s.mgr.GetClient(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
-			csiVSLister,
-			csiVSCLister,
-			s.csiSnapshotClient,
-			newPluginManager,
-			backupStoreGetter,
-			s.metrics,
-			s.discoveryHelper,
-		)
-
-		return controllerRunInfo{
-			controller: deletionController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
 			s.veleroClient.VeleroV1(),
@@ -756,7 +728,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
-		controller.BackupDeletion:    deletionControllerRunInfo,
 		controller.Restore:           restoreControllerRunInfo,
 		controller.ResticRepo:        resticRepoControllerRunInfo,
 	}
@@ -828,6 +799,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+	}
+
+	if err := controller.NewBackupDeletionReconciler(
+		s.logger,
+		s.mgr.GetClient(),
+		backupTracker,
+		s.resticManager,
+		s.metrics,
+		s.discoveryHelper,
+		newPluginManager,
+		backupStoreGetter,
+	).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
