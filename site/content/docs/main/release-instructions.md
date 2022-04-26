@@ -129,12 +129,21 @@ These are the steps to update the Velero Homebrew version.
 - Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 - Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
 - Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
--
+
 ## Plugins
 
 To release plugins maintained by the Velero team, follow the [plugin release instructions](plugin-release-instructions.md).
 
 After the plugin images are built, be sure to update any [e2e tests][3] that use these plugins.
+
+## Helm Chart (GA only)
+
+### Steps
+- Update the CRDs under helm chart folder `crds` according to the current Velero GA version, and add the labels for the helm chart CRDs. For example: https://github.com/vmware-tanzu/helm-charts/pull/248.
+- Bump the Chart version `version` on the `Chart.yaml`.
+- Bump the Velero version `appVersion` on the `Chart.yaml` file and `tag` on the `values.yaml` file.
+- Bump the plugin version on the `values.yaml` if needed.
+- Update the _upgrade_ instruction and related tag on the `README.md` file.
 
 ## How to write and release a blog post
 What to include in a release blog:
