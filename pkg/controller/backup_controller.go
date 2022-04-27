@@ -147,13 +147,12 @@ func NewBackupController(
 				backup := obj.(*velerov1api.Backup)
 
 				switch backup.Status.Phase {
-				case "", velerov1api.BackupPhaseNew:
-					// only process new backups
+				case "", velerov1api.BackupPhaseNew, velerov1api.BackupPhaseInProgress:
 				default:
 					c.logger.WithFields(logrus.Fields{
 						"backup": kubeutil.NamespaceAndName(backup),
 						"phase":  backup.Status.Phase,
-					}).Debug("Backup is not new, skipping")
+					}).Debug("Backup is not new or in-progress, skipping")
 					return
 				}
 
@@ -241,7 +240,22 @@ func (c *backupController) processBackup(key string) error {
 	// this key (even though it was a no-op).
 	switch original.Status.Phase {
 	case "", velerov1api.BackupPhaseNew:
-		// only process new backups
+	case velerov1api.BackupPhaseInProgress:
+		// A backup may stay in-progress forever because of
+		// 1) the controller restarts during the processing of a backup
+		// 2) the backup with in-progress status isn't updated to completed or failed status successfully
+		// So we try to mark such Backups as failed to avoid it
+		updated := original.DeepCopy()
+		updated.Status.Phase = velerov1api.BackupPhaseFailed
+		updated.Status.FailureReason = fmt.Sprintf("got a Backup with unexpected status %q, this may be due to a restart of the controller during the backing up, mark it as %q",
+			velerov1api.BackupPhaseInProgress, updated.Status.Phase)
+		updated.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
+		_, err = patchBackup(original, updated, c.client)
+		if err != nil {
+			return errors.Wrapf(err, "error updating Backup status to %s", updated.Status.Phase)
+		}
+		log.Warn(updated.Status.FailureReason)
+		return nil
 	default:
 		return nil
 	}
@@ -261,6 +275,7 @@ func (c *backupController) processBackup(key string) error {
 	if err != nil {
 		return errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
 	}
+
 	// store ref to just-updated item for creating patch
 	original = updatedBackup
 	request.Backup = updatedBackup.DeepCopy()
@@ -287,6 +302,7 @@ func (c *backupController) processBackup(key string) error {
 		// result in the backup being Failed.
 		log.WithError(err).Error("backup failed")
 		request.Status.Phase = velerov1api.BackupPhaseFailed
+		request.Status.FailureReason = err.Error()
 	}
 
 	switch request.Status.Phase {

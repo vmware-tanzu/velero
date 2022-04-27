@@ -292,6 +292,10 @@ type BackupStatus struct {
 	// +optional
 	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted,omitempty"`
 
+	// FailureReason is an error that caused the entire backup to fail.
+	// +optional
+	FailureReason string `json:"failureReason,omitempty"`
+
 	// Warnings is a count of all warning messages that were generated during
 	// execution of the backup. The actual warnings are in the backup's log
 	// file in object storage.

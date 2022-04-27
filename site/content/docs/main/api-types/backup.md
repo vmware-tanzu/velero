@@ -144,5 +144,7 @@ status:
   warnings: 2
   # Number of errors that were logged by the backup.
   errors: 0
+  # An error that caused the entire backup to fail.
+  failureReason: ""
 
 ```
