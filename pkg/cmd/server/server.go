@@ -476,6 +476,7 @@ func (s *server) veleroResourcesExist() error {
 //	 have restic restores run before controllers adopt the pods.
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
+// - CAPI ClusterClasses go before Clusters.
 // - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 //	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 //   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
@@ -498,6 +499,7 @@ var defaultRestorePriorities = []string{
 	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
 	// in the backup.
 	"replicasets.apps",
+	"clusterclasses.cluster.x-k8s.io",
 	"clusters.cluster.x-k8s.io",
 	"clusterresourcesets.addons.cluster.x-k8s.io",
 }
