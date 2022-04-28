@@ -19,8 +19,8 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
-	github.com/hashicorp/go-hclog v0.12.0
-	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
+	github.com/hashicorp/go-hclog v0.14.1
+	github.com/hashicorp/go-plugin v1.4.3
 	github.com/joho/godotenv v1.3.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/onsi/ginkgo v1.16.5
