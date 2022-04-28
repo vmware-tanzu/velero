@@ -12,6 +12,7 @@ rules:
   - backups
   verbs:
   - create
+  - delete
 - apiGroups:
   - velero.io
   resources:
@@ -28,6 +29,26 @@ rules:
   - velero.io
   resources:
   - backupstoragelocations/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - deletebackuprequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - deletebackuprequests/status
   verbs:
   - get
   - patch
