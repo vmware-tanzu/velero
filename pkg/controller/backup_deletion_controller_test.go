@@ -101,7 +101,7 @@ func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBack
 	return data
 }
 
-func TestBackupDeletionControllerProcessRequest(t *testing.T) {
+func TestBackupDeletionControllerReconcile(t *testing.T) {
 	t.Run("failed to get backup store", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
 		location := &velerov1api.BackupStorageLocation{
