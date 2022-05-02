@@ -125,6 +125,7 @@ all-containers: container-builder-env
 	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
 
 local: build-dirs
+# Add DEBUG=1 to enable debug locally
 	GOOS=$(GOOS) \
 	GOARCH=$(GOARCH) \
 	VERSION=$(VERSION) \
