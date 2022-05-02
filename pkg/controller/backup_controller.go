@@ -645,10 +645,9 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 				backupLog.Error(err)
 			}
 
-			err = c.checkVolumeSnapshotReadyToUse(volumeSnapshots)
+			err = c.checkVolumeSnapshotReadyToUse(context.Background(), volumeSnapshots)
 			if err != nil {
 				backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
-				return err
 			}
 
 			backup.CSISnapshots = volumeSnapshots
@@ -692,7 +691,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	backup.Status.CSIVolumeSnapshotsAttempted = len(backup.CSISnapshots)
 	for _, vs := range backup.CSISnapshots {
-		if *vs.Status.ReadyToUse {
+		if vs.Status != nil && boolptr.IsSetToTrue(vs.Status.ReadyToUse) {
 			backup.Status.CSIVolumeSnapshotsCompleted++
 		}
 	}
@@ -883,8 +882,8 @@ func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
 // using goroutine here instead of waiting in CSI plugin, because it's not easy to make BackupItemAction
 // parallel by now. After BackupItemAction parallel is implemented, this logic should be moved to CSI plugin
 // as https://github.com/vmware-tanzu/velero-plugin-for-csi/pull/100
-func (c *backupController) checkVolumeSnapshotReadyToUse(volumesnapshots []*snapshotv1api.VolumeSnapshot) error {
-	eg, _ := errgroup.WithContext(context.Background())
+func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, volumesnapshots []*snapshotv1api.VolumeSnapshot) error {
+	eg, _ := errgroup.WithContext(ctx)
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 
@@ -892,7 +891,7 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(volumesnapshots []*snap
 		volumeSnapshot := vs
 		eg.Go(func() error {
 			err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-				tmpVS, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(volumeSnapshot.Namespace).Get(context.TODO(), volumeSnapshot.Name, metav1.GetOptions{})
+				tmpVS, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(volumeSnapshot.Namespace).Get(ctx, volumeSnapshot.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name))
 				}
@@ -903,17 +902,12 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(volumesnapshots []*snap
 
 				return true, nil
 			})
-			if err != nil {
-				if err == wait.ErrWaitTimeout {
-					log.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
-				}
-				return err
+
+			if err == wait.ErrWaitTimeout {
+				log.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			}
-			return nil
+			return err
 		})
 	}
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return eg.Wait()
 }

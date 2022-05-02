@@ -302,6 +302,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
+	snapshotv1api.AddToScheme(scheme)
 
 	ctrl.SetLogger(logrusr.NewLogger(logger))
 
@@ -599,6 +600,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetClient(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
+			csiVSLister,
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.csiSnapshotClient,
@@ -864,7 +866,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	if err := s.mgr.Start(s.ctx); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
-
 	return nil
 }
 

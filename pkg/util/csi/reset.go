@@ -37,6 +37,10 @@ func ResetVolumeSnapshotContent(snapCont *snapshotv1api.VolumeSnapshotContent) e
 		return fmt.Errorf("the volumesnapshotcontent '%s' does not have snapshothandle set", snapCont.Name)
 	}
 
-	snapCont.Spec.VolumeSnapshotRef = corev1.ObjectReference{}
+	// set the VolumeSnapshotRef to non-existing one to bypass the validation webhook
+	snapCont.Spec.VolumeSnapshotRef = corev1.ObjectReference{
+		Namespace: fmt.Sprintf("ns-%s", snapCont.UID),
+		Name:      fmt.Sprintf("name-%s", snapCont.UID),
+	}
 	return nil
 }
