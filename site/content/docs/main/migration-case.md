@@ -3,9 +3,21 @@ title: "Cluster migration"
 layout: docs
 ---
 
-## Using Backups and Restores
+Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location.
 
-Velero can help you port your resources from one cluster to another, as long as you point each Velero instance to the same cloud object storage location. This scenario assumes that your clusters are hosted by the same cloud provider. **Note that Velero does not natively  support the migration of persistent volumes snapshots across cloud providers.** If you would like to migrate volume data between cloud platforms, please enable [restic][2], which will backup volume contents at the filesystem level.
+## Migration Limitations
+
+Before migrating you should consider the following,
+
+* Velero does not natively support the migration of persistent volumes snapshots across cloud providers. If you would like to migrate volume data between cloud platforms, enable [restic][2], which will backup volume contents at the filesystem level.
+* Velero doesn't support restoring into a cluster with a lower Kubernetes version than where the backup was taken.
+* Migrating workloads across clusters that are not running the same version of Kubernetes might be possible, but some factors need to be considered before migration, including the compatibility of API groups between clusters for each custom resource. If a Kubernetes version upgrade breaks the compatibility of core/native API groups, migrating with Velero will not be possible without first updating the impacted custom resources. For more information about API group versions, please see [EnableAPIGroupVersions](enable-api-group-versions-feature.md).
+* The Velero plugin for AWS and Azure does not support migrating data between regions. If you need to do this, you must use [restic][2].
+
+
+## Migration Scenario
+
+This scenario assumes that your clusters are hosted by the same cloud provider
 
 1.  *(Cluster 1)* Assuming you haven't already been checkpointing your data with the Velero `schedule` operation, you need to first back up your entire cluster (replacing `<BACKUP-NAME>` as desired):
 
@@ -50,10 +62,7 @@ Check that the second cluster is behaving as expected:
 
 If you encounter issues, make sure that Velero is running in the same namespace in both clusters.
 
-## Migrating Workloads Across Different Kubernetes Versions
 
-Migration across clusters that are not running the same version of Kubernetes might be possible, but some factors need to be considered: compatibility of API groups between clusters for each custom resource, and if a Kubernetes version upgrade breaks the compatibility of core/native API groups. For more information about API group versions, please see [EnableAPIGroupVersions](enable-api-group-versions-feature.md).
-**Note:** Velero doesn't support restoring into a cluster with a lower Kubernetes version than where the backup was taken.
 
 [1]: how-velero-works.md#set-a-backup-to-expire
 [2]: restic.md
