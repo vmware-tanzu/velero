@@ -27,9 +27,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/apex/log"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -37,11 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
@@ -87,6 +91,7 @@ type backupController struct {
 	backupStoreGetter           persistence.ObjectBackupStoreGetter
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1listers.VolumeSnapshotLister
+	volumeSnapshotClient        *snapshotterClientSet.Clientset
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
 	volumeSnapshotClassLister   snapshotv1listers.VolumeSnapshotClassLister
 }
@@ -109,6 +114,7 @@ func NewBackupController(
 	metrics *metrics.ServerMetrics,
 	formatFlag logging.Format,
 	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
+	volumeSnapshotClient *snapshotterClientSet.Clientset,
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	volumesnapshotClassLister snapshotv1listers.VolumeSnapshotClassLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
@@ -132,6 +138,7 @@ func NewBackupController(
 		metrics:                     metrics,
 		formatFlag:                  formatFlag,
 		volumeSnapshotLister:        volumeSnapshotLister,
+		volumeSnapshotClient:        volumeSnapshotClient,
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
 		volumeSnapshotClassLister:   volumesnapshotClassLister,
 		backupStoreGetter:           backupStoreGetter,
@@ -638,6 +645,12 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 				backupLog.Error(err)
 			}
 
+			err = c.checkVolumeSnapshotReadyToUse(volumeSnapshots)
+			if err != nil {
+				backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
+				return err
+			}
+
 			backup.CSISnapshots = volumeSnapshots
 		}
 
@@ -864,4 +877,43 @@ func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
 	}
 
 	return buf, nil
+}
+
+// Waiting for VolumeSnapshot ReadyTosue to true is time consuming. Try to make the process parallel by
+// using goroutine here instead of waiting in CSI plugin, because it's not easy to make BackupItemAction
+// parallel by now. After BackupItemAction parallel is implemented, this logic should be moved to CSI plugin
+// as https://github.com/vmware-tanzu/velero-plugin-for-csi/pull/100
+func (c *backupController) checkVolumeSnapshotReadyToUse(volumesnapshots []*snapshotv1api.VolumeSnapshot) error {
+	eg, _ := errgroup.WithContext(context.Background())
+	timeout := 10 * time.Minute
+	interval := 5 * time.Second
+
+	for _, vs := range volumesnapshots {
+		volumeSnapshot := vs
+		eg.Go(func() error {
+			err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+				tmpVS, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(volumeSnapshot.Namespace).Get(context.TODO(), volumeSnapshot.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name))
+				}
+				if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
+					log.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
+					return false, nil
+				}
+
+				return true, nil
+			})
+			if err != nil {
+				if err == wait.ErrWaitTimeout {
+					log.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
+				}
+				return err
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	return nil
 }
