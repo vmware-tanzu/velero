@@ -34,7 +34,7 @@ To install Restic, use the `--use-restic` flag in the `velero install` command. 
 velero install --use-restic
 ```
 
-When using Restic on a storage provider that doesn't have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
+When using Restic on a storage provider that doesn't have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation. If you are installing
 
 ### Configure Restic DaemonSet spec
 
@@ -144,6 +144,8 @@ oc get ds restic -o yaml -n <velero namespace> > ds.yaml
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
 oc create -n <velero namespace> -f ds.yaml
 ```
+
+Note, Openshift randomizes group IDs, unless you explicitly set the GID, restored containers will have a randomized GID. For more information see, the [Openshift documentation](https://docs.openshift.com/container-platform/3.11/install_config/persistent_storage/pod_security_context.html#fsgroup).
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**
 
@@ -412,7 +414,7 @@ data:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsUser: 1001
-    runAsGroup: 999 
+    runAsGroup: 999
 
 ```
 
