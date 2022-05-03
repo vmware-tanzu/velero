@@ -5,15 +5,17 @@ layout: docs
 
 *Filter objects by namespace, type, or labels.*
 
-Velero includes all objects in a backup or restore when no filtering options are used. 
+This page describes how to use the include and exclude flags with the `velero backup` and `velero restore` commands. Velero includes all objects in a backup or restore when no filtering options are used.
 
 ## Includes
 
-Only specific resources are included, excluding all others.
+Only specific resources are included, all others are excluded.
 
 Wildcard takes precedence when both a wildcard and specific resource are included.
 
 ### --include-namespaces
+
+Namespaces to include. Default is `*`, all namespaces.
 
 * Backup a namespace and it's objects.
 
@@ -27,7 +29,9 @@ Wildcard takes precedence when both a wildcard and specific resource are include
   velero restore create <backup-name> --include-namespaces <namespace1>,<namespace2>
   ```
 
-### --include-resources 
+### --include-resources
+
+Kubernetes resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use `*` for all resources).
 
 * Backup all deployments in the cluster.
 
@@ -49,7 +53,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 
 ### --include-cluster-resources
 
-  This option can have three possible values:
+Includes cluster-scoped resources. This option can have three possible values:
 
 * `true`: all cluster-scoped resources are included.
 
@@ -78,7 +82,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 * Backup a namespace and include cluster-scoped resources.
 
   ```bash
-  velero backup create <backup-name> --include-namespaces <namespace> --include-cluster-resources=true 
+  velero backup create <backup-name> --include-namespaces <namespace> --include-cluster-resources=true
   ```
 
 ### --selector
@@ -104,6 +108,8 @@ Wildcard excludes are ignored.
 
 ### --exclude-namespaces
 
+Namespaces to exclude.
+
 * Exclude kube-system from the cluster backup.
 
   ```bash
@@ -117,6 +123,8 @@ Wildcard excludes are ignored.
   ```
 
 ### --exclude-resources
+
+Kubernetes resources to exclude, formatted as resource.group, such as storageclasses.storage.k8s.io.
 
 * Exclude secrets from the backup.
 
@@ -133,6 +141,3 @@ Wildcard excludes are ignored.
 ### velero.io/exclude-from-backup=true
 
 * Resources with the label `velero.io/exclude-from-backup=true` are not included in backup, even if it contains a matching selector label.
-
-
-
