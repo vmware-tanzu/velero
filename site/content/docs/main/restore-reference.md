@@ -40,9 +40,9 @@ Available Commands:
 
 **Auto assigned** NodePorts **deleted** by default and Services get new **auto assigned** nodePorts after restore.
 
-**Explicitly specified** NodePorts auto detected using **`last-applied-config`** annotation and **preserved** after restore.  NodePorts can be explicitly specified as .spec.ports[*].nodePort field on Service definition.
+**Explicitly specified** NodePorts auto detected using **`last-applied-config`** annotation and **preserved** after restore.  NodePorts can be explicitly specified as `.spec.ports[*].nodePort` field on Service definition.
 
-#### Always Preserve NodePorts
+### Always Preserve NodePorts
 
 It is not always possible to set nodePorts explicitly on some big clusters because of operation complexity. Official Kubernetes documents states that preventing port collisions is responsibility of the user when explicitly specifying nodePorts:
 

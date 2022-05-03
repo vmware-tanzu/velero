@@ -38,6 +38,8 @@ By default, backup storage locations are created in read-write mode. However, du
 
 You can optionally specify restore hooks to be executed during a restore or after resources are restored. For example, you might need to perform a custom database restore operation before the database application containers start. [More about restore hooks][11].
 
+During a restore, Velero is non-destructive. That means that Velero will never overwrite a pre-existing resource which has the same name as a resource in the backup it is restoring. Similarly, if a persistent volume exists, Velero will not overwrite the data in it. This behavior is by design, so that you don't have to worry about accidentally overwriting your cluster's state when using Velero.
+
 ## Backup workflow
 
 When you run `velero backup create test-backup`:
