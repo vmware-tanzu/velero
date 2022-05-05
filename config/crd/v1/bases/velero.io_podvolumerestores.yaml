@@ -16,7 +16,37 @@ spec:
     singular: podvolumerestore
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Namespace of the pod containing the volume to be restored
+      jsonPath: .spec.pod.namespace
+      name: Namespace
+      type: string
+    - description: Name of the pod containing the volume to be restored
+      jsonPath: .spec.pod.name
+      name: Pod
+      type: string
+    - description: Name of the volume to be restored
+      jsonPath: .spec.volume
+      name: Volume
+      type: string
+    - description: Pod Volume Restore status such as New/InProgress
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: Pod Volume Restore status such as New/InProgress
+      format: int64
+      jsonPath: .status.progress.totalBytes
+      name: TotalBytes
+      type: integer
+    - description: Pod Volume Restore status such as New/InProgress
+      format: int64
+      jsonPath: .status.progress.bytesDone
+      name: BytesDone
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
@@ -136,6 +166,8 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""
