@@ -1106,7 +1106,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
 		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
-			return warnings, errs
+			continue
 		}
 
 		ctx.log.Infof("Executing item action for %v", &groupResource)
