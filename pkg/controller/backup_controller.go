@@ -679,7 +679,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	backup.Status.CSIVolumeSnapshotsAttempted = len(backup.CSISnapshots)
 	for _, vs := range backup.CSISnapshots {
-		if *vs.Status.ReadyToUse {
+		if vs.Status != nil && boolptr.IsSetToTrue(vs.Status.ReadyToUse) {
 			backup.Status.CSIVolumeSnapshotsCompleted++
 		}
 	}
