@@ -650,6 +650,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			s.config.formatFlag.Parse(),
 			csiVSLister,
+			s.csiSnapshotClient,
 			csiVSCLister,
 			csiVSClassLister,
 			backupStoreGetter,
