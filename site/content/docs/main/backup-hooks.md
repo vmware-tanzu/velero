@@ -24,7 +24,7 @@ You can use the following annotations on a pod to make Velero execute a hook whe
 * `pre.hook.backup.velero.io/container`
   * The container where the command should be executed. Defaults to the first container in the pod. Optional.
 * `pre.hook.backup.velero.io/command`
-  * The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`
+  * The command to execute. This command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like `/bin/sh`, that is supported by the container at the beginning of your command. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`. See [examples of using pre hook commands](#backup-hook-commands-examples). Optional.
 * `pre.hook.backup.velero.io/on-error`
   * What to do if the command returns a non-zero exit code.  Defaults is `Fail`. Valid values are Fail and Continue. Optional.
 * `pre.hook.backup.velero.io/timeout`
@@ -36,7 +36,7 @@ You can use the following annotations on a pod to make Velero execute a hook whe
 * `post.hook.backup.velero.io/container`
   * The container where the command should be executed. Default is the first container in the pod. Optional.
 * `post.hook.backup.velero.io/command`
-  * The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`
+  * The command to execute. This command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like `/bin/sh`, that is supported by the container at the beginning of your command. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`. See [examples of using pre hook commands](#backup-hook-commands-examples). Optional.
 * `post.hook.backup.velero.io/on-error`
   * What to do if the command returns a non-zero exit code.  Defaults is `Fail`. Valid values are Fail and Continue. Optional.
 * `post.hook.backup.velero.io/timeout`
@@ -78,7 +78,9 @@ velero backup get nginx-hook-test
 velero backup logs nginx-hook-test | grep hookCommand
 ```
 
-## Using Multiple Commands
+## Backup hook commands examples
+
+### Multiple commands
 
 To use multiple commands, wrap your target command in a shell and separate them with `;`, `&&`, or other shell conditional constructs.
 
@@ -86,9 +88,9 @@ To use multiple commands, wrap your target command in a shell and separate them 
     pre.hook.backup.velero.io/command='["/bin/bash", "-c", "echo hello > hello.txt && echo goodbye > goodbye.txt"]'
 ```
 
-## Using Environment Variables in pre and post hooks
+#### Using environment variables
 
-You are able to use environment variables from your pods in your pre and post hook commands by including a shell command before using the environment variable. For example, MYSQL_ROOT_PASSWORD is an environment variable defined in pod called "mysql". To use MYSQL_ROOT_PASSWORD in your pre-hook, you'd include a shell, like `/bin/sh`, before calling your environment variable:
+You are able to use environment variables from your pods in your pre and post hook commands by including a shell command before using the environment variable. For example, `MYSQL_ROOT_PASSWORD` is an environment variable defined in pod called `mysql`. To use `MYSQL_ROOT_PASSWORD` in your pre-hook, you'd include a shell, like `/bin/sh`, before calling your environment variable:
 
 ```
 pre:
@@ -101,7 +103,7 @@ pre:
     onError: Fail
 ```
 
-Your pod must have integrated a shell to use environment variables.
+Note that the container must support the shell command you use. 
 
 
 [1]: api-types/backup.md
