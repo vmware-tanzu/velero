@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/apex/log"
@@ -32,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,6 +70,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
+	"sigs.k8s.io/cluster-api/util/patch"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -676,6 +679,10 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 				backupLog.Error(err)
 			}
 		}
+
+		// Delete the VolumeSnapshots created in the backup, when CSI feature is enabled.
+		c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, *backup, backupLog)
+
 	}
 
 	// Mark completion timestamp before serializing and uploading.
@@ -909,4 +916,138 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 		})
 	}
 	return eg.Wait()
+}
+
+// deleteVolumeSnapshot delete VolumeSnapshot created during backup.
+// This is used to avoid deleting namespace in cluster triggers the VolumeSnapshot deletion,
+// which will cause snapshot deletion on cloud provider, then backup cannot restore the PV.
+// If DeletionPolicy is Retain, just delete it. If DeletionPolicy is Delete, need to
+// change DeletionPolicy to Retain before deleting VS, then change DeletionPolicy back to Delete.
+func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api.VolumeSnapshot,
+	volumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent,
+	backup pkgbackup.Request, logger logrus.FieldLogger) {
+	var wg sync.WaitGroup
+	vscMap := make(map[string]*snapshotv1api.VolumeSnapshotContent)
+	for _, vsc := range volumeSnapshotContents {
+		vscMap[vsc.Name] = vsc
+	}
+
+	for _, vs := range volumeSnapshots {
+		wg.Add(1)
+		go func(vs *snapshotv1api.VolumeSnapshot) {
+			defer wg.Done()
+			var vsc *snapshotv1api.VolumeSnapshotContent
+			modifyVSCFlag := false
+			if vs.Status.BoundVolumeSnapshotContentName != nil &&
+				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
+				vsc = vscMap[*vs.Status.BoundVolumeSnapshotContentName]
+				if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
+					modifyVSCFlag = true
+				}
+			}
+
+			// Change VolumeSnapshotContent's DeletionPolicy to Retain before deleting VolumeSnapshot,
+			// because VolumeSnapshotContent will be deleted by deleting VolumeSnapshot, when
+			// DeletionPolicy is set to Delete, but Velero needs VSC for cleaning snapshot on cloud
+			// in backup deletion.
+			if modifyVSCFlag {
+				logger.Debugf("Patching VolumeSnapshotContent %s", vsc.Name)
+				_, err := c.patchVolumeSnapshotContent(vsc, func(req *snapshotv1api.VolumeSnapshotContent) {
+					req.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
+				})
+				if err != nil {
+					logger.Errorf("fail to modify VolumeSnapshotContent %s DeletionPolicy to Retain: %s", vsc.Name, err.Error())
+					return
+				}
+
+				defer func() {
+					logger.Debugf("Start to recreate VolumeSnapshotContent %s", vsc.Name)
+					err := c.recreateVolumeSnapshotContent(vsc)
+					if err != nil {
+						logger.Errorf("fail to recreate VolumeSnapshotContent %s: %s", vsc.Name, err.Error())
+					}
+				}()
+			}
+
+			// Delete VolumeSnapshot from cluster
+			logger.Debugf("Deleting VolumeSnapshotContent %s", vsc.Name)
+			err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(vs.Namespace).Delete(context.TODO(), vs.Name, metav1.DeleteOptions{})
+			if err != nil {
+				logger.Errorf("fail to delete VolumeSnapshot %s/%s: %s", vs.Namespace, vs.Name, err.Error())
+			}
+		}(vs)
+	}
+
+	wg.Wait()
+}
+
+func (c *backupController) patchVolumeSnapshotContent(req *snapshotv1api.VolumeSnapshotContent, mutate func(*snapshotv1api.VolumeSnapshotContent)) (*snapshotv1api.VolumeSnapshotContent, error) {
+	patchHelper, err := patch.NewHelper(req, c.kbClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to get patch helper.")
+	}
+
+	// Mutate
+	mutate(req)
+
+	if err := patchHelper.Patch(context.TODO(), req); err != nil {
+		return nil, errors.Wrapf(err, "fail to patch VolumeSnapshotContent %s", req.Name)
+	}
+
+	return req, nil
+}
+
+// recreateVolumeSnapshotContent will delete then re-create VolumeSnapshotContent,
+// because some parameter in VolumeSnapshotContent Spec is immutable, e.g. VolumeSnapshotRef
+// and Source. Source is updated to let csi-controller thinks the VSC is statically provsisioned with VS.
+// Set VolumeSnapshotRef's UID to nil will let the csi-controller finds out the related VS is gone, then
+// VSC can be deleted.
+func (c *backupController) recreateVolumeSnapshotContent(vsc *snapshotv1api.VolumeSnapshotContent) error {
+	timeout := 1 * time.Minute
+	interval := 1 * time.Second
+
+	err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Delete(context.TODO(), vsc.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "fail to delete VolumeSnapshotContent: %s", vsc.Name)
+	}
+
+	// Check VolumeSnapshotContents is already deleted, before re-creating it.
+	err = wait.PollImmediate(interval, timeout, func() (bool, error) {
+		_, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Get(context.TODO(), vsc.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, errors.Wrapf(err, fmt.Sprintf("failed to get VolumeSnapshotContent %s", vsc.Name))
+		}
+		return false, nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "fail to retrieve VolumeSnapshotContent %s info", vsc.Name)
+	}
+
+	// Make the VolumeSnapshotContent static
+	vsc.Spec.Source = snapshotv1api.VolumeSnapshotContentSource{
+		SnapshotHandle: vsc.Status.SnapshotHandle,
+	}
+	// Set VolumeSnapshotRef to none exist one, because VolumeSnapshotContent
+	// validation webhook will check whether name and namespace are nil.
+	// external-snapshotter needs Source pointing to snapshot and VolumeSnapshot
+	// reference's UID to nil to determine the VolumeSnapshotContent is deletable.
+	vsc.Spec.VolumeSnapshotRef = v1.ObjectReference{
+		APIVersion: snapshotv1api.SchemeGroupVersion.String(),
+		Kind:       "VolumeSnapshot",
+		Namespace:  "ns-" + string(vsc.UID),
+		Name:       "name-" + string(vsc.UID),
+	}
+	// Revert DeletionPolicy to Delete
+	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
+	// ResourceVersion shouldn't exist for new creation.
+	vsc.ResourceVersion = ""
+	_, err = c.volumeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Create(context.TODO(), vsc, metav1.CreateOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "fail to create VolumeSnapshotContent %s", vsc.Name)
+	}
+
+	return nil
 }
