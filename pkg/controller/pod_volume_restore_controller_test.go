@@ -21,20 +21,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/sirupsen/logrus"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestShouldProcess(t *testing.T) {
@@ -45,34 +44,8 @@ func TestShouldProcess(t *testing.T) {
 		obj             *velerov1api.PodVolumeRestore
 		pod             *corev1api.Pod
 		shouldProcessed bool
+		expectedPhase   velerov1api.PodVolumeRestorePhase
 	}{
-		{
-			name: "InProgress phase pvr should not be processed",
-			obj: &velerov1api.PodVolumeRestore{
-				Status: velerov1api.PodVolumeRestoreStatus{
-					Phase: velerov1api.PodVolumeRestorePhaseInProgress,
-				},
-			},
-			shouldProcessed: false,
-		},
-		{
-			name: "Completed phase pvr should not be processed",
-			obj: &velerov1api.PodVolumeRestore{
-				Status: velerov1api.PodVolumeRestoreStatus{
-					Phase: velerov1api.PodVolumeRestorePhaseCompleted,
-				},
-			},
-			shouldProcessed: false,
-		},
-		{
-			name: "Failed phase pvr should not be processed",
-			obj: &velerov1api.PodVolumeRestore{
-				Status: velerov1api.PodVolumeRestoreStatus{
-					Phase: velerov1api.PodVolumeRestorePhaseFailed,
-				},
-			},
-			shouldProcessed: false,
-		},
 		{
 			name: "Unable to get pvr's pod should not be processed",
 			obj: &velerov1api.PodVolumeRestore{
@@ -89,8 +62,88 @@ func TestShouldProcess(t *testing.T) {
 			shouldProcessed: false,
 		},
 		{
+			name: "InProgress phase pvr should be marked as failed",
+			obj: &velerov1api.PodVolumeRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pvr-1",
+				},
+				Spec: velerov1api.PodVolumeRestoreSpec{
+					Pod: corev1api.ObjectReference{
+						Namespace: "ns-1",
+						Name:      "pod-1",
+					},
+				},
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseInProgress,
+				},
+			},
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+			},
+			shouldProcessed: false,
+			expectedPhase:   velerov1api.PodVolumeRestorePhaseFailed,
+		},
+		{
+			name: "Completed phase pvr should not be processed",
+			obj: &velerov1api.PodVolumeRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pvr-1",
+				},
+				Spec: velerov1api.PodVolumeRestoreSpec{
+					Pod: corev1api.ObjectReference{
+						Namespace: "ns-1",
+						Name:      "pod-1",
+					},
+				},
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseCompleted,
+				},
+			},
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+			},
+			shouldProcessed: false,
+		},
+		{
+			name: "Failed phase pvr should not be processed",
+			obj: &velerov1api.PodVolumeRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pvr-1",
+				},
+				Spec: velerov1api.PodVolumeRestoreSpec{
+					Pod: corev1api.ObjectReference{
+						Namespace: "ns-1",
+						Name:      "pod-1",
+					},
+				},
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseFailed,
+				},
+			},
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns-1",
+					Name:      "pod-1",
+				},
+			},
+			shouldProcessed: false,
+		},
+		{
 			name: "Empty phase pvr with pod on node not running init container should not be processed",
 			obj: &velerov1api.PodVolumeRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pvr-1",
+				},
 				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
@@ -127,6 +180,10 @@ func TestShouldProcess(t *testing.T) {
 		{
 			name: "Empty phase pvr with pod on node running init container should be enqueued",
 			obj: &velerov1api.PodVolumeRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pvr-1",
+				},
 				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
@@ -166,37 +223,34 @@ func TestShouldProcess(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			builder := fake.NewClientBuilder()
-			if test.pod != nil {
-				builder.WithObjects(test.pod)
+	for _, ts := range tests {
+		t.Run(ts.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			var objs []runtime.Object
+			if ts.obj != nil {
+				objs = append(objs, ts.obj)
 			}
+			if ts.pod != nil {
+				objs = append(objs, ts.pod)
+			}
+			cli := test.NewFakeControllerRuntimeClient(t, objs...)
+
 			c := &PodVolumeRestoreReconciler{
 				logger: logrus.New(),
-				Client: builder.Build(),
+				Client: cli,
+				clock:  &clock.RealClock{},
 			}
 
-			shouldProcess, _, _ := c.shouldProcess(context.Background(), c.logger, test.obj)
-			require.Equal(t, test.shouldProcessed, shouldProcess)
+			shouldProcess, _, _ := c.shouldProcess(ctx, c.logger, ts.obj)
+			require.Equal(t, ts.shouldProcessed, shouldProcess)
+			if len(ts.expectedPhase) > 0 {
+				pvr := &velerov1api.PodVolumeRestore{}
+				err := c.Client.Get(ctx, types.NamespacedName{Namespace: ts.obj.Namespace, Name: ts.obj.Name}, pvr)
+				require.Nil(t, err)
+				assert.Equal(t, ts.expectedPhase, pvr.Status.Phase)
+			}
 		})
-	}
-}
-
-func TestIsPVRNew(t *testing.T) {
-	pvr := &velerov1api.PodVolumeRestore{}
-
-	expectationByStatus := map[velerov1api.PodVolumeRestorePhase]bool{
-		"":                                   true,
-		velerov1api.PodVolumeRestorePhaseNew: true,
-		velerov1api.PodVolumeRestorePhaseInProgress: false,
-		velerov1api.PodVolumeRestorePhaseCompleted:  false,
-		velerov1api.PodVolumeRestorePhaseFailed:     false,
-	}
-
-	for phase, expected := range expectationByStatus {
-		pvr.Status.Phase = phase
-		assert.Equal(t, expected, isPVRNew(pvr))
 	}
 }
 

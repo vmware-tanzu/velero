@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -238,4 +239,13 @@ func IsCRDReady(crd *unstructured.Unstructured) (bool, error) {
 	default:
 		return false, fmt.Errorf("unable to handle CRD with version %s", ver)
 	}
+}
+
+// Patch the given object
+func Patch(ctx context.Context, original, updated client.Object, client client.Client) error {
+	helper, err := patch.NewHelper(original, client)
+	if err != nil {
+		return err
+	}
+	return helper.Patch(ctx, updated)
 }
