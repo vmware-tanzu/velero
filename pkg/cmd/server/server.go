@@ -302,6 +302,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
+	snapshotv1api.AddToScheme(scheme)
 
 	ctrl.SetLogger(logrusr.NewLogger(logger))
 
@@ -476,6 +477,7 @@ func (s *server) veleroResourcesExist() error {
 //	 have restic restores run before controllers adopt the pods.
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
+// - CAPI ClusterClasses go before Clusters.
 // - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 //	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 //   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
@@ -498,6 +500,7 @@ var defaultRestorePriorities = []string{
 	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
 	// in the backup.
 	"replicasets.apps",
+	"clusterclasses.cluster.x-k8s.io",
 	"clusters.cluster.x-k8s.io",
 	"clusterresourcesets.addons.cluster.x-k8s.io",
 }
@@ -597,6 +600,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetClient(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
+			csiVSLister,
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.csiSnapshotClient,
@@ -646,6 +650,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			s.config.formatFlag.Parse(),
 			csiVSLister,
+			s.csiSnapshotClient,
 			csiVSCLister,
 			csiVSClassLister,
 			backupStoreGetter,
@@ -668,34 +673,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: gcController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
-	deletionControllerRunInfo := func() controllerRunInfo {
-		deletionController := controller.NewBackupDeletionController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
-			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
-			s.veleroClient.VeleroV1(), // backupClient
-			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.veleroClient.VeleroV1(), // restoreClient
-			backupTracker,
-			s.resticManager,
-			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-			s.mgr.GetClient(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
-			csiVSLister,
-			csiVSCLister,
-			s.csiSnapshotClient,
-			newPluginManager,
-			backupStoreGetter,
-			s.metrics,
-			s.discoveryHelper,
-		)
-
-		return controllerRunInfo{
-			controller: deletionController,
 			numWorkers: defaultControllerWorkers,
 		}
 	}
@@ -743,7 +720,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
-		controller.BackupDeletion:    deletionControllerRunInfo,
 		controller.Restore:           restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
@@ -820,6 +796,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
 	}
 
+	if err := controller.NewBackupDeletionReconciler(
+		s.logger,
+		s.mgr.GetClient(),
+		backupTracker,
+		s.resticManager,
+		s.metrics,
+		s.discoveryHelper,
+		newPluginManager,
+		backupStoreGetter,
+	).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+	}
+
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
 		r := controller.ServerStatusRequestReconciler{
 			Scheme:         s.mgr.GetScheme(),
@@ -864,7 +853,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	if err := s.mgr.Start(s.ctx); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
-
 	return nil
 }
 

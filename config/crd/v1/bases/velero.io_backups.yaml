@@ -372,6 +372,10 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              failureReason:
+                description: FailureReason is an error that caused the entire backup
+                  to fail.
+                type: string
               formatVersion:
                 description: FormatVersion is the backup format version, including
                   major, minor, and patch version.

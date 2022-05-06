@@ -95,12 +95,11 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 			}
 
 			s := &resticServer{
-				kubeClient: kubeClient,
 				logger:     testutil.NewLogger(),
 				fileSystem: fs,
 			}
 
-			err := s.validatePodVolumesHostPath()
+			err := s.validatePodVolumesHostPath(kubeClient)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
