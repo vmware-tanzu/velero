@@ -34,12 +34,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-func NewPeriodicalEnqueueSource(logger logrus.FieldLogger, client client.Client, objList client.ObjectList, period time.Duration) *PeriodicalEnqueueSource {
+func NewPeriodicalEnqueueSource(logger logrus.FieldLogger, client client.Client, objList client.ObjectList, period time.Duration, filters ...func(object client.Object) bool) *PeriodicalEnqueueSource {
 	return &PeriodicalEnqueueSource{
-		logger:  logger.WithField("resource", reflect.TypeOf(objList).String()),
-		Client:  client,
-		objList: objList,
-		period:  period,
+		logger:      logger.WithField("resource", reflect.TypeOf(objList).String()),
+		Client:      client,
+		objList:     objList,
+		period:      period,
+		filterFuncs: filters,
 	}
 }
 
@@ -48,9 +49,10 @@ func NewPeriodicalEnqueueSource(logger logrus.FieldLogger, client client.Client,
 // the reconcile logic periodically
 type PeriodicalEnqueueSource struct {
 	client.Client
-	logger  logrus.FieldLogger
-	objList client.ObjectList
-	period  time.Duration
+	logger      logrus.FieldLogger
+	objList     client.ObjectList
+	period      time.Duration
+	filterFuncs []func(object client.Object) bool
 }
 
 func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHandler, q workqueue.RateLimitingInterface, pre ...predicate.Predicate) error {
@@ -69,6 +71,14 @@ func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHand
 			if !ok {
 				p.logger.Error("%s's type isn't metav1.Object", object.GetObjectKind().GroupVersionKind().String())
 				return nil
+			}
+			for _, filter := range p.filterFuncs {
+				if filter != nil {
+					if enqueueObj := filter(object.(client.Object)); !enqueueObj {
+						p.logger.Debugf("skip enqueue object %s/%s due to filter function.", obj.GetNamespace(), obj.GetName())
+						return nil
+					}
+				}
 			}
 			q.Add(ctrl.Request{
 				NamespacedName: types.NamespacedName{
