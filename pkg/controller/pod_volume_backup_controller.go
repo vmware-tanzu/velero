@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -87,37 +86,40 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.Info("PodVolumeBackup starting")
 
-	// Initialize the patch helper.
-	patchHelper, err := patch.NewHelper(&pvb, r.Client)
-	if err != nil {
-		log.WithError(err).Error("getting patch helper to update this resource")
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	defer func() {
-		// Always attempt to patch the PVB object and status after each reconciliation.
-		if err := patchHelper.Patch(ctx, &pvb); err != nil {
-			log.WithError(err).Error("updating PodVolumeBackup resource")
-			return
-		}
-	}()
-
 	// Only process items for this node.
 	if pvb.Spec.Node != r.NodeName {
 		return ctrl.Result{}, nil
 	}
 
-	// Only process new items.
-	if pvb.Status.Phase != "" && pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseNew {
-		log.Debug("PodVolumeBackup is not new, not processing")
+	switch pvb.Status.Phase {
+	case "", velerov1api.PodVolumeBackupPhaseNew:
+	case velerov1api.PodVolumeBackupPhaseInProgress:
+		original := pvb.DeepCopy()
+		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
+		pvb.Status.Message = fmt.Sprintf("got a PodVolumeBackup with unexpected status %q, this may be due to a restart of the controller during the backing up, mark it as %q",
+			velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
+		pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		if err := kube.Patch(ctx, original, &pvb, r.Client); err != nil {
+			log.WithError(err).Error("error updating PodVolumeBackup status")
+			return ctrl.Result{}, err
+		}
+		log.Warn(pvb.Status.Message)
+		return ctrl.Result{}, nil
+	default:
+		log.Debug("PodVolumeBackup is not new or in-progress, not processing")
 		return ctrl.Result{}, nil
 	}
 
 	r.Metrics.RegisterPodVolumeBackupEnqueue(r.NodeName)
 
 	// Update status to InProgress.
+	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
 	pvb.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+	if err := kube.Patch(ctx, original, &pvb, r.Client); err != nil {
+		log.WithError(err).Error("error updating PodVolumeBackup status")
+		return ctrl.Result{}, err
+	}
 
 	var pod corev1.Pod
 	podNamespacedName := client.ObjectKey{
@@ -125,13 +127,13 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Name:      pvb.Spec.Pod.Name,
 	}
 	if err := r.Client.Get(ctx, podNamespacedName, &pod); err != nil {
-		return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("getting pod %s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name))
+		return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("getting pod %s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name), log)
 	}
 
 	var resticDetails resticDetails
 	resticCmd, err := r.buildResticCommand(ctx, log, &pvb, &pod, &resticDetails)
 	if err != nil {
-		return r.updateStatusToFailed(ctx, &pvb, err, "building Restic command")
+		return r.updateStatusToFailed(ctx, &pvb, err, "building Restic command", log)
 	}
 	defer os.Remove(resticDetails.credsFile)
 
@@ -159,7 +161,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if strings.Contains(stderr, "snapshot is empty") {
 			emptySnapshot = true
 		} else {
-			return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("running Restic backup, stderr=%s", stderr))
+			return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("running Restic backup, stderr=%s", stderr), log)
 		}
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
@@ -177,17 +179,22 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		snapshotID, err = r.ResticExec.GetSnapshotID(cmd)
 		if err != nil {
-			return r.updateStatusToFailed(ctx, &pvb, err, "getting snapshot id")
+			return r.updateStatusToFailed(ctx, &pvb, err, "getting snapshot id", log)
 		}
 	}
 
 	// Update status to Completed with path & snapshot ID.
+	original = pvb.DeepCopy()
 	pvb.Status.Path = resticDetails.path
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
 	pvb.Status.SnapshotID = snapshotID
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	if emptySnapshot {
 		pvb.Status.Message = "volume was empty so no snapshot was taken"
+	}
+	if err = kube.Patch(ctx, original, &pvb, r.Client); err != nil {
+		log.WithError(err).Error("error updating PodVolumeBackup status")
+		return ctrl.Result{}, err
 	}
 
 	latencyDuration := pvb.Status.CompletionTimestamp.Time.Sub(pvb.Status.StartTimestamp.Time)
@@ -280,15 +287,26 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 // the PVB with the new progress.
 func (r *PodVolumeBackupReconciler) updateBackupProgressFunc(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
 	return func(progress velerov1api.PodVolumeOperationProgress) {
+		original := pvb.DeepCopy()
 		pvb.Status.Progress = progress
+		if err := kube.Patch(context.Background(), original, pvb, r.Client); err != nil {
+			log.WithError(err).Error("error update progress")
+		}
 	}
 }
 
-func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string) (ctrl.Result, error) {
+func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
+	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 	pvb.Status.Message = msg
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-	return ctrl.Result{}, errors.Wrap(err, msg)
+
+	if err = kube.Patch(ctx, original, pvb, r.Client); err != nil {
+		log.WithError(err).Error("error updating PodVolumeBackup status")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 type resticDetails struct {

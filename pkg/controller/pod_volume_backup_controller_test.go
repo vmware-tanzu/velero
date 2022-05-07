@@ -179,16 +179,16 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			expectedRequeue: ctrl.Result{},
 		}),
-		Entry("in progress phase pvb on same node should not be processed", request{
+		Entry("in progress phase pvb on same node should be marked as failed", request{
 			pvb: pvbBuilder().
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
 				Node("test_node").
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
-			expectedProcessed: false,
+			expectedProcessed: true,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
-				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
+				Phase(velerov1api.PodVolumeBackupPhaseFailed).
 				Result(),
 			expectedRequeue: ctrl.Result{},
 		}),
