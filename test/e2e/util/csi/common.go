@@ -65,11 +65,20 @@ func GetCsiSnapshotHandle(client TestClient, backupName string) ([]string, error
 	}
 	var snapshotHandleList []string
 	for _, i := range vscList.Items {
+		if i.Status == nil {
+			fmt.Println("SnapshotHandle Status s nil")
+			continue
+		}
 		if i.Status.SnapshotHandle == nil {
 			fmt.Println("SnapshotHandle is nil")
 			continue
 		}
-		fmt.Println(*i.Status.SnapshotHandle)
+
+		if i.Labels == nil {
+			fmt.Println("VolumeSnapshotContents label is nil")
+			continue
+		}
+
 		if i.Labels["velero.io/backup-name"] == backupName {
 			tmp := strings.Split(*i.Status.SnapshotHandle, "/")
 			snapshotHandleList = append(snapshotHandleList, tmp[len(tmp)-1])
@@ -120,13 +129,12 @@ func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, ba
 	return "", errors.New(fmt.Sprintf("Fail to get VolumeSnapshotContentName for pod %s under namespace %s", podName, namespace))
 }
 
-func CheckVolumeSnapshotCR(client TestClient, pods []string, nampespace, backupName string) error {
-	for _, podName := range pods {
-		if snapshotContentName, err := GetVolumeSnapshotContentNameByPod(client, podName, nampespace, backupName); err != nil || snapshotContentName == "" {
-			return errors.Wrap(err, "Fail to get Azure CSI snapshot content")
-		} else {
-			fmt.Println("Found volumesnapshotcontent: " + snapshotContentName)
-		}
+func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount int) error {
+	var err error
+	var snapshotContentNameList []string
+	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil || len(snapshotContentNameList) != expectedCount {
+		return errors.Wrap(err, "Fail to get Azure CSI snapshot content")
 	}
+	fmt.Println(snapshotContentNameList)
 	return nil
 }

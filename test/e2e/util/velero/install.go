@@ -90,6 +90,8 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 	veleroInstallOptions.UseRestic = !useVolumeSnapshots
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
+	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
+	veleroInstallOptions.GarbageCollectionFrequency = GCFrequency
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
 		InstallOptions:         veleroInstallOptions,
@@ -131,6 +133,7 @@ func configvSpherePlugin() error {
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to create velero-vsphere-plugin-config configmap in %s namespace", VeleroCfg.VeleroNamespace)
 	}
+	fmt.Println("configvSpherePlugin: WaitForConfigMapComplete")
 	err = WaitForConfigMapComplete(cli.ClientGo, VeleroCfg.VeleroNamespace, configmaptName)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Failed to ensure configmap %s completion in namespace: %s", configmaptName, VeleroCfg.VeleroNamespace))
@@ -208,6 +211,9 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 			}
 
 		}
+	}
+	if options.GarbageCollectionFrequency > 0 {
+		args = append(args, fmt.Sprintf("--garbage-collection-frequency=%v", options.GarbageCollectionFrequency))
 	}
 
 	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.ResticHelperImage); err != nil {
