@@ -50,6 +50,10 @@ func TestDeployment(t *testing.T) {
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--default-restic-prune-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
 
+	deploy = Deployment("velero", WithGarbageCollectionFrequency(24*time.Hour))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--garbage-collection-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
 	deploy = Deployment("velero", WithFeatures([]string{"EnableCSI", "foo", "bar", "baz"}))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--features=EnableCSI,foo,bar,baz", deploy.Spec.Template.Spec.Containers[0].Args[1])

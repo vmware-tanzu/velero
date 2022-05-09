@@ -67,6 +67,7 @@ type InstallOptions struct {
 	Wait                              bool
 	UseVolumeSnapshots                bool
 	DefaultResticMaintenanceFrequency time.Duration
+	GarbageCollectionFrequency        time.Duration
 	Plugins                           flag.StringArray
 	NoDefaultBackupLocation           bool
 	CRDsOnly                          bool
@@ -103,6 +104,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "Create restic daemonset. Optional.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default. Optional.")
+	flags.DurationVar(&o.GarbageCollectionFrequency, "garbage-collection-frequency", o.GarbageCollectionFrequency, "How often the garbage collection runs for expired backups.(default 1h)")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "Only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
@@ -187,6 +189,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		BSLConfig:                         o.BackupStorageConfig.Data(),
 		VSLConfig:                         o.VolumeSnapshotConfig.Data(),
 		DefaultResticMaintenanceFrequency: o.DefaultResticMaintenanceFrequency,
+		GarbageCollectionFrequency:        o.GarbageCollectionFrequency,
 		Plugins:                           o.Plugins,
 		NoDefaultBackupLocation:           o.NoDefaultBackupLocation,
 		CACertData:                        caCertData,
@@ -393,6 +396,10 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 
 	if o.DefaultResticMaintenanceFrequency < 0 {
 		return errors.New("--default-restic-prune-frequency must be non-negative")
+	}
+
+	if o.GarbageCollectionFrequency < 0 {
+		return errors.New("--garbage-collection-frequency must be non-negative")
 	}
 
 	return nil
