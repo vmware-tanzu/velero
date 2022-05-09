@@ -73,6 +73,7 @@ type ResticRepositoryStatus struct {
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+
 type ResticRepository struct {
 	metav1.TypeMeta `json:",inline"`
 

@@ -49,7 +49,7 @@ type ResticRepoReconciler struct {
 	repositoryManager           restic.RepositoryManager
 }
 
-func NewResticRepoConciler(namespace string, logger logrus.FieldLogger, client client.Client,
+func NewResticRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
 	defaultMaintenanceFrequency time.Duration, repositoryManager restic.RepositoryManager) *ResticRepoReconciler {
 	c := &ResticRepoReconciler{
 		client,

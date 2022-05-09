@@ -36,7 +36,7 @@ func mockResticRepoReconciler(t *testing.T, rr *velerov1api.ResticRepository, mo
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
 	}
-	return NewResticRepoConciler(
+	return NewResticRepoReconciler(
 		velerov1api.DefaultNamespace,
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),

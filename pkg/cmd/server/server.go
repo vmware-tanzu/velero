@@ -792,7 +792,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
 	}
 
-	if err := controller.NewResticRepoConciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.resticManager).SetupWithManager(s.mgr); err != nil {
+	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.resticManager).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
 	}
 
