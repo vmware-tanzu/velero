@@ -99,7 +99,7 @@ func GetPvcByPodName(ctx context.Context, namespace, podName string) ([]string, 
 	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
 }
 
-func GetPvByPvc(ctx context.Context, pvc string) ([]string, error) {
+func GetPvByPvc(ctx context.Context, namespace, pvc string) ([]string, error) {
 	// Example:
 	// 	  NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                              STORAGECLASS             REASON   AGE
 	//    pvc-3f784366-58db-40b2-8fec-77307807e74b   1Gi        RWO            Delete           Bound    bsl-deletion/kibishii-data-kibishii-deployment-0   kibishii-storage-class            6h41m
@@ -110,7 +110,7 @@ func GetPvByPvc(ctx context.Context, pvc string) ([]string, error) {
 
 	CmdLine2 := &common.OsCommandLine{
 		Cmd:  "grep",
-		Args: []string{pvc},
+		Args: []string{namespace + "/" + pvc},
 	}
 
 	CmdLine3 := &common.OsCommandLine{

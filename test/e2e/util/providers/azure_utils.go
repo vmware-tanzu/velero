@@ -226,12 +226,11 @@ func deleteBlob(p pipeline.Pipeline, accountName, containerName, blobName string
 	_, err = blobURL.Delete(ctx, azblob.DeleteSnapshotsOptionNone, azblob.BlobAccessConditions{})
 	return err
 }
-func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error) {
+func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
 	if err != nil {
 		log.Fatal("Fail to get : accountName and accountKey, " + err.Error())
 	}
-
 	credential, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
@@ -250,7 +249,7 @@ func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPref
 	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
 	handleErrors(err)
 
-	fmt.Printf("Finding backup %s blobs in Azure container/bucket %s\n", backupObject, containerName)
+	fmt.Printf("Finding backup %s blobs in Azure container/bucket %s\n", backupName, containerName)
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
 		if err != nil {
@@ -259,8 +258,8 @@ func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPref
 		marker = listBlob.NextMarker
 
 		for _, blobInfo := range listBlob.Segment.BlobItems {
-			if strings.Contains(blobInfo.Name, backupObject) {
-				fmt.Printf("Blob name: %s exist in %s\n", backupObject, blobInfo.Name)
+			if strings.Contains(blobInfo.Name, backupName) {
+				fmt.Printf("Blob name: %s exist in %s\n", backupName, blobInfo.Name)
 				return true, nil
 			}
 		}
@@ -317,7 +316,7 @@ func mapLookup(data map[string]string) func(string) string {
 		return data[key]
 	}
 }
-func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
+func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
 
 	ctx := context.Background()
 
@@ -351,7 +350,7 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupO
 	// // if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse i
 	snapsClient.Authorizer = authorizer
 	snaps := &snapsClient
-	//return ListByResourceGroup(ctx, snaps, envVars[resourceGroupEnvVar], backupObject, snapshotCount)
+	//return ListByResourceGroup(ctx, snaps, envVars[resourceGroupEnvVar], backupName, snapshotCount)
 	req, err := snaps.ListByResourceGroupPreparer(ctx, envVars[resourceGroupEnvVar])
 	if err != nil {
 		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", nil, "Failure preparing request")
@@ -364,11 +363,29 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupO
 	result, err := snaps.ListByResourceGroupResponder(resp)
 	snapshotCountFound := 0
 	backupNameInSnapshot := ""
+	if err != nil {
+		errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
+	}
+	if result.Value == nil {
+		errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
+	}
 	for _, v := range *result.Value {
-		backupNameInSnapshot = *v.Tags["velero.io-backup"]
-		fmt.Println(backupNameInSnapshot)
-		if backupObject == backupNameInSnapshot {
-			snapshotCountFound++
+		if snapshotCheck.EnableCSI {
+			for _, s := range snapshotCheck.SnapshotIDList {
+				fmt.Println("Azure CSI local snapshot CR: " + s)
+				fmt.Println("Azure provider snapshot name: " + *v.Name)
+				if s == *v.Name {
+					fmt.Printf("Azure snapshot %s is created.\n", s)
+					snapshotCountFound++
+				}
+			}
+		} else {
+			fmt.Println(v.Tags)
+			backupNameInSnapshot = *v.Tags["velero.io-backup"]
+			fmt.Println(backupNameInSnapshot)
+			if backupName == backupNameInSnapshot {
+				snapshotCountFound++
+			}
 		}
 	}
 	if err != nil {
