@@ -17,10 +17,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Name of the schedule
-      jsonPath: .metadata.name
-      name: Name
-      type: string
     - description: Status of the schedule
       jsonPath: .status.phase
       name: Status

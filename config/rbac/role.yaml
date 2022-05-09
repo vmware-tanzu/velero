@@ -134,6 +134,26 @@ rules:
 - apiGroups:
   - velero.io
   resources:
+  - resticrepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - resticrepositories/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
   - schedules
   verbs:
   - create
