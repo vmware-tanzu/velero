@@ -41,8 +41,9 @@ func main() {
 				err := removeFolder()
 				if err != nil {
 					fmt.Println(err)
+				} else {
+					fmt.Println("Done cleanup .velero folder")
 				}
-				fmt.Println("Cleanup .velero folder")
 				return
 			}
 		}
@@ -85,7 +86,6 @@ func done() bool {
 func removeFolder() error {
 	children, err := ioutil.ReadDir("/restores")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR reading /restores directory: %s\n", err)
 		return err
 	}
 
