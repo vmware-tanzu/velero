@@ -3,6 +3,12 @@ title: "Support Process"
 layout: docs
 ---
 
+
+Velero provides best effort support through the process on this page for the current version of Velero and n-1 Velero version, including all patch release in the supported minor releases. For example, if the current version is 1.9, the Velero maintainers would offer best effort support for v1.9 and v1.8. If you have a question about a previous Velero version (for example, 1.7), please note that maintainers may ask you to upgrade to a supported version before doing any investigation into your issue.
+
+For more information about Velero testing and supported Kubernetes versions, see Velero's [compatibility matrix](https://github.com/vmware-tanzu/velero/blob/main/README.md#velero-compatibility-matrix).
+
+
 ## Weekly Rotation
 
 The Velero maintainers use a weekly rotation to manage community support. Each week, a different maintainer is the point person for responding to incoming support issues via Slack, GitHub, and the Google group. The point person is *not* expected to be on-call 24x7. Instead, they choose one or more hour(s) per day to be available/responding to incoming issues. They will communicate to the community what that time slot will be each week.
