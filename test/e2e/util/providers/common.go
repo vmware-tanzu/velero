@@ -37,10 +37,10 @@ type ObjectsInStorage interface {
 }
 
 func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
-	fmt.Printf("|| VERIFICATION || - Backup %s should exist in storage [%s]", backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - %s %s should exist in storage [%s]\n", subPrefix, backupName, bslPrefix)
 	exist, _ := IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 	if !exist {
-		return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s is not exist in object store after backup as expected", backupName))
+		return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s is not exist in object store after backup as expected\n", backupName))
 	}
 	fmt.Printf("|| EXPECTED || - Backup %s exist in object storage bucket %s\n", backupName, bslBucket)
 	return nil
@@ -48,11 +48,11 @@ func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bsl
 func ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string, retryTimes int) error {
 	var err error
 	var exist bool
-	fmt.Printf("|| VERIFICATION || - Backup %s should not exist in storage %s", backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - %s %s should not exist in storage %s\n", subPrefix, backupName, bslPrefix)
 	for i := 0; i < retryTimes; i++ {
 		exist, err = IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 		if err != nil {
-			return errors.Wrapf(err, "|| UNEXPECTED || - Failed to get backup %s in object store", backupName)
+			return errors.Wrapf(err, "|| UNEXPECTED || - Failed to get backup %s in object store\n", backupName)
 		}
 		if !exist {
 			fmt.Printf("|| EXPECTED || - Backup %s is not in object store\n", backupName)
@@ -60,7 +60,7 @@ func ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, 
 		}
 		time.Sleep(1 * time.Minute)
 	}
-	return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s still exist in object store after backup deletion", backupName))
+	return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s still exist in object store after backup deletion\n", backupName))
 }
 func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	var s ObjectsInStorage

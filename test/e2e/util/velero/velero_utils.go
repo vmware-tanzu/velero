@@ -47,6 +47,7 @@ import (
 )
 
 const BackupObjectsPrefix = "backups"
+const RestoreObjectsPrefix = "restores"
 const PluginsObjectsPrefix = "plugins"
 
 var pluginsMatrix = map[string]map[string][]string{
@@ -246,19 +247,18 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
-func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace, backupName, namespace, backupLocation string,
-	useVolumeSnapshots bool, selector string) error {
+func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace string, backupCfg BackupConfig) error {
 	args := []string{
 		"--namespace", veleroNamespace,
-		"create", "backup", backupName,
-		"--include-namespaces", namespace,
+		"create", "backup", backupCfg.BackupName,
+		"--include-namespaces", backupCfg.Namespace,
 		"--wait",
 	}
-	if selector != "" {
-		args = append(args, "--selector", selector)
+	if backupCfg.Selector != "" {
+		args = append(args, "--selector", backupCfg.Selector)
 	}
 
-	if useVolumeSnapshots {
+	if backupCfg.UseVolumeSnapshots {
 		args = append(args, "--snapshot-volumes")
 	} else {
 		args = append(args, "--default-volumes-to-restic")
@@ -268,11 +268,13 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace, back
 		// TODO This can be removed if the logic of vSphere plugin bump up to 1.3
 		args = append(args, "--snapshot-volumes=false")
 	}
-	if backupLocation != "" {
-		args = append(args, "--storage-location", backupLocation)
+	if backupCfg.BackupLocation != "" {
+		args = append(args, "--storage-location", backupCfg.BackupLocation)
 	}
-
-	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupName, args)
+	if backupCfg.TTL != 0 {
+		args = append(args, "--ttl", backupCfg.TTL.String())
+	}
+	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupCfg.BackupName, args)
 }
 
 // VeleroBackupExcludeNamespaces uses the veleroCLI to backup a namespace.
@@ -502,7 +504,7 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 	if err != nil {
 		fmt.Print(stdout)
 		fmt.Print(stderr)
-		return nil, errors.Wrap(err, "failed to verify")
+		return nil, errors.Wrap(err, "Failed to get vSphere snapshot ID list from snapshots.backupdriver.cnsdp.vmware.com")
 	}
 	stdout = strings.Replace(stdout, "'", "", -1)
 	lines := strings.Split(stdout, "\n")
@@ -814,9 +816,9 @@ func GetSnapshotCheckPoint(client TestClient, VeleroCfg VerleroConfig, expectCou
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = kibishiiPodNameList
-	if strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+	if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
 		snapshotCheckPoint.EnableCSI = true
-		if err := util.CheckVolumeSnapshotCR(client, kibishiiPodNameList, namespaceBackedUp, backupName); err != nil {
+		if err := util.CheckVolumeSnapshotCR(client, backupName, expectCount); err != nil {
 			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
 		}
 		var err error
@@ -831,4 +833,25 @@ func GetSnapshotCheckPoint(client TestClient, VeleroCfg VerleroConfig, expectCou
 	}
 	fmt.Println(snapshotCheckPoint)
 	return snapshotCheckPoint, nil
+}
+
+func GetBackupTTL(ctx context.Context, veleroNamespace, backupName string) (string, error) {
+
+	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
+		"get", "backup", "-n", veleroNamespace, backupName, "-o=jsonpath='{.spec.ttl}'")
+	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
+	stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
+	if err != nil {
+		fmt.Print(stdout)
+		fmt.Print(stderr)
+		return "", errors.Wrap(err, "failed to verify")
+	}
+	// lines := strings.Split(stdout, "\n")
+	// complete := true
+	// for _, curLine := range lines {
+	// 	fmt.Println(curLine)
+
+	// }
+	// return complete, nil
+	return stdout, err
 }

@@ -19,7 +19,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,7 +28,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	util "github.com/vmware-tanzu/velero/test/e2e/util/csi"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
 
@@ -179,18 +177,25 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 				Expect(AddLabelToPvc(context.Background(), pvc2, bslDeletionTestNs, label_2)).To(Succeed())
 			})
 
+			var BackupCfg BackupConfig
+			BackupCfg.BackupName = backupName_1
+			BackupCfg.Namespace = bslDeletionTestNs
+			BackupCfg.BackupLocation = backupLocation_1
+			BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
+			BackupCfg.Selector = label_1
 			By(fmt.Sprintf("Backup one of PV of sample workload by label-1 - Kibishii by the first BSL %s", backupLocation_1), func() {
 				// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 				// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
 				Expect(VeleroBackupNamespace(oneHourTimeout, VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, backupName_1, bslDeletionTestNs,
-					backupLocation_1, useVolumeSnapshots, label_1)).To(Succeed())
+					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed())
 			})
 
+			BackupCfg.BackupName = backupName_2
+			BackupCfg.BackupLocation = backupLocation_2
+			BackupCfg.Selector = label_2
 			By(fmt.Sprintf("Back up the other one PV of sample workload with label-2 into the additional BSL %s", backupLocation_2), func() {
 				Expect(VeleroBackupNamespace(oneHourTimeout, VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, backupName_2, bslDeletionTestNs,
-					backupLocation_2, useVolumeSnapshots, label_2)).To(Succeed())
+					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed())
 			})
 
 			if useVolumeSnapshots {
@@ -207,14 +212,6 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					By(fmt.Sprintf("Snapshot CR in backup %s should be created", backupName_2), func() {
 						Expect(SnapshotCRsCountShouldBe(context.Background(), bslDeletionTestNs,
 							backupName_2, 1)).To(Succeed())
-					})
-				} else if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
-					By(fmt.Sprintf("CSI VolumeSnapshotContent CR in backup %s should be created", backupName_1), func() {
-						Expect(util.CheckVolumeSnapshotCR(client, []string{podName_1}, bslDeletionTestNs, backupName_1)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot content CR.")
-					})
-
-					By(fmt.Sprintf("CSI VolumeSnapshotContent CR in backup %s should be created", backupName_2), func() {
-						Expect(util.CheckVolumeSnapshotCR(client, []string{podName_2}, bslDeletionTestNs, backupName_2)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot content CR.")
 					})
 				}
 
