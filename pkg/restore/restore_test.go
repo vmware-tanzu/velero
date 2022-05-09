@@ -1270,6 +1270,11 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
+func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggableAction {
+	a.selector = selector
+	return a
+}
+
 // TestRestoreActionModifications runs restores with restore item actions that modify resources, and
 // verifies that that the modified item is correctly created in the API. Verification is done by looking
 // at the full object in the API.
@@ -1329,6 +1334,26 @@ func TestRestoreActionModifications(t *testing.T) {
 			actions: []velero.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(nil)
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").Result()),
+			},
+		},
+		{
+			name:         "action with non-matching label selector doesn't prevent restore",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []velero.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}).addSelector(velero.ResourceSelector{
+					IncludedResources: []string{
+						"Pod",
+					},
+					LabelSelector: "nonmatching=label",
 				}),
 			},
 			want: []*test.APIResource{
