@@ -968,6 +968,76 @@ func TestRestoreItems(t *testing.T) {
 			},
 		},
 		{
+			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("secrets", builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"key-1": []byte("value-1")}).Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
+			},
+			want: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+		},
+		{
+			name:    "update service account labels when service account exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is none",
+			restore: defaultRestore().ExistingResourcePolicy("none").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is not specified, velero behavior is preserved",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+		},
+		{
 			name:    "service account secrets and image pull secrets are restored when service account already exists in cluster",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
@@ -2168,7 +2238,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						ObjectMeta(
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+							// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
 						).ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),

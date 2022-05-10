@@ -95,6 +95,12 @@ func (b *RestoreBuilder) ExcludedResources(resources ...string) *RestoreBuilder 
 	return b
 }
 
+// ExistingResourcePolicy sets the Restore's resource policy.
+func (b *RestoreBuilder) ExistingResourcePolicy(policy string) *RestoreBuilder {
+	b.object.Spec.ExistingResourcePolicy = velerov1api.PolicyType(policy)
+	return b
+}
+
 // IncludeClusterResources sets the Restore's "include cluster resources" flag.
 func (b *RestoreBuilder) IncludeClusterResources(val bool) *RestoreBuilder {
 	b.object.Spec.IncludeClusterResources = &val

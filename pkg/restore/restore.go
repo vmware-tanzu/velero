@@ -1240,6 +1240,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// labels, so copy them from the object we attempted to restore.
 		labels := obj.GetLabels()
 		addRestoreLabels(fromCluster, labels[velerov1api.RestoreNameLabel], labels[velerov1api.BackupNameLabel])
+		fromClusterWithLabels := fromCluster.DeepCopy() // saving the in-cluster object so that we can create label patch if overall patch fails
 
 		if !equality.Semantic.DeepEqual(fromCluster, obj) {
 			switch groupResource {
@@ -1267,15 +1268,56 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				_, err = resourceClient.Patch(name, patchBytes)
 				if err != nil {
 					warnings.Add(namespace, err)
+					// check if there is existingResourcePolicy and if it is set to update policy
+					if len(ctx.restore.Spec.ExistingResourcePolicy) > 0 && ctx.restore.Spec.ExistingResourcePolicy == velerov1api.PolicyTypeUpdate {
+						// remove restore labels so that we apply the latest backup/restore names on the object via patch
+						removeRestoreLabels(fromCluster)
+						//try patching just the backup/restore labels
+						warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, fromClusterWithLabels, namespace, resourceClient)
+						warnings.Merge(&warningsFromUpdate)
+						errs.Merge(&errsFromUpdate)
+					}
 				} else {
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
-				e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
-					obj.GetKind(), obj.GetName())
-				warnings.Add(namespace, e)
+				// check for the presence of existingResourcePolicy
+				if len(ctx.restore.Spec.ExistingResourcePolicy) > 0 {
+					resourcePolicy := ctx.restore.Spec.ExistingResourcePolicy
+					ctx.log.Infof("restore API has resource policy defined %s , executing restore workflow accordingly for changed resource %s %s", resourcePolicy, fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+
+					// existingResourcePolicy is set as none, add warning
+					if resourcePolicy == velerov1api.PolicyTypeNone {
+						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
+							obj.GetKind(), obj.GetName())
+						warnings.Add(namespace, e)
+						// existingResourcePolicy is set as update, attempt patch on the resource and add warning if it fails
+					} else if resourcePolicy == velerov1api.PolicyTypeUpdate {
+						// processing update as existingResourcePolicy
+						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
+						warnings.Merge(&warningsFromUpdateRP)
+						errs.Merge(&errsFromUpdateRP)
+					}
+				} else {
+					// Preserved Velero behavior when existingResourcePolicy is not specified by the user
+					e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
+						obj.GetKind(), obj.GetName())
+					warnings.Add(namespace, e)
+				}
 			}
 			return warnings, errs
+		}
+
+		//update backup/restore labels on the unchanged resources if existingResourcePolicy is set as update
+		if ctx.restore.Spec.ExistingResourcePolicy == velerov1api.PolicyTypeUpdate {
+			resourcePolicy := ctx.restore.Spec.ExistingResourcePolicy
+			ctx.log.Infof("restore API has resource policy defined %s , executing restore workflow accordingly for unchanged resource %s %s ", resourcePolicy, obj.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+			// remove restore labels so that we apply the latest backup/restore names on the object via patch
+			removeRestoreLabels(fromCluster)
+			// try updating the backup/restore labels for the in-cluster object
+			warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, obj, namespace, resourceClient)
+			warnings.Merge(&warningsFromUpdate)
+			errs.Merge(&errsFromUpdate)
 		}
 
 		ctx.log.Infof("Restore of %s, %v skipped: it already exists in the cluster and is the same as the backed up version", obj.GroupVersionKind().Kind, name)
@@ -1830,4 +1872,82 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs
+}
+
+// removeRestoreLabels removes the restore name and the
+// restored backup's name.
+func removeRestoreLabels(obj metav1.Object) {
+	labels := obj.GetLabels()
+
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels[velerov1api.BackupNameLabel] = ""
+	labels[velerov1api.RestoreNameLabel] = ""
+
+	obj.SetLabels(labels)
+}
+
+// updates the backup/restore labels
+func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs Result) {
+	patchBytes, err := generatePatch(fromCluster, fromClusterWithLabels)
+	if err != nil {
+		ctx.log.Errorf("error generating patch for %s %s: %v", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster), err)
+		errs.Add(namespace, err)
+		return warnings, errs
+	}
+
+	if patchBytes == nil {
+		// In-cluster and desired state are the same, so move on to
+		// the next items
+		ctx.log.Errorf("skipped updating backup/restore labels for %s %s: in-cluster and desired state are the same along-with the labels", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+		return warnings, errs
+	}
+
+	// try patching the in-cluster resource (with only latest backup/restore labels)
+	_, err = resourceClient.Patch(fromCluster.GetName(), patchBytes)
+	if err != nil {
+		ctx.log.Errorf("backup/restore label patch attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+		errs.Add(namespace, err)
+	} else {
+		ctx.log.Infof("backup/restore labels successfully updated for %s %s", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+	}
+	return warnings, errs
+}
+
+// function to process existingResourcePolicy as update, tries to patch the diff between in-cluster and restore obj first
+// if the patch fails then tries to update the backup/restore labels for the in-cluster version
+func (ctx *restoreContext) processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs Result) {
+	ctx.log.Infof("restore API has existingResourcePolicy defined as update , executing restore workflow accordingly for changed resource %s %s ", obj.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+	ctx.log.Infof("attempting patch on %s %q", fromCluster.GetKind(), fromCluster.GetName())
+	// remove restore labels so that we apply the latest backup/restore names on the object via patch
+	removeRestoreLabels(fromCluster)
+	patchBytes, err := generatePatch(fromCluster, obj)
+	if err != nil {
+		ctx.log.Errorf("error generating patch for %s %s: %v", obj.GroupVersionKind().Kind, kube.NamespaceAndName(obj), err)
+		errs.Add(namespace, err)
+		return warnings, errs
+	}
+
+	if patchBytes == nil {
+		// In-cluster and desired state are the same, so move on to
+		// the next items
+		ctx.log.Errorf("skipped updating %s %s: in-cluster and desired state are the same", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+		return warnings, errs
+	}
+
+	// try patching the in-cluster resource (resource diff plus latest backup/restore labels)
+	_, err = resourceClient.Patch(obj.GetName(), patchBytes)
+	if err != nil {
+		ctx.log.Errorf("patch attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+		warnings.Add(namespace, err)
+		// try just patching the labels
+		warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, fromClusterWithLabels, namespace, resourceClient)
+		warnings.Merge(&warningsFromUpdate)
+		errs.Merge(&errsFromUpdate)
+	} else {
+		ctx.log.Infof("%s %s successfully updated", obj.GroupVersionKind().Kind, kube.NamespaceAndName(obj))
+	}
+	return warnings, errs
 }

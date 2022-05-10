@@ -92,6 +92,11 @@ type RestoreSpec struct {
 	// Hooks represent custom behaviors that should be executed during or post restore.
 	// +optional
 	Hooks RestoreHooks `json:"hooks,omitempty"`
+
+	// ExistingResourcePolicy specifies the restore behaviour for the kubernetes resource to be restored
+	// +optional
+	// +nullable
+	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
@@ -212,6 +217,14 @@ const (
 	// RestorePhaseFailed means the restore was unable to execute.
 	// The failing error is recorded in status.FailureReason.
 	RestorePhaseFailed RestorePhase = "Failed"
+
+	// PolicyTypeNone means velero will not overwrite the resource
+	// in cluster with the one in backup whether changed/unchanged.
+	PolicyTypeNone PolicyType = "none"
+
+	// PolicyTypeUpdate means velero will try to attempt a patch on
+	// the changed resources.
+	PolicyTypeUpdate PolicyType = "update"
 )
 
 // RestoreStatus captures the current status of a Velero restore
@@ -302,3 +315,6 @@ type RestoreList struct {
 
 	Items []Restore `json:"items"`
 }
+
+// PolicyType helps specify the ExistingResourcePolicy
+type PolicyType string
