@@ -61,6 +61,13 @@ spec:
     matchLabels:
       app: velero
       component: server
+  # Individual object when matched with any of the label selector specified in the set are to be included in the restore. Optional.
+  # orLabelSelectors as well as labelSelector cannot co-exist, only one of them can be specified in the restore request
+  orLabelSelectors:
+  - matchLabels:
+      app: velero
+  - matchLabels:
+      app: data-protection
   # NamespaceMapping is a map of source namespace names to
   # target namespace names to restore into. Any source namespaces not
   # included in the map will be restored into namespaces of the same name.

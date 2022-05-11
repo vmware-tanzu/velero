@@ -162,6 +162,12 @@ func (b *BackupBuilder) LabelSelector(selector *metav1.LabelSelector) *BackupBui
 	return b
 }
 
+// OrLabelSelector sets the Backup's orLabelSelector set.
+func (b *BackupBuilder) OrLabelSelector(orSelectors []*metav1.LabelSelector) *BackupBuilder {
+	b.object.Spec.OrLabelSelectors = orSelectors
+	return b
+}
+
 // SnapshotVolumes sets the Backup's "snapshot volumes" flag.
 func (b *BackupBuilder) SnapshotVolumes(val bool) *BackupBuilder {
 	b.object.Spec.SnapshotVolumes = &val
