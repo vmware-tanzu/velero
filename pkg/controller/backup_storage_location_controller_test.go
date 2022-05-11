@@ -81,7 +81,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 		r := BackupStorageLocationReconciler{
 			Ctx:    ctx,
-			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
+			Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(locations).Build(),
 			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
 				StorageLocation:           "location-1",
 				ServerValidationFrequency: 0,
@@ -91,18 +91,17 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log:               velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctx, ctrl.Request{
-			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
-		})
-
-		Expect(actualResult).To(BeEquivalentTo(ctrl.Result{Requeue: true}))
-		Expect(err).To(BeNil())
-
 		// Assertions
 		for i, location := range locations.Items {
+			actualResult, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Namespace: location.Namespace, Name: location.Name},
+			})
+			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
+			Expect(err).To(BeNil())
+
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err := r.Client.Get(ctx, key, instance)
+			err = r.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
@@ -147,7 +146,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 		r := BackupStorageLocationReconciler{
 			Ctx:    ctx,
-			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
+			Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(locations).Build(),
 			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
 				StorageLocation:           "default",
 				ServerValidationFrequency: 0,
@@ -157,91 +156,19 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			Log:               velerotest.NewLogger(),
 		}
 
-		actualResult, err := r.Reconcile(ctx, ctrl.Request{
-			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
-		})
-
-		Expect(actualResult).To(BeEquivalentTo(ctrl.Result{Requeue: true}))
-		Expect(err).To(BeNil())
-
 		// Assertions
 		for i, location := range locations.Items {
+			actualResult, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Namespace: location.Namespace, Name: location.Name},
+			})
+			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
+			Expect(err).To(BeNil())
+
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err := r.Client.Get(ctx, key, instance)
+			err = r.Client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
-		}
-	})
-
-	It("Should not patch a backup storage location object status phase if the location's validation frequency is specifically set to zero", func() {
-		tests := []struct {
-			backupLocation    *velerov1api.BackupStorageLocation
-			isValidError      error
-			expectedIsDefault bool
-			expectedPhase     velerov1api.BackupStorageLocationPhase
-			wantErr           bool
-		}{
-			{
-				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(0).LastValidationTime(time.Now()).Result(),
-				isValidError:      nil,
-				expectedIsDefault: false,
-				expectedPhase:     "",
-				wantErr:           false,
-			},
-			{
-				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-2").ValidationFrequency(0).LastValidationTime(time.Now()).Result(),
-				isValidError:      nil,
-				expectedIsDefault: false,
-				expectedPhase:     "",
-				wantErr:           false,
-			},
-		}
-
-		// Setup
-		var (
-			pluginManager = &pluginmocks.Manager{}
-			backupStores  = make(map[string]*persistencemocks.BackupStore)
-		)
-		pluginManager.On("CleanupClients").Return(nil)
-
-		locations := new(velerov1api.BackupStorageLocationList)
-		for i, test := range tests {
-			location := test.backupLocation
-			locations.Items = append(locations.Items, *location)
-			backupStores[location.Name] = &persistencemocks.BackupStore{}
-			backupStores[location.Name].On("IsValid").Return(tests[i].isValidError)
-		}
-
-		// Setup reconciler
-		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-		r := BackupStorageLocationReconciler{
-			Ctx:    ctx,
-			Client: fake.NewFakeClientWithScheme(scheme.Scheme, locations),
-			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
-				StorageLocation:           "default",
-				ServerValidationFrequency: 0,
-			},
-			NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-			BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
-			Log:               velerotest.NewLogger(),
-		}
-
-		actualResult, err := r.Reconcile(ctx, ctrl.Request{
-			NamespacedName: types.NamespacedName{Namespace: "ns-1"},
-		})
-
-		Expect(actualResult).To(BeEquivalentTo(ctrl.Result{Requeue: true}))
-		Expect(err).To(BeNil())
-
-		// Assertions
-		for i, location := range locations.Items {
-			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
-			instance := &velerov1api.BackupStorageLocation{}
-			err := r.Client.Get(ctx, key, instance)
-			Expect(err).To(BeNil())
-			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
-			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}
 	})
 })
