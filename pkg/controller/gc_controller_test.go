@@ -53,6 +53,7 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 			sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 			client.VeleroV1(),
 			nil,
+			defaultGCFrequency,
 		).(*gcController)
 	)
 
@@ -114,6 +115,7 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 		sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 		client.VeleroV1(),
 		nil,
+		defaultGCFrequency,
 	).(*gcController)
 
 	keys := make(chan string)
@@ -262,6 +264,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 				sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 				client.VeleroV1(),
 				fakeClient,
+				defaultGCFrequency,
 			).(*gcController)
 			controller.clock = fakeClock
 

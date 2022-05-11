@@ -121,6 +121,7 @@ type serverConfig struct {
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
 	defaultResticMaintenanceFrequency                                       time.Duration
+	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
 }
 
@@ -214,6 +215,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "How long to wait on persistent volumes and namespaces to terminate during a restore before timing out.")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
+	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
 
 	return command
@@ -669,6 +671,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
 			s.veleroClient.VeleroV1(),
 			s.mgr.GetClient(),
+			s.config.garbageCollectionFrequency,
 		)
 
 		return controllerRunInfo{
