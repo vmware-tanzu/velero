@@ -1227,6 +1227,18 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// and which backup they came from.
 	addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
+	// Clear out status.
+
+	objWithoutStatus := obj.DeepCopy()
+	if objWithoutStatus, err = resetStatus(objWithoutStatus); err != nil {
+		errs.Add(namespace, err)
+		return warnings, errs
+	}
+	if !shouldRestoreStatus {
+		ctx.log.Infof("Resetting status for obj %s/%s", obj.GetKind(), obj.GetName())
+		obj = objWithoutStatus
+	}
+
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
 	isAlreadyExistsError, err := isAlreadyExistsError(ctx, obj, restoreErr, resourceClient)
@@ -1255,7 +1267,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		addRestoreLabels(fromCluster, labels[velerov1api.RestoreNameLabel], labels[velerov1api.BackupNameLabel])
 		fromClusterWithLabels := fromCluster.DeepCopy() // saving the in-cluster object so that we can create label patch if overall patch fails
 
-		if !equality.Semantic.DeepEqual(fromCluster, obj) {
+		if !equality.Semantic.DeepEqual(fromCluster, objWithoutStatus) {
 			switch groupResource {
 			case kuberesource.ServiceAccounts:
 				desired, err := mergeServiceAccounts(fromCluster, obj)
