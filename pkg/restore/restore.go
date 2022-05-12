@@ -1256,7 +1256,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
 	// Clear out status.
-
 	objWithoutStatus := obj.DeepCopy()
 	if objWithoutStatus, err = resetStatus(objWithoutStatus); err != nil {
 		errs.Add(namespace, err)
