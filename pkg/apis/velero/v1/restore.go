@@ -86,6 +86,12 @@ type RestoreSpec struct {
 	// +nullable
 	RestorePVs *bool `json:"restorePVs,omitempty"`
 
+	// RestoreStatus specifies which resources we should restore the status
+	// field. If nil, no objects are included. Optional.
+	// +optional
+	// +nullable
+	RestoreStatus *RestoreStatusSpec
+
 	// PreserveNodePorts specifies whether to restore old nodePorts from backup.
 	// +optional
 	// +nullable
@@ -111,6 +117,19 @@ type RestoreSpec struct {
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
 type RestoreHooks struct {
 	Resources []RestoreResourceHookSpec `json:"resources,omitempty"`
+}
+
+type RestoreStatusSpec struct {
+	// IncludedResources specifies the resources to which will restore the status.
+	// If empty, it applies to all resources.
+	// +optional
+	// +nullable
+	IncludedResources []string `json:"includedResources,omitempty"`
+
+	// ExcludedResources specifies the resources to which will not restore the status.
+	// +optional
+	// +nullable
+	ExcludedResources []string `json:"excludedResources,omitempty"`
 }
 
 // RestoreResourceHookSpec defines one or more RestoreResrouceHooks that should be executed based on
