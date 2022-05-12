@@ -206,6 +206,20 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		req.Restore.Spec.ExcludedResources,
 	)
 
+	// Get resource status includes-excludes. Defaults to excluding all resources
+	restoreStatusIncludesExcludes := collections.GetResourceIncludesExcludes(
+		kr.discoveryHelper,
+		[]string{},
+		[]string{"*"},
+	)
+	if req.Restore.Spec.RestoreStatus != nil {
+		restoreStatusIncludesExcludes = collections.GetResourceIncludesExcludes(
+			kr.discoveryHelper,
+			req.Restore.Spec.RestoreStatus.IncludedResources,
+			req.Restore.Spec.RestoreStatus.ExcludedResources,
+		)
+	}
+
 	// Get namespace includes-excludes.
 	namespaceIncludesExcludes := collections.NewIncludesExcludes().
 		Includes(req.Restore.Spec.IncludedNamespaces...).
@@ -268,83 +282,85 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	}
 
 	restoreCtx := &restoreContext{
-		backup:                     req.Backup,
-		backupReader:               req.BackupReader,
-		restore:                    req.Restore,
-		resourceIncludesExcludes:   resourceIncludesExcludes,
-		namespaceIncludesExcludes:  namespaceIncludesExcludes,
-		chosenGrpVersToRestore:     make(map[string]ChosenGroupVersion),
-		selector:                   selector,
-		OrSelectors:                OrSelectors,
-		log:                        req.Log,
-		dynamicFactory:             kr.dynamicFactory,
-		fileSystem:                 kr.fileSystem,
-		namespaceClient:            kr.namespaceClient,
-		restoreItemActions:         resolvedActions,
-		itemSnapshotterActions:     resolvedItemSnapshotterActions,
-		volumeSnapshotterGetter:    volumeSnapshotterGetter,
-		resticRestorer:             resticRestorer,
-		resticErrs:                 make(chan error),
-		pvsToProvision:             sets.NewString(),
-		pvRestorer:                 pvRestorer,
-		volumeSnapshots:            req.VolumeSnapshots,
-		podVolumeBackups:           req.PodVolumeBackups,
-		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
-		resourceClients:            make(map[resourceClientKey]client.Dynamic),
-		restoredItems:              make(map[velero.ResourceIdentifier]struct{}),
-		renamedPVs:                 make(map[string]string),
-		pvRenamer:                  kr.pvRenamer,
-		discoveryHelper:            kr.discoveryHelper,
-		resourcePriorities:         kr.resourcePriorities,
-		resourceRestoreHooks:       resourceRestoreHooks,
-		hooksErrs:                  make(chan error),
-		waitExecHookHandler:        waitExecHookHandler,
-		hooksContext:               hooksCtx,
-		hooksCancelFunc:            hooksCancelFunc,
-		restoreClient:              kr.restoreClient,
+		backup:                         req.Backup,
+		backupReader:                   req.BackupReader,
+		restore:                        req.Restore,
+		resourceIncludesExcludes:       resourceIncludesExcludes,
+		resourceStatusIncludesExcludes: restoreStatusIncludesExcludes,
+		namespaceIncludesExcludes:      namespaceIncludesExcludes,
+		chosenGrpVersToRestore:         make(map[string]ChosenGroupVersion),
+		selector:                       selector,
+		OrSelectors:                    OrSelectors,
+		log:                            req.Log,
+		dynamicFactory:                 kr.dynamicFactory,
+		fileSystem:                     kr.fileSystem,
+		namespaceClient:                kr.namespaceClient,
+		restoreItemActions:             resolvedActions,
+		itemSnapshotterActions:         resolvedItemSnapshotterActions,
+		volumeSnapshotterGetter:        volumeSnapshotterGetter,
+		resticRestorer:                 resticRestorer,
+		resticErrs:                     make(chan error),
+		pvsToProvision:                 sets.NewString(),
+		pvRestorer:                     pvRestorer,
+		volumeSnapshots:                req.VolumeSnapshots,
+		podVolumeBackups:               req.PodVolumeBackups,
+		resourceTerminatingTimeout:     kr.resourceTerminatingTimeout,
+		resourceClients:                make(map[resourceClientKey]client.Dynamic),
+		restoredItems:                  make(map[velero.ResourceIdentifier]struct{}),
+		renamedPVs:                     make(map[string]string),
+		pvRenamer:                      kr.pvRenamer,
+		discoveryHelper:                kr.discoveryHelper,
+		resourcePriorities:             kr.resourcePriorities,
+		resourceRestoreHooks:           resourceRestoreHooks,
+		hooksErrs:                      make(chan error),
+		waitExecHookHandler:            waitExecHookHandler,
+		hooksContext:                   hooksCtx,
+		hooksCancelFunc:                hooksCancelFunc,
+		restoreClient:                  kr.restoreClient,
 	}
 
 	return restoreCtx.execute()
 }
 
 type restoreContext struct {
-	backup                     *velerov1api.Backup
-	backupReader               io.Reader
-	restore                    *velerov1api.Restore
-	restoreDir                 string
-	restoreClient              velerov1client.RestoresGetter
-	resourceIncludesExcludes   *collections.IncludesExcludes
-	namespaceIncludesExcludes  *collections.IncludesExcludes
-	chosenGrpVersToRestore     map[string]ChosenGroupVersion
-	selector                   labels.Selector
-	OrSelectors                []labels.Selector
-	log                        logrus.FieldLogger
-	dynamicFactory             client.DynamicFactory
-	fileSystem                 filesystem.Interface
-	namespaceClient            corev1.NamespaceInterface
-	restoreItemActions         []framework.RestoreItemResolvedAction
-	itemSnapshotterActions     []framework.ItemSnapshotterResolvedAction
-	volumeSnapshotterGetter    VolumeSnapshotterGetter
-	resticRestorer             restic.Restorer
-	resticWaitGroup            sync.WaitGroup
-	resticErrs                 chan error
-	pvsToProvision             sets.String
-	pvRestorer                 PVRestorer
-	volumeSnapshots            []*volume.Snapshot
-	podVolumeBackups           []*velerov1api.PodVolumeBackup
-	resourceTerminatingTimeout time.Duration
-	resourceClients            map[resourceClientKey]client.Dynamic
-	restoredItems              map[velero.ResourceIdentifier]struct{}
-	renamedPVs                 map[string]string
-	pvRenamer                  func(string) (string, error)
-	discoveryHelper            discovery.Helper
-	resourcePriorities         []string
-	hooksWaitGroup             sync.WaitGroup
-	hooksErrs                  chan error
-	resourceRestoreHooks       []hook.ResourceRestoreHook
-	waitExecHookHandler        hook.WaitExecHookHandler
-	hooksContext               go_context.Context
-	hooksCancelFunc            go_context.CancelFunc
+	backup                         *velerov1api.Backup
+	backupReader                   io.Reader
+	restore                        *velerov1api.Restore
+	restoreDir                     string
+	restoreClient                  velerov1client.RestoresGetter
+	resourceIncludesExcludes       *collections.IncludesExcludes
+	resourceStatusIncludesExcludes *collections.IncludesExcludes
+	namespaceIncludesExcludes      *collections.IncludesExcludes
+	chosenGrpVersToRestore         map[string]ChosenGroupVersion
+	selector                       labels.Selector
+	OrSelectors                    []labels.Selector
+	log                            logrus.FieldLogger
+	dynamicFactory                 client.DynamicFactory
+	fileSystem                     filesystem.Interface
+	namespaceClient                corev1.NamespaceInterface
+	restoreItemActions             []framework.RestoreItemResolvedAction
+	itemSnapshotterActions         []framework.ItemSnapshotterResolvedAction
+	volumeSnapshotterGetter        VolumeSnapshotterGetter
+	resticRestorer                 restic.Restorer
+	resticWaitGroup                sync.WaitGroup
+	resticErrs                     chan error
+	pvsToProvision                 sets.String
+	pvRestorer                     PVRestorer
+	volumeSnapshots                []*volume.Snapshot
+	podVolumeBackups               []*velerov1api.PodVolumeBackup
+	resourceTerminatingTimeout     time.Duration
+	resourceClients                map[resourceClientKey]client.Dynamic
+	restoredItems                  map[velero.ResourceIdentifier]struct{}
+	renamedPVs                     map[string]string
+	pvRenamer                      func(string) (string, error)
+	discoveryHelper                discovery.Helper
+	resourcePriorities             []string
+	hooksWaitGroup                 sync.WaitGroup
+	hooksErrs                      chan error
+	resourceRestoreHooks           []hook.ResourceRestoreHook
+	waitExecHookHandler            hook.WaitExecHookHandler
+	hooksContext                   go_context.Context
+	hooksCancelFunc                go_context.CancelFunc
 }
 
 type resourceClientKey struct {
@@ -1354,6 +1370,16 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		ctx.log.Errorf("error restoring %s: %+v", name, restoreErr)
 		errs.Add(namespace, fmt.Errorf("error restoring %s: %v", resourceID, restoreErr))
 		return warnings, errs
+	}
+
+	// if it should restore status, run a UpdateStatus
+	if ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String()) {
+		updated, err := resourceClient.UpdateStatus(obj, metav1.UpdateOptions{})
+		if err != nil {
+			warnings.Add(namespace, err)
+		} else {
+			createdObj = updated
+		}
 	}
 
 	if groupResource == kuberesource.Pods {
