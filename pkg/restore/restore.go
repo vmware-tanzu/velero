@@ -1137,14 +1137,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
 
 	ctx.log.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
-	// Clear out status.
-	if !shouldRestoreStatus {
-		ctx.log.Infof("Resetting status for obj %s/%s", obj.GetKind(), obj.GetName())
-		if obj, err = resetStatus(obj); err != nil {
-			errs.Add(namespace, err)
-			return warnings, errs
-		}
-	}
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
 		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
