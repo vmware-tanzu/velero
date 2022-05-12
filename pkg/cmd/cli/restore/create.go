@@ -85,6 +85,8 @@ type CreateOptions struct {
 	ExistingResourcePolicy  string
 	IncludeResources        flag.StringArray
 	ExcludeResources        flag.StringArray
+	StatusIncludeResources  flag.StringArray
+	StatusExcludeResources  flag.StringArray
 	NamespaceMappings       flag.Map
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
@@ -115,6 +117,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
 	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.StringVar(&o.ExistingResourcePolicy, "existing-resource-policy", "", "Restore Policy to be used during the restore workflow, can be - none or update")
+	flags.Var(&o.StatusIncludeResources, "status-include-resources", "Resources to include in the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
+	flags.Var(&o.StatusExcludeResources, "status-exclude-resources", "Resources to exclude from the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
@@ -277,6 +281,13 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
+	}
+
+	if len([]string(o.StatusIncludeResources)) > 0 {
+		restore.Spec.RestoreStatus = &api.RestoreStatusSpec{
+			IncludedResources: o.StatusIncludeResources,
+			ExcludedResources: o.StatusExcludeResources,
+		}
 	}
 
 	if printed, err := output.PrintWithFormat(c, restore); printed || err != nil {
