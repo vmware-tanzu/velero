@@ -30,6 +30,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
+	. "github.com/vmware-tanzu/velero/test/e2e/orderedresources"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
@@ -101,6 +102,8 @@ var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to
 
 var _ = Describe("[BSL][Deletion][Snapshot] Local backups will be deleted once the corresponding backup storage location is deleted", BslDeletionWithSnapshots)
 var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
+
+var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
 func TestE2e(t *testing.T) {
 	// Skip running E2E tests when running only "short" tests because:
