@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"strings"
@@ -158,6 +159,36 @@ func getProviderVeleroInstallOptions(
 	return io, nil
 }
 
+func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {
+	stdoutPipe, err := checkCMD.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBuf := make([]byte, 16*1024) // If the YAML is bigger than 16K, there's probably something bad happening
+
+	err = checkCMD.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
+
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	if bytesRead == len(jsonBuf) {
+		return nil, errors.New("yaml returned bigger than max allowed")
+	}
+
+	jsonBuf = jsonBuf[0:bytesRead]
+	err = checkCMD.Wait()
+	if err != nil {
+		return nil, err
+	}
+	return &jsonBuf, err
+}
+
 // checkBackupPhase uses VeleroCLI to inspect the phase of a Velero backup.
 func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string,
 	expectedPhase velerov1api.BackupPhase) error {
@@ -165,34 +196,12 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace str
 		backupName)
 
 	fmt.Printf("get backup cmd =%v\n", checkCMD)
-	stdoutPipe, err := checkCMD.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	jsonBuf := make([]byte, 16*1024) // If the YAML is bigger than 16K, there's probably something bad happening
-
-	err = checkCMD.Start()
-	if err != nil {
-		return err
-	}
-
-	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
-
-	if err != nil && err != io.ErrUnexpectedEOF {
-		return err
-	}
-	if bytesRead == len(jsonBuf) {
-		return errors.New("yaml returned bigger than max allowed")
-	}
-
-	jsonBuf = jsonBuf[0:bytesRead]
-	err = checkCMD.Wait()
+	jsonBuf, err := CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}
 	backup := velerov1api.Backup{}
-	err = json.Unmarshal(jsonBuf, &backup)
+	err = json.Unmarshal(*jsonBuf, &backup)
 	if err != nil {
 		return err
 	}
@@ -209,34 +218,12 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 		restoreName)
 
 	fmt.Printf("get restore cmd =%v\n", checkCMD)
-	stdoutPipe, err := checkCMD.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	jsonBuf := make([]byte, 16*1024) // If the YAML is bigger than 16K, there's probably something bad happening
-
-	err = checkCMD.Start()
-	if err != nil {
-		return err
-	}
-
-	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
-
-	if err != nil && err != io.ErrUnexpectedEOF {
-		return err
-	}
-	if bytesRead == len(jsonBuf) {
-		return errors.New("yaml returned bigger than max allowed")
-	}
-
-	jsonBuf = jsonBuf[0:bytesRead]
-	err = checkCMD.Wait()
+	jsonBuf, err := CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}
 	restore := velerov1api.Restore{}
-	err = json.Unmarshal(jsonBuf, &restore)
+	err = json.Unmarshal(*jsonBuf, &restore)
 	if err != nil {
 		return err
 	}
@@ -244,6 +231,67 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 		return errors.Errorf("Unexpected restore phase got %s, expecting %s", restore.Status.Phase, expectedPhase)
 	}
 	return nil
+}
+
+func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	if err != nil {
+		return err
+	}
+	schedule := velerov1api.Schedule{}
+	err = json.Unmarshal(*jsonBuf, &schedule)
+	if err != nil {
+		return err
+	}
+
+	if schedule.Status.Phase != velerov1api.SchedulePhaseEnabled {
+		return errors.Errorf("Unexpected restore phase got %s, expecting %s", schedule.Status.Phase, velerov1api.SchedulePhaseEnabled)
+	}
+	return nil
+}
+
+func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, order map[string]string) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	if err != nil {
+		return err
+	}
+	schedule := velerov1api.Schedule{}
+	err = json.Unmarshal(*jsonBuf, &schedule)
+	if err != nil {
+		return err
+	}
+
+	if schedule.Status.Phase != velerov1api.SchedulePhaseEnabled {
+		return errors.Errorf("Unexpected restore phase got %s, expecting %s", schedule.Status.Phase, velerov1api.SchedulePhaseEnabled)
+	}
+	if reflect.DeepEqual(schedule.Spec.Template.OrderedResources, order) {
+		return nil
+	} else {
+		return fmt.Errorf("resource order %v set in schedule command is not equal with order %v stored in schedule cr", order, schedule.Spec.Template.OrderedResources)
+	}
+}
+
+func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, backupName string, order map[string]string) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "get", "backup", backupName, "-ojson")
+	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	if err != nil {
+		return err
+	}
+	backup := velerov1api.Backup{}
+	err = json.Unmarshal(*jsonBuf, &backup)
+	if err != nil {
+		return err
+	}
+	if backup.Status.Phase != velerov1api.BackupPhaseCompleted {
+		return errors.Errorf("Unexpected restore phase got %s, expecting %s", backup.Status.Phase, velerov1api.BackupPhaseCompleted)
+	}
+	if reflect.DeepEqual(backup.Spec.OrderedResources, order) {
+		return nil
+	} else {
+		return fmt.Errorf("resource order %v set in backup command is not equal with order %v stored in backup cr", order, backup.Spec.OrderedResources)
+	}
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
@@ -320,6 +368,21 @@ func VeleroBackupExec(ctx context.Context, veleroCLI string, veleroNamespace str
 		return err
 	}
 	return checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
+}
+
+func VeleroScheduleDelete(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string) error {
+	args := []string{"--namespace", veleroNamespace, "delete", "schedule", scheduleName, "--confirm"}
+	return VeleroCmdExec(ctx, veleroCLI, args)
+}
+
+func VeleroScheduleCreate(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string, args []string) error {
+	args = append([]string{
+		"--namespace", veleroNamespace, "create", "schedule", scheduleName,
+	}, args...)
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+	return checkSchedulePhase(ctx, veleroCLI, veleroNamespace, scheduleName)
 }
 
 func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
