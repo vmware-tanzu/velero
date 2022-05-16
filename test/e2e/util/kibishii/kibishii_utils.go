@@ -28,7 +28,6 @@ import (
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	util "github.com/vmware-tanzu/velero/test/e2e/util/csi"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
@@ -72,8 +71,13 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName,
-		kibishiiNamespace, backupLocation, useVolumeSnapshots, ""); err != nil {
+	var BackupCfg BackupConfig
+	BackupCfg.BackupName = backupName
+	BackupCfg.Namespace = kibishiiNamespace
+	BackupCfg.BackupLocation = backupLocation
+	BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
+	BackupCfg.Selector = ""
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
@@ -86,10 +90,6 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 			fmt.Println("Waiting for vSphere uploads to complete")
 			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
 				return errors.Wrapf(err, "Error waiting for uploads to complete")
-			}
-		} else if providerName == "azure" && strings.EqualFold(veleroFeatures, "EnableCSI") {
-			if err := util.CheckVolumeSnapshotCR(client, KibishiiPodNameList, kibishiiNamespace, backupName); err != nil {
-				return errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
 			}
 		}
 		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 2, kibishiiNamespace, backupName, KibishiiPodNameList)
@@ -107,14 +107,6 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 	fmt.Printf("Simulating a disaster by removing namespace %s\n", kibishiiNamespace)
 	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
-	}
-	if useVolumeSnapshots && providerName == "azure" && strings.EqualFold(veleroFeatures, "EnableCSI") {
-		err = WaitUntilSnapshotsNotExistInCloud(VeleroCfg.CloudProvider,
-			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
-			backupName, snapshotCheckPoint)
-		if err != nil {
-			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
-		}
 	}
 	time.Sleep(5 * time.Minute)
 
@@ -215,6 +207,7 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	if err := WaitUntilServiceAccountCreated(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, 10*time.Minute); err != nil {
 		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
+
 	// add the image pull secret to avoid the image pull limit issue of Docker Hub
 	if err := PatchServiceAccountWithImagePullSecret(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, registryCredentialFile); err != nil {
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)

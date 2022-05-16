@@ -242,7 +242,13 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 		backup := "backup-rockbands-" + UUIDgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
 
-		err = VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, namespacesStr, "", false, "")
+		var BackupCfg BackupConfig
+		BackupCfg.BackupName = backup
+		BackupCfg.Namespace = namespacesStr
+		BackupCfg.BackupLocation = ""
+		BackupCfg.UseVolumeSnapshots = false
+		BackupCfg.Selector = ""
+		err = VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg)
 		if err != nil {
 			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, "")
 			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)

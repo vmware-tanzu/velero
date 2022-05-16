@@ -118,7 +118,13 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	if err != nil {
 		return err
 	}
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots, ""); err != nil {
+	var BackupCfg BackupConfig
+	BackupCfg.BackupName = backupName
+	BackupCfg.Namespace = deletionTest
+	BackupCfg.BackupLocation = backupLocation
+	BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
+	BackupCfg.Selector = ""
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
 		VeleroBackupLogs(context.Background(), VeleroCfg.UpgradeFromVeleroCLI, veleroNamespace, backupName)
@@ -141,9 +147,6 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	if useVolumeSnapshots {
 		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 2, deletionTest, backupName, KibishiiPodNameList)
 		Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
-		if err != nil {
-			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
-		}
 		err = WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
 			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslConfig,
 			backupName, snapshotCheckPoint)
@@ -185,7 +188,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	}
 
 	backupName = "backup-1-" + UUIDgen.String()
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, deletionTest, backupLocation, useVolumeSnapshots, ""); err != nil {
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
 		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
 		VeleroBackupLogs(context.Background(), VeleroCfg.UpgradeFromVeleroCLI, veleroNamespace, backupName)
