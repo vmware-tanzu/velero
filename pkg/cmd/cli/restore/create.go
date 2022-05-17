@@ -98,7 +98,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Labels:                  flag.NewMap(),
 		IncludeNamespaces:       flag.NewStringArray("*"),
-		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
+		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(',').WithKeyValueDelimiter(':'),
 		RestoreVolumes:          flag.NewOptionalBool(nil),
 		PreserveNodePorts:       flag.NewOptionalBool(nil),
 		IncludeClusterResources: flag.NewOptionalBool(nil),
