@@ -132,7 +132,7 @@ type controllerRunInfo struct {
 
 func NewCommand(f client.Factory) *cobra.Command {
 	var (
-		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
+		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(':')
 		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
 		config                  = serverConfig{
 			pluginDir:                         "/plugins",
