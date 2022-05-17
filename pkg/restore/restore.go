@@ -1128,13 +1128,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
-	// Clear out non-core metadata fields.
-	if obj, err = resetMetadata(obj); err != nil {
+	objStatus, statusFieldExists, statusFieldErr := unstructured.NestedFieldCopy(obj.Object, "status")
+	// Clear out non-core metadata fields and status.
+	if obj, err = resetMetadataAndStatus(obj); err != nil {
 		errs.Add(namespace, err)
 		return warnings, errs
 	}
 
-	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
 
 	ctx.log.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
 
@@ -1247,17 +1247,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// and which backup they came from.
 	addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
-	// Clear out status.
-	objWithoutStatus := obj.DeepCopy()
-	if objWithoutStatus, err = resetStatus(objWithoutStatus); err != nil {
-		errs.Add(namespace, err)
-		return warnings, errs
-	}
-	if !shouldRestoreStatus {
-		ctx.log.Infof("Resetting status for obj %s/%s", obj.GetKind(), obj.GetName())
-		obj = objWithoutStatus
-	}
-
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
 	isAlreadyExistsError, err := isAlreadyExistsError(ctx, obj, restoreErr, resourceClient)
@@ -1273,15 +1262,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs
 		}
 		// Remove insubstantial metadata.
-		fromCluster, err = resetMetadata(fromCluster)
+		fromCluster, err = resetMetadataAndStatus(fromCluster)
 		if err != nil {
 			ctx.log.Infof("Error trying to reset metadata for %s: %v", kube.NamespaceAndName(obj), err)
-			warnings.Add(namespace, err)
-			return warnings, errs
-		}
-		fromCluster, err = resetStatus(fromCluster)
-		if err != nil {
-			ctx.log.Infof("Error trying to reset status for %s: %v", kube.NamespaceAndName(obj), err)
 			warnings.Add(namespace, err)
 			return warnings, errs
 		}
@@ -1292,7 +1275,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		addRestoreLabels(fromCluster, labels[velerov1api.RestoreNameLabel], labels[velerov1api.BackupNameLabel])
 		fromClusterWithLabels := fromCluster.DeepCopy() // saving the in-cluster object so that we can create label patch if overall patch fails
 
-		if !equality.Semantic.DeepEqual(fromCluster, objWithoutStatus) {
+		if !equality.Semantic.DeepEqual(fromCluster, obj) {
 			switch groupResource {
 			case kuberesource.ServiceAccounts:
 				desired, err := mergeServiceAccounts(fromCluster, obj)
@@ -1381,8 +1364,20 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs
 	}
 
+	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
+	if shouldRestoreStatus && statusFieldErr != nil {
+		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
+		ctx.log.Errorf(err.Error())
+		errs.Add(namespace, err)
+		return warnings, errs
+	}
 	// if it should restore status, run a UpdateStatus
-	if shouldRestoreStatus {
+	if statusFieldExists && shouldRestoreStatus {
+		if err := unstructured.SetNestedField(obj.Object, objStatus, "status"); err != nil {
+			ctx.log.Errorf("could not set status field %s: %v", kube.NamespaceAndName(obj), err)
+			errs.Add(namespace, err)
+			return warnings, errs
+		}
 		obj.SetResourceVersion(createdObj.GetResourceVersion())
 		updated, err := resourceClient.UpdateStatus(obj, metav1.UpdateOptions{})
 		if err != nil {
@@ -1703,6 +1698,18 @@ func resetMetadata(obj *unstructured.Unstructured) (*unstructured.Unstructured, 
 func resetStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	delete(obj.UnstructuredContent(), "status")
 	return obj, nil
+}
+
+func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	newObj, err := resetMetadata(obj)
+	if err != nil {
+		return nil, err
+	}
+	newObj, err = resetStatus(obj)
+	if err != nil {
+		return nil, err
+	}
+	return newObj, nil
 }
 
 // addRestoreLabels labels the provided object with the restore name and the
