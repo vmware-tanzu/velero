@@ -3,7 +3,7 @@ title: "Cluster migration"
 layout: docs
 ---
 
-Velero's backup and restore capabilities make it a valuable tool for migrating your data between clusters, helping you perform many common workflows such as upgrading Kubernetes versions or disaster recovery. Cluster migration with Velero is based on Velero's [object storage sync](how-velero-works.md#object-storage-sync) functionality, which is responsible for syncing Velero resources from your designated object storage to your cluster. This means that to perform cluster migration with Velero you must point each Velero instance running on clusters involved with the migration to the same cloud object storage location.
+Velero's backup and restore capabilities make it a valuable tool for migrating your data between clusters. Cluster migration with Velero is based on Velero's [object storage sync](how-velero-works.md#object-storage-sync) functionality, which is responsible for syncing Velero resources from your designated object storage to your cluster. This means that to perform cluster migration with Velero you must point each Velero instance running on clusters involved with the migration to the same cloud object storage location.
 
 This page outlines a cluster migration scenario and some common configurations you will need to start using Velero to begin migrating data.
 
@@ -36,13 +36,13 @@ This scenario steps through the migration of resources from Cluster 1 to Cluster
     default   aws        velero-migration-demo   Available   2022-05-13 13:41:30 +0800 CST   ReadWrite     true
     ```
 
-1. Still on Cluster 1, make sure you have a backup of your cluster. Replace `<BACKUP-NAME>` with a name for your back up.
+1. Still on Cluster 1, make sure you have a backup of your cluster. Replace `<BACKUP-NAME>` with a name for your backup.
 
     ```
     velero backup create <BACKUP-NAME>
     ```
 
-    Alternatively, you can create a [scheduled back up](https://velero.io/docs/main/backup-reference/#schedule-a-backup) of your data with the Velero `schedule` operation. This is the recommended way to make sure your data is automatically backed up according to the schedule you define.
+    Alternatively, you can create a [scheduled backup](https://velero.io/docs/main/backup-reference/#schedule-a-backup) of your data with the Velero `schedule` operation. This is the recommended way to make sure your data is automatically backed up according to the schedule you define.
 
     The default backup retention period, expressed as TTL (time to live), is 30 days (720 hours); you can use the `--ttl <DURATION>` flag to change this as necessary. See [how velero works](how-velero-works.md#set-a-backup-to-expire) for more information about backup expiry.
 
@@ -52,7 +52,7 @@ This scenario steps through the migration of resources from Cluster 1 to Cluster
     velero install --provider aws --image velero/velero:v1.8.0 --plugins velero/velero-plugin-for-aws:v1.4.0 --bucket velero-migration-demo --secret-file xxxx/aws-credentials-cluster2 --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2
     ```
 
-    Alternatively you could configure `BackupStorageLocations` or `VolumeSnapshotLocations` after installing Velero on Cluster 2, pointing to the `--bucket` location used by Cluster 1. To do this you can use to `velero backup-location create` and `velero snapshot-location create` commands.
+    Alternatively you could configure `BackupStorageLocations` and `VolumeSnapshotLocations` after installing Velero on Cluster 2, pointing to the `--bucket` location and  `region` used by Cluster 1. To do this you can use to `velero backup-location create` and `velero snapshot-location create` commands.
 
     ```
     velero backup-location create bsl --provider aws --bucket velero-migration-demo --config region=us-east-2 --access-mode=ReadOnly
@@ -61,21 +61,27 @@ This scenario steps through the migration of resources from Cluster 1 to Cluster
     Make sure to configure the `BackupStorageLocations` as read-only
     by using the `--access-mode=ReadOnly` flag for `velero backup-location create`. See `velero backup-location –help` for more information about the available flags for this command.
 
+    ```
+    velero snapshot-location create vsl --provider aws --config region=us-east-2
+    ```
+    See `velero snapshot-location –help` for more information about the available flags for this command.
+
+
 1.  Continuing on Cluster 2, make sure that the Velero Backup object created on Cluster 1 is available. `<BACKUP-NAME>` should be the same name used to create your backup of Cluster 1.
 
     ```
     velero backup describe <BACKUP-NAME>
     ```
 
-    Velero resources are [synchronized](how-velero-works.md#object-storage-sync) with the backup files in object storage. This means that the Velero resources created by Cluster 1's backup will be synced to Cluster 2 through the shared Backup Storage Location. Once the sync occurs, you will be able to access the back up from Cluster 1 on Cluster 2 using Velero commands. The default sync interval is 1 minute, so you may need to wait before checking for the back up's availability on Cluster 2. You can configure this interval with the `--backup-sync-period` flag to the Velero server on Cluster 2.
+    Velero resources are [synchronized](how-velero-works.md#object-storage-sync) with the backup files in object storage. This means that the Velero resources created by Cluster 1's backup will be synced to Cluster 2 through the shared Backup Storage Location. Once the sync occurs, you will be able to access the backup from Cluster 1 on Cluster 2 using Velero commands. The default sync interval is 1 minute, so you may need to wait before checking for the backup's availability on Cluster 2. You can configure this interval with the `--backup-sync-period` flag to the Velero server on Cluster 2.
 
-1.  On Cluster 2, once you have confirmed that the right back up is available, you can restore everything to Cluster 2.
+1.  On Cluster 2, once you have confirmed that the right backup is available, you can restore everything to Cluster 2.
 
     ```
     velero restore create --from-backup <BACKUP-NAME>
     ```
 
-    Make sure `<BACKUP-NAME>` is the same back up name from Cluster 1.
+    Make sure `<BACKUP-NAME>` is the same backup name from Cluster 1.
 
 ## Verify Both Clusters
 
