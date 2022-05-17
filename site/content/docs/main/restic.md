@@ -36,6 +36,10 @@ velero install --use-restic
 
 When using Restic on a storage provider that doesn't have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
+Velero handles the creation of the restic repo prefix for Amazon, Azure, and GCP plugins, if you are using a different [provider plugin](supported-providers.md), then you will need to make sure the `resticRepoPrefix` is set in the [BackupStorageLocation  `config`](api-types/backupstoragelocation.md). The value for `resticRepoPrefix` should be the cloud storage URL where all namespace restic repos will be created. Velero creates one restic repo per namespace. For example, if backing up 2 namespaces, namespace1 and namespace2, using restic on AWS, the `resticRepoPrefix` would be something like `s3:s3-us-west-2.amazonaws.com/bucket/restic` and the full restic repo path for namespace1 would be `s3:s3-us-west-2.amazonaws.com/bucket/restic/ns1` and for namespace2 would be `s3:s3-us-west-2.amazonaws.com/bucket/restic/ns2`.
+
+There may be additional installation steps depending on the cloud provider plugin you are using. You should refer to the [plugin specific documentation](supported-providers.md) for the must up to date information.
+
 ### Configure Restic DaemonSet spec
 
 After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the Restic DaemonSet spec. The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
@@ -169,7 +173,6 @@ kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
   --patch '[{"op":"add","path":"/mountOptions/-","value":"nouser_xattr"}]'
 ```
 
-
 ## To back up
 
 Velero supports two approaches of discovering pod volumes that need to be backed up using Restic:
@@ -183,7 +186,7 @@ The following sections provide more details on the two approaches.
 
 In this approach, Velero will back up all pod volumes using Restic with the exception of:
 
-- Volumes mounting the default service account token, kubernetes secrets, and config maps
+- Volumes mounting the default service account token, Kubernetes secrets, and config maps
 - Hostpath volumes
 
 It is possible to exclude volumes from being backed up using the `backup.velero.io/backup-volumes-excludes` annotation on the pod.
@@ -412,7 +415,7 @@ data:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     runAsUser: 1001
-    runAsGroup: 999 
+    runAsGroup: 999
 
 ```
 
