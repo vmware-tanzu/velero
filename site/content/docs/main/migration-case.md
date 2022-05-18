@@ -58,8 +58,8 @@ This scenario steps through the migration of resources from Cluster 1 to Cluster
     velero backup-location create bsl --provider aws --bucket velero-migration-demo --config region=us-east-2 --access-mode=ReadOnly
     ```
 
-    Make sure to configure the `BackupStorageLocations` as read-only
-    by using the `--access-mode=ReadOnly` flag for `velero backup-location create`. See `velero backup-location –help` for more information about the available flags for this command.
+    Its recommended that you configure the `BackupStorageLocations` as read-only
+    by using the `--access-mode=ReadOnly` flag for `velero backup-location create`. This will make sure that the backup is not deleted from the object store by mistake during the restore. See `velero backup-location –help` for more information about the available flags for this command.
 
     ```
     velero snapshot-location create vsl --provider aws --config region=us-east-2
