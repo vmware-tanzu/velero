@@ -1135,7 +1135,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs
 	}
 
-
 	ctx.log.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
