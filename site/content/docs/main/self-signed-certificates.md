@@ -46,3 +46,12 @@ Error 116 represents certificate required as seen here in [error codes](https://
 Velero as a client does not include its certificate while performing SSL handshake with the server.
 From [TLS 1.3 spec](https://tools.ietf.org/html/rfc8446), verifying client certificate is optional on the server.
 You will need to change this setting on the server to make it work.
+
+
+## Skipping TLS verification
+
+**Note:** The `--insecure-skip-tls-verify` flag is insecure and susceptible to man-in-the-middle attacks and meant to help your testing and developing scenarios in an on-premise environment. Using this flag in production is not recommended.
+
+Velero provides a way for you to skip TLS verification on the object store by passing the `--insecure-skip-tls-verify` flag with Velero commands. If true, the object store's TLS certificate will not be checked for validity before Velero connects to the object store or Restic repo. You can permanently skip TLS verification for an object store by setting `Spec.Config.InsecureSkipTLSVerify` to true in the [BackupStorageLocation](api-types/backupstoragelocation.md) CRD.
+
+This flag is currently only implemented for use with AWS provider plugin and Restic.
