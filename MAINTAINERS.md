@@ -12,6 +12,7 @@
 | Wenkai Yin | [ywk253100](https://github.com/ywk253100) | [VMware](https://www.github.com/vmware/) |
 | Xun Jiang | [blackpiglet](https://github.com/blackpiglet) | [VMware](https://www.github.com/vmware/) |
 | Ming Qiu | [qiuming-best](https://github.com/qiuming-best) | [VMware](https://www.github.com/vmware/) |
+| Shubham Pampattiwar | [shubham-pampattiwar](https://github.com/shubham-pampattiwar) | [OpenShift](https://github.com/openshift)
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
