@@ -61,13 +61,13 @@ When you run `velero restore create`:
 
 1. The Velero client makes a call to the Kubernetes API server to create a [`Restore`](api-types/restore.md) object.
 
-1. The `RestoreController` notices the new Restore object and preforms validation.
+1. The `RestoreController` notices the new Restore object and performs validation.
 
 1. The `RestoreController` fetches the backup information from the object storage service. It then runs some preprocessing on the backed up resources to make sure the resources will work on the new cluster. For example, using the [backed-up API versions](#backed-up-api-versions) to verify that the restore resource will work on the target cluster.
 
 1. The `RestoreController` starts the restore process, restoring each eligible resource one at a time.
 
-By default, Velero performs a non-destructive restore, meaning that it won't delete any data on the target cluster. If a resource in the backup already exists in the target cluster, Velero will skip that resource. You can configure Velero to use an update policy instead using the [`--existing-resource-policy`](restore-reference.md#restore-existing-resource-policy) restore flag. When this flag is set to `update`, Velero will attempt to update an existing resource in the target cluster to match the resource from the backup. 
+By default, Velero performs a non-destructive restore, meaning that it won't delete any data on the target cluster. If a resource in the backup already exists in the target cluster, Velero will skip that resource. You can configure Velero to use an update policy instead using the [`--existing-resource-policy`](restore-reference.md#restore-existing-resource-policy) restore flag. When this flag is set to `update`, Velero will attempt to update an existing resource in the target cluster to match the resource from the backup.
 
 For more details about the Velero restore process, see the [Restore Reference](restore-reference.md) page.
 
