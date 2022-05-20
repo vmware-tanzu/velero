@@ -3,27 +3,13 @@ title: "Restore Reference"
 layout: docs
 ---
 
-## Restoring Into a Different Namespace
-
-Velero can restore resources into a different namespace than the one they were backed up from. To do this, use the `--namespace-mappings` flag:
-
-```bash
-velero restore create RESTORE_NAME \
-  --from-backup BACKUP_NAME \
-  --namespace-mappings old-ns-1:new-ns-1,old-ns-2:new-ns-2
-```
-## What happens when user removes restore objects
-A **restore** object represents the restore operation. There are two types of deletion for restore objects:
-1. Deleting with **`velero restore delete`**.
-This command will delete the custom resource representing it, along with its individual log and results files. But, it will not delete any objects that were created by it from your cluster.
-2. Deleting with **`kubectl -n velero delete restore`**.
-This command will delete the custom resource representing the restore, but will not delete log/results files from object storage, or any objects that were created during the restore in your cluster.
+The page outlines how to use the `velero restore` command, configuration options for restores, and describes the main process Velero uses to perform restores.
 
 ## Restore command-line options
-To see all commands for restores, run : `velero restore --help`
-To see all options associated with a specific command, provide the --help flag to that command. For example,  **`velero restore create --help`** shows all options associated with the **create** command.
+To see all commands for restores, run `velero restore --help`
+To see all options associated with a specific command, provide the --help flag to that command. For example,  `velero restore create --help` shows all options associated with the `create` command.
 
-To list all options of restore, use **`velero restore --help`**
+To list all options of restore, use `velero restore --help`.
 
 ```Usage:
   velero restore [command]
@@ -36,57 +22,113 @@ Available Commands:
   logs        Get restore logs
 ```
 
-## What happens to NodePorts when restoring Services
+## Detailed Restore workflow
 
-**Auto assigned** NodePorts **deleted** by default and Services get new **auto assigned** nodePorts after restore.
+The following is an overview of Velero's restore process that starts after you run `velero restore create`.
 
-**Explicitly specified** NodePorts auto detected using **`last-applied-config`** annotation and **preserved** after restore.  NodePorts can be explicitly specified as .spec.ports[*].nodePort field on Service definition.
+1. The Velero client makes a call to the Kubernetes API server to create a [`Restore`](api-types/restore.md) object.
 
-#### Always Preserve NodePorts
+1. The `RestoreController` notices the new Restore object and preforms validation.
 
-It is not always possible to set nodePorts explicitly on some big clusters because of operation complexity. Official Kubernetes documents states that preventing port collisions is responsibility of the user when explicitly specifying nodePorts:
+1. The `RestoreController` fetches basic information about the backup being restored, like the [BackupStorageLocation](locations.md) (BSL). It also a tarball of the cluster resources in the backup, any volumes that will be restored using Restic, and any volume snapshots to be restored.
 
-```
-If you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.
+1. The `RestoreController` then extracts the tarball of backup cluster resources to the /tmp folder and preforms some pre-processing on the resources, including
 
-https://kubernetes.io/docs/concepts/services-networking/service/#nodeport
-```
+    * Sorting the resources to help Velero decide the [restore order](#resource-restore-order) to use.
 
-The clusters which are not explicitly specifying nodePorts still may need to restore original NodePorts in case of disaster. Auto assigned nodePorts most probably defined on Load Balancers which located front side of cluster.  Changing all these nodePorts on Load Balancers is another operation complexity after disaster if nodePorts are changed.
+    * Attempting to discover the resources by their Kubernetes [Group Version Resource (GVR)](https://kubernetes.io/docs/reference/using-api/api-concepts/). If a resource is not discoverable, Velero will exclude it from the restore. See more about how [Velero backs up API versions](#backed-up-api-versions)
 
-Velero has a flag to let user deciding the preservation of nodePorts. **`velero restore create`** sub command has  **`--preserve-nodeports`** flag to **preserve** Service nodePorts **always** regardless of nodePorts **explicitly specified** or **not**. This flag used for preserving the original nodePorts from backup and can be used as **`--preserve-nodeports`** or **`--preserve-nodeports=true`**
+    * Applying any configured [resource filters](resource-filtering.md).
 
-If this flag given and/or set to true, Velero does not remove the nodePorts when restoring Service and tries to use the nodePorts which written on backup.
+    * Remapping target namespace according to specified [`--namespace-mappings`](#restoring-into-a-different-namespace) restore option.
 
-Trying to preserve nodePorts may cause **port conflicts** when restoring on situations below:
+1. The `RestoreController` begins restoring the eligible resources one at a time. Valero unmarshalls the current resource into a Kubernetes resource object. Depending on the type of resource and restore options you specified, Velero will make the following modifications to the resource or preparations to the target cluster before attempting to create the resource,
 
-- If the nodePort from the backup already allocated on the target cluster then Velero prints error log as shown below and continue to restore operation.
+    * The `RestoreController` makes sure the target namespace exists. If the target namespace does not exist, then the `RestoreController` will create a new one on the cluster.
 
-  ```
-  time="2020-11-23T12:58:31+03:00" level=info msg="Executing item action for services" logSource="pkg/restore/restore.go:1002" restore=velero/test-with-3-svc-20201123125825
+    * If the resource is a Persistent Volume (PV), the `RestoreController` will [rename](#persistent-volume-rename) the PV and [remap](#restoring-into-a-different-namespace) its namespace.
 
-  time="2020-11-23T12:58:31+03:00" level=info msg="Restoring Services with original NodePort(s)" cmd=_output/bin/linux/amd64/velero logSource="pkg/restore/service_action.go:61" pluginName=velero restore=velero/test-with-3-svc-20201123125825
+    * If the resource is a Persistent Volume Claim (PVC), the `RestoreController` will modify the [PVC metadata](#pvc-restore).
 
-  time="2020-11-23T12:58:31+03:00" level=info msg="Attempting to restore Service: hello-service" logSource="pkg/restore/restore.go:1107" restore=velero/test-with-3-svc-20201123125825
+    * Execute the resource’s `RestoreItemAction` [custom plugins](custom-plugins/), if you have configured one.
 
-  time="2020-11-23T12:58:31+03:00" level=error msg="error restoring hello-service: Service \"hello-service\" is invalid: spec.ports[0].nodePort: Invalid value: 31536: provided port is already allocated" logSource="pkg/restore/restore.go:1170" restore=velero/test-with-3-svc-20201123125825
-  ```
+    * Update the resource object’s namespace if a remapped namespace is specified.
 
+    * The `RestoreController` adds a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the resource. This can help you easily identify restored resources and which backup they were restored from.
 
+1. The `RestoreController` creates the resource object on the target cluster. If the resource is a PV then the `RestoreController` will restore the PV data from the [durable snapshot](#durable-snapshot-pv-restore), [Restic](#restic-pv-restore), or [CSI snapshot](#csi-pv-restore) depending on how the PV was backed up.
 
-- If the nodePort from the backup is not in the nodePort range of target cluster then Velero prints error log as below and continue to restore operation. Kubernetes default nodePort range is 30000-32767 but on the example cluster nodePort range is 20000-22767 and tried to restore Service with nodePort 31536
+    If the resource already exists in the target cluster, which is determined by the Kubernetes API during resource creation, the `RestoreController` will skip the resource. The only [exception](#restore-existing-resource-policy) are Service Accounts, which Velero will attempt to merge differences between the backed up ServiceAccount into the ServiceAccount on the target cluster. You can [change the default existing resource restore policy](#restore-existing-resource-policy) to update resources instead of skipping them using the `--existing-resource-policy`.
 
-  ```
-  time="2020-11-23T13:09:17+03:00" level=info msg="Executing item action for services" logSource="pkg/restore/restore.go:1002" restore=velero/test-with-3-svc-20201123130915
+1. Once the resource is created on the target cluster, Velero may take some additional steps or wait for additional processes to complete before moving onto the next resource to restore.
 
-  time="2020-11-23T13:09:17+03:00" level=info msg="Restoring Services with original NodePort(s)" cmd=_output/bin/linux/amd64/velero logSource="pkg/restore/service_action.go:61" pluginName=velero restore=velero/test-with-3-svc-20201123130915
+    * If the resource is a Pod, the `RestoreController` will execute any [Restore Hooks](restore-hooks.md) and wait for the hook to finish
+    * If the resource is a PV restored by Restic, the `RestoreController` waits for Restic’s restore to complete. The `RestoreController` sets a timeout for any resources restored with Restic during a restore. The default timeout is 4 hours, but you can configure this be setting the `--restic-timeout` restore option.
+    * If the resource is a Custom Resource Definition, the `RestoreController` waits for its availability in the cluster, the timeout is 1 minute.
 
-  time="2020-11-23T13:09:17+03:00" level=info msg="Attempting to restore Service: hello-service" logSource="pkg/restore/restore.go:1107" restore=velero/test-with-3-svc-20201123130915
+    If any failures happen finishing these steps, the `RestoreController` will log an error in the restore result and will continue restoring.
 
-  time="2020-11-23T13:09:17+03:00" level=error msg="error restoring hello-service: Service \"hello-service\" is invalid: spec.ports[0].nodePort: Invalid value: 31536: provided port is not in the valid range. The range of valid ports is 20000-22767" logSource="pkg/restore/restore.go:1170" restore=velero/test-with-3-svc-20201123130915
-  ```
+## Restore order
 
-## Changing PV/PVC Storage Classes
+By default, Velero will restore resources in the following order:
+
+* Custom Resource Definitions
+* Namespaces
+* StorageClasses
+* VolumeSnapshotClasses
+* VolumeSnapshotContents
+* VolumeSnapshots
+* Persistent Volumes
+* Persistent Volume Claims
+* ConfigMaps
+* ServiceAccounts
+* Pods
+
+It's recommended that you use the default order for your restores. You are able to customize this order if you need to by setting the `--restore-resource-priorities` flag on the Velero server and specifying a different resource order. This customized order will apply to all future restores. You don't have to specify all resources in the `--restore-resource-priorities` flag. Velero will append resources not listed to the end of your customized list in alphabetical order.
+
+## Restoring Persistent Volumes and Persistent Volume Claims
+
+Velero has three approaches when restoring a PV, depending on how the backup was taken.
+
+1. When restoring a snapshot, Velero statically creates the PV and then binds it to a restored PVC. Velero's PV rename and remap process is used only in this case because this is the only case where Velero creates the PV resource directly.
+1. When restoring with Restic, Velero uses Kubernetes’ [dynamic provision process](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) to provision the PV after creating the PVC. In this case, the PV object is not actually created by Velero.
+1. When restoring with the [CSI plugin](csi.md), the PV is created from a CSI snapshot by the CSI driver. Velero doesn’t create the PV directly, instead Velero creates a PVC with its DataSource referring to the CSI VolumeSnapshot object.
+
+### Snapshot PV Restore
+
+PV data backed up by durable snapshots is restored by VolumeSnapshot plugins. Velero calls the plugins’ interface to create a volume from a snapshot. The plugin returns the volume’s volumeID. This ID is created by storage vendors and will be updated into the PV object created by Velero, so that the PV object is connected to the volume restored from a snapshot.
+
+### Restic PV Restore
+
+For more information on Restic restores, see the [Restic integration](restic.md#restore) page.
+
+### CSI PV Restore
+
+A PV backed up by CSI snapshots is restored by the [CSI plugin](csi). This happens when restoring the PVC object that has been snapshotted by CSI. The CSI VolumeSnapshot object name is specified with the PVC during backup as the annotation `velero.io/volume-snapshot-name`. After validating the VolumeSnapshot object, Velero updates the PVC by adding a `DataSource` field and setting its value to the VolumeSnapshot name.
+
+### Persistent Volume Rename
+
+Velero will rename a restored PV during restore if both the below two conditions are met,
+
+1. The PV already exists
+1. The PV’s namespace has been [remapped]()
+
+If the both conditions are met, Velero will create the PV with a new name in the namespace you have specified for the remap. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the new PV object.
+
+If the PV does not exist, Velero will create the PV without renaming it.
+
+If you attempt to restore a PV to its original namespace, without remapping the namespace, Velero will not rename it. If a PV exists already in that namespace, the restored PV creation attempt will fail, with an `Already Exist` error from the Kubernetes API Server.
+
+### PVC Restore
+
+PVC objects are created the same way as other Kubernetes resources during a restore, with some specific changes:
+* For a dynamic binding PVCs, Velero removes the fields related to bindings from the PVC object. This enables the default Kubernetes [dynamic binding process](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#binding) to be used for this PVC. The fields include:
+    * volumeName
+    * pv.kubernetes.io/bind-completed annotation
+    * pv.kubernetes.io/bound-by-controller annotation
+* For a PVC that is bound by Velero Restore, if the target PV has been renamed by the [PV restore process](#persistent-volume-rename), the RestoreController renames the `volumeName` field of the PVC object.
+
+### Changing PV/PVC Storage Classes
 
 Velero can change the storage class of persistent volumes and persistent volume claims during restores. To configure a storage class mapping, create a config map in the Velero namespace like the following:
 
@@ -115,7 +157,7 @@ data:
   <old-storage-class>: <new-storage-class>
 ```
 
-## Changing PVC selected-node
+### Changing PVC selected-node
 
 Velero can update the selected-node annotation of persistent volume claim during restores, if selected-node doesn't exist in the cluster then it will remove the selected-node annotation from PersistentVolumeClaim. To configure a node mapping, create a config map in the Velero namespace like the following:
 
@@ -142,3 +184,78 @@ data:
   # node name and the value is the new node name.
   <old-node-name>: <new-node-name>
 ```
+
+## Restoring into a different namespace
+
+Velero can restore resources into a different namespace than the one they were backed up from. To do this, use the `--namespace-mappings` flag:
+
+```bash
+velero restore create <RESTORE_NAME> \
+  --from-backup <BACKUP_NAME> \
+  --namespace-mappings old-ns-1:new-ns-1,old-ns-2:new-ns-2
+```
+
+For example, A Persistent Volume object has a reference to the Persistent Volume Claim’s namespace in the field `Spec.ClaimRef.Namespace`. If you specify that Velero should remap the target namespace during the restore, Velero will change the  `Spec.ClaimRef.Namespace` field on the PV object from `old-ns-1` to `new-ns-1`.
+
+## Restore existing resource policy
+
+By default, Velero is configured to be non-destructive during a restore. This means that it will never overwrite data that already exits in your cluster. When Velero attempts to create a resource during a restore, the resource being restored is compared to the existing resources on the cluster by the Kubernetes API Server. The Kubernetes API Server throws an `AlreadyExists` error if the resources already exists which Velero handles in the following ways,
+
+  * If the existing resource in the target cluster is the same as the one Velero is attempting to restore, Velero will log the `AlreadyExists` error in the logs, skip restoring this resource, and continue restoring the next resource.
+
+  * If the existing resource is not the same as the one to be restored, for example, the resources have different labels, the restore of the resource will abort and marked as failed in the restore. Velero will continue with restoring the next resource.
+
+    An exception to the default restore policy are ServiceAccounts. If a ServiceAccounts being restored already exists on the target cluster, Velero will attempt to merge the fields of a ServiceAccount from the backup into the existing ServiceAccount by appending Secrets and ImagePullSecrets from the backed-up ServiceAccount, leaving existing labels and annotations on the existing ServiceAccount and adding and non-existing labels and annotations from the backed-up ServiceAccount.
+
+You can change Velero's default behavior to `update` existing resources with the `--existing-resource-policy` restore flag. If you chose to have `--existing-resource-policy=update`,
+
+* If the existing resource in the target cluster is the same, Velero will add the `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the existing resource. If labels patch fails Velero adds a restore error.
+
+* If the existing resource in the target cluster is different from the back-up, Velero will first try to patch the existing resource to be like the backup resource. If the patch is successful, Velero will add the `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries to update the backup/restore labels on the resource, if the labels patch also fails then Velero adds restore error.
+
+## Removing a Restore object
+
+There are two ways to delete a Restore object:
+
+1. Deleting with `velero restore delete` will delete the Custom Resource representing the restore, along with its individual log and results files. It will not delete any objects that were created by the restore in your cluster.
+2. Deleting with `kubectl -n velero delete restore` will delete the Custom Resource representing the restore. It will not delete restore log or results files from object storage, or any objects that were created during the restore in your cluster.
+
+## What happens to NodePorts when restoring Services
+
+During a restore, Velero deletes **Auto assigned** NodePorts by default and Services get new **auto assigned** nodePorts after restore.
+
+Velero auto detects **explicitly specified** NodePorts using **`last-applied-config`** annotation and they are **preserved** after restore. NodePorts can be explicitly specified as `.spec.ports[*].nodePort` field on Service definition.
+
+### Always Preserve NodePorts
+
+It is not always possible to set nodePorts explicitly on some big clusters because of operation complexity. As the Kubernetes [NodePort documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) states, "if you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.""
+
+The clusters which are not explicitly specifying nodePorts may still need to restore original NodePorts in the event of a disaster. Auto assigned nodePorts are typically defined on Load Balancers located in front of cluster. Changing all these nodePorts on Load Balancers is another operation complexity you are responsible for updating after disaster if nodePorts are changed.
+
+Use the `velero restore create ` command's `--preserve-nodeports` flag to preserve Service nodePorts always, regardless of whether nodePorts are explicitly specified or not. This flag is used for preserving the original nodePorts from a backup and can be used as `--preserve-nodeports` or `--preserve-nodeports=true`. If this flag is present, Velero will not remove the nodePorts when restoring a Service, but will try to use the nodePorts from the backup.
+
+Trying to preserve nodePorts may cause port conflicts when restoring on situations below:
+
+- If the nodePort from the backup is already allocated on the target cluster then Velero prints error log as shown below and continues the restore operation.
+
+  ```
+  time="2020-11-23T12:58:31+03:00" level=info msg="Executing item action for services" logSource="pkg/restore/restore.go:1002" restore=velero/test-with-3-svc-20201123125825
+
+  time="2020-11-23T12:58:31+03:00" level=info msg="Restoring Services with original NodePort(s)" cmd=_output/bin/linux/amd64/velero logSource="pkg/restore/service_action.go:61" pluginName=velero restore=velero/test-with-3-svc-20201123125825
+
+  time="2020-11-23T12:58:31+03:00" level=info msg="Attempting to restore Service: hello-service" logSource="pkg/restore/restore.go:1107" restore=velero/test-with-3-svc-20201123125825
+
+  time="2020-11-23T12:58:31+03:00" level=error msg="error restoring hello-service: Service \"hello-service\" is invalid: spec.ports[0].nodePort: Invalid value: 31536: provided port is already allocated" logSource="pkg/restore/restore.go:1170" restore=velero/test-with-3-svc-20201123125825
+  ```
+
+- If the nodePort from the backup is not in the nodePort range of target cluster then Velero prints error log as below and continues with the restore operation. Kubernetes default nodePort range is 30000-32767 but on the example cluster nodePort range is 20000-22767 and tried to restore Service with nodePort 31536.
+
+  ```
+  time="2020-11-23T13:09:17+03:00" level=info msg="Executing item action for services" logSource="pkg/restore/restore.go:1002" restore=velero/test-with-3-svc-20201123130915
+
+  time="2020-11-23T13:09:17+03:00" level=info msg="Restoring Services with original NodePort(s)" cmd=_output/bin/linux/amd64/velero logSource="pkg/restore/service_action.go:61" pluginName=velero restore=velero/test-with-3-svc-20201123130915
+
+  time="2020-11-23T13:09:17+03:00" level=info msg="Attempting to restore Service: hello-service" logSource="pkg/restore/restore.go:1107" restore=velero/test-with-3-svc-20201123130915
+
+  time="2020-11-23T13:09:17+03:00" level=error msg="error restoring hello-service: Service \"hello-service\" is invalid: spec.ports[0].nodePort: Invalid value: 31536: provided port is not in the valid range. The range of valid ports is 20000-22767" logSource="pkg/restore/restore.go:1170" restore=velero/test-with-3-svc-20201123130915
+  ```
