@@ -86,6 +86,11 @@ By default, Velero will restore resources in the following order:
 
 It's recommended that you use the default order for your restores. You are able to customize this order if you need to by setting the `--restore-resource-priorities` flag on the Velero server and specifying a different resource order. This customized order will apply to all future restores. You don't have to specify all resources in the `--restore-resource-priorities` flag. Velero will append resources not listed to the end of your customized list in alphabetical order.
 
+```bash
+velero server  --restore-resource-priorities=customresourcedefinitions,namespaces,storageclasses,volumesnapshotclass.snapshot.storage.k8s.io,volumesnapshotcontents.snapshot.storage.k8s.io,volumesnapshots.snapshot.storage.k8s.io,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods,replicasets.apps,clusters.cluster.x-k8s.io,clusterresourcesets.addons.cluster.x-k8s.io
+```
+
+
 ## Restoring Persistent Volumes and Persistent Volume Claims
 
 Velero has three approaches when restoring a PV, depending on how the backup was taken.
@@ -199,15 +204,17 @@ For example, A Persistent Volume object has a reference to the Persistent Volume
 
 ## Restore existing resource policy
 
-The restore policy Velero uses to decide how to handle resources that already exist in the target cluster during a restore is handled by the `--existing-resource-policy` flag. By default, Velero is configured to be non-destructive during a restore, `--existing-resource-policy=none`. This means that it will never overwrite data that already exits in your cluster. When Velero attempts to create a resource during a restore, the resource being restored is compared to the existing resources on the target cluster by the Kubernetes API Server. If the resource already exists in the target cluster, Velero logs an error, skips restoring the resource, and makes no changes to the existing resource.
+By default, Velero is configured to be non-destructive during a restore. This means that it will never overwrite data that already exits in your cluster. When Velero attempts to create a resource during a restore, the resource being restored is compared to the existing resources on the target cluster by the Kubernetes API Server. If the resource already exists in the target cluster, Velero skips restoring the current resource and moves onto the next resource to restore, without making any changes to the target cluster.
 
-The only exception to the default restore policy are ServiceAccounts. When restoring a ServiceAccount that already exists on the target cluster, Velero will attempt to merge the fields of the ServiceAccount from the backup into the existing ServiceAccount. Secrets and ImagePullSecrets are appended from the backed-up ServiceAccount. Velero adds any non-existing labels and annotations from the backed-up ServiceAccount to the existing resource, leaving the existing labels and annotations in place.
+An exception to the default restore policy is ServiceAccounts. When restoring a ServiceAccount that already exists on the target cluster, Velero will attempt to merge the fields of the ServiceAccount from the backup into the existing ServiceAccount. Secrets and ImagePullSecrets are appended from the backed-up ServiceAccount. Velero adds any non-existing labels and annotations from the backed-up ServiceAccount to the existing resource, leaving the existing labels and annotations in place.
 
-You can change Velero's default behavior for a restore to `update` existing resources by setting `--existing-resource-policy=update`. 
+You can change this policy for a restore by using the `--existing-resource-policy` restore flag. The available options are `none` (default) and `update`. If you choose to `update` existing resources during a restore, Velero will attempt to update an existing to match the resource being restored.
 
-* If the existing resource in the target cluster is the same as the resource Velero is attempting to restore, Velero will add the `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the existing resource. If labels patch fails Velero adds a restore error and continues restoring the next resource.
+* If the existing resource in the target cluster is the same as the resource Velero is attempting to restore, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If labels patch fails Velero adds a restore error and continues restoring the next resource.
 
-* If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to be match the backup resource. If the patch is successful, Velero will add the `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries to update the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails then Velero adds restore error and continues restoring the next resource.
+* If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to be match the backup resource. If the patch is successful, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries only add the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails then Velero logs restore error and continues restoring the next resource.
+
+You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 
 ## Removing a Restore object
 
