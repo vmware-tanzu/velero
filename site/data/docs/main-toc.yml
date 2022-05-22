@@ -45,7 +45,7 @@ toc:
         url: /restore-hooks
       - page: Run in any namespace
         url: /namespace
-      - page: CSI Support (beta)
+      - page: CSI Support
         url: /csi
       - page: Verifying Self-signed Certificates
         url: /self-signed-certificates
