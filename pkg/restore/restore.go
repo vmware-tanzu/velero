@@ -1009,7 +1009,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
-		resetStatus(obj)
 		switch {
 		case hasSnapshot(name, ctx.volumeSnapshots):
 			oldName := obj.GetName()
@@ -1694,21 +1693,17 @@ func resetMetadata(obj *unstructured.Unstructured) (*unstructured.Unstructured, 
 	return obj, nil
 }
 
-func resetStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	delete(obj.UnstructuredContent(), "status")
-	return obj, nil
+func resetStatus(obj *unstructured.Unstructured) {
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "status")
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	newObj, err := resetMetadata(obj)
+	_, err := resetMetadata(obj)
 	if err != nil {
 		return nil, err
 	}
-	newObj, err = resetStatus(obj)
-	if err != nil {
-		return nil, err
-	}
-	return newObj, nil
+	resetStatus(obj)
+	return obj, nil
 }
 
 // addRestoreLabels labels the provided object with the restore name and the

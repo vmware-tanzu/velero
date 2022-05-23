@@ -2847,30 +2847,24 @@ func TestResetStatus(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         *unstructured.Unstructured
-		expectedErr bool
 		expectedRes *unstructured.Unstructured
 	}{
 		{
-			name:        "no metadata don't cause error",
+			name:        "no status don't cause error",
 			obj:         &unstructured.Unstructured{},
-			expectedErr: false,
 			expectedRes: &unstructured.Unstructured{},
 		},
 		{
 			name:        "remove status",
 			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
-			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := resetStatus(test.obj)
-
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
-			}
+			resetStatus(test.obj)
+			assert.Equal(t, test.expectedRes, test.obj)
 		})
 	}
 }
