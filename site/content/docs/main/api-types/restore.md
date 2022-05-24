@@ -46,6 +46,21 @@ spec:
   # or fully-qualified. Optional.
   excludedResources:
   - storageclasses.storage.k8s.io
+
+  # restoreStatus selects resources to restore not only the specification, but
+  # the status of the manifest. This is specially useful for CRDs that maintain
+  # external references. By default, it excludes all resources.
+  restoreStatus:
+    # Array of resources to include in the restore status. Just like above,
+    # resources may be shortcuts (for example 'po' for 'pods') or fully-qualified.
+    # If unspecified, no resources are included. Optional.
+    includedResources:
+    - workflows
+    # Array of resources to exclude from the restore status. Resources may be
+    # shortcuts (for example 'po' for 'pods') or fully-qualified.
+    # If unspecified, all resources are excluded. Optional.
+    excludedResources: []
+
   # Whether or not to include cluster-scoped resources. Valid values are true, false, and
   # null/unset. If true, all cluster-scoped resources are included (subject to included/excluded
   # resources and the label selector). If false, no cluster-scoped resources are included. If unset,
