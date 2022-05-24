@@ -25,9 +25,9 @@ If you've already run `velero install` without the `--use-restic` flag, you can 
 
 ## Default Pod Volume backup to restic
 
-By default, `velero install` does not enable the use of restic to take backups of all pod volumes. You must apply an [annotation](restic.md/#using-opt-in-pod-volume-backup) to every pod which contains volumes for Velero to use restic for the backup.
+By default, `velero install` does not enable use of restic to take backups of all pod volumes. An annotation has to be applied on every pod which contains volumes to be backed up by restic.
 
-If you are planning to only use restic for volume backups, you can run the `velero install` command with the `--default-volumes-to-restic` flag. This will default all pod volumes backups to use restic without having to apply annotations to pods. Note that when this flag is set during install, Velero will always try to use restic to perform the backup, even want an individual backup to use volume snapshots, by setting the `--snapshot-volumes` flag in the `backup create` command. Alternatively, you can set the  `--default-volumes-to-restic` on an individual backup to to make sure Velero uses Restic for each volume being backed up.
+To backup all pod volumes using restic without having to apply annotation on the pod, run the `velero install` command with the `--default-volumes-to-restic` flag.
 
 Using this flag requires restic integration to be enabled with the `--use-restic` flag. Please refer to the [restic integration][3] page for more information.
 
@@ -172,26 +172,6 @@ Velero supports any number of backup storage locations and volume snapshot locat
 However, `velero install` only supports configuring at most one backup storage location and one volume snapshot location.
 
 To configure additional locations after running `velero install`, use the `velero backup-location create` and/or `velero snapshot-location create` commands along with provider-specific configuration. Use the `--help` flag on each of these commands for more details.
-
-### Set default backup storage location or volume snapshot locations
-
-When performing backups, Velero needs to know where to backup your data. This means that if you configure multiple locations, you must specify the location Velero should use each time you run `velero backup create`, or you can set a default backup storage location or default volume snapshot locations. If you only have one backup storage llocation or volume snapshot location set for a provider, Velero will automatically use that location as the default.
-
-Set a default backup storage location by passing a `--default` flag with when running `velero backup-location create`.
-
-```
-velero backup-location create backups-primary \
-    --provider aws \
-    --bucket velero-backups \
-    --config region=us-east-1 \
-    --default
-```
-
-You can set a default volume snapshot location for each of your volume snapshot providers using the `--default-volume-snapshot-locations` flag on the `velero server` command.
-
-```
-velero server --default-volume-snapshot-locations="<PROVIDER-NAME>:<LOCATION-NAME>,<PROVIDER2-NAME>:<LOCATION2-NAME>"
-```
 
 ## Do not configure a backup storage location during install
 
