@@ -6,10 +6,9 @@ layout: docs
 The page outlines how to use the `velero restore` command, configuration options for restores, and describes the main process Velero uses to perform restores.
 
 ## Restore command-line options
-To see all commands for restores, run `velero restore --help`
-To see all options associated with a specific command, provide the --help flag to that command. For example,  `velero restore create --help` shows all options associated with the `create` command.
+To see all commands for restores, run `velero restore --help`.
 
-To list all options of restore, use `velero restore --help`.
+To see all options associated with a specific command, provide the `--help` flag to that command. For example,  `velero restore create --help` shows all options associated with the `create` command.
 
 ```Usage:
   velero restore [command]
@@ -30,19 +29,19 @@ The following is an overview of Velero's restore process that starts after you r
 
 1. The `RestoreController` notices the new Restore object and performs validation.
 
-1. The `RestoreController` fetches basic information about the backup being restored, like the [BackupStorageLocation](locations.md) (BSL). It also a tarball of the cluster resources in the backup, any volumes that will be restored using Restic, and any volume snapshots to be restored.
+1. The `RestoreController` fetches basic information about the backup being restored, like the [BackupStorageLocation](locations.md) (BSL). It also fetches a tarball of the cluster resources in the backup, any volumes that will be restored using Restic, and any volume snapshots to be restored.
 
 1. The `RestoreController` then extracts the tarball of backup cluster resources to the /tmp folder and performs some pre-processing on the resources, including
 
     * Sorting the resources to help Velero decide the [restore order](#resource-restore-order) to use.
 
-    * Attempting to discover the resources by their Kubernetes [Group Version Resource (GVR)](https://kubernetes.io/docs/reference/using-api/api-concepts/). If a resource is not discoverable, Velero will exclude it from the restore. See more about how [Velero backs up API versions](#backed-up-api-versions)
+    * Attempting to discover the resources by their Kubernetes [Group Version Resource (GVR)](https://kubernetes.io/docs/reference/using-api/api-concepts/). If a resource is not discoverable, Velero will exclude it from the restore. See more about how [Velero backs up API versions](#backed-up-api-versions).
 
     * Applying any configured [resource filters](resource-filtering.md).
 
     * Remapping target namespace according to specified [`--namespace-mappings`](#restoring-into-a-different-namespace) restore option.
 
-1. The `RestoreController` begins restoring the eligible resources one at a time. Valero unmarshalls the current resource into a Kubernetes resource object. Depending on the type of resource and restore options you specified, Velero will make the following modifications to the resource or preparations to the target cluster before attempting to create the resource,
+1. The `RestoreController` begins restoring the eligible resources one at a time. Velero extracts the current resource into a Kubernetes resource object. Depending on the type of resource and restore options you specified, Velero will make the following modifications to the resource or preparations to the target cluster before attempting to create the resource,
 
     * The `RestoreController` makes sure the target namespace exists. If the target namespace does not exist, then the `RestoreController` will create a new one on the cluster.
 
@@ -62,9 +61,9 @@ The following is an overview of Velero's restore process that starts after you r
 
 1. Once the resource is created on the target cluster, Velero may take some additional steps or wait for additional processes to complete before moving onto the next resource to restore.
 
-    * If the resource is a Pod, the `RestoreController` will execute any [Restore Hooks](restore-hooks.md) and wait for the hook to finish
-    * If the resource is a PV restored by Restic, the `RestoreController` waits for Restic’s restore to complete. The `RestoreController` sets a timeout for any resources restored with Restic during a restore. The default timeout is 4 hours, but you can configure this be setting the `--restic-timeout` restore option.
-    * If the resource is a Custom Resource Definition, the `RestoreController` waits for its availability in the cluster, the timeout is 1 minute.
+    * If the resource is a Pod, the `RestoreController` will execute any [Restore Hooks](restore-hooks.md) and wait for the hook to finish.
+    * If the resource is a PV restored by Restic, the `RestoreController` waits for Restic’s restore to complete. The `RestoreController` sets a timeout for any resources restored with Restic during a restore. The default timeout is 4 hours, but you can configure this be setting using `--restic-timeout` restore option.
+    * If the resource is a Custom Resource Definition, the `RestoreController` waits for its availability in the cluster. The timeout is 1 minute.
 
     If any failures happen finishing these steps, the `RestoreController` will log an error in the restore result and will continue restoring.
 
@@ -97,11 +96,11 @@ Velero has three approaches when restoring a PV, depending on how the backup was
 
 1. When restoring a snapshot, Velero statically creates the PV and then binds it to a restored PVC. Velero's PV rename and remap process is used only in this case because this is the only case where Velero creates the PV resource directly.
 1. When restoring with Restic, Velero uses Kubernetes’ [dynamic provision process](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) to provision the PV after creating the PVC. In this case, the PV object is not actually created by Velero.
-1. When restoring with the [CSI plugin](csi.md), the PV is created from a CSI snapshot by the CSI driver. Velero doesn’t create the PV directly, instead Velero creates a PVC with its DataSource referring to the CSI VolumeSnapshot object.
+1. When restoring with the [CSI plugin](csi.md), the PV is created from a CSI snapshot by the CSI driver. Velero doesn’t create the PV directly. Instead Velero creates a PVC with its DataSource referring to the CSI VolumeSnapshot object.
 
 ### Snapshot PV Restore
 
-PV data backed up by durable snapshots is restored by VolumeSnapshot plugins. Velero calls the plugins’ interface to create a volume from a snapshot. The plugin returns the volume’s volumeID. This ID is created by storage vendors and will be updated into the PV object created by Velero, so that the PV object is connected to the volume restored from a snapshot.
+PV data backed up by durable snapshots is restored by VolumeSnapshot plugins. Velero calls the plugins’ interface to create a volume from a snapshot. The plugin returns the volume’s `volumeID`. This ID is created by storage vendors and will be updated in the PV object created by Velero, so that the PV object is connected to the volume restored from a snapshot.
 
 ### Restic PV Restore
 
@@ -113,12 +112,12 @@ A PV backed up by CSI snapshots is restored by the [CSI plugin](csi). This happe
 
 ### Persistent Volume Rename
 
-Velero will rename a restored PV during restore if both the below two conditions are met,
+Velero will rename a restored PV during restore if both of the following conditions are met,
 
 1. The PV already exists
 1. The PV’s namespace has been [remapped]()
 
-If the both conditions are met, Velero will create the PV with a new name in the namespace you have specified for the remap. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the new PV object.
+If both conditions are met, Velero will create the PV with a new name in the namespace you have specified for the remap. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the new PV object.
 
 If the PV does not exist, Velero will create the PV without renaming it.
 
@@ -204,15 +203,15 @@ For example, A Persistent Volume object has a reference to the Persistent Volume
 
 ## Restore existing resource policy
 
-By default, Velero is configured to be non-destructive during a restore. This means that it will never overwrite data that already exits in your cluster. When Velero attempts to create a resource during a restore, the resource being restored is compared to the existing resources on the target cluster by the Kubernetes API Server. If the resource already exists in the target cluster, Velero skips restoring the current resource and moves onto the next resource to restore, without making any changes to the target cluster.
+By default, Velero is configured to be non-destructive during a restore. This means that it will never overwrite data that already exists in your cluster. When Velero attempts to create a resource during a restore, the resource being restored is compared to the existing resources on the target cluster by the Kubernetes API Server. If the resource already exists in the target cluster, Velero skips restoring the current resource and moves onto the next resource to restore, without making any changes to the target cluster.
 
 An exception to the default restore policy is ServiceAccounts. When restoring a ServiceAccount that already exists on the target cluster, Velero will attempt to merge the fields of the ServiceAccount from the backup into the existing ServiceAccount. Secrets and ImagePullSecrets are appended from the backed-up ServiceAccount. Velero adds any non-existing labels and annotations from the backed-up ServiceAccount to the existing resource, leaving the existing labels and annotations in place.
 
-You can change this policy for a restore by using the `--existing-resource-policy` restore flag. The available options are `none` (default) and `update`. If you choose to `update` existing resources during a restore, Velero will attempt to update an existing to match the resource being restored.
+You can change this policy for a restore by using the `--existing-resource-policy` restore flag. The available options are `none` (default) and `update`. If you choose to `update` existing resources during a restore, Velero will attempt to update an existing resource to match the resource being restored.
 
-* If the existing resource in the target cluster is the same as the resource Velero is attempting to restore, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If labels patch fails Velero adds a restore error and continues restoring the next resource.
+* If the existing resource in the target cluster is the same as the resource Velero is attempting to restore, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If patching the labels fails, Velero adds a restore error and continues restoring the next resource.
 
-* If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to be match the backup resource. If the patch is successful, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries only add the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails then Velero logs restore error and continues restoring the next resource.
+* If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to be match the backup resource. If the patch is successful, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries to add the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails, then Velero logs a restore error and continues restoring the next resource.
 
 You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 
@@ -231,7 +230,7 @@ Velero auto detects **explicitly specified** NodePorts using **`last-applied-con
 
 ### Always Preserve NodePorts
 
-It is not always possible to set nodePorts explicitly on some big clusters because of operation complexity. As the Kubernetes [NodePort documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) states, "if you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.""
+It is not always possible to set nodePorts explicitly on some big clusters because of operational complexity. As the Kubernetes [NodePort documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) states, "if you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.""
 
 The clusters which are not explicitly specifying nodePorts may still need to restore original NodePorts in the event of a disaster. Auto assigned nodePorts are typically defined on Load Balancers located in front of cluster. Changing all these nodePorts on Load Balancers is another operation complexity you are responsible for updating after disaster if nodePorts are changed.
 
