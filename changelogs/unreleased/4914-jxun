@@ -1,0 +1,1 @@
+Make velero completion zsh command output can be used by `source` command.

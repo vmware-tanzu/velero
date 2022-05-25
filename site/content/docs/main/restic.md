@@ -251,7 +251,7 @@ Instructions to back up using this approach are as follows:
 
 ### Using opt-in pod volume backup
 
-Velero, by default, uses this approach to discover pod volumes that need to be backed up using Restic, where every pod containing a volume to be backed up using Restic must be annotated with the volume's name.
+Velero, by default, uses this approach to discover pod volumes that need to be backed up using Restic. Every pod containing a volume to be backed up using Restic must be annotated with the volume's name using the `backup.velero.io/backup-volumes` annotation.
 
 Instructions to back up using this approach are as follows:
 
@@ -526,6 +526,8 @@ on this shortly)
 within each restored volume, under `.velero`, whose name is the UID of the Velero restore being run
 1. Once all such files are found, the init container's process terminates successfully and the pod moves
 on to running other init containers/the main containers.
+
+Velero won't restore a resource if a that resource is scaled to 0 and already exists in the cluster. If Velero restored the requested pods in this scenario, the Kubernetes reconciliation loops that manage resources would delete the running pods because its scaled to be 0. Velero will be able to restore once the resources is scaled up, and the pods are created and remain running.
 
 ## 3rd party controllers
 
