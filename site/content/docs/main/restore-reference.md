@@ -31,7 +31,7 @@ The following is an overview of Velero's restore process that starts after you r
 
 1. The `RestoreController` fetches basic information about the backup being restored, like the [BackupStorageLocation](locations.md) (BSL). It also fetches a tarball of the cluster resources in the backup, any volumes that will be restored using Restic, and any volume snapshots to be restored.
 
-1. The `RestoreController` then extracts the tarball of backup cluster resources to the /tmp folder and performs some pre-processing on the resources, including
+1. The `RestoreController` then extracts the tarball of backup cluster resources to the /tmp folder and performs some pre-processing on the resources, including:
 
     * Sorting the resources to help Velero decide the [restore order](#resource-restore-order) to use.
 
@@ -39,9 +39,10 @@ The following is an overview of Velero's restore process that starts after you r
 
     * Applying any configured [resource filters](resource-filtering.md).
 
-    * Remapping target namespace according to specified [`--namespace-mappings`](#restoring-into-a-different-namespace) restore option.
+    * Verify the target namespace, if you have configured  [`--namespace-mappings`](#restoring-into-a-different-namespace) restore option.
 
-1. The `RestoreController` begins restoring the eligible resources one at a time. Velero extracts the current resource into a Kubernetes resource object. Depending on the type of resource and restore options you specified, Velero will make the following modifications to the resource or preparations to the target cluster before attempting to create the resource,
+
+1. The `RestoreController` begins restoring the eligible resources one at a time. Velero extracts the current resource into a Kubernetes resource object. Depending on the type of resource and restore options you specified, Velero will make the following modifications to the resource or preparations to the target cluster before attempting to create the resource:
 
     * The `RestoreController` makes sure the target namespace exists. If the target namespace does not exist, then the `RestoreController` will create a new one on the cluster.
 
@@ -51,7 +52,7 @@ The following is an overview of Velero's restore process that starts after you r
 
     * Execute the resource’s `RestoreItemAction` [custom plugins](custom-plugins/), if you have configured one.
 
-    * Update the resource object’s namespace if a remapped namespace is specified.
+    * Update the resource object’s namespace if you've configured [namespace remapping](#restoring-into-a-different-namespace).
 
     * The `RestoreController` adds a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the resource. This can help you easily identify restored resources and which backup they were restored from.
 
@@ -72,21 +73,31 @@ The following is an overview of Velero's restore process that starts after you r
 By default, Velero will restore resources in the following order:
 
 * Custom Resource Definitions
-* Namespaces
+* Mamespaces
 * StorageClasses
-* VolumeSnapshotClasses
+* VolumeSnapshotClass
 * VolumeSnapshotContents
 * VolumeSnapshots
-* Persistent Volumes
-* Persistent Volume Claims
+* PersistentVolumes
+* PersistentVolumeClaims
+* Secrets
 * ConfigMaps
 * ServiceAccounts
+* LimitRanges
 * Pods
+* ReplicaSets
+* Clusters
+* ClusterResourceSets
 
 It's recommended that you use the default order for your restores. You are able to customize this order if you need to by setting the `--restore-resource-priorities` flag on the Velero server and specifying a different resource order. This customized order will apply to all future restores. You don't have to specify all resources in the `--restore-resource-priorities` flag. Velero will append resources not listed to the end of your customized list in alphabetical order.
 
-```bash
-velero server  --restore-resource-priorities=customresourcedefinitions,namespaces,storageclasses,volumesnapshotclass.snapshot.storage.k8s.io,volumesnapshotcontents.snapshot.storage.k8s.io,volumesnapshots.snapshot.storage.k8s.io,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods,replicasets.apps,clusters.cluster.x-k8s.io,clusterresourcesets.addons.cluster.x-k8s.io
+```shell
+velero server \
+--restore-resource-priorities=customresourcedefinitions,namespaces,storageclasses,\
+volumesnapshotclass.snapshot.storage.k8s.io,volumesnapshotcontents.snapshot.storage.k8s.io,\
+volumesnapshots.snapshot.storage.k8s.io,persistentvolumes,persistentvolumeclaims,secrets,\
+configmaps,serviceaccounts,limitranges,pods,replicasets.apps,clusters.cluster.x-k8s.io,\
+clusterresourcesets.addons.cluster.x-k8s.io
 ```
 
 
@@ -112,10 +123,10 @@ A PV backed up by CSI snapshots is restored by the [CSI plugin](csi). This happe
 
 ### Persistent Volume Rename
 
-Velero will rename a restored PV during restore if both of the following conditions are met,
+Velero will rename a restored PV during restore if both of the following conditions are met:
 
-1. The PV already exists
-1. The PV’s namespace has been [remapped]()
+1. The PV already exists.
+1. The PV’s namespace has been [remapped](#restoring-into-a-different-namespace).
 
 If both conditions are met, Velero will create the PV with a new name in the namespace you have specified for the remap. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the new PV object.
 
