@@ -22,10 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backup_item_action/v1"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
@@ -98,11 +98,11 @@ func resolveAction(helper discovery.Helper, action velero.Applicable) (resources
 }
 
 type BackupItemResolvedAction struct {
-	velero.BackupItemAction
+	biav1.BackupItemAction
 	resolvedAction
 }
 
-func NewBackupItemActionResolver(actions []velero.BackupItemAction) BackupItemActionResolver {
+func NewBackupItemActionResolver(actions []biav1.BackupItemAction) BackupItemActionResolver {
 	return BackupItemActionResolver{
 		actions: actions,
 	}
@@ -131,7 +131,7 @@ type ActionResolver interface {
 }
 
 type BackupItemActionResolver struct {
-	actions []velero.BackupItemAction
+	actions []biav1.BackupItemAction
 }
 
 func (recv BackupItemActionResolver) ResolveActions(helper discovery.Helper) ([]BackupItemResolvedAction, error) {

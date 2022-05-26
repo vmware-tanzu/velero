@@ -5,6 +5,7 @@ package mocks
 import (
 	mock "github.com/stretchr/testify/mock"
 	velero "github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backup_item_action/v1"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
 
@@ -19,15 +20,15 @@ func (_m *Manager) CleanupClients() {
 }
 
 // GetBackupItemAction provides a mock function with given fields: name
-func (_m *Manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
+func (_m *Manager) GetBackupItemAction(name string) (biav1.BackupItemAction, error) {
 	ret := _m.Called(name)
 
-	var r0 velero.BackupItemAction
-	if rf, ok := ret.Get(0).(func(string) velero.BackupItemAction); ok {
+	var r0 biav1.BackupItemAction
+	if rf, ok := ret.Get(0).(func(string) biav1.BackupItemAction); ok {
 		r0 = rf(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(velero.BackupItemAction)
+			r0 = ret.Get(0).(biav1.BackupItemAction)
 		}
 	}
 
@@ -42,15 +43,15 @@ func (_m *Manager) GetBackupItemAction(name string) (velero.BackupItemAction, er
 }
 
 // GetBackupItemActions provides a mock function with given fields:
-func (_m *Manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
+func (_m *Manager) GetBackupItemActions() ([]biav1.BackupItemAction, error) {
 	ret := _m.Called()
 
-	var r0 []velero.BackupItemAction
-	if rf, ok := ret.Get(0).(func() []velero.BackupItemAction); ok {
+	var r0 []biav1.BackupItemAction
+	if rf, ok := ret.Get(0).(func() []biav1.BackupItemAction); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]velero.BackupItemAction)
+			r0 = ret.Get(0).([]biav1.BackupItemAction)
 		}
 	}
 

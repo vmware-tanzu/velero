@@ -25,7 +25,9 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backup_item_action/v1"
 )
 
 // BackupItemActionGRPCServer implements the proto-generated BackupItemAction interface, and accepts
@@ -34,13 +36,13 @@ type BackupItemActionGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *BackupItemActionGRPCServer) getImpl(name string) (velero.BackupItemAction, error) {
+func (s *BackupItemActionGRPCServer) getImpl(name string) (biav1.BackupItemAction, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.BackupItemAction)
+	itemAction, ok := impl.(biav1.BackupItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a backup item action", impl)
 	}
@@ -48,7 +50,10 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (velero.BackupItemActi
 	return itemAction, nil
 }
 
-func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.BackupItemActionAppliesToRequest) (response *proto.BackupItemActionAppliesToResponse, err error) {
+func (s *BackupItemActionGRPCServer) AppliesTo(
+	ctx context.Context,
+	req *protobiav1.BackupItemActionAppliesToRequest) (
+	response *protobiav1.BackupItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -65,7 +70,7 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.B
 		return nil, newGRPCError(err)
 	}
 
-	return &proto.BackupItemActionAppliesToResponse{
+	return &protobiav1.BackupItemActionAppliesToResponse{
 		&proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
@@ -76,7 +81,8 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.B
 	}, nil
 }
 
-func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.ExecuteRequest) (response *proto.ExecuteResponse, err error) {
+func (s *BackupItemActionGRPCServer) Execute(
+	ctx context.Context, req *protobiav1.ExecuteRequest) (response *protobiav1.ExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -115,7 +121,7 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 		}
 	}
 
-	res := &proto.ExecuteResponse{
+	res := &protobiav1.ExecuteResponse{
 		Item: updatedItemJSON,
 	}
 

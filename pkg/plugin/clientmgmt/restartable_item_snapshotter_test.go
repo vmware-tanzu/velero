@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1/mocks"
-
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1/mocks"
 )
 
 func TestRestartableGetItemSnapshotter(t *testing.T) {

@@ -49,7 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backup_item_action/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -59,7 +59,8 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
+	actions []biav1.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
 	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
 	return args.Error(0)
 }
@@ -834,7 +835,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 			pluginManager.On("GetItemSnapshotters").Return(nil, nil)
-			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
+			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []biav1.BackupItemAction(nil), pluginManager).Return(nil)
 			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolver{}, framework.ItemSnapshotterResolver{}, pluginManager).Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 

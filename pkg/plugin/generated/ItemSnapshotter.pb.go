@@ -25,7 +25,7 @@ func (m *ItemSnapshotterAppliesToRequest) Reset()         { *m = ItemSnapshotter
 func (m *ItemSnapshotterAppliesToRequest) String() string { return proto.CompactTextString(m) }
 func (*ItemSnapshotterAppliesToRequest) ProtoMessage()    {}
 func (*ItemSnapshotterAppliesToRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor2, []int{0}
+	return fileDescriptor1, []int{0}
 }
 
 func (m *ItemSnapshotterAppliesToRequest) GetPlugin() string {
@@ -43,7 +43,7 @@ func (m *ItemSnapshotterAppliesToResponse) Reset()         { *m = ItemSnapshotte
 func (m *ItemSnapshotterAppliesToResponse) String() string { return proto.CompactTextString(m) }
 func (*ItemSnapshotterAppliesToResponse) ProtoMessage()    {}
 func (*ItemSnapshotterAppliesToResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor2, []int{1}
+	return fileDescriptor1, []int{1}
 }
 
 func (m *ItemSnapshotterAppliesToResponse) GetResourceSelector() *ResourceSelector {
@@ -62,7 +62,7 @@ type AlsoHandlesRequest struct {
 func (m *AlsoHandlesRequest) Reset()                    { *m = AlsoHandlesRequest{} }
 func (m *AlsoHandlesRequest) String() string            { return proto.CompactTextString(m) }
 func (*AlsoHandlesRequest) ProtoMessage()               {}
-func (*AlsoHandlesRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{2} }
+func (*AlsoHandlesRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{2} }
 
 func (m *AlsoHandlesRequest) GetPlugin() string {
 	if m != nil {
@@ -92,7 +92,7 @@ type AlsoHandlesResponse struct {
 func (m *AlsoHandlesResponse) Reset()                    { *m = AlsoHandlesResponse{} }
 func (m *AlsoHandlesResponse) String() string            { return proto.CompactTextString(m) }
 func (*AlsoHandlesResponse) ProtoMessage()               {}
-func (*AlsoHandlesResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{3} }
+func (*AlsoHandlesResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{3} }
 
 func (m *AlsoHandlesResponse) GetHandledItems() []*ResourceIdentifier {
 	if m != nil {
@@ -111,7 +111,7 @@ type SnapshotItemRequest struct {
 func (m *SnapshotItemRequest) Reset()                    { *m = SnapshotItemRequest{} }
 func (m *SnapshotItemRequest) String() string            { return proto.CompactTextString(m) }
 func (*SnapshotItemRequest) ProtoMessage()               {}
-func (*SnapshotItemRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{4} }
+func (*SnapshotItemRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{4} }
 
 func (m *SnapshotItemRequest) GetPlugin() string {
 	if m != nil {
@@ -152,7 +152,7 @@ type SnapshotItemResponse struct {
 func (m *SnapshotItemResponse) Reset()                    { *m = SnapshotItemResponse{} }
 func (m *SnapshotItemResponse) String() string            { return proto.CompactTextString(m) }
 func (*SnapshotItemResponse) ProtoMessage()               {}
-func (*SnapshotItemResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{5} }
+func (*SnapshotItemResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{5} }
 
 func (m *SnapshotItemResponse) GetItem() []byte {
 	if m != nil {
@@ -199,7 +199,7 @@ type ProgressRequest struct {
 func (m *ProgressRequest) Reset()                    { *m = ProgressRequest{} }
 func (m *ProgressRequest) String() string            { return proto.CompactTextString(m) }
 func (*ProgressRequest) ProtoMessage()               {}
-func (*ProgressRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{6} }
+func (*ProgressRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{6} }
 
 func (m *ProgressRequest) GetPlugin() string {
 	if m != nil {
@@ -243,7 +243,7 @@ type ProgressResponse struct {
 func (m *ProgressResponse) Reset()                    { *m = ProgressResponse{} }
 func (m *ProgressResponse) String() string            { return proto.CompactTextString(m) }
 func (*ProgressResponse) ProtoMessage()               {}
-func (*ProgressResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{7} }
+func (*ProgressResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{7} }
 
 func (m *ProgressResponse) GetPhase() string {
 	if m != nil {
@@ -312,7 +312,7 @@ type DeleteItemSnapshotRequest struct {
 func (m *DeleteItemSnapshotRequest) Reset()                    { *m = DeleteItemSnapshotRequest{} }
 func (m *DeleteItemSnapshotRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeleteItemSnapshotRequest) ProtoMessage()               {}
-func (*DeleteItemSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{8} }
+func (*DeleteItemSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{8} }
 
 func (m *DeleteItemSnapshotRequest) GetPlugin() string {
 	if m != nil {
@@ -362,7 +362,7 @@ type CreateItemFromSnapshotRequest struct {
 func (m *CreateItemFromSnapshotRequest) Reset()                    { *m = CreateItemFromSnapshotRequest{} }
 func (m *CreateItemFromSnapshotRequest) String() string            { return proto.CompactTextString(m) }
 func (*CreateItemFromSnapshotRequest) ProtoMessage()               {}
-func (*CreateItemFromSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{9} }
+func (*CreateItemFromSnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9} }
 
 func (m *CreateItemFromSnapshotRequest) GetPlugin() string {
 	if m != nil {
@@ -423,7 +423,7 @@ func (m *CreateItemFromSnapshotResponse) Reset()         { *m = CreateItemFromSn
 func (m *CreateItemFromSnapshotResponse) String() string { return proto.CompactTextString(m) }
 func (*CreateItemFromSnapshotResponse) ProtoMessage()    {}
 func (*CreateItemFromSnapshotResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor2, []int{10}
+	return fileDescriptor1, []int{10}
 }
 
 func (m *CreateItemFromSnapshotResponse) GetItem() []byte {
@@ -455,7 +455,7 @@ type ItemSnapshotterInitRequest struct {
 func (m *ItemSnapshotterInitRequest) Reset()                    { *m = ItemSnapshotterInitRequest{} }
 func (m *ItemSnapshotterInitRequest) String() string            { return proto.CompactTextString(m) }
 func (*ItemSnapshotterInitRequest) ProtoMessage()               {}
-func (*ItemSnapshotterInitRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{11} }
+func (*ItemSnapshotterInitRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{11} }
 
 func (m *ItemSnapshotterInitRequest) GetPlugin() string {
 	if m != nil {
@@ -756,9 +756,9 @@ var _ItemSnapshotter_serviceDesc = grpc.ServiceDesc{
 	Metadata: "ItemSnapshotter.proto",
 }
 
-func init() { proto.RegisterFile("ItemSnapshotter.proto", fileDescriptor2) }
+func init() { proto.RegisterFile("ItemSnapshotter.proto", fileDescriptor1) }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor1 = []byte{
 	// 887 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x57, 0x5f, 0x8f, 0xdb, 0x44,
 	0x10, 0x97, 0xe3, 0x5c, 0xee, 0x6e, 0x12, 0x7a, 0xd1, 0xf6, 0x5a, 0x19, 0x57, 0xbd, 0x46, 0x16,
