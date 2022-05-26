@@ -126,7 +126,7 @@ A PV backed up by CSI snapshots is restored by the [CSI plugin](csi). This happe
 Velero will rename a restored PV during restore if both of the following conditions are met:
 
 1. The PV already exists.
-1. The PV’s namespace has been [remapped](#restoring-into-a-different-namespace).
+1. The PV’s claim reference namespace has been [remapped](#restoring-into-a-different-namespace).
 
 If both conditions are met, Velero will create the PV with a new name in the namespace you have specified for the remap. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the new PV object.
 
