@@ -344,6 +344,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
+				nil, // csiVSLister
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -565,6 +566,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
+				nil, // csiVSLister
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient
@@ -659,6 +661,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 				fakeClient,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().Backups().Lister(),
+				nil, // csiVSLister
 				time.Duration(0),
 				test.namespace,
 				nil, // csiSnapshotClient

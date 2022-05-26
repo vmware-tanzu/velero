@@ -24,6 +24,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	waitutil "k8s.io/apimachinery/pkg/util/wait"
+
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	velero "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
@@ -31,14 +33,14 @@ import (
 type ObjectsInStorage interface {
 	IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error)
 	DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error
-	IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error
+	IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error
 }
 
 func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
-	fmt.Printf("|| VERIFICATION || - Backup %s should exist in storage %s", backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - %s %s should exist in storage [%s]\n", subPrefix, backupName, bslPrefix)
 	exist, _ := IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 	if !exist {
-		return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s is not exist in object store after backup as expected", backupName))
+		return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s is not exist in object store after backup as expected\n", backupName))
 	}
 	fmt.Printf("|| EXPECTED || - Backup %s exist in object storage bucket %s\n", backupName, bslBucket)
 	return nil
@@ -46,11 +48,11 @@ func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bsl
 func ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string, retryTimes int) error {
 	var err error
 	var exist bool
-	fmt.Printf("|| VERIFICATION || - Backup %s should not exist in storage %s", backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - %s %s should not exist in storage %s\n", subPrefix, backupName, bslPrefix)
 	for i := 0; i < retryTimes; i++ {
 		exist, err = IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 		if err != nil {
-			return errors.Wrapf(err, "|| UNEXPECTED || - Failed to get backup %s in object store", backupName)
+			return errors.Wrapf(err, "|| UNEXPECTED || - Failed to get backup %s in object store\n", backupName)
 		}
 		if !exist {
 			fmt.Printf("|| EXPECTED || - Backup %s is not in object store\n", backupName)
@@ -58,7 +60,7 @@ func ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, 
 		}
 		time.Sleep(1 * time.Minute)
 	}
-	return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s still exist in object store after backup deletion", backupName))
+	return errors.New(fmt.Sprintf("|| UNEXPECTED ||Backup object %s still exist in object store after backup deletion\n", backupName))
 }
 func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	var s ObjectsInStorage
@@ -109,9 +111,37 @@ func DeleteObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPr
 	return nil
 }
 
-func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string) error {
+func WaitUntilSnapshotsExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
+	err := waitutil.PollImmediate(30*time.Second, 3*time.Minute,
+		func() (bool, error) {
+			err := SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
+				VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+				bslConfig, backupName, snapshotCheckPoint)
+			if err == nil {
+				return true, nil
+			}
+			return false, err
+		})
+	return err
+}
+
+func WaitUntilSnapshotsNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
+	err := waitutil.PollImmediate(30*time.Second, 3*time.Minute,
+		func() (bool, error) {
+			snapshotCheckPoint.ExpectCount = 0
+			err := SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider,
+				VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+				bslConfig, backupName, snapshotCheckPoint)
+			if err == nil {
+				return true, nil
+			}
+			return false, err
+		})
+	return err
+}
+
+func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
 	fmt.Printf("|| VERIFICATION || - Snapshots should not exist in cloud, backup %s\n", backupName)
-	var snapshotCheckPoint SnapshotCheckPoint
 	snapshotCheckPoint.ExpectCount = 0
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {

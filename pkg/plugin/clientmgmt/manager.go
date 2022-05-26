@@ -107,7 +107,7 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 	defer m.lock.Unlock()
 
 	logger := m.logger.WithFields(logrus.Fields{
-		"kind": framework.PluginKindObjectStore.String(),
+		"kind": kind.String(),
 		"name": name,
 	})
 	logger.Debug("looking for plugin in registry")

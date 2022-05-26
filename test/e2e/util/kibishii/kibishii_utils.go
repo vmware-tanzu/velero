@@ -20,54 +20,95 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 const (
-	kibishiiNamespace = "kibishii-workload"
-	jumpPadPod        = "jump-pad"
+	jumpPadPod = "jump-pad"
 )
 
+var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
+
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(client TestClient, providerName, veleroCLI, veleroNamespace, backupName, restoreName, backupLocation string,
-	useVolumeSnapshots bool, registryCredentialFile string, kibishiiDirectory string) error {
+func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
+	useVolumeSnapshots bool) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+	veleroCLI := VeleroCfg.VeleroCLI
+	providerName := VeleroCfg.CloudProvider
+	veleroNamespace := VeleroCfg.VeleroNamespace
+	registryCredentialFile := VeleroCfg.RegistryCredentialFile
+	veleroFeatures := VeleroCfg.Features
+	kibishiiDirectory := VeleroCfg.KibishiiDirectory
+	if _, err := GetNamespace(context.Background(), client, kibishiiNamespace); err == nil {
+		fmt.Printf("Workload namespace %s exists, delete it first.\n", kibishiiNamespace)
+		if err = DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
+			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
+		}
+	}
 	if err := CreateNamespace(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
-		if err := DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
-			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
+		if !veleroCfg.Debug {
+			if err := DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
+				fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
+			}
 		}
 	}()
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, kibishiiNamespace, registryCredentialFile, kibishiiDirectory); err != nil {
+	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName,
+		kibishiiNamespace, registryCredentialFile, veleroFeatures,
+		kibishiiDirectory, useVolumeSnapshots); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
 
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, backupName, kibishiiNamespace, backupLocation, useVolumeSnapshots, ""); err != nil {
+	var BackupCfg BackupConfig
+	BackupCfg.BackupName = backupName
+	BackupCfg.Namespace = kibishiiNamespace
+	BackupCfg.BackupLocation = backupLocation
+	BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
+	BackupCfg.Selector = ""
+	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
-
-	if providerName == "vsphere" && useVolumeSnapshots {
-		// Wait for uploads started by the Velero Plug-in for vSphere to complete
-		// TODO - remove after upload progress monitoring is implemented
-		fmt.Println("Waiting for vSphere uploads to complete")
-		if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
-			return errors.Wrapf(err, "Error waiting for uploads to complete")
+	var snapshotCheckPoint SnapshotCheckPoint
+	var err error
+	if useVolumeSnapshots {
+		if providerName == "vsphere" {
+			// Wait for uploads started by the Velero Plug-in for vSphere to complete
+			// TODO - remove after upload progress monitoring is implemented
+			fmt.Println("Waiting for vSphere uploads to complete")
+			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace); err != nil {
+				return errors.Wrapf(err, "Error waiting for uploads to complete")
+			}
+		}
+		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 2, kibishiiNamespace, backupName, KibishiiPodNameList)
+		if err != nil {
+			return errors.Wrap(err, "Fail to get snapshot checkpoint")
+		}
+		err = WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
+			backupName, snapshotCheckPoint)
+		if err != nil {
+			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
+
 	fmt.Printf("Simulating a disaster by removing namespace %s\n", kibishiiNamespace)
 	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
+	time.Sleep(5 * time.Minute)
 
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
@@ -90,11 +131,19 @@ func RunKibishiiTests(client TestClient, providerName, veleroCLI, veleroNamespac
 	return nil
 }
 
-func installKibishii(ctx context.Context, namespace string, cloudPlatform string, kibishiiDirectory string) error {
+func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
+	kibishiiDirectory string, useVolumeSnapshots bool) error {
+	if strings.EqualFold(cloudPlatform, "azure") &&
+		strings.EqualFold(veleroFeatures, "EnableCSI") &&
+		useVolumeSnapshots {
+		cloudPlatform = "azure-csi"
+	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
 		kibishiiDirectory+cloudPlatform)
+
 	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
+	fmt.Printf("Install Kibishii cmd: %s\n", kibishiiInstallCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
@@ -149,19 +198,23 @@ func waitForKibishiiPods(ctx context.Context, client TestClient, kibishiiNamespa
 	return WaitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
 }
 
-func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient, providerName, kibishiiNamespace, registryCredentialFile, kibishiiDirectory string) error {
+func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient,
+	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
+	kibishiiDirectory string, useVolumeSnapshots bool) error {
 	serviceAccountName := "default"
 
 	// wait until the service account is created before patch the image pull secret
 	if err := WaitUntilServiceAccountCreated(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, 10*time.Minute); err != nil {
 		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
+
 	// add the image pull secret to avoid the image pull limit issue of Docker Hub
 	if err := PatchServiceAccountWithImagePullSecret(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, registryCredentialFile); err != nil {
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
 
-	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, kibishiiDirectory); err != nil {
+	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, veleroFeatures,
+		kibishiiDirectory, useVolumeSnapshots); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
 	}
 

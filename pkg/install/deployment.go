@@ -40,6 +40,7 @@ type podTemplateConfig struct {
 	resources                         corev1.ResourceRequirements
 	withSecret                        bool
 	defaultResticMaintenanceFrequency time.Duration
+	garbageCollectionFrequency        time.Duration
 	plugins                           []string
 	features                          []string
 	defaultVolumesToRestic            bool
@@ -101,6 +102,12 @@ func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
 func WithDefaultResticMaintenanceFrequency(val time.Duration) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultResticMaintenanceFrequency = val
+	}
+}
+
+func WithGarbageCollectionFrequency(val time.Duration) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.garbageCollectionFrequency = val
 	}
 }
 
@@ -273,6 +280,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.defaultResticMaintenanceFrequency > 0 {
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--default-restic-prune-frequency=%v", c.defaultResticMaintenanceFrequency))
+	}
+
+	if c.garbageCollectionFrequency > 0 {
+		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--garbage-collection-frequency=%v", c.garbageCollectionFrequency))
 	}
 
 	if len(c.plugins) > 0 {

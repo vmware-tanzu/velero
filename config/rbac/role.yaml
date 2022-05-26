@@ -4,8 +4,33 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: velero-perms
 rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumerclaims
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - create
+  - delete
 - apiGroups:
   - velero.io
   resources:
@@ -29,6 +54,26 @@ rules:
 - apiGroups:
   - velero.io
   resources:
+  - deletebackuprequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - deletebackuprequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
   - downloadrequests
   verbs:
   - create
@@ -42,6 +87,86 @@ rules:
   - velero.io
   resources:
   - downloadrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumebackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumebackups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumerestores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - podvolumerestores/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - resticrepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - resticrepositories/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - schedules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - schedules/status
   verbs:
   - get
   - patch

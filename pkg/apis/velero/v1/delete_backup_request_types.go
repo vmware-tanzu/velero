@@ -50,8 +50,15 @@ type DeleteBackupRequestStatus struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
+// TODO(2.0) After converting all resources to use the runtime-controller client, the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:object:generate=true
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="BackupName",type="string",JSONPath=".spec.backupName",description="The name of the backup to be deleted"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="The status of the deletion request"
 
 // DeleteBackupRequest is a request to delete one or more backups.
 type DeleteBackupRequest struct {
@@ -68,6 +75,7 @@ type DeleteBackupRequest struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
 
 // DeleteBackupRequestList is a list of DeleteBackupRequests.
 type DeleteBackupRequestList struct {

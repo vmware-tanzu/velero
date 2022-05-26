@@ -10,12 +10,12 @@ reviewers:
   groups:
     maintainers:
       - dsu-igeek
-      - jenting
       - sseago
       - reasonerjt
       - ywk253100
       - blackpiglet
       - qiuming-best
+      - shubham-pampattiwar
 
     tech-writer:
       - a-mccarthy

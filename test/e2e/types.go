@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -49,11 +51,26 @@ type VerleroConfig struct {
 	AddBSLPlugins            string
 	InstallVelero            bool
 	KibishiiDirectory        string
+	Features                 string
+	Debug                    bool
+	GCFrequency              string
 }
 
 type SnapshotCheckPoint struct {
 	NamespaceBackedUp string
-	SnapshotIDList    []string
-	ExpectCount       int
-	PodName           string
+	// SnapshotIDList is for Azure CSI Verification
+	//  we can get SnapshotID from VolumeSnapshotContent from a certain backup
+	SnapshotIDList []string
+	ExpectCount    int
+	PodName        []string
+	EnableCSI      bool
+}
+
+type BackupConfig struct {
+	BackupName         string
+	Namespace          string
+	BackupLocation     string
+	UseVolumeSnapshots bool
+	Selector           string
+	TTL                time.Duration
 }

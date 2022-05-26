@@ -38,6 +38,12 @@ func main() {
 		case <-ticker.C:
 			if done() {
 				fmt.Println("All restic restores are done")
+				err := removeFolder()
+				if err != nil {
+					fmt.Println(err)
+				} else {
+					fmt.Println("Done cleanup .velero folder")
+				}
 				return
 			}
 		}
@@ -74,4 +80,29 @@ func done() bool {
 	}
 
 	return true
+}
+
+// remove .velero folder
+func removeFolder() error {
+	children, err := ioutil.ReadDir("/restores")
+	if err != nil {
+		return err
+	}
+
+	for _, child := range children {
+		if !child.IsDir() {
+			fmt.Printf("%s is not a directory, skipping.\n", child.Name())
+			continue
+		}
+
+		donePath := filepath.Join("/restores", child.Name(), ".velero")
+
+		err = os.RemoveAll(donePath)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Deleted %s", donePath)
+	}
+
+	return nil
 }

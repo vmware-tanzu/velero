@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -47,7 +47,8 @@ type BackupInfo struct {
 	ItemSnapshots,
 	BackupResourceList,
 	CSIVolumeSnapshots,
-	CSIVolumeSnapshotContents io.Reader
+	CSIVolumeSnapshotContents,
+	CSIVolumeSnapshotClasses io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -63,8 +64,9 @@ type BackupStore interface {
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
-	GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error)
-	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error)
+	GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error)
+	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
+	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -252,6 +254,7 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		s.layout.getBackupResourceListKey(info.Name):        info.BackupResourceList,
 		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
 		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
+		s.layout.getCSIVolumeSnapshotClassesKey(info.Name):  info.CSIVolumeSnapshotClasses,
 	}
 
 	for key, reader := range backupObjs {
@@ -371,7 +374,26 @@ func decode(jsongzReader io.Reader, into interface{}) error {
 	return nil
 }
 
-func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error) {
+func (s *objectBackupStore) GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error) {
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotClassesKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// this indicates that the no CSI volumesnapshots were prensent in the backup
+		return nil, nil
+	}
+	defer res.Close()
+
+	var csiVSClasses []*snapshotv1api.VolumeSnapshotClass
+	if err := decode(res, &csiVSClasses); err != nil {
+		return nil, err
+	}
+	return csiVSClasses, nil
+
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error) {
 	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotKey(name))
 	if err != nil {
 		return nil, err
@@ -382,14 +404,14 @@ func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1bet
 	}
 	defer res.Close()
 
-	var csiSnaps []*snapshotv1beta1api.VolumeSnapshot
+	var csiSnaps []*snapshotv1api.VolumeSnapshot
 	if err := decode(res, &csiSnaps); err != nil {
 		return nil, err
 	}
 	return csiSnaps, nil
 }
 
-func (s *objectBackupStore) GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error) {
+func (s *objectBackupStore) GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error) {
 	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(name))
 	if err != nil {
 		return nil, err
@@ -400,7 +422,7 @@ func (s *objectBackupStore) GetCSIVolumeSnapshotContents(name string) ([]*snapsh
 	}
 	defer res.Close()
 
-	var snapConts []*snapshotv1beta1api.VolumeSnapshotContent
+	var snapConts []*snapshotv1api.VolumeSnapshotContent
 	if err := decode(res, &snapConts); err != nil {
 		return nil, err
 	}

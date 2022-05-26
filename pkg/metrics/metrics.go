@@ -54,6 +54,9 @@ const (
 	volumeSnapshotAttemptTotal    = "volume_snapshot_attempt_total"
 	volumeSnapshotSuccessTotal    = "volume_snapshot_success_total"
 	volumeSnapshotFailureTotal    = "volume_snapshot_failure_total"
+	csiSnapshotAttemptTotal       = "csi_snapshot_attempt_total"
+	csiSnapshotSuccessTotal       = "csi_snapshot_success_total"
+	csiSnapshotFailureTotal       = "csi_snapshot_failure_total"
 
 	// Restic metrics
 	podVolumeBackupEnqueueTotal        = "pod_volume_backup_enqueue_count"
@@ -67,8 +70,6 @@ const (
 	pvbNameLabel         = "pod_volume_backup"
 	scheduleLabel        = "schedule"
 	backupNameLabel      = "backupName"
-
-	secondsInMinute = 60.0
 )
 
 // NewServerMetrics returns new ServerMetrics
@@ -268,6 +269,30 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
+			csiSnapshotAttemptTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      csiSnapshotAttemptTotal,
+					Help:      "Total number of CSI attempted volume snapshots",
+				},
+				[]string{scheduleLabel, backupNameLabel},
+			),
+			csiSnapshotSuccessTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      csiSnapshotSuccessTotal,
+					Help:      "Total number of CSI successful volume snapshots",
+				},
+				[]string{scheduleLabel, backupNameLabel},
+			),
+			csiSnapshotFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      csiSnapshotFailureTotal,
+					Help:      "Total number of CSI failed volume snapshots",
+				},
+				[]string{scheduleLabel, backupNameLabel},
+			),
 		},
 	}
 }
@@ -384,6 +409,15 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	}
 	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName, "").Add(0)
+	}
+	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName, "").Add(0)
+	}
+	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName, "").Add(0)
 	}
 }
 
@@ -591,5 +625,26 @@ func (m *ServerMetrics) RegisterVolumeSnapshotSuccesses(backupSchedule string, v
 func (m *ServerMetrics) RegisterVolumeSnapshotFailures(backupSchedule string, volumeSnapshotsFailed int) {
 	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsFailed))
+	}
+}
+
+// RegisterCSISnapshotAttempts records an attempt to snapshot a volume by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotAttempts(backupSchedule, backupName string, csiSnapshotsAttempted int) {
+	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsAttempted))
+	}
+}
+
+// RegisterCSISnapshotSuccesses records a completed volume snapshot by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotSuccesses(backupSchedule, backupName string, csiSnapshotCompleted int) {
+	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotCompleted))
+	}
+}
+
+// RegisterCSISnapshotFailures records a failed volume snapshot by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotFailures(backupSchedule, backupName string, csiSnapshotsFailed int) {
+	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsFailed))
 	}
 }

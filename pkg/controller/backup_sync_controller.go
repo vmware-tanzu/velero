@@ -20,7 +20,9 @@ import (
 	"context"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -48,6 +52,7 @@ type backupSyncController struct {
 	kbClient                client.Client
 	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
 	backupLister            velerov1listers.BackupLister
+	csiVSLister             snapshotv1listers.VolumeSnapshotLister
 	csiSnapshotClient       *snapshotterClientSet.Clientset
 	kubeClient              kubernetes.Interface
 	namespace               string
@@ -62,6 +67,7 @@ func NewBackupSyncController(
 	kbClient client.Client,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	backupLister velerov1listers.BackupLister,
+	csiVSLister snapshotv1listers.VolumeSnapshotLister,
 	syncPeriod time.Duration,
 	namespace string,
 	csiSnapshotClient *snapshotterClientSet.Clientset,
@@ -85,6 +91,7 @@ func NewBackupSyncController(
 		defaultBackupLocation:   defaultBackupLocation,
 		defaultBackupSyncPeriod: syncPeriod,
 		backupLister:            backupLister,
+		csiVSLister:             csiVSLister,
 		csiSnapshotClient:       csiSnapshotClient,
 		kubeClient:              kubeClient,
 
@@ -283,6 +290,22 @@ func (c *backupSyncController) run() {
 			if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 				// we are syncing these objects only to ensure that the storage snapshots are cleaned up
 				// on backup deletion or expiry.
+				log.Info("Syncing CSI volumesnapshotclasses in backup")
+				vsClasses, err := backupStore.GetCSIVolumeSnapshotClasses(backupName)
+				if err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error getting CSI volumesnapclasses for this backup from backup store")
+					continue
+				}
+				for _, vsClass := range vsClasses {
+					vsClass.ResourceVersion = ""
+					created, err := c.csiSnapshotClient.SnapshotV1().VolumeSnapshotClasses().Create(context.TODO(), vsClass, metav1.CreateOptions{})
+					if err != nil {
+						log.WithError(errors.WithStack(err)).Errorf("Error syncing volumesnapshotclass %s into cluster", vsClass.Name)
+						continue
+					}
+					log.Infof("Created CSI volumesnapshotclass %s", created.Name)
+				}
+
 				log.Info("Syncing CSI volumesnapshotcontents in backup")
 				snapConts, err := backupStore.GetCSIVolumeSnapshotContents(backupName)
 				if err != nil {
@@ -294,7 +317,7 @@ func (c *backupSyncController) run() {
 				for _, snapCont := range snapConts {
 					// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
 					snapCont.ResourceVersion = ""
-					created, err := c.csiSnapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Create(context.TODO(), snapCont, metav1.CreateOptions{})
+					created, err := c.csiSnapshotClient.SnapshotV1().VolumeSnapshotContents().Create(context.TODO(), snapCont, metav1.CreateOptions{})
 					switch {
 					case err != nil && kuberrs.IsAlreadyExists(err):
 						log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
@@ -342,11 +365,34 @@ func (c *backupSyncController) deleteOrphanedBackups(locationName string, backup
 		if backup.Status.Phase != velerov1api.BackupPhaseCompleted || backupStoreBackups.Has(backup.Name) {
 			continue
 		}
-
 		if err := c.backupClient.Backups(backup.Namespace).Delete(context.TODO(), backup.Name, metav1.DeleteOptions{}); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")
+			c.deleteCSISnapshotsByBackup(backup.Name, log)
 		}
+	}
+}
+
+func (c *backupSyncController) deleteCSISnapshotsByBackup(backupName string, log logrus.FieldLogger) {
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		return
+	}
+	m := client.MatchingLabels{velerov1api.BackupNameLabel: label.GetValidName(backupName)}
+	if vsList, err := c.csiVSLister.List(label.NewSelectorForBackup(label.GetValidName(backupName))); err != nil {
+		log.WithError(err).Warnf("Failed to list volumesnapshots for backup: %s, the deletion will be skipped", backupName)
+	} else {
+		for _, vs := range vsList {
+			name := kube.NamespaceAndName(vs.GetObjectMeta())
+			log.Debugf("Deleting volumesnapshot %s", name)
+			if err := c.kbClient.Delete(context.TODO(), vs); err != nil {
+				log.WithError(err).Warnf("Failed to delete volumesnapshot %s", name)
+			}
+		}
+	}
+	vsc := &snapshotv1api.VolumeSnapshotContent{}
+	log.Debugf("Deleting volumesnapshotcontents for backup: %s", backupName)
+	if err := c.kbClient.DeleteAllOf(context.TODO(), vsc, m); err != nil {
+		log.WithError(err).Warnf("Failed to delete volumesnapshotcontents for backup: %s", backupName)
 	}
 }

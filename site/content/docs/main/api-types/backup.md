@@ -59,6 +59,13 @@ spec:
     matchLabels:
       app: velero
       component: server
+  # Individual object when matched with any of the label selector specified in the set are to be included in the backup. Optional.
+  # orLabelSelectors as well as labelSelector cannot co-exist, only one of them can be specified in the backup request
+  orLabelSelectors:
+  - matchLabels:
+      app: velero
+  - matchLabels:
+      app: data-protection
   # Whether or not to snapshot volumes. This only applies to PersistentVolumes for Azure, GCE, and
   # AWS. Valid values are true, false, and null/unset. If unset, Velero performs snapshots as long as
   # a persistent volume provider is configured for Velero.
@@ -144,5 +151,7 @@ status:
   warnings: 2
   # Number of errors that were logged by the backup.
   errors: 0
+  # An error that caused the entire backup to fail.
+  failureReason: ""
 
 ```

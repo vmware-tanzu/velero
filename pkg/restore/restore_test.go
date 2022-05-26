@@ -253,6 +253,36 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "OrLabelSelectors only restores matching resources",
+			restore: defaultRestore().OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
+				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup: defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a1", "b1")).Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a3", "b3")).Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a5", "b5")).Result(),
+					builder.ForPersistentVolume("pv-2").ObjectMeta(builder.WithLabels("a4", "b4")).Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-2/deploy-2"},
+				test.PVs():         {"/pv-2"},
+			},
+		},
+		{
 			name:    "should include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=true",
 			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(true).Result(),
 			backup:  defaultBackup().Result(),
@@ -740,7 +770,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			tarball: test.NewTarWriter(t).
 				Done(),
 			wantErrs: Result{
-				Velero: []string{"error parsing backup contents: directory \"resources\" does not exist"},
+				Velero: []string{archive.ErrNotExist.Error()},
 			},
 		},
 		{
@@ -761,7 +791,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			},
 			wantErrs: Result{
 				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"resources/pods/namespaces/ns-1/pod-1.json\": invalid character 'i' looking for beginning of value"},
+					"ns-1": {"error decoding"},
 				},
 			},
 		},
@@ -792,9 +822,31 @@ func TestInvalidTarballContents(t *testing.T) {
 			)
 
 			assertEmptyResults(t, warnings)
-			assert.Equal(t, tc.wantErrs, errs)
+			assertWantErrs(t, tc.wantErrs, errs)
 			assertAPIContents(t, h, tc.want)
 		})
+	}
+}
+
+func assertWantErrs(t *testing.T, wantErrRes Result, errRes Result) {
+	t.Helper()
+	if wantErrRes.Velero != nil {
+		assert.Equal(t, len(wantErrRes.Velero), len(errRes.Velero))
+		for i := range errRes.Velero {
+			assert.Contains(t, errRes.Velero[i], wantErrRes.Velero[i])
+		}
+	}
+	if wantErrRes.Namespaces != nil {
+		assert.Equal(t, len(wantErrRes.Namespaces), len(errRes.Namespaces))
+		for ns := range errRes.Namespaces {
+			assert.Equal(t, len(wantErrRes.Namespaces[ns]), len(errRes.Namespaces[ns]))
+			for i := range errRes.Namespaces[ns] {
+				assert.Contains(t, errRes.Namespaces[ns][i], wantErrRes.Namespaces[ns][i])
+			}
+		}
+	}
+	if wantErrRes.Cluster != nil {
+		assert.Equal(t, wantErrRes.Cluster, errRes.Cluster)
 	}
 }
 
@@ -943,6 +995,76 @@ func TestRestoreItems(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
+			},
+		},
+		{
+			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("secrets", builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"key-1": []byte("value-1")}).Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
+			},
+			want: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+		},
+		{
+			name:    "update service account labels when service account exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is none",
+			restore: defaultRestore().ExistingResourcePolicy("none").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is not specified, velero behavior is preserved",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
 			},
 		},
 		{
@@ -1248,6 +1370,11 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
+func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggableAction {
+	a.selector = selector
+	return a
+}
+
 // TestRestoreActionModifications runs restores with restore item actions that modify resources, and
 // verifies that that the modified item is correctly created in the API. Verification is done by looking
 // at the full object in the API.
@@ -1307,6 +1434,26 @@ func TestRestoreActionModifications(t *testing.T) {
 			actions: []velero.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(nil)
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").Result()),
+			},
+		},
+		{
+			name:         "action with non-matching label selector doesn't prevent restore",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []velero.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}).addSelector(velero.ResourceSelector{
+					IncludedResources: []string{
+						"Pod",
+					},
+					LabelSelector: "nonmatching=label",
 				}),
 			},
 			want: []*test.APIResource{
@@ -1720,6 +1867,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 			// empty in the structured objects. Remove them to make comparison easier.
 			unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
 			unstructured.RemoveNestedField(want.Object, "status")
+			unstructured.RemoveNestedField(res.Object, "status")
 
 			assert.Equal(t, want, res)
 		}
@@ -2121,7 +2269,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						ObjectMeta(
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+							// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
 						).ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),
@@ -2658,7 +2806,7 @@ func TestRestoreWithRestic(t *testing.T) {
 	}
 }
 
-func TestResetMetadataAndStatus(t *testing.T) {
+func TestResetMetadata(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         *unstructured.Unstructured
@@ -2677,20 +2825,46 @@ func TestResetMetadataAndStatus(t *testing.T) {
 			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
 		},
 		{
-			name:        "don't keep status",
+			name:        "keep status",
 			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
 			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := resetMetadata(test.obj)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestResetStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		obj         *unstructured.Unstructured
+		expectedRes *unstructured.Unstructured
+	}{
+		{
+			name:        "no status don't cause error",
+			obj:         &unstructured.Unstructured{},
+			expectedRes: &unstructured.Unstructured{},
+		},
+		{
+			name:        "remove status",
+			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
 			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := resetMetadataAndStatus(test.obj)
-
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
-			}
+			resetStatus(test.obj)
+			assert.Equal(t, test.expectedRes, test.obj)
 		})
 	}
 }

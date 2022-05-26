@@ -25,11 +25,9 @@ If you've already run `velero install` without the `--use-restic` flag, you can 
 
 ## Default Pod Volume backup to restic
 
-By default, `velero install` does not enable use of restic to take backups of all pod volumes. An annotation has to be applied on every pod which contains volumes to be backed up by restic.
+By default, `velero install` does not enable the use of restic to take backups of all pod volumes. You must apply an [annotation](restic.md/#using-opt-in-pod-volume-backup) to every pod which contains volumes for Velero to use restic for the backup.
 
-To backup all pod volumes using restic without having to apply annotation on the pod, run the `velero install` command with the `--default-volumes-to-restic` flag.
-
-Using this flag requires restic integration to be enabled with the `--use-restic` flag. Please refer to the [restic integration][3] page for more information.
+If you are planning to only use restic for volume backups, you can run the `velero install` command with the `--default-volumes-to-restic` flag. This will default all pod volumes backups to use restic without having to apply annotations to pods. Note that when this flag is set during install, Velero will always try to use restic to perform the backup, even want an individual backup to use volume snapshots, by setting the `--snapshot-volumes` flag in the `backup create` command. Alternatively, you can set the  `--default-volumes-to-restic` on an individual backup to to make sure Velero uses Restic for each volume being backed up.
 
 ## Enable features
 
@@ -100,6 +98,10 @@ At installation, Velero sets default resource requests and limits for the Velero
 |Memory limit|512Mi|1024Mi|
 {{< /table >}}
 
+Depending on the cluster resources, especially if you are using Restic, you may need to increase these defaults. Through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources and total size of files is 100GB or below. If the resources you are planning to backup or restore exceed this, you will need to increase the CPU or memory resources available to Velero. In general, the Velero maintainer's testing found that backup operations needed more CPU & memory resources but were less time-consuming than restore operations, when comparing backing up and restoring the same amount of data. The exact CPU and memory limits you will need depend on the scale of the files and directories of your resources and your hardware. It's recommended that you perform your own testing to find the best resource limits for your clusters and resources.
+
+Due to a [known Restic issue](https://github.com/restic/restic/issues/2446), the Restic pod will consume large amounts of memory, especially if you are backing up millions of tiny files and directories. If you are planning to use Restic to backup 100GB of data or more, you will need to increase the resource limits to make sure backups complete successfully.
+
 ### Install with custom resource requests and limits
 
 You can customize these resource requests and limit when you first install using the [velero install][6] CLI command.
@@ -168,6 +170,26 @@ Velero supports any number of backup storage locations and volume snapshot locat
 However, `velero install` only supports configuring at most one backup storage location and one volume snapshot location.
 
 To configure additional locations after running `velero install`, use the `velero backup-location create` and/or `velero snapshot-location create` commands along with provider-specific configuration. Use the `--help` flag on each of these commands for more details.
+
+### Set default backup storage location or volume snapshot locations
+
+When performing backups, Velero needs to know where to backup your data. This means that if you configure multiple locations, you must specify the location Velero should use each time you run `velero backup create`, or you can set a default backup storage location or default volume snapshot locations. If you only have one backup storage llocation or volume snapshot location set for a provider, Velero will automatically use that location as the default.
+
+Set a default backup storage location by passing a `--default` flag with when running `velero backup-location create`.
+
+```
+velero backup-location create backups-primary \
+    --provider aws \
+    --bucket velero-backups \
+    --config region=us-east-1 \
+    --default
+```
+
+You can set a default volume snapshot location for each of your volume snapshot providers using the `--default-volume-snapshot-locations` flag on the `velero server` command.
+
+```
+velero server --default-volume-snapshot-locations="<PROVIDER-NAME>:<LOCATION-NAME>,<PROVIDER2-NAME>:<LOCATION2-NAME>"
+```
 
 ## Do not configure a backup storage location during install
 

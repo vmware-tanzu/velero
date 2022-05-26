@@ -49,8 +49,11 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
 controller-gen \
   crd:crdVersions=v1\
   paths=./pkg/apis/velero/v1/... \
+  rbac:roleName=velero-perms \
   paths=./pkg/controller/... \
-  output:crd:artifacts:config=config/crd/v1/bases
+  output:crd:artifacts:config=config/crd/v1/bases \
+  object \
+  paths=./pkg/apis/velero/v1/...
 
 # this is a super hacky workaround for https://github.com/kubernetes/kubernetes/issues/91395
 # which a result of fixing the validation on CRD objects. The validation ensures the fields that are list map keys, are either marked

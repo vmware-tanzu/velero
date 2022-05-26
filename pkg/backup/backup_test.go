@@ -333,6 +333,35 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "OrLabelSelector only backs up matching resources",
+			backup: defaultBackup().
+				OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
+					{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("a1", "b1")).Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("a2", "b2")).Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a4", "b4")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("a5", "b5")).Result(),
+				),
+			},
+			want: []string{
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/cluster/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/bar.json",
+			},
+		},
+		{
 			name: "resources with velero.io/exclude-from-backup=true label are not included",
 			backup: defaultBackup().
 				Result(),

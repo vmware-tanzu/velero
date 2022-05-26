@@ -7,12 +7,12 @@
 | Maintainer | GitHub ID | Affiliation |
 | --------------- | --------- | ----------- |
 | Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [Kasten](https://github.com/kastenhq/) |
-| JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/)
 | Scott Seago | [sseago](https://github.com/sseago) | [OpenShift](https://github.com/openshift)
 | Daniel Jiang | [reasonerjt](https://github.com/reasonerjt) | [VMware](https://www.github.com/vmware/)
 | Wenkai Yin | [ywk253100](https://github.com/ywk253100) | [VMware](https://www.github.com/vmware/) |
 | Xun Jiang | [blackpiglet](https://github.com/blackpiglet) | [VMware](https://www.github.com/vmware/) |
 | Ming Qiu | [qiuming-best](https://github.com/qiuming-best) | [VMware](https://www.github.com/vmware/) |
+| Shubham Pampattiwar | [shubham-pampattiwar](https://github.com/shubham-pampattiwar) | [OpenShift](https://github.com/openshift)
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
@@ -23,6 +23,7 @@
 * Ashish Amarnath ([ashish-amarnath](https://github.com/ashish-amarnath))
 * Carlisia Thompson ([carlisia](https://github.com/carlisia))
 * Bridget McErlean ([zubron](https://github.com/zubron))
+* JenTing Hsiao ([jenting](https://github.com/jenting))
 
 ## Velero Contributors & Stakeholders
 
@@ -31,6 +32,6 @@
 | Architect | Dave Smith-Uchida (dsu-igeek) |
 | Technical Lead | Daniel Jiang (reasonerjt) |
 | Kubernetes CSI Liaison |  |
-| Deployment | JenTing Hsiao (jenting) |
+| Deployment |  |
 | Community Management | Orlin Vasilev (OrlinVasilev) |
 | Product Management | Eleanor Millman (eleanor-millman) |

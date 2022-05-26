@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	GCSyncPeriod             = 60 * time.Minute
+	defaultGCFrequency       = 60 * time.Minute
 	garbageCollectionFailure = "velero.io/gc-failure"
 	gcFailureBSLNotFound     = "BSLNotFound"
 	gcFailureBSLCannotGet    = "BSLCannotGet"
@@ -54,6 +54,7 @@ type gcController struct {
 	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
 	kbClient                  client.Client
+	frequency                 time.Duration
 
 	clock clock.Clock
 }
@@ -65,6 +66,7 @@ func NewGCController(
 	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister,
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
 	kbClient client.Client,
+	frequency time.Duration,
 ) Interface {
 	c := &gcController{
 		genericController:         newGenericController(GarbageCollection, logger),
@@ -76,7 +78,11 @@ func NewGCController(
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.resyncPeriod = GCSyncPeriod
+	c.resyncPeriod = frequency
+	if c.resyncPeriod < 0 {
+		c.resyncPeriod = defaultGCFrequency
+	}
+	logger.Infof("Garbage collection frequency: %s", c.resyncPeriod.String())
 	c.resyncFunc = c.enqueueAllBackups
 
 	backupInformer.Informer().AddEventHandler(

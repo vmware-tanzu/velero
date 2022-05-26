@@ -82,7 +82,7 @@ see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-v
 endef
 
 # The version of restic binary to be downloaded
-RESTIC_VERSION ?= 0.12.1
+RESTIC_VERSION ?= 0.13.1
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
@@ -125,6 +125,7 @@ all-containers: container-builder-env
 	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
 
 local: build-dirs
+# Add DEBUG=1 to enable debug locally
 	GOOS=$(GOOS) \
 	GOARCH=$(GOARCH) \
 	VERSION=$(VERSION) \

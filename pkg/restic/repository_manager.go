@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -94,6 +95,16 @@ type repositoryManager struct {
 	pvClient             corev1client.PersistentVolumesGetter
 	credentialsFileStore credentials.FileStore
 }
+
+const (
+	// insecureSkipTLSVerifyKey is the flag in BackupStorageLocation's config
+	// to indicate whether to skip TLS verify to setup insecure HTTPS connection.
+	insecureSkipTLSVerifyKey = "insecureSkipTLSVerify"
+
+	// resticInsecureTLSFlag is the flag for Restic command line to indicate
+	// skip TLS verify on https connection.
+	resticInsecureTLSFlag = "--insecure-tls"
+)
 
 // NewRepositoryManager constructs a RepositoryManager.
 func NewRepositoryManager(
@@ -184,10 +195,11 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) e
 	defer rm.repoLocker.Unlock(repo.Name)
 
 	snapshotsCmd := SnapshotsCommand(repo.Spec.ResticIdentifier)
-	// use the '--last' flag to minimize the amount of data fetched since
+	// use the '--latest=1' flag to minimize the amount of data fetched since
 	// we're just validating that the repo exists and can be authenticated
 	// to.
-	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--last")
+	// "--last" is replaced by "--latest=1" in restic v0.12.1
+	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--latest=1")
 
 	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
 }
@@ -265,6 +277,14 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	}
 	cmd.Env = env
 
+	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
+	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
+	// is not enable for Restic command.
+	skipTLSRet := GetInsecureSkipTLSVerifyFromBSL(loc, rm.log)
+	if len(skipTLSRet) > 0 {
+		cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
+	}
+
 	stdout, stderr, err := veleroexec.RunCommand(cmd.Cmd())
 	rm.log.WithFields(logrus.Fields{
 		"repository": cmd.RepoName(),
@@ -277,4 +297,23 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	}
 
 	return nil
+}
+
+// GetInsecureSkipTLSVerifyFromBSL get insecureSkipTLSVerify flag from BSL configuration,
+// Then return --insecure-tls flag with boolean value as result.
+func GetInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
+	result := ""
+
+	if backupLocation == nil {
+		logger.Info("bsl is nil. return empty.")
+		return result
+	}
+
+	if insecure, _ := strconv.ParseBool(backupLocation.Spec.Config[insecureSkipTLSVerifyKey]); insecure {
+		logger.Debugf("set --insecure-tls=true for Restic command according to BSL %s config", backupLocation.Name)
+		result = resticInsecureTLSFlag + "=true"
+		return result
+	}
+
+	return result
 }

@@ -10,6 +10,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
 	github.com/Azure/go-autorest/autorest/to v0.3.0
+	github.com/apex/log v1.9.0
 	github.com/aws/aws-sdk-go v1.28.2
 	github.com/bombsimon/logrusr v1.1.0
 	github.com/evanphx/json-patch v4.11.0+incompatible
@@ -19,10 +20,10 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
-	github.com/hashicorp/go-hclog v0.12.0
-	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
+	github.com/hashicorp/go-hclog v0.14.1
+	github.com/hashicorp/go-plugin v1.4.3
 	github.com/joho/godotenv v1.3.0
-	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
+	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.16.0
 	github.com/pkg/errors v0.9.1
@@ -37,6 +38,7 @@ require (
 	golang.org/x/mod v0.4.2
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/api v0.56.0
 	google.golang.org/grpc v1.40.0
 	k8s.io/api v0.22.2

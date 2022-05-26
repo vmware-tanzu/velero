@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -144,13 +144,12 @@ func NewRestoreController(
 				restore := obj.(*api.Restore)
 
 				switch restore.Status.Phase {
-				case "", api.RestorePhaseNew:
-					// only process new restores
+				case "", api.RestorePhaseNew, api.RestorePhaseInProgress:
 				default:
 					c.logger.WithFields(logrus.Fields{
 						"restore": kubeutil.NamespaceAndName(restore),
 						"phase":   restore.Status.Phase,
-					}).Debug("Restore is not new, skipping")
+					}).Debug("Restore is not new or in-progress, skipping")
 					return
 				}
 
@@ -202,7 +201,21 @@ func (c *restoreController) processQueueItem(key string) error {
 	// is ("" | New)
 	switch restore.Status.Phase {
 	case "", api.RestorePhaseNew:
-		// only process new restores
+	case api.RestorePhaseInProgress:
+		// A restore may stay in-progress forever because of
+		// 1) the controller restarts during the processing of a restore
+		// 2) the restore with in-progress status isn't updated to completed or failed status successfully
+		// So we try to mark such restores as failed to avoid it
+		updated := restore.DeepCopy()
+		updated.Status.Phase = api.RestorePhaseFailed
+		updated.Status.FailureReason = fmt.Sprintf("got a Restore with unexpected status %q, this may be due to a restart of the controller during the restore, mark it as %q",
+			api.RestorePhaseInProgress, updated.Status.Phase)
+		_, err = patchRestore(restore, updated, c.restoreClient)
+		if err != nil {
+			return errors.Wrapf(err, "error updating Restore status to %s", updated.Status.Phase)
+		}
+		log.Warn(updated.Status.FailureReason)
+		return nil
 	default:
 		return nil
 	}
@@ -311,6 +324,11 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 	// validate included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(restore.Spec.IncludedNamespaces, restore.Spec.ExcludedNamespaces) {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
+	}
+
+	// validate that only one exists orLabelSelector or just labelSelector (singular)
+	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"))
 	}
 
 	// validate that exactly one of BackupName and ScheduleName have been specified

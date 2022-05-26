@@ -77,8 +77,17 @@ type ScheduleStatus struct {
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 }
 
+// TODO(2.0) After converting all resources to use the runtime-controller client, the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:generate=true
+// +kubebuilder:object:root=true
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Status of the schedule"
+// +kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description="A Cron expression defining when to run the Backup"
+// +kubebuilder:printcolumn:name="LastBackup",type="date",JSONPath=".status.lastBackup",description="The last time a Backup was run for this schedule"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Schedule is a Velero resource that represents a pre-scheduled or
 // periodic Backup that should be run.
@@ -96,6 +105,8 @@ type Schedule struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:generate=true
+// +kubebuilder:object:root=true
 
 // ScheduleList is a list of Schedules.
 type ScheduleList struct {

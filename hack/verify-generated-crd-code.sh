@@ -16,7 +16,7 @@
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 
-${HACK_DIR}/update-generated-crd-code.sh --verify-only
+${HACK_DIR}/update-generated-crd-code.sh
 
 # ensure no changes to generated CRDs
 if ! git diff --exit-code config/crd/v1/crds/crds.go >/dev/null; then

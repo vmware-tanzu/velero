@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,10 +45,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
-	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
-	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
-	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/backup"
@@ -121,6 +121,7 @@ type serverConfig struct {
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
 	defaultResticMaintenanceFrequency                                       time.Duration
+	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
 }
 
@@ -131,7 +132,7 @@ type controllerRunInfo struct {
 
 func NewCommand(f client.Factory) *cobra.Command {
 	var (
-		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
+		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(':')
 		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
 		config                  = serverConfig{
 			pluginDir:                         "/plugins",
@@ -214,6 +215,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "How long to wait on persistent volumes and namespaces to terminate during a restore before timing out.")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
+	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
 
 	return command
@@ -230,7 +232,7 @@ type server struct {
 	dynamicClient                       dynamic.Interface
 	sharedInformerFactory               informers.SharedInformerFactory
 	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
-	csiSnapshotClient                   *snapshotv1beta1client.Clientset
+	csiSnapshotClient                   *snapshotv1client.Clientset
 	ctx                                 context.Context
 	cancelFunc                          context.CancelFunc
 	logger                              logrus.FieldLogger
@@ -290,9 +292,9 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	var csiSnapClient *snapshotv1beta1client.Clientset
+	var csiSnapClient *snapshotv1client.Clientset
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		csiSnapClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
+		csiSnapClient, err = snapshotv1client.NewForConfig(clientConfig)
 		if err != nil {
 			cancelFunc()
 			return nil, err
@@ -302,6 +304,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
+	snapshotv1api.AddToScheme(scheme)
 
 	ctrl.SetLogger(logrusr.NewLogger(logger))
 
@@ -476,6 +479,7 @@ func (s *server) veleroResourcesExist() error {
 //	 have restic restores run before controllers adopt the pods.
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
+// - CAPI ClusterClasses go before Clusters.
 // - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 //	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 //   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
@@ -498,6 +502,7 @@ var defaultRestorePriorities = []string{
 	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
 	// in the backup.
 	"replicasets.apps",
+	"clusterclasses.cluster.x-k8s.io",
 	"clusters.cluster.x-k8s.io",
 	"clusterresourcesets.addons.cluster.x-k8s.io",
 }
@@ -535,32 +540,34 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) getCSISnapshotListers() (snapshotv1beta1listers.VolumeSnapshotLister, snapshotv1beta1listers.VolumeSnapshotContentLister) {
+func (s *server) getCSISnapshotListers() (snapshotv1listers.VolumeSnapshotLister, snapshotv1listers.VolumeSnapshotContentLister, snapshotv1listers.VolumeSnapshotClassLister) {
 	// Make empty listers that will only be populated if CSI is properly enabled.
-	var vsLister snapshotv1beta1listers.VolumeSnapshotLister
-	var vscLister snapshotv1beta1listers.VolumeSnapshotContentLister
+	var vsLister snapshotv1listers.VolumeSnapshotLister
+	var vscLister snapshotv1listers.VolumeSnapshotContentLister
+	var vsClassLister snapshotv1listers.VolumeSnapshotClassLister
 	var err error
 
 	// If CSI is enabled, check for the CSI groups and generate the listers
 	// If CSI isn't enabled, return empty listers.
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
+		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
 		switch {
 		case apierrors.IsNotFound(err):
 			// CSI is enabled, but the required CRDs aren't installed, so halt.
-			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
+			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
 		case err == nil:
 			// CSI is enabled, and the resources were found.
 			// Instantiate the listers fully
 			s.logger.Debug("Creating CSI listers")
 			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
-			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshots().Lister()
+			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotContents().Lister()
+			vsClassLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotClasses().Lister()
 		case err != nil:
 			cmd.CheckError(err)
 		}
 	}
-	return vsLister, vscLister
+	return vsLister, vscLister, vsClassLister
 }
 
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
@@ -587,7 +594,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	backupStoreGetter := persistence.NewObjectBackupStoreGetter(s.credentialFileStore)
 
-	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
+	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
@@ -595,6 +602,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetClient(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
+			csiVSLister,
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.csiSnapshotClient,
@@ -644,28 +652,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			s.config.formatFlag.Parse(),
 			csiVSLister,
+			s.csiSnapshotClient,
 			csiVSCLister,
+			csiVSClassLister,
 			backupStoreGetter,
 		)
 
 		return controllerRunInfo{
 			controller: backupController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
-	scheduleControllerRunInfo := func() controllerRunInfo {
-		scheduleController := controller.NewScheduleController(
-			s.namespace,
-			s.veleroClient.VeleroV1(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Schedules(),
-			s.logger,
-			s.metrics,
-		)
-
-		return controllerRunInfo{
-			controller: scheduleController,
 			numWorkers: defaultControllerWorkers,
 		}
 	}
@@ -677,38 +671,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
 			s.veleroClient.VeleroV1(),
 			s.mgr.GetClient(),
+			s.config.garbageCollectionFrequency,
 		)
 
 		return controllerRunInfo{
 			controller: gcController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
-	deletionControllerRunInfo := func() controllerRunInfo {
-		deletionController := controller.NewBackupDeletionController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
-			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
-			s.veleroClient.VeleroV1(), // backupClient
-			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.veleroClient.VeleroV1(), // restoreClient
-			backupTracker,
-			s.resticManager,
-			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-			s.mgr.GetClient(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
-			csiVSLister,
-			csiVSCLister,
-			s.csiSnapshotClient,
-			newPluginManager,
-			backupStoreGetter,
-			s.metrics,
-			s.discoveryHelper,
-		)
-
-		return controllerRunInfo{
-			controller: deletionController,
 			numWorkers: defaultControllerWorkers,
 		}
 	}
@@ -752,30 +719,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	resticRepoControllerRunInfo := func() controllerRunInfo {
-		resticRepoController := controller.NewResticRepositoryController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().ResticRepositories(),
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.resticManager,
-			s.config.defaultResticMaintenanceFrequency,
-		)
-
-		return controllerRunInfo{
-			controller: resticRepoController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	enabledControllers := map[string]func() controllerRunInfo{
 		controller.BackupSync:        backupSyncControllerRunInfo,
 		controller.Backup:            backupControllerRunInfo,
-		controller.Schedule:          scheduleControllerRunInfo,
 		controller.GarbageCollection: gcControllerRunInfo,
-		controller.BackupDeletion:    deletionControllerRunInfo,
 		controller.Restore:           restoreControllerRunInfo,
-		controller.ResticRepo:        resticRepoControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := make(map[string]struct{})
@@ -843,6 +791,27 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
 
+	if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+	}
+
+	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.resticManager).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
+	}
+
+	if err := controller.NewBackupDeletionReconciler(
+		s.logger,
+		s.mgr.GetClient(),
+		backupTracker,
+		s.resticManager,
+		s.metrics,
+		s.discoveryHelper,
+		newPluginManager,
+		backupStoreGetter,
+	).SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+	}
+
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
 		r := controller.ServerStatusRequestReconciler{
 			Scheme:         s.mgr.GetScheme(),
@@ -887,7 +856,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	if err := s.mgr.Start(s.ctx); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
-
 	return nil
 }
 
@@ -929,16 +897,16 @@ func (s *server) runProfiler() {
 
 // CSIInformerFactoryWrapper is a proxy around the CSI SharedInformerFactory that checks the CSI feature flag before performing operations.
 type CSIInformerFactoryWrapper struct {
-	factory snapshotv1beta1informers.SharedInformerFactory
+	factory snapshotv1informers.SharedInformerFactory
 }
 
-func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInformerFactoryWrapper {
+func NewCSIInformerFactoryWrapper(c snapshotv1client.Interface) *CSIInformerFactoryWrapper {
 	// If no namespace is specified, all namespaces are watched.
 	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
 	w := &CSIInformerFactoryWrapper{}
 
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		w.factory = snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(c, 0)
+		w.factory = snapshotv1informers.NewSharedInformerFactoryWithOptions(c, 0)
 	}
 	return w
 }

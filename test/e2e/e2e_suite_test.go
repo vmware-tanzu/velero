@@ -30,6 +30,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
+	. "github.com/vmware-tanzu/velero/test/e2e/orderedresources"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
@@ -56,23 +57,26 @@ func init() {
 	flag.BoolVar(&VeleroCfg.InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
 	flag.StringVar(&VeleroCfg.RegistryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
 	flag.StringVar(&VeleroCfg.KibishiiDirectory, "kibishii-directory", "github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/", "The file directory or URL path to install Kibishii. Optional.")
-
+	//vmware-tanzu-experiments
 	// Flags to create an additional BSL for multiple credentials test
 	flag.StringVar(&VeleroCfg.AdditionalBSLProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")
 	flag.StringVar(&VeleroCfg.AdditionalBSLBucket, "additional-bsl-bucket", "", "name of the object storage bucket for additional backup storage location. Required if testing multiple credentials support.")
 	flag.StringVar(&VeleroCfg.AdditionalBSLPrefix, "additional-bsl-prefix", "", "prefix under which all Velero data should be stored within the bucket for additional backup storage location. Optional.")
 	flag.StringVar(&VeleroCfg.AdditionalBSLConfig, "additional-bsl-config", "", "configuration to use for the additional backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&VeleroCfg.AdditionalBSLCredentials, "additional-bsl-credentials-file", "", "file containing credentials for additional backup storage location provider. Required if testing multiple credentials support.")
+	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
+	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", false, "Switch to control namespace cleaning.")
+	flag.StringVar(&VeleroCfg.GCFrequency, "garbage-collection-frequency", "", "Frequency of garbage collection.")
 }
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", APIGropuVersionsTest)
 
 // Test backup and restore of Kibishi using restic
-var _ = Describe("[Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
+var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
 
-var _ = Describe("[Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+var _ = Describe("[Basic][Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
 
-var _ = Describe("[Basic] Backup/restore of cluster resources", ResourcesCheckTest)
+var _ = Describe("[Basic][ClusterResource] Backup/restore of cluster resources", ResourcesCheckTest)
 
 var _ = Describe("[Scale] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
 
@@ -91,12 +95,18 @@ var _ = Describe("[ResourceFiltering][IncludeNamespaces][Restore] Velero test on
 var _ = Describe("[ResourceFiltering][IncludeResources][Backup] Velero test on include resources from the cluster backup", BackupWithIncludeResources)
 var _ = Describe("[ResourceFiltering][IncludeResources][Restore] Velero test on include resources from the cluster restore", RestoreWithIncludeResources)
 var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup include resources matching the label selector", BackupWithLabelSelector)
+
 var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
-var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
+var _ = Describe("[Backups][TTL] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
 var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
+
+var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
+
 var _ = Describe("[BSL][Deletion][Snapshot] Local backups will be deleted once the corresponding backup storage location is deleted", BslDeletionWithSnapshots)
 var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
+
+var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
 func TestE2e(t *testing.T) {
 	// Skip running E2E tests when running only "short" tests because:

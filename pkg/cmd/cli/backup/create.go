@@ -41,8 +41,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
-const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
-
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
@@ -106,7 +104,6 @@ type CreateOptions struct {
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		TTL:                     DefaultBackupTTL,
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),

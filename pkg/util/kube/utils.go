@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -35,7 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	corev1listers "k8s.io/client-go/listers/core/v1"
+	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
@@ -117,8 +116,7 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 // GetVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
 // where the specified volume lives.
 // For volumes with a CSIVolumeSource, append "/mount" to the directory name.
-func GetVolumeDirectory(log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, pvcLister corev1listers.PersistentVolumeClaimLister,
-	pvLister corev1listers.PersistentVolumeLister, client client.Client) (string, error) {
+func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (string, error) {
 	var volume *corev1api.Volume
 
 	for _, item := range pod.Spec.Volumes {
@@ -142,18 +140,20 @@ func GetVolumeDirectory(log logrus.FieldLogger, pod *corev1api.Pod, volumeName s
 	}
 
 	// Most common case is that we have a PVC VolumeSource, and we need to check the PV it points to for a CSI source.
-	pvc, err := pvcLister.PersistentVolumeClaims(pod.Namespace).Get(volume.VolumeSource.PersistentVolumeClaim.ClaimName)
+	pvc := &corev1api.PersistentVolumeClaim{}
+	err := cli.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: volume.VolumeSource.PersistentVolumeClaim.ClaimName}, pvc)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	pv, err := pvLister.Get(pvc.Spec.VolumeName)
+	pv := &corev1api.PersistentVolume{}
+	err = cli.Get(ctx, client.ObjectKey{Name: pvc.Spec.VolumeName}, pv)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	// PV's been created with a CSI source.
-	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, client)
+	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, cli)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -239,4 +239,13 @@ func IsCRDReady(crd *unstructured.Unstructured) (bool, error) {
 	default:
 		return false, fmt.Errorf("unable to handle CRD with version %s", ver)
 	}
+}
+
+// Patch the given object
+func Patch(ctx context.Context, original, updated client.Object, client client.Client) error {
+	helper, err := patch.NewHelper(original, client)
+	if err != nil {
+		return err
+	}
+	return helper.Patch(ctx, updated)
 }

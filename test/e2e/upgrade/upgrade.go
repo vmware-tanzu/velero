@@ -19,156 +19,223 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
+
+type UpgradeFromVelero struct {
+	UpgradeFromVeleroVersion string
+	UpgradeFromVeleroCLI     string
+}
 
 const (
 	upgradeNamespace = "upgrade-workload"
 )
 
+func GetUpgradePathList() []UpgradeFromVelero {
+	var upgradeFromVeleroList []UpgradeFromVelero
+	UpgradeFromVeleroVersionList := strings.Split(VeleroCfg.UpgradeFromVeleroVersion, ",")
+	UpgradeFromVeleroCliList := strings.Split(VeleroCfg.UpgradeFromVeleroCLI, ",")
+
+	for _, upgradeFromVeleroVersion := range UpgradeFromVeleroVersionList {
+		upgradeFromVeleroList = append(upgradeFromVeleroList,
+			UpgradeFromVelero{upgradeFromVeleroVersion, ""})
+	}
+	for i, upgradeFromVeleroCli := range UpgradeFromVeleroCliList {
+		if i == len(UpgradeFromVeleroVersionList)-1 {
+			break
+		}
+		upgradeFromVeleroList[i].UpgradeFromVeleroCLI = upgradeFromVeleroCli
+	}
+	return upgradeFromVeleroList
+}
+
 func BackupUpgradeRestoreWithSnapshots() {
-	BackupUpgradeRestoreTest(true)
+	for _, upgradeFromVelero := range GetUpgradePathList() {
+		BackupUpgradeRestoreTest(true, upgradeFromVelero)
+	}
 }
 
 func BackupUpgradeRestoreWithRestic() {
-	BackupUpgradeRestoreTest(false)
+	for _, upgradeFromVelero := range GetUpgradePathList() {
+		BackupUpgradeRestoreTest(false, upgradeFromVelero)
+	}
 }
 
-func BackupUpgradeRestoreTest(useVolumeSnapshots bool) {
+func BackupUpgradeRestoreTest(useVolumeSnapshots bool, upgradeFromVelero UpgradeFromVelero) {
 	var (
-		backupName, restoreName, upgradeFromVeleroCLI string
+		backupName, restoreName string
+		client                  TestClient
+		err                     error
 	)
 
-	client, err := NewTestClient()
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
-
+	By("Create test client instance", func() {
+		client, err = NewTestClient()
+		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+	})
 	BeforeEach(func() {
+		if !VeleroCfg.InstallVelero {
+			Skip("Upgrade test should not be triggered if VeleroCfg.InstallVelero is set to false")
+		}
 		if (len(VeleroCfg.UpgradeFromVeleroVersion)) == 0 {
 			Skip("An original velero version is required to run upgrade test, please run test with upgrade-from-velero-version=<version>")
 		}
 		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
 		}
-
-		var err error
-		flag.Parse()
-		UUIDgen, err = uuid.NewRandom()
-		Expect(err).To(Succeed())
-		if VeleroCfg.InstallVelero {
-			//Set VeleroImage and ResticHelperImage to blank
-			//VeleroImage and ResticHelperImage should be the default value in originalCli
-			tmpCfg := VeleroCfg
-			tmpCfg.VeleroImage = ""
-			tmpCfg.ResticHelperImage = ""
-			tmpCfg.Plugins = ""
-			//Assume tag of velero server image is identical to velero CLI version
-			//Download velero CLI if it's empty according to velero CLI version
-			if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
-				tmpCfg.VeleroCLI, err = InstallVeleroCLI(VeleroCfg.UpgradeFromVeleroVersion)
-				upgradeFromVeleroCLI = tmpCfg.VeleroCLI
-				Expect(err).To(Succeed())
-			}
-			Expect(VeleroInstall(context.Background(), &tmpCfg, "", useVolumeSnapshots)).To(Succeed())
-			Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI, tmpCfg.UpgradeFromVeleroVersion)).To(Succeed())
-		} else {
-			Skip("Upgrade test is skipped since user don't want to install any other velero")
+		if VeleroCfg.VeleroCLI == "" {
+			Skip("VeleroCLI should be provide")
 		}
 	})
-
 	AfterEach(func() {
 		if VeleroCfg.InstallVelero {
-			err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-			Expect(err).To(Succeed())
+			if !VeleroCfg.Debug {
+				By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
+					DeleteNamespace(context.Background(), client, upgradeNamespace, true)
+				})
+				By("Uninstall Velero", func() {
+					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
+						VeleroCfg.VeleroNamespace)).To(Succeed())
+				})
+			}
 		}
 	})
-
 	When("kibishii is the sample workload", func() {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
+			flag.Parse()
+			UUIDgen, err = uuid.NewRandom()
+			Expect(err).To(Succeed())
+
+			if upgradeFromVelero.UpgradeFromVeleroCLI == "" {
+				//Assume tag of velero server image is identical to velero CLI version
+				//Download velero CLI if it's empty according to velero CLI version
+				By(fmt.Sprintf("Install the expected old version Velero CLI (%s) for installing Velero",
+					upgradeFromVelero.UpgradeFromVeleroVersion), func() {
+					upgradeFromVelero.UpgradeFromVeleroCLI, err = InstallVeleroCLI(upgradeFromVelero.UpgradeFromVeleroVersion)
+					Expect(err).To(Succeed())
+				})
+			}
+			VeleroCfg.GCFrequency = ""
+			By(fmt.Sprintf("Install the expected old version Velero (%s) for upgrade",
+				upgradeFromVelero.UpgradeFromVeleroVersion), func() {
+				//Set VeleroImage and ResticHelperImage to blank
+				//VeleroImage and ResticHelperImage should be the default value in originalCli
+				tmpCfgForOldVeleroInstall := VeleroCfg
+				tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion = upgradeFromVelero.UpgradeFromVeleroVersion
+				tmpCfgForOldVeleroInstall.VeleroCLI = upgradeFromVelero.UpgradeFromVeleroCLI
+				tmpCfgForOldVeleroInstall.VeleroImage = ""
+				tmpCfgForOldVeleroInstall.ResticHelperImage = ""
+				tmpCfgForOldVeleroInstall.Plugins = ""
+
+				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall,
+					useVolumeSnapshots)).To(Succeed())
+				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,
+					tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion)).To(Succeed())
+			})
+
 			backupName = "backup-" + UUIDgen.String()
 			restoreName = "restore-" + UUIDgen.String()
 			tmpCfg := VeleroCfg
-			if (len(VeleroCfg.UpgradeFromVeleroCLI)) == 0 {
-				tmpCfg.UpgradeFromVeleroCLI = upgradeFromVeleroCLI
-				Expect(err).To(Succeed())
+			tmpCfg.UpgradeFromVeleroCLI = upgradeFromVelero.UpgradeFromVeleroCLI
+			tmpCfg.UpgradeFromVeleroVersion = upgradeFromVelero.UpgradeFromVeleroVersion
+			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+
+			By("Create namespace for sample workload", func() {
+				Expect(CreateNamespace(oneHourTimeout, client, upgradeNamespace)).To(Succeed(),
+					fmt.Sprintf("Failed to create namespace %s to install Kibishii workload", upgradeNamespace))
+			})
+
+			By("Deploy sample workload of Kibishii", func() {
+				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, client, tmpCfg.CloudProvider,
+					upgradeNamespace, tmpCfg.RegistryCredentialFile, tmpCfg.Features,
+					tmpCfg.KibishiiDirectory, useVolumeSnapshots)).To(Succeed())
+			})
+
+			By(fmt.Sprintf("Backup namespace %s", upgradeNamespace), func() {
+				var BackupCfg BackupConfig
+				BackupCfg.BackupName = backupName
+				BackupCfg.Namespace = upgradeNamespace
+				BackupCfg.BackupLocation = ""
+				BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
+				BackupCfg.Selector = ""
+				Expect(VeleroBackupNamespace(oneHourTimeout, tmpCfg.UpgradeFromVeleroCLI,
+					tmpCfg.VeleroNamespace, BackupCfg)).ShouldNot(HaveOccurred(), func() string {
+					err = VeleroBackupLogs(context.Background(), tmpCfg.UpgradeFromVeleroCLI,
+						tmpCfg.VeleroNamespace, backupName)
+					return "Get backup logs"
+				})
+			})
+
+			if useVolumeSnapshots {
+				if VeleroCfg.CloudProvider == "vsphere" {
+					// TODO - remove after upload progress monitoring is implemented
+					By("Waiting for vSphere uploads to complete", func() {
+						Expect(WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour,
+							upgradeNamespace)).To(Succeed())
+					})
+				}
+				var snapshotCheckPoint SnapshotCheckPoint
+				snapshotCheckPoint.NamespaceBackedUp = upgradeNamespace
+				By("Snapshot should be created in cloud object store", func() {
+					snapshotCheckPoint, err := GetSnapshotCheckPoint(client, VeleroCfg, 2,
+						upgradeNamespace, backupName, KibishiiPodNameList)
+					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
+					Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+						VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+						VeleroCfg.BSLConfig, backupName, snapshotCheckPoint)).To(Succeed())
+				})
 			}
-			Expect(runUpgradeTests(client, &tmpCfg, backupName, restoreName, "", useVolumeSnapshots)).To(Succeed(),
-				"Failed to successfully backup and restore Kibishii namespace")
+
+			By(fmt.Sprintf("Simulating a disaster by removing namespace %s\n", upgradeNamespace), func() {
+				Expect(DeleteNamespace(oneHourTimeout, client, upgradeNamespace, true)).To(Succeed(),
+					fmt.Sprintf("failed to delete namespace %s", upgradeNamespace))
+			})
+
+			if useVolumeSnapshots && VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+				// Upgrade test is not running daily since no CSI plugin v1.0 released, because builds before
+				//   v1.0 have issues to fail upgrade case.
+				By("Sleep 5 minutes to avoid snapshot recreated by unknown reason ", func() {
+					time.Sleep(5 * time.Minute)
+				})
+			}
+			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+			if tmpCfg.CloudProvider == "aws" && useVolumeSnapshots {
+				fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
+				time.Sleep(5 * time.Minute)
+			}
+
+			By(fmt.Sprintf("Upgrade Velero by CLI %s", tmpCfg.VeleroCLI), func() {
+				tmpCfg.GCFrequency = ""
+				Expect(VeleroInstall(context.Background(), &tmpCfg, useVolumeSnapshots)).To(Succeed())
+				Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
+					tmpCfg.VeleroVersion)).To(Succeed())
+			})
+
+			By(fmt.Sprintf("Restore %s", upgradeNamespace), func() {
+				Expect(VeleroRestore(oneHourTimeout, tmpCfg.VeleroCLI,
+					tmpCfg.VeleroNamespace, restoreName, backupName)).To(Succeed(), func() string {
+					RunDebug(context.Background(), tmpCfg.VeleroCLI,
+						tmpCfg.VeleroNamespace, "", restoreName)
+					return "Fail to restore workload"
+				})
+			})
+
+			By(fmt.Sprintf("Verify workload %s after restore ", upgradeNamespace), func() {
+				Expect(KibishiiVerifyAfterRestore(client, upgradeNamespace,
+					oneHourTimeout)).To(Succeed(), "Fail to verify workload after restore")
+			})
 		})
 	})
-}
-
-// runUpgradeTests runs upgrade test on the provider by kibishii.
-func runUpgradeTests(client TestClient, veleroCfg *VerleroConfig, backupName, restoreName, backupLocation string,
-	useVolumeSnapshots bool) error {
-	if veleroCfg.VeleroCLI == "" {
-		return errors.New("empty")
-	}
-	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
-	if err := CreateNamespace(oneHourTimeout, client, upgradeNamespace); err != nil {
-		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", upgradeNamespace)
-	}
-	defer func() {
-		if err := DeleteNamespace(context.Background(), client, upgradeNamespace, true); err != nil {
-			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", upgradeNamespace))
-		}
-	}()
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, veleroCfg.CloudProvider, upgradeNamespace, veleroCfg.RegistryCredentialFile, veleroCfg.KibishiiDirectory); err != nil {
-		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", upgradeNamespace)
-	}
-
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName, upgradeNamespace, backupLocation, useVolumeSnapshots, ""); err != nil {
-		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
-		// TODO move to "RunDebug" after we bump up to 1.7 in the upgrade case
-		VeleroBackupLogs(context.Background(), veleroCfg.UpgradeFromVeleroCLI, veleroCfg.VeleroNamespace, backupName)
-		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", upgradeNamespace)
-	}
-
-	if veleroCfg.CloudProvider == "vsphere" && useVolumeSnapshots {
-		// Wait for uploads started by the Velero Plug-in for vSphere to complete
-		// TODO - remove after upload progress monitoring is implemented
-		fmt.Println("Waiting for vSphere uploads to complete")
-		if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, upgradeNamespace); err != nil {
-			return errors.Wrapf(err, "Error waiting for uploads to complete")
-		}
-	}
-	fmt.Printf("Simulating a disaster by removing namespace %s\n", upgradeNamespace)
-	if err := DeleteNamespace(oneHourTimeout, client, upgradeNamespace, true); err != nil {
-		return errors.Wrapf(err, "failed to delete namespace %s", upgradeNamespace)
-	}
-
-	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
-	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
-	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-	if veleroCfg.CloudProvider == "aws" && useVolumeSnapshots {
-		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
-		time.Sleep(5 * time.Minute)
-	}
-
-	if err := VeleroInstall(context.Background(), veleroCfg, "", useVolumeSnapshots); err != nil {
-		return errors.Wrapf(err, "Failed to install velero from image %s", veleroCfg.VeleroImage)
-	}
-	if err := CheckVeleroVersion(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroVersion); err != nil {
-		return errors.Wrapf(err, "Velero install version mismatch.")
-	}
-	if err := VeleroRestore(oneHourTimeout, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, restoreName, backupName); err != nil {
-		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", restoreName)
-		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
-	}
-
-	if err := KibishiiVerifyAfterRestore(client, upgradeNamespace, oneHourTimeout); err != nil {
-		return errors.Wrapf(err, "Error verifying kibishii after restore")
-	}
-
-	fmt.Printf("Upgrade test completed successfully\n")
-	return nil
 }

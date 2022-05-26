@@ -54,8 +54,14 @@ VELERO_VERSION ?= $(VERSION)
 PLUGINS ?=
 RESTIC_HELPER_IMAGE ?=
 #Released version only
+UPGRADE_FROM_VELERO_VERSION ?= v1.7.1,v1.8.1
+# UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
+# Upgrade tests will be executed sequently according to the list by UPGRADE_FROM_VELERO_VERSION
+# So although length of UPGRADE_FROM_VELERO_CLI list is not equal with UPGRADE_FROM_VELERO_VERSION
+# Script will still read UPGRADE_FROM_VELERO_CLI list to match UPGRADE_FROM_VELERO_VERSION list from beginning
+# to the end, nil string will be set if UPGRADE_FROM_VELERO_CLI is shorter than UPGRADE_FROM_VELERO_VERSION
 UPGRADE_FROM_VELERO_CLI ?=
-UPGRADE_FROM_VELERO_VERSION ?= v1.7.1
+
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
 BSL_BUCKET ?=
@@ -66,7 +72,8 @@ CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
-KIBISHII_DIRECTORY ?=
+KIBISHII_DIRECTORY ?= github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/
+
 
 # Flags to create an additional BSL for multiple credentials tests
 ADDITIONAL_BSL_PLUGINS ?=
@@ -75,6 +82,9 @@ ADDITIONAL_CREDS_FILE ?=
 ADDITIONAL_BSL_BUCKET ?=
 ADDITIONAL_BSL_PREFIX ?=
 ADDITIONAL_BSL_CONFIG ?=
+
+FEATURES ?=
+DEBUG_E2E_TEST ?= false
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -109,9 +119,11 @@ run: ginkgo
 		-additional-bsl-bucket=$(ADDITIONAL_BSL_BUCKET) \
 		-additional-bsl-prefix=$(ADDITIONAL_BSL_PREFIX) \
 		-additional-bsl-config=$(ADDITIONAL_BSL_CONFIG) \
+		-features=$(FEATURES) \
 		-install-velero=$(INSTALL_VELERO) \
 		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
-		-kibishii-directory=$(KIBISHII_DIRECTORY)
+		-kibishii-directory=$(KIBISHII_DIRECTORY) \
+		-debug-e2e-test=$(DEBUG_E2E_TEST)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)
