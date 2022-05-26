@@ -287,9 +287,8 @@ Kopia’s debug logs will be written to the same log file as Velero server or Po
 As mentioned above, we will use an option “Legacy” to choose different paths. We don’t pursue a dynamic switch as there is no user requirement.  
 Instead, we assume the value of this option is set at the time of installation of Velero and never changed unless Velero is uninstalled. This means, if users want to switch the path, they need to uninstall Velero first and reinstall it.  
 Specifically, we will have the “Legacy” option/mode in two places:
-- Add the “Legacy” option as a parameter of the Velero server and PodVolumeBackup daemonset. The parameters will be set by the installation. For details of installation, see below Installation section.
-- Add a mode value in the BackupRepository CRs and PodVolumeBackup CRs.  
-
+- Add the “Legacy” option as a parameter of the Velero server and PodVolumeBackup daemonset. The parameters will be set by the installation.
+- Add a "legacy-mode" value in the BackupRepository CRs and PodVolumeBackup CRs. The value could be added as a tag in the CRs' spec. If the tag is missing, it by default means "legacy-mode=true", so the CRs were created to manage the Restic repository/backup using Restic.  
 The corresponding controllers handle the CRs with the matched mode only, the mismatched ones will be ignored. In this way, the corresponding controllers could handle the switch correctly for both fresh installation and upgrade.
 
 ### Upgrade
@@ -307,10 +306,116 @@ As a side effect, when upgrading from an old release, even though the path is no
 Therefore, users are recommended to uninstall Velero and delete all the resources in the Velero namespace before installing the new release.
 
 ## Installation
-The “legacy” flag will be set into Velero server deployment and PodVolumeBackup daemonset deployment so that both the RepositoryProvider and UploaderProvider see the flag.  
-The same “legacy” option will be added for Velero’s installation, including CLI installation and Helm Chart Installation. Then we need to transfer users’ selection into the two deployments mentioned above:
-- Helm Chart Installation: add a “Legacy” value into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation.
-- CLI Installation: add the “Legacy” option into the installation command line, and then set the flag when creating the two deployments accordingly. Users could change the option at the time of installation.
+ We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has below two values:  
+ **"Restic"**: it means Velero will use Restic to do the pod volume backup. Therefore, the Velero server deployment and PodVolumeBackup daemonset will be created as below:
+ ```
+    spec:
+      containers:
+      - args:
+        - server
+        - --features=
+        - --legacy
+        command:
+        - /velero
+```
+```
+    spec:
+      containers:
+      - args:
+        - restic
+        - server
+        - --features=
+        - --legacy
+        command:
+        - /velero
+```
+The BackupRepository CRs and PodVolumeBackup CRs created in this case are as below:
+```
+spec:
+  tags:
+    legacy-mode: true
+```
+```
+spec:
+  tags:
+    backup: bakup-testns-36
+    backup-uid: 1d5c06ee-bb8a-4e32-9606-145308b9747c
+    ns: testns-36
+    pod: deployment-2636-68b9697c56-6hpz5
+    pod-uid: 2858c332-b3d6-4985-b0e6-6ecbbf1d0284
+    pvc-uid: b17f03a0-b6f9-4ddf-95e6-59a85e67aada
+    volume: volume1
+    legacy-mode: true
+```
+ **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment and PodVolumeBackup daemonset will be created as below:
+  ```
+    spec:
+      containers:
+      - args:
+        - server
+        - --features=
+        - debug
+        - --legacy=false
+        command:
+        - /velero
+```
+```
+    spec:
+      containers:
+      - args:
+        - restic
+        - server
+        - --features=
+        - debug
+        - --legacy=false
+        command:
+        - /velero
+```
+The BackupRepository CRs and PodVolumeBackup CRs created in this case are as below:
+```
+spec:
+  tags:
+    legacy-mode: false
+```
+```
+spec:
+  tags:
+    backup: bakup-testns-36
+    backup-uid: 1d5c06ee-bb8a-4e32-9606-145308b9747c
+    ns: testns-36
+    pod: deployment-2636-68b9697c56-6hpz5
+    pod-uid: 2858c332-b3d6-4985-b0e6-6ecbbf1d0284
+    pvc-uid: b17f03a0-b6f9-4ddf-95e6-59a85e67aada
+    volume: volume1
+    legacy-mode: false
+```
+We will add the flag for both CLI installation and Helm Chart Installation. Specifically:
+- Helm Chart Installation: add the "--pod-volume-backup-uploader" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
+```
+          command:
+            - /velero
+          args:
+            - server
+          {{- with .Values.configuration }}
+            {{- if .pod-volume-backup-uploader "restic" }}
+            - --legacy
+            {{- end }} 
+```     
+
+```
+          command:
+            - /velero
+          args:
+            - restic
+            - server
+          {{- with .Values.configuration }}
+            {{- if .pod-volume-backup-uploader "restic" }}
+            - --legacy
+            {{- end }}   
+```
+- CLI Installation: add the "--pod-volume-backup-uploader" flag into the installation command line, and then create the two deployments accordingly. Users could change the option at the time of installation. The CLI is as below:  
+```velero install --pod-volume-backup-uploader=restic```  
+```velero install --pod-volume-backup-uploader=kopia```  
 
 ## User Experience Changes
 Below user experiences are changed for this design:
