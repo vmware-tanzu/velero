@@ -23,6 +23,7 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 )
 
 // restartableBackupItemAction is a backup item action for a given implementation (such as "pod"). It is associated with
@@ -45,13 +46,13 @@ func newRestartableBackupItemAction(name string, sharedPluginProcess Restartable
 
 // getBackupItemAction returns the backup item action for this restartableBackupItemAction. It does *not* restart the
 // plugin process.
-func (r *restartableBackupItemAction) getBackupItemAction() (velero.BackupItemAction, error) {
+func (r *restartableBackupItemAction) getBackupItemAction() (biav1.BackupItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	backupItemAction, ok := plugin.(velero.BackupItemAction)
+	backupItemAction, ok := plugin.(biav1.BackupItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a BackupItemAction!", plugin)
 	}
@@ -60,7 +61,7 @@ func (r *restartableBackupItemAction) getBackupItemAction() (velero.BackupItemAc
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the backup item action for this restartableBackupItemAction.
-func (r *restartableBackupItemAction) getDelegate() (velero.BackupItemAction, error) {
+func (r *restartableBackupItemAction) getDelegate() (biav1.BackupItemAction, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}

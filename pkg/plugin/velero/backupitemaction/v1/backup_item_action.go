@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package velero
+package v1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // BackupItemAction is an actor that performs an operation on an individual item being backed up.
@@ -28,18 +28,11 @@ type BackupItemAction interface {
 	// AppliesTo returns information about which resources this action should be invoked for.
 	// A BackupItemAction's Execute function will only be invoked on items that match the returned
 	// selector. A zero-valued ResourceSelector matches all resources.
-	AppliesTo() (ResourceSelector, error)
+	AppliesTo() (velero.ResourceSelector, error)
 
 	// Execute allows the ItemAction to perform arbitrary logic with the item being backed up,
 	// including mutating the item itself prior to backup. The item (unmodified or modified)
 	// should be returned, along with an optional slice of ResourceIdentifiers specifying
 	// additional related items that should be backed up.
-	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []ResourceIdentifier, error)
-}
-
-// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
-type ResourceIdentifier struct {
-	schema.GroupResource
-	Namespace string
-	Name      string
+	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error)
 }

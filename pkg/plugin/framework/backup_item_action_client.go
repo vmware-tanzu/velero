@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -42,18 +42,18 @@ func NewBackupItemActionPlugin(options ...PluginOption) *BackupItemActionPlugin 
 // gRPC client to make calls to the plugin server.
 type BackupItemActionGRPCClient struct {
 	*clientBase
-	grpcClient proto.BackupItemActionClient
+	grpcClient protobiav1.BackupItemActionClient
 }
 
 func newBackupItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
 	return &BackupItemActionGRPCClient{
 		clientBase: base,
-		grpcClient: proto.NewBackupItemActionClient(clientConn),
+		grpcClient: protobiav1.NewBackupItemActionClient(clientConn),
 	}
 }
 
 func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
-	req := &proto.BackupItemActionAppliesToRequest{
+	req := &protobiav1.BackupItemActionAppliesToRequest{
 		Plugin: c.plugin,
 	}
 
@@ -86,7 +86,7 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 		return nil, nil, errors.WithStack(err)
 	}
 
-	req := &proto.ExecuteRequest{
+	req := &protobiav1.ExecuteRequest{
 		Plugin: c.plugin,
 		Item:   itemJSON,
 		Backup: backupJSON,

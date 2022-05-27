@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1"
 )
 
 // BackupItemActionPlugin is an implementation of go-plugin's Plugin
@@ -39,6 +39,6 @@ func (p *BackupItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBro
 
 // GRPCServer registers a BackupItemAction gRPC server.
 func (p *BackupItemActionPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
-	proto.RegisterBackupItemActionServer(server, &BackupItemActionGRPCServer{mux: p.serverMux})
+	protobiav1.RegisterBackupItemActionServer(server, &BackupItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }

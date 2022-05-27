@@ -1,5 +1,6 @@
 syntax = "proto3";
-package generated;
+package v1;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1";
 
 import "Shared.proto";
 
@@ -11,7 +12,7 @@ message ExecuteRequest {
 
 message ExecuteResponse {
     bytes item = 1;
-    repeated ResourceIdentifier additionalItems = 2;
+    repeated generated.ResourceIdentifier additionalItems = 2;
 }
 
 service BackupItemAction {
@@ -24,5 +25,5 @@ message BackupItemActionAppliesToRequest {
 }
 
 message BackupItemActionAppliesToResponse {
-    ResourceSelector ResourceSelector = 1;
+    generated.ResourceSelector ResourceSelector = 1;
 }
