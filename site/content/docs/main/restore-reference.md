@@ -123,16 +123,14 @@ A PV backed up by CSI snapshots is restored by the [CSI plugin](csi). This happe
 
 ### Persistent Volume Rename
 
-Velero will rename a restored PV during restore if both of the following conditions are met:
+When restoring PVs, if the PV being restored does not exist on the target cluster, Velero will create the PV using the name from the backup. Velero will rename a PV before restoring if both of the following conditions are met:
 
-1. The PV already exists.
-1. The PV’s claim reference namespace has been [remapped](#restoring-into-a-different-namespace).
+1. The PV already exists on the target cluster.
+1. The PV’s claim namespace has been [remapped](#restoring-into-a-different-namespace).
 
-If both conditions are met, Velero will create the PV with a new name in the namespace you have specified for the remap. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the new PV object.
+If both conditions are met, Velero will create the PV with a new name. The new name is the prefix `velero-clone-` and a random UUID. Velero also preserves the original name of the PV by adding an annotation `velero.io/original-pv-name` to the restored PV object.
 
-If the PV does not exist, Velero will create the PV without renaming it.
-
-If you attempt to restore a PV to its original namespace, without remapping the namespace, Velero will not rename it. If a PV exists already in that namespace, the restored PV creation attempt will fail, with an `Already Exist` error from the Kubernetes API Server.
+If you attempt to restore the PV's referenced PVC into its original namespace without remapping the namespace, Velero will not rename the PV. If a PV's referenced PVC exists already for that namespace, the restored PV creation attempt will fail, with an `Already Exist` error from the Kubernetes API Server.
 
 ### PVC Restore
 
@@ -218,11 +216,11 @@ By default, Velero is configured to be non-destructive during a restore. This me
 
 An exception to the default restore policy is ServiceAccounts. When restoring a ServiceAccount that already exists on the target cluster, Velero will attempt to merge the fields of the ServiceAccount from the backup into the existing ServiceAccount. Secrets and ImagePullSecrets are appended from the backed-up ServiceAccount. Velero adds any non-existing labels and annotations from the backed-up ServiceAccount to the existing resource, leaving the existing labels and annotations in place.
 
-You can change this policy for a restore by using the `--existing-resource-policy` restore flag. The available options are `none` (default) and `update`. If you choose to `update` existing resources during a restore, Velero will attempt to update an existing resource to match the resource being restored.
+You can change this policy for a restore by using the `--existing-resource-policy` restore flag. The available options are `none` (default) and `update`. If you choose to `update` existing resources during a restore (`--existing-resource-policy=update`), Velero will attempt to update an existing resource to match the resource being restored:
 
 * If the existing resource in the target cluster is the same as the resource Velero is attempting to restore, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If patching the labels fails, Velero adds a restore error and continues restoring the next resource.
 
-* If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to be match the backup resource. If the patch is successful, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries to add the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails, then Velero logs a restore error and continues restoring the next resource.
+* If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to match the backup resource. If the patch is successful, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries to add the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails, then Velero logs a restore error and continues restoring the next resource.
 
 You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 
