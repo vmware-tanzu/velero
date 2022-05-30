@@ -5,7 +5,7 @@ layout: docs
 
 *Filter objects by namespace, type, or labels.*
 
-This page describes how to use the include and exclude flags with the `velero backup` and `velero restore` commands. Velero includes all objects in a backup or restore when no filtering options are used.
+This page describes how to use the include and exclude flags with the `velero backup` and `velero restore` commands. By default Velero includes all objects in a backup or restore when no filtering options are used. 
 
 ## Includes
 

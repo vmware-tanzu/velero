@@ -28,15 +28,6 @@ The **schedule** operation allows you to back up your data at recurring interval
 
 Velero saves backups created from a schedule with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. For more information see the [Backup Reference documentation](backup-reference.md).
 
-## Restores
-
-The **restore** operation allows you to restore all of the objects and persistent volumes from a previously created backup. You can also restore only a filtered subset of objects and persistent volumes. Velero supports multiple namespace remapping--for example, in a single restore, objects in namespace "abc" can be recreated under namespace "def", and the objects in namespace "123" under "456".
-
-The default name of a restore is `<BACKUP NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. You can also specify a custom name. A restored object also includes a label with key `velero.io/restore-name` and value `<RESTORE NAME>`.
-
-By default, backup storage locations are created in read-write mode. However, during a restore, you can configure a backup storage location to be in read-only mode, which disables backup creation and deletion for the storage location. This is useful to ensure that no backups are inadvertently created or deleted during a restore scenario.
-
-You can optionally specify restore hooks to be executed during a restore or after resources are restored. For example, you might need to perform a custom database restore operation before the database application containers start. [More about restore hooks][11].
 
 ## Backup workflow
 
@@ -53,6 +44,32 @@ When you run `velero backup create test-backup`:
 By default, `velero backup create` makes disk snapshots of any persistent volumes. You can adjust the snapshots by specifying additional flags. Run `velero backup create --help` to see available flags. Snapshots can be disabled with the option `--snapshot-volumes=false`.
 
 ![19]
+
+## Restores
+
+The **restore** operation allows you to restore all of the objects and persistent volumes from a previously created backup. You can also restore only a [filtered](resource-filtering.md) subset of objects and persistent volumes. Velero supports multiple namespace remapping--for example, in a single restore, objects in namespace "abc" can be recreated under namespace "def", and the objects in namespace "123" under "456".
+
+The default name of a restore is `<BACKUP NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. You can also specify a custom name. A restored object also includes a label with key `velero.io/restore-name` and value `<RESTORE NAME>`.
+
+By default, backup storage locations are created in read-write mode. However, during a restore, you can configure a backup storage location to be in read-only mode, which disables backup creation and deletion for the storage location. This is useful to ensure that no backups are inadvertently created or deleted during a restore scenario.
+
+You can optionally specify [restore hooks][11] to be executed during a restore or after resources are restored. For example, you might need to perform a custom database restore operation before the database application containers start.
+
+### Restore workflow
+
+When you run `velero restore create`:
+
+1. The Velero client makes a call to the Kubernetes API server to create a [`Restore`](api-types/restore.md) object.
+
+1. The `RestoreController` notices the new Restore object and performs validation.
+
+1. The `RestoreController` fetches the backup information from the object storage service. It then runs some preprocessing on the backed up resources to make sure the resources will work on the new cluster. For example, using the [backed-up API versions](#backed-up-api-versions) to verify that the restore resource will work on the target cluster.
+
+1. The `RestoreController` starts the restore process, restoring each eligible resource one at a time.
+
+By default, Velero performs a non-destructive restore, meaning that it won't delete any data on the target cluster. If a resource in the backup already exists in the target cluster, Velero will skip that resource. You can configure Velero to use an update policy instead using the [`--existing-resource-policy`](restore-reference.md#restore-existing-resource-policy) restore flag. When this flag is set to `update`, Velero will attempt to update an existing resource in the target cluster to match the resource from the backup.
+
+For more details about the Velero restore process, see the [Restore Reference](restore-reference.md) page.
 
 ## Backed-up API versions
 
