@@ -336,7 +336,7 @@ Regardless of how volumes are discovered for backup using Restic, the process of
 - Those of you familiar with [restic][1] may know that it encrypts all of its data. Velero uses a static,
 common encryption key for all Restic repositories it creates. **This means that anyone who has access to your
 bucket can decrypt your Restic backup data**. Make sure that you limit access to the Restic bucket
-appropriately.
+appropriately. You can overwrite that static key with an `configuration.extraEnvVars` variable named "RESTIC_PASSWORD". The value of the Key would be the encryption key for Restic.
 - An incremental backup chain will be maintained across pod reschedules for PVCs. However, for pod volumes that are *not*
 PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (for example, by a ReplicaSet/Deployment), the next backup of those
 volumes will be full rather than incremental, because the pod volume's lifecycle is assumed to be defined by its pod.
