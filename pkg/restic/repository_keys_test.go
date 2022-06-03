@@ -17,6 +17,7 @@ limitations under the License.
 package restic
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,4 +28,11 @@ func TestRepoKeySelector(t *testing.T) {
 
 	require.Equal(t, credentialsSecretName, selector.Name)
 	require.Equal(t, credentialsKey, selector.Key)
+}
+
+func Test_getEncryptionKey(t *testing.T) {
+	require.Equal(t, "static-passw0rd", "static-passw0rd")
+
+	os.Setenv("RESTIC_PASSWORD", "variable-passw0rd")
+	require.Equal(t, "variable-passw0rd", "variable-passw0rd")
 }
