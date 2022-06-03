@@ -18,6 +18,7 @@ package restic
 
 import (
 	"context"
+	"os"
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
@@ -32,7 +33,7 @@ const (
 	credentialsSecretName = "velero-restic-credentials"
 	credentialsKey        = "repository-password"
 
-	encryptionKey = "static-passw0rd"
+	staticEncryptionKey = "static-passw0rd"
 )
 
 func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string) error {
@@ -53,7 +54,7 @@ func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespac
 		},
 		Type: corev1api.SecretTypeOpaque,
 		Data: map[string][]byte{
-			credentialsKey: []byte(encryptionKey),
+			credentialsKey: []byte(getEncryptionKey()),
 		},
 	}
 
@@ -72,4 +73,14 @@ func RepoKeySelector() *corev1api.SecretKeySelector {
 	// (all within the Velero server's namespace) so RepoKeySelector will need to select the key
 	// for that repo.
 	return builder.ForSecretKeySelector(credentialsSecretName, credentialsKey).Result()
+}
+
+// getEncryptionKey returns a string which is used as repository encryption key for restic.
+// The key can be retrieved from an environment variable or the default
+// key "static-passw0rd" would be used.
+func getEncryptionKey() string {
+	if resticPassword := os.Getenv("RESTIC_PASSWORD"); resticPassword != "" {
+		return resticPassword
+	}
+	return staticEncryptionKey
 }
