@@ -1,0 +1,6 @@
+Added functionality to deploy a specific Restic encryption password.
+The behavior currently is that the Restic encryption password is hard-coded. I've implemented that the 
+encryption password can be controlled by an environment variable "RESTIC_PASSWORD". If the environment
+variable is not set, the default password would be set to the old hard-coded password. Because of this,
+there should be no problem for users that do not set this variable.
+I've added this functionality because we don't want to use the default password for the restic encryption.
