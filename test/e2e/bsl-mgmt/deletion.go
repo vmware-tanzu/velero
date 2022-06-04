@@ -220,7 +220,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 				By(fmt.Sprintf("Snapshot of bsl %s should be created in cloud object store", backupLocation_1), func() {
 					snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 1, bslDeletionTestNs, backupName_1, []string{podName_1})
 					Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
-					Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+					Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 						VeleroCfg.CloudCredentialsFile, VeleroCfg.AdditionalBSLBucket,
 						VeleroCfg.BSLConfig, backupName_1, snapshotCheckPoint)).To(Succeed())
 				})
@@ -236,7 +236,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 						BSLConfig = VeleroCfg.BSLConfig
 					}
 
-					Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+					Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 						BSLCredentials, VeleroCfg.AdditionalBSLBucket,
 						BSLConfig, backupName_2, snapshotCheckPoint)).To(Succeed())
 				})
@@ -318,7 +318,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 					snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 1, bslDeletionTestNs, backupName_1, []string{podName_1})
 					Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
-					Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+					Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 						VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
 						VeleroCfg.BSLConfig, backupName_1, snapshotCheckPoint)).To(Succeed())
 				})
@@ -333,7 +333,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					}
 					snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 1, bslDeletionTestNs, backupName_2, []string{podName_2})
 					Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
-					Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+					Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 						BSLCredentials, VeleroCfg.AdditionalBSLBucket,
 						BSLConfig, backupName_2, snapshotCheckPoint)).To(Succeed())
 				})
