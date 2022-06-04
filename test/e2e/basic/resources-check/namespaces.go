@@ -57,7 +57,7 @@ func (m *MultiNSBackup) Init() error {
 		}
 	} else {
 		m.NamespacesTotal = 2
-		m.TimeoutDuration = time.Minute * 5
+		m.TimeoutDuration = time.Minute * 10
 		m.TestMsg = &TestMSG{
 			Text:      "When I create 2 namespaces should be successfully backed up and restored",
 			FailedMSG: "Failed to successfully backup and restore multiple namespaces",

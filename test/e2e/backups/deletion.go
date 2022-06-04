@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	waitutil "k8s.io/apimachinery/pkg/util/wait"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
@@ -147,7 +146,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	if useVolumeSnapshots {
 		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 2, deletionTest, backupName, KibishiiPodNameList)
 		Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
-		err = WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+		err = SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslConfig,
 			backupName, snapshotCheckPoint)
 		if err != nil {
@@ -159,7 +158,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 		return err
 	}
 	if useVolumeSnapshots {
-		err = WaitUntilSnapshotsNotExistInCloud(VeleroCfg.CloudProvider,
+		err = SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider,
 			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
 			backupName, snapshotCheckPoint)
 		if err != nil {
@@ -172,17 +171,9 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 		return err
 	}
 	if useVolumeSnapshots {
-		err = waitutil.PollImmediate(30*time.Second, 3*time.Minute,
-			func() (bool, error) {
-				err := SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider,
-					VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
-					bslConfig, backupName, snapshotCheckPoint)
-				if err == nil {
-					return true, nil
-				}
-				return false, err
-			})
-		if err != nil {
+		if err := SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider,
+			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+			bslConfig, backupName, snapshotCheckPoint); err != nil {
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
