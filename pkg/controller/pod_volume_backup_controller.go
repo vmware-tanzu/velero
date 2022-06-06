@@ -93,20 +93,9 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	switch pvb.Status.Phase {
 	case "", velerov1api.PodVolumeBackupPhaseNew:
-	case velerov1api.PodVolumeBackupPhaseInProgress:
-		original := pvb.DeepCopy()
-		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-		pvb.Status.Message = fmt.Sprintf("got a PodVolumeBackup with unexpected status %q, this may be due to a restart of the controller during the backing up, mark it as %q",
-			velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
-		pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-		if err := kube.Patch(ctx, original, &pvb, r.Client); err != nil {
-			log.WithError(err).Error("error updating PodVolumeBackup status")
-			return ctrl.Result{}, err
-		}
-		log.Warn(pvb.Status.Message)
-		return ctrl.Result{}, nil
+		// Only process new items.
 	default:
-		log.Debug("PodVolumeBackup is not new or in-progress, not processing")
+		log.Debug("PodVolumeBackup is not new, not processing")
 		return ctrl.Result{}, nil
 	}
 
@@ -298,7 +287,7 @@ func (r *PodVolumeBackupReconciler) updateBackupProgressFunc(pvb *velerov1api.Po
 func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
 	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-	pvb.Status.Message = msg
+	pvb.Status.Message = errors.WithMessage(err, msg).Error()
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
 	if err = kube.Patch(ctx, original, pvb, r.Client); err != nil {

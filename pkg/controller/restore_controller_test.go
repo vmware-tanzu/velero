@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -172,6 +171,11 @@ func TestProcessQueueItemSkips(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:       "restore with phase InProgress does not get processed",
+			restoreKey: "foo/bar",
+			restore:    builder.ForRestore("foo", "bar").Phase(velerov1api.RestorePhaseInProgress).Result(),
+		},
+		{
 			name:       "restore with phase Completed does not get processed",
 			restoreKey: "foo/bar",
 			restore:    builder.ForRestore("foo", "bar").Phase(velerov1api.RestorePhaseCompleted).Result(),
@@ -220,31 +224,6 @@ func TestProcessQueueItemSkips(t *testing.T) {
 			assert.Equal(t, test.expectError, err != nil)
 		})
 	}
-}
-
-func TestMarkInProgressRestoreAsFailed(t *testing.T) {
-	var (
-		restore         = builder.ForRestore("velero", "bar").Phase(velerov1api.RestorePhaseInProgress).Result()
-		client          = fake.NewSimpleClientset(restore)
-		sharedInformers = informers.NewSharedInformerFactory(client, 0)
-		logger          = velerotest.NewLogger()
-	)
-
-	c := restoreController{
-		genericController: newGenericController("restore-test", logger),
-		restoreClient:     client.VeleroV1(),
-		restoreLister:     sharedInformers.Velero().V1().Restores().Lister(),
-	}
-
-	err := sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore)
-	require.Nil(t, err)
-
-	err = c.processQueueItem(fmt.Sprintf("%s/%s", restore.Namespace, restore.Name))
-	require.Nil(t, err)
-
-	res, err := c.restoreClient.Restores(restore.Namespace).Get(context.Background(), restore.Name, metav1.GetOptions{})
-	require.Nil(t, err)
-	assert.Equal(t, velerov1api.RestorePhaseFailed, res.Status.Phase)
 }
 
 func TestProcessQueueItem(t *testing.T) {
