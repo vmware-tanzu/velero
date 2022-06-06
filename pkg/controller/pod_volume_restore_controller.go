@@ -134,6 +134,11 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, *corev1api.Pod, error) {
+	if !isPVRNew(pvr) {
+		log.Debug("PodVolumeRestore is not new, skip")
+		return false, nil, nil
+	}
+
 	// we filter the pods during the initialization of cache, if we can get a pod here, the pod must be in the same node with the controller
 	// so we don't need to compare the node anymore
 	pod := &corev1api.Pod{}
@@ -144,28 +149,6 @@ func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logr
 		}
 		log.WithError(err).Error("Unable to get pod")
 		return false, nil, err
-	}
-
-	// the status checking logic must be put after getting the PVR's pod because that the getting pod logic
-	// makes sure the PVR's pod is on the same node with the controller. The controller should only process
-	// the PVRs on the same node
-	switch pvr.Status.Phase {
-	case "", velerov1api.PodVolumeRestorePhaseNew:
-	case velerov1api.PodVolumeRestorePhaseInProgress:
-		original := pvr.DeepCopy()
-		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
-		pvr.Status.Message = fmt.Sprintf("got a PodVolumeRestore with unexpected status %q, this may be due to a restart of the controller during the restoring, mark it as %q",
-			velerov1api.PodVolumeRestorePhaseInProgress, pvr.Status.Phase)
-		pvr.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-		if err := kube.Patch(ctx, original, pvr, c.Client); err != nil {
-			log.WithError(err).Error("Unable to update status to failed")
-			return false, nil, err
-		}
-		log.Warn(pvr.Status.Message)
-		return false, nil, nil
-	default:
-		log.Debug("PodVolumeRestore is not new or in-progress, skip")
-		return false, nil, nil
 	}
 
 	if !isResticInitContainerRunning(pod) {
@@ -207,6 +190,10 @@ func (c *PodVolumeRestoreReconciler) findVolumeRestoresForPod(pod client.Object)
 		}
 	}
 	return requests
+}
+
+func isPVRNew(pvr *velerov1api.PodVolumeRestore) bool {
+	return pvr.Status.Phase == "" || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseNew
 }
 
 func isResticInitContainerRunning(pod *corev1api.Pod) bool {

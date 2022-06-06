@@ -74,6 +74,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
@@ -377,6 +378,8 @@ func (s *server) run() error {
 	if err := s.initRestic(); err != nil {
 		return err
 	}
+
+	markInProgressCRsFailed(s.ctx, s.mgr.GetConfig(), s.mgr.GetScheme(), s.namespace, s.logger)
 
 	if err := s.runControllers(s.config.defaultVolumeSnapshotLocations); err != nil {
 		return err
@@ -924,4 +927,66 @@ func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map
 		return w.factory.WaitForCacheSync(stopCh)
 	}
 	return nil
+}
+
+// if there is a restarting during the reconciling of backups/restores/etc, these CRs may be stuck in progress status
+// markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
+func markInProgressCRsFailed(ctx context.Context, cfg *rest.Config, scheme *runtime.Scheme, namespace string, log logrus.FieldLogger) {
+	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
+	client, err := ctrlclient.New(cfg, ctrlclient.Options{Scheme: scheme})
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to create client")
+		return
+	}
+
+	markInProgressBackupsFailed(ctx, client, namespace, log)
+
+	markInProgressRestoresFailed(ctx, client, namespace, log)
+}
+
+func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
+	backups := &velerov1api.BackupList{}
+	if err := client.List(ctx, backups, &ctrlclient.MatchingFields{"metadata.namespace": namespace}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list backups")
+		return
+	}
+
+	for _, backup := range backups.Items {
+		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
+			continue
+		}
+		updated := backup.DeepCopy()
+		updated.Status.Phase = velerov1api.BackupPhaseFailed
+		updated.Status.FailureReason = fmt.Sprintf("get a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
+		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backup)); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
+			continue
+		}
+		log.WithField("backup", backup.GetName()).Warn(updated.Status.FailureReason)
+	}
+}
+
+func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
+	restores := &velerov1api.RestoreList{}
+	if err := client.List(ctx, restores, &ctrlclient.MatchingFields{"metadata.namespace": namespace}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list restores")
+		return
+	}
+	for _, restore := range restores.Items {
+		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
+			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
+			continue
+		}
+		updated := restore.DeepCopy()
+		updated.Status.Phase = velerov1api.RestorePhaseFailed
+		updated.Status.FailureReason = fmt.Sprintf("get a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
+		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restore)); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
+			continue
+		}
+		log.WithField("restore", restore.GetName()).Warn(updated.Status.FailureReason)
+	}
 }
