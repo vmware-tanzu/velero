@@ -96,7 +96,7 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}
-		err = WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+		err = SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 			VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, veleroCfg.BSLConfig,
 			backupName, snapshotCheckPoint)
 		if err != nil {

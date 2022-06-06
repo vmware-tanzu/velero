@@ -69,6 +69,8 @@ func ScheduleOrderedResources() {
 			Expect(DeleteNamespace(test.Ctx, test.Client, test.Namespace, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.Namespace))
 			err = VeleroScheduleDelete(test.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.ScheduleName)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete schedule with err %v", err))
+			err = test.DeleteBackups()
+			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete backups with err %v", err))
 		}()
 
 		By(fmt.Sprintf("Prepare workload as target to backup in base namespace %s", test.Namespace), func() {
@@ -186,6 +188,19 @@ func (o *OrderedResources) CreateResources() error {
 	err = WaitForConfigMapComplete(o.Client.ClientGo, o.Namespace, configmapName)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", o.Namespace))
+	}
+	return nil
+}
+
+func (o *OrderedResources) DeleteBackups() error {
+	backupList := new(velerov1api.BackupList)
+	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
+		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
+	}
+	for _, backup := range backupList.Items {
+		if err := VeleroBackupDelete(o.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
+			return err
+		}
 	}
 	return nil
 }

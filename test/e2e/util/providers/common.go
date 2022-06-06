@@ -24,8 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	waitutil "k8s.io/apimachinery/pkg/util/wait"
-
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	velero "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
@@ -109,35 +107,6 @@ func DeleteObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPr
 		return errors.Wrapf(err, fmt.Sprintf("Fail to delete %s", bslPrefix))
 	}
 	return nil
-}
-
-func WaitUntilSnapshotsExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
-	err := waitutil.PollImmediate(30*time.Second, 3*time.Minute,
-		func() (bool, error) {
-			err := SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
-				VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
-				bslConfig, backupName, snapshotCheckPoint)
-			if err == nil {
-				return true, nil
-			}
-			return false, err
-		})
-	return err
-}
-
-func WaitUntilSnapshotsNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
-	err := waitutil.PollImmediate(30*time.Second, 3*time.Minute,
-		func() (bool, error) {
-			snapshotCheckPoint.ExpectCount = 0
-			err := SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider,
-				VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
-				bslConfig, backupName, snapshotCheckPoint)
-			if err == nil {
-				return true, nil
-			}
-			return false, err
-		})
-	return err
 }
 
 func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
