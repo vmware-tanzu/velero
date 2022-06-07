@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -68,16 +67,10 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	// Initialize the patch helper.
-	patchHelper, err := patch.NewHelper(downloadRequest, r.Client)
-	if err != nil {
-		log.WithError(err).Error("Error getting a patch helper to update this resource")
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
+	original := downloadRequest.DeepCopy()
 	defer func() {
 		// Always attempt to Patch the downloadRequest object and status after each reconciliation.
-		if err := patchHelper.Patch(ctx, downloadRequest); err != nil {
+		if err := r.Client.Patch(ctx, downloadRequest, kbclient.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Error updating download request")
 			return
 		}

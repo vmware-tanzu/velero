@@ -105,7 +105,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
 	pvb.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
-	if err := kube.Patch(ctx, original, &pvb, r.Client); err != nil {
+	if err := r.Client.Patch(ctx, &pvb, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")
 		return ctrl.Result{}, err
 	}
@@ -181,7 +181,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if emptySnapshot {
 		pvb.Status.Message = "volume was empty so no snapshot was taken"
 	}
-	if err = kube.Patch(ctx, original, &pvb, r.Client); err != nil {
+	if err = r.Client.Patch(ctx, &pvb, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")
 		return ctrl.Result{}, err
 	}
@@ -278,7 +278,7 @@ func (r *PodVolumeBackupReconciler) updateBackupProgressFunc(pvb *velerov1api.Po
 	return func(progress velerov1api.PodVolumeOperationProgress) {
 		original := pvb.DeepCopy()
 		pvb.Status.Progress = progress
-		if err := kube.Patch(context.Background(), original, pvb, r.Client); err != nil {
+		if err := r.Client.Patch(context.Background(), pvb, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("error update progress")
 		}
 	}
@@ -290,7 +290,7 @@ func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pv
 	pvb.Status.Message = errors.WithMessage(err, msg).Error()
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
-	if err = kube.Patch(ctx, original, pvb, r.Client); err != nil {
+	if err = r.Client.Patch(ctx, pvb, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")
 		return ctrl.Result{}, err
 	}

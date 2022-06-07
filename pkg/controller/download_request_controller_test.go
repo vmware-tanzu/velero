@@ -143,9 +143,9 @@ var _ = Describe("Download Request Reconciler", func() {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			} else {
 				if test.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-					Expect(instance).To(Equal(test.downloadRequest))
+					Expect(instance.Status).To(Equal(test.downloadRequest.Status))
 				} else {
-					Expect(instance).ToNot(Equal(test.downloadRequest))
+					Expect(instance.Status).ToNot(Equal(test.downloadRequest.Status))
 				}
 				Expect(err).To(BeNil())
 			}

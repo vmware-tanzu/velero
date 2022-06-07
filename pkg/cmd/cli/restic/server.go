@@ -54,7 +54,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -301,15 +300,15 @@ func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 			log.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
 			continue
 		}
-		updated := pvb.DeepCopy()
-		updated.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-		updated.Status.Message = fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, updated.Status.Phase)
-		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := kube.Patch(s.ctx, &pvb, updated, client); err != nil {
+		original := pvb.DeepCopy()
+		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
+		pvb.Status.Message = fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
+		pvb.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(s.ctx, &pvb, ctrlclient.MergeFrom(original)); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
 			continue
 		}
-		log.WithField("podvolumebackup", pvb.GetName()).Warn(updated.Status.Message)
+		log.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
 	}
 }
 
@@ -339,14 +338,14 @@ func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		updated := pvr.DeepCopy()
-		updated.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
-		updated.Status.Message = fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, updated.Status.Phase)
-		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := kube.Patch(s.ctx, &pvr, updated, client); err != nil {
+		original := pvr.DeepCopy()
+		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
+		pvr.Status.Message = fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, pvr.Status.Phase)
+		pvr.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(s.ctx, &pvr, ctrlclient.MergeFrom(original)); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
 			continue
 		}
-		log.WithField("podvolumerestore", pvr.GetName()).Warn(updated.Status.Message)
+		log.WithField("podvolumerestore", pvr.GetName()).Warn(pvr.Status.Message)
 	}
 }

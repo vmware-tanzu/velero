@@ -104,7 +104,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	original := pvr.DeepCopy()
 	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseInProgress
 	pvr.Status.StartTimestamp = &metav1.Time{Time: c.clock.Now()}
-	if err = kube.Patch(ctx, original, pvr, c.Client); err != nil {
+	if err = c.Patch(ctx, pvr, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("Unable to update status to in progress")
 		return ctrl.Result{}, err
 	}
@@ -114,7 +114,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
 		pvr.Status.Message = err.Error()
 		pvr.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-		if e := kube.Patch(ctx, original, pvr, c.Client); e != nil {
+		if e := c.Patch(ctx, pvr, client.MergeFrom(original)); e != nil {
 			log.WithError(err).Error("Unable to update status to failed")
 		}
 
@@ -125,7 +125,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	original = pvr.DeepCopy()
 	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseCompleted
 	pvr.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-	if err = kube.Patch(ctx, original, pvr, c.Client); err != nil {
+	if err = c.Patch(ctx, pvr, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("Unable to update status to completed")
 		return ctrl.Result{}, err
 	}
@@ -334,7 +334,7 @@ func (c *PodVolumeRestoreReconciler) updateRestoreProgressFunc(req *velerov1api.
 	return func(progress velerov1api.PodVolumeOperationProgress) {
 		original := req.DeepCopy()
 		req.Status.Progress = progress
-		if err := kube.Patch(context.Background(), original, req, c.Client); err != nil {
+		if err := c.Patch(context.Background(), req, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Unable to update PodVolumeRestore progress")
 		}
 	}

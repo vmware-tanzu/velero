@@ -56,7 +56,6 @@ type DeleteBackupRequestStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
-// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="BackupName",type="string",JSONPath=".spec.backupName",description="The name of the backup to be deleted"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="The status of the deletion request"
 
