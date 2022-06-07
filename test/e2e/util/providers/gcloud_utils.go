@@ -77,30 +77,26 @@ func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	}
 	bucket := client.Bucket(bslBucket)
 	iter := bucket.Objects(context.Background(), q)
-	deleted := false
 	for {
 		obj, err := iter.Next()
-		if err == iterator.Done {
-			fmt.Println(err)
-			if !deleted {
-				return errors.New("|| UNEXPECTED ||Backup object is not exist and was not deleted in object store")
-			}
-			return nil
-		}
 		if err != nil {
+			fmt.Printf("GCP bucket iterator exists due to %s\n", err)
+			if err == iterator.Done {
+				return nil
+			}
 			return errors.WithStack(err)
 		}
+
 		if obj.Name == bslPrefix {
 			fmt.Println("Ignore GCS prefix itself")
 			continue
 		}
 		// Only delete folder named as backupObject under prefix
 		if strings.Contains(obj.Name, bslPrefix+backupObject+"/") {
+			fmt.Printf("Delete item: %s\n", obj.Name)
 			if err = bucket.Object(obj.Name).Delete(ctx); err != nil {
 				return errors.Wrapf(err, fmt.Sprintf("Fail to delete object %s in bucket %s", obj.Name, bslBucket))
 			}
-			fmt.Printf("Delete item: %s\n", obj.Name)
-			deleted = true
 		}
 	}
 }
