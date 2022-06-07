@@ -28,7 +28,6 @@ import (
 // +kubebuilder:resource:shortName=ssr
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
-// +kubebuilder:subresource:status
 
 // ServerStatusRequest is a request to access current status information about
 // the Velero server.

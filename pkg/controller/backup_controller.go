@@ -70,7 +70,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
-	"sigs.k8s.io/cluster-api/util/patch"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -943,10 +942,9 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 			// in backup deletion.
 			if modifyVSCFlag {
 				logger.Debugf("Patching VolumeSnapshotContent %s", vsc.Name)
-				_, err := c.patchVolumeSnapshotContent(vsc, func(req *snapshotv1api.VolumeSnapshotContent) {
-					req.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
-				})
-				if err != nil {
+				original := vsc.DeepCopy()
+				vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
+				if err := c.kbClient.Patch(context.Background(), vsc, kbclient.MergeFrom(original)); err != nil {
 					logger.Errorf("fail to modify VolumeSnapshotContent %s DeletionPolicy to Retain: %s", vsc.Name, err.Error())
 					return
 				}
@@ -970,22 +968,6 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 	}
 
 	wg.Wait()
-}
-
-func (c *backupController) patchVolumeSnapshotContent(req *snapshotv1api.VolumeSnapshotContent, mutate func(*snapshotv1api.VolumeSnapshotContent)) (*snapshotv1api.VolumeSnapshotContent, error) {
-	patchHelper, err := patch.NewHelper(req, c.kbClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to get patch helper.")
-	}
-
-	// Mutate
-	mutate(req)
-
-	if err := patchHelper.Patch(context.TODO(), req); err != nil {
-		return nil, errors.Wrapf(err, "fail to patch VolumeSnapshotContent %s", req.Name)
-	}
-
-	return req, nil
 }
 
 // recreateVolumeSnapshotContent will delete then re-create VolumeSnapshotContent,

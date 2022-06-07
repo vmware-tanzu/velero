@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -88,20 +87,13 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	switch statusRequest.Status.Phase {
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing new ServerStatusRequest")
-
-		// Initialize the patch helper.
-		patchHelper, err := patch.NewHelper(statusRequest, r.Client)
-		if err != nil {
-			log.WithError(err).Error("Error getting a patch helper to update this resource")
-			return ctrl.Result{}, err
-		}
-
+		original := statusRequest.DeepCopy()
 		statusRequest.Status.ServerVersion = buildinfo.Version
 		statusRequest.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
 		statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		statusRequest.Status.Plugins = velero.GetInstalledPluginInfo(r.PluginRegistry)
 
-		if err := patchHelper.Patch(r.Ctx, statusRequest); err != nil {
+		if err := r.Client.Patch(r.Ctx, statusRequest, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Error updating ServerStatusRequest status")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
 		}

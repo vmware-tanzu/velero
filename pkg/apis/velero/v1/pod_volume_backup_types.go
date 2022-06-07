@@ -112,7 +112,6 @@ type PodVolumeBackupStatus struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:object:root=true
 // +kubebuilder:object:generate=true
-// +kubebuilder:subresource:status
 
 type PodVolumeBackup struct {
 	metav1.TypeMeta `json:",inline"`
