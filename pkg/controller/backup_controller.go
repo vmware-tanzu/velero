@@ -1045,8 +1045,6 @@ func (c *backupController) recreateVolumeSnapshotContent(vsc *snapshotv1api.Volu
 		Namespace:  "ns-" + string(vsc.UID),
 		Name:       "name-" + string(vsc.UID),
 	}
-	// Revert DeletionPolicy to Delete
-	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
 	// ResourceVersion shouldn't exist for new creation.
 	vsc.ResourceVersion = ""
 	_, err = c.volumeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Create(context.TODO(), vsc, metav1.CreateOptions{})
