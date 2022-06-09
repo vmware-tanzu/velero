@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -63,12 +62,10 @@ func TestPatchResticRepository(t *testing.T) {
 	reconciler := mockResticRepoReconciler(t, rr, "", nil, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
-	patchHelper, err := patch.NewHelper(rr, reconciler.Client)
-	assert.NoError(t, err)
-	err = reconciler.patchResticRepository(context.Background(), rr, patchHelper, reconciler.logger, repoReady())
+	err = reconciler.patchResticRepository(context.Background(), rr, repoReady())
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
-	err = reconciler.patchResticRepository(context.Background(), rr, patchHelper, reconciler.logger, repoNotReady("not ready"))
+	err = reconciler.patchResticRepository(context.Background(), rr, repoNotReady("not ready"))
 	assert.NoError(t, err)
 	assert.NotEqual(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
 }
@@ -78,13 +75,11 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
-	patchHelper, err := patch.NewHelper(rr, reconciler.Client)
-	assert.NoError(t, err)
-	err = reconciler.checkNotReadyRepo(context.TODO(), rr, patchHelper, reconciler.logger)
+	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhase(""))
 	rr.Spec.ResticIdentifier = "s3:test.amazonaws.com/bucket/restic"
-	err = reconciler.checkNotReadyRepo(context.TODO(), rr, patchHelper, reconciler.logger)
+	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
 }
@@ -94,16 +89,14 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 	reconciler := mockResticRepoReconciler(t, rr, "PruneRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
-	patchHelper, err := patch.NewHelper(rr, reconciler.Client)
-	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, patchHelper, reconciler.logger)
+	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.NotEqual(t, rr.Status.LastMaintenanceTime, lastTm)
 
 	rr.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
 	lastTm = rr.Status.LastMaintenanceTime
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, patchHelper, reconciler.logger)
+	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
 }
@@ -113,8 +106,6 @@ func TestInitializeRepo(t *testing.T) {
 	rr.Spec.BackupStorageLocation = "default"
 	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
-	patchHelper, err := patch.NewHelper(rr, reconciler.Client)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{
@@ -128,7 +119,7 @@ func TestInitializeRepo(t *testing.T) {
 
 	err = reconciler.Client.Create(context.TODO(), locations)
 	assert.NoError(t, err)
-	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger, patchHelper)
+	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
 }

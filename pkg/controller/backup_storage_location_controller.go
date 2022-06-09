@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -102,12 +101,8 @@ func (r *BackupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	func() {
-		// Initialize the patch helper.
-		patchHelper, err := patch.NewHelper(&location, r.Client)
-		if err != nil {
-			log.WithError(err).Error("Error getting a patch helper to update BackupStorageLocation")
-			return
-		}
+		var err error
+		original := location.DeepCopy()
 		defer func() {
 			location.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 			if err != nil {
@@ -121,7 +116,7 @@ func (r *BackupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 				location.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
 				location.Status.Message = ""
 			}
-			if err := patchHelper.Patch(r.Ctx, &location); err != nil {
+			if err := r.Client.Patch(r.Ctx, &location, client.MergeFrom(original)); err != nil {
 				log.WithError(err).Error("Error updating BackupStorageLocation phase")
 			}
 		}()
