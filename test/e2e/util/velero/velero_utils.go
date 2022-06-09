@@ -234,8 +234,8 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 }
 
 func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
 	return wait.PollImmediate(time.Second*5, time.Minute*2, func() (bool, error) {
+		checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
 		jsonBuf, err := CMDExecWithOutput(checkCMD)
 		if err != nil {
 			return false, err
