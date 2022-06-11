@@ -252,12 +252,12 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			}
 
 			By(fmt.Sprintf("Backup 1 %s should be created.", backupName_1), func() {
-				Expect(WaitForBackupCreated(context.Background(), VeleroCfg.VeleroCLI,
+				Expect(WaitForBackupToBeCreated(context.Background(), VeleroCfg.VeleroCLI,
 					backupName_1, 10*time.Minute)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup 2 %s should be created.", backupName_2), func() {
-				Expect(WaitForBackupCreated(context.Background(), VeleroCfg.VeleroCLI,
+				Expect(WaitForBackupToBeCreated(context.Background(), VeleroCfg.VeleroCLI,
 					backupName_2, 10*time.Minute)).To(Succeed())
 			})
 
@@ -280,6 +280,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 				By(fmt.Sprintf("Delete one of backup locations - %s", backupLocation_1), func() {
 					Expect(DeleteBslResource(context.Background(), VeleroCfg.VeleroCLI, backupLocation_1)).To(Succeed())
+					Expect(WaitForBackupsToBeDeleted(context.Background(), VeleroCfg.VeleroCLI, backupsInBSL1, 10*time.Minute)).To(Succeed())
 				})
 
 				By("Get all backups from 2 BSLs after deleting one of them", func() {
