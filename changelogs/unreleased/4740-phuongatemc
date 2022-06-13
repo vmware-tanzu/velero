@@ -1,2 +1,0 @@
-Add PriorityClass to the AdditionalItems of Backup's PodAction and Restore's PodAction plugin to
-backup and restore PriorityClass if it is used by a Pod.
