@@ -1,1 +1,0 @@
-Mark the BSL as "Unavailable" when gets any error and add a new field "Message" to the status to record the error message

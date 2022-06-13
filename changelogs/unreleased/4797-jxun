@@ -1,1 +1,0 @@
-Do not take snapshot for PV to avoid duplicated snapshotting, when CSI feature is enabled.

@@ -1,1 +1,0 @@
-Garbage collector now adds labels to backups that failed to delete for BSLNotFound, BSLCannotGet, BSLReadOnly reasons.
