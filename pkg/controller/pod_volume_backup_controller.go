@@ -211,7 +211,7 @@ func (r *PodVolumeBackupReconciler) singlePathMatch(path string) (string, error)
 	}
 
 	if len(matches) != 1 {
-		return "", errors.Errorf("expected one matching path, got %d", len(matches))
+		return "", errors.Errorf("expected one matching path: %s, got %d", path, len(matches))
 	}
 
 	return matches[0], nil
