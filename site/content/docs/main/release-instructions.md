@@ -98,15 +98,16 @@ https://github.com/vmware-tanzu/velero/blob/release-1.7/Dockerfile#L53-L54
 - If the dry-run fails with random errors, try running it again.
 
 #### Steps
-1.  Create a tagged release in dry-run mode
+1. Manually create the release branch on Github, in the form like `release-$major.$minor`
+1. Create a tagged release in dry-run mode
 	- This won't push anything to GitHub.
-	- Run `VELERO_VERSION=v1.0.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh`.
+	- Run `VELERO_VERSION=v1.9.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ON_RELEASE_BRANCH=TRUE ./hack/release-tools/tag-release.sh`.
 	- Fix any issue.
 1. Create a tagged release and push it to GitHub
-	- Run `VELERO_VERSION=v1.0.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh publish`.
+	- Run `VELERO_VERSION=v1.9.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ON_RELEASE_BRANCH=TRUE ./hack/release-tools/tag-release.sh publish`.
 1. Publish the release
 	- Navigate to the draft GitHub release at https://github.com/vmware-tanzu/velero/releases and edit the release.
-	- If this is a patch release (e.g. `v1.4.1`), note that the full `CHANGELOG-1.4.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
+	- If this is a patch release (e.g. `v1.9.1`), note that the full `CHANGELOG-1.9.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.9.0`'s changelog) so that only the latest patch release's changelog shows.
 	- Do a quick review for formatting. 
 	- **Note:** the `goreleaser` process should have detected if it's a pre-release version and, if so, checked the box at the bottom of the GitHub release page appropriately, but it's always worth double-checking.
 	- Verify that GitHub has built and pushed all the images (it takes a while): https://github.com/vmware-tanzu/velero/actions
