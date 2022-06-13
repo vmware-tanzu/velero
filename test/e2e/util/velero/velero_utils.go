@@ -705,6 +705,7 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 
 	return tmpfile, nil
 }
+
 func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName string) error {
 	args := []string{"backup", "delete", backupName, "--confirm"}
 
@@ -771,19 +772,48 @@ func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string,
 	})
 }
 
-func WaitForBackupCreated(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI string, backupName string,
+	timeout time.Duration, existing bool) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
 			return false, err
 		} else {
-			if exist {
+			msg := "does not exist"
+			if existing {
+				msg = "was found"
+			}
+			if exist == existing {
+				fmt.Println("Backup <" + backupName + "> " + msg)
 				return true, nil
 			} else {
+				fmt.Println("Backup <" + backupName + "> " + msg)
 				return false, nil
 			}
 		}
 	})
 }
+
+func WaitForBackupToBeCreated(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, true)
+}
+
+func WaitForBackupToBeDeleted(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, false)
+}
+
+func WaitForBackupsToBeDeleted(ctx context.Context, veleroCLI string, backups []string, timeout time.Duration) error {
+	var err error
+	for _, backupName := range backups {
+		fmt.Println("Waiting for deletion of backup <" + backupName + ">")
+		err = WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, false)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println("All backups were deleted.")
+	return nil
+}
+
 func GetBackupsFromBsl(ctx context.Context, veleroCLI, bslName string) ([]string, error) {
 	args1 := []string{"get", "backups"}
 	if strings.TrimSpace(bslName) != "" {
