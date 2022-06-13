@@ -3,6 +3,7 @@
 
 ## Older releases:
   * [CHANGELOG-1.8.md][18]
+  * [CHANGELOG-1.7.md][17]
   * [CHANGELOG-1.6.md][16]
   * [CHANGELOG-1.5.md][15]
   * [CHANGELOG-1.4.md][14]
