@@ -63,7 +63,7 @@ func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
 	}
 
 	if len(snapshots) != 1 {
-		return "", errors.Errorf("expected one matching snapshot, got %d", len(snapshots))
+		return "", errors.Errorf("expected one matching snapshot by command: %s, got %d", snapshotIdCmd.String(), len(snapshots))
 	}
 
 	return snapshots[0].ShortID, nil
