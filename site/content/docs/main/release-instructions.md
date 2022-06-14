@@ -67,7 +67,9 @@ For each major or minor release, create and publish a blog post to let folks kno
 	- Run `make gen-docs`, passing the appropriate variables. Examples:
 		a) `VELERO_VERSION=v1.5.0-rc.1 NEW_DOCS_VERSION=v1.5.0-rc.1 make gen-docs`.
 		b) `VELERO_VERSION=v1.5.0 NEW_DOCS_VERSION=v1.5 make gen-docs`).
-	- Note: `PREVIOUS_DOCS_VERSION=<doc-version-to-copy-from>` is optional; when not set, it will default to the latest doc version.
+	- Note:
+	    - `PREVIOUS_DOCS_VERSION=<doc-version-to-copy-from>` is optional; when not set, it will default to the latest doc version.
+	    - `VELERO_VERSION` and `NEW_DOCS_VERSION` are slightly different, the `VELERO_VERSION` may have lots of small release versions for one specific $major.minor, such as 'v1.5.0' and 'v1.5.1', but `NEW_DOCS_VERSION` may still be 'v1.5' for not document update.
 1. Clean up when there is an existing set of pre-release versioned docs for the version you are releasing
 	- Example: `site/content/docs/v1.5.0-beta.1` exists, and you're releasing `v1.5.0-rc.1` or `v1.5`
     - Remove the directory containing the pre-release docs, i.e. `site/content/docs/<pre-release-version>`.
