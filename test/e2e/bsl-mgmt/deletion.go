@@ -221,7 +221,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 1, bslDeletionTestNs, backupName_1, []string{podName_1})
 					Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 					Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
-						VeleroCfg.CloudCredentialsFile, VeleroCfg.AdditionalBSLBucket,
+						VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
 						VeleroCfg.BSLConfig, backupName_1, snapshotCheckPoint)).To(Succeed())
 				})
 				By(fmt.Sprintf("Snapshot of bsl %s should be created in cloud object store", backupLocation_2), func() {
@@ -232,6 +232,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 						BSLCredentials = VeleroCfg.AdditionalBSLCredentials
 						BSLConfig = VeleroCfg.AdditionalBSLConfig
 					} else {
+						// Snapshotting by non-vSphere provider using credentials
+						//    and config in default BSL
 						BSLCredentials = VeleroCfg.CloudCredentialsFile
 						BSLConfig = VeleroCfg.BSLConfig
 					}
