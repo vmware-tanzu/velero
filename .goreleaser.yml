@@ -14,7 +14,7 @@
 
 dist: _output
 builds:
-  - main: ./cmd/velero/main.go
+  - main: ./cmd/velero/velero.go
     env:
       - CGO_ENABLED=0
     goos:
