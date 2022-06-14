@@ -112,4 +112,4 @@ Once parsed into a `[]string`, the features can then be registered using the `Ne
 Velero adds the `LD_LIBRARY_PATH` into the list of environment variables to provide the convenience for plugins that requires C libraries/extensions in the runtime.
 
 [1]: https://github.com/vmware-tanzu/velero-plugin-example
-[2]: https://github.com/vmware-tanzu/velero/blob/v1.9/pkg/plugin/logger.go
+[2]: https://github.com/vmware-tanzu/velero/blob/v1.9.0/pkg/plugin/logger.go
