@@ -221,7 +221,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 1, bslDeletionTestNs, backupName_1, []string{podName_1})
 					Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 					Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
-						VeleroCfg.CloudCredentialsFile, VeleroCfg.AdditionalBSLBucket,
+						VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
 						VeleroCfg.BSLConfig, backupName_1, snapshotCheckPoint)).To(Succeed())
 				})
 				By(fmt.Sprintf("Snapshot of bsl %s should be created in cloud object store", backupLocation_2), func() {
@@ -232,6 +232,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 						BSLCredentials = VeleroCfg.AdditionalBSLCredentials
 						BSLConfig = VeleroCfg.AdditionalBSLConfig
 					} else {
+						// Snapshotting by non-vSphere provider using credentials
+						//    and config in default BSL
 						BSLCredentials = VeleroCfg.CloudCredentialsFile
 						BSLConfig = VeleroCfg.BSLConfig
 					}
@@ -252,12 +254,12 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			}
 
 			By(fmt.Sprintf("Backup 1 %s should be created.", backupName_1), func() {
-				Expect(WaitForBackupCreated(context.Background(), VeleroCfg.VeleroCLI,
+				Expect(WaitForBackupToBeCreated(context.Background(), VeleroCfg.VeleroCLI,
 					backupName_1, 10*time.Minute)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup 2 %s should be created.", backupName_2), func() {
-				Expect(WaitForBackupCreated(context.Background(), VeleroCfg.VeleroCLI,
+				Expect(WaitForBackupToBeCreated(context.Background(), VeleroCfg.VeleroCLI,
 					backupName_2, 10*time.Minute)).To(Succeed())
 			})
 
@@ -280,6 +282,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 				By(fmt.Sprintf("Delete one of backup locations - %s", backupLocation_1), func() {
 					Expect(DeleteBslResource(context.Background(), VeleroCfg.VeleroCLI, backupLocation_1)).To(Succeed())
+					Expect(WaitForBackupsToBeDeleted(context.Background(), VeleroCfg.VeleroCLI, backupsInBSL1, 10*time.Minute)).To(Succeed())
 				})
 
 				By("Get all backups from 2 BSLs after deleting one of them", func() {
