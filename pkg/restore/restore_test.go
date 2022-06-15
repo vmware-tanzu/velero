@@ -871,7 +871,6 @@ func TestRestoreItems(t *testing.T) {
 						ObjectMeta(
 							builder.WithLabels("key-1", "val-1"),
 							builder.WithAnnotations("key-1", "val-1"),
-							builder.WithClusterName("cluster-1"),
 							builder.WithFinalizers("finalizer-1"),
 						).
 						Result(),
