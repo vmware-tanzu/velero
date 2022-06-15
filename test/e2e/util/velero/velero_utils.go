@@ -87,6 +87,13 @@ var pluginsMatrix = map[string]map[string][]string{
 		"gcp":       {"velero/velero-plugin-for-gcp:v1.4.0"},
 		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.4.0", "velero/velero-plugin-for-csi:v0.2.0"},
 	},
+	"v1.9": {
+		"aws":       {"velero/velero-plugin-for-aws:v1.5.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.5.0"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.5.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.4.0"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.5.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.5.0", "velero/velero-plugin-for-csi:v0.3.0"},
+	},
 	"main": {
 		"aws":       {"velero/velero-plugin-for-aws:main"},
 		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
@@ -234,21 +241,24 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 }
 
 func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
-	jsonBuf, err := CMDExecWithOutput(checkCMD)
-	if err != nil {
-		return err
-	}
-	schedule := velerov1api.Schedule{}
-	err = json.Unmarshal(*jsonBuf, &schedule)
-	if err != nil {
-		return err
-	}
+	return wait.PollImmediate(time.Second*5, time.Minute*2, func() (bool, error) {
+		checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+		jsonBuf, err := CMDExecWithOutput(checkCMD)
+		if err != nil {
+			return false, err
+		}
+		schedule := velerov1api.Schedule{}
+		err = json.Unmarshal(*jsonBuf, &schedule)
+		if err != nil {
+			return false, err
+		}
 
-	if schedule.Status.Phase != velerov1api.SchedulePhaseEnabled {
-		return errors.Errorf("Unexpected restore phase got %s, expecting %s", schedule.Status.Phase, velerov1api.SchedulePhaseEnabled)
-	}
-	return nil
+		if schedule.Status.Phase != velerov1api.SchedulePhaseEnabled {
+			fmt.Printf("Unexpected schedule phase got %s, expecting %s, still waiting...", schedule.Status.Phase, velerov1api.SchedulePhaseEnabled)
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, order map[string]string) error {
@@ -368,6 +378,16 @@ func VeleroBackupExec(ctx context.Context, veleroCLI string, veleroNamespace str
 		return err
 	}
 	return checkBackupPhase(ctx, veleroCLI, veleroNamespace, backupName, velerov1api.BackupPhaseCompleted)
+}
+
+func VeleroBackupDelete(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
+	args := []string{"--namespace", veleroNamespace, "delete", "backup", backupName, "--confirm"}
+	return VeleroCmdExec(ctx, veleroCLI, args)
+}
+
+func VeleroRestoreDelete(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string) error {
+	args := []string{"--namespace", veleroNamespace, "delete", "restore", restoreName, "--confirm"}
+	return VeleroCmdExec(ctx, veleroCLI, args)
 }
 
 func VeleroScheduleDelete(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string) error {
@@ -514,7 +534,7 @@ func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 // WaitForVSphereUploadCompletion waits for uploads started by the Velero Plug-in for vSphere to complete
 // TODO - remove after upload progress monitoring is implemented
 func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, namespace string) error {
-	err := wait.PollImmediate(time.Minute, timeout, func() (bool, error) {
+	err := wait.PollImmediate(time.Second*5, timeout, func() (bool, error) {
 		checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 			"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.phase}{\"\\n\"}{end}'")
 		fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -692,6 +712,7 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 
 	return tmpfile, nil
 }
+
 func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName string) error {
 	args := []string{"backup", "delete", backupName, "--confirm"}
 
@@ -758,19 +779,48 @@ func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string,
 	})
 }
 
-func WaitForBackupCreated(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI string, backupName string,
+	timeout time.Duration, existing bool) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
 			return false, err
 		} else {
-			if exist {
+			msg := "does not exist"
+			if existing {
+				msg = "was found"
+			}
+			if exist == existing {
+				fmt.Println("Backup <" + backupName + "> " + msg)
 				return true, nil
 			} else {
+				fmt.Println("Backup <" + backupName + "> " + msg)
 				return false, nil
 			}
 		}
 	})
 }
+
+func WaitForBackupToBeCreated(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, true)
+}
+
+func WaitForBackupToBeDeleted(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, false)
+}
+
+func WaitForBackupsToBeDeleted(ctx context.Context, veleroCLI string, backups []string, timeout time.Duration) error {
+	var err error
+	for _, backupName := range backups {
+		fmt.Println("Waiting for deletion of backup <" + backupName + ">")
+		err = WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, false)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println("All backups were deleted.")
+	return nil
+}
+
 func GetBackupsFromBsl(ctx context.Context, veleroCLI, bslName string) ([]string, error) {
 	args1 := []string{"get", "backups"}
 	if strings.TrimSpace(bslName) != "" {

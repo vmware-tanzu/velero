@@ -161,5 +161,5 @@ func BackupsSyncTest() {
 }
 
 func (b *SyncBackups) IsBackupsSynced() error {
-	return WaitForBackupCreated(b.ctx, VeleroCfg.VeleroCLI, b.backupName, 10*time.Minute)
+	return WaitForBackupToBeCreated(b.ctx, VeleroCfg.VeleroCLI, b.backupName, 10*time.Minute)
 }

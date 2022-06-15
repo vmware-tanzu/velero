@@ -52,8 +52,8 @@ func (b *TTL) Init() {
 	b.testNS = "backup-ttl-test-" + UUIDgen.String()
 	b.backupName = "backup-ttl-test-" + UUIDgen.String()
 	b.restoreName = "restore-ttl-test-" + UUIDgen.String()
-	b.ctx, _ = context.WithTimeout(context.Background(), time.Duration(time.Minute*30))
-	b.ttl = time.Duration(10 * time.Minute)
+	b.ctx, _ = context.WithTimeout(context.Background(), time.Duration(time.Hour))
+	b.ttl = time.Duration(20 * time.Minute)
 
 }
 
@@ -87,14 +87,13 @@ func TTLTest() {
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
-		oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS), func() {
-			Expect(CreateNamespace(oneHourTimeout, client, test.testNS)).To(Succeed(),
+			Expect(CreateNamespace(test.ctx, client, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
 		})
 
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, client, VeleroCfg.CloudProvider,
+			Expect(KibishiiPrepareBeforeBackup(test.ctx, client, VeleroCfg.CloudProvider,
 				test.testNS, VeleroCfg.RegistryCredentialFile, VeleroCfg.Features,
 				VeleroCfg.KibishiiDirectory, useVolumeSnapshots)).To(Succeed())
 		})
@@ -108,7 +107,7 @@ func TTLTest() {
 		BackupCfg.TTL = test.ttl
 
 		By(fmt.Sprintf("Backup the workload in %s namespace", test.testNS), func() {
-			Expect(VeleroBackupNamespace(oneHourTimeout, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			Expect(VeleroBackupNamespace(test.ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
 				RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, test.backupName, "")
 				return "Fail to backup workload"
 			})
@@ -119,14 +118,14 @@ func TTLTest() {
 			if VeleroCfg.CloudProvider == "vsphere" {
 				// TODO - remove after upload progress monitoring is implemented
 				By("Waiting for vSphere uploads to complete", func() {
-					Expect(WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour,
+					Expect(WaitForVSphereUploadCompletion(test.ctx, time.Hour,
 						test.testNS)).To(Succeed())
 				})
 			}
 			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, VeleroCfg, 2, test.testNS, test.backupName, KibishiiPodNameList)
 			Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 
-			Expect(WaitUntilSnapshotsExistInCloud(VeleroCfg.CloudProvider,
+			Expect(SnapshotsShouldBeCreatedInCloud(VeleroCfg.CloudProvider,
 				VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLConfig,
 				test.backupName, snapshotCheckPoint)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 		}
@@ -183,7 +182,7 @@ func TTLTest() {
 
 		By("PersistentVolume snapshots should be deleted", func() {
 			if useVolumeSnapshots {
-				Expect(WaitUntilSnapshotsNotExistInCloud(VeleroCfg.CloudProvider,
+				Expect(SnapshotsShouldNotExistInCloud(VeleroCfg.CloudProvider,
 					VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLConfig,
 					test.backupName, snapshotCheckPoint)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 			}

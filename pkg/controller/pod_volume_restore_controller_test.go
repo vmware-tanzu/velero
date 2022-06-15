@@ -27,7 +27,6 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -44,48 +43,15 @@ func TestShouldProcess(t *testing.T) {
 		obj             *velerov1api.PodVolumeRestore
 		pod             *corev1api.Pod
 		shouldProcessed bool
-		expectedPhase   velerov1api.PodVolumeRestorePhase
 	}{
 		{
-			name: "Unable to get pvr's pod should not be processed",
+			name: "InProgress phase pvr should not be processed",
 			obj: &velerov1api.PodVolumeRestore{
-				Spec: velerov1api.PodVolumeRestoreSpec{
-					Pod: corev1api.ObjectReference{
-						Namespace: "ns-1",
-						Name:      "pod-1",
-					},
-				},
-				Status: velerov1api.PodVolumeRestoreStatus{
-					Phase: "",
-				},
-			},
-			shouldProcessed: false,
-		},
-		{
-			name: "InProgress phase pvr should be marked as failed",
-			obj: &velerov1api.PodVolumeRestore{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "pvr-1",
-				},
-				Spec: velerov1api.PodVolumeRestoreSpec{
-					Pod: corev1api.ObjectReference{
-						Namespace: "ns-1",
-						Name:      "pod-1",
-					},
-				},
 				Status: velerov1api.PodVolumeRestoreStatus{
 					Phase: velerov1api.PodVolumeRestorePhaseInProgress,
 				},
 			},
-			pod: &corev1api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "ns-1",
-					Name:      "pod-1",
-				},
-			},
 			shouldProcessed: false,
-			expectedPhase:   velerov1api.PodVolumeRestorePhaseFailed,
 		},
 		{
 			name: "Completed phase pvr should not be processed",
@@ -94,20 +60,8 @@ func TestShouldProcess(t *testing.T) {
 					Namespace: "velero",
 					Name:      "pvr-1",
 				},
-				Spec: velerov1api.PodVolumeRestoreSpec{
-					Pod: corev1api.ObjectReference{
-						Namespace: "ns-1",
-						Name:      "pod-1",
-					},
-				},
 				Status: velerov1api.PodVolumeRestoreStatus{
 					Phase: velerov1api.PodVolumeRestorePhaseCompleted,
-				},
-			},
-			pod: &corev1api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "ns-1",
-					Name:      "pod-1",
 				},
 			},
 			shouldProcessed: false,
@@ -119,6 +73,15 @@ func TestShouldProcess(t *testing.T) {
 					Namespace: "velero",
 					Name:      "pvr-1",
 				},
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseFailed,
+				},
+			},
+			shouldProcessed: false,
+		},
+		{
+			name: "Unable to get pvr's pod should not be processed",
+			obj: &velerov1api.PodVolumeRestore{
 				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
@@ -126,13 +89,7 @@ func TestShouldProcess(t *testing.T) {
 					},
 				},
 				Status: velerov1api.PodVolumeRestoreStatus{
-					Phase: velerov1api.PodVolumeRestorePhaseFailed,
-				},
-			},
-			pod: &corev1api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "ns-1",
-					Name:      "pod-1",
+					Phase: "",
 				},
 			},
 			shouldProcessed: false,
@@ -244,12 +201,6 @@ func TestShouldProcess(t *testing.T) {
 
 			shouldProcess, _, _ := c.shouldProcess(ctx, c.logger, ts.obj)
 			require.Equal(t, ts.shouldProcessed, shouldProcess)
-			if len(ts.expectedPhase) > 0 {
-				pvr := &velerov1api.PodVolumeRestore{}
-				err := c.Client.Get(ctx, types.NamespacedName{Namespace: ts.obj.Namespace, Name: ts.obj.Name}, pvr)
-				require.Nil(t, err)
-				assert.Equal(t, ts.expectedPhase, pvr.Status.Phase)
-			}
 		})
 	}
 }

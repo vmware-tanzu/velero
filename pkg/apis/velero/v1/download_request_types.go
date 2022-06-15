@@ -87,7 +87,6 @@ type DownloadRequestStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
-// +kubebuilder:subresource:status
 
 // DownloadRequest is a request to download an artifact from backup object storage, such as a backup
 // log file.
