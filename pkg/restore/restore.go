@@ -207,11 +207,8 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	)
 
 	// Get resource status includes-excludes. Defaults to excluding all resources
-	restoreStatusIncludesExcludes := collections.GetResourceIncludesExcludes(
-		kr.discoveryHelper,
-		[]string{},
-		[]string{"*"},
-	)
+	var restoreStatusIncludesExcludes *collections.IncludesExcludes
+
 	if req.Restore.Spec.RestoreStatus != nil {
 		restoreStatusIncludesExcludes = collections.GetResourceIncludesExcludes(
 			kr.discoveryHelper,
@@ -1362,13 +1359,14 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs
 	}
 
-	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
+	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes != nil && ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
 	if shouldRestoreStatus && statusFieldErr != nil {
 		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
 		ctx.log.Errorf(err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs
 	}
+	ctx.log.Debugf("status field for %s: exists: %v, should restore: %v", groupResource, statusFieldExists, shouldRestoreStatus)
 	// if it should restore status, run a UpdateStatus
 	if statusFieldExists && shouldRestoreStatus {
 		if err := unstructured.SetNestedField(obj.Object, objStatus, "status"); err != nil {
@@ -1379,6 +1377,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		obj.SetResourceVersion(createdObj.GetResourceVersion())
 		updated, err := resourceClient.UpdateStatus(obj, metav1.UpdateOptions{})
 		if err != nil {
+			ctx.log.Infof("status field update failed %s: %v", kube.NamespaceAndName(obj), err)
 			warnings.Add(namespace, err)
 		} else {
 			createdObj = updated
