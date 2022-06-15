@@ -1,0 +1,6 @@
+Update the k8s.io dependencies to 0.24.0.
+This also required an update to github.com/bombsimon/logrusr/v3.
+Removed the `WithClusterName` method
+as it is a "legacy field that was
+always cleared by the system and never used" as per upstream k8s
+https://github.com/kubernetes/apimachinery/blob/release-1.24/pkg/apis/meta/v1/types.go#L257-L259

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bombsimon/logrusr"
+	logrusr "github.com/bombsimon/logrusr/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -307,7 +307,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	corev1api.AddToScheme(scheme)
 	snapshotv1api.AddToScheme(scheme)
 
-	ctrl.SetLogger(logrusr.NewLogger(logger))
+	ctrl.SetLogger(logrusr.New(logger))
 
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme:    scheme,
