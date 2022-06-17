@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -88,15 +87,8 @@ func (r *ResticRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	// Initialize the patch helper.
-	patchHelper, err := patch.NewHelper(resticRepo, r.Client)
-	if err != nil {
-		log.WithError(err).Error("Error getting a patch helper to update restic repository resource")
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
 	if resticRepo.Status.Phase == "" || resticRepo.Status.Phase == velerov1api.ResticRepositoryPhaseNew {
-		if err = r.initializeRepo(ctx, resticRepo, log, patchHelper); err != nil {
+		if err := r.initializeRepo(ctx, resticRepo, log); err != nil {
 			log.WithError(err).Error("error initialize repository")
 			return ctrl.Result{}, errors.WithStack(err)
 		}
@@ -114,15 +106,15 @@ func (r *ResticRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	switch resticRepo.Status.Phase {
 	case velerov1api.ResticRepositoryPhaseReady:
-		return ctrl.Result{}, r.runMaintenanceIfDue(ctx, resticRepo, patchHelper, log)
+		return ctrl.Result{}, r.runMaintenanceIfDue(ctx, resticRepo, log)
 	case velerov1api.ResticRepositoryPhaseNotReady:
-		return ctrl.Result{}, r.checkNotReadyRepo(ctx, resticRepo, patchHelper, log)
+		return ctrl.Result{}, r.checkNotReadyRepo(ctx, resticRepo, log)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.ResticRepository, log logrus.FieldLogger, patchHelper *patch.Helper) error {
+func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.ResticRepository, log logrus.FieldLogger) error {
 	log.Info("Initializing restic repository")
 
 	// confirm the repo's BackupStorageLocation is valid
@@ -132,12 +124,12 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
 	}, loc); err != nil {
-		return r.patchResticRepository(ctx, req, patchHelper, log, repoNotReady(err.Error()))
+		return r.patchResticRepository(ctx, req, repoNotReady(err.Error()))
 	}
 
 	repoIdentifier, err := restic.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
 	if err != nil {
-		return r.patchResticRepository(ctx, req, patchHelper, log, func(rr *velerov1api.ResticRepository) {
+		return r.patchResticRepository(ctx, req, func(rr *velerov1api.ResticRepository) {
 			rr.Status.Message = err.Error()
 			rr.Status.Phase = velerov1api.ResticRepositoryPhaseNotReady
 
@@ -148,7 +140,7 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 	}
 
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
-	if err := r.patchResticRepository(ctx, req, patchHelper, log, func(rr *velerov1api.ResticRepository) {
+	if err := r.patchResticRepository(ctx, req, func(rr *velerov1api.ResticRepository) {
 		rr.Spec.ResticIdentifier = repoIdentifier
 
 		if rr.Spec.MaintenanceFrequency.Duration <= 0 {
@@ -159,10 +151,10 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 	}
 
 	if err := ensureRepo(req, r.repositoryManager); err != nil {
-		return r.patchResticRepository(ctx, req, patchHelper, log, repoNotReady(err.Error()))
+		return r.patchResticRepository(ctx, req, repoNotReady(err.Error()))
 	}
 
-	return r.patchResticRepository(ctx, req, patchHelper, log, func(rr *velerov1api.ResticRepository) {
+	return r.patchResticRepository(ctx, req, func(rr *velerov1api.ResticRepository) {
 		rr.Status.Phase = velerov1api.ResticRepositoryPhaseReady
 		rr.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
 	})
@@ -187,7 +179,7 @@ func ensureRepo(repo *velerov1api.ResticRepository, repoManager restic.Repositor
 	return nil
 }
 
-func (r *ResticRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.ResticRepository, patchHelper *patch.Helper, log logrus.FieldLogger) error {
+func (r *ResticRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.ResticRepository, log logrus.FieldLogger) error {
 	log.Debug("resticRepositoryController.runMaintenanceIfDue")
 
 	now := r.clock.Now()
@@ -204,12 +196,12 @@ func (r *ResticRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 	log.Debug("Pruning repo")
 	if err := r.repositoryManager.PruneRepo(req); err != nil {
 		log.WithError(err).Warn("error pruning repository")
-		if patchErr := patchHelper.Patch(ctx, req); patchErr != nil {
-			req.Status.Message = err.Error()
-			return patchErr
-		}
+		return r.patchResticRepository(ctx, req, func(rr *velerov1api.ResticRepository) {
+			rr.Status.Message = err.Error()
+		})
 	}
-	return r.patchResticRepository(ctx, req, patchHelper, log, func(rr *velerov1api.ResticRepository) {
+
+	return r.patchResticRepository(ctx, req, func(rr *velerov1api.ResticRepository) {
 		rr.Status.LastMaintenanceTime = &metav1.Time{Time: now}
 	})
 }
@@ -218,7 +210,7 @@ func dueForMaintenance(req *velerov1api.ResticRepository, now time.Time) bool {
 	return req.Status.LastMaintenanceTime == nil || req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
 }
 
-func (r *ResticRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.ResticRepository, patchHelper *patch.Helper, log logrus.FieldLogger) error {
+func (r *ResticRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.ResticRepository, log logrus.FieldLogger) error {
 	// no identifier: can't possibly be ready, so just return
 	if req.Spec.ResticIdentifier == "" {
 		return nil
@@ -229,9 +221,9 @@ func (r *ResticRepoReconciler) checkNotReadyRepo(ctx context.Context, req *veler
 	// we need to ensure it (first check, if check fails, attempt to init)
 	// because we don't know if it's been successfully initialized yet.
 	if err := ensureRepo(req, r.repositoryManager); err != nil {
-		return r.patchResticRepository(ctx, req, patchHelper, log, repoNotReady(err.Error()))
+		return r.patchResticRepository(ctx, req, repoNotReady(err.Error()))
 	}
-	return r.patchResticRepository(ctx, req, patchHelper, log, repoReady())
+	return r.patchResticRepository(ctx, req, repoReady())
 }
 
 func repoNotReady(msg string) func(*velerov1api.ResticRepository) {
@@ -251,11 +243,11 @@ func repoReady() func(*velerov1api.ResticRepository) {
 // patchResticRepository mutates req with the provided mutate function, and patches it
 // through the Kube API. After executing this function, req will be updated with both
 // the mutation and the results of the Patch() API call.
-func (r *ResticRepoReconciler) patchResticRepository(ctx context.Context, req *velerov1api.ResticRepository, patchHelper *patch.Helper, log logrus.FieldLogger, mutate func(*velerov1api.ResticRepository)) error {
+func (r *ResticRepoReconciler) patchResticRepository(ctx context.Context, req *velerov1api.ResticRepository, mutate func(*velerov1api.ResticRepository)) error {
+	original := req.DeepCopy()
 	mutate(req)
-	if err := patchHelper.Patch(ctx, req); err != nil {
-		log.WithError(err).Errorf("error updating restic repository resource %s in namespace %s  with err %s", req.Name, req.Namespace, err.Error())
-		return err
+	if err := r.Patch(ctx, req, client.MergeFrom(original)); err != nil {
+		return errors.Wrap(err, "error patching ResticRepository")
 	}
 	return nil
 }

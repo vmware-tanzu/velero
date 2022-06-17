@@ -50,6 +50,8 @@ spec:
                     - BackupResourceList
                     - RestoreLog
                     - RestoreResults
+                    - CSIBackupVolumeSnapshots
+                    - CSIBackupVolumeSnapshotContents
                     type: string
                   name:
                     description: Name is the name of the kubernetes resource with
@@ -85,8 +87,6 @@ spec:
         type: object
     served: true
     storage: true
-    subresources:
-      status: {}
 status:
   acceptedNames:
     kind: ""

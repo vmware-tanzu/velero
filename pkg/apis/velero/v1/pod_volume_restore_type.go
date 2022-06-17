@@ -87,7 +87,6 @@ type PodVolumeRestoreStatus struct {
 // +kubebuilder:object:generate=true
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
-// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".spec.pod.namespace",description="Namespace of the pod containing the volume to be restored"
 // +kubebuilder:printcolumn:name="Pod",type="string",JSONPath=".spec.pod.name",description="Name of the pod containing the volume to be restored"
 // +kubebuilder:printcolumn:name="Volume",type="string",JSONPath=".spec.volume",description="Name of the volume to be restored"

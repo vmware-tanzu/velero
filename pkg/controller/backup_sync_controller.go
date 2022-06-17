@@ -337,7 +337,7 @@ func (c *backupSyncController) run() {
 		// update the location's last-synced time field
 		statusPatch := client.MergeFrom(location.DeepCopy())
 		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := c.kbClient.Status().Patch(context.Background(), &location, statusPatch); err != nil {
+		if err := c.kbClient.Patch(context.Background(), &location, statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}

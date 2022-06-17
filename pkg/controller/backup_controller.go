@@ -70,7 +70,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
-	"sigs.k8s.io/cluster-api/util/patch"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -157,12 +156,13 @@ func NewBackupController(
 				backup := obj.(*velerov1api.Backup)
 
 				switch backup.Status.Phase {
-				case "", velerov1api.BackupPhaseNew, velerov1api.BackupPhaseInProgress:
+				case "", velerov1api.BackupPhaseNew:
+					// only process new backups
 				default:
 					c.logger.WithFields(logrus.Fields{
 						"backup": kubeutil.NamespaceAndName(backup),
 						"phase":  backup.Status.Phase,
-					}).Debug("Backup is not new or in-progress, skipping")
+					}).Debug("Backup is not new, skipping")
 					return
 				}
 
@@ -250,22 +250,7 @@ func (c *backupController) processBackup(key string) error {
 	// this key (even though it was a no-op).
 	switch original.Status.Phase {
 	case "", velerov1api.BackupPhaseNew:
-	case velerov1api.BackupPhaseInProgress:
-		// A backup may stay in-progress forever because of
-		// 1) the controller restarts during the processing of a backup
-		// 2) the backup with in-progress status isn't updated to completed or failed status successfully
-		// So we try to mark such Backups as failed to avoid it
-		updated := original.DeepCopy()
-		updated.Status.Phase = velerov1api.BackupPhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("got a Backup with unexpected status %q, this may be due to a restart of the controller during the backing up, mark it as %q",
-			velerov1api.BackupPhaseInProgress, updated.Status.Phase)
-		updated.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-		_, err = patchBackup(original, updated, c.client)
-		if err != nil {
-			return errors.Wrapf(err, "error updating Backup status to %s", updated.Status.Phase)
-		}
-		log.Warn(updated.Status.FailureReason)
-		return nil
+		// only process new backups
 	default:
 		return nil
 	}
@@ -957,10 +942,9 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 			// in backup deletion.
 			if modifyVSCFlag {
 				logger.Debugf("Patching VolumeSnapshotContent %s", vsc.Name)
-				_, err := c.patchVolumeSnapshotContent(vsc, func(req *snapshotv1api.VolumeSnapshotContent) {
-					req.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
-				})
-				if err != nil {
+				original := vsc.DeepCopy()
+				vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
+				if err := c.kbClient.Patch(context.Background(), vsc, kbclient.MergeFrom(original)); err != nil {
 					logger.Errorf("fail to modify VolumeSnapshotContent %s DeletionPolicy to Retain: %s", vsc.Name, err.Error())
 					return
 				}
@@ -984,22 +968,6 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 	}
 
 	wg.Wait()
-}
-
-func (c *backupController) patchVolumeSnapshotContent(req *snapshotv1api.VolumeSnapshotContent, mutate func(*snapshotv1api.VolumeSnapshotContent)) (*snapshotv1api.VolumeSnapshotContent, error) {
-	patchHelper, err := patch.NewHelper(req, c.kbClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to get patch helper.")
-	}
-
-	// Mutate
-	mutate(req)
-
-	if err := patchHelper.Patch(context.TODO(), req); err != nil {
-		return nil, errors.Wrapf(err, "fail to patch VolumeSnapshotContent %s", req.Name)
-	}
-
-	return req, nil
 }
 
 // recreateVolumeSnapshotContent will delete then re-create VolumeSnapshotContent,
@@ -1045,8 +1013,6 @@ func (c *backupController) recreateVolumeSnapshotContent(vsc *snapshotv1api.Volu
 		Namespace:  "ns-" + string(vsc.UID),
 		Name:       "name-" + string(vsc.UID),
 	}
-	// Revert DeletionPolicy to Delete
-	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
 	// ResourceVersion shouldn't exist for new creation.
 	vsc.ResourceVersion = ""
 	_, err = c.volumeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Create(context.TODO(), vsc, metav1.CreateOptions{})

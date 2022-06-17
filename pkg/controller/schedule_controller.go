@@ -27,7 +27,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -99,10 +98,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	c.metrics.InitSchedule(schedule.Name)
 
-	patchHelper, err := patch.NewHelper(schedule, c.Client)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "error new patch helper for schedule %s", req.String())
-	}
+	original := schedule.DeepCopy()
 
 	// validation - even if the item is Enabled, we can't trust it
 	// so re-validate
@@ -118,7 +114,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// update status if it's changed
 	if currentPhase != schedule.Status.Phase {
-		if err = patchHelper.Patch(ctx, schedule); err != nil {
+		if err := c.Patch(ctx, schedule, client.MergeFrom(original)); err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "error updating phase of schedule %s to %s", req.String(), schedule.Status.Phase)
 		}
 	}
@@ -200,13 +196,10 @@ func (c *scheduleReconciler) submitBackupIfDue(ctx context.Context, item *velero
 		return errors.Wrap(err, "error creating Backup")
 	}
 
-	patchHelper, err := patch.NewHelper(item, c.Client)
-	if err != nil {
-		return errors.Wrap(err, "error creating patch helper")
-	}
+	original := item.DeepCopy()
 	item.Status.LastBackup = &metav1.Time{Time: now}
 
-	if err := patchHelper.Patch(ctx, item); err != nil {
+	if err := c.Patch(ctx, item, client.MergeFrom(original)); err != nil {
 		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", item.Status.LastBackup)
 	}
 

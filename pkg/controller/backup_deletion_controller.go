@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/vmware-tanzu/velero/internal/delete"
@@ -458,13 +457,9 @@ func (r *backupDeletionReconciler) deleteResticSnapshots(ctx context.Context, ba
 }
 
 func (r *backupDeletionReconciler) patchDeleteBackupRequest(ctx context.Context, req *velerov1api.DeleteBackupRequest, mutate func(*velerov1api.DeleteBackupRequest)) (*velerov1api.DeleteBackupRequest, error) {
-	patchHelper, err := patch.NewHelper(req, r.Client)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get the patch helper")
-	}
-	// Mutate
+	original := req.DeepCopy()
 	mutate(req)
-	if err := patchHelper.Patch(ctx, req); err != nil {
+	if err := r.Patch(ctx, req, client.MergeFrom(original)); err != nil {
 		return nil, errors.Wrap(err, "error patching the deletebackuprquest")
 	}
 	return req, nil

@@ -79,7 +79,7 @@ func NewGCController(
 
 	c.syncHandler = c.processQueueItem
 	c.resyncPeriod = frequency
-	if c.resyncPeriod < 0 {
+	if c.resyncPeriod <= 0 {
 		c.resyncPeriod = defaultGCFrequency
 	}
 	logger.Infof("Garbage collection frequency: %s", c.resyncPeriod.String())

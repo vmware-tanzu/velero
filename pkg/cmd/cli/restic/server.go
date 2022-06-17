@@ -22,7 +22,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/apex/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -32,11 +34,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -105,6 +109,7 @@ type resticServer struct {
 	metrics        *metrics.ServerMetrics
 	metricsAddress string
 	namespace      string
+	nodeName       string
 }
 
 func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAddress string) (*resticServer, error) {
@@ -121,11 +126,13 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 	v1.AddToScheme(scheme)
 	storagev1api.AddToScheme(scheme)
 
+	nodeName := os.Getenv("NODE_NAME")
+
 	// use a field selector to filter to only pods scheduled on this node.
 	cacheOption := cache.Options{
 		SelectorsByObject: cache.SelectorsByObject{
 			&v1.Pod{}: {
-				Field: fields.Set{"spec.nodeName": os.Getenv("NODE_NAME")}.AsSelector(),
+				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
 		},
 	}
@@ -145,6 +152,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 		mgr:            mgr,
 		metricsAddress: metricAddress,
 		namespace:      factory.Namespace(),
+		nodeName:       nodeName,
 	}
 
 	// the cache isn't initialized yet when "validatePodVolumesHostPath" is called, the client returned by the manager cannot
@@ -173,7 +181,9 @@ func (s *resticServer) run() {
 	}()
 	s.metrics = metrics.NewResticServerMetrics()
 	s.metrics.RegisterAllMetrics()
-	s.metrics.InitResticMetricsForNode(os.Getenv("NODE_NAME"))
+	s.metrics.InitResticMetricsForNode(s.nodeName)
+
+	s.markInProgressCRsFailed()
 
 	s.logger.Info("Starting controllers")
 
@@ -193,7 +203,7 @@ func (s *resticServer) run() {
 		Clock:          clock.RealClock{},
 		Metrics:        s.metrics,
 		CredsFileStore: credentialFileStore,
-		NodeName:       os.Getenv("NODE_NAME"),
+		NodeName:       s.nodeName,
 		FileSystem:     filesystem.NewFileSystem(),
 		ResticExec:     restic.BackupExec{},
 		Log:            s.logger,
@@ -229,7 +239,7 @@ func (s *resticServer) validatePodVolumesHostPath(client kubernetes.Interface) e
 		}
 	}
 
-	pods, err := client.CoreV1().Pods("").List(s.ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", os.Getenv("NODE_NAME"))})
+	pods, err := client.CoreV1().Pods("").List(s.ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", s.nodeName)})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -258,4 +268,84 @@ func (s *resticServer) validatePodVolumesHostPath(client kubernetes.Interface) e
 	}
 
 	return nil
+}
+
+// if there is a restarting during the reconciling of pvbs/pvrs/etc, these CRs may be stuck in progress status
+// markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
+func (s *resticServer) markInProgressCRsFailed() {
+	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
+	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to create client")
+		return
+	}
+
+	s.markInProgressPVBsFailed(client)
+
+	s.markInProgressPVRsFailed(client)
+}
+
+func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
+	pvbs := &velerov1api.PodVolumeBackupList{}
+	if err := client.List(s.ctx, pvbs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
+		return
+	}
+	for _, pvb := range pvbs.Items {
+		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseInProgress {
+			log.Debugf("the status of podvolumebackup %q is %q, skip", pvb.GetName(), pvb.Status.Phase)
+			continue
+		}
+		if pvb.Spec.Node != s.nodeName {
+			log.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
+			continue
+		}
+		original := pvb.DeepCopy()
+		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
+		pvb.Status.Message = fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
+		pvb.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(s.ctx, &pvb, ctrlclient.MergeFrom(original)); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
+			continue
+		}
+		log.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
+	}
+}
+
+func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
+	pvrs := &velerov1api.PodVolumeRestoreList{}
+	if err := client.List(s.ctx, pvrs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")
+		return
+	}
+	for _, pvr := range pvrs.Items {
+		if pvr.Status.Phase != velerov1api.PodVolumeRestorePhaseInProgress {
+			log.Debugf("the status of podvolumerestore %q is %q, skip", pvr.GetName(), pvr.Status.Phase)
+			continue
+		}
+
+		pod := &v1.Pod{}
+		if err := client.Get(s.ctx, types.NamespacedName{
+			Namespace: pvr.Spec.Pod.Namespace,
+			Name:      pvr.Spec.Pod.Name,
+		}, pod); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to get pod \"%s/%s\" of podvolumerestore %q",
+				pvr.Spec.Pod.Namespace, pvr.Spec.Pod.Name, pvr.GetName())
+			continue
+		}
+		if pod.Spec.NodeName != s.nodeName {
+			log.Debugf("the node of pod referenced by podvolumebackup %q is %q, not %q, skip", pvr.GetName(), pod.Spec.NodeName, s.nodeName)
+			continue
+		}
+
+		original := pvr.DeepCopy()
+		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
+		pvr.Status.Message = fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, pvr.Status.Phase)
+		pvr.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(s.ctx, &pvr, ctrlclient.MergeFrom(original)); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
+			continue
+		}
+		log.WithField("podvolumerestore", pvr.GetName()).Warn(pvr.Status.Message)
+	}
 }

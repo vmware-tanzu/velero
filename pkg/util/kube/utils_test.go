@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -425,26 +424,4 @@ func TestIsCRDReady(t *testing.T) {
 	require.NoError(t, err)
 	_, err = IsCRDReady(obj)
 	assert.NotNil(t, err)
-}
-
-func TestPatch(t *testing.T) {
-	original := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pod",
-		},
-	}
-	cli := fake.NewClientBuilder().WithObjects(original).Build()
-
-	updated := original.DeepCopy()
-	updated.SetLabels(map[string]string{"key": "value"})
-
-	ctx := context.Background()
-	err := Patch(ctx, original, updated, cli)
-	require.Nil(t, err)
-
-	pod := &corev1.Pod{}
-	err = cli.Get(ctx, types.NamespacedName{Namespace: "default", Name: "pod"}, pod)
-	require.Nil(t, err)
-	assert.Equal(t, 1, len(pod.GetLabels()))
 }
