@@ -102,3 +102,4 @@ With bumping up the API to v1 in CSI plugin, the v0.3.0 CSI plugin will only wor
   * Fix E2E test [Backups][Deletion][Restic] on GCP. (#4968, @jxun)
   * Disable status as sub resource in CRDs (#4972, @ywk253100)
   * Add more information for failing to get path or snapshot in restic backup and restore. (#4988, @jxun)
+  * When spec.RestoreStatus is empty, don't restore status (#5015, @sseago)
