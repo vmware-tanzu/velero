@@ -62,7 +62,9 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		for _, podName := range pods {
 			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
-				return false, errors.WithMessage(err, fmt.Sprintf("Failed to verify pod %s/%s is %s", namespace, podName, corev1api.PodRunning))
+				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
+				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...", namespace, podName, corev1api.PodRunning)))
+				return false, nil
 			}
 			// If any pod is still waiting we don't need to check any more so return and wait for next poll interval
 			if checkPod.Status.Phase != corev1api.PodRunning {
