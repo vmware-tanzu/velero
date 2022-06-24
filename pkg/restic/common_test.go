@@ -473,6 +473,24 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
+			name:                   "should exclude all pod volumes when defaultVolumesToRestic is true and wildcard exclude is used",
+			defaultVolumesToRestic: true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToExcludeAnnotation: "*",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						/// Excluded from restic through annotation
+						{Name: "nonResticPV1"}, {Name: "nonResticPV2"}, {Name: "nonResticPV3"},
+					},
+				},
+			},
+			expected: []string{},
+		},
+		{
 			name:                   "should exclude default service account token from restic backup",
 			defaultVolumesToRestic: true,
 			pod: &corev1api.Pod{

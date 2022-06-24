@@ -1,0 +1,1 @@
+Allow excluding all volumes of a pod from restic using the `backup.velero.io/backup-volumes-excludes` annotation with a `*` wildcard.

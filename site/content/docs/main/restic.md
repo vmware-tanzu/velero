@@ -230,6 +230,12 @@ Instructions to back up using this approach are as follows:
     kubectl -n sample annotate pod/app1 backup.velero.io/backup-volumes-excludes=pvc1-vm
     ```
 
+    To exclude all volumes from the Restic backup, you would run:
+
+    ```bash
+    kubectl -n sample annotate pod/app1 backup.velero.io/backup-volumes-excludes=*
+    ```
+
 2. Take a Velero backup:
 
     ```bash

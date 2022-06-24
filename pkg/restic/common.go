@@ -214,7 +214,7 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 			continue
 		}
 		// don't backup volumes that are included in the exclude list.
-		if contains(volsToExclude, pv.Name) {
+		if contains(volsToExclude, "*") || contains(volsToExclude, pv.Name) {
 			continue
 		}
 		// don't include volumes that mount the default service account token.
