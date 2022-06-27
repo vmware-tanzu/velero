@@ -193,9 +193,9 @@ const (
     OBJECT_DATA_ACCESS_MODE_FILE    int = 1
     OBJECT_DATA_ACCESS_MODE_BLOCK   int = 2
 
-	OBJECT_DATA_BACKUP_MODE_UNKNOWN int = 0
-	OBJECT_DATA_BACKUP_MODE_FULL    int = 1
-	OBJECT_DATA_BACKUP_MODE_INC     int = 2    
+    OBJECT_DATA_BACKUP_MODE_UNKNOWN int = 0
+    OBJECT_DATA_BACKUP_MODE_FULL    int = 1
+    OBJECT_DATA_BACKUP_MODE_INC     int = 2    
 )
 
 ///ManifestEntryMetadata is the metadata describing one manifest data
@@ -295,10 +295,10 @@ Instead, we assume that the path is decided at the time of installation of Veler
 On the other hand, changing the path during upgrade or during referring to old backup data is not prohibited, though we need to take some mesure to handle the mismatch problems.  
 Specifically, we will have the option/mode values for path selection in two places:
 - Add the “uploader-type” option as a parameter of the Velero server and VeleroNodeAgent daemonset. The parameters will be set by the installation. Currently the option has two values, either "restic" or "kopia" (in future, we may add other file system uploaders, then we will have more values).
-- Add a "uploader-type" value in the PodVolumeBackup CR and a "repository-type" value in the BackupRepository CR. The values could be added as tags in the CRs' spec. "uploader-type" currently has two values , either "restic" or "kopia";  "repository-type" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repository-type is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the tags are missing in the CRs, it by default means "uploader-type=restic" and "repository-type=restic", so the legacy CRs are handled correctly by Restic.  
+- Add a "uploader-type" value in the PodVolumeBackup CR and a "repository-type" value in the BackupRepository CR. "uploader-type" currently has two values , either "restic" or "kopia";  "repository-type" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repository-type is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the values are missing in the CRs, it by default means "uploader-type=restic" and "repository-type=restic", so the legacy CRs are handled correctly by Restic.  
 
 The corresponding controllers handle the CRs with the matched mode only, the mismatched ones will be ignored.  
-In spite of the above pricipal solutions, some complex cases related to upgrade and old data reference are still valuable to dicuss, as described in below sections.  
+In spite of the above principal solutions, some complex cases related to upgrade and old data reference are still valuable to dicuss, as described in below sections.  
 
 ### CR Handling Under Mismatched Path
 The path is recorded in BackupRepository CR, PodVolumeBackup CR and PodVolumeRestore CR, when the path doesn't match to the current path of the controllers, below shows how the mismatches are handled:
@@ -314,8 +314,15 @@ We will change below CRs' name to make them more generic:
 - "ResticRepository" CR to "BackupRepository" CR  
 
 This means, we add a new CR type and deprecate the old one. As a result, if users upgrade from the old release, the old CRs will be orphaned, Velero will neither refer to it nor manage it, users need to delete these CRs manually.  
-As a side effect, when upgrading from an old release, even though the path is not changed, the repository is initialized all the time, because Velero will not refer to the old CR's status. This means, the same repository will be initialized again. This is a minor side effect, we don't see critical problems.  
-Therefore, users are recommended to uninstall Velero and delete all the resources in the Velero namespace before installing the new release.
+As a side effect, when upgrading from an old release, even though the path is not changed, the BackupRepository gets created all the time, because Velero will not refer to the old CR's status. This seems to cause the repository to initialize more than once, however, it won't happen. In the BackupRepository controller, before initializing a repository, it always tries to connect to the repository first, if it is connectable, it won't do the initialization.  
+When backing up with the new release, Velero always creates BackupRepository CRs instead of ResticRepository CRs.  
+When restoring from an old backup, Velero always creates BackupRepository CRs instead of ResticRepository CRs.  
+For a upgrade case, if there are already backups or restores running during the upgrade, the backups/restores could fall into below results:
+- The backups/restores have started but the ResticRepository CRs have not been created. In this case, the BackupRepository CRs will be created instead, the backups/restores will finish successfully.
+- The backups/restores have started and the old ResticRepository CRs have been created, but the CRs have not been processed. In this case, since the new controller doesn't process the old CRs, the backups/restores will wait there until a timeout. At present, the timeout is 1 minute.
+- The backups/restores have started and the old ResticRepository CRs have been created and processed. In this case, the backup repository has been successfully connected, the backups/restores could finish successfully.  
+
+As shown above, there are complexities for the upgrade case, so users are recommended to uninstall Velero and delete all the resources in the Velero namespace before installing the new release.
 
 ## Installation
  We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has 3 meanings:
@@ -349,20 +356,18 @@ Therefore, users are recommended to uninstall Velero and delete all the resource
 The BackupRepository CRs and PodVolumeBackup CRs created in this case are as below:
 ```
 spec:
-  tags:
-    repository-type: restic
+  backupStorageLocation: default
+  ...
+  repository-type: restic
+  volumeNamespace: nginx-example
 ```
 ```
 spec:
   tags:
     backup: bakup-testns-36
-    backup-uid: 1d5c06ee-bb8a-4e32-9606-145308b9747c
-    ns: testns-36
-    pod: deployment-2636-68b9697c56-6hpz5
-    pod-uid: 2858c332-b3d6-4985-b0e6-6ecbbf1d0284
-    pvc-uid: b17f03a0-b6f9-4ddf-95e6-59a85e67aada
+    ...
     volume: volume1
-    uploader-type: restic
+  uploader-type: restic
 ```
  **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment and VeleroNodeAgent daemonset will be created as below:
   ```
@@ -389,20 +394,18 @@ spec:
 The BackupRepository CRs created in this case are hard set with "kopia" at present, sice Kopia is the only option as a backup repository. The PodVolumeBackup CRs are created with "kopia" as well:
 ```
 spec:
-  tags:
-    repository-type: kopia
+  backupStorageLocation: default
+  ...
+  repository-type: kopia
+  volumeNamespace: nginx-example
 ```
 ```
 spec:
   tags:
     backup: bakup-testns-36
-    backup-uid: 1d5c06ee-bb8a-4e32-9606-145308b9747c
-    ns: testns-36
-    pod: deployment-2636-68b9697c56-6hpz5
-    pod-uid: 2858c332-b3d6-4985-b0e6-6ecbbf1d0284
-    pvc-uid: b17f03a0-b6f9-4ddf-95e6-59a85e67aada
+    ...
     volume: volume1
-    uploader-type: kopia
+  uploader-type: kopia
 ```
 We will add the flag for both CLI installation and Helm Chart Installation. Specifically:
 - Helm Chart Installation: add the "--pod-volume-backup-uploader" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
