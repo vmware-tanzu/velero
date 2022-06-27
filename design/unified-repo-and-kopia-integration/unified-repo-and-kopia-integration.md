@@ -58,12 +58,14 @@ On the other hand, based on a previous analysis and testing, we found that Kopia
 Below shows the primary modules and their responsibilities:
 
 - Kopia uploader, as been well isolated, could move all file system data either from the production PV (as Velero’s PodVolume BR does), or from any kind of snapshot (i.e., CSI snapshot).
-- Kopia uploader, the same as other data movers, calls the Unified Repository Interface to write/read data to/from the Unified Repository.
+- Unified Repository Interface, data movers call the Unified Repository Interface to write/read data to/from the Unified Repository.
 - Kopia repository layers, CAOS and CABS, work as the backup repository and expose the Kopia Repository interface.
 - A Kopia Repository Library works as an adapter between Unified Repository Interface and Kopia Repository interface. Specifically, it implements Unified Repository Interface and calls Kopia Repository interface.
 - At present, there is only one kind of backup repository -- Kopia Repository. If a new backup repository/storage is required, we need to create a new Library as an adapter to the Unified Repository Interface
 - At present, the Kopia Repository works as a single piece in the same process of the caller, in future, we may run its CABS into a dedicated process or node.
-- At present, we don’t have a requirement to extend the backup repository, if needed, an extra module could be added as an upper layer into the Unified Repository without changing the data movers.
+- At present, we don’t have a requirement to extend the backup repository, if needed, an extra module could be added as an upper layer into the Unified Repository without changing the data movers.  
+
+Neither Kopia uploader nor Kopia Repository is invoked through CLI, instead, they are invoked through code interfaces, because we need to do lots of customizations.  
 
 The Unified Repository takes two kinds of data:
 - Unified Repository Object: This is the user's logical data, for example, files/directories, blocks of a volume, data of a database, etc.
@@ -89,7 +91,7 @@ Velero by default uses the Unified Repository for all kinds of data movement, it
 # Detailed Design
 
 ## The Unified Repository Interface  
-Below are the definitions of the Unified Repository Interface  
+Below are the definitions of the Unified Repository Interface. All the functions are synchronization functions.   
 ```
 ///BackupRepoService is used to initialize, open or maintain a backup repository  
 type BackupRepoService interface {
@@ -97,47 +99,47 @@ type BackupRepoService interface {
     ///repoOption: option to the backup repository and the underlying backup storage
     ///createNew: indicates whether to create a new or connect to an existing backup repository
     ///result: the backup repository specific output that could be used to open the backup repository later
-    Init(repoOption RepoOptions, createNew bool) (result map[string]string, err error)
+    Init(ctx context.Context, repoOption RepoOptions, createNew bool) (result map[string]string, err error)
  
     ///Open an backup repository that has been created/connected
     ///config: options to open the backup repository and the underlying storage
-    Open(config map[string]string) (BackupRepo, error)
+    Open(ctx context.Context, config map[string]string) (BackupRepo, error)
  
     ///Periodically called to maintain the backup repository to eliminate redundant data and improve performance
     ///config: options to open the backup repository and the underlying storage
-    Maintain(config map[string]string) error
+    Maintain(ctx context.Context, config map[string]string) error
 }
 
 ///BackupRepo provides the access to the backup repository
 type BackupRepo interface {
     ///Open an existing object for read
     ///id: the object's unified identifier
-    OpenObject(id ID) (ObjectReader, error)
+    OpenObject(ctx context.Context, id ID) (ObjectReader, error)
  
     ///Get a manifest data
-    GetManifest(id ID, mani *RepoManifest) error
+    GetManifest(ctx context.Context, id ID, mani *RepoManifest) error
  
     ///Get one or more manifest data that match the given labels
-    FindManifests(filter ManifestFilter) ([]*ManifestEntryMetadata, error)
+    FindManifests(ctx context.Context, filter ManifestFilter) ([]*ManifestEntryMetadata, error)
  
     ///Create a new object and return the object's writer interface
     ///return: A unified identifier of the object on success
-    NewObjectWriter(opt ObjectWriteOptions) ObjectWriter
+    NewObjectWriter(ctx context.Context, opt ObjectWriteOptions) ObjectWriter
  
     ///Save a manifest object
-    PutManifest(mani RepoManifest) (ID, error)
+    PutManifest(ctx context.Context, mani RepoManifest) (ID, error)
  
     ///Delete a manifest object
-    DeleteManifest(id ID) error
+    DeleteManifest(ctx context.Context, id ID) error
  
     ///Flush all the backup repository data
-    Flush() error
+    Flush(ctx context.Context) error
  
     ///Get the local time of the backup repository. It may be different from the time of the caller
     Time() time.Time
  
     ///Close the backup repository
-    Close() error
+    Close(ctx context.Context) error
 }
 
 type ObjectReader interface {
@@ -199,7 +201,7 @@ const (
 ///ManifestEntryMetadata is the metadata describing one manifest data
 type ManifestEntryMetadata struct {
     ID      ID                ///The ID of the manifest data
-    Length  int               ///The data size of the manifest data
+    Length  int32             ///The data size of the manifest data
     Labels  map[string]string ///Labels saved together with the manifest data
     ModTime time.Time         ///Modified time of the manifest data
 }
@@ -220,7 +222,7 @@ type ManifestFilter struct {
 
 We preserve the bone of the existing BR workflow, that is:
 
-- Still use the Velero Server pod and PodVolumeBackup daemonSet (originally called Restic daemonset) pods to hold the corresponding controllers and modules
+- Still use the Velero Server pod and VeleroNodeAgent daemonSet (originally called Restic daemonset) pods to hold the corresponding controllers and modules
 - Still use the Backup/Restore CR and BackupRepository CR (originally called ResticRepository CR) to drive the BR workflow
 
 The modules in gray color in below diagram are the existing modules and with no significant changes.  
@@ -229,7 +231,8 @@ In the new design, we will have separate and independent modules/logics for back
 - Repository Provider provides functionalities to manage the backup repository. For example, initialize a repository, connect to a repository, manage the snapshots in the repository, maintain a repository, etc.
 - Uploader Provider provides functionalities to run a backup or restore.
 
-The Repository Provider and Uploader Provider use an option called “Legacy” to choose the path --- Restic Repository vs. Unified Repository or Restic Uploader vs. Kopia Uploader. Specifically, if Legacy = true, Repository Provider will manage Restic Repository only, otherwise, it manages Unified Repository only; if Legacy = true, Uploader Provider calls Restic to do the BR, otherwise, it calls Kopia to do the BR.  
+The Repository Provider and Uploader Provider use options to choose the path --- legacy path vs. new path (Kopia uploader + Unified Repository). Specifically, for legacy path, Repository Provider will manage Restic Repository only, otherwise, it manages Unified Repository only; for legacy path, Uploader Provider calls Restic to do the BR, otherwise, it calls Kopia uploader to do the BR.  
+
 In order to manage Restic Repository, the Repository Provider calls Restic Repository Provider, the latter invokes the existing Restic CLIs.  
 In order to manage Unified Repository, the Repository Provider calls Unified Repository Provider, the latter calls the Unified Repository module through the udmrepo.BackupRepoService interface. It doesn’t know how the Unified Repository is implemented necessarily.  
 In order to use Restic to do BR, the Uploader Provider calls Restic Uploader Provider, the latter invokes the existing Restic CLIs.  
@@ -243,6 +246,7 @@ In order to use Kopia to do BR, the Uploader Provider calls Kopia Uploader Provi
 - Finally, the read/write calls flow to Unified Repository module
 
 The Unified Repository provides all-in-one functionalities of a Backup Repository and exposes the Unified Repository Interface. Inside, Kopia Library is an adapter for Kopia Repository to translate the Unified Repository Interface calls to Kopia Repository interface calls.  
+Both Kopia Shim and Kopia Library rely on Kopia Repository interface, so we need to have some Kopia version control. We may need to change Kopia Shim and Kopia Library when upgrading Kopia to a new version and the Kopia Repository interface has some changes in the new version.
 ![A BR Workflow](br-workflow.png)  
 The modules in blue color in below diagram represent the newly added modules/logics or reorganized logics.  
 The modules in yellow color in below diagram represent the called Kopia modules without changes.  
@@ -281,25 +285,31 @@ In this way, Velero will be able to get the progress as shown in the diagram bel
 In the current design, Velero is using two unchanged Kopia modules --- the Kopia Uploader and the Kopia Repository. Both will generate debug logs during their run. Velero will collect these logs in order to aid the debug.  
 Kopia’s Uploader and Repository both get the Logger information from the current GO Context, therefore, the Kopia Uploader Provider/Kopia Library could set the Logger interface into the current context and pass the context to Kopia Uploader/Kopia Repository.  
 Velero will set Logger interfaces separately for Kopia Uploader and Kopia Repository. In this way, the Unified Repository could serve other data movers without losing the debug log capability; and the Kopia Uploader could write to any repository without losing the debug log capability.  
-Kopia’s debug logs will be written to the same log file as Velero server or PodVolumeBackup daemonset, so Velero doesn’t need to upload/download these debug logs separately.  
+Kopia’s debug logs will be written to the same log file as Velero server or VeleroNodeAgent daemonset, so Velero doesn’t need to upload/download these debug logs separately.  
 ![A Debug Log for Uploader](debug-log-uploader.png) 
 ![A Debug Log for Repository](debug-log-repository.png) 
 
 ## Path Switch & Coexist
-As mentioned above, we will use an option “Legacy” to choose different paths. We don’t pursue a dynamic switch as there is no user requirement.  
-Instead, we assume the value of this option is set at the time of installation of Velero and never changed unless Velero is uninstalled. This means, if users want to switch the path, they need to uninstall Velero first and reinstall it.  
-Specifically, we will have the “Legacy” option/mode in two places:
-- Add the “Legacy” option as a parameter of the Velero server and PodVolumeBackup daemonset. The parameters will be set by the installation.
-- Add a "legacy-mode" value in the BackupRepository CRs and PodVolumeBackup CRs. The value could be added as a tag in the CRs' spec. If the tag is missing, it by default means "legacy-mode=true", so the CRs were created to manage the Restic repository/backup using Restic.  
-The corresponding controllers handle the CRs with the matched mode only, the mismatched ones will be ignored. In this way, the corresponding controllers could handle the switch correctly for both fresh installation and upgrade.
+As mentioned above, we will have two paths. We don’t pursue a dynamic switch as there is no user requirement.  
+Instead, we assume that the path is decided at the time of installation of Velero and never changed unless Velero is reinstalled. This means, if users want to switch the path, the best practice is to fresh install Velero and don't refer to any old backup data.  
+On the other hand, changing the path during upgrade or during referring to old backup data is not prohibited, though we need to take some mesure to handle the mismatch problems.  
+Specifically, we will have the option/mode values for path selection in two places:
+- Add the “uploader-type” option as a parameter of the Velero server and VeleroNodeAgent daemonset. The parameters will be set by the installation. Currently the option has two values, either "restic" or "kopia" (in future, we may add other file system uploaders, then we will have more values).
+- Add a "uploader-type" value in the PodVolumeBackup CR and a "repository-type" value in the BackupRepository CR. The values could be added as tags in the CRs' spec. "uploader-type" currently has two values , either "restic" or "kopia";  "repository-type" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repository-type is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the tags are missing in the CRs, it by default means "uploader-type=restic" and "repository-type=restic", so the legacy CRs are handled correctly by Restic.  
 
-### Upgrade
-Changing path during upgrade is not prohibited, however some mismatches cases will happen, below shows how the mismatches are handled:
-- If a BackupRepository CR already exists, but users install Velero again with the “Legacy” value changed, the BackupRepository controller tries to find the existing BackupRepository CR to decide whether it needs to initialize the repository or to connect to the repository. Since the value has changed, the existing CR will be ignored and a new CR is created, during which, the new repository is initialized
-- If PodVolumeBackup CRs already exist, but users install Velero again with the “Legacy” value changed, the PodVolumeBackup controller tries to search the parent backup from the existing PodVolumeBackup CRs, since the value has changed, the CRs with the mismatched mode will be skipped, as a result, the correct parent backup could be retrieved
-- As you can see above, there may be orphan CRs left after the mode is switched. Velero will add warning logs for the orphan CRs and leverage on users to delete them from kubernetes.
+The corresponding controllers handle the CRs with the matched mode only, the mismatched ones will be ignored.  
+In spite of the above pricipal solutions, some complex cases related to upgrade and old data reference are still valuable to dicuss, as described in below sections.  
 
-## Velero CR Changes
+### CR Handling Under Mismatched Path
+The path is recorded in BackupRepository CR, PodVolumeBackup CR and PodVolumeRestore CR, when the path doesn't match to the current path of the controllers, below shows how the mismatches are handled:
+- If a BackupRepository CR already exists, but users install Velero again with the path changed, the BackupRepository controller tries to find the existing BackupRepository CR to decide whether it needs to initialize the repository or to connect to the repository. Since the value has changed, the existing CR will be ignored and a new CR is created, during which, the new repository is initialized
+- If PodVolumeBackup CRs already exist, but users install Velero again with the path changed, the PodVolumeBackup controller tries to search the parent backup from the existing PodVolumeBackup CRs, since the value has changed, the CRs with the mismatched mode will be skipped, as a result, the correct parent backup could be retrieved
+- As you can see above, there may be orphan CRs left after the mode is switched. Velero will add warning logs for the orphan CRs and leverage on users to delete them from kubernetes.  
+### Backup List, Sync and Describe
+### Backup Deletion Under Mismatched Path
+### Restore Under Mismatched Path
+
+## Velero CR Name Changes
 We will change below CRs' name to make them more generic:
 - "ResticRepository" CR to "BackupRepository" CR  
 
@@ -308,15 +318,20 @@ As a side effect, when upgrading from an old release, even though the path is no
 Therefore, users are recommended to uninstall Velero and delete all the resources in the Velero namespace before installing the new release.
 
 ## Installation
- We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has below two values:  
- **"Restic"**: it means Velero will use Restic to do the pod volume backup. Therefore, the Velero server deployment and PodVolumeBackup daemonset will be created as below:
+ We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has 3 meanings:
+ - It indicates PodVolume BR as the default method to protect PV data over other methods, i.e., durable snapshot. Therefore, the existing --use-restic option will be replaced
+ - It indicates the file system uploader to be used by PodVolume BR
+ - It implies the backup repository type manner, Restic if pod-volume-backup-uploader=restic, Unified Repository in all other cases
+
+ The flag has below two values:  
+ **"Restic"**: it means Velero will use Restic to do the pod volume backup. Therefore, the Velero server deployment and VeleroNodeAgent daemonset will be created as below:
  ```
     spec:
       containers:
       - args:
         - server
         - --features=
-        - --legacy
+        - --uploader-type=restic
         command:
         - /velero
 ```
@@ -327,7 +342,7 @@ Therefore, users are recommended to uninstall Velero and delete all the resource
         - restic
         - server
         - --features=
-        - --legacy
+        - --uploader-type=restic
         command:
         - /velero
 ```
@@ -335,7 +350,7 @@ The BackupRepository CRs and PodVolumeBackup CRs created in this case are as bel
 ```
 spec:
   tags:
-    legacy-mode: true
+    repository-type: restic
 ```
 ```
 spec:
@@ -347,17 +362,16 @@ spec:
     pod-uid: 2858c332-b3d6-4985-b0e6-6ecbbf1d0284
     pvc-uid: b17f03a0-b6f9-4ddf-95e6-59a85e67aada
     volume: volume1
-    legacy-mode: true
+    uploader-type: restic
 ```
- **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment and PodVolumeBackup daemonset will be created as below:
+ **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment and VeleroNodeAgent daemonset will be created as below:
   ```
     spec:
       containers:
       - args:
         - server
         - --features=
-        - debug
-        - --legacy=false
+        - --uploader-type=kopia
         command:
         - /velero
 ```
@@ -368,16 +382,15 @@ spec:
         - restic
         - server
         - --features=
-        - debug
-        - --legacy=false
+        - --uploader-type=kopia
         command:
         - /velero
 ```
-The BackupRepository CRs and PodVolumeBackup CRs created in this case are as below:
+The BackupRepository CRs created in this case are hard set with "kopia" at present, sice Kopia is the only option as a backup repository. The PodVolumeBackup CRs are created with "kopia" as well:
 ```
 spec:
   tags:
-    legacy-mode: false
+    repository-type: kopia
 ```
 ```
 spec:
@@ -389,7 +402,7 @@ spec:
     pod-uid: 2858c332-b3d6-4985-b0e6-6ecbbf1d0284
     pvc-uid: b17f03a0-b6f9-4ddf-95e6-59a85e67aada
     volume: volume1
-    legacy-mode: false
+    uploader-type: kopia
 ```
 We will add the flag for both CLI installation and Helm Chart Installation. Specifically:
 - Helm Chart Installation: add the "--pod-volume-backup-uploader" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
