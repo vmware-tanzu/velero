@@ -190,6 +190,12 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 	}
 
 	volsToExclude := getVolumesToExclude(pod)
+
+	// exclude all volumes if a wildcard is used
+	if len(volsToExclude) == 1 && volsToExclude[0] == "*" {
+		return []string{}
+	}
+
 	podVolumes := []string{}
 	for _, pv := range pod.Spec.Volumes {
 		// cannot backup hostpath volumes as they are not mounted into /var/lib/kubelet/pods
@@ -214,7 +220,7 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 			continue
 		}
 		// don't backup volumes that are included in the exclude list.
-		if contains(volsToExclude, "*") || contains(volsToExclude, pv.Name) {
+		if contains(volsToExclude, pv.Name) {
 			continue
 		}
 		// don't include volumes that mount the default service account token.
