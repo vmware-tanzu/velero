@@ -298,14 +298,10 @@ According to the requirements, path changing is fulfilled at the backup/restore 
 The corresponding controllers handle the CRs by checking the CRs' path value. Some examples are as below:
 - The PodVolume BR controller checks the "uploader-type" value from PodVolume CRs and decide its working path
 - The BackupRepository controller checks the "repository-type" value from BackupRepository CRs and decide its working path
-- The Backup controller that runs in Velero server checks its “uploader-type” parameter to decide the path for the Backup CRs it is going to create
-- The Restore controller checks the Backup CR, from which it is going to restore, for the path and then create the Restore CR
+- The Backup controller that runs in Velero server checks its “uploader-type” parameter to decide the path for the Backup it is going to create and then create the PodVolume Backup CR and BackupRepository CR
+- The Restore controller checks the Backup, from which it is going to restore, for the path and then create the PodVolume Restore CR and BackupRepository CR
 
 As described above, the “uploader-type” parameter of the Velero server is only used to decide the path when creating a new Backup, for other cases, the path selection is driven by the related CRs. Therefore, we only need to add this parameter to the Velero server.  
-
-### Backup List, Sync and Describe
-### Backup Deletion Under Mismatched Path
-### Restore Under Mismatched Path
 
 ## Velero CR Name Changes
 We will change below CRs' name to make them more generic:
@@ -466,7 +462,7 @@ Moreover, if users upgrade from the old release, we need to change the existing 
 Below Velero CLI or its output needs some changes:  
 - ```Velero backup describe```: the output should indicate the path  
 - ```Velero restore describe```: the output should indicate the path  
-- ```Velero restic repo get```: the name of this CLI should be changed to a generic one, for example, "Velero repo get"; the output of this CLI should print different information according to the path  
+- ```Velero restic repo get```: the name of this CLI should be changed to a generic one, for example, "Velero repo get"; the output of this CLI should print all the backup repository if Restic repository and Unified Repository exist at the same time  
 
 At present, we don't have a requirement for selecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.
 
