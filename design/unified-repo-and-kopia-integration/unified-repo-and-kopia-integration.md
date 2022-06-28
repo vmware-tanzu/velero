@@ -267,7 +267,7 @@ Velero already has an existing workflow to call Restic maintenance (it is called
   - For Restic Repository, Restic Repository Provider invokes the existing “Prune” CLI of Restic
   - For Unified Repository, Unified Repository Provider calls udmrepo.BackupRepoService’s Maintain function
 
-Kopia supports two maintenance modes – the full maintenance and quick maintenance. There are many differences between full and quick mode, but briefly speaking, quick mode only processes the hottest data (primarily, it is the metadata and index data), in this way, the maintenance will finish very fast and make less impact. We will also take this quick maintenance into Velero.  
+Kopia has two maintenance modes – the full maintenance and quick maintenance. There are many differences between full and quick mode, but briefly speaking, quick mode only processes the hottest data (primarily, it is the metadata and index data), so quick maintenance is much faster than full maintenance. On ther other hand, quick maintenance also scatters the burden of full maintenance so that the full maintenance could finish fastly and make less impact. We will also take this quick maintenance into Velero.  
 We will add a new Due Time to Velero, finally, we have two Prune Due Time:
 - Normal Due Time: For Restic, this will invoke Restic Prune; for Unified Repository, this will invoke udmrepo.BackupRepoService’s Maintain(full) call and finally call Kopia’s full maintenance
 - Quick Due Time: For Restic, this does nothing; for Unified Repository, this will invoke udmrepo.BackupRepoService’s Maintain(quick) call and finally call Kopia’s quick maintenance  
@@ -290,21 +290,19 @@ Kopia’s debug logs will be written to the same log file as Velero server or Ve
 ![A Debug Log for Repository](debug-log-repository.png) 
 
 ## Path Switch & Coexist
-As mentioned above, we will have two paths. We don’t pursue a dynamic switch as there is no user requirement.  
-Instead, we assume that the path is decided at the time of installation of Velero and never changed unless Velero is reinstalled. This means, if users want to switch the path, the best practice is to fresh install Velero and don't refer to any old backup data.  
-On the other hand, changing the path during upgrade or during referring to old backup data is not prohibited, though we need to take some mesure to handle the mismatch problems.  
-Specifically, we will have the option/mode values for path selection in two places:
-- Add the “uploader-type” option as a parameter of the Velero server and VeleroNodeAgent daemonset. The parameters will be set by the installation. Currently the option has two values, either "restic" or "kopia" (in future, we may add other file system uploaders, then we will have more values).
-- Add a "uploader-type" value in the PodVolumeBackup CR and a "repository-type" value in the BackupRepository CR. "uploader-type" currently has two values , either "restic" or "kopia";  "repository-type" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repository-type is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the values are missing in the CRs, it by default means "uploader-type=restic" and "repository-type=restic", so the legacy CRs are handled correctly by Restic.  
+As mentioned above, There will be two paths. The related controllers need to identify the path during runtime and adjust its working mode.  
+According to the requirements, path changing is fulfilled at the backup/restore level. In order to let the controllers know the path, we need to add some option values. Specifically, there will be option/mode values for path selection in two places:
+- Add the “uploader-type” option as a parameter of the Velero server. The parameters will be set by the installation. Currently the option has two values, either "restic" or "kopia" (in future, we may add other file system uploaders, then we will have more values).
+- Add a "uploader-type" value in the PodVolume Backup/Restore CR and a "repository-type" value in the BackupRepository CR. "uploader-type" currently has two values , either "restic" or "kopia";  "repository-type" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repository-type is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the values are missing in the CRs, it by default means "uploader-type=restic" and "repository-type=restic", so the legacy CRs are handled correctly by Restic.  
 
-The corresponding controllers handle the CRs with the matched mode only, the mismatched ones will be ignored.  
-In spite of the above principal solutions, some complex cases related to upgrade and old data reference are still valuable to dicuss, as described in below sections.  
+The corresponding controllers handle the CRs by checking the CRs' path value. Some examples are as below:
+- The PodVolume BR controller checks the "uploader-type" value from PodVolume CRs and decide its working path
+- The BackupRepository controller checks the "repository-type" value from BackupRepository CRs and decide its working path
+- The Backup controller that runs in Velero server checks its “uploader-type” parameter to decide the path for the Backup CRs it is going to create
+- The Restore controller checks the Backup CR, from which it is going to restore, for the path and then create the Restore CR
 
-### CR Handling Under Mismatched Path
-The path is recorded in BackupRepository CR, PodVolumeBackup CR and PodVolumeRestore CR, when the path doesn't match to the current path of the controllers, below shows how the mismatches are handled:
-- If a BackupRepository CR already exists, but users install Velero again with the path changed, the BackupRepository controller tries to find the existing BackupRepository CR to decide whether it needs to initialize the repository or to connect to the repository. Since the value has changed, the existing CR will be ignored and a new CR is created, during which, the new repository is initialized
-- If PodVolumeBackup CRs already exist, but users install Velero again with the path changed, the PodVolumeBackup controller tries to search the parent backup from the existing PodVolumeBackup CRs, since the value has changed, the CRs with the mismatched mode will be skipped, as a result, the correct parent backup could be retrieved
-- As you can see above, there may be orphan CRs left after the mode is switched. Velero will add warning logs for the orphan CRs and leverage on users to delete them from kubernetes.  
+As described above, the “uploader-type” parameter of the Velero server is only used to decide the path when creating a new Backup, for other cases, the path selection is driven by the related CRs. Therefore, we only need to add this parameter to the Velero server.  
+
 ### Backup List, Sync and Describe
 ### Backup Deletion Under Mismatched Path
 ### Restore Under Mismatched Path
@@ -322,8 +320,6 @@ For a upgrade case, if there are already backups or restores running during the 
 - The backups/restores have started and the old ResticRepository CRs have been created, but the CRs have not been processed. In this case, since the new controller doesn't process the old CRs, the backups/restores will wait there until a timeout. At present, the timeout is 1 minute.
 - The backups/restores have started and the old ResticRepository CRs have been created and processed. In this case, the backup repository has been successfully connected, the backups/restores could finish successfully.  
 
-As shown above, there are complexities for the upgrade case, so users are recommended to uninstall Velero and delete all the resources in the Velero namespace before installing the new release.
-
 ## Installation
  We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has 3 meanings:
  - It indicates PodVolume BR as the default method to protect PV data over other methods, i.e., durable snapshot. Therefore, the existing --use-restic option will be replaced
@@ -331,22 +327,11 @@ As shown above, there are complexities for the upgrade case, so users are recomm
  - It implies the backup repository type manner, Restic if pod-volume-backup-uploader=restic, Unified Repository in all other cases
 
  The flag has below two values:  
- **"Restic"**: it means Velero will use Restic to do the pod volume backup. Therefore, the Velero server deployment and VeleroNodeAgent daemonset will be created as below:
+ **"Restic"**: it means Velero will use Restic to do the pod volume backup. Therefore, the Velero server deployment will be created as below:
  ```
     spec:
       containers:
       - args:
-        - server
-        - --features=
-        - --uploader-type=restic
-        command:
-        - /velero
-```
-```
-    spec:
-      containers:
-      - args:
-        - restic
         - server
         - --features=
         - --uploader-type=restic
@@ -369,22 +354,11 @@ spec:
     volume: volume1
   uploader-type: restic
 ```
- **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment and VeleroNodeAgent daemonset will be created as below:
+ **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment will be created as below:
   ```
     spec:
       containers:
       - args:
-        - server
-        - --features=
-        - --uploader-type=kopia
-        command:
-        - /velero
-```
-```
-    spec:
-      containers:
-      - args:
-        - restic
         - server
         - --features=
         - --uploader-type=kopia
@@ -419,25 +393,27 @@ We will add the flag for both CLI installation and Helm Chart Installation. Spec
             - --legacy
             {{- end }} 
 ```     
-
-```
-          command:
-            - /velero
-          args:
-            - restic
-            - server
-          {{- with .Values.configuration }}
-            {{- if .pod-volume-backup-uploader "restic" }}
-            - --legacy
-            {{- end }}   
-```
 - CLI Installation: add the "--pod-volume-backup-uploader" flag into the installation command line, and then create the two deployments accordingly. Users could change the option at the time of installation. The CLI is as below:  
 ```velero install --pod-volume-backup-uploader=restic```  
-```velero install --pod-volume-backup-uploader=kopia```  
+```velero install --pod-volume-backup-uploader=kopia``` 
+
+## Upgrade
+For upgrade, we allow users to change the path by specifying "--pod-volume-backup-uploader" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade for both CLI and Helm Chart. Additionally, We need to add a label to Velero server to indicate the current path, so as to privide an easy for querying it.  
+Moreover, if users upgrade from the old release, we need to change the existing Restic Daemonset name to VeleroNodeAgent daemonSet. The name change should be applied after upgrade for both CLI and Helm Chart.  
+
+## CLI
+Below Velero CLI or its output needs some changes:  
+- ```Velero backup describe```: the output should indicate the path  
+- ```Velero restore describe```: the output should indicate the path  
+- ```Velero restic repo get```: the name of this CLI should be changed to a generic one, for example, "Velero repo get"; the output of this CLI should print different information according to the path  
+
+At present, we don't have a requirement for slecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.
 
 ## User Experience Changes
 Below user experiences are changed for this design:
 - Installation CLI change: a new option is added to the installation CLI, see the Installation section for details
 - CR change: One or more existing CRs have been renamed, see the Velero CR Changes section for details
-- Wording Alignment: as the existing situation, many places are using the word of "Restic", for example, "Restic" daemonset, "default-volume-to-restic" option, most of them are not accurate anymore, we will change these words and give a detailed list of the changes
+- Velero CLI name and output change, see the CLI section for details
+- Velero daemonset name change
+- Wording Alignment: as the existing situation, many places are using the word of "Restic", for example, "default-volume-to-restic" option, most of them are not accurate anymore, we will change these words and give a detailed list of the changes
 
