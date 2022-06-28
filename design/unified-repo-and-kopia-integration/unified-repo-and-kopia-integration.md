@@ -267,7 +267,7 @@ Velero already has an existing workflow to call Restic maintenance (it is called
   - For Restic Repository, Restic Repository Provider invokes the existing “Prune” CLI of Restic
   - For Unified Repository, Unified Repository Provider calls udmrepo.BackupRepoService’s Maintain function
 
-Kopia has two maintenance modes – the full maintenance and quick maintenance. There are many differences between full and quick mode, but briefly speaking, quick mode only processes the hottest data (primarily, it is the metadata and index data), so quick maintenance is much faster than full maintenance. On ther other hand, quick maintenance also scatters the burden of full maintenance so that the full maintenance could finish fastly and make less impact. We will also take this quick maintenance into Velero.  
+Kopia has two maintenance modes – the full maintenance and quick maintenance. There are many differences between full and quick mode, but briefly speaking, quick mode only processes the hottest data (primarily, it is the metadata and index data), so quick maintenance is much faster than full maintenance. On the other hand, quick maintenance also scatters the burden of full maintenance so that the full maintenance could finish fastly and make less impact. We will also take this quick maintenance into Velero.  
 We will add a new Due Time to Velero, finally, we have two Prune Due Time:
 - Normal Due Time: For Restic, this will invoke Restic Prune; for Unified Repository, this will invoke udmrepo.BackupRepoService’s Maintain(full) call and finally call Kopia’s full maintenance
 - Quick Due Time: For Restic, this does nothing; for Unified Repository, this will invoke udmrepo.BackupRepoService’s Maintain(quick) call and finally call Kopia’s quick maintenance  
@@ -320,6 +320,55 @@ For a upgrade case, if there are already backups or restores running during the 
 - The backups/restores have started and the old ResticRepository CRs have been created, but the CRs have not been processed. In this case, since the new controller doesn't process the old CRs, the backups/restores will wait there until a timeout. At present, the timeout is 1 minute.
 - The backups/restores have started and the old ResticRepository CRs have been created and processed. In this case, the backup repository has been successfully connected, the backups/restores could finish successfully.  
 
+## Storage Configuration
+The backup repository needs some parameters to connect to various backup storage. For example, for a S3 compatible storage, the parameters may include bucket name, region, endpoint, etc. Different backup storage have totally different parameters. BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs save these parameters in their spec, as a string called repoIdentififer. The format of the string is for S3 storage only, it meets Restic CLI's requirements but is not enough for other backup repository. Therefore, we will use a structured storage configuration to replace the repoIdentififer string. 
+The configuration in BackupRepository CRs, PodVolumeBackup CRs and PodVolumeRestore CRs are as below:
+```
+spec:
+  backupStorageLocation: default
+  maintenanceFrequency: 168h0m0s
+  storageConfig:
+    provider: azure
+    param:
+      container: container01
+      prefix: /restic/nginx-example
+  volumeNamespace: nginx-example
+```
+```
+spec:
+  backupStorageLocation: default
+  node: aks-agentpool-27359964-vmss000000
+  pod:
+    kind: Pod
+    name: nginx-stateful-0
+    namespace: nginx-example
+    uid: 86aaec56-2b21-4736-9964-621047717133
+  storageConfig:
+   provider: azure
+   param:
+    container: container01
+    prefix: /restic/nginx-example    
+  tags:
+    ...
+  volume: nginx-log
+```
+```
+spec:
+  backupStorageLocation: default
+  pod:
+    kind: Pod
+    name: nginx-stateful-0
+    namespace: nginx-example
+    uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
+  storageConfig:
+    provider: azure
+    param:
+     container: container01
+     prefix: /restic/nginx-example
+  snapshotID: 1741e5f1
+  volume: nginx-log
+```
+
 ## Installation
  We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has 3 meanings:
  - It indicates PodVolume BR as the default method to protect PV data over other methods, i.e., durable snapshot. Therefore, the existing --use-restic option will be replaced
@@ -342,17 +391,23 @@ The BackupRepository CRs and PodVolumeBackup CRs created in this case are as bel
 ```
 spec:
   backupStorageLocation: default
-  ...
+  maintenanceFrequency: 168h0m0s
   repository-type: restic
   volumeNamespace: nginx-example
 ```
 ```
 spec:
+  backupStorageLocation: default
+  node: aks-agentpool-27359964-vmss000000
+  pod:
+    kind: Pod
+    name: nginx-stateful-0
+    namespace: nginx-example
+    uid: 86aaec56-2b21-4736-9964-621047717133   
   tags:
-    backup: bakup-testns-36
     ...
-    volume: volume1
   uploader-type: restic
+  volume: nginx-log
 ```
  **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment will be created as below:
   ```
@@ -369,17 +424,23 @@ The BackupRepository CRs created in this case are hard set with "kopia" at prese
 ```
 spec:
   backupStorageLocation: default
-  ...
+  maintenanceFrequency: 168h0m0s
   repository-type: kopia
   volumeNamespace: nginx-example
 ```
 ```
 spec:
+  backupStorageLocation: default
+  node: aks-agentpool-27359964-vmss000000
+  pod:
+    kind: Pod
+    name: nginx-stateful-0
+    namespace: nginx-example
+    uid: 86aaec56-2b21-4736-9964-621047717133   
   tags:
-    backup: bakup-testns-36
     ...
-    volume: volume1
   uploader-type: kopia
+  volume: nginx-log
 ```
 We will add the flag for both CLI installation and Helm Chart Installation. Specifically:
 - Helm Chart Installation: add the "--pod-volume-backup-uploader" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
@@ -398,7 +459,7 @@ We will add the flag for both CLI installation and Helm Chart Installation. Spec
 ```velero install --pod-volume-backup-uploader=kopia``` 
 
 ## Upgrade
-For upgrade, we allow users to change the path by specifying "--pod-volume-backup-uploader" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade for both CLI and Helm Chart. Additionally, We need to add a label to Velero server to indicate the current path, so as to privide an easy for querying it.  
+For upgrade, we allow users to change the path by specifying "--pod-volume-backup-uploader" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade for both CLI and Helm Chart. Additionally, We need to add a label to Velero server to indicate the current path, so as to provide an easy for querying it.  
 Moreover, if users upgrade from the old release, we need to change the existing Restic Daemonset name to VeleroNodeAgent daemonSet. The name change should be applied after upgrade for both CLI and Helm Chart.  
 
 ## CLI
@@ -407,7 +468,7 @@ Below Velero CLI or its output needs some changes:
 - ```Velero restore describe```: the output should indicate the path  
 - ```Velero restic repo get```: the name of this CLI should be changed to a generic one, for example, "Velero repo get"; the output of this CLI should print different information according to the path  
 
-At present, we don't have a requirement for slecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.
+At present, we don't have a requirement for selecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.
 
 ## User Experience Changes
 Below user experiences are changed for this design:
