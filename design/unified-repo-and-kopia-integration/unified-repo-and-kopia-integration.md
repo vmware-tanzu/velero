@@ -343,7 +343,7 @@ spec:
    provider: azure
    param:
     container: container01
-    prefix: /restic/nginx-example    
+    prefix: /restic/nginx-example 
   tags:
     ...
   volume: nginx-log
@@ -356,12 +356,12 @@ spec:
     name: nginx-stateful-0
     namespace: nginx-example
     uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
+  snapshotID: 1741e5f1   
   storageConfig:
     provider: azure
     param:
      container: container01
      prefix: /restic/nginx-example
-  snapshotID: 1741e5f1
   volume: nginx-log
 ```
 
@@ -383,7 +383,7 @@ spec:
         command:
         - /velero
 ```
-The BackupRepository CRs and PodVolumeBackup CRs created in this case are as below:
+The BackupRepository CRs and PodVolume Backup/Restore CRs created in this case are as below:
 ```
 spec:
   backupStorageLocation: default
@@ -405,6 +405,18 @@ spec:
   uploader-type: restic
   volume: nginx-log
 ```
+```
+spec:
+  backupStorageLocation: default
+  pod:
+    kind: Pod
+    name: nginx-stateful-0
+    namespace: nginx-example
+    uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
+  snapshotID: 1741e5f1
+  uploader-type: restic
+  volume: nginx-log
+```
  **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment will be created as below:
   ```
     spec:
@@ -416,7 +428,7 @@ spec:
         command:
         - /velero
 ```
-The BackupRepository CRs created in this case are hard set with "kopia" at present, sice Kopia is the only option as a backup repository. The PodVolumeBackup CRs are created with "kopia" as well:
+The BackupRepository CRs created in this case are hard set with "kopia" at present, sice Kopia is the only option as a backup repository. The PodVolume Backup/Restore CRs are created with "kopia" as well:
 ```
 spec:
   backupStorageLocation: default
@@ -438,6 +450,18 @@ spec:
   uploader-type: kopia
   volume: nginx-log
 ```
+```
+spec:
+  backupStorageLocation: default
+  pod:
+    kind: Pod
+    name: nginx-stateful-0
+    namespace: nginx-example
+    uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
+  snapshotID: 1741e5f1
+  uploader-type: kopia
+  volume: nginx-log
+```
 We will add the flag for both CLI installation and Helm Chart Installation. Specifically:
 - Helm Chart Installation: add the "--pod-volume-backup-uploader" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
 ```
@@ -455,8 +479,9 @@ We will add the flag for both CLI installation and Helm Chart Installation. Spec
 ```velero install --pod-volume-backup-uploader=kopia``` 
 
 ## Upgrade
-For upgrade, we allow users to change the path by specifying "--pod-volume-backup-uploader" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade for both CLI and Helm Chart. Additionally, We need to add a label to Velero server to indicate the current path, so as to provide an easy for querying it.  
-Moreover, if users upgrade from the old release, we need to change the existing Restic Daemonset name to VeleroNodeAgent daemonSet. The name change should be applied after upgrade for both CLI and Helm Chart.  
+For upgrade, we allow users to change the path by specifying "--pod-volume-backup-uploader" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade. Additionally, We need to add a label to Velero server to indicate the current path, so as to provide an easy for querying it.  
+Moreover, if users upgrade from the old release, we need to change the existing Restic Daemonset name to VeleroNodeAgent daemonSet. The name change should be applied after upgrade.  
+The recommended way for upgrade is to modify the related Velero resource directly through kubectl, the above changes will be applied in the same way. We need to modify the Velero doc for all these changes.  
 
 ## CLI
 Below Velero CLI or its output needs some changes:  
@@ -464,7 +489,13 @@ Below Velero CLI or its output needs some changes:
 - ```Velero restore describe```: the output should indicate the path  
 - ```Velero restic repo get```: the name of this CLI should be changed to a generic one, for example, "Velero repo get"; the output of this CLI should print all the backup repository if Restic repository and Unified Repository exist at the same time  
 
-At present, we don't have a requirement for selecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.
+At present, we don't have a requirement for selecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is a requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.  
+
+## CR Example
+Below sample files demonstrate complete CRs with all the changes mentioned above:
+- BackupRepository CR: https://gist.github.com/Lyndon-Li/f38ad69dd8c4785c046cd7ed0ef2b6ed#file-backup-repository-sample-yaml
+- PodVolumeBackup CR: https://gist.github.com/Lyndon-Li/f38ad69dd8c4785c046cd7ed0ef2b6ed#file-pvb-sample-yaml
+- PodVolumeRestore CR: https://gist.github.com/Lyndon-Li/f38ad69dd8c4785c046cd7ed0ef2b6ed#file-pvr-sample-yaml
 
 ## User Experience Changes
 Below user experiences are changed for this design:
