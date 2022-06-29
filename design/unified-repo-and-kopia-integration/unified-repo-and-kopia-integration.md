@@ -311,58 +311,23 @@ This means, we add a new CR type and deprecate the old one. As a result, if user
 As a side effect, when upgrading from an old release, even though the path is not changed, the BackupRepository gets created all the time, because Velero will not refer to the old CR's status. This seems to cause the repository to initialize more than once, however, it won't happen. In the BackupRepository controller, before initializing a repository, it always tries to connect to the repository first, if it is connectable, it won't do the initialization.  
 When backing up with the new release, Velero always creates BackupRepository CRs instead of ResticRepository CRs.  
 When restoring from an old backup, Velero always creates BackupRepository CRs instead of ResticRepository CRs.  
-For a upgrade case, if there are already backups or restores running during the upgrade, the backups/restores could fall into below results:
-- The backups/restores have started but the ResticRepository CRs have not been created. In this case, the BackupRepository CRs will be created instead, the backups/restores will finish successfully.
-- The backups/restores have started and the old ResticRepository CRs have been created, but the CRs have not been processed. In this case, since the new controller doesn't process the old CRs, the backups/restores will wait there until a timeout. At present, the timeout is 1 minute.
-- The backups/restores have started and the old ResticRepository CRs have been created and processed. In this case, the backup repository has been successfully connected, the backups/restores could finish successfully.  
+When there are already backups or restores running during the upgrade, since after upgrade, the Velero server pods and VeleroNodeAgent daemonset pods are restarted, the existing backups/restores will fail immediately. 
 
 ## Storage Configuration
-The backup repository needs some parameters to connect to various backup storage. For example, for a S3 compatible storage, the parameters may include bucket name, region, endpoint, etc. Different backup storage have totally different parameters. BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs save these parameters in their spec, as a string called repoIdentififer. The format of the string is for S3 storage only, it meets Restic CLI's requirements but is not enough for other backup repository. Therefore, we will use a structured storage configuration to replace the repoIdentififer string. 
-The configuration in BackupRepository CRs, PodVolumeBackup CRs and PodVolumeRestore CRs are as below:
+The backup repository needs some parameters to connect to various backup storage. For example, for a S3 compatible storage, the parameters may include bucket name, region, endpoint, etc. Different backup storage have totally different parameters. BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs save these parameters in their spec, as a string called repoIdentififer. The format of the string is for S3 storage only, it meets Restic CLI's requirements but is not enough for other backup repository. Therefore, we will add a structured storage configuration and preserved the existing repoIdentififer string for Restic, considering backward compatibility. 
+Moreover, the storage configuration structure is added into the BackupRepository CRs only. When a PodVolume controller processes a PodVolume CR, it could get the corresponding BackupRepository CR first and then get the storage configuration from the CR. By this there will not be redundant information.  
+The configuration in BackupRepository CRs are as below:  
 ```
 spec:
   backupStorageLocation: default
   maintenanceFrequency: 168h0m0s
+  resticIdentifier: azure:container01:/restic/nginx-example
   storageConfig:
     provider: azure
     param:
       container: container01
       prefix: /restic/nginx-example
   volumeNamespace: nginx-example
-```
-```
-spec:
-  backupStorageLocation: default
-  node: aks-agentpool-27359964-vmss000000
-  pod:
-    kind: Pod
-    name: nginx-stateful-0
-    namespace: nginx-example
-    uid: 86aaec56-2b21-4736-9964-621047717133
-  storageConfig:
-   provider: azure
-   param:
-    container: container01
-    prefix: /restic/nginx-example 
-  tags:
-    ...
-  volume: nginx-log
-```
-```
-spec:
-  backupStorageLocation: default
-  pod:
-    kind: Pod
-    name: nginx-stateful-0
-    namespace: nginx-example
-    uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
-  snapshotID: 1741e5f1   
-  storageConfig:
-    provider: azure
-    param:
-     container: container01
-     prefix: /restic/nginx-example
-  volume: nginx-log
 ```
 
 ## Installation
