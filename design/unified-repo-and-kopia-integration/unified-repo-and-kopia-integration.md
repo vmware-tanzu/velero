@@ -462,11 +462,16 @@ Below sample files demonstrate complete CRs with all the changes mentioned above
 - PodVolumeBackup CR: https://gist.github.com/Lyndon-Li/f38ad69dd8c4785c046cd7ed0ef2b6ed#file-pvb-sample-yaml
 - PodVolumeRestore CR: https://gist.github.com/Lyndon-Li/f38ad69dd8c4785c046cd7ed0ef2b6ed#file-pvr-sample-yaml
 
-## User Experience Changes
+## User Perspective
+This design aims to provide a flexible backup repository layer and a generic file system uploader, which are fundermental for PodVolume and other data movements. Although this will make Velero more capable, at present, we don't pursue to expose differentiated features end to end. Specifically:  
+- By default, Velero still uses Restic for PodVolume BR
+- Even when changing to the new path, Velero still allows users to restore from the data backed up by Restic
+- The capability of PodVolume BR under the new path is kept the same as it under Restic path and the same as the existing PodVolume BR
+- The operational experiences are kept the same as much as possible, the known changes are listed below
+
 Below user experiences are changed for this design:
 - Installation CLI change: a new option is added to the installation CLI, see the Installation section for details
 - CR change: One or more existing CRs have been renamed, see the Velero CR Changes section for details
 - Velero CLI name and output change, see the CLI section for details
 - Velero daemonset name change
-- Wording Alignment: as the existing situation, many places are using the word of "Restic", for example, "default-volume-to-restic" option, most of them are not accurate anymore, we will change these words and give a detailed list of the changes
-
+- Wording Alignment: as the existing situation, many places are using the word of "Restic", for example, "default-volume-to-restic" option, most of them are not accurate anymore, we will change these words and give a detailed list of the changes  
