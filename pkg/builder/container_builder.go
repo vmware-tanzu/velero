@@ -17,9 +17,11 @@ limitations under the License.
 package builder
 
 import (
+	"encoding/json"
 	"strings"
 
 	corev1api "k8s.io/api/core/v1"
+	apimachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // ContainerBuilder builds Container objects
@@ -87,6 +89,17 @@ func getName(image string) string {
 // Result returns the built Container.
 func (b *ContainerBuilder) Result() *corev1api.Container {
 	return b.object
+}
+
+// ResultRawExtension returns the Container as runtime.RawExtension.
+func (b *ContainerBuilder) ResultRawExtension() apimachineryRuntime.RawExtension {
+	result, err := json.Marshal(b.object)
+	if err != nil {
+		return apimachineryRuntime.RawExtension{}
+	}
+	return apimachineryRuntime.RawExtension{
+		Raw: result,
+	}
 }
 
 // Args sets the container's Args.

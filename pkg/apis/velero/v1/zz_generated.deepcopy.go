@@ -670,7 +670,7 @@ func (in *InitRestoreHook) DeepCopyInto(out *InitRestoreHook) {
 	*out = *in
 	if in.InitContainers != nil {
 		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]corev1.Container, len(*in))
+		*out = make([]runtime.RawExtension, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
