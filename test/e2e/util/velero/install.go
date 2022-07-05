@@ -76,7 +76,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
 		veleroCfg.ObjectStoreProvider = "aws"
-		if err := configvSpherePlugin(); err != nil {
+		if err := configvSpherePlugin(*veleroCfg.ClientToInstallVelero); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
 		}
 	}
@@ -106,11 +106,8 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 }
 
 //configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
-func configvSpherePlugin() error {
-	cli, err := NewTestClient()
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to instantiate cluster client to config vsphere plugin")
-	}
+func configvSpherePlugin(cli TestClient) error {
+	var err error
 	vsphereSecret := "velero-vsphere-config-secret"
 	configmaptName := "velero-vsphere-plugin-config"
 	if err := clearupvSpherePluginConfig(cli.ClientGo, VeleroCfg.VeleroNamespace, vsphereSecret, configmaptName); err != nil {

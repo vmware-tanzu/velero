@@ -47,14 +47,9 @@ func BackupDeletionWithRestic() {
 func backup_deletion_test(useVolumeSnapshots bool) {
 	var (
 		backupName string
-		client     TestClient
 		err        error
 	)
 
-	By("Create test client instance", func() {
-		client, err = NewTestClient()
-		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
-	})
 	BeforeEach(func() {
 		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
@@ -80,7 +75,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	When("kibishii is the sample workload", func() {
 		It("Deleted backups are deleted from object storage and backups deleted from object storage can be deleted locally", func() {
 			backupName = "backup-" + UUIDgen.String()
-			Expect(runBackupDeletionTests(client, VeleroCfg, backupName, "", useVolumeSnapshots, VeleroCfg.KibishiiDirectory)).To(Succeed(),
+			Expect(runBackupDeletionTests(*VeleroCfg.ClientToInstallVelero, VeleroCfg, backupName, "", useVolumeSnapshots, VeleroCfg.KibishiiDirectory)).To(Succeed(),
 				"Failed to run backup deletion test")
 		})
 	})

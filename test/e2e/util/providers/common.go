@@ -35,7 +35,7 @@ type ObjectsInStorage interface {
 }
 
 func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
-	fmt.Printf("|| VERIFICATION || - %s %s should exist in storage [%s]\n", subPrefix, backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - %s should exist in storage [%s %s]\n", backupName, bslPrefix, subPrefix)
 	exist, err := IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 	if !exist {
 		return errors.Wrap(err, fmt.Sprintf("|| UNEXPECTED ||Backup object %s is not exist in object store after backup as expected\n", backupName))

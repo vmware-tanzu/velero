@@ -89,7 +89,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		},
 	}
 
-	f := client.NewFactory(name, config)
+	f := client.NewFactory(name, "", config)
 	f.BindFlags(c.PersistentFlags())
 
 	// Bind features directly to the root command so it's available to all callers.

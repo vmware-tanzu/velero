@@ -181,7 +181,14 @@ func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 
 	for _, n := range result.Snapshots {
 		fmt.Println(n.SnapshotId)
+		if n.SnapshotId != nil {
+			fmt.Println(*n.SnapshotId)
+		}
 		fmt.Println(n.Tags)
+		fmt.Println(n.VolumeId)
+		if n.VolumeId != nil {
+			fmt.Println(*n.VolumeId)
+		}
 	}
 	if len(result.Snapshots) != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count is not as expected %d", snapshotCheck.ExpectCount))
