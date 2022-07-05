@@ -73,9 +73,7 @@ var TestClientInstance TestClient
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		By("Create test client instance", func() {
-			var err error
-			TestClientInstance, err = NewTestClient()
-			Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+			TestClientInstance = *VeleroCfg.ClientToInstallVelero
 		})
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		BeforeEach(func() {
@@ -99,13 +97,11 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		var err error
 		var countIt int
 		By("Create test client instance", func() {
-			TestClientInstance, err = NewTestClient()
-			Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+			TestClientInstance = *VeleroCfg.ClientToInstallVelero
 		})
-		//Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
 		}

@@ -118,7 +118,7 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 		time.Sleep(5 * time.Minute)
 	}
 
-	if err := VeleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName); err != nil {
+	if err := VeleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName, ""); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
@@ -134,8 +134,7 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
 	kibishiiDirectory string, useVolumeSnapshots bool) error {
 	if strings.EqualFold(cloudPlatform, "azure") &&
-		strings.EqualFold(veleroFeatures, "EnableCSI") &&
-		useVolumeSnapshots {
+		strings.EqualFold(veleroFeatures, "EnableCSI") {
 		cloudPlatform = "azure-csi"
 	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
@@ -182,7 +181,8 @@ func generateData(ctx context.Context, namespace string, levels int, filesPerLev
 
 func verifyData(ctx context.Context, namespace string, levels int, filesPerLevel int, dirsPerLevel int, fileSize int,
 	blockSize int, passNum int, expectedNodes int) error {
-	kibishiiVerifyCmd := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
+	timeout, _ := context.WithTimeout(context.Background(), time.Minute*5)
+	kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 		"/usr/local/bin/verify.sh", strconv.Itoa(levels), strconv.Itoa(filesPerLevel), strconv.Itoa(dirsPerLevel), strconv.Itoa(fileSize),
 		strconv.Itoa(blockSize), strconv.Itoa(passNum), strconv.Itoa(expectedNodes))
 	fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
@@ -238,7 +238,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 	if err := waitForKibishiiPods(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
-
+	time.Sleep(60 * time.Second)
 	// TODO - check that namespace exists
 	fmt.Printf("running kibishii verify\n")
 	if err := verifyData(oneHourTimeout, kibishiiNamespace, 2, 10, 10, 1024, 1024, 0, 2); err != nil {

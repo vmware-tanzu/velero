@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	common "github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
 
@@ -56,11 +57,11 @@ func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace str
 
 // WaitForPods waits until all of the pods have gone to PodRunning state
 func WaitForPods(ctx context.Context, client TestClient, namespace string, pods []string) error {
-	timeout := 10 * time.Minute
+	timeout := 5 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		for _, podName := range pods {
-			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
 				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
 				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...", namespace, podName, corev1api.PodRunning)))
@@ -142,4 +143,14 @@ func AddLabelToPod(ctx context.Context, podName, namespace, label string) error 
 func KubectlApplyByFile(ctx context.Context, file string) error {
 	args := []string{"apply", "-f", file, "--force=true"}
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
+}
+
+func KubectlConfigUseContext(ctx context.Context, kubectlContext string) error {
+	cmd := exec.CommandContext(ctx, "kubectl",
+		"config", "use-context", kubectlContext)
+	fmt.Printf("Kubectl config use-context cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Print(stdout)
+	fmt.Print(stderr)
+	return err
 }

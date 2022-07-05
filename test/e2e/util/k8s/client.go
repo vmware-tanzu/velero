@@ -17,8 +17,6 @@ limitations under the License.
 package k8s
 
 import (
-	"sync"
-
 	"k8s.io/client-go/kubernetes"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -48,28 +46,24 @@ type TestClient struct {
 }
 
 var (
-	once       sync.Once
-	testClient TestClient
-	err        error
+	err error
 )
 
-func NewTestClient() (TestClient, error) {
-	once.Do(func() { // <-- atomic, does not allow repeating
-		testClient, err = InitTestClient() // <-- thread safe
-	})
-	return testClient, err
+// NewTestClient returns a set of ready-to-use API clients.
+func NewTestClient(kubecontext string) (TestClient, error) {
+	return InitTestClient(kubecontext)
 }
 
-// NewTestClient returns a set of ready-to-use API clients.
-func InitTestClient() (TestClient, error) {
+func InitTestClient(kubecontext string) (TestClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {
 		return TestClient{}, err
 	}
 
-	f := client.NewFactory("e2e", config)
+	f := client.NewFactory("e2e", kubecontext, config)
 
 	clientGo, err := f.KubeClient()
+
 	if err != nil {
 		return TestClient{}, err
 	}

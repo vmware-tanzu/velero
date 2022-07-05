@@ -309,8 +309,10 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 	args := []string{
 		"--namespace", veleroNamespace,
 		"create", "backup", backupCfg.BackupName,
-		"--include-namespaces", backupCfg.Namespace,
 		"--wait",
+	}
+	if backupCfg.Namespace != "" {
+		args = append(args, "--include-namespaces", backupCfg.Namespace)
 	}
 	if backupCfg.Selector != "" {
 		args = append(args, "--selector", backupCfg.Selector)
@@ -332,6 +334,23 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 	if backupCfg.TTL != 0 {
 		args = append(args, "--ttl", backupCfg.TTL.String())
 	}
+
+	if backupCfg.IncludeResources != "" {
+		args = append(args, "--include-resources", backupCfg.IncludeResources)
+	}
+
+	if backupCfg.ExcludeResources != "" {
+		args = append(args, "--exclude-resources", backupCfg.ExcludeResources)
+	}
+
+	if backupCfg.IncludeClusterResources {
+		args = append(args, "--include-cluster-resources")
+	}
+
+	if backupCfg.OrderedResources != "" {
+		args = append(args, "--ordered-resources", backupCfg.OrderedResources)
+	}
+
 	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupCfg.BackupName, args)
 }
 
@@ -358,10 +377,13 @@ func VeleroBackupIncludeNamespaces(ctx context.Context, veleroCLI string, velero
 }
 
 // VeleroRestore uses the VeleroCLI to restore from a Velero backup.
-func VeleroRestore(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string, backupName string) error {
+func VeleroRestore(ctx context.Context, veleroCLI, veleroNamespace, restoreName, backupName, includeResources string) error {
 	args := []string{
 		"--namespace", veleroNamespace, "create", "restore", restoreName,
 		"--from-backup", backupName, "--wait",
+	}
+	if includeResources != "" {
+		args = append(args, "--include-resources", includeResources)
 	}
 	return VeleroRestoreExec(ctx, veleroCLI, veleroNamespace, restoreName, args)
 }
@@ -761,7 +783,7 @@ func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bo
 			return false, err
 		}
 	}
-	fmt.Printf("Backup %s exist locally according to output %s", backupName, out)
+	fmt.Printf("Backup <%s> exist locally according to output \n[%s]\n", backupName, out)
 	return true, nil
 }
 
@@ -785,9 +807,9 @@ func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI string, backupN
 		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
 			return false, err
 		} else {
-			msg := "does not exist"
-			if existing {
-				msg = "was found"
+			msg := "does not exist as expect"
+			if exist {
+				msg = "was found as expect"
 			}
 			if exist == existing {
 				fmt.Println("Backup <" + backupName + "> " + msg)
@@ -892,22 +914,22 @@ func SnapshotCRsCountShouldBe(ctx context.Context, namespace, backupName string,
 	}
 }
 
-func ResticRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targetNamespace string, expectedCount int) error {
+func BackupRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targetNamespace string, expectedCount int) error {
 	resticArr, err := GetResticRepositories(ctx, veleroNamespace, targetNamespace)
 	if err != nil {
-		return errors.Wrapf(err, "Fail to get GetResticRepositories")
+		return errors.Wrapf(err, "Fail to get BackupRepositories")
 	}
 	if len(resticArr) == expectedCount {
 		return nil
 	} else {
-		return errors.New(fmt.Sprintf("Resticrepositories count %d in namespace %s is not as expected %d", len(resticArr), targetNamespace, expectedCount))
+		return errors.New(fmt.Sprintf("BackupRepositories count %d in namespace %s is not as expected %d", len(resticArr), targetNamespace, expectedCount))
 	}
 }
 
 func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace string) ([]string, error) {
 	CmdLine1 := &common.OsCommandLine{
 		Cmd:  "kubectl",
-		Args: []string{"get", "-n", veleroNamespace, "resticrepositories"},
+		Args: []string{"get", "-n", veleroNamespace, "BackupRepositories"},
 	}
 
 	CmdLine2 := &common.OsCommandLine{
@@ -967,4 +989,22 @@ func GetBackupTTL(ctx context.Context, veleroNamespace, backupName string) (stri
 	// }
 	// return complete, nil
 	return stdout, err
+}
+
+func GetVersionList(veleroCli, veleroVersion string) []VeleroCLI2Version {
+	var veleroCLI2VersionList []VeleroCLI2Version
+	veleroVersionList := strings.Split(veleroVersion, ",")
+	veleroCliList := strings.Split(veleroCli, ",")
+
+	for _, veleroVersion := range veleroVersionList {
+		veleroCLI2VersionList = append(veleroCLI2VersionList,
+			VeleroCLI2Version{veleroVersion, ""})
+	}
+	for i, veleroCli := range veleroCliList {
+		if i == len(veleroVersionList)-1 {
+			break
+		}
+		veleroCLI2VersionList[i].VeleroCLI = veleroCli
+	}
+	return veleroCLI2VersionList
 }
