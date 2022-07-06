@@ -110,6 +110,12 @@ type BackupSpec struct {
 	// +optional
 	// +nullable
 	OrderedResources map[string]string `json:"orderedResources,omitempty"`
+
+	// CSISnapshotTimeout specifies the time used to wait for CSI VolumeSnapshot status turns to
+	// ReadyToUse during creation, before returning error as timeout.
+	// The default value is 10 minute.
+	// +optional
+	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.
