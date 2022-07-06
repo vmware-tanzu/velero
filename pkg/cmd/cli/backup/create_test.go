@@ -19,6 +19,7 @@ package backup
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	o.Labels.Set("velero.io/test=true")
 	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
 	orders, err := ParseOrderedResources(o.OrderedResources)
+	o.CSISnapshotTimeout = 20 * time.Minute
 	assert.NoError(t, err)
 
 	backup, err := o.BuildBackup(testNamespace)
@@ -46,6 +48,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 		SnapshotVolumes:         o.SnapshotVolumes.Value,
 		IncludeClusterResources: o.IncludeClusterResources.Value,
 		OrderedResources:        orders,
+		CSISnapshotTimeout:      metav1.Duration{Duration: o.CSISnapshotTimeout},
 	}, backup.Spec)
 
 	assert.Equal(t, map[string]string{
