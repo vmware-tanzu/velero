@@ -24,12 +24,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -39,7 +37,10 @@ import (
 )
 
 const (
-	backupStorageLocationSyncPeriod = 1 * time.Minute
+	// keep the enqueue period a smaller value to make sure the BSL can be validated as expected.
+	// The BSL validation frequency is 1 minute by default, if we set the enqueue period as 1 minute,
+	// this will cause the actual validation interval for each BSL to be 2 minutes
+	bslValidationEnqueuePeriod = 10 * time.Second
 )
 
 // BackupStorageLocationReconciler reconciles a BackupStorageLocation object
@@ -185,7 +186,7 @@ func (r *BackupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) err
 		r.Log,
 		mgr.GetClient(),
 		&velerov1api.BackupStorageLocationList{},
-		backupStorageLocationSyncPeriod,
+		bslValidationEnqueuePeriod,
 		// Add filter function to enqueue BSL per ValidationFrequency setting.
 		func(object client.Object) bool {
 			location := object.(*velerov1api.BackupStorageLocation)
@@ -193,22 +194,8 @@ func (r *BackupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) err
 		},
 	)
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&velerov1api.BackupStorageLocation{}).
-		// Handle BSL's creation event and spec update event to let changed BSL got validation immediately.
-		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(ce event.CreateEvent) bool {
-				return true
-			},
-			UpdateFunc: func(ue event.UpdateEvent) bool {
-				return ue.ObjectNew.GetGeneration() != ue.ObjectOld.GetGeneration()
-			},
-			DeleteFunc: func(de event.DeleteEvent) bool {
-				return false
-			},
-			GenericFunc: func(ge event.GenericEvent) bool {
-				return false
-			},
-		}).
+		// As the "status.LastValidationTime" field is always updated, this triggers new reconciling process, skip the update event that include no spec change to avoid the reconcile loop
+		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.SpecChangePredicate{})).
 		Watches(g, nil).
 		Complete(r)
 }
