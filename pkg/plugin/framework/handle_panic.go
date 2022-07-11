@@ -17,6 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"runtime/debug"
+
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 )
@@ -38,7 +40,8 @@ func handlePanic(p interface{}) error {
 		if _, ok := panicErr.(stackTracer); ok {
 			err = panicErr
 		} else {
-			err = errors.Wrap(panicErr, "plugin panicked")
+			errWithStacktrace := errors.Errorf("%v, stack trace: %s", panicErr, debug.Stack())
+			err = errors.Wrap(errWithStacktrace, "plugin panicked")
 		}
 	}
 
