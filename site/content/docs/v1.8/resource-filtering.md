@@ -24,7 +24,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 * Restore two namespaces and their objects.
 
   ```bash
-  velero restore create <backup-name> --include-namespaces <namespace1>,<namespace2>
+  velero restore create <restore-name> --include-namespaces <namespace1>,<namespace2> --from-backup <backup-name>
   ```
 
 ### --include-resources 
@@ -38,7 +38,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 * Restore all deployments and configmaps in the cluster.
 
   ```bash
-  velero restore create <backup-name> --include-resources deployments,configmaps
+  velero restore create <restore-name> --include-resources deployments,configmaps --from-backup <backup-name>
   ```
 
 * Backup the deployments in a namespace.
@@ -72,7 +72,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
 * Restore only namespaced resources in the cluster.
 
   ```bash
-  velero restore create <backup-name> --include-cluster-resources=false
+  velero restore create <restore-name> --include-cluster-resources=false --from-backup <backup-name>
   ```
 
 * Backup a namespace and include cluster-scoped resources.
@@ -113,7 +113,7 @@ Wildcard excludes are ignored.
 * Exclude two namespaces during a restore.
 
   ```bash
-  velero restore create <backup-name> --exclude-namespaces <namespace1>,<namespace2>
+  velero restore create <restore-name> --exclude-namespaces <namespace1>,<namespace2> --from-backup <backup-name>
   ```
 
 ### --exclude-resources
