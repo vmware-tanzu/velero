@@ -38,11 +38,11 @@ import (
 // repositoryEnsurer ensures that Velero restic repositories are created and ready.
 type repositoryEnsurer struct {
 	log        logrus.FieldLogger
-	repoLister velerov1listers.ResticRepositoryLister
-	repoClient velerov1client.ResticRepositoriesGetter
+	repoLister velerov1listers.BackupRepositoryLister
+	repoClient velerov1client.BackupRepositoriesGetter
 
 	repoChansLock sync.Mutex
-	repoChans     map[string]chan *velerov1api.ResticRepository
+	repoChans     map[string]chan *velerov1api.BackupRepository
 
 	// repoLocksMu synchronizes reads/writes to the repoLocks map itself
 	// since maps are not threadsafe.
@@ -55,20 +55,20 @@ type repoKey struct {
 	backupLocation  string
 }
 
-func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInformer, repoClient velerov1client.ResticRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
+func newRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInformer, repoClient velerov1client.BackupRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
 	r := &repositoryEnsurer{
 		log:        log,
 		repoLister: repoInformer.Lister(),
 		repoClient: repoClient,
-		repoChans:  make(map[string]chan *velerov1api.ResticRepository),
+		repoChans:  make(map[string]chan *velerov1api.BackupRepository),
 		repoLocks:  make(map[repoKey]*sync.Mutex),
 	}
 
 	repoInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(old, upd interface{}) {
-				oldObj := old.(*velerov1api.ResticRepository)
-				newObj := upd.(*velerov1api.ResticRepository)
+				oldObj := old.(*velerov1api.BackupRepository)
+				newObj := upd.(*velerov1api.BackupRepository)
 
 				// we're only interested in phase-changing updates
 				if oldObj.Status.Phase == newObj.Status.Phase {
@@ -76,7 +76,7 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 				}
 
 				// we're only interested in updates where the updated object is either Ready or NotReady
-				if newObj.Status.Phase != velerov1api.ResticRepositoryPhaseReady && newObj.Status.Phase != velerov1api.ResticRepositoryPhaseNotReady {
+				if newObj.Status.Phase != velerov1api.BackupRepositoryPhaseReady && newObj.Status.Phase != velerov1api.BackupRepositoryPhaseNotReady {
 					return
 				}
 
@@ -105,7 +105,7 @@ func repoLabels(volumeNamespace, backupLocation string) labels.Set {
 	}
 }
 
-func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.ResticRepository, error) {
+func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.BackupRepository, error) {
 	log := r.log.WithField("volumeNamespace", volumeNamespace).WithField("backupLocation", backupLocation)
 
 	// It's only safe to have one instance of this method executing concurrently for a
@@ -132,7 +132,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 
 	selector := labels.SelectorFromSet(repoLabels(volumeNamespace, backupLocation))
 
-	repos, err := r.repoLister.ResticRepositories(namespace).List(selector)
+	repos, err := r.repoLister.BackupRepositories(namespace).List(selector)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -140,7 +140,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q", volumeNamespace, backupLocation)
 	}
 	if len(repos) == 1 {
-		if repos[0].Status.Phase != velerov1api.ResticRepositoryPhaseReady {
+		if repos[0].Status.Phase != velerov1api.BackupRepositoryPhaseReady {
 			return nil, errors.Errorf("restic repository is not ready: %s", repos[0].Status.Message)
 		}
 
@@ -151,13 +151,13 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	log.Debug("No repository found, creating one")
 
 	// no repo found: create one and wait for it to be ready
-	repo := &velerov1api.ResticRepository{
+	repo := &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
 			Labels:       repoLabels(volumeNamespace, backupLocation),
 		},
-		Spec: velerov1api.ResticRepositorySpec{
+		Spec: velerov1api.BackupRepositorySpec{
 			VolumeNamespace:       volumeNamespace,
 			BackupStorageLocation: backupLocation,
 		},
@@ -169,7 +169,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		close(repoChan)
 	}()
 
-	if _, err := r.repoClient.ResticRepositories(namespace).Create(context.TODO(), repo, metav1.CreateOptions{}); err != nil {
+	if _, err := r.repoClient.BackupRepositories(namespace).Create(context.TODO(), repo, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrapf(err, "unable to create restic repository resource")
 	}
 
@@ -181,7 +181,8 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	case <-ctx.Done():
 		return nil, errors.New("timed out waiting for restic repository to become ready")
 	case res := <-repoChan:
-		if res.Status.Phase == velerov1api.ResticRepositoryPhaseNotReady {
+
+		if res.Status.Phase == velerov1api.BackupRepositoryPhaseNotReady {
 			return nil, errors.Errorf("restic repository is not ready: %s", res.Status.Message)
 		}
 
@@ -189,11 +190,11 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 }
 
-func (r *repositoryEnsurer) getRepoChan(name string) chan *velerov1api.ResticRepository {
+func (r *repositoryEnsurer) getRepoChan(name string) chan *velerov1api.BackupRepository {
 	r.repoChansLock.Lock()
 	defer r.repoChansLock.Unlock()
 
-	r.repoChans[name] = make(chan *velerov1api.ResticRepository)
+	r.repoChans[name] = make(chan *velerov1api.BackupRepository)
 	return r.repoChans[name]
 }
 

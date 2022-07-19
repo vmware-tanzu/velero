@@ -297,11 +297,11 @@ Kopia’s debug logs will be written to the same log file as Velero server or Ve
 As mentioned above, There will be two paths. The related controllers need to identify the path during runtime and adjust its working mode.  
 According to the requirements, path changing is fulfilled at the backup/restore level. In order to let the controllers know the path, we need to add some option values. Specifically, there will be option/mode values for path selection in two places:
 - Add the “uploader-type” option as a parameter of the Velero server. The parameters will be set by the installation. Currently the option has two values, either "restic" or "kopia" (in future, we may add other file system uploaders, then we will have more values).
-- Add a "uploader-type" value in the PodVolume Backup/Restore CR and a "repository-type" value in the BackupRepository CR. "uploader-type" currently has two values , either "restic" or "kopia";  "repository-type" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repository-type is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the values are missing in the CRs, it by default means "uploader-type=restic" and "repository-type=restic", so the legacy CRs are handled correctly by Restic.  
+- Add a "uploaderType" value in the PodVolume Backup/Restore CR and a "repositoryType" value in the BackupRepository CR. "uploaderType" currently has two values , either "restic" or "kopia";  "repositoryType" currently has two values, either "restic" or "kopia" (in future, the Unified Repository could opt among multiple backup repository/backup storage, so there may be more values. This is a good reason that repositoryType is a multivariate flag, however, in which way to opt among the backup repository/backup storage is not covered in this PR). If the values are missing in the CRs, it by default means "uploaderType=restic" and "repositoryType=restic", so the legacy CRs are handled correctly by Restic.  
 
 The corresponding controllers handle the CRs by checking the CRs' path value. Some examples are as below:
-- The PodVolume BR controller checks the "uploader-type" value from PodVolume CRs and decide its working path
-- The BackupRepository controller checks the "repository-type" value from BackupRepository CRs and decide its working path
+- The PodVolume BR controller checks the "uploaderType" value from PodVolume CRs and decide its working path
+- The BackupRepository controller checks the "repositoryType" value from BackupRepository CRs and decide its working path
 - The Backup controller that runs in Velero server checks its “uploader-type” parameter to decide the path for the Backup it is going to create and then create the PodVolume Backup CR and BackupRepository CR
 - The Restore controller checks the Backup, from which it is going to restore, for the path and then create the PodVolume Restore CR and BackupRepository CR
 
@@ -345,7 +345,7 @@ The BackupRepository CRs and PodVolume Backup/Restore CRs created in this case a
 spec:
   backupStorageLocation: default
   maintenanceFrequency: 168h0m0s
-  repository-type: restic
+  repositoryType: restic
   volumeNamespace: nginx-example
 ```
 ```
@@ -359,7 +359,7 @@ spec:
     uid: 86aaec56-2b21-4736-9964-621047717133   
   tags:
     ...
-  uploader-type: restic
+  uploaderType: restic
   volume: nginx-log
 ```
 ```
@@ -371,7 +371,7 @@ spec:
     namespace: nginx-example
     uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
   snapshotID: 1741e5f1
-  uploader-type: restic
+  uploaderType: restic
   volume: nginx-log
 ```
  **"Kopia"**: it means Velero will use Kopia uploader to do the pod volume backup (so it will use Unified Repository as the backup target). Therefore, the Velero server deployment will be created as below:
@@ -390,7 +390,7 @@ The BackupRepository CRs created in this case are hard set with "kopia" at prese
 spec:
   backupStorageLocation: default
   maintenanceFrequency: 168h0m0s
-  repository-type: kopia
+  repositoryType: kopia
   volumeNamespace: nginx-example
 ```
 ```
@@ -404,7 +404,7 @@ spec:
     uid: 86aaec56-2b21-4736-9964-621047717133   
   tags:
     ...
-  uploader-type: kopia
+  uploaderType: kopia
   volume: nginx-log
 ```
 ```
@@ -416,7 +416,7 @@ spec:
     namespace: nginx-example
     uid: e56d5872-3d94-4125-bfe8-8a222bf0fcf1
   snapshotID: 1741e5f1
-  uploader-type: kopia
+  uploaderType: kopia
   volume: nginx-log
 ```
 We will add the flag for both CLI installation and Helm Chart Installation. Specifically:

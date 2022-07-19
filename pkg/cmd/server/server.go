@@ -527,7 +527,7 @@ func (s *server) initRestic() error {
 		s.ctx,
 		s.namespace,
 		s.veleroClient,
-		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
+		s.sharedInformerFactory.Velero().V1().BackupRepositories(),
 		s.veleroClient.VeleroV1(),
 		s.mgr.GetClient(),
 		s.kubeClient.CoreV1(),
