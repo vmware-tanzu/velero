@@ -32,59 +32,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ResticRepositoryInformer provides access to a shared informer and lister for
-// ResticRepositories.
-type ResticRepositoryInformer interface {
+// BackupRepositoryInformer provides access to a shared informer and lister for
+// BackupRepositories.
+type BackupRepositoryInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ResticRepositoryLister
+	Lister() v1.BackupRepositoryLister
 }
 
-type resticRepositoryInformer struct {
+type backupRepositoryInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewResticRepositoryInformer constructs a new informer for ResticRepository type.
+// NewBackupRepositoryInformer constructs a new informer for BackupRepository type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewResticRepositoryInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredResticRepositoryInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewBackupRepositoryInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredBackupRepositoryInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredResticRepositoryInformer constructs a new informer for ResticRepository type.
+// NewFilteredBackupRepositoryInformer constructs a new informer for BackupRepository type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredResticRepositoryInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredBackupRepositoryInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.VeleroV1().ResticRepositories(namespace).List(context.TODO(), options)
+				return client.VeleroV1().BackupRepositories(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.VeleroV1().ResticRepositories(namespace).Watch(context.TODO(), options)
+				return client.VeleroV1().BackupRepositories(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&velerov1.ResticRepository{},
+		&velerov1.BackupRepository{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *resticRepositoryInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredResticRepositoryInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *backupRepositoryInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredBackupRepositoryInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *resticRepositoryInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&velerov1.ResticRepository{}, f.defaultInformer)
+func (f *backupRepositoryInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&velerov1.BackupRepository{}, f.defaultInformer)
 }
 
-func (f *resticRepositoryInformer) Lister() v1.ResticRepositoryLister {
-	return v1.NewResticRepositoryLister(f.Informer().GetIndexer())
+func (f *backupRepositoryInformer) Lister() v1.BackupRepositoryLister {
+	return v1.NewBackupRepositoryLister(f.Informer().GetIndexer())
 }

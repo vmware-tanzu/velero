@@ -151,8 +151,8 @@ func findAssociatedBackups(client kbclient.Client, bslName, ns string) (velerov1
 	return backups, err
 }
 
-func findAssociatedResticRepos(client kbclient.Client, bslName, ns string) (velerov1api.ResticRepositoryList, error) {
-	var repos velerov1api.ResticRepositoryList
+func findAssociatedResticRepos(client kbclient.Client, bslName, ns string) (velerov1api.BackupRepositoryList, error) {
+	var repos velerov1api.BackupRepositoryList
 	err := client.List(context.Background(), &repos, &kbclient.ListOptions{
 		Namespace: ns,
 		Raw:       &metav1.ListOptions{LabelSelector: bslLabelKey + "=" + bslName},
@@ -172,7 +172,7 @@ func deleteBackups(client kbclient.Client, backups velerov1api.BackupList) []err
 	return errs
 }
 
-func deleteResticRepos(client kbclient.Client, repos velerov1api.ResticRepositoryList) []error {
+func deleteResticRepos(client kbclient.Client, repos velerov1api.BackupRepositoryList) []error {
 	var errs []error
 	for _, repo := range repos.Items {
 		if err := client.Delete(context.Background(), &repo, &kbclient.DeleteOptions{}); err != nil {

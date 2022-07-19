@@ -6,20 +6,23 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
-  name: resticrepositories.velero.io
+  name: backuprepositories.velero.io
 spec:
   group: velero.io
   names:
-    kind: ResticRepository
-    listKind: ResticRepositoryList
-    plural: resticrepositories
-    singular: resticrepository
+    kind: BackupRepository
+    listKind: BackupRepositoryList
+    plural: backuprepositories
+    singular: backuprepository
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - jsonPath: .spec.repositoryType
+      name: Repository Type
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -37,7 +40,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ResticRepositorySpec is the specification for a ResticRepository.
+            description: BackupRepositorySpec is the specification for a BackupRepository.
             properties:
               backupStorageLocation:
                 description: BackupStorageLocation is the name of the BackupStorageLocation
@@ -47,12 +50,19 @@ spec:
                 description: MaintenanceFrequency is how often maintenance should
                   be run.
                 type: string
+              repositoryType:
+                description: RepositoryType indicates the type of the backend repository
+                enum:
+                - kopia
+                - restic
+                - ""
+                type: string
               resticIdentifier:
                 description: ResticIdentifier is the full restic-compatible string
                   for identifying this repository.
                 type: string
               volumeNamespace:
-                description: VolumeNamespace is the namespace this restic repository
+                description: VolumeNamespace is the namespace this backup repository
                   contains pod volume backups for.
                 type: string
             required:
@@ -62,7 +72,7 @@ spec:
             - volumeNamespace
             type: object
           status:
-            description: ResticRepositoryStatus is the current status of a ResticRepository.
+            description: BackupRepositoryStatus is the current status of a BackupRepository.
             properties:
               lastMaintenanceTime:
                 description: LastMaintenanceTime is the last time maintenance was
@@ -72,10 +82,10 @@ spec:
                 type: string
               message:
                 description: Message is a message about the current status of the
-                  ResticRepository.
+                  BackupRepository.
                 type: string
               phase:
-                description: Phase is the current state of the ResticRepository.
+                description: Phase is the current state of the BackupRepository.
                 enum:
                 - New
                 - Ready

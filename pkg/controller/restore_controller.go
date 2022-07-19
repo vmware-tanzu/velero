@@ -71,10 +71,14 @@ var nonRestorableResources = []string{
 	// https://github.com/vmware-tanzu/velero/issues/622
 	"restores.velero.io",
 
+	// TODO: Remove this in v1.11 or v1.12
 	// Restic repositories are automatically managed by Velero and will be automatically
 	// created as needed if they don't exist.
 	// https://github.com/vmware-tanzu/velero/issues/1113
 	"resticrepositories.velero.io",
+
+	// Backup repositories were renamed from Restic repositories
+	"backuprepositories.velero.io",
 }
 
 type restoreController struct {
