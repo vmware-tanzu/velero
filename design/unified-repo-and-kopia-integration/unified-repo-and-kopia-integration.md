@@ -99,15 +99,15 @@ type BackupRepoService interface {
     ///repoOption: option to the backup repository and the underlying backup storage
     ///createNew: indicates whether to create a new or connect to an existing backup repository
     ///result: the backup repository specific output that could be used to open the backup repository later
-    Init(ctx context.Context, repoOption RepoOptions, createNew bool) (result map[string]string, err error)
+    Init(ctx context.Context, repoOption RepoOptions, createNew bool) error
  
     ///Open an backup repository that has been created/connected
-    ///config: options to open the backup repository and the underlying storage
-    Open(ctx context.Context, config map[string]string) (BackupRepo, error)
+	  ///repoOption: options to open the backup repository and the underlying storage
+	  Open(ctx context.Context, repoOption RepoOptions) (BackupRepo, error)
  
     ///Periodically called to maintain the backup repository to eliminate redundant data and improve performance
-    ///config: options to open the backup repository and the underlying storage
-    Maintain(ctx context.Context, config map[string]string) error
+	  ///repoOption: options to maintain the backup repository
+	  Maintain(ctx context.Context, repoOption RepoOptions) error
 }
 
 ///BackupRepo provides the access to the backup repository
@@ -156,7 +156,11 @@ type ObjectWriter interface {
     ///For some cases, i.e. block incremental, the object is not written sequentially
     io.Seeker
  
- 
+ 	  // Periodically called to preserve the state of data written to the repo so far
+	  // Return a unified identifier that represent the current state
+	  // An empty ID could be returned on success if the backup repository doesn't support this
+	  Checkpoint() (ID, error)
+
     ///Wait for the completion of the object write
     ///Result returns the object's unified identifier after the write completes
     Result() (ID, error)
@@ -314,21 +318,9 @@ When restoring from an old backup, Velero always creates BackupRepository CRs in
 When there are already backups or restores running during the upgrade, since after upgrade, the Velero server pods and VeleroNodeAgent daemonset pods are restarted, the existing backups/restores will fail immediately. 
 
 ## Storage Configuration
-The backup repository needs some parameters to connect to various backup storage. For example, for a S3 compatible storage, the parameters may include bucket name, region, endpoint, etc. Different backup storage have totally different parameters. BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs save these parameters in their spec, as a string called repoIdentififer. The format of the string is for S3 storage only, it meets Restic CLI's requirements but is not enough for other backup repository. Therefore, we will add a structured storage configuration and preserved the existing repoIdentififer string for Restic, considering backward compatibility. 
-Moreover, the storage configuration structure is added into the BackupRepository CRs only. When a PodVolume controller processes a PodVolume CR, it could get the corresponding BackupRepository CR first and then get the storage configuration from the CR. By this there will not be redundant information.  
-The configuration in BackupRepository CRs are as below:  
-```
-spec:
-  backupStorageLocation: default
-  maintenanceFrequency: 168h0m0s
-  resticIdentifier: azure:container01:/restic/nginx-example
-  storageConfig:
-    provider: azure
-    param:
-      container: container01
-      prefix: /restic/nginx-example
-  volumeNamespace: nginx-example
-```
+The backup repository needs some parameters to connect to various backup storage. For example, for a S3 compatible storage, the parameters may include bucket name, region, endpoint, etc. Different backup storage have totally different parameters. BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs save these parameters in their spec, as a string called repoIdentififer. The format of the string is for S3 storage only, it meets Restic CLI's requirements but is not enough for other backup repository. On the other hand, the parameters that are used to generate the repoIdentififer all come from the BackupStorageLocation. The latter has a map structure that could take parameters from any storage kind.  
+Therefore, for the new path, Velero uses the information in the BackupStorageLocation directly. That is, whenever Velero needs to initialize/connect to the Unified Repository, it accquires the storage configuration from the corresponding BackupStorageLocation. Then no more elements will be added in BackupRepository CRs, PodVolume Backup CRs or PodVolume Restore CRs.  
+The legacy path will be kept as is. That is, Velero still sets/gets the repoIdentififer in BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs and then passes to Restic CLI.  
 
 ## Installation
  We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has 3 meanings:
