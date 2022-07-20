@@ -102,12 +102,12 @@ type BackupRepoService interface {
     Init(ctx context.Context, repoOption RepoOptions, createNew bool) error
  
     ///Open an backup repository that has been created/connected
-	  ///repoOption: options to open the backup repository and the underlying storage
-	  Open(ctx context.Context, repoOption RepoOptions) (BackupRepo, error)
+    ///repoOption: options to open the backup repository and the underlying storage
+    Open(ctx context.Context, repoOption RepoOptions) (BackupRepo, error)
  
     ///Periodically called to maintain the backup repository to eliminate redundant data and improve performance
-	  ///repoOption: options to maintain the backup repository
-	  Maintain(ctx context.Context, repoOption RepoOptions) error
+    ///repoOption: options to maintain the backup repository
+    Maintain(ctx context.Context, repoOption RepoOptions) error
 }
 
 ///BackupRepo provides the access to the backup repository
@@ -155,11 +155,11 @@ type ObjectWriter interface {
  
     ///For some cases, i.e. block incremental, the object is not written sequentially
     io.Seeker
- 
- 	  // Periodically called to preserve the state of data written to the repo so far
-	  // Return a unified identifier that represent the current state
-	  // An empty ID could be returned on success if the backup repository doesn't support this
-	  Checkpoint() (ID, error)
+    
+    // Periodically called to preserve the state of data written to the repo so far
+    // Return a unified identifier that represent the current state
+    // An empty ID could be returned on success if the backup repository doesn't support this
+    Checkpoint() (ID, error)
 
     ///Wait for the completion of the object write
     ///Result returns the object's unified identifier after the write completes
