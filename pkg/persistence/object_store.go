@@ -131,19 +131,25 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 		return nil, errors.Errorf("backup storage location's bucket name %q must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)", location.Spec.ObjectStorage.Bucket)
 	}
 
+	// Pass a new map into the object store rather than modifying the passed-in
+	// location. This prevents Velero controllers from accidentally modifying
+	// the in-cluster BSL with data which doesn't belong in Spec.Config
+	objectStoreConfig := make(map[string]string)
+	if location.Spec.Config != nil {
+		for key, val := range location.Spec.Config {
+			objectStoreConfig[key] = val
+		}
+	}
+
 	// add the bucket name and prefix to the config map so that object stores
 	// can use them when initializing. The AWS object store uses the bucket
 	// name to determine the bucket's region when setting up its client.
-	if location.Spec.Config == nil {
-		location.Spec.Config = make(map[string]string)
-	}
-
-	location.Spec.Config["bucket"] = bucket
-	location.Spec.Config["prefix"] = prefix
+	objectStoreConfig["bucket"] = bucket
+	objectStoreConfig["prefix"] = prefix
 
 	// Only include a CACert if it's specified in order to maintain compatibility with plugins that don't expect it.
 	if location.Spec.ObjectStorage.CACert != nil {
-		location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
+		objectStoreConfig["caCert"] = string(location.Spec.ObjectStorage.CACert)
 	}
 
 	// If the BSL specifies a credential, fetch its path on disk and pass to
@@ -154,7 +160,7 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 			return nil, errors.Wrap(err, "unable to get credentials")
 		}
 
-		location.Spec.Config["credentialsFile"] = credsFile
+		objectStoreConfig["credentialsFile"] = credsFile
 	}
 
 	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)
@@ -162,7 +168,7 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 		return nil, err
 	}
 
-	if err := objectStore.Init(location.Spec.Config); err != nil {
+	if err := objectStore.Init(objectStoreConfig); err != nil {
 		return nil, err
 	}
 

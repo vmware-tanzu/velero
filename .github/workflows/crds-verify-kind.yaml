@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.17
         id: go
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
@@ -64,6 +64,8 @@ jobs:
           - 1.20.2
           - 1.21.1
           - 1.22.0
+          - 1.23.6
+          - 1.24.2
     # All steps run in parallel unless otherwise specified.
     # See https://docs.github.com/en/actions/learn-github-actions/managing-complex-workflows#creating-dependent-jobs
     steps:
@@ -81,7 +83,7 @@ jobs:
             velero-${{ github.event.pull_request.number }}-
       - uses: engineerd/setup-kind@v0.5.0
         with:
-          version: "v0.11.1"
+          version: "v0.14.0"
           image: "kindest/node:v${{ matrix.k8s }}"
       - name: Install CRDs
         run: |
