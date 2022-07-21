@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package repoconfig
+package config
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -78,7 +74,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 			var err error
 			region := location.Spec.Config["region"]
 			if region == "" {
-				region, err = GetAWSBucketRegion(bucket)
+				region, err = getAWSBucketRegion(bucket)
 			}
 			if err != nil {
 				return "", errors.Wrapf(err, "failed to detect the region via bucket: %s", bucket)
@@ -104,6 +100,10 @@ func GetBackendType(provider string) BackendType {
 	return BackendType(provider)
 }
 
+func IsBackendTypeValid(backendType BackendType) bool {
+	return (backendType == AWSBackend || backendType == AzureBackend || backendType == GCPBackend || backendType == FSBackend)
+}
+
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
 // restic commands for the given repository.
 func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string) (string, error) {
@@ -113,30 +113,4 @@ func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string)
 	}
 
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(prefix, "/"), name), nil
-}
-
-// GetBucketRegion returns the AWS region that a bucket is in, or an error
-// if the region cannot be determined.
-func GetAWSBucketRegion(bucket string) (string, error) {
-	var region string
-
-	sess, err := session.NewSession()
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	for _, partition := range endpoints.DefaultPartitions() {
-		for regionHint := range partition.Regions() {
-			region, _ = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
-
-			// we only need to try a single region hint per partition, so break after the first
-			break
-		}
-
-		if region != "" {
-			return region, nil
-		}
-	}
-
-	return "", errors.New("unable to determine bucket's region")
 }

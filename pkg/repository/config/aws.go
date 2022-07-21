@@ -14,13 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package repoconfig
+package config
 
 import (
-	"errors"
+	"context"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -66,4 +70,30 @@ func GetS3Credentials(config map[string]string) (credentials.Value, error) {
 	}
 
 	return credValue, nil
+}
+
+// GetAWSBucketRegion returns the AWS region that a bucket is in, or an error
+// if the region cannot be determined.
+func GetAWSBucketRegion(bucket string) (string, error) {
+	var region string
+
+	sess, err := session.NewSession()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	for _, partition := range endpoints.DefaultPartitions() {
+		for regionHint := range partition.Regions() {
+			region, _ = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
+
+			// we only need to try a single region hint per partition, so break after the first
+			break
+		}
+
+		if region != "" {
+			return region, nil
+		}
+	}
+
+	return "", errors.New("unable to determine bucket's region")
 }

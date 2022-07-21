@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package repoconfig
+package config
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetGCPResticEnvVars(t *testing.T) {
+func TestGetS3ResticEnvVars(t *testing.T) {
 	testCases := []struct {
 		name     string
 		config   map[string]string
@@ -34,19 +34,28 @@ func TestGetGCPResticEnvVars(t *testing.T) {
 			expected: map[string]string{},
 		},
 		{
+			name: "when config contains profile key, profile env var is set with profile value",
+			config: map[string]string{
+				"profile": "profile-value",
+			},
+			expected: map[string]string{
+				"AWS_PROFILE": "profile-value",
+			},
+		},
+		{
 			name: "when config contains credentials file key, credentials file env var is set with credentials file value",
 			config: map[string]string{
 				"credentialsFile": "/tmp/credentials/path/to/secret",
 			},
 			expected: map[string]string{
-				"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/credentials/path/to/secret",
+				"AWS_SHARED_CREDENTIALS_FILE": "/tmp/credentials/path/to/secret",
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := GetGCPResticEnvVars(tc.config)
+			actual, err := GetS3ResticEnvVars(tc.config)
 
 			require.NoError(t, err)
 
