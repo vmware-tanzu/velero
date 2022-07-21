@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repoconfig
 
 import (
 	"testing"
@@ -55,7 +55,7 @@ func TestGetS3ResticEnvVars(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := getS3ResticEnvVars(tc.config)
+			actual, err := GetS3ResticEnvVars(tc.config)
 
 			require.NoError(t, err)
 

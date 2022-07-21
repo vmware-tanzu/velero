@@ -14,7 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repoconfig
+
+import (
+	"errors"
+	"os"
+
+	"github.com/aws/aws-sdk-go/aws/credentials"
+)
 
 const (
 	// AWS specific environment variable
@@ -23,13 +30,13 @@ const (
 	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE"
 )
 
-// getS3ResticEnvVars gets the environment variables that restic
+// GetS3ResticEnvVars gets the environment variables that restic
 // relies on (AWS_PROFILE) based on info in the provided object
 // storage location config map.
-func getS3ResticEnvVars(config map[string]string) (map[string]string, error) {
+func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
 
-	if credentialsFile, ok := config[credentialsFileKey]; ok {
+	if credentialsFile, ok := config[CredentialsFileKey]; ok {
 		result[awsCredentialsFileEnvVar] = credentialsFile
 	}
 
@@ -38,4 +45,25 @@ func getS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 	}
 
 	return result, nil
+}
+
+// GetS3Credentials gets the S3 credential values according to the information
+// of the provided config or the system's environment variables
+func GetS3Credentials(config map[string]string) (credentials.Value, error) {
+	credentialsFile := config[CredentialsFileKey]
+	if credentialsFile == "" {
+		credentialsFile = os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
+	}
+
+	if credentialsFile == "" {
+		return credentials.Value{}, errors.New("missing credential file")
+	}
+
+	creds := credentials.NewSharedCredentials(credentialsFile, "")
+	credValue, err := creds.Get()
+	if err != nil {
+		return credValue, err
+	}
+
+	return credValue, nil
 }

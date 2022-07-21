@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repoconfig
 
 import (
 	"testing"
@@ -46,7 +46,7 @@ func TestGetGCPResticEnvVars(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := getGCPResticEnvVars(tc.config)
+			actual, err := GetGCPResticEnvVars(tc.config)
 
 			require.NoError(t, err)
 

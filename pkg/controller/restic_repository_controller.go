@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository/repoconfig"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -127,7 +128,7 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 		return r.patchResticRepository(ctx, req, repoNotReady(err.Error()))
 	}
 
-	repoIdentifier, err := restic.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
 	if err != nil {
 		return r.patchResticRepository(ctx, req, func(rr *velerov1api.ResticRepository) {
 			rr.Status.Message = err.Error()
