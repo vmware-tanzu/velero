@@ -34,9 +34,7 @@ const (
 	AzureBackend BackendType = "velero.io/azure"
 	GCPBackend   BackendType = "velero.io/gcp"
 	FSBackend    BackendType = "velero.io/fs"
-)
 
-const (
 	// CredentialsFileKey is the key within a BSL config that is checked to see if
 	// the BSL is using its own credentials, rather than those in the environment
 	CredentialsFileKey = "credentialsFile"

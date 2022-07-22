@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package podvolume
 
 import (
 	"context"
@@ -28,7 +28,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
@@ -46,10 +48,11 @@ type Restorer interface {
 }
 
 type restorer struct {
-	ctx         context.Context
-	repoManager *repositoryManager
-	repoEnsurer *repositoryEnsurer
-	pvcClient   corev1client.PersistentVolumeClaimsGetter
+	ctx          context.Context
+	repoLocker   *repository.RepoLocker
+	repoEnsurer  *repository.RepositoryEnsurer
+	veleroClient clientset.Interface
+	pvcClient    corev1client.PersistentVolumeClaimsGetter
 
 	resultsLock sync.Mutex
 	results     map[string]chan *velerov1api.PodVolumeRestore
@@ -57,17 +60,19 @@ type restorer struct {
 
 func newRestorer(
 	ctx context.Context,
-	rm *repositoryManager,
-	repoEnsurer *repositoryEnsurer,
+	repoLocker *repository.RepoLocker,
+	repoEnsurer *repository.RepositoryEnsurer,
 	podVolumeRestoreInformer cache.SharedIndexInformer,
+	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	log logrus.FieldLogger,
 ) *restorer {
 	r := &restorer{
-		ctx:         ctx,
-		repoManager: rm,
-		repoEnsurer: repoEnsurer,
-		pvcClient:   pvcClient,
+		ctx:          ctx,
+		repoLocker:   repoLocker,
+		repoEnsurer:  repoEnsurer,
+		veleroClient: veleroClient,
+		pvcClient:    pvcClient,
 
 		results: make(map[string]chan *velerov1api.PodVolumeRestore),
 	}
@@ -108,8 +113,8 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 
 	// get a single non-exclusive lock since we'll wait for all individual
 	// restores to be complete before releasing it.
-	r.repoManager.repoLocker.Lock(repo.Name)
-	defer r.repoManager.repoLocker.Unlock(repo.Name)
+	r.repoLocker.Lock(repo.Name)
+	defer r.repoLocker.Unlock(repo.Name)
 
 	resultsChan := make(chan *velerov1api.PodVolumeRestore)
 
@@ -142,7 +147,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 		// TODO: Remove the hard-coded uploader type before v1.10 FC
 		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, snapshot, repo.Spec.ResticIdentifier, "restic", pvc)
 
-		if err := errorOnly(r.repoManager.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
+		if err := errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}

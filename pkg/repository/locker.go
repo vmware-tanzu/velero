@@ -13,23 +13,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package restic
+
+package repository
 
 import "sync"
 
-// repoLocker manages exclusive/non-exclusive locks for
+// RepoLocker manages exclusive/non-exclusive locks for
 // operations against restic repositories. The semantics
 // of exclusive/non-exclusive locks are the same as for
 // a sync.RWMutex, where a non-exclusive lock is equivalent
 // to a read lock, and an exclusive lock is equivalent to
 // a write lock.
-type repoLocker struct {
+type RepoLocker struct {
 	mu    sync.Mutex
 	locks map[string]*sync.RWMutex
 }
 
-func newRepoLocker() *repoLocker {
-	return &repoLocker{
+func NewRepoLocker() *RepoLocker {
+	return &RepoLocker{
 		locks: make(map[string]*sync.RWMutex),
 	}
 }
@@ -37,28 +38,28 @@ func newRepoLocker() *repoLocker {
 // LockExclusive acquires an exclusive lock for the specified
 // repository. This function blocks until no other locks exist
 // for the repo.
-func (rl *repoLocker) LockExclusive(name string) {
+func (rl *RepoLocker) LockExclusive(name string) {
 	rl.ensureLock(name).Lock()
 }
 
 // Lock acquires a non-exclusive lock for the specified
 // repository. This function blocks until no exclusive
 // locks exist for the repo.
-func (rl *repoLocker) Lock(name string) {
+func (rl *RepoLocker) Lock(name string) {
 	rl.ensureLock(name).RLock()
 }
 
 // UnlockExclusive releases an exclusive lock for the repo.
-func (rl *repoLocker) UnlockExclusive(name string) {
+func (rl *RepoLocker) UnlockExclusive(name string) {
 	rl.ensureLock(name).Unlock()
 }
 
 // Unlock releases a non-exclusive lock for the repo.
-func (rl *repoLocker) Unlock(name string) {
+func (rl *RepoLocker) Unlock(name string) {
 	rl.ensureLock(name).RUnlock()
 }
 
-func (rl *repoLocker) ensureLock(name string) *sync.RWMutex {
+func (rl *RepoLocker) ensureLock(name string) *sync.RWMutex {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
