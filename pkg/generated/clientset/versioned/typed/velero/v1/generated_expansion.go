@@ -20,6 +20,8 @@ package v1
 
 type BackupExpansion interface{}
 
+type BackupRepositoryExpansion interface{}
+
 type BackupStorageLocationExpansion interface{}
 
 type DeleteBackupRequestExpansion interface{}
@@ -29,8 +31,6 @@ type DownloadRequestExpansion interface{}
 type PodVolumeBackupExpansion interface{}
 
 type PodVolumeRestoreExpansion interface{}
-
-type ResticRepositoryExpansion interface{}
 
 type RestoreExpansion interface{}
 

@@ -26,6 +26,14 @@ type BackupListerExpansion interface{}
 // BackupNamespaceLister.
 type BackupNamespaceListerExpansion interface{}
 
+// BackupRepositoryListerExpansion allows custom methods to be added to
+// BackupRepositoryLister.
+type BackupRepositoryListerExpansion interface{}
+
+// BackupRepositoryNamespaceListerExpansion allows custom methods to be added to
+// BackupRepositoryNamespaceLister.
+type BackupRepositoryNamespaceListerExpansion interface{}
+
 // BackupStorageLocationListerExpansion allows custom methods to be added to
 // BackupStorageLocationLister.
 type BackupStorageLocationListerExpansion interface{}
@@ -65,14 +73,6 @@ type PodVolumeRestoreListerExpansion interface{}
 // PodVolumeRestoreNamespaceListerExpansion allows custom methods to be added to
 // PodVolumeRestoreNamespaceLister.
 type PodVolumeRestoreNamespaceListerExpansion interface{}
-
-// ResticRepositoryListerExpansion allows custom methods to be added to
-// ResticRepositoryLister.
-type ResticRepositoryListerExpansion interface{}
-
-// ResticRepositoryNamespaceListerExpansion allows custom methods to be added to
-// ResticRepositoryNamespaceLister.
-type ResticRepositoryNamespaceListerExpansion interface{}
 
 // RestoreListerExpansion allows custom methods to be added to
 // RestoreLister.
