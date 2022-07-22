@@ -191,3 +191,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - velero.io
+  resources:
+  - volumesnapshotlocations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
