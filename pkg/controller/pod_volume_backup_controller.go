@@ -124,7 +124,11 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		return r.updateStatusToFailed(ctx, &pvb, err, "building Restic command", log)
 	}
-	defer os.Remove(resticDetails.credsFile)
+
+	defer func() {
+		os.Remove(resticDetails.credsFile)
+		os.Remove(resticDetails.caCertFile)
+	}()
 
 	backupLocation := &velerov1api.BackupStorageLocation{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{
@@ -344,8 +348,6 @@ func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log 
 		if err != nil {
 			log.WithError(err).Error("creating temporary caCert file")
 		}
-		defer os.Remove(details.caCertFile)
-
 	}
 	cmd.CACertFile = details.caCertFile
 
