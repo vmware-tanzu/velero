@@ -63,6 +63,7 @@ type CreateOptions struct {
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Config: flag.NewMap(),
+		Labels: flag.NewMap(),
 	}
 }
 
