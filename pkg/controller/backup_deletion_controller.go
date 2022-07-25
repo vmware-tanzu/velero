@@ -198,7 +198,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// if the request object has no labels defined, initialise an empty map since
+	// if the request object has no labels defined, initialize an empty map since
 	// we will be updating labels
 	if dbr.Labels == nil {
 		dbr.Labels = map[string]string{}
