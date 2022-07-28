@@ -1,5 +1,9 @@
 name: Pull Request Changelog Check
-on: [pull_request]
+# by setting `on: [pull_request]`, that means action will be trigger when PR is opened, synchronize, reopened.
+# Add labeled and unlabeled events too.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
 
   build:
