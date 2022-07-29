@@ -31,11 +31,11 @@ type RepositoryManager struct {
 }
 
 // ConnectToRepo provides a mock function with given fields: repo
-func (_m *RepositoryManager) ConnectToRepo(repo *v1.ResticRepository) error {
+func (_m *RepositoryManager) ConnectToRepo(repo *v1.BackupRepository) error {
 	ret := _m.Called(repo)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*v1.ResticRepository) error); ok {
+	if rf, ok := ret.Get(0).(func(*v1.BackupRepository) error); ok {
 		r0 = rf(repo)
 	} else {
 		r0 = ret.Error(0)
@@ -59,11 +59,11 @@ func (_m *RepositoryManager) Forget(_a0 context.Context, _a1 restic.SnapshotIden
 }
 
 // InitRepo provides a mock function with given fields: repo
-func (_m *RepositoryManager) InitRepo(repo *v1.ResticRepository) error {
+func (_m *RepositoryManager) InitRepo(repo *v1.BackupRepository) error {
 	ret := _m.Called(repo)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*v1.ResticRepository) error); ok {
+	if rf, ok := ret.Get(0).(func(repository *v1.BackupRepository) error); ok {
 		r0 = rf(repo)
 	} else {
 		r0 = ret.Error(0)
@@ -119,11 +119,11 @@ func (_m *RepositoryManager) NewRestorer(_a0 context.Context, _a1 *v1.Restore) (
 }
 
 // PruneRepo provides a mock function with given fields: repo
-func (_m *RepositoryManager) PruneRepo(repo *v1.ResticRepository) error {
+func (_m *RepositoryManager) PruneRepo(repo *v1.BackupRepository) error {
 	ret := _m.Called(repo)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*v1.ResticRepository) error); ok {
+	if rf, ok := ret.Get(0).(func(repository *v1.BackupRepository) error); ok {
 		r0 = rf(repo)
 	} else {
 		r0 = ret.Error(0)
@@ -133,11 +133,11 @@ func (_m *RepositoryManager) PruneRepo(repo *v1.ResticRepository) error {
 }
 
 // UnlockRepo provides a mock function with given fields: repo
-func (_m *RepositoryManager) UnlockRepo(repo *v1.ResticRepository) error {
+func (_m *RepositoryManager) UnlockRepo(repo *v1.BackupRepository) error {
 	ret := _m.Called(repo)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*v1.ResticRepository) error); ok {
+	if rf, ok := ret.Get(0).(func(repository *v1.BackupRepository) error); ok {
 		r0 = rf(repo)
 	} else {
 		r0 = ret.Error(0)

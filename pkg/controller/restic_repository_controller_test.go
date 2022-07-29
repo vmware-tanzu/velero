@@ -30,7 +30,7 @@ import (
 
 const defaultMaintenanceFrequency = 10 * time.Minute
 
-func mockResticRepoReconciler(t *testing.T, rr *velerov1api.ResticRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
+func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
 	mgr := &resticmokes.RepositoryManager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
@@ -44,13 +44,13 @@ func mockResticRepoReconciler(t *testing.T, rr *velerov1api.ResticRepository, mo
 	)
 }
 
-func mockResticRepositoryCR() *velerov1api.ResticRepository {
-	return &velerov1api.ResticRepository{
+func mockResticRepositoryCR() *velerov1api.BackupRepository {
+	return &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "repo",
 		},
-		Spec: velerov1api.ResticRepositorySpec{
+		Spec: velerov1api.BackupRepositorySpec{
 			MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
 		},
 	}
@@ -64,10 +64,10 @@ func TestPatchResticRepository(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.patchResticRepository(context.Background(), rr, repoReady())
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 	err = reconciler.patchResticRepository(context.Background(), rr, repoNotReady("not ready"))
 	assert.NoError(t, err)
-	assert.NotEqual(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.NotEqual(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
@@ -77,11 +77,11 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhase(""))
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhase(""))
 	rr.Spec.ResticIdentifier = "s3:test.amazonaws.com/bucket/restic"
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestRunMaintenanceIfDue(t *testing.T) {
@@ -121,23 +121,23 @@ func TestInitializeRepo(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestResticRepoReconcile(t *testing.T) {
 	tests := []struct {
 		name      string
-		repo      *velerov1api.ResticRepository
+		repo      *velerov1api.BackupRepository
 		expectNil bool
 	}{
 		{
 			name: "test on api server not found",
-			repo: &velerov1api.ResticRepository{
+			repo: &velerov1api.BackupRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "unknown",
 				},
-				Spec: velerov1api.ResticRepositorySpec{
+				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
 				},
 			},
@@ -145,12 +145,12 @@ func TestResticRepoReconcile(t *testing.T) {
 		},
 		{
 			name: "test on initialize repo",
-			repo: &velerov1api.ResticRepository{
+			repo: &velerov1api.BackupRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
 				},
-				Spec: velerov1api.ResticRepositorySpec{
+				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
 				},
 			},
@@ -158,16 +158,16 @@ func TestResticRepoReconcile(t *testing.T) {
 		},
 		{
 			name: "test on repo with new phase",
-			repo: &velerov1api.ResticRepository{
+			repo: &velerov1api.BackupRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
 				},
-				Spec: velerov1api.ResticRepositorySpec{
+				Spec: velerov1api.BackupRepositorySpec{
 					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
 				},
-				Status: velerov1api.ResticRepositoryStatus{
-					Phase: velerov1api.ResticRepositoryPhaseNew,
+				Status: velerov1api.BackupRepositoryStatus{
+					Phase: velerov1api.BackupRepositoryPhaseNew,
 				},
 			},
 			expectNil: true,

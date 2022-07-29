@@ -43,19 +43,19 @@ import (
 // RepositoryManager executes commands against restic repositories.
 type RepositoryManager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
-	InitRepo(repo *velerov1api.ResticRepository) error
+	InitRepo(repo *velerov1api.BackupRepository) error
 
 	// ConnectToRepo runs the 'restic snapshots' command against the
 	// specified repo, and returns an error if it fails. This is
 	// intended to be used to ensure that the repo exists/can be
 	// authenticated to.
-	ConnectToRepo(repo *velerov1api.ResticRepository) error
+	ConnectToRepo(repo *velerov1api.BackupRepository) error
 
 	// PruneRepo deletes unused data from a repo.
-	PruneRepo(repo *velerov1api.ResticRepository) error
+	PruneRepo(repo *velerov1api.BackupRepository) error
 
 	// UnlockRepo removes stale locks from a repo.
-	UnlockRepo(repo *velerov1api.ResticRepository) error
+	UnlockRepo(repo *velerov1api.BackupRepository) error
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
@@ -83,7 +83,7 @@ type RestorerFactory interface {
 type repositoryManager struct {
 	namespace            string
 	veleroClient         clientset.Interface
-	repoLister           velerov1listers.ResticRepositoryLister
+	repoLister           velerov1listers.BackupRepositoryLister
 	repoInformerSynced   cache.InformerSynced
 	kbClient             kbclient.Client
 	log                  logrus.FieldLogger
@@ -111,8 +111,8 @@ func NewRepositoryManager(
 	ctx context.Context,
 	namespace string,
 	veleroClient clientset.Interface,
-	repoInformer velerov1informers.ResticRepositoryInformer,
-	repoClient velerov1client.ResticRepositoriesGetter,
+	repoInformer velerov1informers.BackupRepositoryInformer,
+	repoClient velerov1client.BackupRepositoriesGetter,
 	kbClient kbclient.Client,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
@@ -181,7 +181,7 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *velerov1a
 	return r, nil
 }
 
-func (rm *repositoryManager) InitRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) InitRepo(repo *velerov1api.BackupRepository) error {
 	// restic init requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
@@ -189,7 +189,7 @@ func (rm *repositoryManager) InitRepo(repo *velerov1api.ResticRepository) error 
 	return rm.exec(InitCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.BackupRepository) error {
 	// restic snapshots requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
@@ -204,7 +204,7 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) e
 	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) PruneRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	// restic prune requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
@@ -212,7 +212,7 @@ func (rm *repositoryManager) PruneRepo(repo *velerov1api.ResticRepository) error
 	return rm.exec(PruneCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) UnlockRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) UnlockRepo(repo *velerov1api.BackupRepository) error {
 	// restic unlock requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)

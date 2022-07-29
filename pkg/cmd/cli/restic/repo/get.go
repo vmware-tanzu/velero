@@ -41,16 +41,16 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
-			var repos *api.ResticRepositoryList
+			var repos *api.BackupRepositoryList
 			if len(args) > 0 {
-				repos = new(api.ResticRepositoryList)
+				repos = new(api.BackupRepositoryList)
 				for _, name := range args {
-					repo, err := veleroClient.VeleroV1().ResticRepositories(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
+					repo, err := veleroClient.VeleroV1().BackupRepositories(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					repos.Items = append(repos.Items, *repo)
 				}
 			} else {
-				repos, err = veleroClient.VeleroV1().ResticRepositories(f.Namespace()).List(context.TODO(), listOptions)
+				repos, err = veleroClient.VeleroV1().BackupRepositories(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 

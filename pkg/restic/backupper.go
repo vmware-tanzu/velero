@@ -176,8 +176,8 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			log.Warnf("Volume %s is declared in pod %s/%s but not mounted by any container, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
 		}
-
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, pvc)
+		// TODO: Remove the hard-coded uploader type before v1.10 FC
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, "restic", pvc)
 		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
@@ -236,7 +236,7 @@ func isHostPathVolume(volume *corev1api.Volume, pvc *corev1api.PersistentVolumeC
 	return pv.Spec.HostPath != nil, nil
 }
 
-func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeBackup {
+func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier, uploaderType string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeBackup {
 	pvb := &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
@@ -274,6 +274,7 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 			},
 			BackupStorageLocation: backup.Spec.StorageLocation,
 			RepoIdentifier:        repoIdentifier,
+			UploaderType:          uploaderType,
 		},
 	}
 

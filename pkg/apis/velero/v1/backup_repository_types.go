@@ -20,15 +20,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ResticRepositorySpec is the specification for a ResticRepository.
-type ResticRepositorySpec struct {
-	// VolumeNamespace is the namespace this restic repository contains
+// BackupRepositorySpec is the specification for a BackupRepository.
+type BackupRepositorySpec struct {
+	// VolumeNamespace is the namespace this backup repository contains
 	// pod volume backups for.
 	VolumeNamespace string `json:"volumeNamespace"`
 
 	// BackupStorageLocation is the name of the BackupStorageLocation
 	// that should contain this repository.
 	BackupStorageLocation string `json:"backupStorageLocation"`
+
+	// RepositoryType indicates the type of the backend repository
+	// +kubebuilder:validation:Enum=kopia;restic;""
+	// +optional
+	RepositoryType string `json:"repositoryType"`
 
 	// ResticIdentifier is the full restic-compatible string for identifying
 	// this repository.
@@ -38,23 +43,23 @@ type ResticRepositorySpec struct {
 	MaintenanceFrequency metav1.Duration `json:"maintenanceFrequency"`
 }
 
-// ResticRepositoryPhase represents the lifecycle phase of a ResticRepository.
+// BackupRepositoryPhase represents the lifecycle phase of a BackupRepository.
 // +kubebuilder:validation:Enum=New;Ready;NotReady
-type ResticRepositoryPhase string
+type BackupRepositoryPhase string
 
 const (
-	ResticRepositoryPhaseNew      ResticRepositoryPhase = "New"
-	ResticRepositoryPhaseReady    ResticRepositoryPhase = "Ready"
-	ResticRepositoryPhaseNotReady ResticRepositoryPhase = "NotReady"
+	BackupRepositoryPhaseNew      BackupRepositoryPhase = "New"
+	BackupRepositoryPhaseReady    BackupRepositoryPhase = "Ready"
+	BackupRepositoryPhaseNotReady BackupRepositoryPhase = "NotReady"
 )
 
-// ResticRepositoryStatus is the current status of a ResticRepository.
-type ResticRepositoryStatus struct {
-	// Phase is the current state of the ResticRepository.
+// BackupRepositoryStatus is the current status of a BackupRepository.
+type BackupRepositoryStatus struct {
+	// Phase is the current state of the BackupRepository.
 	// +optional
-	Phase ResticRepositoryPhase `json:"phase,omitempty"`
+	Phase BackupRepositoryPhase `json:"phase,omitempty"`
 
-	// Message is a message about the current status of the ResticRepository.
+	// Message is a message about the current status of the BackupRepository.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -72,33 +77,35 @@ type ResticRepositoryStatus struct {
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Repository Type",type="string",JSONPath=".spec.repositoryType"
+//
 
-type ResticRepository struct {
+type BackupRepository struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +optional
-	Spec ResticRepositorySpec `json:"spec,omitempty"`
+	Spec BackupRepositorySpec `json:"spec,omitempty"`
 
 	// +optional
-	Status ResticRepositoryStatus `json:"status,omitempty"`
+	Status BackupRepositoryStatus `json:"status,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runtime-controller client,
 // the k8s:deepcopy marker will no longer be needed and should be removed.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
-// +kubebuilder:rbac:groups=velero.io,resources=resticrepositories,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=velero.io,resources=resticrepositories/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=velero.io,resources=backuprepositories,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=backuprepositories/status,verbs=get;update;patch
 
-// ResticRepositoryList is a list of ResticRepositories.
-type ResticRepositoryList struct {
+// BackupRepositoryList is a list of BackupRepositories.
+type BackupRepositoryList struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	Items []ResticRepository `json:"items"`
+	Items []BackupRepository `json:"items"`
 }

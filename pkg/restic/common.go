@@ -32,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
@@ -62,10 +63,6 @@ const (
 	// VolumesToExcludeAnnotation is the annotation on a pod whose mounted volumes
 	// should be excluded from restic backup.
 	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
-
-	// credentialsFileKey is the key within a BSL config that is checked to see if
-	// the BSL is using its own credentials, rather than those in the environment
-	credentialsFileKey = "credentialsFile"
 
 	// Deprecated.
 	//
@@ -322,24 +319,24 @@ func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileSto
 		if err != nil {
 			return []string{}, errors.WithStack(err)
 		}
-		config[credentialsFileKey] = credsFile
+		config[repoconfig.CredentialsFileKey] = credsFile
 	}
 
-	backendType := getBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
 
 	switch backendType {
-	case AWSBackend:
-		customEnv, err = getS3ResticEnvVars(config)
+	case repoconfig.AWSBackend:
+		customEnv, err = repoconfig.GetS3ResticEnvVars(config)
 		if err != nil {
 			return []string{}, err
 		}
-	case AzureBackend:
-		customEnv, err = getAzureResticEnvVars(config)
+	case repoconfig.AzureBackend:
+		customEnv, err = repoconfig.GetAzureResticEnvVars(config)
 		if err != nil {
 			return []string{}, err
 		}
-	case GCPBackend:
-		customEnv, err = getGCPResticEnvVars(config)
+	case repoconfig.GCPBackend:
+		customEnv, err = repoconfig.GetGCPResticEnvVars(config)
 		if err != nil {
 			return []string{}, err
 		}

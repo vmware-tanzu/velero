@@ -61,6 +61,11 @@ type itemBackupper struct {
 	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
 }
 
+const (
+	// veleroExcludeFromBackupLabel labeled item should be exclude by velero in backup job.
+	veleroExcludeFromBackupLabel = "velero.io/exclude-from-backup"
+)
+
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
 // In addition to the error return, backupItem also returns a bool indicating whether the item
@@ -78,8 +83,8 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	log = log.WithField("resource", groupResource.String())
 	log = log.WithField("namespace", namespace)
 
-	if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
-		log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
+	if metadata.GetLabels()[veleroExcludeFromBackupLabel] == "true" {
+		log.Infof("Excluding item because it has label %s=true", veleroExcludeFromBackupLabel)
 		return false, nil
 	}
 
