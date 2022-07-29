@@ -19,8 +19,10 @@ package plugin
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/features"
 
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -36,11 +38,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
-			pluginServer.
+			pluginServer = pluginServer.
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
-				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction(f)).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
@@ -55,13 +56,15 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
 				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
 				RegisterRestoreItemAction("velero.io/apiservice", newAPIServiceRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/admission-webhook-configuration", newAdmissionWebhookConfigurationAction).
-				Serve()
+				RegisterRestoreItemAction("velero.io/admission-webhook-configuration", newAdmissionWebhookConfigurationAction)
+			if !features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
+				// Do not register crd-remap-version BIA if the API Group feature flag is enabled, so that the v1 CRD can be backed up
+				pluginServer = pluginServer.RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction(f))
+			}
+			pluginServer.Serve()
 		},
 	}
-
 	pluginServer.BindFlags(c.Flags())
-
 	return c
 }
 
