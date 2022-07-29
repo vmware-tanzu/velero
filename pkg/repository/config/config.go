@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package config
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,11 +33,18 @@ const (
 	AWSBackend   BackendType = "velero.io/aws"
 	AzureBackend BackendType = "velero.io/azure"
 	GCPBackend   BackendType = "velero.io/gcp"
+	FSBackend    BackendType = "velero.io/fs"
+)
+
+const (
+	// CredentialsFileKey is the key within a BSL config that is checked to see if
+	// the BSL is using its own credentials, rather than those in the environment
+	CredentialsFileKey = "credentialsFile"
 )
 
 // this func is assigned to a package-level variable so it can be
 // replaced when unit-testing
-var getAWSBucketRegion = getBucketRegion
+var getAWSBucketRegion = GetAWSBucketRegion
 
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
@@ -55,7 +58,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 		prefix = layout.GetResticDir()
 	}
 
-	backendType := getBackendType(location.Spec.Provider)
+	backendType := GetBackendType(location.Spec.Provider)
 
 	if repoPrefix := location.Spec.Config["resticRepoPrefix"]; repoPrefix != "" {
 		return repoPrefix, nil
@@ -89,12 +92,16 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 	return "", errors.New("restic repository prefix (resticRepoPrefix) not specified in backup storage location's config")
 }
 
-func getBackendType(provider string) BackendType {
+func GetBackendType(provider string) BackendType {
 	if !strings.Contains(provider, "/") {
 		provider = "velero.io/" + provider
 	}
 
 	return BackendType(provider)
+}
+
+func IsBackendTypeValid(backendType BackendType) bool {
+	return (backendType == AWSBackend || backendType == AzureBackend || backendType == GCPBackend || backendType == FSBackend)
 }
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
@@ -106,30 +113,4 @@ func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string)
 	}
 
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(prefix, "/"), name), nil
-}
-
-// getBucketRegion returns the AWS region that a bucket is in, or an error
-// if the region cannot be determined.
-func getBucketRegion(bucket string) (string, error) {
-	var region string
-
-	sess, err := session.NewSession()
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	for _, partition := range endpoints.DefaultPartitions() {
-		for regionHint := range partition.Regions() {
-			region, _ = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
-
-			// we only need to try a single region hint per partition, so break after the first
-			break
-		}
-
-		if region != "" {
-			return region, nil
-		}
-	}
-
-	return "", errors.New("unable to determine bucket's region")
 }
