@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package config
 
 import (
 	"context"
@@ -37,6 +37,7 @@ const (
 	storageAccountConfigKey          = "storageAccount"
 	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
 	subscriptionIDConfigKey          = "subscriptionId"
+	storageDomainConfigKey           = "storageDomain"
 )
 
 // getSubscriptionID gets the subscription ID from the 'config' map if it contains
@@ -131,10 +132,10 @@ func mapLookup(data map[string]string) func(string) string {
 	}
 }
 
-// getAzureResticEnvVars gets the environment variables that restic
+// GetAzureResticEnvVars gets the environment variables that restic
 // relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
 // on info in the provided object storage location config map.
-func getAzureResticEnvVars(config map[string]string) (map[string]string, error) {
+func GetAzureResticEnvVars(config map[string]string) (map[string]string, error) {
 	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
 		return nil, err
@@ -158,7 +159,7 @@ func credentialsFileFromEnv() string {
 // selectCredentialsFile selects the Azure credentials file to use, retrieving it
 // from the given config or falling back to retrieving it from the environment.
 func selectCredentialsFile(config map[string]string) string {
-	if credentialsFile, ok := config[credentialsFileKey]; ok {
+	if credentialsFile, ok := config[CredentialsFileKey]; ok {
 		return credentialsFile
 	}
 
@@ -207,4 +208,23 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	}
 
 	return results, nil
+}
+
+// GetAzureStorageDomain gets the Azure storage domain required by a Azure blob connection,
+// if the provided config doean't have the value, get it from system's environment variables
+func GetAzureStorageDomain(config map[string]string) string {
+	if domain, exist := config[storageDomainConfigKey]; exist {
+		return domain
+	} else {
+		return os.Getenv(cloudNameEnvVar)
+	}
+}
+
+func GetAzureCredentials(config map[string]string) (string, string, error) {
+	storageAccountKey, _, err := getStorageAccountKey(config)
+	if err != nil {
+		return "", "", err
+	}
+
+	return config[storageAccountConfigKey], storageAccountKey, nil
 }
