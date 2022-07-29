@@ -39,6 +39,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -241,7 +242,7 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error identifying path of volume")
 	}
 
-	credsFile, err := c.credentialsFileStore.Path(restic.RepoKeySelector())
+	credsFile, err := c.credentialsFileStore.Path(repokey.RepoKeySelector())
 	if err != nil {
 		return errors.Wrap(err, "error creating temp restic credentials file")
 	}

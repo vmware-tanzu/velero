@@ -80,6 +80,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 )
 
 const (
@@ -519,7 +520,7 @@ func (s *server) initRestic() error {
 	}
 
 	// ensure the repo key secret is set up
-	if err := restic.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
 		return err
 	}
 
