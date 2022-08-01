@@ -13,6 +13,8 @@ spec:
     kind: VolumeSnapshotLocation
     listKind: VolumeSnapshotLocationList
     plural: volumesnapshotlocations
+    shortNames:
+    - vsl
     singular: volumesnapshotlocation
   scope: Namespaced
   versions:

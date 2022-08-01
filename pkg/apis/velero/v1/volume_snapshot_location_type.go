@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=vsl
+// +kubebuilder:object:generate=true
+// +kubebuilder:storageversion
 
 // VolumeSnapshotLocation is a location where Velero stores volume snapshots.
 type VolumeSnapshotLocation struct {
@@ -36,6 +40,8 @@ type VolumeSnapshotLocation struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:rbac:groups=velero.io,resources=volumesnapshotlocations,verbs=get;list;watch;create;update;patch;delete
 
 // VolumeSnapshotLocationList is a list of VolumeSnapshotLocations.
 type VolumeSnapshotLocationList struct {
