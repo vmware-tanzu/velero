@@ -94,6 +94,7 @@ type repositoryManager struct {
 	pvcClient            corev1client.PersistentVolumeClaimsGetter
 	pvClient             corev1client.PersistentVolumesGetter
 	credentialsFileStore credentials.FileStore
+	lockCleanupThrottle  *lockCleanupThrottle
 }
 
 const (
@@ -131,9 +132,10 @@ func NewRepositoryManager(
 		log:                  log,
 		ctx:                  ctx,
 
-		repoLocker:  newRepoLocker(),
-		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
-		fileSystem:  filesystem.NewFileSystem(),
+		repoLocker:          newRepoLocker(),
+		repoEnsurer:         newRepositoryEnsurer(repoInformer, repoClient, log),
+		fileSystem:          filesystem.NewFileSystem(),
+		lockCleanupThrottle: newLockCleanupThrottle(),
 	}
 
 	return rm, nil
@@ -182,6 +184,8 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *velerov1a
 }
 
 func (rm *repositoryManager) InitRepo(repo *velerov1api.BackupRepository) error {
+	rm.checkForStaleLocks(repo)
+
 	// restic init requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
@@ -190,6 +194,8 @@ func (rm *repositoryManager) InitRepo(repo *velerov1api.BackupRepository) error 
 }
 
 func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.BackupRepository) error {
+	rm.checkForStaleLocks(repo)
+
 	// restic snapshots requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
@@ -205,6 +211,8 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.BackupRepository) e
 }
 
 func (rm *repositoryManager) PruneRepo(repo *velerov1api.BackupRepository) error {
+	rm.checkForStaleLocks(repo)
+
 	// restic prune requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
@@ -217,7 +225,14 @@ func (rm *repositoryManager) UnlockRepo(repo *velerov1api.BackupRepository) erro
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
 
-	return rm.exec(UnlockCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
+	err := rm.exec(UnlockCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
+
+	if err == nil {
+		// Record stale locks clean up
+		rm.lockCleanupThrottle.locksCleanedUp(repo.Name)
+	}
+
+	return err
 }
 
 func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error {
@@ -234,11 +249,26 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 		return err
 	}
 
+	rm.checkForStaleLocks(repo)
+
 	// restic forget requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
 	return rm.exec(ForgetCommand(repo.Spec.ResticIdentifier, snapshot.SnapshotID), repo.Spec.BackupStorageLocation)
+}
+
+
+func (rm *repositoryManager) checkForStaleLocks(resticRepo *velerov1api.BackupRepository) error {
+	if ! rm.lockCleanupThrottle.shouldPerformCleanup(resticRepo.Name) {
+		return nil
+	}
+
+	if err := rm.UnlockRepo(resticRepo); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
