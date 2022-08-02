@@ -241,7 +241,7 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 
 	// Go through all the podvolumebackups for the PVC and look for the most
 	// recent completed one to use as the parent.
-	var mostRecentPVB *velerov1api.PodVolumeBackup
+	var mostRecentPVB velerov1api.PodVolumeBackup
 	for _, pvb := range pvbList.Items {
 		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
 			continue
@@ -258,12 +258,12 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 			continue
 		}
 
-		if mostRecentPVB == nil || pvb.Status.StartTimestamp.After(mostRecentPVB.Status.StartTimestamp.Time) {
-			mostRecentPVB = &pvb
+		if mostRecentPVB.Status == (velerov1api.PodVolumeBackupStatus{}) || pvb.Status.StartTimestamp.After(mostRecentPVB.Status.StartTimestamp.Time) {
+			mostRecentPVB = pvb
 		}
 	}
 
-	if mostRecentPVB == nil {
+	if mostRecentPVB.Status == (velerov1api.PodVolumeBackupStatus{}) {
 		log.Info("No completed PodVolumeBackup found for PVC")
 		return ""
 	}
