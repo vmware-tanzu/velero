@@ -1,3 +1,26 @@
+## v1.9.1
+### 2022-08-03
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.9.1
+
+### Container Image
+`velero/velero:v1.9.1`
+
+### Documentation
+https://velero.io/docs/v1.9/
+
+### Upgrading
+https://velero.io/docs/v1.9/upgrade-to-1.9/
+
+### All changes
+
+  * Fix bsl validation bug: the BSL is validated continually and doesn't respect the validation period configured (#5112, @ywk253100)
+  * Modify BackupStoreGetter to avoid BSL spec changes (#5134, @sseago)
+  * Delay CA file deletion in PVB controller. (#5150, @jxun)
+  * Skip registering "crd-remap-version" plugin when feature flag "EnableAPIGroupVersions" is set (#5173, @reasonerjt)
+  * Fix restic backups to multiple backup storage locations bug (#5175, @qiuming-best)
+
 ## v1.9.0
 ### 2022-06-13
 
