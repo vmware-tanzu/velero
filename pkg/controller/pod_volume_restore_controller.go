@@ -215,19 +215,6 @@ func getResticInitContainerIndex(pod *corev1api.Pod) int {
 	return -1
 }
 
-func singlePathMatch(path string) (string, error) {
-	matches, err := filepath.Glob(path)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	if len(matches) != 1 {
-		return "", errors.Errorf("expected one matching path: %s, got %d", path, len(matches))
-	}
-
-	return matches[0], nil
-}
-
 func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *velerov1api.PodVolumeRestore, pod *corev1api.Pod, log logrus.FieldLogger) error {
 	volumeDir, err := kube.GetVolumeDirectory(ctx, log, pod, req.Spec.Volume, c.Client)
 	if err != nil {
@@ -236,7 +223,9 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
-	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
+	volumePath, err := kube.SinglePathMatch(
+		fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir),
+		c.fileSystem, log)
 	if err != nil {
 		return errors.Wrap(err, "error identifying path of volume")
 	}
