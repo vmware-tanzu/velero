@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -324,7 +325,7 @@ func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log 
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// Temporary credentials.
-	details.credsFile, err = r.CredsFileStore.Path(restic.RepoKeySelector())
+	details.credsFile, err = r.CredsFileStore.Path(repokey.RepoKeySelector())
 	if err != nil {
 		return nil, errors.Wrap(err, "creating temporary Restic credentials file")
 	}

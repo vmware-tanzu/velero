@@ -28,15 +28,16 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/util/ownership"
 )
 
 type unifiedRepoProvider struct {
-	credentialsFileStore credentials.FileStore
-	workPath             string
-	repoService          udmrepo.BackupRepoService
-	log                  logrus.FieldLogger
+	credentialGetter credentials.CredentialGetter
+	workPath         string
+	repoService      udmrepo.BackupRepoService
+	log              logrus.FieldLogger
 }
 
 // this func is assigned to a package-level variable so it can be
@@ -47,18 +48,30 @@ var getGCPCredentials = repoconfig.GetGCPCredentials
 var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 var getAzureStorageDomain = repoconfig.GetAzureStorageDomain
 
+type localFuncTable struct {
+	getRepoPassword       func(credentials.SecretStore, RepoParam) (string, error)
+	getStorageVariables   func(*velerov1api.BackupStorageLocation, string) (map[string]string, error)
+	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
+}
+
+var funcTable = localFuncTable{
+	getRepoPassword:       getRepoPassword,
+	getStorageVariables:   getStorageVariables,
+	getStorageCredentials: getStorageCredentials,
+}
+
 // NewUnifiedRepoProvider creates the service provider for Unified Repo
 // workPath is the path for Unified Repo to store some local information
 // workPath could be empty, if so, the default path will be used
 func NewUnifiedRepoProvider(
-	credentialFileStore credentials.FileStore,
+	credentialGetter credentials.CredentialGetter,
 	workPath string,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	repo := unifiedRepoProvider{
-		credentialsFileStore: credentialFileStore,
-		workPath:             workPath,
-		log:                  log,
+		credentialGetter: credentialGetter,
+		workPath:         workPath,
+		log:              log,
 	}
 
 	repo.repoService = createRepoService(log)
@@ -120,15 +133,38 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 	return nil
 }
 
-func (urp *unifiedRepoProvider) getRepoPassword(param RepoParam) (string, error) {
-	///TODO: get repo password
+func getRepoPassword(secretStore credentials.SecretStore, param RepoParam) (string, error) {
+	if secretStore == nil {
+		return "", errors.New("invalid credentials interface")
+	}
 
-	return "", nil
+	buf, err := secretStore.Get(repokey.RepoKeySelector())
+	if err != nil {
+		return "", errors.Wrap(err, "error to get password buffer")
+	}
+
+	return strings.TrimSpace(string(buf)), nil
 }
 
 func (urp *unifiedRepoProvider) getRepoOption(param RepoParam) (udmrepo.RepoOptions, error) {
+	repoPassword, err := funcTable.getRepoPassword(urp.credentialGetter.FromSecret, param)
+	if err != nil {
+		return udmrepo.RepoOptions{}, errors.Wrap(err, "error to get repo password")
+	}
+
+	storeVar, err := funcTable.getStorageVariables(param.BackupLocation, param.SubDir)
+	if err != nil {
+		return udmrepo.RepoOptions{}, errors.Wrap(err, "error to get storage variables")
+	}
+
+	storeCred, err := funcTable.getStorageCredentials(param.BackupLocation, urp.credentialGetter.FromFile)
+	if err != nil {
+		return udmrepo.RepoOptions{}, errors.Wrap(err, "error to get repo credentials")
+	}
+
 	repoOption := udmrepo.RepoOptions{
 		StorageType:    getStorageType(param.BackupLocation),
+		RepoPassword:   repoPassword,
 		ConfigFilePath: getRepoConfigFile(urp.workPath, string(param.BackupLocation.UID)),
 		Ownership: udmrepo.OwnershipOptions{
 			Username:   ownership.GetRepositoryOwner().Username,
@@ -138,25 +174,8 @@ func (urp *unifiedRepoProvider) getRepoOption(param RepoParam) (udmrepo.RepoOpti
 		GeneralOptions: make(map[string]string),
 	}
 
-	repoPassword, err := urp.getRepoPassword(param)
-	if err != nil {
-		return repoOption, errors.Wrap(err, "error to get repo password")
-	}
-
-	repoOption.RepoPassword = repoPassword
-
-	storeVar, err := getStorageVariables(param.BackupLocation, param.SubDir)
-	if err != nil {
-		return repoOption, errors.Wrap(err, "error to get storage variables")
-	}
-
 	for k, v := range storeVar {
 		repoOption.StorageOptions[k] = v
-	}
-
-	storeCred, err := getStorageCredentials(param.BackupLocation, urp.credentialsFileStore)
-	if err != nil {
-		return repoOption, errors.Wrap(err, "error to get repo credential env")
 	}
 
 	for k, v := range storeCred {
@@ -186,6 +205,10 @@ func getStorageType(backupLocation *velerov1api.BackupStorageLocation) string {
 func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, credentialsFileStore credentials.FileStore) (map[string]string, error) {
 	result := make(map[string]string)
 	var err error
+
+	if credentialsFileStore == nil {
+		return map[string]string{}, errors.New("invalid credentials interface")
+	}
 
 	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
 	if !repoconfig.IsBackendTypeValid(backendType) {
