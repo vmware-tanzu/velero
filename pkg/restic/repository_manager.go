@@ -36,6 +36,7 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -242,7 +243,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 }
 
 func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
-	file, err := rm.credentialsFileStore.Path(RepoKeySelector())
+	file, err := rm.credentialsFileStore.Path(repokey.RepoKeySelector())
 	if err != nil {
 		return err
 	}
