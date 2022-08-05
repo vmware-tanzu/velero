@@ -7,7 +7,7 @@ k8s_yaml([
     'config/crd/v1/bases/velero.io_downloadrequests.yaml',
     'config/crd/v1/bases/velero.io_podvolumebackups.yaml',
     'config/crd/v1/bases/velero.io_podvolumerestores.yaml',
-    'config/crd/v1/bases/velero.io_resticrepositories.yaml',
+    'config/crd/v1/bases/velero.io_backuprepositories.yaml',
     'config/crd/v1/bases/velero.io_restores.yaml',
     'config/crd/v1/bases/velero.io_schedules.yaml',
     'config/crd/v1/bases/velero.io_serverstatusrequests.yaml',

@@ -1,0 +1,1 @@
+This commit splits the pkg/restic package into several packages to support Kopia integration works

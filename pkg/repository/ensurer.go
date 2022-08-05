@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repository
 
 import (
 	"context"
@@ -35,8 +35,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
-// repositoryEnsurer ensures that Velero restic repositories are created and ready.
-type repositoryEnsurer struct {
+// RepositoryEnsurer ensures that backup repositories are created and ready.
+type RepositoryEnsurer struct {
 	log        logrus.FieldLogger
 	repoLister velerov1listers.BackupRepositoryLister
 	repoClient velerov1client.BackupRepositoriesGetter
@@ -55,8 +55,8 @@ type repoKey struct {
 	backupLocation  string
 }
 
-func newRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInformer, repoClient velerov1client.BackupRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
-	r := &repositoryEnsurer{
+func NewRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInformer, repoClient velerov1client.BackupRepositoriesGetter, log logrus.FieldLogger) *RepositoryEnsurer {
+	r := &RepositoryEnsurer{
 		log:        log,
 		repoLister: repoInformer.Lister(),
 		repoClient: repoClient,
@@ -105,7 +105,7 @@ func repoLabels(volumeNamespace, backupLocation string) labels.Set {
 	}
 }
 
-func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.BackupRepository, error) {
+func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.BackupRepository, error) {
 	log := r.log.WithField("volumeNamespace", volumeNamespace).WithField("backupLocation", backupLocation)
 
 	// It's only safe to have one instance of this method executing concurrently for a
@@ -190,7 +190,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 }
 
-func (r *repositoryEnsurer) getRepoChan(name string) chan *velerov1api.BackupRepository {
+func (r *RepositoryEnsurer) getRepoChan(name string) chan *velerov1api.BackupRepository {
 	r.repoChansLock.Lock()
 	defer r.repoChansLock.Unlock()
 
@@ -198,7 +198,7 @@ func (r *repositoryEnsurer) getRepoChan(name string) chan *velerov1api.BackupRep
 	return r.repoChans[name]
 }
 
-func (r *repositoryEnsurer) repoLock(volumeNamespace, backupLocation string) *sync.Mutex {
+func (r *RepositoryEnsurer) repoLock(volumeNamespace, backupLocation string) *sync.Mutex {
 	r.repoLocksMu.Lock()
 	defer r.repoLocksMu.Unlock()
 

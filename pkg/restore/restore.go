@@ -59,7 +59,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -104,7 +104,7 @@ type kubernetesRestorer struct {
 	discoveryHelper            discovery.Helper
 	dynamicFactory             client.DynamicFactory
 	namespaceClient            corev1.NamespaceInterface
-	resticRestorerFactory      restic.RestorerFactory
+	resticRestorerFactory      podvolume.RestorerFactory
 	resticTimeout              time.Duration
 	resourceTerminatingTimeout time.Duration
 	resourcePriorities         []string
@@ -122,7 +122,7 @@ func NewKubernetesRestorer(
 	dynamicFactory client.DynamicFactory,
 	resourcePriorities []string,
 	namespaceClient corev1.NamespaceInterface,
-	resticRestorerFactory restic.RestorerFactory,
+	resticRestorerFactory podvolume.RestorerFactory,
 	resticTimeout time.Duration,
 	resourceTerminatingTimeout time.Duration,
 	logger logrus.FieldLogger,
@@ -248,7 +248,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	ctx, cancelFunc := go_context.WithTimeout(go_context.Background(), podVolumeTimeout)
 	defer cancelFunc()
 
-	var resticRestorer restic.Restorer
+	var resticRestorer podvolume.Restorer
 	if kr.resticRestorerFactory != nil {
 		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, req.Restore)
 		if err != nil {
@@ -338,7 +338,7 @@ type restoreContext struct {
 	restoreItemActions             []framework.RestoreItemResolvedAction
 	itemSnapshotterActions         []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter        VolumeSnapshotterGetter
-	resticRestorer                 restic.Restorer
+	resticRestorer                 podvolume.Restorer
 	resticWaitGroup                sync.WaitGroup
 	resticErrs                     chan error
 	pvsToProvision                 sets.String
@@ -1394,7 +1394,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// Do not create podvolumerestore when current restore excludes pv/pvc
 		if ctx.resourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()) &&
 			ctx.resourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumes.String()) &&
-			len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
+			len(podvolume.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
 			restorePodVolumeBackups(ctx, createdObj, originalNamespace)
 		}
 	}
@@ -1549,7 +1549,7 @@ func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstr
 				return
 			}
 
-			data := restic.RestoreData{
+			data := podvolume.RestoreData{
 				Restore:          ctx.restore,
 				Pod:              pod,
 				PodVolumeBackups: ctx.podVolumeBackups,
@@ -1631,7 +1631,7 @@ func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreCont
 
 	var found bool
 	for _, pvb := range ctx.podVolumeBackups {
-		if pvb.Spec.Pod.Namespace == pv.Spec.ClaimRef.Namespace && pvb.GetAnnotations()[restic.PVCNameAnnotation] == pv.Spec.ClaimRef.Name {
+		if pvb.Spec.Pod.Namespace == pv.Spec.ClaimRef.Namespace && pvb.GetAnnotations()[podvolume.PVCNameAnnotation] == pv.Spec.ClaimRef.Name {
 			found = true
 			break
 		}
