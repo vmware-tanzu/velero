@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package podvolume
 
 import (
 	"context"
@@ -30,7 +30,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
@@ -41,11 +43,12 @@ type Backupper interface {
 }
 
 type backupper struct {
-	ctx         context.Context
-	repoManager *repositoryManager
-	repoEnsurer *repositoryEnsurer
-	pvcClient   corev1client.PersistentVolumeClaimsGetter
-	pvClient    corev1client.PersistentVolumesGetter
+	ctx          context.Context
+	repoLocker   *repository.RepoLocker
+	repoEnsurer  *repository.RepositoryEnsurer
+	veleroClient clientset.Interface
+	pvcClient    corev1client.PersistentVolumeClaimsGetter
+	pvClient     corev1client.PersistentVolumesGetter
 
 	results     map[string]chan *velerov1api.PodVolumeBackup
 	resultsLock sync.Mutex
@@ -53,19 +56,21 @@ type backupper struct {
 
 func newBackupper(
 	ctx context.Context,
-	repoManager *repositoryManager,
-	repoEnsurer *repositoryEnsurer,
+	repoLocker *repository.RepoLocker,
+	repoEnsurer *repository.RepositoryEnsurer,
 	podVolumeBackupInformer cache.SharedIndexInformer,
+	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
 	log logrus.FieldLogger,
 ) *backupper {
 	b := &backupper{
-		ctx:         ctx,
-		repoManager: repoManager,
-		repoEnsurer: repoEnsurer,
-		pvcClient:   pvcClient,
-		pvClient:    pvClient,
+		ctx:          ctx,
+		repoLocker:   repoLocker,
+		repoEnsurer:  repoEnsurer,
+		veleroClient: veleroClient,
+		pvcClient:    pvcClient,
+		pvClient:     pvClient,
 
 		results: make(map[string]chan *velerov1api.PodVolumeBackup),
 	}
@@ -109,8 +114,8 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 
 	// get a single non-exclusive lock since we'll wait for all individual
 	// backups to be complete before releasing it.
-	b.repoManager.repoLocker.Lock(repo.Name)
-	defer b.repoManager.repoLocker.Unlock(repo.Name)
+	b.repoLocker.Lock(repo.Name)
+	defer b.repoLocker.Unlock(repo.Name)
 
 	resultsChan := make(chan *velerov1api.PodVolumeBackup)
 
@@ -176,9 +181,10 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			log.Warnf("Volume %s is declared in pod %s/%s but not mounted by any container, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
 		}
+
 		// TODO: Remove the hard-coded uploader type before v1.10 FC
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, "restic", pvc)
-		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
+		if volumeBackup, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
 		}
