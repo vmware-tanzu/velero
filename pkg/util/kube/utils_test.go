@@ -197,6 +197,13 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 			pv:   builder.ForPersistentVolume("a-pv").ObjectMeta(builder.WithAnnotations(KubeAnnDynamicallyProvisioned, "csi.test.com")).Result(),
 			want: "a-pv/mount",
 		},
+		{
+			name: "Volume with CSI annotation 'pv.kubernetes.io/migrated-to' appends '/mount' to the volume name",
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").ObjectMeta(builder.WithAnnotations(KubeAnnMigratedTo, "csi.test.com")).Result(),
+			want: "a-pv/mount",
+		},
 	}
 
 	csiDriver := storagev1api.CSIDriver{
@@ -424,4 +431,14 @@ func TestIsCRDReady(t *testing.T) {
 	require.NoError(t, err)
 	_, err = IsCRDReady(obj)
 	assert.NotNil(t, err)
+}
+
+func TestSinglePathMatch(t *testing.T) {
+	fakeFS := velerotest.NewFakeFileSystem()
+	fakeFS.MkdirAll("testDir1/subpath", 0755)
+	fakeFS.MkdirAll("testDir2/subpath", 0755)
+
+	_, err := SinglePathMatch("./*/subpath", fakeFS, logrus.StandardLogger())
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "expected one matching path")
 }
