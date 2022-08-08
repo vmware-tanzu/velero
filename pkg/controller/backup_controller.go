@@ -438,11 +438,13 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 
 	// Add namespaces with label velero.io/exclude-from-backup=true into request.Spec.ExcludedNamespaces
 	// Essentially, adding the label velero.io/exclude-from-backup=true to a namespace would be equivalent to setting spec.ExcludedNamespaces
-	namespaces, excludeLabel := corev1api.NamespaceList{}, "velero.io/exclude-from-backup"
-	if err := c.kbClient.List(context.Background(), &namespaces, kbclient.MatchingLabels{excludeLabel: "true"}); err == nil {
+	namespaces := corev1api.NamespaceList{}
+	if err := c.kbClient.List(context.Background(), &namespaces, kbclient.MatchingLabels{"velero.io/exclude-from-backup": "true"}); err == nil {
 		for _, ns := range namespaces.Items {
 			request.Spec.ExcludedNamespaces = append(request.Spec.ExcludedNamespaces, ns.Name)
 		}
+	} else {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting namespace list: %v", err))
 	}
 
 	// validate the included/excluded resources
