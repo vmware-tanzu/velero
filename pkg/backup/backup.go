@@ -46,7 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
@@ -74,7 +74,7 @@ type kubernetesBackupper struct {
 	dynamicFactory         client.DynamicFactory
 	discoveryHelper        discovery.Helper
 	podCommandExecutor     podexec.PodCommandExecutor
-	resticBackupperFactory restic.BackupperFactory
+	resticBackupperFactory podvolume.BackupperFactory
 	resticTimeout          time.Duration
 	defaultVolumesToRestic bool
 	clientPageSize         int
@@ -100,7 +100,7 @@ func NewKubernetesBackupper(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
 	podCommandExecutor podexec.PodCommandExecutor,
-	resticBackupperFactory restic.BackupperFactory,
+	resticBackupperFactory podvolume.BackupperFactory,
 	resticTimeout time.Duration,
 	defaultVolumesToRestic bool,
 	clientPageSize int,
@@ -234,7 +234,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	ctx, cancelFunc := context.WithTimeout(context.Background(), podVolumeTimeout)
 	defer cancelFunc()
 
-	var resticBackupper restic.Backupper
+	var resticBackupper podvolume.Backupper
 	if kb.resticBackupperFactory != nil {
 		resticBackupper, err = kb.resticBackupperFactory.NewBackupper(ctx, backupRequest.Backup)
 		if err != nil {

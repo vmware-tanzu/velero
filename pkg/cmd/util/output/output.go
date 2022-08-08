@@ -177,15 +177,15 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 			ColumnDefinitions: scheduleColumns,
 			Rows:              printScheduleList(obj.(*velerov1api.ScheduleList)),
 		}
-	case *velerov1api.ResticRepository:
+	case *velerov1api.BackupRepository:
 		table = &metav1.Table{
 			ColumnDefinitions: resticRepoColumns,
-			Rows:              printResticRepo(obj.(*velerov1api.ResticRepository)),
+			Rows:              printResticRepo(obj.(*velerov1api.BackupRepository)),
 		}
-	case *velerov1api.ResticRepositoryList:
+	case *velerov1api.BackupRepositoryList:
 		table = &metav1.Table{
 			ColumnDefinitions: resticRepoColumns,
-			Rows:              printResticRepoList(obj.(*velerov1api.ResticRepositoryList)),
+			Rows:              printResticRepoList(obj.(*velerov1api.BackupRepositoryList)),
 		}
 	case *velerov1api.BackupStorageLocation:
 		table = &metav1.Table{

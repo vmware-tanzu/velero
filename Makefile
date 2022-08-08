@@ -163,6 +163,7 @@ shell: build-dirs build-env
 	@# under $GOPATH).
 	@docker run \
 		-e GOFLAGS \
+		-e GOPROXY \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \

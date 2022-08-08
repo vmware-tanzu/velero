@@ -1191,11 +1191,11 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 	}
 }
 
-func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
+func TestGetInitContainerFromAnnotations(t *testing.T) {
 	testCases := []struct {
 		name             string
 		inputAnnotations map[string]string
-		expected         velerov1api.InitRestoreHook
+		expected         *corev1api.Container
 		expectNil        bool
 	}{
 		{
@@ -1223,12 +1223,8 @@ func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
 				podRestoreHookInitContainerNameAnnotationKey:    "",
 				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator /user-data full",
 			},
-			expected: velerov1api.InitRestoreHook{
-				InitContainers: []corev1api.Container{
-					*builder.ForContainer("restore-init1", "busy-box").
-						Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
-				},
-			},
+			expected: builder.ForContainer("restore-init1", "busy-box").
+				Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
 		},
 		{
 			name:      "should generate container name when container name is missing",
@@ -1237,22 +1233,14 @@ func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
 				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
 				podRestoreHookInitContainerCommandAnnotationKey: "/usr/bin/data-populator /user-data full",
 			},
-			expected: velerov1api.InitRestoreHook{
-				InitContainers: []corev1api.Container{
-					*builder.ForContainer("restore-init1", "busy-box").
-						Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
-				},
-			},
+			expected: builder.ForContainer("restore-init1", "busy-box").
+				Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
 		},
 		{
 			name:      "should return expected init container when all annotations are specified",
 			expectNil: false,
-			expected: velerov1api.InitRestoreHook{
-				InitContainers: []corev1api.Container{
-					*builder.ForContainer("restore-init1", "busy-box").
-						Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
-				},
-			},
+			expected: builder.ForContainer("restore-init1", "busy-box").
+				Command([]string{"/usr/bin/data-populator /user-data full"}).Result(),
 			inputAnnotations: map[string]string{
 				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
 				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
@@ -1262,12 +1250,8 @@ func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
 		{
 			name:      "should return expected init container when all annotations are specified with command as a JSON array",
 			expectNil: false,
-			expected: velerov1api.InitRestoreHook{
-				InitContainers: []corev1api.Container{
-					*builder.ForContainer("restore-init1", "busy-box").
-						Command([]string{"a", "b", "c"}).Result(),
-				},
-			},
+			expected: builder.ForContainer("restore-init1", "busy-box").
+				Command([]string{"a", "b", "c"}).Result(),
 			inputAnnotations: map[string]string{
 				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
 				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
@@ -1277,12 +1261,8 @@ func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
 		{
 			name:      "should return expected init container when all annotations are specified with command as malformed a JSON array",
 			expectNil: false,
-			expected: velerov1api.InitRestoreHook{
-				InitContainers: []corev1api.Container{
-					*builder.ForContainer("restore-init1", "busy-box").
-						Command([]string{"[foobarbaz"}).Result(),
-				},
-			},
+			expected: builder.ForContainer("restore-init1", "busy-box").
+				Command([]string{"[foobarbaz"}).Result(),
 			inputAnnotations: map[string]string{
 				podRestoreHookInitContainerImageAnnotationKey:   "busy-box",
 				podRestoreHookInitContainerNameAnnotationKey:    "restore-init",
@@ -1293,15 +1273,14 @@ func TestGetInitRestoreHookFromAnnotations(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := getInitRestoreHookFromAnnotation("test/pod1", tc.inputAnnotations, velerotest.NewLogger())
+			actualInitContainer := getInitContainerFromAnnotation("test/pod1", tc.inputAnnotations, velerotest.NewLogger())
 			if tc.expectNil {
-				assert.Nil(t, actual)
+				assert.Nil(t, actualInitContainer)
 				return
 			}
-			assert.NotEmpty(t, actual.InitContainers[0].Name)
-			assert.Equal(t, len(tc.expected.InitContainers), len(actual.InitContainers))
-			assert.Equal(t, tc.expected.InitContainers[0].Image, actual.InitContainers[0].Image)
-			assert.Equal(t, tc.expected.InitContainers[0].Command, actual.InitContainers[0].Command)
+			assert.NotEmpty(t, actualInitContainer.Name)
+			assert.Equal(t, tc.expected.Image, actualInitContainer.Image)
+			assert.Equal(t, tc.expected.Command, actualInitContainer.Command)
 		})
 	}
 }
@@ -1347,11 +1326,11 @@ func TestGetRestoreHooksFromSpec(t *testing.T) {
 						PostHooks: []velerov1api.RestoreResourceHook{
 							{
 								Init: &velerov1api.InitRestoreHook{
-									InitContainers: []corev1api.Container{
-										*builder.ForContainer("restore-init1", "busy-box").
-											Command([]string{"foobarbaz"}).Result(),
-										*builder.ForContainer("restore-init2", "busy-box").
-											Command([]string{"foobarbaz"}).Result(),
+									InitContainers: []runtime.RawExtension{
+										builder.ForContainer("restore-init1", "busy-box").
+											Command([]string{"foobarbaz"}).ResultRawExtension(),
+										builder.ForContainer("restore-init2", "busy-box").
+											Command([]string{"foobarbaz"}).ResultRawExtension(),
 									},
 								},
 							},
@@ -1369,11 +1348,11 @@ func TestGetRestoreHooksFromSpec(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init1", "busy-box").
-										Command([]string{"foobarbaz"}).Result(),
-									*builder.ForContainer("restore-init2", "busy-box").
-										Command([]string{"foobarbaz"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init1", "busy-box").
+										Command([]string{"foobarbaz"}).ResultRawExtension(),
+									builder.ForContainer("restore-init2", "busy-box").
+										Command([]string{"foobarbaz"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1539,9 +1518,9 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("should-not exist", "does-not-matter").
-										Command([]string{""}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("should-not exist", "does-not-matter").
+										Command([]string{""}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1555,6 +1534,9 @@ func TestHandleRestoreHooks(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "app1",
 					Namespace: "default",
+				},
+				Spec: corev1api.PodSpec{
+					InitContainers: []corev1api.Container{},
 				},
 			},
 			expectedError: nil,
@@ -1582,11 +1564,11 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
-									*builder.ForContainer("restore-init-container-2", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
+									builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1643,11 +1625,11 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
-									*builder.ForContainer("restore-init-container-2", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
+									builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1680,11 +1662,11 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
-									*builder.ForContainer("restore-init-container-2", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
+									builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1733,11 +1715,11 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
-									*builder.ForContainer("restore-init-container-2", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
+									builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1795,11 +1777,11 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
-									*builder.ForContainer("restore-init-container-2", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
+									builder.ForContainer("restore-init-container-2", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1868,9 +1850,9 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1911,9 +1893,9 @@ func TestHandleRestoreHooks(t *testing.T) {
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
 							Init: &velerov1api.InitRestoreHook{
-								InitContainers: []corev1api.Container{
-									*builder.ForContainer("restore-init-container-1", "nginx").
-										Command([]string{"a", "b", "c"}).Result(),
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										Command([]string{"a", "b", "c"}).ResultRawExtension(),
 								},
 							},
 						},
@@ -1921,6 +1903,37 @@ func TestHandleRestoreHooks(t *testing.T) {
 				},
 			},
 			namespaceMapping: map[string]string{"default": "new"},
+		},
+		{
+			name: "Invalid InitContainer in Restore hook should return nil as pod, and error.",
+			podInput: corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "app1",
+					Namespace: "new",
+				},
+				Spec: corev1api.PodSpec{},
+			},
+			expectedError: fmt.Errorf("invalid InitContainer in restore hook, it doesn't have Command, Name or Image field"),
+			expectedPod:   nil,
+			restoreHooks: []ResourceRestoreHook{
+				{
+					Name: "hook1",
+					Selector: ResourceHookSelector{
+						Namespaces: collections.NewIncludesExcludes().Includes("new"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
+					},
+					RestoreHooks: []velerov1api.RestoreResourceHook{
+						{
+							Init: &velerov1api.InitRestoreHook{
+								InitContainers: []runtime.RawExtension{
+									builder.ForContainer("restore-init-container-1", "nginx").
+										ResultRawExtension(),
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -1931,10 +1944,32 @@ func TestHandleRestoreHooks(t *testing.T) {
 			assert.NoError(t, err)
 			actual, err := handler.HandleRestoreHooks(velerotest.NewLogger(), kuberesource.Pods, &unstructured.Unstructured{Object: podMap}, tc.restoreHooks, tc.namespaceMapping)
 			assert.Equal(t, tc.expectedError, err)
-			actualPod := new(corev1api.Pod)
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(actual.UnstructuredContent(), actualPod)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedPod, actualPod)
+			if actual != nil {
+				actualPod := new(corev1api.Pod)
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(actual.UnstructuredContent(), actualPod)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedPod, actualPod)
+			}
 		})
 	}
+}
+
+func TestValidateContainer(t *testing.T) {
+	valid := `{"name": "test", "image": "busybox", "command": ["pwd"]}`
+	noName := `{"image": "busybox", "command": ["pwd"]}`
+	noImage := `{"name": "test", "command": ["pwd"]}`
+	noCommand := `{"name": "test", "image": "busybox"}`
+	expectedError := fmt.Errorf("invalid InitContainer in restore hook, it doesn't have Command, Name or Image field")
+
+	// valid string should return nil as result.
+	assert.Equal(t, nil, ValidateContainer([]byte(valid)))
+
+	// noName string should return expected error as result.
+	assert.Equal(t, expectedError, ValidateContainer([]byte(noName)))
+
+	// noImage string should return expected error as result.
+	assert.Equal(t, expectedError, ValidateContainer([]byte(noImage)))
+
+	// noCommand string should return expected error as result.
+	assert.Equal(t, expectedError, ValidateContainer([]byte(noCommand)))
 }

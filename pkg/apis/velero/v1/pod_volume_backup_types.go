@@ -34,11 +34,16 @@ type PodVolumeBackupSpec struct {
 	Volume string `json:"volume"`
 
 	// BackupStorageLocation is the name of the backup storage location
-	// where the restic repository is stored.
+	// where the backup repository is stored.
 	BackupStorageLocation string `json:"backupStorageLocation"`
 
-	// RepoIdentifier is the restic repository identifier.
+	// RepoIdentifier is the backup repository identifier.
 	RepoIdentifier string `json:"repoIdentifier"`
+
+	// UploaderType is the type of the uploader to handle the data transfer.
+	// +kubebuilder:validation:Enum=kopia;restic;""
+	// +optional
+	UploaderType string `json:"uploaderType"`
 
 	// Tags are a map of key-value pairs that should be applied to the
 	// volume backup as tags.
@@ -107,7 +112,8 @@ type PodVolumeBackupStatus struct {
 // +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".spec.pod.namespace",description="Namespace of the pod containing the volume to be backed up"
 // +kubebuilder:printcolumn:name="Pod",type="string",JSONPath=".spec.pod.name",description="Name of the pod containing the volume to be backed up"
 // +kubebuilder:printcolumn:name="Volume",type="string",JSONPath=".spec.volume",description="Name of the volume to be backed up"
-// +kubebuilder:printcolumn:name="Restic Repo",type="string",JSONPath=".spec.repoIdentifier",description="Restic repository identifier for this backup"
+// +kubebuilder:printcolumn:name="Repository ID",type="string",JSONPath=".spec.repoIdentifier",description="Backup repository identifier for this backup"
+// +kubebuilder:printcolumn:name="Uploader Type",type="string",JSONPath=".spec.uploaderType",description="The type of the uploader to handle data transfer"
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where this backup should be stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:object:root=true

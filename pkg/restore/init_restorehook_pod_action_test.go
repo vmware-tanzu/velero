@@ -90,11 +90,11 @@ func TestInitContainerRestoreHookPodActionExecute(t *testing.T) {
 								PostHooks: []velerov1api.RestoreResourceHook{
 									{
 										Init: &velerov1api.InitRestoreHook{
-											InitContainers: []corev1api.Container{
-												*builder.ForContainer("restore-init1", "busy-box").
-													Command([]string{"foobarbaz"}).Result(),
-												*builder.ForContainer("restore-init2", "busy-box").
-													Command([]string{"foobarbaz"}).Result(),
+											InitContainers: []runtime.RawExtension{
+												builder.ForContainer("restore-init1", "busy-box").
+													Command([]string{"foobarbaz"}).ResultRawExtension(),
+												builder.ForContainer("restore-init2", "busy-box").
+													Command([]string{"foobarbaz"}).ResultRawExtension(),
 											},
 										},
 									},

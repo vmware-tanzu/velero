@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
+	hook "github.com/vmware-tanzu/velero/internal/hook"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -71,10 +72,14 @@ var nonRestorableResources = []string{
 	// https://github.com/vmware-tanzu/velero/issues/622
 	"restores.velero.io",
 
+	// TODO: Remove this in v1.11 or v1.12
 	// Restic repositories are automatically managed by Velero and will be automatically
 	// created as needed if they don't exist.
 	// https://github.com/vmware-tanzu/velero/issues/1113
 	"resticrepositories.velero.io",
+
+	// Backup repositories were renamed from Restic repositories
+	"backuprepositories.velero.io",
 }
 
 type restoreController struct {
@@ -322,6 +327,22 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 	if !backupXorScheduleProvided(restore) {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Either a backup or schedule must be specified as a source for the restore, but not both")
 		return backupInfo{}
+	}
+
+	// validate Restore Init Hook's InitContainers
+	restoreHooks, err := hook.GetRestoreHooksFromSpec(&restore.Spec.Hooks)
+	if err != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+	}
+	for _, resource := range restoreHooks {
+		for _, h := range resource.RestoreHooks {
+			for _, container := range h.Init.InitContainers {
+				err = hook.ValidateContainer(container.Raw)
+				if err != nil {
+					restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+				}
+			}
+		}
 	}
 
 	// if ScheduleName is specified, fill in BackupName with the most recent successful backup from

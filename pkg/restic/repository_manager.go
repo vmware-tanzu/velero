@@ -18,16 +18,13 @@ package restic
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -36,6 +33,9 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -43,57 +43,45 @@ import (
 // RepositoryManager executes commands against restic repositories.
 type RepositoryManager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
-	InitRepo(repo *velerov1api.ResticRepository) error
+	InitRepo(repo *velerov1api.BackupRepository) error
 
 	// ConnectToRepo runs the 'restic snapshots' command against the
 	// specified repo, and returns an error if it fails. This is
 	// intended to be used to ensure that the repo exists/can be
 	// authenticated to.
-	ConnectToRepo(repo *velerov1api.ResticRepository) error
+	ConnectToRepo(repo *velerov1api.BackupRepository) error
 
 	// PruneRepo deletes unused data from a repo.
-	PruneRepo(repo *velerov1api.ResticRepository) error
+	PruneRepo(repo *velerov1api.BackupRepository) error
 
 	// UnlockRepo removes stale locks from a repo.
-	UnlockRepo(repo *velerov1api.ResticRepository) error
+	UnlockRepo(repo *velerov1api.BackupRepository) error
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
 	Forget(context.Context, SnapshotIdentifier) error
 
-	BackupperFactory
+	podvolume.BackupperFactory
 
-	RestorerFactory
-}
-
-// BackupperFactory can construct restic backuppers.
-type BackupperFactory interface {
-	// NewBackupper returns a restic backupper for use during a single
-	// Velero backup.
-	NewBackupper(context.Context, *velerov1api.Backup) (Backupper, error)
-}
-
-// RestorerFactory can construct restic restorers.
-type RestorerFactory interface {
-	// NewRestorer returns a restic restorer for use during a single
-	// Velero restore.
-	NewRestorer(context.Context, *velerov1api.Restore) (Restorer, error)
+	podvolume.RestorerFactory
 }
 
 type repositoryManager struct {
 	namespace            string
 	veleroClient         clientset.Interface
-	repoLister           velerov1listers.ResticRepositoryLister
+	repoLister           velerov1listers.BackupRepositoryLister
 	repoInformerSynced   cache.InformerSynced
 	kbClient             kbclient.Client
 	log                  logrus.FieldLogger
-	repoLocker           *repoLocker
-	repoEnsurer          *repositoryEnsurer
+	repoLocker           *repository.RepoLocker
+	repoEnsurer          *repository.RepositoryEnsurer
 	fileSystem           filesystem.Interface
 	ctx                  context.Context
 	pvcClient            corev1client.PersistentVolumeClaimsGetter
 	pvClient             corev1client.PersistentVolumesGetter
 	credentialsFileStore credentials.FileStore
+	podvolume.BackupperFactory
+	podvolume.RestorerFactory
 }
 
 const (
@@ -111,8 +99,8 @@ func NewRepositoryManager(
 	ctx context.Context,
 	namespace string,
 	veleroClient clientset.Interface,
-	repoInformer velerov1informers.ResticRepositoryInformer,
-	repoClient velerov1client.ResticRepositoriesGetter,
+	repoInformer velerov1informers.BackupRepositoryInformer,
+	repoClient velerov1client.BackupRepositoriesGetter,
 	kbClient kbclient.Client,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
@@ -131,57 +119,19 @@ func NewRepositoryManager(
 		log:                  log,
 		ctx:                  ctx,
 
-		repoLocker:  newRepoLocker(),
-		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
+		repoLocker:  repository.NewRepoLocker(),
+		repoEnsurer: repository.NewRepositoryEnsurer(repoInformer, repoClient, log),
 		fileSystem:  filesystem.NewFileSystem(),
 	}
+	rm.BackupperFactory = podvolume.NewBackupperFactory(rm.repoLocker, rm.repoEnsurer, rm.veleroClient, rm.pvcClient,
+		rm.pvClient, rm.repoInformerSynced, rm.log)
+	rm.RestorerFactory = podvolume.NewRestorerFactory(rm.repoLocker, rm.repoEnsurer, rm.veleroClient, rm.pvcClient,
+		rm.repoInformerSynced, rm.log)
 
 	return rm, nil
 }
 
-func (rm *repositoryManager) NewBackupper(ctx context.Context, backup *velerov1api.Backup) (Backupper, error) {
-	informer := velerov1informers.NewFilteredPodVolumeBackupInformer(
-		rm.veleroClient,
-		backup.Namespace,
-		0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(opts *metav1.ListOptions) {
-			opts.LabelSelector = fmt.Sprintf("%s=%s", velerov1api.BackupUIDLabel, backup.UID)
-		},
-	)
-
-	b := newBackupper(ctx, rm, rm.repoEnsurer, informer, rm.pvcClient, rm.pvClient, rm.log)
-
-	go informer.Run(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {
-		return nil, errors.New("timed out waiting for caches to sync")
-	}
-
-	return b, nil
-}
-
-func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *velerov1api.Restore) (Restorer, error) {
-	informer := velerov1informers.NewFilteredPodVolumeRestoreInformer(
-		rm.veleroClient,
-		restore.Namespace,
-		0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(opts *metav1.ListOptions) {
-			opts.LabelSelector = fmt.Sprintf("%s=%s", velerov1api.RestoreUIDLabel, restore.UID)
-		},
-	)
-
-	r := newRestorer(ctx, rm, rm.repoEnsurer, informer, rm.pvcClient, rm.log)
-
-	go informer.Run(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {
-		return nil, errors.New("timed out waiting for cache to sync")
-	}
-
-	return r, nil
-}
-
-func (rm *repositoryManager) InitRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) InitRepo(repo *velerov1api.BackupRepository) error {
 	// restic init requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
@@ -189,7 +139,7 @@ func (rm *repositoryManager) InitRepo(repo *velerov1api.ResticRepository) error 
 	return rm.exec(InitCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.BackupRepository) error {
 	// restic snapshots requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
@@ -204,7 +154,7 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) e
 	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) PruneRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	// restic prune requires an exclusive lock
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
@@ -212,7 +162,7 @@ func (rm *repositoryManager) PruneRepo(repo *velerov1api.ResticRepository) error
 	return rm.exec(PruneCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) UnlockRepo(repo *velerov1api.ResticRepository) error {
+func (rm *repositoryManager) UnlockRepo(repo *velerov1api.BackupRepository) error {
 	// restic unlock requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
@@ -242,7 +192,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 }
 
 func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
-	file, err := rm.credentialsFileStore.Path(RepoKeySelector())
+	file, err := rm.credentialsFileStore.Path(repokey.RepoKeySelector())
 	if err != nil {
 		return err
 	}

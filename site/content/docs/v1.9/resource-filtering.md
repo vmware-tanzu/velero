@@ -26,7 +26,7 @@ Namespaces to include. Default is `*`, all namespaces.
 * Restore two namespaces and their objects.
 
   ```bash
-  velero restore create <backup-name> --include-namespaces <namespace1>,<namespace2>
+  velero restore create <restore-name> --include-namespaces <namespace1>,<namespace2> --from-backup <backup-name>
   ```
 
 ### --include-resources
@@ -42,7 +42,7 @@ Kubernetes resources to include in the backup, formatted as resource.group, such
 * Restore all deployments and configmaps in the cluster.
 
   ```bash
-  velero restore create <backup-name> --include-resources deployments,configmaps
+  velero restore create <restore-name> --include-resources deployments,configmaps --from-backup <backup-name>
   ```
 
 * Backup the deployments in a namespace.
@@ -76,7 +76,7 @@ Includes cluster-scoped resources. This option can have three possible values:
 * Restore only namespaced resources in the cluster.
 
   ```bash
-  velero restore create <backup-name> --include-cluster-resources=false
+  velero restore create <restore-name> --include-cluster-resources=false --from-backup <backup-name>
   ```
 
 * Backup a namespace and include cluster-scoped resources.
@@ -119,7 +119,7 @@ Namespaces to exclude.
 * Exclude two namespaces during a restore.
 
   ```bash
-  velero restore create <backup-name> --exclude-namespaces <namespace1>,<namespace2>
+  velero restore create <restore-name> --exclude-namespaces <namespace1>,<namespace2> --from-backup <backup-name>
   ```
 
 ### --exclude-resources

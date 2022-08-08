@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// Backups returns a BackupInformer.
 	Backups() BackupInformer
+	// BackupRepositories returns a BackupRepositoryInformer.
+	BackupRepositories() BackupRepositoryInformer
 	// BackupStorageLocations returns a BackupStorageLocationInformer.
 	BackupStorageLocations() BackupStorageLocationInformer
 	// DeleteBackupRequests returns a DeleteBackupRequestInformer.
@@ -36,8 +38,6 @@ type Interface interface {
 	PodVolumeBackups() PodVolumeBackupInformer
 	// PodVolumeRestores returns a PodVolumeRestoreInformer.
 	PodVolumeRestores() PodVolumeRestoreInformer
-	// ResticRepositories returns a ResticRepositoryInformer.
-	ResticRepositories() ResticRepositoryInformer
 	// Restores returns a RestoreInformer.
 	Restores() RestoreInformer
 	// Schedules returns a ScheduleInformer.
@@ -64,6 +64,11 @@ func (v *version) Backups() BackupInformer {
 	return &backupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// BackupRepositories returns a BackupRepositoryInformer.
+func (v *version) BackupRepositories() BackupRepositoryInformer {
+	return &backupRepositoryInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // BackupStorageLocations returns a BackupStorageLocationInformer.
 func (v *version) BackupStorageLocations() BackupStorageLocationInformer {
 	return &backupStorageLocationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -87,11 +92,6 @@ func (v *version) PodVolumeBackups() PodVolumeBackupInformer {
 // PodVolumeRestores returns a PodVolumeRestoreInformer.
 func (v *version) PodVolumeRestores() PodVolumeRestoreInformer {
 	return &podVolumeRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ResticRepositories returns a ResticRepositoryInformer.
-func (v *version) ResticRepositories() ResticRepositoryInformer {
-	return &resticRepositoryInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Restores returns a RestoreInformer.

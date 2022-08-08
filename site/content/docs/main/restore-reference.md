@@ -73,7 +73,7 @@ The following is an overview of Velero's restore process that starts after you r
 By default, Velero will restore resources in the following order:
 
 * Custom Resource Definitions
-* Mamespaces
+* Namespaces
 * StorageClasses
 * VolumeSnapshotClass
 * VolumeSnapshotContents

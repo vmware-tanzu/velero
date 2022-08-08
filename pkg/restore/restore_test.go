@@ -48,8 +48,8 @@ import (
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/restic"
-	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -2681,10 +2681,10 @@ func TestRestorePersistentVolumes(t *testing.T) {
 }
 
 type fakeResticRestorerFactory struct {
-	restorer *resticmocks.Restorer
+	restorer *uploadermocks.Restorer
 }
 
-func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (restic.Restorer, error) {
+func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (podvolume.Restorer, error) {
 	return f.restorer, nil
 }
 
@@ -2749,7 +2749,7 @@ func TestRestoreWithRestic(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			restorer := new(resticmocks.Restorer)
+			restorer := new(uploadermocks.Restorer)
 			defer restorer.AssertExpectations(t)
 			h.restorer.resticRestorerFactory = &fakeResticRestorerFactory{
 				restorer: restorer,
@@ -2773,7 +2773,7 @@ func TestRestoreWithRestic(t *testing.T) {
 
 				// the restore process adds these labels before restoring, so we must add them here too otherwise they won't match
 				pod.Labels = map[string]string{"velero.io/backup-name": tc.backup.Name, "velero.io/restore-name": tc.restore.Name}
-				expectedArgs := restic.RestoreData{
+				expectedArgs := podvolume.RestoreData{
 					Restore:          tc.restore,
 					Pod:              pod,
 					PodVolumeBackups: tc.podVolumeBackups,

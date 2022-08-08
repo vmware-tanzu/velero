@@ -33,7 +33,7 @@ var (
 	}
 )
 
-func printResticRepoList(list *v1.ResticRepositoryList) []metav1.TableRow {
+func printResticRepoList(list *v1.BackupRepositoryList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
@@ -42,14 +42,14 @@ func printResticRepoList(list *v1.ResticRepositoryList) []metav1.TableRow {
 	return rows
 }
 
-func printResticRepo(repo *v1.ResticRepository) []metav1.TableRow {
+func printResticRepo(repo *v1.BackupRepository) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: repo},
 	}
 
 	status := repo.Status.Phase
 	if status == "" {
-		status = v1.ResticRepositoryPhaseNew
+		status = v1.BackupRepositoryPhaseNew
 	}
 
 	var lastMaintenance string

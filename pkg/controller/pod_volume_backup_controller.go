@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -124,7 +125,11 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		return r.updateStatusToFailed(ctx, &pvb, err, "building Restic command", log)
 	}
-	defer os.Remove(resticDetails.credsFile)
+
+	defer func() {
+		os.Remove(resticDetails.credsFile)
+		os.Remove(resticDetails.caCertFile)
+	}()
 
 	backupLocation := &velerov1api.BackupStorageLocation{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{
@@ -204,19 +209,6 @@ func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *PodVolumeBackupReconciler) singlePathMatch(path string) (string, error) {
-	matches, err := r.FileSystem.Glob(path)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	if len(matches) != 1 {
-		return "", errors.Errorf("expected one matching path: %s, got %d", path, len(matches))
-	}
-
-	return matches[0], nil
-}
-
 // getParentSnapshot finds the most recent completed PodVolumeBackup for the
 // specified PVC and returns its Restic snapshot ID. Any errors encountered are
 // logged but not returned since they do not prevent a backup from proceeding.
@@ -237,7 +229,7 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 
 	// Go through all the podvolumebackups for the PVC and look for the most
 	// recent completed one to use as the parent.
-	var mostRecentPVB *velerov1api.PodVolumeBackup
+	var mostRecentPVB velerov1api.PodVolumeBackup
 	for _, pvb := range pvbList.Items {
 		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
 			continue
@@ -254,12 +246,12 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 			continue
 		}
 
-		if mostRecentPVB == nil || pvb.Status.StartTimestamp.After(mostRecentPVB.Status.StartTimestamp.Time) {
-			mostRecentPVB = &pvb
+		if mostRecentPVB.Status == (velerov1api.PodVolumeBackupStatus{}) || pvb.Status.StartTimestamp.After(mostRecentPVB.Status.StartTimestamp.Time) {
+			mostRecentPVB = pvb
 		}
 	}
 
-	if mostRecentPVB == nil {
+	if mostRecentPVB.Status == (velerov1api.PodVolumeBackupStatus{}) {
 		log.Info("No completed PodVolumeBackup found for PVC")
 		return ""
 	}
@@ -313,14 +305,14 @@ func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log 
 	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pvb.Spec.Pod.UID), volDir)
 	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
-	path, err := r.singlePathMatch(pathGlob)
+	path, err := kube.SinglePathMatch(pathGlob, r.FileSystem, log)
 	if err != nil {
 		return nil, errors.Wrap(err, "identifying unique volume path on host")
 	}
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// Temporary credentials.
-	details.credsFile, err = r.CredsFileStore.Path(restic.RepoKeySelector())
+	details.credsFile, err = r.CredsFileStore.Path(repokey.RepoKeySelector())
 	if err != nil {
 		return nil, errors.Wrap(err, "creating temporary Restic credentials file")
 	}
@@ -344,8 +336,6 @@ func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log 
 		if err != nil {
 			log.WithError(err).Error("creating temporary caCert file")
 		}
-		defer os.Remove(details.caCertFile)
-
 	}
 	cmd.CACertFile = details.caCertFile
 

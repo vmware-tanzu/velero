@@ -27,6 +27,26 @@ rules:
 - apiGroups:
   - velero.io
   resources:
+  - backuprepositories
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - backuprepositories/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
   - backups
   verbs:
   - create
@@ -134,26 +154,6 @@ rules:
 - apiGroups:
   - velero.io
   resources:
-  - resticrepositories
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - velero.io
-  resources:
-  - resticrepositories/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - velero.io
-  resources:
   - schedules
   verbs:
   - create
@@ -191,3 +191,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - velero.io
+  resources:
+  - volumesnapshotlocations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

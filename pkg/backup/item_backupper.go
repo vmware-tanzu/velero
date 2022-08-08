@@ -42,7 +42,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -53,13 +53,18 @@ type itemBackupper struct {
 	tarWriter               tarWriter
 	dynamicFactory          client.DynamicFactory
 	discoveryHelper         discovery.Helper
-	resticBackupper         restic.Backupper
+	resticBackupper         podvolume.Backupper
 	resticSnapshotTracker   *pvcSnapshotTracker
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 
 	itemHookHandler                    hook.ItemHookHandler
 	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
 }
+
+const (
+	// veleroExcludeFromBackupLabel labeled item should be exclude by velero in backup job.
+	veleroExcludeFromBackupLabel = "velero.io/exclude-from-backup"
+)
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
@@ -78,8 +83,8 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	log = log.WithField("resource", groupResource.String())
 	log = log.WithField("namespace", namespace)
 
-	if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
-		log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
+	if metadata.GetLabels()[veleroExcludeFromBackupLabel] == "true" {
+		log.Infof("Excluding item because it has label %s=true", veleroExcludeFromBackupLabel)
 		return false, nil
 	}
 
@@ -144,7 +149,7 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			// Get the list of volumes to back up using restic from the pod's annotations. Remove from this list
 			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			for _, volume := range restic.GetPodVolumesUsingRestic(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToRestic)) {
+			for _, volume := range podvolume.GetPodVolumesUsingRestic(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToRestic)) {
 				if found, pvcName := ib.resticSnapshotTracker.HasPVCForPodVolume(pod, volume); found {
 					log.WithFields(map[string]interface{}{
 						"podVolume": volume,
