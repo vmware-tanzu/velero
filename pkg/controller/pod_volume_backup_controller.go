@@ -209,19 +209,6 @@ func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *PodVolumeBackupReconciler) singlePathMatch(path string) (string, error) {
-	matches, err := r.FileSystem.Glob(path)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	if len(matches) != 1 {
-		return "", errors.Errorf("expected one matching path: %s, got %d", path, len(matches))
-	}
-
-	return matches[0], nil
-}
-
 // getParentSnapshot finds the most recent completed PodVolumeBackup for the
 // specified PVC and returns its Restic snapshot ID. Any errors encountered are
 // logged but not returned since they do not prevent a backup from proceeding.
@@ -318,7 +305,7 @@ func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log 
 	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pvb.Spec.Pod.UID), volDir)
 	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
-	path, err := r.singlePathMatch(pathGlob)
+	path, err := kube.SinglePathMatch(pathGlob, r.FileSystem, log)
 	if err != nil {
 		return nil, errors.Wrap(err, "identifying unique volume path on host")
 	}
