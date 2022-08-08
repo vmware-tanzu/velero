@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +51,14 @@ const (
 	// DefaultVolumesToRestic specifies whether restic should be used, by default, to
 	// take backup of all pod volumes.
 	DefaultVolumesToRestic = false
+
+	// insecureSkipTLSVerifyKey is the flag in BackupStorageLocation's config
+	// to indicate whether to skip TLS verify to setup insecure HTTPS connection.
+	insecureSkipTLSVerifyKey = "insecureSkipTLSVerify"
+
+	// resticInsecureTLSFlag is the flag for Restic command line to indicate
+	// skip TLS verify on https connection.
+	resticInsecureTLSFlag = "--insecure-tls"
 )
 
 // SnapshotIdentifier uniquely identifies a restic snapshot
@@ -175,4 +185,23 @@ func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileSto
 	}
 
 	return env, nil
+}
+
+// GetInsecureSkipTLSVerifyFromBSL get insecureSkipTLSVerify flag from BSL configuration,
+// Then return --insecure-tls flag with boolean value as result.
+func GetInsecureSkipTLSVerifyFromBSL(backupLocation *velerov1api.BackupStorageLocation, logger logrus.FieldLogger) string {
+	result := ""
+
+	if backupLocation == nil {
+		logger.Info("bsl is nil. return empty.")
+		return result
+	}
+
+	if insecure, _ := strconv.ParseBool(backupLocation.Spec.Config[insecureSkipTLSVerifyKey]); insecure {
+		logger.Debugf("set --insecure-tls=true for Restic command according to BSL %s config", backupLocation.Name)
+		result = resticInsecureTLSFlag + "=true"
+		return result
+	}
+
+	return result
 }

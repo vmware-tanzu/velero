@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
@@ -215,4 +216,99 @@ func TestTempCACertFile(t *testing.T) {
 	assert.Equal(t, string(caCertData), string(contents))
 
 	os.Remove(fileName)
+}
+
+func TestGetInsecureSkipTLSVerifyFromBSL(t *testing.T) {
+	log := logrus.StandardLogger()
+	tests := []struct {
+		name           string
+		backupLocation *velerov1api.BackupStorageLocation
+		logger         logrus.FieldLogger
+		expected       string
+	}{
+		{
+			"Test with nil BSL. Should return empty string.",
+			nil,
+			log,
+			"",
+		},
+		{
+			"Test BSL with no configuration. Should return empty string.",
+			&velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "azure",
+				},
+			},
+			log,
+			"",
+		},
+		{
+			"Test with AWS BSL's insecureSkipTLSVerify set to false.",
+			&velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					Config: map[string]string{
+						"insecureSkipTLSVerify": "false",
+					},
+				},
+			},
+			log,
+			"",
+		},
+		{
+			"Test with AWS BSL's insecureSkipTLSVerify set to true.",
+			&velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+					Config: map[string]string{
+						"insecureSkipTLSVerify": "true",
+					},
+				},
+			},
+			log,
+			"--insecure-tls=true",
+		},
+		{
+			"Test with Azure BSL's insecureSkipTLSVerify set to invalid.",
+			&velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "azure",
+					Config: map[string]string{
+						"insecureSkipTLSVerify": "invalid",
+					},
+				},
+			},
+			log,
+			"",
+		},
+		{
+			"Test with GCP without insecureSkipTLSVerify.",
+			&velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "gcp",
+					Config:   map[string]string{},
+				},
+			},
+			log,
+			"",
+		},
+		{
+			"Test with AWS without config.",
+			&velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "aws",
+				},
+			},
+			log,
+			"",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res := GetInsecureSkipTLSVerifyFromBSL(test.backupLocation, test.logger)
+
+			assert.Equal(t, test.expected, res)
+		})
+	}
 }
