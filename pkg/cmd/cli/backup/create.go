@@ -98,6 +98,7 @@ type CreateOptions struct {
 	SnapshotLocations       []string
 	FromSchedule            string
 	OrderedResources        string
+	CSISnapshotTimeout      time.Duration
 
 	client veleroclient.Interface
 }
@@ -122,6 +123,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
+	flags.DurationVar(&o.CSISnapshotTimeout, "csi-snapshot-timeout", o.CSISnapshotTimeout, "How long to wait for CSI snapshot creation before timeout.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
@@ -332,7 +334,8 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			LabelSelector(o.Selector.LabelSelector).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
-			VolumeSnapshotLocations(o.SnapshotLocations...)
+			VolumeSnapshotLocations(o.SnapshotLocations...).
+			CSISnapshotTimeout(o.CSISnapshotTimeout)
 		if len(o.OrderedResources) > 0 {
 			orders, err := ParseOrderedResources(o.OrderedResources)
 			if err != nil {

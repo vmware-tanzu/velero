@@ -103,6 +103,8 @@ const (
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
 
+	defaultCSISnapshotTimeout = 10 * time.Minute
+
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
@@ -112,7 +114,7 @@ type serverConfig struct {
 	// TODO(2.0) Deprecate defaultBackupLocation
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
-	defaultBackupTTL, storeValidationFrequency                              time.Duration
+	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
 	restoreResourcePriorities                                               []string
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -143,6 +145,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultVolumeSnapshotLocations:    make(map[string]string),
 			backupSyncPeriod:                  defaultBackupSyncPeriod,
 			defaultBackupTTL:                  defaultBackupTTL,
+			defaultCSISnapshotTimeout:         defaultCSISnapshotTimeout,
 			storeValidationFrequency:          defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:         defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:         defaultRestorePriorities,
@@ -651,6 +654,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultBackupLocation,
 			s.config.defaultVolumesToRestic,
 			s.config.defaultBackupTTL,
+			s.config.defaultCSISnapshotTimeout,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
