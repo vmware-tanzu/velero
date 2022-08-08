@@ -264,18 +264,6 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 	return mostRecentPVB.Status.SnapshotID
 }
 
-// updateBackupProgressFunc returns a func that takes progress info and patches
-// the PVB with the new progress.
-func (r *PodVolumeBackupReconciler) updateBackupProgressFunc(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
-	return func(progress velerov1api.PodVolumeOperationProgress) {
-		original := pvb.DeepCopy()
-		pvb.Status.Progress = progress
-		if err := r.Client.Patch(context.Background(), pvb, client.MergeFrom(original)); err != nil {
-			log.WithError(err).Error("error update progress")
-		}
-	}
-}
-
 func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
 	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed

@@ -22,10 +22,8 @@ import (
 )
 
 const (
-	ResticType    = "restic"
-	KopiaType     = "kopia"
-	VeleroBackup  = "backup"
-	VeleroRestore = "restore"
+	ResticType = "restic"
+	KopiaType  = "kopia"
 )
 
 // ValidateUploaderType validates if the input param is a valid uploader type.
@@ -41,9 +39,4 @@ func ValidateUploaderType(t string) error {
 type SnapshotInfo struct {
 	ID   string `json:"id"`
 	Size int64  `json:"Size"`
-}
-
-type UploaderProgress struct {
-	TotalBytes int64 `json:"totalBytes,omitempty"`
-	BytesDone  int64 `json:"doneBytes,omitempty"`
 }
