@@ -317,15 +317,3 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 
 	return nil
 }
-
-// updateRestoreProgressFunc returns a func that takes progress info and patches
-// the PVR with the new progress
-func (c *PodVolumeRestoreReconciler) updateRestoreProgressFunc(req *velerov1api.PodVolumeRestore, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
-	return func(progress velerov1api.PodVolumeOperationProgress) {
-		original := req.DeepCopy()
-		req.Status.Progress = progress
-		if err := c.Patch(context.Background(), req, client.MergeFrom(original)); err != nil {
-			log.WithError(err).Error("Unable to update PodVolumeRestore progress")
-		}
-	}
-}
