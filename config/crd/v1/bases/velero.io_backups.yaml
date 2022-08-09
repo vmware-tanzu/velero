@@ -37,6 +37,11 @@ spec:
           spec:
             description: BackupSpec defines the specification for a Velero backup.
             properties:
+              csiSnapshotTimeout:
+                description: CSISnapshotTimeout specifies the time used to wait for
+                  CSI VolumeSnapshot status turns to ReadyToUse during creation, before
+                  returning error as timeout. The default value is 10 minute.
+                type: string
               defaultVolumesToRestic:
                 description: DefaultVolumesToRestic specifies whether restic should
                   be used to take a backup of all pod volumes by default.

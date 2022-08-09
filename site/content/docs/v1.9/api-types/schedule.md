@@ -34,6 +34,11 @@ spec:
   schedule: 0 7 * * *
   # Template is the spec that should be used for each backup triggered by this schedule.
   template:
+    # Available since v1.9.1.
+    # CSISnapshotTimeout specifies the time used to wait for
+    # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
+    # returning error as timeout. The default value is 10 minute.
+    csiSnapshotTimeout: 10m
     # Array of namespaces to include in the scheduled backup. If unspecified, all namespaces are included.
     # Optional.
     includedNamespaces:

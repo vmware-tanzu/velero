@@ -29,6 +29,10 @@ metadata:
   namespace: velero
 # Parameters about the backup. Required.
 spec:
+  # CSISnapshotTimeout specifies the time used to wait for
+  # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
+  # returning error as timeout. The default value is 10 minute.
+  csiSnapshotTimeout: 10m
   # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
