@@ -60,11 +60,11 @@ func (b *TTL) Init() {
 func TTLTest() {
 	useVolumeSnapshots := true
 	test := new(TTL)
-	client, err := NewTestClient()
+	client, err := NewTestClient(VeleroCfg.DefaultCluster)
 	if err != nil {
 		println(err.Error())
 	}
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+	//Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
 		flag.Parse()
@@ -142,7 +142,7 @@ func TTLTest() {
 
 		By(fmt.Sprintf("Restore %s", test.testNS), func() {
 			Expect(VeleroRestore(test.ctx, VeleroCfg.VeleroCLI,
-				VeleroCfg.VeleroNamespace, test.restoreName, test.backupName)).To(Succeed(), func() string {
+				VeleroCfg.VeleroNamespace, test.restoreName, test.backupName, "")).To(Succeed(), func() string {
 				RunDebug(test.ctx, VeleroCfg.VeleroCLI,
 					VeleroCfg.VeleroNamespace, "", test.restoreName)
 				return "Fail to restore workload"

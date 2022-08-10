@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
 var UUIDgen uuid.UUID
@@ -47,6 +49,8 @@ type VerleroConfig struct {
 	ResticHelperImage        string
 	UpgradeFromVeleroVersion string
 	UpgradeFromVeleroCLI     string
+	MigrateFromVeleroVersion string
+	MigrateFromVeleroCLI     string
 	Plugins                  string
 	AddBSLPlugins            string
 	InstallVelero            bool
@@ -54,6 +58,11 @@ type VerleroConfig struct {
 	Features                 string
 	Debug                    bool
 	GCFrequency              string
+	DefaultCluster           string
+	StandbyCluster           string
+	ClientToInstallVelero    *TestClient
+	DefaultClient            *TestClient
+	StandbyClient            *TestClient
 }
 
 type SnapshotCheckPoint struct {
@@ -67,10 +76,19 @@ type SnapshotCheckPoint struct {
 }
 
 type BackupConfig struct {
-	BackupName         string
-	Namespace          string
-	BackupLocation     string
-	UseVolumeSnapshots bool
-	Selector           string
-	TTL                time.Duration
+	BackupName              string
+	Namespace               string
+	BackupLocation          string
+	UseVolumeSnapshots      bool
+	Selector                string
+	TTL                     time.Duration
+	IncludeResources        string
+	ExcludeResources        string
+	IncludeClusterResources bool
+	OrderedResources        string
+}
+
+type VeleroCLI2Version struct {
+	VeleroVersion string
+	VeleroCLI     string
 }

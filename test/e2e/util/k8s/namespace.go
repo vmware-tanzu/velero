@@ -67,21 +67,22 @@ func GetNamespace(ctx context.Context, client TestClient, namespace string) (*co
 }
 
 func DeleteNamespace(ctx context.Context, client TestClient, namespace string, wait bool) error {
-	if err := client.ClientGo.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
+	oneMinuteTimeout, _ := context.WithTimeout(context.Background(), time.Minute*1)
+	if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 	}
 	if !wait {
 		return nil
 	}
-
 	return waitutil.PollImmediateInfinite(5*time.Second,
 		func() (bool, error) {
-			if _, err := client.ClientGo.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
+			if _, err := client.ClientGo.CoreV1().Namespaces().Get(oneMinuteTimeout, namespace, metav1.GetOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
 				}
 				return false, err
 			}
+			fmt.Printf("namespace %q is still being deleted...\n", namespace)
 			logrus.Debugf("namespace %q is still being deleted...", namespace)
 			return false, nil
 		})

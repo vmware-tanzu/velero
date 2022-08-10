@@ -53,16 +53,8 @@ func (b *SyncBackups) Init() {
 func BackupsSyncTest() {
 	test := new(SyncBackups)
 	var (
-		client TestClient
-		err    error
+		err error
 	)
-
-	By("Create test client instance", func() {
-		client, err = NewTestClient()
-		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
-	})
-
-	Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
 		flag.Parse()
@@ -82,11 +74,11 @@ func BackupsSyncTest() {
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS))
-		Expect(CreateNamespace(test.ctx, client, test.testNS)).To(Succeed(),
+		Expect(CreateNamespace(test.ctx, *VeleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", test.testNS))
 
 		defer func() {
-			Expect(DeleteNamespace(test.ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
+			Expect(DeleteNamespace(test.ctx, *VeleroCfg.ClientToInstallVelero, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 		}()
 
 		var BackupCfg BackupConfig
@@ -119,12 +111,12 @@ func BackupsSyncTest() {
 	It("Deleted backups in object storage are synced to be deleted in Velero", func() {
 		test.Init()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace in %s namespace", test.testNS), func() {
-			Expect(CreateNamespace(test.ctx, client, test.testNS)).To(Succeed(),
+			Expect(CreateNamespace(test.ctx, *VeleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
 		})
 		if !VeleroCfg.Debug {
 			defer func() {
-				Expect(DeleteNamespace(test.ctx, client, test.testNS, false)).To(Succeed(),
+				Expect(DeleteNamespace(test.ctx, *VeleroCfg.ClientToInstallVelero, test.testNS, false)).To(Succeed(),
 					fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 			}()
 		}
