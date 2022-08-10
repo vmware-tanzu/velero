@@ -87,6 +87,7 @@ type backupController struct {
 	defaultBackupLocation       string
 	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
+	defaultCSISnapshotTimeout   time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
@@ -111,6 +112,7 @@ func NewBackupController(
 	defaultBackupLocation string,
 	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
+	defaultCSISnapshotTimeout time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -135,6 +137,7 @@ func NewBackupController(
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
+		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
 		snapshotLocationLister:      volumeSnapshotLocationLister,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
 		metrics:                     metrics,
@@ -357,6 +360,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	if request.Spec.TTL.Duration == 0 {
 		// set default backup TTL
 		request.Spec.TTL.Duration = c.defaultBackupTTL
+	}
+
+	if request.Spec.CSISnapshotTimeout.Duration == 0 {
+		// set default CSI VolumeSnapshot timeout
+		request.Spec.CSISnapshotTimeout.Duration = c.defaultCSISnapshotTimeout
 	}
 
 	// calculate expiration
@@ -638,7 +646,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 				backupLog.Error(err)
 			}
 
-			err = c.checkVolumeSnapshotReadyToUse(context.Background(), volumeSnapshots)
+			err = c.checkVolumeSnapshotReadyToUse(context.Background(), volumeSnapshots, backup.Spec.CSISnapshotTimeout.Duration)
 			if err != nil {
 				backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
 			}
@@ -879,9 +887,10 @@ func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
 // using goroutine here instead of waiting in CSI plugin, because it's not easy to make BackupItemAction
 // parallel by now. After BackupItemAction parallel is implemented, this logic should be moved to CSI plugin
 // as https://github.com/vmware-tanzu/velero-plugin-for-csi/pull/100
-func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, volumesnapshots []*snapshotv1api.VolumeSnapshot) error {
+func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, volumesnapshots []*snapshotv1api.VolumeSnapshot,
+	csiSnapshotTimeout time.Duration) error {
 	eg, _ := errgroup.WithContext(ctx)
-	timeout := 10 * time.Minute
+	timeout := csiSnapshotTimeout
 	interval := 5 * time.Second
 
 	for _, vs := range volumesnapshots {

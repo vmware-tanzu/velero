@@ -233,3 +233,9 @@ func (b *BackupBuilder) OrderedResources(orders map[string]string) *BackupBuilde
 	b.object.Spec.OrderedResources = orders
 	return b
 }
+
+// CSISnapshotTimeout sets the Backup's CSISnapshotTimeout
+func (b *BackupBuilder) CSISnapshotTimeout(timeout time.Duration) *BackupBuilder {
+	b.object.Spec.CSISnapshotTimeout.Duration = timeout
+	return b
+}

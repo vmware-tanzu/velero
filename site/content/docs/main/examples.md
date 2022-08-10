@@ -47,10 +47,10 @@ cd velero
     kubectl apply -f examples/nginx-app/with-pv.yaml
     ```
 
-1. Create a backup with PV snapshotting:
+1. Create a backup with PV snapshotting. `--csi-snapshot-timeout` is used to setup time to wait before CSI snapshot creation timeout. The default value is 10 minutes:
 
     ```bash
-    velero backup create nginx-backup --include-namespaces nginx-example
+    velero backup create nginx-backup --include-namespaces nginx-example --csi-snapshot-timeout=20m
     ```
 
 1. Simulate a disaster:
