@@ -105,7 +105,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	}
 
 	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest,
-		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots); err != nil {
+		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
 	err := ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)
