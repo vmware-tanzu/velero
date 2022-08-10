@@ -95,7 +95,7 @@ func TTLTest() {
 		By("Deploy sample workload of Kibishii", func() {
 			Expect(KibishiiPrepareBeforeBackup(test.ctx, client, VeleroCfg.CloudProvider,
 				test.testNS, VeleroCfg.RegistryCredentialFile, VeleroCfg.Features,
-				VeleroCfg.KibishiiDirectory, useVolumeSnapshots)).To(Succeed())
+				VeleroCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
 		})
 
 		var BackupCfg BackupConfig

@@ -122,6 +122,9 @@ var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
 
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
+var _ = Describe("[NamespaceMapping][Single] Backup resources should follow the specific order in schedule", OneNamespaceMappingTest)
+var _ = Describe("[NamespaceMapping][Multiple] Backup resources should follow the specific order in schedule", MultiNamespacesMappingTest)
+
 func GetKubeconfigContext() error {
 	var err error
 	var tcDefault, tcStandby TestClient
