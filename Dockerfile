@@ -50,7 +50,7 @@ RUN mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
-FROM gcr.io/distroless/base-debian11@sha256:e672eb713e56feb13e349773973b81b1b9284f70b15cf18d1a09ad31a03abe59
+FROM gcr.io/distroless/base-debian11@sha256:49d2923f35d66b8402487a7c01bc62a66d8279cd42e89c11b64cdce8d5826c03
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
