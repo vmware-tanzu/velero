@@ -22,6 +22,7 @@ https://velero.io/docs/v1.9/upgrade-to-1.9/
   * Fix restic backups to multiple backup storage locations bug (#5175, @qiuming-best)
   * Make CSI snapshot creation timeout configurable. (#5189, @jxun)
   * Add annotation "pv.kubernetes.io/migrated-to" for CSI checking. (#5186, @jxun)
+  * Bump up base image and package version to fix CVEs. (#5202, @ywk253100)
 
 ## v1.9.0
 ### 2022-06-13
