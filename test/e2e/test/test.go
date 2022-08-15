@@ -174,7 +174,7 @@ func (t *TestCase) Verify() error {
 }
 
 func (t *TestCase) Clean() error {
-	return CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+	return CleanupNamespacesWithPoll(t.Ctx, t.Client, t.NSBaseName)
 }
 
 func (t *TestCase) GetTestMsg() *TestMSG {

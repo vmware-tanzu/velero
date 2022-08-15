@@ -67,7 +67,7 @@ func GetNamespace(ctx context.Context, client TestClient, namespace string) (*co
 }
 
 func DeleteNamespace(ctx context.Context, client TestClient, namespace string, wait bool) error {
-	oneMinuteTimeout, _ := context.WithTimeout(context.Background(), time.Minute*1)
+	tenMinuteTimeout, _ := context.WithTimeout(context.Background(), time.Minute*10)
 	if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 	}
@@ -76,7 +76,7 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 	}
 	return waitutil.PollImmediateInfinite(5*time.Second,
 		func() (bool, error) {
-			if _, err := client.ClientGo.CoreV1().Namespaces().Get(oneMinuteTimeout, namespace, metav1.GetOptions{}); err != nil {
+			if _, err := client.ClientGo.CoreV1().Namespaces().Get(tenMinuteTimeout, namespace, metav1.GetOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
 				}
@@ -90,6 +90,7 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 
 func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseName string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
@@ -99,6 +100,7 @@ func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseNam
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
 			}
+			fmt.Printf("Delete namespace %s", checkNamespace.Name)
 		}
 	}
 	return nil
@@ -134,4 +136,17 @@ func WaitAllSelectedNSDeleted(ctx context.Context, client TestClient, label stri
 				return false, nil
 			}
 		})
+}
+
+func NamespaceShouldNotExist(ctx context.Context, client TestClient, namespace string) error {
+	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Could not retrieve namespaces")
+	}
+	for _, checkNamespace := range namespaces.Items {
+		if checkNamespace.Name == namespace {
+			return errors.New(fmt.Sprintf("Namespace %s still exist", checkNamespace.Name))
+		}
+	}
+	return nil
 }

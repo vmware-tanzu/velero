@@ -147,7 +147,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			By("Deploy sample workload of Kibishii", func() {
 				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, *VeleroCfg.ClientToInstallVelero, VeleroCfg.CloudProvider,
 					bslDeletionTestNs, VeleroCfg.RegistryCredentialFile, VeleroCfg.Features,
-					VeleroCfg.KibishiiDirectory, useVolumeSnapshots)).To(Succeed())
+					VeleroCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
 			})
 
 			// Restic can not backup PV only, so pod need to be labeled also
