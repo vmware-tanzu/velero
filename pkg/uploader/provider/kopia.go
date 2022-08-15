@@ -97,8 +97,8 @@ func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struc
 	}
 }
 
-func (kp *kopiaProvider) Close(ctx context.Context) {
-	kp.bkRepo.Close(ctx)
+func (kp *kopiaProvider) Close(ctx context.Context) error {
+	return kp.bkRepo.Close(ctx)
 }
 
 //RunBackup which will backup specific path and update backup progress

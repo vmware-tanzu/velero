@@ -20,11 +20,16 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
@@ -49,23 +54,34 @@ type Provider interface {
 		volumePath string,
 		updater uploader.ProgressUpdater) error
 	// Close which will close related repository
-	Close(ctx context.Context)
+	Close(ctx context.Context) error
 }
 
 // NewUploaderProvider initialize provider with specific uploaderType
 func NewUploaderProvider(
 	ctx context.Context,
+	client client.Client,
 	uploaderType string,
 	repoIdentifier string,
 	bsl *velerov1api.BackupStorageLocation,
-	backupReo *velerov1api.BackupRepository,
+	backupRepo *velerov1api.BackupRepository,
 	credGetter *credentials.CredentialGetter,
 	repoKeySelector *v1.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
+	if credGetter.FromFile == nil {
+		return nil, errors.New("uninitialized FileStore credentail is not supported")
+	}
 	if uploaderType == uploader.KopiaType {
-		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
+		if err := provider.NewUnifiedRepoProvider(*credGetter, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
+			return nil, errors.Wrap(err, "failed to connect repository")
+		}
+		return NewKopiaUploaderProvider(ctx, credGetter, backupRepo, log)
 	} else {
-		return NewKopiaUploaderProvider(ctx, credGetter, backupReo, log)
+		err := provider.NewResticRepositoryProvider(credGetter.FromFile, nil, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to connect repository")
+		}
+		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	}
 }

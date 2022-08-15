@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -42,27 +43,28 @@ import (
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-func NewPodVolumeRestoreReconciler(logger logrus.FieldLogger, client client.Client, credentialsFileStore credentials.FileStore) *PodVolumeRestoreReconciler {
+func NewPodVolumeRestoreReconciler(logger logrus.FieldLogger, client client.Client, credentialGetter *credentials.CredentialGetter) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
-		Client:               client,
-		logger:               logger.WithField("controller", "PodVolumeRestore"),
-		credentialsFileStore: credentialsFileStore,
-		fileSystem:           filesystem.NewFileSystem(),
-		clock:                &clock.RealClock{},
+		Client:           client,
+		logger:           logger.WithField("controller", "PodVolumeRestore"),
+		credentialGetter: credentialGetter,
+		fileSystem:       filesystem.NewFileSystem(),
+		clock:            &clock.RealClock{},
 	}
 }
 
 type PodVolumeRestoreReconciler struct {
 	client.Client
-	logger               logrus.FieldLogger
-	credentialsFileStore credentials.FileStore
-	fileSystem           filesystem.Interface
-	clock                clock.Clock
+	logger           logrus.FieldLogger
+	credentialGetter *credentials.CredentialGetter
+	fileSystem       filesystem.Interface
+	clock            clock.Clock
 }
 
 type RestoreProgressUpdater struct {
@@ -239,20 +241,6 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error identifying path of volume")
 	}
 
-	credsFile, err := c.credentialsFileStore.Path(repokey.RepoKeySelector())
-	if err != nil {
-		return errors.Wrap(err, "error creating temp restic credentials file")
-	}
-	// ignore error since there's nothing we can do and it's a temp file.
-	defer os.Remove(credsFile)
-
-	resticCmd := restic.RestoreCommand(
-		req.Spec.RepoIdentifier,
-		credsFile,
-		req.Spec.SnapshotID,
-		volumePath,
-	)
-
 	backupLocation := &velerov1api.BackupStorageLocation{}
 	if err := c.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
@@ -261,38 +249,46 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	var caCertFile string
-	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
-		caCertFile, err = restic.TempCACertFile(backupLocation.Spec.ObjectStorage.CACert, req.Spec.BackupStorageLocation, c.fileSystem)
-		if err != nil {
-			log.WithError(err).Error("Error creating temp cacert file")
+	// name of ResticRepository is generated with prefix volumeNamespace-backupLocation- and end with random characters
+	// it could not retrieve the ResticRepository CR with namespace + name. so first list all CRs with in the volumeNamespace
+	// then filtering the matched CR with prefix volumeNamespace-backupLocation-
+	backupRepos := &velerov1api.BackupRepositoryList{}
+	var backupRepo velerov1api.BackupRepository
+	isFoundRepo := false
+	if c.List(ctx, backupRepos, &client.ListOptions{
+		Namespace: req.Namespace,
+	}); err != nil {
+		return errors.Wrap(err, "error getting backup repository")
+	} else if len(backupRepos.Items) == 0 {
+		return errors.Errorf("find empty BackupRepository found for workload namespace %s, backup storage location %s", req.Namespace, req.Spec.BackupStorageLocation)
+	} else {
+		for _, repo := range backupRepos.Items {
+			if strings.HasPrefix(repo.Name, fmt.Sprintf("%s-%s-", req.Spec.Pod.Namespace, req.Spec.BackupStorageLocation)) {
+				backupRepo = repo
+				isFoundRepo = true
+				break
+			}
 		}
-		// ignore error since there's nothing we can do and it's a temp file.
-		defer os.Remove(caCertFile)
+		if !isFoundRepo {
+			return errors.Errorf("could not found match BackupRepository for workload namespace %s, backup storage location %s", req.Namespace, req.Spec.BackupStorageLocation)
+		}
 	}
-	resticCmd.CACertFile = caCertFile
 
-	env, err := restic.CmdEnv(backupLocation, c.credentialsFileStore)
+	uploaderProv, err := provider.NewUploaderProvider(ctx, c.Client, req.Spec.UploaderType,
+		req.Spec.RepoIdentifier, backupLocation, &backupRepo, c.credentialGetter, repokey.RepoKeySelector(), log)
 	if err != nil {
-		return errors.Wrap(err, "error setting restic cmd env")
-	}
-	resticCmd.Env = env
-
-	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
-	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
-	// is not enable for Restic command.
-	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(backupLocation, log)
-	if len(skipTLSRet) > 0 {
-		resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, skipTLSRet)
+		return errors.Wrap(err, "error creating uploader")
 	}
 
-	var stdout, stderr string
+	defer func() {
+		if err := uploaderProv.Close(ctx); err != nil {
+			log.Errorf("failed to close uploader provider with error %v", err)
+		}
+	}()
 
-	if stdout, stderr, err = restic.RunRestore(resticCmd, log, c.updateRestoreProgressFunc(req, log)); err != nil {
-		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+	if err = uploaderProv.RunRestore(ctx, req.Spec.SnapshotID, volumePath, c.NewRestoreProgressUpdater(req, log, ctx)); err != nil {
+		return errors.Wrapf(err, "error running restic restore err=%v", err)
 	}
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 
 	// Remove the .velero directory from the restored volume (it may contain done files from previous restores
 	// of this volume, which we don't want to carry over). If this fails for any reason, log and continue, since
@@ -324,18 +320,6 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	}
 
 	return nil
-}
-
-// updateRestoreProgressFunc returns a func that takes progress info and patches
-// the PVR with the new progress
-func (c *PodVolumeRestoreReconciler) updateRestoreProgressFunc(req *velerov1api.PodVolumeRestore, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
-	return func(progress velerov1api.PodVolumeOperationProgress) {
-		original := req.DeepCopy()
-		req.Status.Progress = progress
-		if err := c.Patch(context.Background(), req, client.MergeFrom(original)); err != nil {
-			log.WithError(err).Error("Unable to update PodVolumeRestore progress")
-		}
-	}
 }
 
 func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger, ctx context.Context) *RestoreProgressUpdater {

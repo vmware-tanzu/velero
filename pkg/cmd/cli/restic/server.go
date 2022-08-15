@@ -52,7 +52,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
@@ -197,22 +196,27 @@ func (s *resticServer) run() {
 		s.logger.Fatalf("Failed to create credentials file store: %v", err)
 	}
 
+	credSecretStore, err := credentials.NewNamespacedSecretStore(s.mgr.GetClient(), s.namespace)
+	if err != nil {
+		s.logger.Fatalf("Failed to create secret file store: %v", err)
+	}
+
+	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
 	pvbReconciler := controller.PodVolumeBackupReconciler{
-		Scheme:         s.mgr.GetScheme(),
-		Client:         s.mgr.GetClient(),
-		Clock:          clock.RealClock{},
-		Metrics:        s.metrics,
-		CredsFileStore: credentialFileStore,
-		NodeName:       s.nodeName,
-		FileSystem:     filesystem.NewFileSystem(),
-		ResticExec:     restic.BackupExec{},
-		Log:            s.logger,
+		Scheme:           s.mgr.GetScheme(),
+		Client:           s.mgr.GetClient(),
+		Clock:            clock.RealClock{},
+		Metrics:          s.metrics,
+		CredentialGetter: credentialGetter,
+		NodeName:         s.nodeName,
+		FileSystem:       filesystem.NewFileSystem(),
+		Log:              s.logger,
 	}
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
 	}
 
-	if err = controller.NewPodVolumeRestoreReconciler(s.logger, s.mgr.GetClient(), credentialFileStore).SetupWithManager(s.mgr); err != nil {
+	if err = controller.NewPodVolumeRestoreReconciler(s.logger, s.mgr.GetClient(), credentialGetter).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 

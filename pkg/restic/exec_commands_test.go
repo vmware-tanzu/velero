@@ -52,7 +52,7 @@ func Test_getSummaryLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			summary, err := getSummaryLine([]byte(tt.output))
+			summary, err := GetSummaryLine([]byte(tt.output))
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -79,7 +79,7 @@ third line
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			assert.Equal(t, []byte(tt.want), getLastLine([]byte(tt.output)))
+			assert.Equal(t, []byte(tt.want), GetLastLine([]byte(tt.output)))
 		})
 	}
 }
@@ -103,7 +103,7 @@ func Test_getVolumeSize(t *testing.T) {
 	fileSystem = fakefs
 	defer func() { fileSystem = filesystem.NewFileSystem() }()
 
-	actualSize, err := getVolumeSize("/")
+	actualSize, err := GetVolumeSize("/")
 
 	assert.NoError(t, err)
 	assert.Equal(t, expectedSize, actualSize)
