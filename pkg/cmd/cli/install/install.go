@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/uploader"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -74,6 +76,7 @@ type InstallOptions struct {
 	CACertFile                        string
 	Features                          string
 	DefaultVolumesToRestic            bool
+	UploaderType                      string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -110,6 +113,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
 	flags.BoolVar(&o.DefaultVolumesToRestic, "default-volumes-to-restic", o.DefaultVolumesToRestic, "Bool flag to configure Velero server to use restic by default to backup all pod volumes on all backups. Optional.")
+	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -135,6 +139,7 @@ func NewInstallOptions() *InstallOptions {
 		NoDefaultBackupLocation: false,
 		CRDsOnly:                false,
 		DefaultVolumesToRestic:  false,
+		UploaderType:            uploader.ResticType,
 	}
 }
 
@@ -195,6 +200,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		CACertData:                        caCertData,
 		Features:                          strings.Split(o.Features, ","),
 		DefaultVolumesToRestic:            o.DefaultVolumesToRestic,
+		UploaderType:                      o.UploaderType,
 	}, nil
 }
 
@@ -324,6 +330,10 @@ func (o *InstallOptions) Complete(args []string, f client.Factory) error {
 // Validate validates options provided to a command.
 func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
+		return err
+	}
+
+	if err := uploader.ValidateUploaderType(o.UploaderType); err != nil {
 		return err
 	}
 
