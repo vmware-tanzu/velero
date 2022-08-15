@@ -123,6 +123,19 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 			"hookTimeout":   localHook.Timeout,
 		},
 	)
+
+	if pod.Status.Phase == corev1api.PodUnknown {
+		hookLog.Error("Pod phase is Unknown, trying to run hook anyway")
+	} else if pod.Status.Phase == corev1api.PodPending || pod.Status.Phase == corev1api.PodFailed {
+		// Taking a backup of a Pending or Failed Pod that has a hook defined is probably something
+		// which the user didn't intend. We return an error, so this doesn't happen silently.
+		// Possible improvement in the future: When Pod is Pending, defer the backup a bit.
+		return errors.Errorf("Pod phase is %s", pod.Status.Phase)
+	} else if pod.Status.Phase == corev1api.PodSucceeded {
+		hookLog.Info("Skipping hook because Pod phase is Succeeded")
+		return nil
+	}
+
 	hookLog.Info("running exec hook")
 
 	req := e.restClient.Post().
