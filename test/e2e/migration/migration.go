@@ -68,8 +68,11 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 		}
 	})
 	AfterEach(func() {
-		if VeleroCfg.InstallVelero {
-			if !VeleroCfg.Debug {
+		if !VeleroCfg.Debug {
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *VeleroCfg.DefaultClient)
+			})
+			if VeleroCfg.InstallVelero {
 				By(fmt.Sprintf("Uninstall Velero and delete sample workload namespace %s", migrationNamespace), func() {
 					Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
 					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
@@ -81,12 +84,13 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 						VeleroCfg.VeleroNamespace)).To(Succeed())
 					DeleteNamespace(context.Background(), *VeleroCfg.StandbyClient, migrationNamespace, true)
 				})
-				By(fmt.Sprintf("Switch to default kubeconfig context %s", VeleroCfg.DefaultClient), func() {
-					Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
-					VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
-				})
 			}
+			By(fmt.Sprintf("Switch to default kubeconfig context %s", VeleroCfg.DefaultClient), func() {
+				Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
+				VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+			})
 		}
+
 	})
 	When("kibishii is the sample workload", func() {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {

@@ -70,11 +70,14 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 		}
 	})
 	AfterEach(func() {
-		if VeleroCfg.InstallVelero {
-			if !VeleroCfg.Debug {
-				By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
-					DeleteNamespace(context.Background(), *VeleroCfg.ClientToInstallVelero, upgradeNamespace, true)
-				})
+		if !VeleroCfg.Debug {
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
+			})
+			By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
+				DeleteNamespace(context.Background(), *VeleroCfg.ClientToInstallVelero, upgradeNamespace, true)
+			})
+			if VeleroCfg.InstallVelero {
 				By("Uninstall Velero", func() {
 					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
 						VeleroCfg.VeleroNamespace)).To(Succeed())
