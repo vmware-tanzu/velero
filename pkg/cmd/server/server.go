@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/uploader"
+
 	"github.com/bombsimon/logrusr"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -127,6 +129,7 @@ type serverConfig struct {
 	defaultResticMaintenanceFrequency                                       time.Duration
 	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
+	uploaderType                                                            string
 }
 
 type controllerRunInfo struct {
@@ -157,6 +160,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
 			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
+			uploaderType:                      uploader.ResticType,
 		}
 	)
 
@@ -222,6 +226,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
+	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
 
 	return command
 }
@@ -251,6 +256,10 @@ type server struct {
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
+	if err := uploader.ValidateUploaderType(config.uploaderType); err != nil {
+		return nil, err
+	}
+
 	if config.clientQPS < 0.0 {
 		return nil, errors.New("client-qps must be positive")
 	}
