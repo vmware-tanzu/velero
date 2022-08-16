@@ -32,6 +32,9 @@ const (
 	GenOptionMaintainFull  = "full"
 	GenOptionMaintainQuick = "quick"
 
+	GenOptionOwnerName   = "username"
+	GenOptionOwnerDomain = "domainname"
+
 	StoreOptionS3KeyId            = "accessKeyID"
 	StoreOptionS3Provider         = "providerName"
 	StoreOptionS3SecretKey        = "secretAccessKey"
@@ -56,11 +59,24 @@ const (
 	StoreOptionPrefix         = "prefix"
 	StoreOptionPrefixName     = "unified-repo"
 
+	StoreOptionGenHashAlgo    = "hashAlgo"
+	StoreOptionGenEncryptAlgo = "encryptAlgo"
+	StoreOptionGenSplitAlgo   = "splitAlgo"
+
+	StoreOptionGenRetentionMode   = "retentionMode"
+	StoreOptionGenRetentionPeriod = "retentionPeriod"
+	StoreOptionGenReadOnly        = "readOnly"
+
 	ThrottleOptionReadOps       = "readOPS"
 	ThrottleOptionWriteOps      = "writeOPS"
 	ThrottleOptionListOps       = "listOPS"
 	ThrottleOptionUploadBytes   = "uploadBytes"
 	ThrottleOptionDownloadBytes = "downloadBytes"
+)
+
+const (
+	defaultUsername = "default"
+	defaultDomain   = "default"
 )
 
 type RepoOptions struct {
@@ -80,59 +96,72 @@ type RepoOptions struct {
 	Description string
 }
 
+// PasswordGetter defines the method to get a repository password.
 type PasswordGetter interface {
 	GetPassword(param interface{}) (string, error)
 }
 
+// StoreOptionsGetter defines the methods to get the storage related options.
 type StoreOptionsGetter interface {
 	GetStoreType(param interface{}) (string, error)
 	GetStoreOptions(param interface{}) (map[string]string, error)
 }
 
-func NewRepoOptions(options ...func(*RepoOptions) error) (*RepoOptions, error) {
-	ro := &RepoOptions{}
-	for _, o := range options {
-		err := o(ro)
+// NewRepoOptions creates a new RepoOptions for different purpose
+func NewRepoOptions(optionFuncs ...func(*RepoOptions) error) (*RepoOptions, error) {
+	options := &RepoOptions{
+		GeneralOptions: make(map[string]string),
+		StorageOptions: make(map[string]string),
+	}
+
+	for _, optionFunc := range optionFuncs {
+		err := optionFunc(options)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return ro, nil
+	return options, nil
 }
 
+// WithPassword sets the RepoPassword to RepoOptions, the password is acquired through
+// the provided interface
 func WithPassword(getter PasswordGetter, param interface{}) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
+	return func(options *RepoOptions) error {
 		password, err := getter.GetPassword(param)
 		if err != nil {
 			return err
 		}
 
-		ro.RepoPassword = password
+		options.RepoPassword = password
 
 		return nil
 	}
 }
 
+// WithConfigFile sets the ConfigFilePath to RepoOptions
 func WithConfigFile(workPath string, repoID string) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
-		ro.ConfigFilePath = getRepoConfigFile(workPath, repoID)
+	return func(options *RepoOptions) error {
+		options.ConfigFilePath = getRepoConfigFile(workPath, repoID)
 		return nil
 	}
 }
 
+// WithGenOptions sets the GeneralOptions to RepoOptions
 func WithGenOptions(genOptions map[string]string) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
+	return func(options *RepoOptions) error {
 		for k, v := range genOptions {
-			ro.GeneralOptions[k] = v
+			options.GeneralOptions[k] = v
 		}
 
 		return nil
 	}
 }
 
+// WithStoreOptions sets the StorageOptions to RepoOptions, the store options are acquired through
+// the provided interface
 func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
+	return func(options *RepoOptions) error {
 		storeType, err := getter.GetStoreType(param)
 		if err != nil {
 			return err
@@ -143,21 +172,32 @@ func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOp
 			return err
 		}
 
-		ro.StorageType = storeType
+		options.StorageType = storeType
 
 		for k, v := range storeOptions {
-			ro.StorageOptions[k] = v
+			options.StorageOptions[k] = v
 		}
 
 		return nil
 	}
 }
 
+// WithDescription sets the Description to RepoOptions
 func WithDescription(desc string) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
-		ro.Description = desc
+	return func(options *RepoOptions) error {
+		options.Description = desc
 		return nil
 	}
+}
+
+// GetRepoUser returns the default username that is used to manipulate the Unified Repo
+func GetRepoUser() string {
+	return defaultUsername
+}
+
+// GetRepoDomain returns the default user domain that is used to manipulate the Unified Repo
+func GetRepoDomain() string {
+	return defaultDomain
 }
 
 func getRepoConfigFile(workPath string, repoID string) string {
