@@ -70,79 +70,51 @@ type ObjectWriteOptions struct {
 	BackupMode  int    // OBJECT_DATA_BACKUP_*
 }
 
-// OwnershipOptions is used to add some access control to the unified repository.
-// For example, some privileged operations of the unified repository can be done by the
-// repository owner only; the data of a backup may be manipulated by the backup owner
-// who created it only. It is optional for a backup repository to support this ownership control.
-type OwnershipOptions struct {
-	Username      string
-	DomainName    string
-	FullQualified string
-}
-
-type RepoOptions struct {
-	// A repository specific string to identify a backup storage, i.e., "s3", "filesystem"
-	StorageType string
-	// Backup repository password, if any
-	RepoPassword string
-	// A custom path to save the repository's configuration, if any
-	ConfigFilePath string
-	// The ownership for the current repository operation
-	Ownership OwnershipOptions
-	// Other repository specific options
-	GeneralOptions map[string]string
-	// Storage specific options
-	StorageOptions map[string]string
-
-	// Description of the backup repository
-	Description string
-}
-
 // BackupRepoService is used to initialize, open or maintain a backup repository
 type BackupRepoService interface {
-	// Create a backup repository or connect to an existing backup repository.
+	// Init creates a backup repository or connect to an existing backup repository.
 	// repoOption: option to the backup repository and the underlying backup storage.
 	// createNew: indicates whether to create a new or connect to an existing backup repository.
 	Init(ctx context.Context, repoOption RepoOptions, createNew bool) error
 
-	// Open an backup repository that has been created/connected.
+	// Open opens an backup repository that has been created/connected.
 	// repoOption: options to open the backup repository and the underlying storage.
 	Open(ctx context.Context, repoOption RepoOptions) (BackupRepo, error)
 
-	// Periodically called to maintain the backup repository to eliminate redundant data and improve performance.
+	// Maintain is periodically called to maintain the backup repository to eliminate redundant data.
 	// repoOption: options to maintain the backup repository.
 	Maintain(ctx context.Context, repoOption RepoOptions) error
 }
 
 // BackupRepo provides the access to the backup repository
 type BackupRepo interface {
-	// Open an existing object for read.
+	// OpenObject opens an existing object for read.
 	// id: the object's unified identifier.
 	OpenObject(ctx context.Context, id ID) (ObjectReader, error)
 
-	// Get a manifest data.
+	// GetManifest gets a manifest data from the backup repository.
 	GetManifest(ctx context.Context, id ID, mani *RepoManifest) error
 
-	// Get one or more manifest data that match the given labels
+	// FindManifests gets one or more manifest data that match the given labels
 	FindManifests(ctx context.Context, filter ManifestFilter) ([]*ManifestEntryMetadata, error)
 
-	// Create a new object and return the object's writer interface.
+	// NewObjectWriter creates a new object and return the object's writer interface.
 	// return: A unified identifier of the object on success.
 	NewObjectWriter(ctx context.Context, opt ObjectWriteOptions) ObjectWriter
 
-	// Save a manifest object
+	// PutManifest saves a manifest object into the backup repository.
 	PutManifest(ctx context.Context, mani RepoManifest) (ID, error)
 
-	// Delete a manifest object
+	// DeleteManifest deletes a manifest object from the backup repository.
 	DeleteManifest(ctx context.Context, id ID) error
 
-	// Flush all the backup repository data
+	// Flush flushes all the backup repository data
 	Flush(ctx context.Context) error
 
-	// Get the local time of the backup repository. It may be different from the time of the caller
+	// Time returns the local time of the backup repository. It may be different from the time of the caller
 	Time() time.Time
 
-	// Close the backup repository
+	// Close closes the backup repository
 	Close(ctx context.Context) error
 }
 
@@ -157,15 +129,15 @@ type ObjectReader interface {
 type ObjectWriter interface {
 	io.WriteCloser
 
-	// For some cases, i.e. block incremental, the object is not written sequentially
+	// Seeker is used in the cases that the object is not written sequentially
 	io.Seeker
 
-	// Periodically called to preserve the state of data written to the repo so far.
-	// Return a unified identifier that represent the current state.
+	// Checkpoint is periodically called to preserve the state of data written to the repo so far.
+	// Checkpoint returns a unified identifier that represent the current state.
 	// An empty ID could be returned on success if the backup repository doesn't support this.
 	Checkpoint() (ID, error)
 
-	// Wait for the completion of the object write.
+	// Result waits for the completion of the object write.
 	// Result returns the object's unified identifier after the write completes.
 	Result() (ID, error)
 }
