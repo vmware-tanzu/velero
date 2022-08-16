@@ -951,7 +951,7 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 			if vs.Status.BoundVolumeSnapshotContentName != nil &&
 				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
 				vsc = vscMap[*vs.Status.BoundVolumeSnapshotContentName]
-				if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
+				if nil != vsc && vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
 					modifyVSCFlag = true
 				}
 			}
@@ -979,7 +979,9 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 			}
 
 			// Delete VolumeSnapshot from cluster
-			logger.Debugf("Deleting VolumeSnapshotContent %s", vsc.Name)
+			if nil != vsc {
+				logger.Debugf("Deleting VolumeSnapshotContent %s", vsc.Name)
+			}
 			err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(vs.Namespace).Delete(context.TODO(), vs.Name, metav1.DeleteOptions{})
 			if err != nil {
 				logger.Errorf("fail to delete VolumeSnapshot %s/%s: %s", vs.Namespace, vs.Name, err.Error())
