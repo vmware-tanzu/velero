@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -37,9 +38,10 @@ import (
 
 // repositoryEnsurer ensures that Velero restic repositories are created and ready.
 type repositoryEnsurer struct {
-	log        logrus.FieldLogger
-	repoLister velerov1listers.ResticRepositoryLister
-	repoClient velerov1client.ResticRepositoriesGetter
+	log          logrus.FieldLogger
+	repoLister   velerov1listers.ResticRepositoryLister
+	repoClient   velerov1client.ResticRepositoriesGetter
+	veleroClient clientset.Interface
 
 	repoChansLock sync.Mutex
 	repoChans     map[string]chan *velerov1api.ResticRepository
@@ -55,13 +57,14 @@ type repoKey struct {
 	backupLocation  string
 }
 
-func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInformer, repoClient velerov1client.ResticRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
+func newRepositoryEnsurer(veleroClient clientset.Interface, repoInformer velerov1informers.ResticRepositoryInformer, repoClient velerov1client.ResticRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
 	r := &repositoryEnsurer{
-		log:        log,
-		repoLister: repoInformer.Lister(),
-		repoClient: repoClient,
-		repoChans:  make(map[string]chan *velerov1api.ResticRepository),
-		repoLocks:  make(map[repoKey]*sync.Mutex),
+		log:          log,
+		repoLister:   repoInformer.Lister(),
+		repoClient:   repoClient,
+		repoChans:    make(map[string]chan *velerov1api.ResticRepository),
+		repoLocks:    make(map[repoKey]*sync.Mutex),
+		veleroClient: veleroClient,
 	}
 
 	repoInformer.Informer().AddEventHandler(
@@ -139,28 +142,32 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	if len(repos) > 1 {
 		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q", volumeNamespace, backupLocation)
 	}
+	foundStale := false
 	if len(repos) == 1 {
-		if repos[0].Status.Phase != velerov1api.ResticRepositoryPhaseReady {
-			return nil, errors.Errorf("restic repository is not ready: %s", repos[0].Status.Message)
+		// if restic identifier does not contain bucket name, this is a legacy repository and needs to be updated.
+		bsl, err := r.veleroClient.VeleroV1().BackupStorageLocations(namespace).Get(context.Background(), backupLocation, metav1.GetOptions{})
+		if err != nil {
+			return nil, errors.WithStack(err)
 		}
-
-		log.Debug("Ready repository found")
-		return repos[0], nil
-	}
-
-	log.Debug("No repository found, creating one")
-
-	// no repo found: create one and wait for it to be ready
-	repo := &velerov1api.ResticRepository{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    namespace,
-			GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
-			Labels:       repoLabels(volumeNamespace, backupLocation),
-		},
-		Spec: velerov1api.ResticRepositorySpec{
-			VolumeNamespace:       volumeNamespace,
-			BackupStorageLocation: backupLocation,
-		},
+		repoIdentifier, err := GetRepoIdentifier(bsl, volumeNamespace)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		if repos[0].Spec.ResticIdentifier != repoIdentifier {
+			log.Debugf("ResticRepository %s/%s has a stale ResticIdentifier, replacing with correct one", repos[0].Namespace, repos[0].Name)
+			repos[0].Spec.ResticIdentifier = repoIdentifier
+			foundStale = true
+			if _, err := r.repoClient.ResticRepositories(namespace).Update(context.TODO(), repos[0], metav1.UpdateOptions{}); err != nil {
+				return nil, errors.Wrapf(err, "unable to update restic repository resource")
+			}
+		}
+		if !foundStale {
+			if repos[0].Status.Phase != velerov1api.ResticRepositoryPhaseReady {
+				return nil, errors.Errorf("restic repository is not ready: %s", repos[0].Status.Message)
+			}
+			log.Debug("Ready repository found")
+			return repos[0], nil
+		}
 	}
 
 	repoChan := r.getRepoChan(selector.String())
@@ -169,8 +176,25 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		close(repoChan)
 	}()
 
-	if _, err := r.repoClient.ResticRepositories(namespace).Create(context.TODO(), repo, metav1.CreateOptions{}); err != nil {
-		return nil, errors.Wrapf(err, "unable to create restic repository resource")
+	if !foundStale {
+		log.Debug("No repository found, creating one")
+		// no repo found: create one and wait for it to be ready
+		repo := &velerov1api.ResticRepository{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    namespace,
+				GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
+				Labels:       repoLabels(volumeNamespace, backupLocation),
+			},
+			Spec: velerov1api.ResticRepositorySpec{
+				VolumeNamespace:       volumeNamespace,
+				BackupStorageLocation: backupLocation,
+				MaintenanceFrequency:  metav1.Duration{Duration: DefaultMaintenanceFrequency},
+			},
+		}
+
+		if _, err := r.repoClient.ResticRepositories(namespace).Create(context.TODO(), repo, metav1.CreateOptions{}); err != nil {
+			return nil, errors.Wrapf(err, "unable to create restic repository resource")
+		}
 	}
 
 	select {

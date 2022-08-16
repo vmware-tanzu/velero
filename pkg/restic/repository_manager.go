@@ -132,7 +132,7 @@ func NewRepositoryManager(
 		ctx:                  ctx,
 
 		repoLocker:  newRepoLocker(),
-		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
+		repoEnsurer: newRepositoryEnsurer(veleroClient, repoInformer, repoClient, log),
 		fileSystem:  filesystem.NewFileSystem(),
 	}
 
