@@ -44,6 +44,7 @@ type podTemplateConfig struct {
 	plugins                           []string
 	features                          []string
 	defaultVolumesToRestic            bool
+	uploaderType                      string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -83,7 +84,6 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 func WithSecret(secretPresent bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.withSecret = secretPresent
-
 	}
 }
 
@@ -123,6 +123,12 @@ func WithFeatures(features []string) podTemplateOption {
 	}
 }
 
+func WithUploaderType(t string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.uploaderType = t
+	}
+}
+
 func WithDefaultVolumesToRestic() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultVolumesToRestic = true
@@ -153,6 +159,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.defaultVolumesToRestic {
 		args = append(args, "--default-volumes-to-restic=true")
+	}
+
+	if len(c.uploaderType) > 0 {
+		args = append(args, fmt.Sprintf("--uploader-type=%s", c.uploaderType))
 	}
 
 	deployment := &appsv1.Deployment{
