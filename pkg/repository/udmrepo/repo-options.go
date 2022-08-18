@@ -89,42 +89,42 @@ type StoreOptionsGetter interface {
 	GetStoreOptions(param interface{}) (map[string]string, error)
 }
 
-func NewRepoOptions(options ...func(*RepoOptions) error) (*RepoOptions, error) {
-	ro := &RepoOptions{}
-	for _, o := range options {
-		err := o(ro)
+func NewRepoOptions(optionFuncs ...func(*RepoOptions) error) (*RepoOptions, error) {
+	options := &RepoOptions{}
+	for _, optionFunc := range optionFuncs {
+		err := optionFunc(options)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return ro, nil
+	return options, nil
 }
 
 func WithPassword(getter PasswordGetter, param interface{}) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
+	return func(options *RepoOptions) error {
 		password, err := getter.GetPassword(param)
 		if err != nil {
 			return err
 		}
 
-		ro.RepoPassword = password
+		options.RepoPassword = password
 
 		return nil
 	}
 }
 
 func WithConfigFile(workPath string, repoID string) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
-		ro.ConfigFilePath = getRepoConfigFile(workPath, repoID)
+	return func(options *RepoOptions) error {
+		options.ConfigFilePath = getRepoConfigFile(workPath, repoID)
 		return nil
 	}
 }
 
 func WithGenOptions(genOptions map[string]string) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
+	return func(options *RepoOptions) error {
 		for k, v := range genOptions {
-			ro.GeneralOptions[k] = v
+			options.GeneralOptions[k] = v
 		}
 
 		return nil
@@ -132,7 +132,7 @@ func WithGenOptions(genOptions map[string]string) func(*RepoOptions) error {
 }
 
 func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
+	return func(options *RepoOptions) error {
 		storeType, err := getter.GetStoreType(param)
 		if err != nil {
 			return err
@@ -143,10 +143,10 @@ func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOp
 			return err
 		}
 
-		ro.StorageType = storeType
+		options.StorageType = storeType
 
 		for k, v := range storeOptions {
-			ro.StorageOptions[k] = v
+			options.StorageOptions[k] = v
 		}
 
 		return nil
@@ -154,8 +154,8 @@ func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOp
 }
 
 func WithDescription(desc string) func(*RepoOptions) error {
-	return func(ro *RepoOptions) error {
-		ro.Description = desc
+	return func(options *RepoOptions) error {
+		options.Description = desc
 		return nil
 	}
 }
