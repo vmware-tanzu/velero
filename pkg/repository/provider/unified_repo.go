@@ -62,6 +62,8 @@ const (
 	repoOpDescFullMaintain  = "full maintenance"
 	repoOpDescQuickMaintain = "quick maintenance"
 	repoOpDescForget        = "forget"
+
+	repoConnectDesc = "unfied repo"
 )
 
 // NewUnifiedRepoProvider creates the service provider for Unified Repo
@@ -92,8 +94,14 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
 		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
+				udmrepo.GenOptionOwnerDomain: udmrepo.GetRepoDomain(),
+			},
+		),
 		udmrepo.WithStoreOptions(urp, param),
-		udmrepo.WithDescription(repoOpDescFullMaintain),
+		udmrepo.WithDescription(repoConnectDesc),
 	)
 
 	if err != nil {
@@ -121,8 +129,14 @@ func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoPar
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
 		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
+				udmrepo.GenOptionOwnerDomain: udmrepo.GetRepoDomain(),
+			},
+		),
 		udmrepo.WithStoreOptions(urp, param),
-		udmrepo.WithDescription(repoOpDescFullMaintain),
+		udmrepo.WithDescription(repoConnectDesc),
 	)
 
 	if err != nil {
@@ -150,8 +164,14 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
 		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
+				udmrepo.GenOptionOwnerDomain: udmrepo.GetRepoDomain(),
+			},
+		),
 		udmrepo.WithStoreOptions(urp, param),
-		udmrepo.WithDescription(repoOpDescFullMaintain),
+		udmrepo.WithDescription(repoConnectDesc),
 	)
 
 	if err != nil {
@@ -185,7 +205,11 @@ func (urp *unifiedRepoProvider) PruneRepo(ctx context.Context, param RepoParam) 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
 		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
-		udmrepo.WithGenOptions(map[string]string{udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainFull}),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainFull,
+			},
+		),
 		udmrepo.WithDescription(repoOpDescFullMaintain),
 	)
 
@@ -214,7 +238,11 @@ func (urp *unifiedRepoProvider) PruneRepoQuick(ctx context.Context, param RepoPa
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
 		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
-		udmrepo.WithGenOptions(map[string]string{udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainQuick}),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainQuick,
+			},
+		),
 		udmrepo.WithDescription(repoOpDescQuickMaintain),
 	)
 
@@ -280,7 +308,7 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
-		return "", errors.New("invalid parameter")
+		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
 	repoPassword, err := getRepoPassword(urp.credentialGetter.FromSecret, repoParam)
@@ -294,7 +322,7 @@ func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
 func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
-		return "", errors.New("invalid parameter")
+		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
 	return getStorageType(repoParam.BackupLocation), nil
@@ -303,7 +331,7 @@ func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) 
 func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
-		return map[string]string{}, errors.New("invalid parameter")
+		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
 	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, repoParam.BackupRepo.Spec.VolumeNamespace)

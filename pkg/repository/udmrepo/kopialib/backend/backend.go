@@ -14,16 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package backend
 
 import (
-	"github.com/sirupsen/logrus"
+	"context"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/kopia/kopia/repo/blob"
 )
 
-// Create creates an instance of BackupRepoService
-func Create(logger logrus.FieldLogger) udmrepo.BackupRepoService {
-	///TODO: create from kopiaLib
-	return nil
+// Store defines the methods for Kopia to establish a connection to
+// the backend storage
+type Store interface {
+	// Setup setups the variables to a specific backend storage
+	Setup(ctx context.Context, flags map[string]string) error
+
+	// Connect connects to a specific backend storage with the storage variables
+	Connect(ctx context.Context, isCreate bool) (blob.Storage, error)
 }

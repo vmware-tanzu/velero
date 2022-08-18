@@ -503,7 +503,7 @@ func TestGetStoreOptions(t *testing.T) {
 			name:        "wrong param type",
 			repoParam:   struct{}{},
 			expected:    map[string]string{},
-			expectedErr: "invalid parameter",
+			expectedErr: "invalid parameter, expect provider.RepoParam, actual struct {}",
 		},
 		{
 			name: "get storage variable fail",
