@@ -85,7 +85,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					DeleteNamespace(context.Background(), *VeleroCfg.StandbyClient, migrationNamespace, true)
 				})
 			}
-			By(fmt.Sprintf("Switch to default kubeconfig context %s", VeleroCfg.DefaultClient), func() {
+			By(fmt.Sprintf("Switch to default kubeconfig context %s", VeleroCfg.DefaultCluster), func() {
 				Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
 				VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
 			})
