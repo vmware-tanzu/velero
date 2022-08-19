@@ -71,15 +71,23 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		if VeleroCfg.InstallVelero {
-			if !VeleroCfg.Debug {
+		if !VeleroCfg.Debug {
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *VeleroCfg.DefaultClient)
+			})
+			By(fmt.Sprintf("Delete sample workload namespace %s", bslDeletionTestNs), func() {
 				Expect(DeleteNamespace(context.Background(), *VeleroCfg.ClientToInstallVelero, bslDeletionTestNs,
 					true)).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q",
 					bslDeletionTestNs))
-				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace)).To(Succeed())
+			})
+			if VeleroCfg.InstallVelero {
+				By("Uninstall Velero", func() {
+					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
+						VeleroCfg.VeleroNamespace)).To(Succeed())
+				})
 			}
 		}
+
 	})
 
 	When("kibishii is the sample workload", func() {

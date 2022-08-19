@@ -83,8 +83,8 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 			}
 		})
 		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				if !VeleroCfg.Debug {
+			if !VeleroCfg.Debug {
+				if VeleroCfg.InstallVelero {
 					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
 				}
 			}
@@ -117,9 +117,11 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		})
 
 		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				if countIt == len(tests) && !VeleroCfg.Debug {
-					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+			if !VeleroCfg.Debug {
+				if VeleroCfg.InstallVelero {
+					if countIt == len(tests) && !VeleroCfg.Debug {
+						Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+					}
 				}
 			}
 		})
@@ -174,7 +176,15 @@ func (t *TestCase) Verify() error {
 }
 
 func (t *TestCase) Clean() error {
-	return CleanupNamespacesWithPoll(t.Ctx, t.Client, t.NSBaseName)
+	if !VeleroCfg.Debug {
+		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.NSBaseName), func() {
+			CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+		})
+		By("Clean backups after test", func() {
+			DeleteBackups(t.Ctx, t.Client)
+		})
+	}
+	return nil
 }
 
 func (t *TestCase) GetTestMsg() *TestMSG {
