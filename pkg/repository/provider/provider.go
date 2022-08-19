@@ -28,6 +28,7 @@ type RepoParam struct {
 	BackupRepo     *velerov1api.BackupRepository
 }
 
+// Provider defines the methods to manipulate a backup repository
 type Provider interface {
 	//InitRepo is to initialize a repository from a new storage place
 	InitRepo(ctx context.Context, param RepoParam) error

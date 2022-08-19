@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -45,11 +46,11 @@ type ResticRepoReconciler struct {
 	logger                      logrus.FieldLogger
 	clock                       clock.Clock
 	defaultMaintenanceFrequency time.Duration
-	repositoryManager           restic.RepositoryManager
+	repositoryManager           repository.Manager
 }
 
 func NewResticRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	defaultMaintenanceFrequency time.Duration, repositoryManager restic.RepositoryManager) *ResticRepoReconciler {
+	defaultMaintenanceFrequency time.Duration, repositoryManager repository.Manager) *ResticRepoReconciler {
 	c := &ResticRepoReconciler{
 		client,
 		namespace,
@@ -163,7 +164,7 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 // ensureRepo checks to see if a repository exists, and attempts to initialize it if
 // it does not exist. An error is returned if the repository can't be connected to
 // or initialized.
-func ensureRepo(repo *velerov1api.BackupRepository, repoManager restic.RepositoryManager) error {
+func ensureRepo(repo *velerov1api.BackupRepository, repoManager repository.Manager) error {
 	if err := repoManager.ConnectToRepo(repo); err != nil {
 		// If the repository has not yet been initialized, the error message will always include
 		// the following string. This is the only scenario where we should try to initialize it.

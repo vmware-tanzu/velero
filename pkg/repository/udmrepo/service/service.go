@@ -22,16 +22,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )
 
-const (
-	defaultUsername = "default"
-	defaultDomain   = "default"
-)
-
+// Create creates an instance of BackupRepoService
 func Create(logger logrus.FieldLogger) udmrepo.BackupRepoService {
 	///TODO: create from kopiaLib
 	return nil
-}
-
-func GetRepoUser() (username, domain string) {
-	return defaultUsername, defaultDomain
 }

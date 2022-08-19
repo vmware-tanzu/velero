@@ -82,6 +82,8 @@ import (
 	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 )
 
@@ -248,7 +250,9 @@ type server struct {
 	logger                              logrus.FieldLogger
 	logLevel                            logrus.Level
 	pluginRegistry                      clientmgmt.Registry
-	resticManager                       restic.RepositoryManager
+	repoManager                         repository.Manager
+	repoLocker                          *repository.RepoLocker
+	repoEnsurer                         *repository.RepositoryEnsurer
 	metrics                             *metrics.ServerMetrics
 	config                              serverConfig
 	mgr                                 manager.Manager
@@ -536,22 +540,10 @@ func (s *server) initRestic() error {
 		return err
 	}
 
-	res, err := restic.NewRepositoryManager(
-		s.ctx,
-		s.namespace,
-		s.veleroClient,
-		s.sharedInformerFactory.Velero().V1().BackupRepositories(),
-		s.veleroClient.VeleroV1(),
-		s.mgr.GetClient(),
-		s.kubeClient.CoreV1(),
-		s.kubeClient.CoreV1(),
-		s.credentialFileStore,
-		s.logger,
-	)
-	if err != nil {
-		return err
-	}
-	s.resticManager = res
+	s.repoLocker = repository.NewRepoLocker()
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.sharedInformerFactory.Velero().V1().BackupRepositories(), s.veleroClient.VeleroV1(), s.logger)
+
+	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.logger)
 
 	return nil
 }
@@ -643,7 +635,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.resticManager,
+			podvolume.NewBackupperFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(), s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
 			s.config.clientPageSize,
@@ -704,7 +697,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			client.NewDynamicFactory(s.dynamicClient),
 			s.config.restoreResourcePriorities,
 			s.kubeClient.CoreV1().Namespaces(),
-			s.resticManager,
+			podvolume.NewRestorerFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
+				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
 			s.logger,
@@ -812,7 +806,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
 	}
 
-	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.resticManager).SetupWithManager(s.mgr); err != nil {
+	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
 	}
 
@@ -820,7 +814,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger,
 		s.mgr.GetClient(),
 		backupTracker,
-		s.resticManager,
+		s.repoManager,
 		s.metrics,
 		s.discoveryHelper,
 		newPluginManager,

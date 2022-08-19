@@ -14,17 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package backend
 
 import (
-	"testing"
+	"context"
 
-	"github.com/stretchr/testify/require"
+	"github.com/kopia/kopia/repo/blob"
 )
 
-func TestRepoKeySelector(t *testing.T) {
-	selector := RepoKeySelector()
+// Store defines the methods for Kopia to establish a connection to
+// the backend storage
+type Store interface {
+	// Setup setups the variables to a specific backend storage
+	Setup(ctx context.Context, flags map[string]string) error
 
-	require.Equal(t, credentialsSecretName, selector.Name)
-	require.Equal(t, credentialsKey, selector.Key)
+	// Connect connects to a specific backend storage with the storage variables
+	Connect(ctx context.Context, isCreate bool) (blob.Storage, error)
 }
