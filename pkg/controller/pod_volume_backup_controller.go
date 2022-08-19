@@ -38,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -59,6 +60,13 @@ type PodVolumeBackupReconciler struct {
 	FileSystem     filesystem.Interface
 	ResticExec     BackupExecuter
 	Log            logrus.FieldLogger
+}
+
+type BackupProgressUpdater struct {
+	PodVolumeBackup *velerov1api.PodVolumeBackup
+	Log             logrus.FieldLogger
+	Ctx             context.Context
+	Cli             client.Client
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
@@ -264,6 +272,18 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 	return mostRecentPVB.Status.SnapshotID
 }
 
+// updateBackupProgressFunc returns a func that takes progress info and patches
+// the PVB with the new progress.
+func (r *PodVolumeBackupReconciler) updateBackupProgressFunc(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
+	return func(progress velerov1api.PodVolumeOperationProgress) {
+		original := pvb.DeepCopy()
+		pvb.Status.Progress = progress
+		if err := r.Client.Patch(context.Background(), pvb, client.MergeFrom(original)); err != nil {
+			log.WithError(err).Error("error update progress")
+		}
+	}
+}
+
 func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
 	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
@@ -351,4 +371,21 @@ func (r *PodVolumeBackupReconciler) buildResticCommand(ctx context.Context, log 
 	}
 
 	return cmd, nil
+}
+
+func (r *PodVolumeBackupReconciler) NewBackupProgressUpdater(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger, ctx context.Context) *BackupProgressUpdater {
+	return &BackupProgressUpdater{pvb, log, ctx, r.Client}
+}
+
+//UpdateProgress which implement ProgressUpdater interface to update pvb progress status
+func (b *BackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
+	original := b.PodVolumeBackup.DeepCopy()
+	b.PodVolumeBackup.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	if b.Cli == nil {
+		b.Log.Errorf("failed to update backup pod %s volume %s progress with uninitailize client", b.PodVolumeBackup.Spec.Pod.Name, b.PodVolumeBackup.Spec.Volume)
+		return
+	}
+	if err := b.Cli.Patch(b.Ctx, b.PodVolumeBackup, client.MergeFrom(original)); err != nil {
+		b.Log.Errorf("update backup pod %s volume %s progress with %v", b.PodVolumeBackup.Spec.Pod.Name, b.PodVolumeBackup.Spec.Volume, err)
+	}
 }

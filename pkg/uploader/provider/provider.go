@@ -34,37 +34,38 @@ const backupProgressCheckInterval = 10 * time.Second
 // Provider which is designed for one pod volumn to do the backup or restore
 type Provider interface {
 	// RunBackup which will do backup for one specific volumn and return snapshotID error
-	// updater which is used for update backup progress into related pvb status
+	// updater is used for updating backup progress which implement by third-party
 	RunBackup(
 		ctx context.Context,
 		path string,
 		tags map[string]string,
 		parentSnapshot string,
-		updater velerov1api.ProgressUpdater) (string, error)
+		updater uploader.ProgressUpdater) (string, error)
 	// RunRestore which will do restore for one specific volumn with given snapshot id and return error
-	// updateFunc which is used for update restore progress into related pvr status
+	// updater is used for updating backup progress which implement by third-party
 	RunRestore(
 		ctx context.Context,
 		snapshotID string,
 		volumePath string,
-		updater velerov1api.ProgressUpdater) error
+		updater uploader.ProgressUpdater) error
 	// Close which will close related repository
 	Close(ctx context.Context)
 }
 
-//NewUploaderProvider initialize provider with specific uploader_type
+// NewUploaderProvider initialize provider with specific uploaderType
 func NewUploaderProvider(
 	ctx context.Context,
-	uploader_type string,
+	uploaderType string,
 	repoIdentifier string,
 	bsl *velerov1api.BackupStorageLocation,
+	backupReo *velerov1api.BackupRepository,
 	credGetter *credentials.CredentialGetter,
 	repoKeySelector *v1.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
-	if uploader_type == uploader.KopiaType {
+	if uploaderType == uploader.KopiaType {
 		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	} else {
-		return NewKopiaUploaderProvider(ctx, credGetter, bsl, log)
+		return NewKopiaUploaderProvider(ctx, credGetter, backupReo, log)
 	}
 }
