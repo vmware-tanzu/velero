@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 //Throttle throttles controlle the interval of output result
@@ -60,9 +60,9 @@ type KopiaProgress struct {
 	estimatedFileCount  int32 // +checklocksignore the total count of files to be processed
 	estimatedTotalBytes int64 // +checklocksignore	the total size of files to be processed
 	// +checkatomic
-	processedBytes int64                       // which statistic all bytes has been processed currently
-	outputThrottle Throttle                    // which control the frequency of update progress
-	Updater        velerov1api.ProgressUpdater //which the kopia progress will call the UpdateProgress, the third party will implement the interface to update progress
+	processedBytes int64                    // which statistic all bytes has been processed currently
+	outputThrottle Throttle                 // which control the frequency of update progress
+	Updater        uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
 }
 
 //UploadedBytes the total bytes has uploaded currently
@@ -90,10 +90,10 @@ func (p *KopiaProgress) EstimatedDataSize(fileCount int, totalBytes int64) {
 	p.UpdateProgress()
 }
 
-//UpdateProgress which called by UpdateProgress func, it is used to update pvb or pvr status
+//UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
 func (p *KopiaProgress) UpdateProgress() {
 	if p.outputThrottle.ShouldOutput() {
-		p.Updater.UpdateProgress(&velerov1api.UploaderProgress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
+		p.Updater.UpdateProgress(&uploader.UploaderProgress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
 	}
 }
 

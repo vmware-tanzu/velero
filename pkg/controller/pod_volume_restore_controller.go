@@ -41,6 +41,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -62,6 +63,13 @@ type PodVolumeRestoreReconciler struct {
 	credentialsFileStore credentials.FileStore
 	fileSystem           filesystem.Interface
 	clock                clock.Clock
+}
+
+type RestoreProgressUpdater struct {
+	PodVolumeRestore *velerov1api.PodVolumeRestore
+	Log              logrus.FieldLogger
+	Ctx              context.Context
+	Cli              client.Client
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -316,4 +324,33 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	}
 
 	return nil
+}
+
+// updateRestoreProgressFunc returns a func that takes progress info and patches
+// the PVR with the new progress
+func (c *PodVolumeRestoreReconciler) updateRestoreProgressFunc(req *velerov1api.PodVolumeRestore, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
+	return func(progress velerov1api.PodVolumeOperationProgress) {
+		original := req.DeepCopy()
+		req.Status.Progress = progress
+		if err := c.Patch(context.Background(), req, client.MergeFrom(original)); err != nil {
+			log.WithError(err).Error("Unable to update PodVolumeRestore progress")
+		}
+	}
+}
+
+func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger, ctx context.Context) *RestoreProgressUpdater {
+	return &RestoreProgressUpdater{pvr, log, ctx, r.Client}
+}
+
+//UpdateProgress which implement ProgressUpdater interface to update pvr progress status
+func (r *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
+	original := r.PodVolumeRestore.DeepCopy()
+	r.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	if r.Cli == nil {
+		r.Log.Errorf("failed to update restore pod %s volume %s progress with uninitailize client", r.PodVolumeRestore.Spec.Pod.Name, r.PodVolumeRestore.Spec.Volume)
+		return
+	}
+	if err := r.Cli.Patch(r.Ctx, r.PodVolumeRestore, client.MergeFrom(original)); err != nil {
+		r.Log.Errorf("update restore pod %s volume %s progress with %v", r.PodVolumeRestore.Spec.Pod.Name, r.PodVolumeRestore.Spec.Volume, err)
+	}
 }

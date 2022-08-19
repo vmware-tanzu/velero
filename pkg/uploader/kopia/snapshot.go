@@ -18,7 +18,6 @@ package kopia
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -28,7 +27,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/service"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 
 	"github.com/kopia/kopia/fs"
@@ -86,7 +85,7 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath string,
 	parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, error) {
 	if fsUploader == nil {
-		return nil, fmt.Errorf("get empty kopia uploader")
+		return nil, errors.New("get empty kopia uploader")
 	}
 	dir, err := filepath.Abs(sourcePath)
 	if err != nil {
@@ -94,9 +93,11 @@ func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter rep
 	}
 
 	sourceInfo := snapshot.SourceInfo{
-		Path: filepath.Clean(dir),
+		UserName: udmrepo.GetRepoUser(),
+		Host:     udmrepo.GetRepoDomain(),
+		Path:     filepath.Clean(dir),
 	}
-	sourceInfo.UserName, sourceInfo.Host = service.GetRepoUser()
+
 	rootDir, err := getLocalFSEntry(sourceInfo.Path)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to get local filesystem entry")

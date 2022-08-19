@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	repomocks "github.com/vmware-tanzu/velero/pkg/repository/mocks"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/uploader/mocks"
 )
 
@@ -187,7 +186,7 @@ func TestSnapshotSource(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := InjectSnapshotFuncs()
 			MockFuncs(s, tc.args)
-			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, "/", log, "TestSnapshotSource", func(up uploader.UploaderProgress) {})
+			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, "/", log, "TestSnapshotSource")
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {

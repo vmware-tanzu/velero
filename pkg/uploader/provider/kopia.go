@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/kopia"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -40,20 +40,17 @@ var BackupFunc = kopia.Backup
 var RestoreFunc = kopia.Restore
 
 //kopiaProvider recorded info related with kopiaProvider
-//action which means provider handle backup or restore
 type kopiaProvider struct {
-	bkRepo        udmrepo.BackupRepo
-	credGetter    *credentials.CredentialGetter
-	uploader      *snapshotfs.Uploader
-	restoreCancel chan struct{}
-	log           logrus.FieldLogger
+	bkRepo     udmrepo.BackupRepo
+	credGetter *credentials.CredentialGetter
+	log        logrus.FieldLogger
 }
 
 //NewKopiaUploaderProvider initialized with open or create a repository
 func NewKopiaUploaderProvider(
 	ctx context.Context,
 	credGetter *credentials.CredentialGetter,
-	bsl *velerov1api.BackupStorageLocation,
+	backupRepo *velerov1api.BackupRepository,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	kp := &kopiaProvider{
@@ -61,7 +58,7 @@ func NewKopiaUploaderProvider(
 		credGetter: credGetter,
 	}
 	//repoUID which is used to generate kopia repository config with unique directory path
-	repoUID := string(bsl.GetUID())
+	repoUID := string(backupRepo.GetUID())
 	repoOpt, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(kp, ""),
 		udmrepo.WithConfigFile("", repoUID),
@@ -81,24 +78,22 @@ func NewKopiaUploaderProvider(
 	return kp, nil
 }
 
-//CheckContext check context status periodically
-//check if context is timeout or cancel
-func (kp *kopiaProvider) CheckContext(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			if kp.uploader != nil {
-				kp.uploader.Cancel()
-				kp.log.Infof("Backup is been canceled")
-			}
-			if kp.restoreCancel != nil {
-				close(kp.restoreCancel)
-				kp.log.Infof("Restore is been canceled")
-			}
-			return
-		default:
-			time.Sleep(time.Second * 10)
+//CheckContext check context status check if context is timeout or cancel and backup restore once finished it will quit and return
+func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struct{}, restoreChan chan struct{}, uploader *snapshotfs.Uploader) {
+	select {
+	case <-finishChan:
+		kp.log.Infof("Action finished")
+		return
+	case <-ctx.Done():
+		if uploader != nil {
+			uploader.Cancel()
+			kp.log.Infof("Backup is been canceled")
 		}
+		if restoreChan != nil {
+			close(restoreChan)
+			kp.log.Infof("Restore is been canceled")
+		}
+		return
 	}
 }
 
@@ -106,15 +101,15 @@ func (kp *kopiaProvider) Close(ctx context.Context) {
 	kp.bkRepo.Close(ctx)
 }
 
-//RunBackup which will backup specific path and update backup progress in pvb status
+//RunBackup which will backup specific path and update backup progress
 func (kp *kopiaProvider) RunBackup(
 	ctx context.Context,
 	path string,
 	tags map[string]string,
 	parentSnapshot string,
-	updater velerov1api.ProgressUpdater) (string, error) {
+	updater uploader.ProgressUpdater) (string, error) {
 	if updater == nil {
-		return "", errors.New("Need to inital backup progress updater first")
+		return "", errors.New("Need to initial backup progress updater first")
 	}
 
 	log := kp.log.WithFields(logrus.Fields{
@@ -122,25 +117,29 @@ func (kp *kopiaProvider) RunBackup(
 		"parentSnapshot": parentSnapshot,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
-	kp.uploader = snapshotfs.NewUploader(repoWriter)
+	kpUploader := snapshotfs.NewUploader(repoWriter)
 	prorgess := new(kopia.KopiaProgress)
 	prorgess.InitThrottle(backupProgressCheckInterval)
 	prorgess.Updater = updater
-	kp.uploader.Progress = prorgess
-
+	kpUploader.Progress = prorgess
+	quit := make(chan struct{})
 	log.Info("Starting backup")
-	go kp.CheckContext(ctx)
+	go kp.CheckContext(ctx, quit, nil, kpUploader)
 
-	snapshotInfo, err := BackupFunc(ctx, kp.uploader, repoWriter, path, parentSnapshot, log)
+	defer func() {
+		close(quit)
+	}()
+
+	snapshotInfo, err := BackupFunc(ctx, kpUploader, repoWriter, path, parentSnapshot, log)
 
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed to run kopia backup")
 	} else if snapshotInfo == nil {
 		return "", fmt.Errorf("failed to get kopia backup snapshot info for path %v", path)
 	}
-
+	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
 	updater.UpdateProgress(
-		&velerov1api.UploaderProgress{
+		&uploader.UploaderProgress{
 			TotalBytes: snapshotInfo.Size,
 			BytesDone:  snapshotInfo.Size,
 		},
@@ -162,12 +161,12 @@ func (kp *kopiaProvider) GetPassword(param interface{}) (string, error) {
 	return strings.TrimSpace(rawPass), nil
 }
 
-//RunRestore which will restore specific path and update restore progress in pvr status
+//RunRestore which will restore specific path and update restore progress
 func (kp *kopiaProvider) RunRestore(
 	ctx context.Context,
 	snapshotID string,
 	volumePath string,
-	updater velerov1api.ProgressUpdater) error {
+	updater uploader.ProgressUpdater) error {
 	log := kp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,
 		"volumePath": volumePath,
@@ -176,22 +175,27 @@ func (kp *kopiaProvider) RunRestore(
 	prorgess := new(kopia.KopiaProgress)
 	prorgess.InitThrottle(restoreProgressCheckInterval)
 	prorgess.Updater = updater
-	kp.restoreCancel = make(chan struct{})
-	defer func() {
-		if kp.restoreCancel != nil {
-			close(kp.restoreCancel)
-		}
-	}()
+	restoreCancel := make(chan struct{})
+	quit := make(chan struct{})
 
 	log.Info("Starting restore")
-	go kp.CheckContext(ctx)
-	size, fileCount, err := RestoreFunc(ctx, repoWriter, prorgess, snapshotID, volumePath, log, kp.restoreCancel)
+	go kp.CheckContext(ctx, quit, restoreCancel, nil)
+
+	defer func() {
+		if restoreCancel != nil {
+			close(restoreCancel)
+		}
+		close(quit)
+	}()
+
+	size, fileCount, err := RestoreFunc(ctx, repoWriter, prorgess, snapshotID, volumePath, log, restoreCancel)
 
 	if err != nil {
 		return errors.Wrapf(err, "Failed to run kopia restore")
 	}
 
-	updater.UpdateProgress(&velerov1api.UploaderProgress{
+	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
+	updater.UpdateProgress(&uploader.UploaderProgress{
 		TotalBytes: size,
 		BytesDone:  size,
 	})

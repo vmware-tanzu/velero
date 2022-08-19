@@ -40,3 +40,14 @@ type SnapshotInfo struct {
 	ID   string `json:"id"`
 	Size int64  `json:"Size"`
 }
+
+//UploaderProgress which defined two variables to record progress
+type UploaderProgress struct {
+	TotalBytes int64 `json:"totalBytes,omitempty"`
+	BytesDone  int64 `json:"doneBytes,omitempty"`
+}
+
+//UploaderProgress which defined generic interface to update progress
+type ProgressUpdater interface {
+	UpdateProgress(p *UploaderProgress)
+}
