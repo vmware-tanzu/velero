@@ -23,7 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,23 +32,39 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
 
-// DownloadRequestReconciler reconciles a DownloadRequest object
-type DownloadRequestReconciler struct {
-	Scheme *runtime.Scheme
-	Client kbclient.Client
-	Clock  clock.Clock
+// downloadRequestReconciler reconciles a DownloadRequest object
+type downloadRequestReconciler struct {
+	client kbclient.Client
+	clock  clock.Clock
 	// use variables to refer to these functions so they can be
 	// replaced with fakes for testing.
-	NewPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
-	BackupStoreGetter persistence.ObjectBackupStoreGetter
+	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
+	backupStoreGetter persistence.ObjectBackupStoreGetter
 
-	Log logrus.FieldLogger
+	log logrus.FieldLogger
+}
+
+// NewDownloadRequestReconciler initializes and returns downloadRequestReconciler struct.
+func NewDownloadRequestReconciler(
+	client kbclient.Client,
+	clock clock.Clock,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupStoreGetter persistence.ObjectBackupStoreGetter,
+	log logrus.FieldLogger,
+) *downloadRequestReconciler {
+	return &downloadRequestReconciler{
+		client:            client,
+		clock:             clock,
+		newPluginManager:  newPluginManager,
+		backupStoreGetter: backupStoreGetter,
+		log:               log,
+	}
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests/status,verbs=get;update;patch
-func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithFields(logrus.Fields{
+func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.log.WithFields(logrus.Fields{
 		"controller":      "download-request",
 		"downloadRequest": req.NamespacedName,
 	})
@@ -57,7 +72,7 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Fetch the DownloadRequest instance.
 	log.Debug("Getting DownloadRequest")
 	downloadRequest := &velerov1api.DownloadRequest{}
-	if err := r.Client.Get(ctx, req.NamespacedName, downloadRequest); err != nil {
+	if err := r.client.Get(ctx, req.NamespacedName, downloadRequest); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Debug("Unable to find DownloadRequest")
 			return ctrl.Result{}, nil
@@ -70,19 +85,19 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	original := downloadRequest.DeepCopy()
 	defer func() {
 		// Always attempt to Patch the downloadRequest object and status after each reconciliation.
-		if err := r.Client.Patch(ctx, downloadRequest, kbclient.MergeFrom(original)); err != nil {
+		if err := r.client.Patch(ctx, downloadRequest, kbclient.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Error updating download request")
 			return
 		}
 	}()
 
 	if downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && downloadRequest.Status.Expiration != nil {
-		if downloadRequest.Status.Expiration.Time.Before(r.Clock.Now()) {
+		if downloadRequest.Status.Expiration.Time.Before(r.clock.Now()) {
 
 			// Delete any request that is expired, regardless of the phase: it is not
 			// worth proceeding and trying/retrying to find it.
 			log.Debug("DownloadRequest has expired - deleting")
-			if err := r.Client.Delete(ctx, downloadRequest); err != nil {
+			if err := r.client.Delete(ctx, downloadRequest); err != nil {
 				log.WithError(err).Error("Error deleting an expired download request")
 				return ctrl.Result{}, errors.WithStack(err)
 			}
@@ -103,12 +118,12 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if downloadRequest.Status.Phase == "" || downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseNew {
 
 		// Update the expiration.
-		downloadRequest.Status.Expiration = &metav1.Time{Time: r.Clock.Now().Add(persistence.DownloadURLTTL)}
+		downloadRequest.Status.Expiration = &metav1.Time{Time: r.clock.Now().Add(persistence.DownloadURLTTL)}
 
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreLog ||
 			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResults {
 			restore := &velerov1api.Restore{}
-			if err := r.Client.Get(ctx, kbclient.ObjectKey{
+			if err := r.client.Get(ctx, kbclient.ObjectKey{
 				Namespace: downloadRequest.Namespace,
 				Name:      downloadRequest.Spec.Target.Name,
 			}, restore); err != nil {
@@ -118,7 +133,7 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		backup := &velerov1api.Backup{}
-		if err := r.Client.Get(ctx, kbclient.ObjectKey{
+		if err := r.client.Get(ctx, kbclient.ObjectKey{
 			Namespace: downloadRequest.Namespace,
 			Name:      backupName,
 		}, backup); err != nil {
@@ -126,17 +141,17 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		location := &velerov1api.BackupStorageLocation{}
-		if err := r.Client.Get(ctx, kbclient.ObjectKey{
+		if err := r.client.Get(ctx, kbclient.ObjectKey{
 			Namespace: backup.Namespace,
 			Name:      backup.Spec.StorageLocation,
 		}, location); err != nil {
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 
-		pluginManager := r.NewPluginManager(log)
+		pluginManager := r.newPluginManager(log)
 		defer pluginManager.CleanupClients()
 
-		backupStore, err := r.BackupStoreGetter.Get(location, pluginManager, log)
+		backupStore, err := r.backupStoreGetter.Get(location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting a backup store")
 			return ctrl.Result{}, errors.WithStack(err)
@@ -149,7 +164,7 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		downloadRequest.Status.Phase = velerov1api.DownloadRequestPhaseProcessed
 
 		// Update the expiration again to extend the time we wait (the TTL) to start after successfully processing the URL.
-		downloadRequest.Status.Expiration = &metav1.Time{Time: r.Clock.Now().Add(persistence.DownloadURLTTL)}
+		downloadRequest.Status.Expiration = &metav1.Time{Time: r.clock.Now().Add(persistence.DownloadURLTTL)}
 	}
 
 	// Requeue is mostly to handle deleting any expired requests that were not
@@ -157,7 +172,7 @@ func (r *DownloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func (r *DownloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.DownloadRequest{}).
 		Complete(r)
