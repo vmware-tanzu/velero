@@ -486,7 +486,7 @@ func (v *volumesByPod) Add(namespace, name, volume, phase string, progress veler
 	key := fmt.Sprintf("%s/%s", namespace, name)
 
 	// append backup progress percentage if backup is in progress
-	if phase == "In Progress" && progress != (velerov1api.PodVolumeOperationProgress{}) {
+	if phase == "In Progress" && progress.TotalBytes != 0 {
 		volume = fmt.Sprintf("%s (%.2f%%)", volume, float64(progress.BytesDone)/float64(progress.TotalBytes)*100)
 	}
 
