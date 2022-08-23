@@ -37,6 +37,8 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -433,6 +435,9 @@ func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
 	cmd.Stderr = os.Stderr
 	fmt.Printf("velero cmd =%v\n", cmd)
 	err := cmd.Run()
+	if strings.Contains(fmt.Sprint(cmd.Stdout), "Failed") {
+		return errors.New(fmt.Sprintf("velero cmd =%v return with failure\n", cmd))
+	}
 	if err != nil {
 		return err
 	}
@@ -1007,4 +1012,17 @@ func GetVersionList(veleroCli, veleroVersion string) []VeleroCLI2Version {
 		veleroCLI2VersionList[i].VeleroCLI = veleroCli
 	}
 	return veleroCLI2VersionList
+}
+func DeleteBackups(ctx context.Context, client TestClient) error {
+	backupList := new(velerov1api.BackupList)
+	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
+		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
+	}
+	for _, backup := range backupList.Items {
+		fmt.Printf("Backup %s is going to be deleted...", backup.Name)
+		if err := VeleroBackupDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
+			return err
+		}
+	}
+	return nil
 }

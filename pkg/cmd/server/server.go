@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/uploader"
+
 	"github.com/bombsimon/logrusr"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -80,6 +82,8 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 )
 
@@ -127,6 +131,7 @@ type serverConfig struct {
 	defaultResticMaintenanceFrequency                                       time.Duration
 	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
+	uploaderType                                                            string
 }
 
 type controllerRunInfo struct {
@@ -157,6 +162,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
 			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
+			uploaderType:                      uploader.ResticType,
 		}
 	)
 
@@ -222,6 +228,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
+	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
 
 	return command
 }
@@ -243,7 +250,9 @@ type server struct {
 	logger                              logrus.FieldLogger
 	logLevel                            logrus.Level
 	pluginRegistry                      clientmgmt.Registry
-	resticManager                       restic.RepositoryManager
+	repoManager                         repository.Manager
+	repoLocker                          *repository.RepoLocker
+	repoEnsurer                         *repository.RepositoryEnsurer
 	metrics                             *metrics.ServerMetrics
 	config                              serverConfig
 	mgr                                 manager.Manager
@@ -251,6 +260,10 @@ type server struct {
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
+	if err := uploader.ValidateUploaderType(config.uploaderType); err != nil {
+		return nil, err
+	}
+
 	if config.clientQPS < 0.0 {
 		return nil, errors.New("client-qps must be positive")
 	}
@@ -527,22 +540,10 @@ func (s *server) initRestic() error {
 		return err
 	}
 
-	res, err := restic.NewRepositoryManager(
-		s.ctx,
-		s.namespace,
-		s.veleroClient,
-		s.sharedInformerFactory.Velero().V1().BackupRepositories(),
-		s.veleroClient.VeleroV1(),
-		s.mgr.GetClient(),
-		s.kubeClient.CoreV1(),
-		s.kubeClient.CoreV1(),
-		s.credentialFileStore,
-		s.logger,
-	)
-	if err != nil {
-		return err
-	}
-	s.resticManager = res
+	s.repoLocker = repository.NewRepoLocker()
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.sharedInformerFactory.Velero().V1().BackupRepositories(), s.veleroClient.VeleroV1(), s.logger)
+
+	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.logger)
 
 	return nil
 }
@@ -611,7 +612,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.resticManager,
+			podvolume.NewBackupperFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(), s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
 			s.config.clientPageSize,
@@ -649,22 +651,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	gcControllerRunInfo := func() controllerRunInfo {
-		gcController := controller.NewGCController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.config.garbageCollectionFrequency,
-		)
-
-		return controllerRunInfo{
-			controller: gcController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
 			s.veleroClient.VeleroV1(),
@@ -672,7 +658,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			client.NewDynamicFactory(s.dynamicClient),
 			s.config.restoreResourcePriorities,
 			s.kubeClient.CoreV1().Namespaces(),
-			s.resticManager,
+			podvolume.NewRestorerFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
+				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
 			s.logger,
@@ -709,14 +696,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	// This is because of PVB and PVR are used by Restic DaemonSet,
 	// and BSL controller is mandatory for Velero to work.
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.Backup:            backupControllerRunInfo,
-		controller.GarbageCollection: gcControllerRunInfo,
-		controller.Restore:           restoreControllerRunInfo,
+		controller.Backup:  backupControllerRunInfo,
+		controller.Restore: restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
 		controller.ServerStatusRequest: {},
 		controller.DownloadRequest:     {},
+		controller.GarbageCollection:   {},
 		controller.BackupSync:          {},
 	}
 
@@ -785,7 +772,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
 	}
 
-	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.resticManager).SetupWithManager(s.mgr); err != nil {
+	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
 	}
 
@@ -793,7 +780,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger,
 		s.mgr.GetClient(),
 		backupTracker,
-		s.resticManager,
+		s.repoManager,
 		s.metrics,
 		s.discoveryHelper,
 		newPluginManager,
@@ -846,6 +833,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		if err := backupSyncReconciler.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, " unable to create controller ", "controller ", controller.BackupSync)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.GarbageCollection]; ok {
+		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient())
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.GarbageCollection)
 		}
 	}
 

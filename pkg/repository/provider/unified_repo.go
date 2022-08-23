@@ -30,7 +30,7 @@ import (
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/util/ownership"
+	reposervice "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/service"
 )
 
 type unifiedRepoProvider struct {
@@ -49,28 +49,30 @@ var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 var getAzureStorageDomain = repoconfig.GetAzureStorageDomain
 
 type localFuncTable struct {
-	getRepoPassword       func(credentials.SecretStore, RepoParam) (string, error)
 	getStorageVariables   func(*velerov1api.BackupStorageLocation, string) (map[string]string, error)
 	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
 }
 
 var funcTable = localFuncTable{
-	getRepoPassword:       getRepoPassword,
 	getStorageVariables:   getStorageVariables,
 	getStorageCredentials: getStorageCredentials,
 }
 
+const (
+	repoOpDescFullMaintain  = "full maintenance"
+	repoOpDescQuickMaintain = "quick maintenance"
+	repoOpDescForget        = "forget"
+
+	repoConnectDesc = "unfied repo"
+)
+
 // NewUnifiedRepoProvider creates the service provider for Unified Repo
-// workPath is the path for Unified Repo to store some local information
-// workPath could be empty, if so, the default path will be used
 func NewUnifiedRepoProvider(
 	credentialGetter credentials.CredentialGetter,
-	workPath string,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	repo := unifiedRepoProvider{
 		credentialGetter: credentialGetter,
-		workPath:         workPath,
 		log:              log,
 	}
 
@@ -89,12 +91,24 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 
 	log.Debug("Start to init repo")
 
-	repoOption, err := urp.getRepoOption(param)
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
+				udmrepo.GenOptionOwnerDomain: udmrepo.GetRepoDomain(),
+			},
+		),
+		udmrepo.WithStoreOptions(urp, param),
+		udmrepo.WithDescription(repoConnectDesc),
+	)
+
 	if err != nil {
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, repoOption, true)
+	err = urp.repoService.Init(ctx, *repoOption, true)
 	if err != nil {
 		return errors.Wrap(err, "error to init backup repo")
 	}
@@ -105,22 +119,144 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 }
 
 func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoParam) error {
-	///TODO
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name": param.BackupLocation.Name,
+		"BSL UID":  param.BackupLocation.UID,
+	})
+
+	log.Debug("Start to connect repo")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
+				udmrepo.GenOptionOwnerDomain: udmrepo.GetRepoDomain(),
+			},
+		),
+		udmrepo.WithStoreOptions(urp, param),
+		udmrepo.WithDescription(repoConnectDesc),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "error to get repo options")
+	}
+
+	err = urp.repoService.Init(ctx, *repoOption, false)
+	if err != nil {
+		return errors.Wrap(err, "error to connect backup repo")
+	}
+
+	log.Debug("Connect repo complete")
+
 	return nil
 }
 
 func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam) error {
-	///TODO
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name": param.BackupLocation.Name,
+		"BSL UID":  param.BackupLocation.UID,
+	})
+
+	log.Debug("Start to prepare repo")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
+				udmrepo.GenOptionOwnerDomain: udmrepo.GetRepoDomain(),
+			},
+		),
+		udmrepo.WithStoreOptions(urp, param),
+		udmrepo.WithDescription(repoConnectDesc),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "error to get repo options")
+	}
+
+	err = urp.repoService.Init(ctx, *repoOption, false)
+	if err == nil {
+		log.Debug("Repo has already been initialized remotely")
+		return nil
+	}
+
+	err = urp.repoService.Init(ctx, *repoOption, true)
+	if err != nil {
+		return errors.Wrap(err, "error to init backup repo")
+	}
+
+	log.Debug("Prepare repo complete")
+
 	return nil
 }
 
 func (urp *unifiedRepoProvider) PruneRepo(ctx context.Context, param RepoParam) error {
-	///TODO
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name": param.BackupLocation.Name,
+		"BSL UID":  param.BackupLocation.UID,
+	})
+
+	log.Debug("Start to prune repo")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainFull,
+			},
+		),
+		udmrepo.WithDescription(repoOpDescFullMaintain),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "error to get repo options")
+	}
+
+	err = urp.repoService.Maintain(ctx, *repoOption)
+	if err != nil {
+		return errors.Wrap(err, "error to prune backup repo")
+	}
+
+	log.Debug("Prune repo complete")
+
 	return nil
 }
 
 func (urp *unifiedRepoProvider) PruneRepoQuick(ctx context.Context, param RepoParam) error {
-	///TODO
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name": param.BackupLocation.Name,
+		"BSL UID":  param.BackupLocation.UID,
+	})
+
+	log.Debug("Start to prune repo quick")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithGenOptions(
+			map[string]string{
+				udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainQuick,
+			},
+		),
+		udmrepo.WithDescription(repoOpDescQuickMaintain),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "error to get repo options")
+	}
+
+	err = urp.repoService.Maintain(ctx, *repoOption)
+	if err != nil {
+		return errors.Wrap(err, "error to prune backup repo quick")
+	}
+
+	log.Debug("Prune repo quick complete")
+
 	return nil
 }
 
@@ -129,8 +265,95 @@ func (urp *unifiedRepoProvider) EnsureUnlockRepo(ctx context.Context, param Repo
 }
 
 func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, param RepoParam) error {
-	///TODO
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name":   param.BackupLocation.Name,
+		"BSL UID":    param.BackupLocation.UID,
+		"snapshotID": snapshotID,
+	})
+
+	log.Debug("Start to forget snapshot")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithDescription(repoOpDescForget),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "error to get repo options")
+	}
+
+	bkRepo, err := urp.repoService.Open(ctx, *repoOption)
+	if err != nil {
+		return errors.Wrap(err, "error to open backup repo")
+	}
+
+	defer func() {
+		c := bkRepo.Close(ctx)
+		if c != nil {
+			log.WithError(c).Error("Failed to close repo")
+		}
+	}()
+
+	err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
+	if err != nil {
+		return errors.Wrap(err, "error to delete manifest")
+	}
+
+	log.Debug("Forget snapshot complete")
+
 	return nil
+}
+
+func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
+	repoParam, ok := param.(RepoParam)
+	if !ok {
+		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
+	}
+
+	repoPassword, err := getRepoPassword(urp.credentialGetter.FromSecret, repoParam)
+	if err != nil {
+		return "", errors.Wrap(err, "error to get repo password")
+	}
+
+	return repoPassword, nil
+}
+
+func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) {
+	repoParam, ok := param.(RepoParam)
+	if !ok {
+		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
+	}
+
+	return getStorageType(repoParam.BackupLocation), nil
+}
+
+func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]string, error) {
+	repoParam, ok := param.(RepoParam)
+	if !ok {
+		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
+	}
+
+	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, repoParam.BackupRepo.Spec.VolumeNamespace)
+	if err != nil {
+		return map[string]string{}, errors.Wrap(err, "error to get storage variables")
+	}
+
+	storeCred, err := funcTable.getStorageCredentials(repoParam.BackupLocation, urp.credentialGetter.FromFile)
+	if err != nil {
+		return map[string]string{}, errors.Wrap(err, "error to get repo credentials")
+	}
+
+	storeOptions := make(map[string]string)
+	for k, v := range storeVar {
+		storeOptions[k] = v
+	}
+
+	for k, v := range storeCred {
+		storeOptions[k] = v
+	}
+
+	return storeOptions, nil
 }
 
 func getRepoPassword(secretStore credentials.SecretStore, param RepoParam) (string, error) {
@@ -138,51 +361,12 @@ func getRepoPassword(secretStore credentials.SecretStore, param RepoParam) (stri
 		return "", errors.New("invalid credentials interface")
 	}
 
-	buf, err := secretStore.Get(repokey.RepoKeySelector())
+	rawPass, err := secretStore.Get(repokey.RepoKeySelector())
 	if err != nil {
-		return "", errors.Wrap(err, "error to get password buffer")
+		return "", errors.Wrap(err, "error to get password")
 	}
 
-	return strings.TrimSpace(string(buf)), nil
-}
-
-func (urp *unifiedRepoProvider) getRepoOption(param RepoParam) (udmrepo.RepoOptions, error) {
-	repoPassword, err := funcTable.getRepoPassword(urp.credentialGetter.FromSecret, param)
-	if err != nil {
-		return udmrepo.RepoOptions{}, errors.Wrap(err, "error to get repo password")
-	}
-
-	storeVar, err := funcTable.getStorageVariables(param.BackupLocation, param.SubDir)
-	if err != nil {
-		return udmrepo.RepoOptions{}, errors.Wrap(err, "error to get storage variables")
-	}
-
-	storeCred, err := funcTable.getStorageCredentials(param.BackupLocation, urp.credentialGetter.FromFile)
-	if err != nil {
-		return udmrepo.RepoOptions{}, errors.Wrap(err, "error to get repo credentials")
-	}
-
-	repoOption := udmrepo.RepoOptions{
-		StorageType:    getStorageType(param.BackupLocation),
-		RepoPassword:   repoPassword,
-		ConfigFilePath: getRepoConfigFile(urp.workPath, string(param.BackupLocation.UID)),
-		Ownership: udmrepo.OwnershipOptions{
-			Username:   ownership.GetRepositoryOwner().Username,
-			DomainName: ownership.GetRepositoryOwner().DomainName,
-		},
-		StorageOptions: make(map[string]string),
-		GeneralOptions: make(map[string]string),
-	}
-
-	for k, v := range storeVar {
-		repoOption.StorageOptions[k] = v
-	}
-
-	for k, v := range storeCred {
-		repoOption.StorageOptions[k] = v
-	}
-
-	return repoOption, nil
+	return strings.TrimSpace(rawPass), nil
 }
 
 func getStorageType(backupLocation *velerov1api.BackupStorageLocation) string {
@@ -304,12 +488,6 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	return result, nil
 }
 
-func getRepoConfigFile(workPath string, repoID string) string {
-	///TODO: call udmrepo to get config file
-	return ""
-}
-
 func createRepoService(log logrus.FieldLogger) udmrepo.BackupRepoService {
-	///TODO: call udmrepo create repo service
-	return nil
+	return reposervice.Create(log)
 }

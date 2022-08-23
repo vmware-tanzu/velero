@@ -23,19 +23,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/tools/cache"
-
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -46,100 +43,77 @@ const (
 	gcFailureBSLReadOnly     = "BSLReadOnly"
 )
 
-// gcController creates DeleteBackupRequests for expired backups.
-type gcController struct {
-	*genericController
-
-	backupLister              velerov1listers.BackupLister
-	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister
-	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
-	kbClient                  client.Client
-	frequency                 time.Duration
-
-	clock clock.Clock
+// gcReconciler creates DeleteBackupRequests for expired backups.
+type gcReconciler struct {
+	client.Client
+	logger logrus.FieldLogger
+	clock  clock.Clock
 }
 
-// NewGCController constructs a new gcController.
-func NewGCController(
+// NewGCReconciler constructs a new gcReconciler.
+func NewGCReconciler(
 	logger logrus.FieldLogger,
-	backupInformer velerov1informers.BackupInformer,
-	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister,
-	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
-	kbClient client.Client,
-	frequency time.Duration,
-) Interface {
-	c := &gcController{
-		genericController:         newGenericController(GarbageCollection, logger),
-		clock:                     clock.RealClock{},
-		backupLister:              backupInformer.Lister(),
-		deleteBackupRequestLister: deleteBackupRequestLister,
-		deleteBackupRequestClient: deleteBackupRequestClient,
-		kbClient:                  kbClient,
-	}
-
-	c.syncHandler = c.processQueueItem
-	c.resyncPeriod = frequency
-	if c.resyncPeriod <= 0 {
-		c.resyncPeriod = defaultGCFrequency
-	}
-	logger.Infof("Garbage collection frequency: %s", c.resyncPeriod.String())
-	c.resyncFunc = c.enqueueAllBackups
-
-	backupInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.enqueue,
-			UpdateFunc: func(_, obj interface{}) { c.enqueue(obj) },
-		},
-	)
-
-	return c
-}
-
-// enqueueAllBackups lists all backups from cache and enqueues all of them so we can check each one
-// for expiration.
-func (c *gcController) enqueueAllBackups() {
-	c.logger.Debug("gcController.enqueueAllBackups")
-
-	backups, err := c.backupLister.List(labels.Everything())
-	if err != nil {
-		c.logger.WithError(errors.WithStack(err)).Error("error listing backups")
-		return
-	}
-
-	for _, backup := range backups {
-		c.enqueue(backup)
+	client client.Client,
+) *gcReconciler {
+	return &gcReconciler{
+		Client: client,
+		logger: logger,
+		clock:  clock.RealClock{},
 	}
 }
 
-func (c *gcController) processQueueItem(key string) error {
-	log := c.logger.WithField("backup", key)
+// GCController only watches on CreateEvent for ensuring every new backup will be taken care of.
+// Other Events will be filtered to decrease the number of reconcile call. Especially UpdateEvent must be filtered since we removed
+// the backup status as the sub-resource of backup in v1.9, every change on it will be treated as UpdateEvent and trigger reconcile call.
+func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1api.BackupList{}, defaultGCFrequency)
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&velerov1api.Backup{}).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(ue event.UpdateEvent) bool {
+				return false
+			},
+			DeleteFunc: func(de event.DeleteEvent) bool {
+				return false
+			},
+			GenericFunc: func(ge event.GenericEvent) bool {
+				return false
+			},
+		}).
+		Watches(s, nil).
+		Complete(c)
+}
 
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
-	}
+// +kubebuilder:rbac:groups=velero.io,resources=backups,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=velero.io,resources=backups/status,verbs=get
+// +kubebuilder:rbac:groups=velero.io,resources=deletebackuprequests,verbs=get;list;watch;create;
+// +kubebuilder:rbac:groups=velero.io,resources=deletebackuprequests/status,verbs=get
+// +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations,verbs=get
+func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := c.logger.WithField("gc backup", req.String())
+	log.Debug("gcController getting backup")
 
-	backup, err := c.backupLister.Backups(ns).Get(name)
-	if apierrors.IsNotFound(err) {
-		log.Debug("Unable to find backup")
-		return nil
+	backup := &velerov1api.Backup{}
+	if err := c.Get(ctx, req.NamespacedName, backup); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.WithError(err).Error("backup not found")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, errors.Wrapf(err, "error getting backup %s", req.String())
 	}
-	if err != nil {
-		return errors.Wrap(err, "error getting backup")
-	}
+	log.Debugf("backup: %v", backup)
 
 	log = c.logger.WithFields(
 		logrus.Fields{
-			"backup":     key,
+			"backup":     req.String(),
 			"expiration": backup.Status.Expiration,
 		},
 	)
 
 	now := c.clock.Now()
-
 	if backup.Status.Expiration == nil || backup.Status.Expiration.After(now) {
 		log.Debug("Backup has not expired yet, skipping")
-		return nil
+		return ctrl.Result{}, nil
 	}
 
 	log.Info("Backup has expired")
@@ -149,8 +123,8 @@ func (c *gcController) processQueueItem(key string) error {
 	}
 
 	loc := &velerov1api.BackupStorageLocation{}
-	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
-		Namespace: ns,
+	if err := c.Get(ctx, client.ObjectKey{
+		Namespace: req.Namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, loc); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -159,53 +133,56 @@ func (c *gcController) processQueueItem(key string) error {
 		} else {
 			backup.Labels[garbageCollectionFailure] = gcFailureBSLCannotGet
 		}
-		if err := c.kbClient.Update(context.Background(), backup); err != nil {
+		if err := c.Update(ctx, backup); err != nil {
 			log.WithError(err).Error("error updating backup labels")
 		}
-		return errors.Wrap(err, "error getting backup storage location")
+		return ctrl.Result{}, errors.Wrap(err, "error getting backup storage location")
 	}
 
 	if loc.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		log.Infof("Backup cannot be garbage-collected because backup storage location %s is currently in read-only mode", loc.Name)
 		backup.Labels[garbageCollectionFailure] = gcFailureBSLReadOnly
-		if err := c.kbClient.Update(context.Background(), backup); err != nil {
+		if err := c.Update(ctx, backup); err != nil {
 			log.WithError(err).Error("error updating backup labels")
 		}
-		return nil
+		return ctrl.Result{}, nil
 	}
 
 	// remove gc fail error label after this point
 	delete(backup.Labels, garbageCollectionFailure)
-	if err := c.kbClient.Update(context.Background(), backup); err != nil {
+	if err := c.Update(ctx, backup); err != nil {
 		log.WithError(err).Error("error updating backup labels")
 	}
 
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+	selector := client.MatchingLabels{
 		velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 		velerov1api.BackupUIDLabel:  string(backup.UID),
-	}))
-
-	dbrs, err := c.deleteBackupRequestLister.DeleteBackupRequests(ns).List(selector)
-	if err != nil {
-		return errors.Wrap(err, "error listing existing DeleteBackupRequests for backup")
 	}
+
+	dbrs := &velerov1api.DeleteBackupRequestList{}
+	if err := c.List(ctx, dbrs, selector); err != nil {
+		log.WithError(err).Error("error listing DeleteBackupRequests")
+		return ctrl.Result{}, errors.Wrap(err, "error listing existing DeleteBackupRequests for backup")
+	}
+	log.Debugf("length of dbrs:%d", len(dbrs.Items))
 
 	// if there's an existing unprocessed deletion request for this backup, don't create
 	// another one
-	for _, dbr := range dbrs {
+	for _, dbr := range dbrs.Items {
 		switch dbr.Status.Phase {
 		case "", velerov1api.DeleteBackupRequestPhaseNew, velerov1api.DeleteBackupRequestPhaseInProgress:
 			log.Info("Backup already has a pending deletion request")
-			return nil
+			return ctrl.Result{}, nil
 		}
 	}
 
 	log.Info("Creating a new deletion request")
-	req := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
-
-	if _, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(context.TODO(), req, metav1.CreateOptions{}); err != nil {
-		return errors.Wrap(err, "error creating DeleteBackupRequest")
+	ndbr := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
+	ndbr.SetNamespace(backup.Namespace)
+	if err := c.Create(ctx, ndbr); err != nil {
+		log.WithError(err).Error("error creating DeleteBackupRequests")
+		return ctrl.Result{}, errors.Wrap(err, "error creating DeleteBackupRequest")
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }

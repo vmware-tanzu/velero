@@ -64,12 +64,16 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		if VeleroCfg.InstallVelero {
-			if !VeleroCfg.Debug {
+		if !VeleroCfg.Debug {
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
+			})
+			if VeleroCfg.InstallVelero {
 				err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 				Expect(err).To(Succeed())
 			}
 		}
+
 	})
 
 	When("kibishii is the sample workload", func() {
@@ -105,7 +109,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	}
 
 	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest,
-		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots); err != nil {
+		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
 	err := ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)

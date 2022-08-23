@@ -63,22 +63,25 @@ func APIGropuVersionsTest() {
 	})
 
 	AfterEach(func() {
-		fmt.Printf("Clean up resource: kubectl delete crd %s.%s\n", resource, group)
-		cmd := exec.CommandContext(ctx, "kubectl", "delete", "crd", resource+"."+group)
-		_, stderr, err := veleroexec.RunCommand(cmd)
-		if strings.Contains(stderr, "NotFound") {
-			fmt.Printf("Ignore error: %v\n", stderr)
-			err = nil
-		}
-		Expect(err).NotTo(HaveOccurred())
+		if !VeleroCfg.Debug {
+			fmt.Printf("Clean up resource: kubectl delete crd %s.%s\n", resource, group)
+			cmd := exec.CommandContext(ctx, "kubectl", "delete", "crd", resource+"."+group)
+			_, stderr, err := veleroexec.RunCommand(cmd)
+			if strings.Contains(stderr, "NotFound") {
+				fmt.Printf("Ignore error: %v\n", stderr)
+				err = nil
+			}
+			Expect(err).NotTo(HaveOccurred())
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
+			})
+			if VeleroCfg.InstallVelero {
 
-		if VeleroCfg.InstallVelero {
-			if !VeleroCfg.Debug {
-				err = VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
-				Expect(err).NotTo(HaveOccurred())
+				By("Uninstall Velero", func() {
+					Expect(VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
+				})
 			}
 		}
-
 	})
 
 	Context("When EnableAPIGroupVersions flag is set", func() {

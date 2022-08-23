@@ -23,12 +23,12 @@ import (
 )
 
 // RepoParam includes the parameters to manipulate a backup repository
-// SubDir is used to generate the path in the backup storage
 type RepoParam struct {
-	SubDir         string
 	BackupLocation *velerov1api.BackupStorageLocation
+	BackupRepo     *velerov1api.BackupRepository
 }
 
+// Provider defines the methods to manipulate a backup repository
 type Provider interface {
 	//InitRepo is to initialize a repository from a new storage place
 	InitRepo(ctx context.Context, param RepoParam) error

@@ -122,6 +122,9 @@ var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
 
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
+var _ = Describe("[NamespaceMapping][Single] Backup resources should follow the specific order in schedule", OneNamespaceMappingTest)
+var _ = Describe("[NamespaceMapping][Multiple] Backup resources should follow the specific order in schedule", MultiNamespacesMappingTest)
+
 func GetKubeconfigContext() error {
 	var err error
 	var tcDefault, tcStandby TestClient
@@ -154,7 +157,7 @@ func GetKubeconfigContext() error {
 func TestE2e(t *testing.T) {
 	// Skip running E2E tests when running only "short" tests because:
 	// 1. E2E tests are long running tests involving installation of Velero and performing backup and restore operations.
-	// 2. E2E tests require a kubernetes cluster to install and run velero which further requires ore configuration. See above referenced command line flags.
+	// 2. E2E tests require a kubernetes cluster to install and run velero which further requires more configuration. See above referenced command line flags.
 	if testing.Short() {
 		t.Skip("Skipping E2E tests")
 	}
