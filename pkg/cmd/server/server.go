@@ -674,22 +674,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	gcControllerRunInfo := func() controllerRunInfo {
-		gcController := controller.NewGCController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.config.garbageCollectionFrequency,
-		)
-
-		return controllerRunInfo{
-			controller: gcController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
 			s.veleroClient.VeleroV1(),
@@ -731,15 +715,15 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.BackupSync:        backupSyncControllerRunInfo,
-		controller.Backup:            backupControllerRunInfo,
-		controller.GarbageCollection: gcControllerRunInfo,
-		controller.Restore:           restoreControllerRunInfo,
+		controller.BackupSync: backupSyncControllerRunInfo,
+		controller.Backup:     backupControllerRunInfo,
+		controller.Restore:    restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := make(map[string]struct{})
 	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
 	enabledRuntimeControllers[controller.DownloadRequest] = struct{}{}
+	enabledRuntimeControllers[controller.GarbageCollection] = struct{}{}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -848,6 +832,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.GarbageCollection]; ok {
+		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient())
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.GarbageCollection)
 		}
 	}
 
