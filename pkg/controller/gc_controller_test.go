@@ -34,10 +34,11 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func mockGCReconciler(fakeClient kbclient.Client, fakeClock *clock.FakeClock) *gcReconciler {
+func mockGCReconciler(fakeClient kbclient.Client, fakeClock *clock.FakeClock, freq time.Duration) *gcReconciler {
 	gcr := NewGCReconciler(
 		velerotest.NewLogger(),
 		fakeClient,
+		freq,
 	)
 	gcr.clock = fakeClock
 	return gcr
@@ -137,7 +138,7 @@ func TestGCReconcile(t *testing.T) {
 			}
 
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
-			reconciler := mockGCReconciler(fakeClient, fakeClock)
+			reconciler := mockGCReconciler(fakeClient, fakeClock, defaultGCFrequency)
 			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)
