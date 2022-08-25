@@ -27,7 +27,7 @@ cleanup() {
 }
 
 echo "Verifying generated Github issue template"
-${HACK_DIR}/update-generated-issue-template.sh ${OUT_TMP_FILE} > /dev/null
+${HACK_DIR}/update-4generated-issue-template.sh ${OUT_TMP_FILE} > /dev/null
 output=$(echo "`diff ${ISSUE_TEMPLATE_FILE} ${OUT_TMP_FILE}`")
 
 if [[ -n "${output}" ]] ; then
