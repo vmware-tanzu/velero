@@ -25,7 +25,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -44,8 +46,40 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
+func defaultLocation(namespace string) *velerov1api.BackupStorageLocation {
+	return &velerov1api.BackupStorageLocation{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "location-1",
+		},
+		Spec: velerov1api.BackupStorageLocationSpec{
+			Provider: "objStoreProvider",
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
+					Bucket: "bucket-1",
+				},
+			},
+			Default: true,
+		},
+	}
+}
+
 func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation {
 	return []*velerov1api.BackupStorageLocation{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      "location-0",
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				Provider: "objStoreProvider",
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
+						Bucket: "bucket-1",
+					},
+				},
+			},
+		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -70,20 +104,15 @@ func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation
 				Provider: "objStoreProvider",
 				StorageType: velerov1api.StorageType{
 					ObjectStorage: &velerov1api.ObjectStorageLocation{
-						Bucket: "bucket-2",
+						Bucket: "bucket-1",
 					},
 				},
 			},
 		},
-	}
-}
-
-func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api.BackupStorageLocation {
-	return []*velerov1api.BackupStorageLocation{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
-				Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-1",
+				Name:      "location-3",
 			},
 			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
@@ -94,17 +123,20 @@ func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api
 				},
 			},
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-2",
-			},
-			Spec: velerov1api.BackupStorageLocationSpec{
-				Provider: "objStoreProvider",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
-						Bucket: "bucket-2",
-					},
+	}
+}
+
+func defaultLocationWithLongerLocationName(namespace string) *velerov1api.BackupStorageLocation {
+	return &velerov1api.BackupStorageLocation{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-1",
+		},
+		Spec: velerov1api.BackupStorageLocationSpec{
+			Provider: "objStoreProvider",
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
+					Bucket: "bucket-1",
 				},
 			},
 		},
@@ -131,8 +163,8 @@ var _ = Describe("Backup Sync Reconciler", func() {
 		tests := []struct {
 			name                     string
 			namespace                string
-			locations                []*velerov1api.BackupStorageLocation
-			cloudBuckets             map[string][]*cloudBackupData
+			location                 *velerov1api.BackupStorageLocation
+			cloudBackups             []*cloudBackupData
 			existingBackups          []*velerov1api.Backup
 			existingPodVolumeBackups []*velerov1api.PodVolumeBackup
 			longLocationNameEnabled  bool
@@ -140,71 +172,44 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:      "no cloud backups",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
+				location:  defaultLocation("ns-1"),
 			},
 			{
 				name:      "normal case",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-						},
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").Result(),
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-3").Result(),
-						},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 					},
 				},
 			},
 			{
 				name:      "all synced backups get created in Velero server's namespace",
 				namespace: "velero",
-				locations: defaultLocationsList("velero"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-						},
+				location:  defaultLocation("velero"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").Result(),
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-2", "backup-3").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("velero", "backup-4").Result(),
-						},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 					},
 				},
 			},
 			{
 				name:      "new backups get synced when some cloud backups already exist in the cluster",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-						},
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").Result(),
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-3").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-4").Result(),
-						},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 					},
 				},
 				existingBackups: []*velerov1api.Backup{
@@ -217,12 +222,10 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:      "existing backups without a StorageLocation get it filled in",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").Result(),
-						},
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").Result(),
 					},
 				},
 				existingBackups: []*velerov1api.Backup{
@@ -234,74 +237,45 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:      "backup storage location names and labels get updated",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").StorageLocation("foo").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "foo")).Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-						},
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").StorageLocation("foo").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "foo")).Result(),
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-3").StorageLocation("bar").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "bar")).Result(),
-						},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 					},
 				},
 			},
 			{
 				name:                    "backup storage location names and labels get updated with location name greater than 63 chars",
 				namespace:               "ns-1",
-				locations:               defaultLocationsListWithLongerLocationName("ns-1"),
+				location:                defaultLocationWithLongerLocationName("ns-1"),
 				longLocationNameEnabled: true,
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").StorageLocation("foo").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "foo")).Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-						},
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").StorageLocation("foo").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "foo")).Result(),
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-3").StorageLocation("bar").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "bar")).Result(),
-						},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 					},
 				},
 			},
 			{
 				name:      "all synced backups and pod volume backups get created in Velero server's namespace",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").Result(),
-							podVolumeBackups: []*velerov1api.PodVolumeBackup{
-								builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
-							},
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-							podVolumeBackups: []*velerov1api.PodVolumeBackup{
-								builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
-							},
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
 						},
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-3").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-4").Result(),
-							podVolumeBackups: []*velerov1api.PodVolumeBackup{
-								builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
-								builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
-								builder.ForPodVolumeBackup("ns-1", "pvb-3").Result(),
-							},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
 						},
 					},
 				},
@@ -309,33 +283,18 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			{
 				name:      "new pod volume backups get synched when some pod volume backups already exist in the cluster",
 				namespace: "ns-1",
-				locations: defaultLocationsList("ns-1"),
-				cloudBuckets: map[string][]*cloudBackupData{
-					"bucket-1": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-1").Result(),
-							podVolumeBackups: []*velerov1api.PodVolumeBackup{
-								builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
-							},
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-2").Result(),
-							podVolumeBackups: []*velerov1api.PodVolumeBackup{
-								builder.ForPodVolumeBackup("ns-1", "pvb-3").Result(),
-							},
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
 						},
 					},
-					"bucket-2": {
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-3").Result(),
-						},
-						&cloudBackupData{
-							backup: builder.ForBackup("ns-1", "backup-4").Result(),
-							podVolumeBackups: []*velerov1api.PodVolumeBackup{
-								builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
-								builder.ForPodVolumeBackup("ns-1", "pvb-5").Result(),
-								builder.ForPodVolumeBackup("ns-1", "pvb-6").Result(),
-							},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-3").Result(),
 						},
 					},
 				},
@@ -363,20 +322,18 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				logger:                  velerotest.NewLogger(),
 			}
 
-			for _, location := range test.locations {
-				Expect(r.client.Create(ctx, location)).ShouldNot(HaveOccurred())
-				backupStores[location.Name] = &persistencemocks.BackupStore{}
-			}
+			if test.location != nil {
+				Expect(r.client.Create(ctx, test.location)).ShouldNot(HaveOccurred())
+				backupStores[test.location.Name] = &persistencemocks.BackupStore{}
 
-			for _, location := range test.locations {
-				backupStore, ok := backupStores[location.Name]
-				Expect(ok).To(BeTrue(), "no mock backup store for location %s", location.Name)
+				backupStore, ok := backupStores[test.location.Name]
+				Expect(ok).To(BeTrue(), "no mock backup store for location %s", test.location.Name)
 
 				var backupNames []string
-				for _, bucket := range test.cloudBuckets[location.Spec.ObjectStorage.Bucket] {
-					backupNames = append(backupNames, bucket.backup.Name)
-					backupStore.On("GetBackupMetadata", bucket.backup.Name).Return(bucket.backup, nil)
-					backupStore.On("GetPodVolumeBackups", bucket.backup.Name).Return(bucket.podVolumeBackups, nil)
+				for _, backup := range test.cloudBackups {
+					backupNames = append(backupNames, backup.backup.Name)
+					backupStore.On("GetBackupMetadata", backup.backup.Name).Return(backup.backup, nil)
+					backupStore.On("GetPodVolumeBackups", backup.backup.Name).Return(backup.podVolumeBackups, nil)
 				}
 				backupStore.On("ListBackups").Return(backupNames, nil)
 			}
@@ -392,92 +349,79 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			}
 
 			actualResult, err := r.Reconcile(ctx, ctrl.Request{
-				NamespacedName: types.NamespacedName{Namespace: "ns-1"},
+				NamespacedName: types.NamespacedName{Namespace: test.location.Namespace, Name: test.location.Name},
 			})
 
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
 			Expect(err).To(BeNil())
 
-			for bucket, backupDataSet := range test.cloudBuckets {
-				// figure out which location this bucket is for; we need this for verification
-				// purposes later
-				var location *velerov1api.BackupStorageLocation
-				for _, loc := range test.locations {
-					if loc.Spec.ObjectStorage.Bucket == bucket {
-						location = loc
+			// process the cloud backups
+			for _, cloudBackupData := range test.cloudBackups {
+				obj := &velerov1api.Backup{}
+				err := client.Get(
+					context.TODO(),
+					types.NamespacedName{
+						Namespace: cloudBackupData.backup.Namespace,
+						Name:      cloudBackupData.backup.Name},
+					obj)
+				Expect(err).To(BeNil())
+
+				// did this cloud backup already exist in the cluster?
+				var existing *velerov1api.Backup
+				for _, obj := range test.existingBackups {
+					if obj.Name == cloudBackupData.backup.Name {
+						existing = obj
 						break
 					}
 				}
-				Expect(location).NotTo(BeNil())
 
-				// process the cloud backups
-				for _, cloudBackupData := range backupDataSet {
-					obj := &velerov1api.Backup{}
+				if existing != nil {
+					// if this cloud backup already exists in the cluster, make sure that what we get from the
+					// client is the existing backup, not the cloud one.
+
+					// verify that the in-cluster backup has its storage location populated, if it's not already.
+					expected := existing.DeepCopy()
+					expected.Spec.StorageLocation = test.location.Name
+
+					Expect(expected).To(BeEquivalentTo(obj))
+				} else {
+					// verify that the storage location field and label are set properly
+					Expect(test.location.Name).To(BeEquivalentTo(obj.Spec.StorageLocation))
+
+					locationName := test.location.Name
+					if test.longLocationNameEnabled {
+						locationName = label.GetValidName(locationName)
+					}
+					Expect(locationName).To(BeEquivalentTo(obj.Labels[velerov1api.StorageLocationLabel]))
+					Expect(len(obj.Labels[velerov1api.StorageLocationLabel]) <= validation.DNS1035LabelMaxLength).To(BeTrue())
+				}
+
+				// process the cloud pod volume backups for this backup, if any
+				for _, podVolumeBackup := range cloudBackupData.podVolumeBackups {
+					objPodVolumeBackup := &velerov1api.PodVolumeBackup{}
 					err := client.Get(
 						context.TODO(),
 						types.NamespacedName{
-							Namespace: cloudBackupData.backup.Namespace,
-							Name:      cloudBackupData.backup.Name},
-						obj)
-					Expect(err).To(BeNil())
+							Namespace: podVolumeBackup.Namespace,
+							Name:      podVolumeBackup.Name,
+						},
+						objPodVolumeBackup)
+					Expect(err).ShouldNot(HaveOccurred())
 
-					// did this cloud backup already exist in the cluster?
-					var existing *velerov1api.Backup
-					for _, obj := range test.existingBackups {
-						if obj.Name == cloudBackupData.backup.Name {
-							existing = obj
+					// did this cloud pod volume backup already exist in the cluster?
+					var existingPodVolumeBackup *velerov1api.PodVolumeBackup
+					for _, objPodVolumeBackup := range test.existingPodVolumeBackups {
+						if objPodVolumeBackup.Name == podVolumeBackup.Name {
+							existingPodVolumeBackup = objPodVolumeBackup
 							break
 						}
 					}
 
-					if existing != nil {
-						// if this cloud backup already exists in the cluster, make sure that what we get from the
+					if existingPodVolumeBackup != nil {
+						// if this cloud pod volume backup already exists in the cluster, make sure that what we get from the
 						// client is the existing backup, not the cloud one.
-
-						// verify that the in-cluster backup has its storage location populated, if it's not already.
-						expected := existing.DeepCopy()
-						expected.Spec.StorageLocation = location.Name
-
-						Expect(expected).To(BeEquivalentTo(obj))
-					} else {
-						// verify that the storage location field and label are set properly
-						Expect(location.Name).To(BeEquivalentTo(obj.Spec.StorageLocation))
-
-						locationName := location.Name
-						if test.longLocationNameEnabled {
-							locationName = label.GetValidName(locationName)
-						}
-						Expect(locationName).To(BeEquivalentTo(obj.Labels[velerov1api.StorageLocationLabel]))
-						Expect(len(obj.Labels[velerov1api.StorageLocationLabel]) <= validation.DNS1035LabelMaxLength).To(BeTrue())
-					}
-
-					// process the cloud pod volume backups for this backup, if any
-					for _, podVolumeBackup := range cloudBackupData.podVolumeBackups {
-						objPodVolumeBackup := &velerov1api.PodVolumeBackup{}
-						err := client.Get(
-							context.TODO(),
-							types.NamespacedName{
-								Namespace: podVolumeBackup.Namespace,
-								Name:      podVolumeBackup.Name,
-							},
-							objPodVolumeBackup)
-						Expect(err).ShouldNot(HaveOccurred())
-
-						// did this cloud pod volume backup already exist in the cluster?
-						var existingPodVolumeBackup *velerov1api.PodVolumeBackup
-						for _, objPodVolumeBackup := range test.existingPodVolumeBackups {
-							if objPodVolumeBackup.Name == podVolumeBackup.Name {
-								existingPodVolumeBackup = objPodVolumeBackup
-								break
-							}
-						}
-
-						if existingPodVolumeBackup != nil {
-							// if this cloud pod volume backup already exists in the cluster, make sure that what we get from the
-							// client is the existing backup, not the cloud one.
-							expected := existingPodVolumeBackup.DeepCopy()
-							Expect(expected).To(BeEquivalentTo(objPodVolumeBackup))
-						}
+						expected := existingPodVolumeBackup.DeepCopy()
+						Expect(expected).To(BeEquivalentTo(objPodVolumeBackup))
 					}
 				}
 			}
@@ -649,5 +593,31 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			expected := len(test.k8sBackups) - len(test.expectedDeletes)
 			Expect(expected).To(BeEquivalentTo(numBackups))
 		}
+	})
+
+	It("Test moving default BSL at the head of BSL array.", func() {
+		locationList := &velerov1api.BackupStorageLocationList{}
+		objArray := make([]runtime.Object, 0)
+
+		// Generate BSL array.
+		locations := defaultLocationsList("velero")
+		for _, bsl := range locations {
+			objArray = append(objArray, bsl)
+		}
+
+		meta.SetList(locationList, objArray)
+
+		testObjList := backupSyncSourceOrderFunc(locationList)
+		testObjArray, err := meta.ExtractList(testObjList)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		expectLocation := testObjArray[0].(*velerov1api.BackupStorageLocation)
+		Expect(expectLocation.Spec.Default).To(BeEquivalentTo(true))
+
+		// If BSL list without default BSL is passed in, the output should be same with input.
+		locationList.Items = testObjList.(*velerov1api.BackupStorageLocationList).Items[1:]
+		testObjList = backupSyncSourceOrderFunc(locationList)
+		Expect(testObjList).To(BeEquivalentTo(locationList))
+
 	})
 })

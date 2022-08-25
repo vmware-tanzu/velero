@@ -207,10 +207,13 @@ func (r *backupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) err
 		mgr.GetClient(),
 		&velerov1api.BackupStorageLocationList{},
 		bslValidationEnqueuePeriod,
-		// Add filter function to enqueue BSL per ValidationFrequency setting.
-		func(object client.Object) bool {
-			location := object.(*velerov1api.BackupStorageLocation)
-			return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.defaultBackupLocationInfo.ServerValidationFrequency, r.log.WithField("controller", BackupStorageLocation))
+		kube.PeriodicalEnqueueSourceOption{
+			FilterFuncs: []func(object client.Object) bool{
+				func(object client.Object) bool {
+					location := object.(*velerov1api.BackupStorageLocation)
+					return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.defaultBackupLocationInfo.ServerValidationFrequency, r.log.WithField("controller", BackupStorageLocation))
+				},
+			},
 		},
 	)
 	return ctrl.NewControllerManagedBy(mgr).
