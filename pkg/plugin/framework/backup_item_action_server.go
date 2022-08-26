@@ -70,7 +70,7 @@ func (s *BackupItemActionGRPCServer) AppliesTo(
 	}
 
 	return &protobiav1.BackupItemActionAppliesToResponse{
-		&proto.ResourceSelector{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,

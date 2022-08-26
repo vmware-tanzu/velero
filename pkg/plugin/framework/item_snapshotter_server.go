@@ -88,7 +88,7 @@ func (recv *ItemSnapshotterGRPCServer) AppliesTo(ctx context.Context, req *proto
 	}
 
 	return &proto.ItemSnapshotterAppliesToResponse{
-		&proto.ResourceSelector{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
