@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"time"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -30,27 +31,27 @@ type RepoParam struct {
 
 // Provider defines the methods to manipulate a backup repository
 type Provider interface {
-	//InitRepo is to initialize a repository from a new storage place
+	// InitRepo is to initialize a repository from a new storage place
 	InitRepo(ctx context.Context, param RepoParam) error
 
-	//ConnectToRepo is to establish the connection to a
-	//storage place that a repository is already initialized
+	// ConnectToRepo is to establish the connection to a
+	// storage place that a repository is already initialized
 	ConnectToRepo(ctx context.Context, param RepoParam) error
 
-	//PrepareRepo is a combination of InitRepo and ConnectToRepo,
-	//it may do initializing + connecting, connecting only if the repository
-	//is already initialized, or do nothing if the repository is already connected
+	// PrepareRepo is a combination of InitRepo and ConnectToRepo,
+	// it may do initializing + connecting, connecting only if the repository
+	// is already initialized, or do nothing if the repository is already connected
 	PrepareRepo(ctx context.Context, param RepoParam) error
 
-	//PruneRepo does a full prune/maintenance of the repository
+	// PruneRepo does a full prune/maintenance of the repository
 	PruneRepo(ctx context.Context, param RepoParam) error
 
-	//PruneRepoQuick does a quick prune/maintenance of the repository if available
-	PruneRepoQuick(ctx context.Context, param RepoParam) error
-
-	//EnsureUnlockRepo esures to remove any stale file locks in the storage
+	// EnsureUnlockRepo esures to remove any stale file locks in the storage
 	EnsureUnlockRepo(ctx context.Context, param RepoParam) error
 
-	//Forget is to delete a snapshot from the repository
+	// Forget is to delete a snapshot from the repository
 	Forget(ctx context.Context, snapshotID string, param RepoParam) error
+
+	// DefaultMaintenanceFrequency returns the default frequency to run maintenance
+	DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration
 }

@@ -18,6 +18,7 @@ package restic
 
 import (
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -69,6 +70,10 @@ func (r *RepositoryService) UnlockRepo(bsl *velerov1api.BackupStorageLocation, r
 
 func (r *RepositoryService) Forget(bsl *velerov1api.BackupStorageLocation, repo *velerov1api.BackupRepository, snapshotID string) error {
 	return r.exec(restic.ForgetCommand(repo.Spec.ResticIdentifier, snapshotID), bsl)
+}
+
+func (r *RepositoryService) DefaultMaintenanceFrequency() time.Duration {
+	return restic.DefaultMaintenanceFrequency
 }
 
 func (r *RepositoryService) exec(cmd *restic.Command, bsl *velerov1api.BackupStorageLocation) error {

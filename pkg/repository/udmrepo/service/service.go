@@ -20,10 +20,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib"
 )
 
 // Create creates an instance of BackupRepoService
 func Create(logger logrus.FieldLogger) udmrepo.BackupRepoService {
-	///TODO: create from kopiaLib
-	return nil
+	return kopialib.NewKopiaRepoService(logger)
 }
