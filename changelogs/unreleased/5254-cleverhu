@@ -1,0 +1,1 @@
+enhance install command, output pod log when velero deploy is not ready.

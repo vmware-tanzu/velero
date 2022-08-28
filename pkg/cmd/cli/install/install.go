@@ -289,6 +289,12 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	if err != nil {
 		return err
 	}
+
+	client, err := f.KubeClient()
+	if err != nil {
+		return err
+	}
+
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
 	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout)
@@ -298,7 +304,7 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	if o.Wait {
 		fmt.Println("Waiting for Velero deployment to be ready.")
-		if _, err = install.DeploymentIsReady(dynamicFactory, o.Namespace); err != nil {
+		if _, err = install.DeploymentIsReady(client, o.Namespace, os.Stdout); err != nil {
 			return errors.Wrap(err, errorMsg)
 		}
 
@@ -321,7 +327,7 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	return nil
 }
 
-//Complete completes options for a command.
+// Complete completes options for a command.
 func (o *InstallOptions) Complete(args []string, f client.Factory) error {
 	o.Namespace = f.Namespace()
 	return nil

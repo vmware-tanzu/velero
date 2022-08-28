@@ -18,6 +18,7 @@ package install
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -165,30 +167,20 @@ func isAvailable(c appsv1.DeploymentCondition) bool {
 }
 
 // DeploymentIsReady will poll the kubernetes API server to see if the velero deployment is ready to service user requests.
-func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
-	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "Deployment")
-	apiResource := metav1.APIResource{
-		Name:       "deployments",
-		Namespaced: true,
-	}
-	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, namespace)
-	if err != nil {
-		return false, errors.Wrapf(err, "Error creating client for deployment polling")
-	}
+func DeploymentIsReady(c kubernetes.Interface, namespace string, w io.Writer) (bool, error) {
+	deployName := "velero"
+
 	// declare this variable out of scope so we can return it
 	var isReady bool
 	var readyObservations int32
+	var deploy *appsv1.Deployment
+	var err error
 	err = wait.PollImmediate(time.Second, 3*time.Minute, func() (bool, error) {
-		unstructuredDeployment, err := c.Get("velero", metav1.GetOptions{})
+		deploy, err = c.AppsV1().Deployments(namespace).Get(context.Background(), deployName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
 			return false, errors.Wrap(err, "error waiting for deployment to be ready")
-		}
-
-		deploy := new(appsv1.Deployment)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredDeployment.Object, deploy); err != nil {
-			return false, errors.Wrap(err, "error converting deployment from unstructured")
 		}
 
 		for _, cond := range deploy.Status.Conditions {
@@ -204,6 +196,55 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 			return false, nil
 		}
 	})
+
+	if err == wait.ErrWaitTimeout && deploy != nil {
+		log := func(f string, a ...interface{}) {
+			id := fmt.Sprintf("%s/%s", "Deployment", deployName)
+			format := strings.Join([]string{id, ": ", f, "\n"}, "")
+			fmt.Fprintf(w, format, a...)
+		}
+		log("Waiting for Velero deployment to be ready failed.")
+
+		selector, err := metav1.LabelSelectorAsSelector(deploy.Spec.Selector)
+		if err != nil {
+			log("Failed to get pod selector, error: %v", err)
+			return isReady, err
+		}
+
+		list, err := c.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			log("Failed to get deploy pod list, error: %v", err)
+			return isReady, err
+		}
+
+		pods := list.Items
+		if len(pods) > 0 {
+			podName := pods[0].Name
+			if len(pods) > 1 {
+				log("Found %v pods, using pod/%v", len(pods), pods[0].Name)
+			}
+
+			req := c.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
+			rsp, err := req.DoRaw(context.Background())
+			if err != nil {
+				statusErr := &metav1.Status{}
+				unmarshalErr := json.Unmarshal(rsp, statusErr)
+				if unmarshalErr != nil {
+					log("Failed to get log from pod: %s, error: %v", podName, err)
+				} else {
+					log("Failed to get log from pod: %s, error: %v", podName, statusErr.Message)
+				}
+				return isReady, err
+			}
+
+			if len(rsp) == 0 {
+				log("Pod is pending, please check the deployment resources or node taint")
+			} else {
+				log(string(rsp))
+			}
+		}
+	}
+
 	return isReady, err
 }
 
@@ -331,7 +372,7 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer) error {
 	rg := GroupResources(resources)
 
-	//Install CRDs first
+	// Install CRDs first
 	for _, r := range rg.CRDResources {
 		if err := createResource(r, dynamicFactory, w); err != nil {
 			return err
