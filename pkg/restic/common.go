@@ -17,7 +17,6 @@ limitations under the License.
 package restic
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -25,24 +24,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 const (
-	// DaemonSet is the name of the Velero restic daemonset.
-	DaemonSet = "restic"
-
-	// InitContainer is the name of the init container added
-	// to workload pods to help with restores.
-	InitContainer = "restic-wait"
 
 	// DefaultMaintenanceFrequency is the default time interval
 	// at which restic prune is run.
@@ -60,51 +49,6 @@ const (
 	// skip TLS verify on https connection.
 	resticInsecureTLSFlag = "--insecure-tls"
 )
-
-// SnapshotIdentifier uniquely identifies a restic snapshot
-// taken by Velero.
-type SnapshotIdentifier struct {
-	// VolumeNamespace is the namespace of the pod/volume that
-	// the restic snapshot is for.
-	VolumeNamespace string
-
-	// BackupStorageLocation is the backup's storage location
-	// name.
-	BackupStorageLocation string
-
-	// SnapshotID is the short ID of the restic snapshot.
-	SnapshotID string
-}
-
-// GetSnapshotsInBackup returns a list of all restic snapshot ids associated with
-// a given Velero backup.
-func GetSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbClient client.Client) ([]SnapshotIdentifier, error) {
-	podVolumeBackups := &velerov1api.PodVolumeBackupList{}
-	options := &client.ListOptions{
-		LabelSelector: labels.Set(map[string]string{
-			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
-		}).AsSelector(),
-	}
-
-	err := kbClient.List(ctx, podVolumeBackups, options)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	var res []SnapshotIdentifier
-	for _, item := range podVolumeBackups.Items {
-		if item.Status.SnapshotID == "" {
-			continue
-		}
-		res = append(res, SnapshotIdentifier{
-			VolumeNamespace:       item.Spec.Pod.Namespace,
-			BackupStorageLocation: backup.Spec.StorageLocation,
-			SnapshotID:            item.Status.SnapshotID,
-		})
-	}
-
-	return res, nil
-}
 
 // TempCACertFile creates a temp file containing a CA bundle
 // and returns its path. The caller should generally call os.Remove()
@@ -129,14 +73,6 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	}
 
 	return name, nil
-}
-
-// NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
-// find PodVolumeRestores for the restore identified by name.
-func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
-	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, label.GetValidName(name)),
-	}
 }
 
 // CmdEnv returns a list of environment variables (in the format var=val) that

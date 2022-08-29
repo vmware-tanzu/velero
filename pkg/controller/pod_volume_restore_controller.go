@@ -39,6 +39,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -106,7 +107,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	resticInitContainerIndex := getResticInitContainerIndex(pod)
 	if resticInitContainerIndex > 0 {
 		log.Warnf(`Init containers before the %s container may cause issues
-		          if they interfere with volumes being restored: %s index %d`, restic.InitContainer, restic.InitContainer, resticInitContainerIndex)
+		          if they interfere with volumes being restored: %s index %d`, podvolume.InitContainer, podvolume.InitContainer, resticInitContainerIndex)
 	}
 
 	log.Info("Restore starting")
@@ -216,7 +217,7 @@ func isResticInitContainerRunning(pod *corev1api.Pod) bool {
 func getResticInitContainerIndex(pod *corev1api.Pod) int {
 	// Restic wait container can be anywhere in the list of init containers so locate it.
 	for i, initContainer := range pod.Spec.InitContainers {
-		if initContainer.Name == restic.InitContainer {
+		if initContainer.Name == podvolume.InitContainer {
 			return i
 		}
 	}
