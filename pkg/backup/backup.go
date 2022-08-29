@@ -404,6 +404,10 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 
 	log.WithField("progress", "").Infof("Backed up a total of %d items", len(backupRequest.BackedUpItems))
 
+	if len(backupRequest.BackedUpItems) == 0 {
+		return errors.New("Backed up resources is empty")
+	}
+
 	return nil
 }
 
