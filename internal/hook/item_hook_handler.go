@@ -36,7 +36,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -126,7 +126,7 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 	// restored data to be consumed by the application container(s).
 	// So if there is a "restic-wait" init container already on the pod at index 0, we'll preserve that and run
 	// it before running any other init container.
-	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == restic.InitContainer {
+	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == podvolume.InitContainer {
 		initContainers = append(initContainers, pod.Spec.InitContainers[0])
 		pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
 	}

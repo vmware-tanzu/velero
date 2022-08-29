@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -55,15 +56,14 @@ func (r *resticRepositoryProvider) PruneRepo(ctx context.Context, param RepoPara
 	return r.svc.PruneRepo(param.BackupLocation, param.BackupRepo)
 }
 
-func (r *resticRepositoryProvider) PruneRepoQuick(ctx context.Context, param RepoParam) error {
-	// restic doesn't support this operation
-	return nil
-}
-
 func (r *resticRepositoryProvider) EnsureUnlockRepo(ctx context.Context, param RepoParam) error {
 	return r.svc.UnlockRepo(param.BackupLocation, param.BackupRepo)
 }
 
 func (r *resticRepositoryProvider) Forget(ctx context.Context, snapshotID string, param RepoParam) error {
 	return r.svc.Forget(param.BackupLocation, param.BackupRepo, snapshotID)
+}
+
+func (r *resticRepositoryProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+	return r.svc.DefaultMaintenanceFrequency()
 }

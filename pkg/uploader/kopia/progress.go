@@ -60,9 +60,9 @@ type KopiaProgress struct {
 	estimatedFileCount  int32 // +checklocksignore the total count of files to be processed
 	estimatedTotalBytes int64 // +checklocksignore	the total size of files to be processed
 	// +checkatomic
-	processedBytes int64                           // which statistic all bytes has been processed currently
-	outputThrottle Throttle                        // which control the frequency of update progress
-	UpFunc         func(uploader.UploaderProgress) //which called by UpdateProgress func, it is used to update pvb or pvr status
+	processedBytes int64                    // which statistic all bytes has been processed currently
+	outputThrottle Throttle                 // which control the frequency of update progress
+	Updater        uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
 }
 
 //UploadedBytes the total bytes has uploaded currently
@@ -90,13 +90,10 @@ func (p *KopiaProgress) EstimatedDataSize(fileCount int, totalBytes int64) {
 	p.UpdateProgress()
 }
 
-//UpdateProgress which called by UpdateProgress func, it is used to update pvb or pvr status
+//UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
 func (p *KopiaProgress) UpdateProgress() {
 	if p.outputThrottle.ShouldOutput() {
-		p.UpFunc(uploader.UploaderProgress{
-			TotalBytes: atomic.LoadInt64(&p.estimatedTotalBytes),
-			BytesDone:  atomic.LoadInt64(&p.processedBytes),
-		})
+		p.Updater.UpdateProgress(&uploader.UploaderProgress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
 	}
 }
 

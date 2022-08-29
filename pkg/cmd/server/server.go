@@ -112,6 +112,9 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
+
+	// daemonSet is the name of the Velero restic daemonset.
+	daemonSet = "restic"
 )
 
 type serverConfig struct {
@@ -529,7 +532,7 @@ var defaultRestorePriorities = []string{
 
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
-	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, daemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
 	} else if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
@@ -674,22 +677,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	gcControllerRunInfo := func() controllerRunInfo {
-		gcController := controller.NewGCController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.config.garbageCollectionFrequency,
-		)
-
-		return controllerRunInfo{
-			controller: gcController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
 			s.veleroClient.VeleroV1(),
@@ -731,10 +718,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.BackupSync:        backupSyncControllerRunInfo,
-		controller.Backup:            backupControllerRunInfo,
-		controller.GarbageCollection: gcControllerRunInfo,
-		controller.Restore:           restoreControllerRunInfo,
+		controller.BackupSync: backupSyncControllerRunInfo,
+		controller.Backup:     backupControllerRunInfo,
+		controller.Restore:    restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
@@ -855,6 +841,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.GarbageCollection]; ok {
+		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient())
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.GarbageCollection)
 		}
 	}
 

@@ -42,6 +42,10 @@ const (
 	// VolumesToExcludeAnnotation is the annotation on a pod whose mounted volumes
 	// should be excluded from restic backup.
 	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
+
+	// InitContainer is the name of the init container added
+	// to workload pods to help with restores.
+	InitContainer = "restic-wait"
 )
 
 // GetVolumeBackupsForPod returns a map, of volume name -> snapshot id,

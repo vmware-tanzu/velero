@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,17 +13,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
-package service
+package provider
 
 import (
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib"
+	"github.com/vmware-tanzu/velero/internal/credentials"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-// Create creates an instance of BackupRepoService
-func Create(logger logrus.FieldLogger) udmrepo.BackupRepoService {
-	return kopialib.NewKopiaRepoService(logger)
+func NewResticUploaderProvider(
+	repoIdentifier string,
+	bsl *velerov1api.BackupStorageLocation,
+	credGetter *credentials.CredentialGetter,
+	repoKeySelector *v1.SecretKeySelector,
+	log logrus.FieldLogger,
+) (Provider, error) {
+	return nil, nil //TODO
 }

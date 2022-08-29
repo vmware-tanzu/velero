@@ -951,6 +951,10 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 			if vs.Status.BoundVolumeSnapshotContentName != nil &&
 				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
 				vsc = vscMap[*vs.Status.BoundVolumeSnapshotContentName]
+				if nil == vsc {
+					logger.Errorf("Not find %s from the vscMap", vs.Status.BoundVolumeSnapshotContentName)
+					return
+				}
 				if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
 					modifyVSCFlag = true
 				}

@@ -39,8 +39,10 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -62,6 +64,13 @@ type PodVolumeRestoreReconciler struct {
 	credentialsFileStore credentials.FileStore
 	fileSystem           filesystem.Interface
 	clock                clock.Clock
+}
+
+type RestoreProgressUpdater struct {
+	PodVolumeRestore *velerov1api.PodVolumeRestore
+	Log              logrus.FieldLogger
+	Ctx              context.Context
+	Cli              client.Client
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -98,7 +107,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	resticInitContainerIndex := getResticInitContainerIndex(pod)
 	if resticInitContainerIndex > 0 {
 		log.Warnf(`Init containers before the %s container may cause issues
-		          if they interfere with volumes being restored: %s index %d`, restic.InitContainer, restic.InitContainer, resticInitContainerIndex)
+		          if they interfere with volumes being restored: %s index %d`, podvolume.InitContainer, podvolume.InitContainer, resticInitContainerIndex)
 	}
 
 	log.Info("Restore starting")
@@ -208,7 +217,7 @@ func isResticInitContainerRunning(pod *corev1api.Pod) bool {
 func getResticInitContainerIndex(pod *corev1api.Pod) int {
 	// Restic wait container can be anywhere in the list of init containers so locate it.
 	for i, initContainer := range pod.Spec.InitContainers {
-		if initContainer.Name == restic.InitContainer {
+		if initContainer.Name == podvolume.InitContainer {
 			return i
 		}
 	}
@@ -327,5 +336,22 @@ func (c *PodVolumeRestoreReconciler) updateRestoreProgressFunc(req *velerov1api.
 		if err := c.Patch(context.Background(), req, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Unable to update PodVolumeRestore progress")
 		}
+	}
+}
+
+func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger, ctx context.Context) *RestoreProgressUpdater {
+	return &RestoreProgressUpdater{pvr, log, ctx, r.Client}
+}
+
+//UpdateProgress which implement ProgressUpdater interface to update pvr progress status
+func (r *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
+	original := r.PodVolumeRestore.DeepCopy()
+	r.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	if r.Cli == nil {
+		r.Log.Errorf("failed to update restore pod %s volume %s progress with uninitailize client", r.PodVolumeRestore.Spec.Pod.Name, r.PodVolumeRestore.Spec.Volume)
+		return
+	}
+	if err := r.Cli.Patch(r.Ctx, r.PodVolumeRestore, client.MergeFrom(original)); err != nil {
+		r.Log.Errorf("update restore pod %s volume %s progress with %v", r.PodVolumeRestore.Spec.Pod.Name, r.PodVolumeRestore.Spec.Volume, err)
 	}
 }

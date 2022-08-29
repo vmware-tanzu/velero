@@ -22,10 +22,8 @@ import (
 )
 
 const (
-	ResticType    = "restic"
-	KopiaType     = "kopia"
-	VeleroBackup  = "backup"
-	VeleroRestore = "restore"
+	ResticType = "restic"
+	KopiaType  = "kopia"
 )
 
 // ValidateUploaderType validates if the input param is a valid uploader type.
@@ -43,7 +41,13 @@ type SnapshotInfo struct {
 	Size int64  `json:"Size"`
 }
 
+//UploaderProgress which defined two variables to record progress
 type UploaderProgress struct {
 	TotalBytes int64 `json:"totalBytes,omitempty"`
 	BytesDone  int64 `json:"doneBytes,omitempty"`
+}
+
+//UploaderProgress which defined generic interface to update progress
+type ProgressUpdater interface {
+	UpdateProgress(p *UploaderProgress)
 }
