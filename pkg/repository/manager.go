@@ -27,9 +27,23 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
+
+// SnapshotIdentifier uniquely identifies a restic snapshot
+// taken by Velero.
+type SnapshotIdentifier struct {
+	// VolumeNamespace is the namespace of the pod/volume that
+	// the restic snapshot is for.
+	VolumeNamespace string
+
+	// BackupStorageLocation is the backup's storage location
+	// name.
+	BackupStorageLocation string
+
+	// SnapshotID is the short ID of the restic snapshot.
+	SnapshotID string
+}
 
 // Manager manages backup repositories.
 type Manager interface {
@@ -50,7 +64,7 @@ type Manager interface {
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
-	Forget(context.Context, restic.SnapshotIdentifier) error
+	Forget(context.Context, SnapshotIdentifier) error
 }
 
 type manager struct {
@@ -147,7 +161,7 @@ func (m *manager) UnlockRepo(repo *velerov1api.BackupRepository) error {
 	return prd.EnsureUnlockRepo(context.Background(), param)
 }
 
-func (m *manager) Forget(ctx context.Context, snapshot restic.SnapshotIdentifier) error {
+func (m *manager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error {
 	repo, err := m.repoEnsurer.EnsureRepo(ctx, m.namespace, snapshot.VolumeNamespace, snapshot.BackupStorageLocation)
 	if err != nil {
 		return err
