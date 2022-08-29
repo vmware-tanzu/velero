@@ -37,7 +37,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -161,7 +160,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	initContainerBuilder.Command(getCommand(log, config))
 
 	initContainer := *initContainerBuilder.Result()
-	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
+	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != podvolume.InitContainer {
 		pod.Spec.InitContainers = append([]corev1.Container{initContainer}, pod.Spec.InitContainers...)
 	} else {
 		pod.Spec.InitContainers[0] = initContainer
@@ -290,7 +289,7 @@ func getPluginConfig(kind framework.PluginKind, name string, client corev1client
 }
 
 func newResticInitContainerBuilder(image, restoreUID string) *builder.ContainerBuilder {
-	return builder.ForContainer(restic.InitContainer, image).
+	return builder.ForContainer(podvolume.InitContainer, image).
 		Args(restoreUID).
 		Env([]*corev1.EnvVar{
 			{
