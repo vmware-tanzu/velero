@@ -46,27 +46,34 @@ const (
 // gcReconciler creates DeleteBackupRequests for expired backups.
 type gcReconciler struct {
 	client.Client
-	logger logrus.FieldLogger
-	clock  clock.Clock
+	logger    logrus.FieldLogger
+	clock     clock.Clock
+	frequency time.Duration
 }
 
 // NewGCReconciler constructs a new gcReconciler.
 func NewGCReconciler(
 	logger logrus.FieldLogger,
 	client client.Client,
+	frequency time.Duration,
 ) *gcReconciler {
-	return &gcReconciler{
-		Client: client,
-		logger: logger,
-		clock:  clock.RealClock{},
+	gcr := &gcReconciler{
+		Client:    client,
+		logger:    logger,
+		clock:     clock.RealClock{},
+		frequency: frequency,
 	}
+	if gcr.frequency <= 0 {
+		gcr.frequency = defaultGCFrequency
+	}
+	return gcr
 }
 
 // GCController only watches on CreateEvent for ensuring every new backup will be taken care of.
 // Other Events will be filtered to decrease the number of reconcile call. Especially UpdateEvent must be filtered since we removed
 // the backup status as the sub-resource of backup in v1.9, every change on it will be treated as UpdateEvent and trigger reconcile call.
 func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1api.BackupList{}, defaultGCFrequency)
+	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1api.BackupList{}, c.frequency, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}).
 		WithEventFilter(predicate.Funcs{
@@ -101,7 +108,7 @@ func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		}
 		return ctrl.Result{}, errors.Wrapf(err, "error getting backup %s", req.String())
 	}
-	log.Debugf("backup: %v", backup)
+	log.Debugf("backup: %s", backup.Name)
 
 	log = c.logger.WithFields(
 		logrus.Fields{
@@ -116,7 +123,7 @@ func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("Backup has expired")
+	log.Infof("Backup:%s has expired", backup.Name)
 
 	if backup.Labels == nil {
 		backup.Labels = make(map[string]string)

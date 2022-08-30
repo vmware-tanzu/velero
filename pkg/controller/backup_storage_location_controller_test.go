@@ -79,16 +79,16 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-		r := BackupStorageLocationReconciler{
-			Ctx:    ctx,
-			Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(locations).Build(),
-			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+		r := backupStorageLocationReconciler{
+			ctx:    ctx,
+			client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(locations).Build(),
+			defaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
 				StorageLocation:           "location-1",
 				ServerValidationFrequency: 0,
 			},
-			NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-			BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
-			Log:               velerotest.NewLogger(),
+			newPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			backupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			log:               velerotest.NewLogger(),
 		}
 
 		// Assertions
@@ -101,7 +101,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err = r.Client.Get(ctx, key, instance)
+			err = r.client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
@@ -144,16 +144,16 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 		// Setup reconciler
 		Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-		r := BackupStorageLocationReconciler{
-			Ctx:    ctx,
-			Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(locations).Build(),
-			DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+		r := backupStorageLocationReconciler{
+			ctx:    ctx,
+			client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(locations).Build(),
+			defaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
 				StorageLocation:           "default",
 				ServerValidationFrequency: 0,
 			},
-			NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-			BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
-			Log:               velerotest.NewLogger(),
+			newPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			backupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			log:               velerotest.NewLogger(),
 		}
 
 		// Assertions
@@ -166,7 +166,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
-			err = r.Client.Get(ctx, key, instance)
+			err = r.client.Get(ctx, key, instance)
 			Expect(err).To(BeNil())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 		}
