@@ -53,6 +53,7 @@ import (
 	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -79,7 +80,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
@@ -607,29 +607,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
-	backupSyncControllerRunInfo := func() controllerRunInfo {
-		backupSyncContoller := controller.NewBackupSyncController(
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			csiVSLister,
-			s.config.backupSyncPeriod,
-			s.namespace,
-			s.csiSnapshotClient,
-			s.kubeClient,
-			s.config.defaultBackupLocation,
-			newPluginManager,
-			backupStoreGetter,
-			s.logger,
-		)
-
-		return controllerRunInfo{
-			controller: backupSyncContoller,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	backupTracker := controller.NewBackupTracker()
 
 	backupControllerRunInfo := func() controllerRunInfo {
@@ -717,10 +694,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
+	// By far, PodVolumeBackup, PodVolumeRestore, BackupStorageLocation controllers
+	// are not included in --disable-controllers list.
+	// This is because of PVB and PVR are used by Restic DaemonSet,
+	// and BSL controller is mandatory for Velero to work.
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.BackupSync: backupSyncControllerRunInfo,
-		controller.Backup:     backupControllerRunInfo,
-		controller.Restore:    restoreControllerRunInfo,
+		controller.Backup:  backupControllerRunInfo,
+		controller.Restore: restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
@@ -729,6 +709,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.Schedule:            {},
 		controller.ResticRepo:          {},
 		controller.BackupDeletion:      {},
+		controller.GarbageCollection:   {},
+		controller.BackupSync:          {},
 	}
 
 	if s.config.restoreOnly {
@@ -742,7 +724,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	// Remove disabled controllers so they are not initialized. If a match is not found we want
-	// to hault the system so the user knows this operation was not possible.
+	// to halt the system so the user knows this operation was not possible.
 	if err := removeControllers(s.config.disabledControllers, enabledControllers, enabledRuntimeControllers, s.logger); err != nil {
 		log.Fatal(err, "unable to disable a controller")
 	}
@@ -776,18 +758,18 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
-	bslr := controller.BackupStorageLocationReconciler{
-		Ctx:    s.ctx,
-		Client: s.mgr.GetClient(),
-		Scheme: s.mgr.GetScheme(),
-		DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+	bslr := controller.NewBackupStorageLocationReconciler(
+		s.ctx,
+		s.mgr.GetClient(),
+		s.mgr.GetScheme(),
+		storage.DefaultBackupLocationInfo{
 			StorageLocation:           s.config.defaultBackupLocation,
 			ServerValidationFrequency: s.config.storeValidationFrequency,
 		},
-		NewPluginManager:  newPluginManager,
-		BackupStoreGetter: backupStoreGetter,
-		Log:               s.logger,
-	}
+		newPluginManager,
+		backupStoreGetter,
+		s.logger,
+	)
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
@@ -841,6 +823,25 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.BackupSync]; ok {
+		syncPeriod := s.config.backupSyncPeriod
+		if syncPeriod <= 0 {
+			syncPeriod = time.Minute
+		}
+
+		backupSyncReconciler := controller.NewBackupSyncReconciler(
+			s.mgr.GetClient(),
+			s.namespace,
+			syncPeriod,
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+		)
+		if err := backupSyncReconciler.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, " unable to create controller ", "controller ", controller.BackupSync)
 		}
 	}
 
