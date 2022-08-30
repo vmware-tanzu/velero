@@ -45,6 +45,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 )
 
 const (
@@ -515,6 +517,7 @@ func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbCli
 			VolumeNamespace:       item.Spec.Pod.Namespace,
 			BackupStorageLocation: backup.Spec.StorageLocation,
 			SnapshotID:            item.Status.SnapshotID,
+			RepositoryType:        podvolume.GetRepositoryTypeFromUploaderType(item.Spec.UploaderType),
 		})
 	}
 

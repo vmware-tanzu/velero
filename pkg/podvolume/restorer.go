@@ -56,6 +56,7 @@ type restorer struct {
 
 	resultsLock sync.Mutex
 	results     map[string]chan *velerov1api.PodVolumeRestore
+	log         logrus.FieldLogger
 }
 
 func newRestorer(
@@ -75,6 +76,7 @@ func newRestorer(
 		pvcClient:    pvcClient,
 
 		results: make(map[string]chan *velerov1api.PodVolumeRestore),
+		log:     log,
 	}
 
 	podVolumeRestoreInformer.AddEventHandler(
@@ -101,12 +103,17 @@ func newRestorer(
 }
 
 func (r *restorer) RestorePodVolumes(data RestoreData) []error {
-	volumesToRestore := GetVolumeBackupsForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
+	volumesToRestore := GetVolumeBackupInfoForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
 	if len(volumesToRestore) == 0 {
 		return nil
 	}
 
-	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, data.Restore.Namespace, data.SourceNamespace, data.BackupLocation)
+	repositoryType, err := getVolumesRepositoryType(volumesToRestore)
+	if err != nil {
+		return []error{err}
+	}
+
+	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, data.Restore.Namespace, data.SourceNamespace, data.BackupLocation, repositoryType)
 	if err != nil {
 		return []error{err}
 	}
@@ -132,7 +139,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 	for _, podVolume := range data.Pod.Spec.Volumes {
 		podVolumes[podVolume.Name] = podVolume
 	}
-	for volume, snapshot := range volumesToRestore {
+	for volume, backupInfo := range volumesToRestore {
 		volumeObj, ok := podVolumes[volume]
 		var pvc *corev1api.PersistentVolumeClaim
 		if ok {
@@ -144,8 +151,8 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 				}
 			}
 		}
-		// TODO: Remove the hard-coded uploader type before v1.10 FC
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, snapshot, repo.Spec.ResticIdentifier, "restic", pvc)
+
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.SnapshotID, repo.Spec.ResticIdentifier, backupInfo.UploaderType, pvc)
 
 		if err := errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -212,4 +219,28 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 		pvr.Labels[velerov1api.PVCUIDLabel] = string(pvc.UID)
 	}
 	return pvr
+}
+
+func getVolumesRepositoryType(volumes map[string]VolumeBackupInfo) (string, error) {
+	if len(volumes) == 0 {
+		return "", errors.New("empty volume list")
+	}
+
+	// the podVolumeBackups list come from one backup. In one backup, it is impossible that volumes are
+	// backed up by different uploaders or to different repositories. Asserting this ensures one repo only,
+	// which will simplify the following logics
+	repositoryType := ""
+	for _, backupInfo := range volumes {
+		if backupInfo.RepositoryType == "" {
+			return "", errors.New("invalid repository type among volumes")
+		}
+
+		if repositoryType == "" {
+			repositoryType = backupInfo.RepositoryType
+		} else if repositoryType != backupInfo.RepositoryType {
+			return "", errors.New("multiple repository type in one backup")
+		}
+	}
+
+	return repositoryType, nil
 }

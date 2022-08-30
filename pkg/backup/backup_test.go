@@ -2595,7 +2595,7 @@ func TestBackupWithHooks(t *testing.T) {
 
 type fakeResticBackupperFactory struct{}
 
-func (f *fakeResticBackupperFactory) NewBackupper(context.Context, *velerov1.Backup) (podvolume.Backupper, error) {
+func (f *fakeResticBackupperFactory) NewBackupper(context.Context, *velerov1.Backup, string) (podvolume.Backupper, error) {
 	return &fakeResticBackupper{}, nil
 }
 

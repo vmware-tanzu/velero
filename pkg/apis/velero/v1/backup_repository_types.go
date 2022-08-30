@@ -31,7 +31,7 @@ type BackupRepositorySpec struct {
 	BackupStorageLocation string `json:"backupStorageLocation"`
 
 	// RepositoryType indicates the type of the backend repository
-	// +kubebuilder:validation:Enum=kopia;restic;""
+	// +kubebuilder:validation:Enum=unified;restic;""
 	// +optional
 	RepositoryType string `json:"repositoryType"`
 

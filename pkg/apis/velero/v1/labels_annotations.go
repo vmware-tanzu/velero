@@ -40,16 +40,19 @@ const (
 
 	// PodVolumeOperationTimeoutAnnotation is the annotation key used to apply
 	// a backup/restore-specific timeout value for pod volume operations (i.e.
-	// restic backups/restores).
+	// pod volume backups/restores).
 	PodVolumeOperationTimeoutAnnotation = "velero.io/pod-volume-timeout"
 
 	// StorageLocationLabel is the label key used to identify the storage
 	// location of a backup.
 	StorageLocationLabel = "velero.io/storage-location"
 
-	// ResticVolumeNamespaceLabel is the label key used to identify which
-	// namespace a restic repository stores pod volume backups for.
-	ResticVolumeNamespaceLabel = "velero.io/volume-namespace"
+	// VolumeNamespaceLabel is the label key used to identify which
+	// namespace a repository stores backups for.
+	VolumeNamespaceLabel = "velero.io/volume-namespace"
+
+	// RepositoryTypeLabel is the label key used to identify the type of a repository
+	RepositoryTypeLabel = "velero.io/repository-type"
 
 	// SourceClusterK8sVersionAnnotation is the label key used to identify the k8s
 	// git version of the backup , i.e. v1.16.4
