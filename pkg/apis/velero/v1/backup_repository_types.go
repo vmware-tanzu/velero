@@ -31,7 +31,7 @@ type BackupRepositorySpec struct {
 	BackupStorageLocation string `json:"backupStorageLocation"`
 
 	// RepositoryType indicates the type of the backend repository
-	// +kubebuilder:validation:Enum=unified;restic;""
+	// +kubebuilder:validation:Enum=kopia;restic;""
 	// +optional
 	RepositoryType string `json:"repositoryType"`
 
@@ -52,8 +52,8 @@ const (
 	BackupRepositoryPhaseReady    BackupRepositoryPhase = "Ready"
 	BackupRepositoryPhaseNotReady BackupRepositoryPhase = "NotReady"
 
-	BackupRepositoryTypeRestic  string = "restic"
-	BackupRepositoryTypeUnified string = "unified"
+	BackupRepositoryTypeRestic string = "restic"
+	BackupRepositoryTypeKopia  string = "kopia"
 )
 
 // BackupRepositoryStatus is the current status of a BackupRepository.

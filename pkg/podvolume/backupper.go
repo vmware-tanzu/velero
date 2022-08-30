@@ -110,9 +110,9 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, nil
 	}
 
-	repositoryType := GetRepositoryTypeFromUploaderType(b.uploaderType)
+	repositoryType := getRepositoryType(b.uploaderType)
 	if repositoryType == "" {
-		err := errors.New("invalid repository type")
+		err := errors.Errorf("empty repository type, uploader %s", b.uploaderType)
 		return nil, []error{err}
 	}
 

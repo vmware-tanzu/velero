@@ -105,7 +105,7 @@ func NewManager(
 	}
 
 	mgr.providers[velerov1api.BackupRepositoryTypeRestic] = provider.NewResticRepositoryProvider(credentialFileStore, mgr.fileSystem, mgr.log)
-	mgr.providers[velerov1api.BackupRepositoryTypeUnified] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
+	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,
 	}, mgr.log)
@@ -211,8 +211,8 @@ func (m *manager) getRepositoryProvider(repo *velerov1api.BackupRepository) (pro
 	switch repo.Spec.RepositoryType {
 	case "", velerov1api.BackupRepositoryTypeRestic:
 		return m.providers[velerov1api.BackupRepositoryTypeRestic], nil
-	case velerov1api.BackupRepositoryTypeUnified:
-		return m.providers[velerov1api.BackupRepositoryTypeUnified], nil
+	case velerov1api.BackupRepositoryTypeKopia:
+		return m.providers[velerov1api.BackupRepositoryTypeKopia], nil
 	default:
 		return nil, fmt.Errorf("failed to get provider for repository %s", repo.Spec.RepositoryType)
 	}

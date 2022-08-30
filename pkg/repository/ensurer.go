@@ -117,7 +117,7 @@ func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	// It's only safe to have one instance of this method executing concurrently for a
 	// given volumeNamespace + backupLocation + repositoryType, so synchronize based on that. It's fine
 	// to run concurrently for *different* namespaces/locations. If you had 2 goroutines
-	// running this for the same inputs, both might find no ResticRepository exists, then
+	// running this for the same inputs, both might find no BackupRepository exists, then
 	// both would create new ones for the same namespace/location.
 	//
 	// This issue could probably be avoided if we had a deterministic name for
@@ -143,7 +143,7 @@ func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		return nil, errors.WithStack(err)
 	}
 	if len(repos) > 1 {
-		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q, repository type %q", volumeNamespace, backupLocation, repositoryType)
+		return nil, errors.Errorf("more than one BackupRepository found for workload namespace %q, backup storage location %q, repository type %q", volumeNamespace, backupLocation, repositoryType)
 	}
 	if len(repos) == 1 {
 		if repos[0].Status.Phase != velerov1api.BackupRepositoryPhaseReady {

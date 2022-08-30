@@ -53,7 +53,7 @@ spec:
               repositoryType:
                 description: RepositoryType indicates the type of the backend repository
                 enum:
-                - unified
+                - kopia
                 - restic
                 - ""
                 type: string

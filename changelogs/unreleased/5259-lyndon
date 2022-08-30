@@ -1,6 +1,1 @@
-Fill gaps for Kopia path of PVBR:
-
-Repo Manager with Unified Repo
-Uploader type to PVBR backupper/restorer
-Repository Type to BackupRepository controller
-Repository Type to Repo Ensurer
+Fill gaps for Kopia path of PVBR: integrate Repo Manager with Unified Repo; pass UploaderType to PVBR backupper and restorer; pass RepositoryType to BackupRepository controller and Repo Ensurer

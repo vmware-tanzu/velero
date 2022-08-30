@@ -508,18 +508,5 @@ func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbCli
 		return nil, errors.WithStack(err)
 	}
 
-	var res []repository.SnapshotIdentifier
-	for _, item := range podVolumeBackups.Items {
-		if item.Status.SnapshotID == "" {
-			continue
-		}
-		res = append(res, repository.SnapshotIdentifier{
-			VolumeNamespace:       item.Spec.Pod.Namespace,
-			BackupStorageLocation: backup.Spec.StorageLocation,
-			SnapshotID:            item.Status.SnapshotID,
-			RepositoryType:        podvolume.GetRepositoryTypeFromUploaderType(item.Spec.UploaderType),
-		})
-	}
-
-	return res, nil
+	return podvolume.GetSnapshotIdentifier(podVolumeBackups), nil
 }

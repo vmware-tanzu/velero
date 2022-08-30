@@ -25,7 +25,7 @@ import (
 func TestGetVolumesRepositoryType(t *testing.T) {
 	testCases := []struct {
 		name        string
-		volumes     map[string]VolumeBackupInfo
+		volumes     map[string]volumeBackupInfo
 		expected    string
 		expectedErr string
 	}{
@@ -35,41 +35,41 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 		},
 		{
 			name: "empty repository type, first one",
-			volumes: map[string]VolumeBackupInfo{
-				"volume1": {"", "", ""},
+			volumes: map[string]volumeBackupInfo{
+				"volume1": {"fake-snapshot-id-1", "fake-uploader-1", ""},
 				"volume2": {"", "", "fake-type"},
 			},
-			expectedErr: "invalid repository type among volumes",
+			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-1, uploader fake-uploader-1",
 		},
 		{
 			name: "empty repository type, last one",
-			volumes: map[string]VolumeBackupInfo{
+			volumes: map[string]volumeBackupInfo{
 				"volume1": {"", "", "fake-type"},
 				"volume2": {"", "", "fake-type"},
-				"volume3": {"", "", ""},
+				"volume3": {"fake-snapshot-id-3", "fake-uploader-3", ""},
 			},
-			expectedErr: "invalid repository type among volumes",
+			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-3, uploader fake-uploader-3",
 		},
 		{
 			name: "empty repository type, middle one",
-			volumes: map[string]VolumeBackupInfo{
+			volumes: map[string]volumeBackupInfo{
 				"volume1": {"", "", "fake-type"},
-				"volume2": {"", "", ""},
+				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", ""},
 				"volume3": {"", "", "fake-type"},
 			},
-			expectedErr: "invalid repository type among volumes",
+			expectedErr: "empty repository type found among volume snapshots, snapshot ID fake-snapshot-id-2, uploader fake-uploader-2",
 		},
 		{
 			name: "mismatch repository type",
-			volumes: map[string]VolumeBackupInfo{
+			volumes: map[string]volumeBackupInfo{
 				"volume1": {"", "", "fake-type1"},
-				"volume2": {"", "", "fake-type2"},
+				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", "fake-type2"},
 			},
-			expectedErr: "multiple repository type in one backup",
+			expectedErr: "multiple repository type in one backup, current type fake-type1, differential one [type fake-type2, snapshot ID fake-snapshot-id-2, uploader fake-uploader-2]",
 		},
 		{
 			name: "success",
-			volumes: map[string]VolumeBackupInfo{
+			volumes: map[string]volumeBackupInfo{
 				"volume1": {"", "", "fake-type"},
 				"volume2": {"", "", "fake-type"},
 				"volume3": {"", "", "fake-type"},

@@ -103,7 +103,7 @@ func newRestorer(
 }
 
 func (r *restorer) RestorePodVolumes(data RestoreData) []error {
-	volumesToRestore := GetVolumeBackupInfoForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
+	volumesToRestore := getVolumeBackupInfoForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
 	if len(volumesToRestore) == 0 {
 		return nil
 	}
@@ -152,7 +152,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			}
 		}
 
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.SnapshotID, repo.Spec.ResticIdentifier, backupInfo.UploaderType, pvc)
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repo.Spec.ResticIdentifier, backupInfo.uploaderType, pvc)
 
 		if err := errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -221,7 +221,7 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 	return pvr
 }
 
-func getVolumesRepositoryType(volumes map[string]VolumeBackupInfo) (string, error) {
+func getVolumesRepositoryType(volumes map[string]volumeBackupInfo) (string, error) {
 	if len(volumes) == 0 {
 		return "", errors.New("empty volume list")
 	}
@@ -231,14 +231,16 @@ func getVolumesRepositoryType(volumes map[string]VolumeBackupInfo) (string, erro
 	// which will simplify the following logics
 	repositoryType := ""
 	for _, backupInfo := range volumes {
-		if backupInfo.RepositoryType == "" {
-			return "", errors.New("invalid repository type among volumes")
+		if backupInfo.repositoryType == "" {
+			return "", errors.Errorf("empty repository type found among volume snapshots, snapshot ID %s, uploader %s",
+				backupInfo.snapshotID, backupInfo.uploaderType)
 		}
 
 		if repositoryType == "" {
-			repositoryType = backupInfo.RepositoryType
-		} else if repositoryType != backupInfo.RepositoryType {
-			return "", errors.New("multiple repository type in one backup")
+			repositoryType = backupInfo.repositoryType
+		} else if repositoryType != backupInfo.repositoryType {
+			return "", errors.Errorf("multiple repository type in one backup, current type %s, differential one [type %s, snapshot ID %s, uploader %s]",
+				repositoryType, backupInfo.repositoryType, backupInfo.snapshotID, backupInfo.uploaderType)
 		}
 	}
 
