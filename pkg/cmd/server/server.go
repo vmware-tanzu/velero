@@ -723,10 +723,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.Restore:    restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
-	enabledRuntimeControllers := make(map[string]struct{})
-	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
-	enabledRuntimeControllers[controller.DownloadRequest] = struct{}{}
-	enabledRuntimeControllers[controller.GarbageCollection] = struct{}{}
+	enabledRuntimeControllers := map[string]struct{}{
+		controller.ServerStatusRequest: {},
+		controller.DownloadRequest:     {},
+		controller.Schedule:            {},
+		controller.ResticRepo:          {},
+		controller.BackupDeletion:      {},
+	}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -789,50 +792,53 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
 
-	if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+	if _, ok := enabledRuntimeControllers[controller.Schedule]; ok {
+		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+		}
 	}
 
-	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
+	if _, ok := enabledRuntimeControllers[controller.ResticRepo]; ok {
+		if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
+		}
 	}
 
-	if err := controller.NewBackupDeletionReconciler(
-		s.logger,
-		s.mgr.GetClient(),
-		backupTracker,
-		s.repoManager,
-		s.metrics,
-		s.discoveryHelper,
-		newPluginManager,
-		backupStoreGetter,
-	).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+	if _, ok := enabledRuntimeControllers[controller.BackupDeletion]; ok {
+		if err := controller.NewBackupDeletionReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			backupTracker,
+			s.repoManager,
+			s.metrics,
+			s.discoveryHelper,
+			newPluginManager,
+			backupStoreGetter,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+		}
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
-		r := controller.ServerStatusRequestReconciler{
-			Scheme:         s.mgr.GetScheme(),
-			Client:         s.mgr.GetClient(),
-			Ctx:            s.ctx,
-			PluginRegistry: s.pluginRegistry,
-			Clock:          clock.RealClock{},
-			Log:            s.logger,
-		}
-		if err := r.SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewServerStatusRequestReconciler(
+			s.mgr.GetClient(),
+			s.ctx,
+			s.pluginRegistry,
+			clock.RealClock{},
+			s.logger,
+		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
 		}
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
-		r := controller.DownloadRequestReconciler{
-			Scheme:            s.mgr.GetScheme(),
-			Client:            s.mgr.GetClient(),
-			Clock:             clock.RealClock{},
-			NewPluginManager:  newPluginManager,
-			BackupStoreGetter: backupStoreGetter,
-			Log:               s.logger,
-		}
+		r := controller.NewDownloadRequestReconciler(
+			s.mgr.GetClient(),
+			clock.RealClock{},
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
 		}
