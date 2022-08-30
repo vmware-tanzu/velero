@@ -775,6 +775,7 @@ func TestForget(t *testing.T) {
 
 			err := urp.Forget(context.Background(), "", RepoParam{
 				BackupLocation: &velerov1api.BackupStorageLocation{},
+				BackupRepo:     &velerov1api.BackupRepository{},
 			})
 
 			if tc.expectedErr == "" {

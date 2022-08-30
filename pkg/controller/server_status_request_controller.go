@@ -24,7 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,21 +45,36 @@ type PluginLister interface {
 	List(kind framework.PluginKind) []framework.PluginIdentifier
 }
 
-// ServerStatusRequestReconciler reconciles a ServerStatusRequest object
-type ServerStatusRequestReconciler struct {
-	Scheme         *runtime.Scheme
-	Client         client.Client
-	Ctx            context.Context
-	PluginRegistry PluginLister
-	Clock          clock.Clock
+// serverStatusRequestReconciler reconciles a ServerStatusRequest object
+type serverStatusRequestReconciler struct {
+	client         client.Client
+	ctx            context.Context
+	pluginRegistry PluginLister
+	clock          clock.Clock
 
-	Log logrus.FieldLogger
+	log logrus.FieldLogger
+}
+
+// NewServerStatusRequestReconciler initializes and returns serverStatusRequestReconciler struct.
+func NewServerStatusRequestReconciler(
+	client client.Client,
+	ctx context.Context,
+	pluginRegistry PluginLister,
+	clock clock.Clock,
+	log logrus.FieldLogger) *serverStatusRequestReconciler {
+	return &serverStatusRequestReconciler{
+		client:         client,
+		ctx:            ctx,
+		pluginRegistry: pluginRegistry,
+		clock:          clock,
+		log:            log,
+	}
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests/status,verbs=get;update;patch
-func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithFields(logrus.Fields{
+func (r *serverStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.log.WithFields(logrus.Fields{
 		"controller":          ServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
 	})
@@ -68,7 +82,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	// Fetch the ServerStatusRequest instance.
 	log.Debug("Getting ServerStatusRequest")
 	statusRequest := &velerov1api.ServerStatusRequest{}
-	if err := r.Client.Get(r.Ctx, req.NamespacedName, statusRequest); err != nil {
+	if err := r.client.Get(r.ctx, req.NamespacedName, statusRequest); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Debug("Unable to find ServerStatusRequest")
 			return ctrl.Result{}, nil
@@ -78,7 +92,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	log = r.Log.WithFields(logrus.Fields{
+	log = r.log.WithFields(logrus.Fields{
 		"controller":          ServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
 		"phase":               statusRequest.Status.Phase,
@@ -90,23 +104,23 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		original := statusRequest.DeepCopy()
 		statusRequest.Status.ServerVersion = buildinfo.Version
 		statusRequest.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
-		statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: r.Clock.Now()}
-		statusRequest.Status.Plugins = velero.GetInstalledPluginInfo(r.PluginRegistry)
+		statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: r.clock.Now()}
+		statusRequest.Status.Plugins = velero.GetInstalledPluginInfo(r.pluginRegistry)
 
-		if err := r.Client.Patch(r.Ctx, statusRequest, client.MergeFrom(original)); err != nil {
+		if err := r.client.Patch(r.ctx, statusRequest, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Error updating ServerStatusRequest status")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
 		}
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
 		expiration := statusRequest.Status.ProcessedTimestamp.Add(ttl)
-		if expiration.After(r.Clock.Now()) {
+		if expiration.After(r.clock.Now()) {
 			log.Debug("ServerStatusRequest has not expired")
 			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
 		}
 
 		log.Debug("ServerStatusRequest has expired, deleting it")
-		if err := r.Client.Delete(r.Ctx, statusRequest); err != nil {
+		if err := r.client.Delete(r.ctx, statusRequest); err != nil {
 			log.WithError(err).Error("Unable to delete the request")
 			return ctrl.Result{}, nil
 		}
@@ -119,7 +133,7 @@ func (r *ServerStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
 }
 
-func (r *ServerStatusRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *serverStatusRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.ServerStatusRequest{}).
 		WithOptions(controller.Options{

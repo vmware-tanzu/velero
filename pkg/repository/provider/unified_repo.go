@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -59,9 +60,8 @@ var funcTable = localFuncTable{
 }
 
 const (
-	repoOpDescFullMaintain  = "full maintenance"
-	repoOpDescQuickMaintain = "quick maintenance"
-	repoOpDescForget        = "forget"
+	repoOpDescMaintain = "repo maintenance"
+	repoOpDescForget   = "forget"
 
 	repoConnectDesc = "unfied repo"
 )
@@ -70,7 +70,7 @@ const (
 func NewUnifiedRepoProvider(
 	credentialGetter credentials.CredentialGetter,
 	log logrus.FieldLogger,
-) (Provider, error) {
+) Provider {
 	repo := unifiedRepoProvider{
 		credentialGetter: credentialGetter,
 		log:              log,
@@ -78,22 +78,21 @@ func NewUnifiedRepoProvider(
 
 	repo.repoService = createRepoService(log)
 
-	log.Debug("Finished create unified repo service")
-
-	return &repo, nil
+	return &repo
 }
 
 func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) error {
 	log := urp.log.WithFields(logrus.Fields{
-		"BSL name": param.BackupLocation.Name,
-		"BSL UID":  param.BackupLocation.UID,
+		"BSL name":  param.BackupLocation.Name,
+		"repo name": param.BackupRepo.Name,
+		"repo UID":  param.BackupRepo.UID,
 	})
 
 	log.Debug("Start to init repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
-		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
 		udmrepo.WithGenOptions(
 			map[string]string{
 				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
@@ -120,15 +119,16 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 
 func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoParam) error {
 	log := urp.log.WithFields(logrus.Fields{
-		"BSL name": param.BackupLocation.Name,
-		"BSL UID":  param.BackupLocation.UID,
+		"BSL name":  param.BackupLocation.Name,
+		"repo name": param.BackupRepo.Name,
+		"repo UID":  param.BackupRepo.UID,
 	})
 
 	log.Debug("Start to connect repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
-		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
 		udmrepo.WithGenOptions(
 			map[string]string{
 				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
@@ -155,15 +155,16 @@ func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoPar
 
 func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam) error {
 	log := urp.log.WithFields(logrus.Fields{
-		"BSL name": param.BackupLocation.Name,
-		"BSL UID":  param.BackupLocation.UID,
+		"BSL name":  param.BackupLocation.Name,
+		"repo name": param.BackupRepo.Name,
+		"repo UID":  param.BackupRepo.UID,
 	})
 
 	log.Debug("Start to prepare repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
-		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
 		udmrepo.WithGenOptions(
 			map[string]string{
 				udmrepo.GenOptionOwnerName:   udmrepo.GetRepoUser(),
@@ -196,21 +197,17 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 
 func (urp *unifiedRepoProvider) PruneRepo(ctx context.Context, param RepoParam) error {
 	log := urp.log.WithFields(logrus.Fields{
-		"BSL name": param.BackupLocation.Name,
-		"BSL UID":  param.BackupLocation.UID,
+		"BSL name":  param.BackupLocation.Name,
+		"repo name": param.BackupRepo.Name,
+		"repo UID":  param.BackupRepo.UID,
 	})
 
 	log.Debug("Start to prune repo")
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
-		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
-		udmrepo.WithGenOptions(
-			map[string]string{
-				udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainFull,
-			},
-		),
-		udmrepo.WithDescription(repoOpDescFullMaintain),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
+		udmrepo.WithDescription(repoOpDescMaintain),
 	)
 
 	if err != nil {
@@ -227,39 +224,6 @@ func (urp *unifiedRepoProvider) PruneRepo(ctx context.Context, param RepoParam) 
 	return nil
 }
 
-func (urp *unifiedRepoProvider) PruneRepoQuick(ctx context.Context, param RepoParam) error {
-	log := urp.log.WithFields(logrus.Fields{
-		"BSL name": param.BackupLocation.Name,
-		"BSL UID":  param.BackupLocation.UID,
-	})
-
-	log.Debug("Start to prune repo quick")
-
-	repoOption, err := udmrepo.NewRepoOptions(
-		udmrepo.WithPassword(urp, param),
-		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
-		udmrepo.WithGenOptions(
-			map[string]string{
-				udmrepo.GenOptionMaintainMode: udmrepo.GenOptionMaintainQuick,
-			},
-		),
-		udmrepo.WithDescription(repoOpDescQuickMaintain),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "error to get repo options")
-	}
-
-	err = urp.repoService.Maintain(ctx, *repoOption)
-	if err != nil {
-		return errors.Wrap(err, "error to prune backup repo quick")
-	}
-
-	log.Debug("Prune repo quick complete")
-
-	return nil
-}
-
 func (urp *unifiedRepoProvider) EnsureUnlockRepo(ctx context.Context, param RepoParam) error {
 	return nil
 }
@@ -267,7 +231,8 @@ func (urp *unifiedRepoProvider) EnsureUnlockRepo(ctx context.Context, param Repo
 func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, param RepoParam) error {
 	log := urp.log.WithFields(logrus.Fields{
 		"BSL name":   param.BackupLocation.Name,
-		"BSL UID":    param.BackupLocation.UID,
+		"repo name":  param.BackupRepo.Name,
+		"repo UID":   param.BackupRepo.UID,
 		"snapshotID": snapshotID,
 	})
 
@@ -275,7 +240,7 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
-		udmrepo.WithConfigFile(urp.workPath, string(param.BackupLocation.UID)),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
 		udmrepo.WithDescription(repoOpDescForget),
 	)
 
@@ -303,6 +268,10 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 	log.Debug("Forget snapshot complete")
 
 	return nil
+}
+
+func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+	return urp.repoService.DefaultMaintenanceFrequency()
 }
 
 func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {

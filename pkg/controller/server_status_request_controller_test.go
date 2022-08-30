@@ -62,15 +62,15 @@ var _ = Describe("Server Status Request Reconciler", func() {
 		func(test request) {
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-			r := ServerStatusRequestReconciler{
-				Client:         fake.NewFakeClientWithScheme(scheme.Scheme, test.req),
-				Ctx:            context.Background(),
-				PluginRegistry: test.reqPluginLister,
-				Clock:          clock.NewFakeClock(now),
-				Log:            velerotest.NewLogger(),
-			}
+			r := NewServerStatusRequestReconciler(
+				fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(test.req).Build(),
+				context.Background(),
+				test.reqPluginLister,
+				clock.NewFakeClock(now),
+				velerotest.NewLogger(),
+			)
 
-			actualResult, err := r.Reconcile(r.Ctx, ctrl.Request{
+			actualResult, err := r.Reconcile(r.ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      test.req.Name,
@@ -86,7 +86,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 			}
 
 			instance := &velerov1api.ServerStatusRequest{}
-			err = r.Client.Get(ctx, kbclient.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, instance)
+			err = r.client.Get(ctx, kbclient.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, instance)
 
 			// Assertions
 			if test.expected == nil {

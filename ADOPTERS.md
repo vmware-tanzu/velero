@@ -40,7 +40,9 @@ We have integrated our [solution with Velero][11] to provide our customers with 
 Kyma [integrates with Velero][41] to effortlessly back up and restore Kyma clusters with all its resources. Velero capabilities allow Kyma users to define and run manual and scheduled backups in order to successfully handle a disaster-recovery scenario.
 
 **[Red Hat][50]**  
-Red Hat has developed the [Cluster Application Migration Tool][51] which uses [Velero and Restic][52] to drive the migration of applications between OpenShift clusters.
+Red Hat has developed 2 operators for the OpenShift platform:
+- [Migration Toolkit for Containers][51] (Crane): This operator uses [Velero and Restic][52] to drive the migration of applications between OpenShift clusters.
+- [OADP (OpenShift API for Data Protection) Operator][53]: This operator sets up and installs Velero on the OpenShift platform, allowing users to backup and restore applications.
 
 **[Dell EMC][70]**  
 For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Container Storage Interface (CSI) framework to take snapshots to back up the persistent data or the data that the application creates e.g. databases. [Dell EMC leverages Velero][72] to backup the namespace configuration files (also known as Namespace meta data) for enterprise grade data protection.
@@ -89,6 +91,7 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 [50]: https://redhat.com
 [51]: https://github.com/fusor/mig-operator
 [52]: https://github.com/fusor/mig-operator/blob/master/docs/usage/2.md
+[53]: https://github.com/openshift/oadp-operator
 
 [60]: https://banzaicloud.com
 [61]: https://banzaicloud.com/products/pipeline/

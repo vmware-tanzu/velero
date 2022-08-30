@@ -41,7 +41,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/repository"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
@@ -440,7 +439,7 @@ func (r *backupDeletionReconciler) deleteResticSnapshots(ctx context.Context, ba
 		return nil
 	}
 
-	snapshots, err := restic.GetSnapshotsInBackup(ctx, backup, r.Client)
+	snapshots, err := getSnapshotsInBackup(ctx, backup, r.Client)
 	if err != nil {
 		return []error{err}
 	}
@@ -490,4 +489,34 @@ func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *vele
 		return nil, errors.Wrap(err, "error patching Backup")
 	}
 	return backup, nil
+}
+
+// getSnapshotsInBackup returns a list of all restic snapshot ids associated with
+// a given Velero backup.
+func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbClient client.Client) ([]repository.SnapshotIdentifier, error) {
+	podVolumeBackups := &velerov1api.PodVolumeBackupList{}
+	options := &client.ListOptions{
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
+		}).AsSelector(),
+	}
+
+	err := kbClient.List(ctx, podVolumeBackups, options)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var res []repository.SnapshotIdentifier
+	for _, item := range podVolumeBackups.Items {
+		if item.Status.SnapshotID == "" {
+			continue
+		}
+		res = append(res, repository.SnapshotIdentifier{
+			VolumeNamespace:       item.Spec.Pod.Namespace,
+			BackupStorageLocation: backup.Spec.StorageLocation,
+			SnapshotID:            item.Status.SnapshotID,
+		})
+	}
+
+	return res, nil
 }
