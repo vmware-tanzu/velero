@@ -1,0 +1,1 @@
+Refactor BackupItemAction proto and related code to backupitemaction/v1 package.  This is part of implementation of the plugin version design https://github.com/vmware-tanzu/velero/blob/main/design/plugin-versioning.md

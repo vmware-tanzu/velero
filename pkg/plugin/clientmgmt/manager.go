@@ -20,12 +20,12 @@ import (
 	"strings"
 	"sync"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
 
 // Manager manages the lifecycles of plugins.
@@ -37,10 +37,10 @@ type Manager interface {
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 
 	// GetBackupItemActions returns all backup item action plugins.
-	GetBackupItemActions() ([]velero.BackupItemAction, error)
+	GetBackupItemActions() ([]biav1.BackupItemAction, error)
 
 	// GetBackupItemAction returns the backup item action plugin for name.
-	GetBackupItemAction(name string) (velero.BackupItemAction, error)
+	GetBackupItemAction(name string) (biav1.BackupItemAction, error)
 
 	// GetRestoreItemActions returns all restore item action plugins.
 	GetRestoreItemActions() ([]velero.RestoreItemAction, error)
@@ -55,10 +55,10 @@ type Manager interface {
 	GetDeleteItemAction(name string) (velero.DeleteItemAction, error)
 
 	// GetItemSnapshotter returns the item snapshotter plugin for name
-	GetItemSnapshotter(name string) (v1.ItemSnapshotter, error)
+	GetItemSnapshotter(name string) (isv1.ItemSnapshotter, error)
 
 	// GetItemSnapshotters returns all item snapshotter plugins
-	GetItemSnapshotters() ([]v1.ItemSnapshotter, error)
+	GetItemSnapshotters() ([]isv1.ItemSnapshotter, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
@@ -166,10 +166,10 @@ func (m *manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, e
 }
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
-func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
+func (m *manager) GetBackupItemActions() ([]biav1.BackupItemAction, error) {
 	list := m.registry.List(framework.PluginKindBackupItemAction)
 
-	actions := make([]velero.BackupItemAction, 0, len(list))
+	actions := make([]biav1.BackupItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -186,7 +186,7 @@ func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 }
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
-func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
+func (m *manager) GetBackupItemAction(name string) (biav1.BackupItemAction, error) {
 	name = sanitizeName(name)
 
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemAction, name)
@@ -264,7 +264,7 @@ func (m *manager) GetDeleteItemAction(name string) (velero.DeleteItemAction, err
 	return r, nil
 }
 
-func (m *manager) GetItemSnapshotter(name string) (v1.ItemSnapshotter, error) {
+func (m *manager) GetItemSnapshotter(name string) (isv1.ItemSnapshotter, error) {
 	name = sanitizeName(name)
 
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindItemSnapshotter, name)
@@ -276,10 +276,10 @@ func (m *manager) GetItemSnapshotter(name string) (v1.ItemSnapshotter, error) {
 	return r, nil
 }
 
-func (m *manager) GetItemSnapshotters() ([]v1.ItemSnapshotter, error) {
+func (m *manager) GetItemSnapshotters() ([]isv1.ItemSnapshotter, error) {
 	list := m.registry.List(framework.PluginKindItemSnapshotter)
 
-	actions := make([]v1.ItemSnapshotter, 0, len(list))
+	actions := make([]isv1.ItemSnapshotter, 0, len(list))
 
 	for i := range list {
 		id := list[i]

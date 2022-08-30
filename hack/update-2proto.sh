@@ -18,6 +18,8 @@ HACK_DIR=$(dirname "${BASH_SOURCE}")
 
 echo "Updating plugin proto"
 
-protoc pkg/plugin/proto/*.proto --go_out=plugins=grpc:pkg/plugin/generated/ -I pkg/plugin/proto/
+echo protoc --version
+protoc pkg/plugin/proto/*.proto --go_out=plugins=grpc:pkg/plugin/generated/ --go_opt=module=github.com/vmware-tanzu/velero/pkg/plugin/generated -I pkg/plugin/proto/
+protoc pkg/plugin/proto/backupitemaction/v1/*.proto --go_out=plugins=grpc:pkg/plugin/generated/ --go_opt=module=github.com/vmware-tanzu/velero/pkg/plugin/generated -I pkg/plugin/proto/
 
 echo "Updating plugin proto - done!"

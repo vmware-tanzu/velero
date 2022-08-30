@@ -66,7 +66,7 @@ func (s *DeleteItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.D
 	}
 
 	return &proto.DeleteItemActionAppliesToResponse{
-		&proto.ResourceSelector{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
