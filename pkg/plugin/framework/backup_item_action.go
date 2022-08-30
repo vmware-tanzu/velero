@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // BackupItemActionPlugin is an implementation of go-plugin's Plugin
