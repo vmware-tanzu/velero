@@ -18,6 +18,7 @@ package kopia
 
 import (
 	"context"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -83,13 +84,21 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 
 //Backup backup specific sourcePath and update progress
 func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath string,
-	parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, error) {
+	parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
-		return nil, errors.New("get empty kopia uploader")
+		return nil, false, errors.New("get empty kopia uploader")
 	}
 	dir, err := filepath.Abs(sourcePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Invalid source path '%s'", sourcePath)
+		return nil, false, errors.Wrapf(err, "Invalid source path '%s'", sourcePath)
+	}
+
+	// to be consistent with restic when backup empty dir returns one error for upper logic handle
+	dirs, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", dir)
+	} else if len(dirs) == 0 {
+		return nil, true, nil
 	}
 
 	sourceInfo := snapshot.SourceInfo{
@@ -97,14 +106,13 @@ func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter rep
 		Host:     udmrepo.GetRepoDomain(),
 		Path:     filepath.Clean(dir),
 	}
-
 	rootDir, err := getLocalFSEntry(sourceInfo.Path)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to get local filesystem entry")
+		return nil, false, errors.Wrap(err, "Unable to get local filesystem entry")
 	}
 	snapID, snapshotSize, err := SnapshotSource(ctx, repoWriter, fsUploader, sourceInfo, rootDir, parentSnapshot, log, "Kopia Uploader")
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	snapshotInfo := &uploader.SnapshotInfo{
@@ -112,7 +120,7 @@ func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter rep
 		Size: snapshotSize,
 	}
 
-	return snapshotInfo, nil
+	return snapshotInfo, false, nil
 }
 
 func getLocalFSEntry(path0 string) (fs.Entry, error) {

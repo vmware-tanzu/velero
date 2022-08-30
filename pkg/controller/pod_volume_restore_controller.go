@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -40,9 +39,10 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/repository/util"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -250,29 +250,17 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	// name of ResticRepository is generated with prefix volumeNamespace-backupLocation- and end with random characters
-	// it could not retrieve the ResticRepository CR with namespace + name. so first list all CRs with in the volumeNamespace
-	// then filtering the matched CR with prefix volumeNamespace-backupLocation-
-	backupRepos := &velerov1api.BackupRepositoryList{}
-	var backupRepo velerov1api.BackupRepository
-	isFoundRepo := false
-	if c.List(ctx, backupRepos, &client.ListOptions{
-		Namespace: req.Namespace,
-	}); err != nil {
+	selector := labels.SelectorFromSet(
+		map[string]string{
+			//TODO
+			//velerov1api.VolumeNamespaceLabel: label.GetValidName(volumeNamespace),
+			velerov1api.StorageLocationLabel: label.GetValidName(req.Spec.BackupStorageLocation),
+			//velerov1api.RepositoryTypeLabel:  label.GetValidName(repositoryType),
+		},
+	)
+	backupRepo, err := util.GetBackupRepositoryByLabel(ctx, c.Client, req.Namespace, selector)
+	if err != nil {
 		return errors.Wrap(err, "error getting backup repository")
-	} else if len(backupRepos.Items) == 0 {
-		return errors.Errorf("find empty BackupRepository found for workload namespace %s, backup storage location %s", req.Namespace, req.Spec.BackupStorageLocation)
-	} else {
-		for _, repo := range backupRepos.Items {
-			if strings.HasPrefix(repo.Name, fmt.Sprintf("%s-%s-", req.Spec.Pod.Namespace, req.Spec.BackupStorageLocation)) {
-				backupRepo = repo
-				isFoundRepo = true
-				break
-			}
-		}
-		if !isFoundRepo {
-			return errors.Errorf("could not found match BackupRepository for workload namespace %s, backup storage location %s", req.Namespace, req.Spec.BackupStorageLocation)
-		}
 	}
 
 	uploaderProv, err := provider.NewUploaderProvider(ctx, c.Client, req.Spec.UploaderType,
@@ -288,7 +276,7 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	}()
 
 	if err = uploaderProv.RunRestore(ctx, req.Spec.SnapshotID, volumePath, c.NewRestoreProgressUpdater(req, log, ctx)); err != nil {
-		return errors.Wrapf(err, "error running restic restore err=%v", err)
+		return errors.Wrapf(err, "error running restore err=%v", err)
 	}
 
 	// Remove the .velero directory from the restored volume (it may contain done files from previous restores

@@ -18,7 +18,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -29,6 +28,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 func TestResticRunBackup(t *testing.T) {
@@ -36,9 +36,10 @@ func TestResticRunBackup(t *testing.T) {
 	rp.log = logrus.New()
 	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: rp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
 	testCases := []struct {
-		name            string
-		hookBackupFunc  func(repoIdentifier string, passwordFile string, path string, tags map[string]string) *restic.Command
-		errorHandleFunc func(err error) bool
+		name              string
+		hookBackupFunc    func(repoIdentifier string, passwordFile string, path string, tags map[string]string) *restic.Command
+		hookRunBackupFunc func(backupCmd *restic.Command, log logrus.FieldLogger, updater uploader.ProgressUpdater) (string, string, error)
+		errorHandleFunc   func(err error) bool
 	}{
 		{
 			name: "wrong restic execute command",
@@ -62,71 +63,40 @@ func TestResticRunBackup(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ResticBackupFunc = tc.hookBackupFunc
-			_, err := rp.RunBackup(context.Background(), "var", nil, "", &updater)
+			ResticBackupCMDFunc = tc.hookBackupFunc
+			_, _, err := rp.RunBackup(context.Background(), "var", nil, "", &updater)
 			rp.log.Infof("test name %v error %v", tc.name, err)
 			require.Equal(t, true, tc.errorHandleFunc(err))
 		})
 	}
 }
+
 func TestResticRunRestore(t *testing.T) {
 	var rp resticProvider
 	rp.log = logrus.New()
 	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: rp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
-	ResticRestoreFunc = func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
+	ResticRestoreCMDFunc = func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
 		return &restic.Command{Args: []string{""}}
 	}
 	testCases := []struct {
-		name                          string
-		hookResticGetVolumeSizeFunc   func(path string) (int64, error)
-		hookResticGetSnapshotSizeFunc func(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error)
-		hookResticRestoreFunc         func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command
-		errorHandleFunc               func(err error) bool
+		name                  string
+		hookResticRestoreFunc func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command
+		errorHandleFunc       func(err error) bool
 	}{
 		{
-			name:                        "failed to get snapshot",
-			hookResticGetVolumeSizeFunc: func(path string) (int64, error) { return 100, nil },
-			hookResticGetSnapshotSizeFunc: func(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error) {
-				return 100, errors.New("failed to get snapshot")
-			},
-			hookResticRestoreFunc: func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
-				return &restic.Command{Args: []string{""}}
-			},
-			errorHandleFunc: func(err error) bool { return strings.Contains(err.Error(), "failed to get snapshot") },
-		},
-		{
-			name:                        "failed to get volume size",
-			hookResticGetVolumeSizeFunc: func(path string) (int64, error) { return 100, errors.New("failed to get volume size") },
-			hookResticGetSnapshotSizeFunc: func(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error) {
-				return 100, nil
-			},
-			hookResticRestoreFunc: func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
-				return &restic.Command{Args: []string{""}}
-			},
-			errorHandleFunc: func(err error) bool {
-				return strings.Contains(err.Error(), "failed to execute restore command restic")
-			},
-		},
-		{
-			name:                        "wrong restic execute command",
-			hookResticGetVolumeSizeFunc: func(path string) (int64, error) { return 100, nil },
-			hookResticGetSnapshotSizeFunc: func(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error) {
-				return 100, nil
-			},
+			name: "wrong restic execute command",
 			hookResticRestoreFunc: func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
 				return &restic.Command{Args: []string{"date"}}
 			},
 			errorHandleFunc: func(err error) bool {
-				return strings.Contains(err.Error(), "failed to execute restore command restic")
+				return strings.Contains(err.Error(), "executable file not found ")
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ResticGetSnapshotSizeFunc = tc.hookResticGetSnapshotSizeFunc
-			ResticGetVolumeSizeFunc = tc.hookResticGetVolumeSizeFunc
-			ResticRestoreFunc = tc.hookResticRestoreFunc
+			ResticRestoreCMDFunc = tc.hookResticRestoreFunc
 			err := rp.RunRestore(context.Background(), "", "var", &updater)
 			rp.log.Infof("test name %v error %v", tc.name, err)
 			require.Equal(t, true, tc.errorHandleFunc(err))

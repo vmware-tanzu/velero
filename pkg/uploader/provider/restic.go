@@ -17,11 +17,10 @@ limitations under the License.
 package provider
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,25 +30,21 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-// BackupFunc mainly used to make testing more convenient
-var ResticBackupFunc = restic.BackupCommand
-var ResticRunCMDFunc = exec.RunCommand
-var ResticGetSnapshotSizeFunc = restic.GetSnapshotSize
-var ResticGetVolumeSizeFunc = restic.GetVolumeSize
-var ResticRestoreFunc = restic.RestoreCommand
+// mainly used to make testing more convenient
+var ResticBackupCMDFunc = restic.BackupCommand
+var ResticRestoreCMDFunc = restic.RestoreCommand
 
 type resticProvider struct {
 	repoIdentifier  string
 	credentialsFile string
 	caCertFile      string
-	repoEnv         []string
-	backupTags      map[string]string
-	log             logrus.FieldLogger
+	cmdEnv          []string
+	extraFlags      []string
 	bsl             *velerov1api.BackupStorageLocation
+	log             logrus.FieldLogger
 }
 
 func NewResticUploaderProvider(
@@ -61,8 +56,8 @@ func NewResticUploaderProvider(
 ) (Provider, error) {
 	provider := resticProvider{
 		repoIdentifier: repoIdentifier,
-		log:            log,
 		bsl:            bsl,
+		log:            log,
 	}
 
 	var err error
@@ -79,38 +74,42 @@ func NewResticUploaderProvider(
 		}
 	}
 
-	provider.repoEnv, err = restic.CmdEnv(bsl, credGetter.FromFile)
+	provider.cmdEnv, err = restic.CmdEnv(bsl, credGetter.FromFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "error generating repository cmnd env")
+	}
+
+	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
+	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
+	// is not enable for Restic command.
+	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(bsl, log)
+	if len(skipTLSRet) > 0 {
+		provider.extraFlags = append(provider.extraFlags, skipTLSRet)
 	}
 
 	return &provider, nil
 }
 
-// Not implement yet
-func (rp *resticProvider) Cancel() {
-}
-
 func (rp *resticProvider) Close(ctx context.Context) error {
 	if err := os.Remove(rp.credentialsFile); err != nil {
-		return errors.Wrapf(err, "failed to remove file %s", rp.credentialsFile)
+		rp.log.Warnf("Failed to remove file %s with err %v", rp.credentialsFile, err)
 	}
 	if err := os.Remove(rp.caCertFile); err != nil {
-		return errors.Wrapf(err, "failed to remove file %s", rp.caCertFile)
+		rp.log.Warnf("Failed to remove file %s with err %v", rp.caCertFile, err)
 	}
 	return nil
 }
 
 // RunBackup runs a `backup` command and watches the output to provide
-// progress updates to the caller.
+// progress updates to the caller and return snapshotID, isEmptySnapshot, error
 func (rp *resticProvider) RunBackup(
 	ctx context.Context,
 	path string,
 	tags map[string]string,
 	parentSnapshot string,
-	updater uploader.ProgressUpdater) (string, error) {
+	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
-		return "", errors.New("Need to initial backup progress updater first")
+		return "", false, errors.New("Need to initial backup progress updater first")
 	}
 
 	log := rp.log.WithFields(logrus.Fields{
@@ -118,104 +117,33 @@ func (rp *resticProvider) RunBackup(
 		"parentSnapshot": parentSnapshot,
 	})
 
-	// buffers for copying command stdout/err output into
-	stdoutBuf := new(bytes.Buffer)
-	stderrBuf := new(bytes.Buffer)
-
-	// create a channel to signal when to end the goroutine scanning for progress
-	// updates
-	quit := make(chan struct{})
-
-	rp.backupTags = tags
-	backupCmd := ResticBackupFunc(rp.repoIdentifier, rp.credentialsFile, path, tags)
-	backupCmd.Env = rp.repoEnv
+	backupCmd := ResticBackupCMDFunc(rp.repoIdentifier, rp.credentialsFile, path, tags)
+	backupCmd.Env = rp.cmdEnv
 	backupCmd.CACertFile = rp.caCertFile
-
+	backupCmd.ExtraFlags = rp.extraFlags
 	if parentSnapshot != "" {
 		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshot))
 	}
 
-	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
-	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
-	// is not enable for Restic command.
-	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(rp.bsl, rp.log)
-	if len(skipTLSRet) > 0 {
-		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, skipTLSRet)
-	}
-
-	cmd := backupCmd.Cmd()
-	cmd.Stdout = stdoutBuf
-	cmd.Stderr = stderrBuf
-
-	err := cmd.Start()
+	summary, stderrBuf, err := restic.RunBackup(backupCmd, log, updater)
 	if err != nil {
-		log.Errorf("failed to execute %v with stderr %v error %v", cmd, stderrBuf.String(), err)
-		return "", err
-	}
-
-	go func() {
-		ticker := time.NewTicker(backupProgressCheckInterval)
-		for {
-			select {
-			case <-ticker.C:
-				lastLine := restic.GetLastLine(stdoutBuf.Bytes())
-				if len(lastLine) > 0 {
-					stat, err := restic.DecodeBackupStatusLine(lastLine)
-					if err != nil {
-						rp.log.WithError(err).Errorf("error getting backup progress")
-					}
-
-					// if the line contains a non-empty bytes_done field, we can update the
-					// caller with the progress
-					if stat.BytesDone != 0 {
-						updater.UpdateProgress(&uploader.UploaderProgress{
-							TotalBytes: stat.TotalBytesProcessed,
-							BytesDone:  stat.TotalBytesProcessed,
-						})
-					}
-				}
-			case <-quit:
-				ticker.Stop()
-				return
-			}
+		if strings.Contains(err.Error(), "snapshot is empty") {
+			log.Debugf("Restic backup got empty dir with %s path", path)
+			return "", true, nil
 		}
-	}()
-
-	err = cmd.Wait()
-	if err != nil {
-		return "", errors.WithStack(fmt.Errorf("failed to wait execute %v with stderr %v error %v", cmd, stderrBuf.String(), err))
+		return "", false, errors.WithStack(fmt.Errorf("error running restic backup with error: %v", err))
 	}
-	quit <- struct{}{}
-
-	summary, err := restic.GetSummaryLine(stdoutBuf.Bytes())
-	if err != nil {
-		return "", errors.WithStack(fmt.Errorf("failed to get summary %v with error %v", stderrBuf.String(), err))
-	}
-	stat, err := restic.DecodeBackupStatusLine(summary)
-	if err != nil {
-		return "", errors.WithStack(fmt.Errorf("failed to decode summary %v with error %v", string(summary), err))
-	}
-	if stat.MessageType != "summary" {
-		return "", errors.WithStack(fmt.Errorf("error getting backup summary: %s", string(summary)))
-	}
-
-	// update progress to 100%
-	updater.UpdateProgress(&uploader.UploaderProgress{
-		TotalBytes: stat.TotalBytesProcessed,
-		BytesDone:  stat.TotalBytesProcessed,
-	})
-
-	//GetSnapshtotID
-	snapshotIdCmd := restic.GetSnapshotCommand(rp.repoIdentifier, rp.credentialsFile, rp.backupTags)
-	snapshotIdCmd.Env = rp.repoEnv
+	// GetSnapshotID
+	snapshotIdCmd := restic.GetSnapshotCommand(rp.repoIdentifier, rp.credentialsFile, tags)
+	snapshotIdCmd.Env = rp.cmdEnv
 	snapshotIdCmd.CACertFile = rp.caCertFile
 
 	snapshotID, err := restic.GetSnapshotID(snapshotIdCmd)
 	if err != nil {
-		return "", errors.WithStack(fmt.Errorf("error getting snapshot id with error: %s", err))
+		return "", false, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
 	}
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", cmd.String(), summary, stderrBuf.String())
-	return snapshotID, nil
+	log.Debugf("Run command=%s, stdout=%s, stderr=%s", backupCmd.String(), summary, stderrBuf)
+	return snapshotID, false, nil
 }
 
 // RunRestore runs a `restore` command and monitors the volume size to
@@ -225,68 +153,21 @@ func (rp *resticProvider) RunRestore(
 	snapshotID string,
 	volumePath string,
 	updater uploader.ProgressUpdater) error {
+	if updater == nil {
+		return errors.New("Need to initial backup progress updater first")
+	}
 	log := rp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,
 		"volumePath": volumePath,
 	})
 
-	restoreCmd := ResticRestoreFunc(rp.repoIdentifier, rp.credentialsFile, snapshotID, volumePath)
-	restoreCmd.Env = rp.repoEnv
+	restoreCmd := ResticRestoreCMDFunc(rp.repoIdentifier, rp.credentialsFile, snapshotID, volumePath)
+	restoreCmd.Env = rp.cmdEnv
 	restoreCmd.CACertFile = rp.caCertFile
+	restoreCmd.ExtraFlags = rp.extraFlags
 
-	// #4820: restrieve insecureSkipTLSVerify from BSL configuration for
-	// AWS plugin. If nothing is return, that means insecureSkipTLSVerify
-	// is not enable for Restic command.
-	skipTLSRet := restic.GetInsecureSkipTLSVerifyFromBSL(rp.bsl, log)
-	if len(skipTLSRet) > 0 {
-		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, skipTLSRet)
-	}
-	snapshotSize, err := ResticGetSnapshotSizeFunc(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env, skipTLSRet)
-	if err != nil {
-		return errors.Wrap(err, "error getting snapshot size")
-	}
+	stdout, stderr, err := restic.RunRestore(restoreCmd, log, updater)
 
-	updater.UpdateProgress(&uploader.UploaderProgress{
-		TotalBytes: snapshotSize,
-	})
-
-	// create a channel to signal when to end the goroutine scanning for progress
-	// updates
-	quit := make(chan struct{})
-
-	go func() {
-		ticker := time.NewTicker(restoreProgressCheckInterval)
-		for {
-			select {
-			case <-ticker.C:
-				volumeSize, err := ResticGetVolumeSizeFunc(restoreCmd.Dir)
-				if err != nil {
-					log.WithError(err).Errorf("error getting volume size for restore dir %v", restoreCmd.Dir)
-					return
-				}
-				if volumeSize != 0 {
-					updater.UpdateProgress(&uploader.UploaderProgress{
-						TotalBytes: snapshotSize,
-						BytesDone:  volumeSize,
-					})
-				}
-			case <-quit:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-
-	stdout, stderr, err := ResticRunCMDFunc(restoreCmd.Cmd())
-	quit <- struct{}{}
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to execute restore command %v with stderr %v", restoreCmd.Cmd().String(), stderr))
-	}
-	// update progress to 100%
-	updater.UpdateProgress(&uploader.UploaderProgress{
-		TotalBytes: snapshotSize,
-		BytesDone:  snapshotSize,
-	})
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", restoreCmd.Command, stdout, stderr)
+	log.Debugf("Run command=%s, stdout=%s, stderr=%s", restoreCmd.Command, stdout, stderr)
 	return err
 }

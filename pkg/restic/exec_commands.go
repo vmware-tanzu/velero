@@ -20,10 +20,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -66,7 +69,82 @@ func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
 	return snapshots[0].ShortID, nil
 }
 
-func DecodeBackupStatusLine(lastLine []byte) (backupStatusLine, error) {
+// RunBackup runs a `restic backup` command and watches the output to provide
+// progress updates to the caller.
+func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.ProgressUpdater) (string, string, error) {
+	// buffers for copying command stdout/err output into
+	stdoutBuf := new(bytes.Buffer)
+	stderrBuf := new(bytes.Buffer)
+
+	// create a channel to signal when to end the goroutine scanning for progress
+	// updates
+	quit := make(chan struct{})
+
+	cmd := backupCmd.Cmd()
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
+
+	err := cmd.Start()
+	if err != nil {
+		return stdoutBuf.String(), stderrBuf.String(), err
+	}
+
+	go func() {
+		ticker := time.NewTicker(backupProgressCheckInterval)
+		for {
+			select {
+			case <-ticker.C:
+				lastLine := getLastLine(stdoutBuf.Bytes())
+				if len(lastLine) > 0 {
+					stat, err := decodeBackupStatusLine(lastLine)
+					if err != nil {
+						log.WithError(err).Errorf("error getting restic backup progress")
+					}
+
+					// if the line contains a non-empty bytes_done field, we can update the
+					// caller with the progress
+					if stat.BytesDone != 0 {
+						updater.UpdateProgress(&uploader.UploaderProgress{
+							TotalBytes: stat.TotalBytesProcessed,
+							BytesDone:  stat.TotalBytesProcessed,
+						})
+					}
+				}
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	err = cmd.Wait()
+	if err != nil {
+		return stdoutBuf.String(), stderrBuf.String(), err
+	}
+	quit <- struct{}{}
+
+	summary, err := getSummaryLine(stdoutBuf.Bytes())
+	if err != nil {
+		return stdoutBuf.String(), stderrBuf.String(), err
+	}
+	stat, err := decodeBackupStatusLine(summary)
+	if err != nil {
+		return stdoutBuf.String(), stderrBuf.String(), err
+	}
+	if stat.MessageType != "summary" {
+		return stdoutBuf.String(), stderrBuf.String(), errors.WithStack(fmt.Errorf("error getting restic backup summary: %s", string(summary)))
+	}
+
+	// update progress to 100%
+	updater.UpdateProgress(&uploader.UploaderProgress{
+		TotalBytes: stat.TotalBytesProcessed,
+		BytesDone:  stat.TotalBytesProcessed,
+	})
+
+	return string(summary), stderrBuf.String(), nil
+}
+
+func decodeBackupStatusLine(lastLine []byte) (backupStatusLine, error) {
 	var stat backupStatusLine
 	if err := json.Unmarshal(lastLine, &stat); err != nil {
 		return stat, errors.Wrapf(err, "unable to decode backup JSON line: %s", string(lastLine))
@@ -74,10 +152,10 @@ func DecodeBackupStatusLine(lastLine []byte) (backupStatusLine, error) {
 	return stat, nil
 }
 
-// GetLastLine returns the last line of a byte array. The string is assumed to
+// getLastLine returns the last line of a byte array. The string is assumed to
 // have a newline at the end of it, so this returns the substring between the
 // last two newlines.
-func GetLastLine(b []byte) []byte {
+func getLastLine(b []byte) []byte {
 	if b == nil || len(b) == 0 {
 		return []byte("")
 	}
@@ -86,12 +164,12 @@ func GetLastLine(b []byte) []byte {
 	return b[lastNewLineIdx+1 : len(b)-1]
 }
 
-// GetSummaryLine looks for the summary JSON line
+// getSummaryLine looks for the summary JSON line
 // (`{"message_type:"summary",...`) in the restic backup command output. Due to
 // an issue in Restic, this might not always be the last line
 // (https://github.com/restic/restic/issues/2389). It returns an error if it
 // can't be found.
-func GetSummaryLine(b []byte) ([]byte, error) {
+func getSummaryLine(b []byte) ([]byte, error) {
 	summaryLineIdx := bytes.LastIndex(b, []byte(`{"message_type":"summary"`))
 	if summaryLineIdx < 0 {
 		return nil, errors.New("unable to find summary in restic backup command output")
@@ -104,7 +182,66 @@ func GetSummaryLine(b []byte) ([]byte, error) {
 	return b[summaryLineIdx : summaryLineIdx+newLineIdx], nil
 }
 
-func GetSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error) {
+// RunRestore runs a `restic restore` command and monitors the volume size to
+// provide progress updates to the caller.
+func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updater uploader.ProgressUpdater) (string, string, error) {
+	insecureTLSFlag := ""
+
+	for _, extraFlag := range restoreCmd.ExtraFlags {
+		if strings.Contains(extraFlag, resticInsecureTLSFlag) {
+			insecureTLSFlag = extraFlag
+		}
+	}
+
+	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env, insecureTLSFlag)
+	if err != nil {
+		return "", "", errors.Wrap(err, "error getting snapshot size")
+	}
+
+	updater.UpdateProgress(&uploader.UploaderProgress{
+		TotalBytes: snapshotSize,
+	})
+
+	// create a channel to signal when to end the goroutine scanning for progress
+	// updates
+	quit := make(chan struct{})
+
+	go func() {
+		ticker := time.NewTicker(restoreProgressCheckInterval)
+		for {
+			select {
+			case <-ticker.C:
+				volumeSize, err := getVolumeSize(restoreCmd.Dir)
+				if err != nil {
+					log.WithError(err).Errorf("error getting restic restore progress")
+				}
+
+				if volumeSize != 0 {
+					updater.UpdateProgress(&uploader.UploaderProgress{
+						TotalBytes: snapshotSize,
+						BytesDone:  volumeSize,
+					})
+				}
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	stdout, stderr, err := exec.RunCommand(restoreCmd.Cmd())
+	quit <- struct{}{}
+
+	// update progress to 100%
+	updater.UpdateProgress(&uploader.UploaderProgress{
+		TotalBytes: snapshotSize,
+		BytesDone:  snapshotSize,
+	})
+
+	return stdout, stderr, err
+}
+
+func getSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureTLS string) (int64, error) {
 	cmd := StatsCommand(repoIdentifier, passwordFile, snapshotID)
 	cmd.Env = env
 	cmd.CACertFile = caCertFile
@@ -129,7 +266,7 @@ func GetSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string
 	return snapshotStats.TotalSize, nil
 }
 
-func GetVolumeSize(path string) (int64, error) {
+func getVolumeSize(path string) (int64, error) {
 	var size int64
 
 	files, err := fileSystem.ReadDir(path)
@@ -139,7 +276,7 @@ func GetVolumeSize(path string) (int64, error) {
 
 	for _, file := range files {
 		if file.IsDir() {
-			s, err := GetVolumeSize(fmt.Sprintf("%s/%s", path, file.Name()))
+			s, err := getVolumeSize(fmt.Sprintf("%s/%s", path, file.Name()))
 			if err != nil {
 				return 0, err
 			}

@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,8 +34,10 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+	"github.com/vmware-tanzu/velero/pkg/repository/util"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -143,30 +145,17 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}, backupLocation); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup storage location")
 	}
-
-	// name of ResticRepository is generated with prefix volumeNamespace-backupLocation- and end with random characters
-	// it could not retrieve the ResticRepository CR with namespace + name. so first list all CRs with in the volumeNamespace
-	// then filtering the matched CR with prefix volumeNamespace-backupLocation-
-	backupRepos := &velerov1api.BackupRepositoryList{}
-	var backupRepo velerov1api.BackupRepository
-	isFoundRepo := false
-	if r.Client.List(ctx, backupRepos, &client.ListOptions{
-		Namespace: pvb.Namespace,
-	}); err != nil {
+	selector := labels.SelectorFromSet(
+		map[string]string{
+			//TODO
+			//velerov1api.VolumeNamespaceLabel: label.GetValidName(volumeNamespace),
+			velerov1api.StorageLocationLabel: label.GetValidName(pvb.Spec.BackupStorageLocation),
+			//velerov1api.RepositoryTypeLabel:  label.GetValidName(repositoryType),
+		},
+	)
+	backupRepo, err := util.GetBackupRepositoryByLabel(ctx, r.Client, pvb.Namespace, selector)
+	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup repository")
-	} else if len(backupRepos.Items) == 0 {
-		return ctrl.Result{}, errors.Errorf("find empty BackupRepository found for workload namespace %s, backup storage location %s", pvb.Namespace, pvb.Spec.BackupStorageLocation)
-	} else {
-		for _, repo := range backupRepos.Items {
-			if strings.HasPrefix(repo.Name, fmt.Sprintf("%s-%s-", pvb.Spec.Pod.Namespace, pvb.Spec.BackupStorageLocation)) {
-				backupRepo = repo
-				isFoundRepo = true
-				break
-			}
-		}
-		if !isFoundRepo {
-			return ctrl.Result{}, errors.Errorf("could not found match BackupRepository for workload namespace %s, backup storage location %s", pvb.Namespace, pvb.Spec.BackupStorageLocation)
-		}
 	}
 
 	var uploaderProv provider.Provider
@@ -177,17 +166,17 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// If this is a PVC, look for the most recent completed pod volume backup for it and get
-	// its restic snapshot ID to use as the value of the `--parent` flag. Without this,
+	// its snapshot ID to do new backup based on it. Without this,
 	// if the pod using the PVC (and therefore the directory path under /host_pods/) has
-	// changed since the PVC's last backup, restic will not be able to identify a suitable
+	// changed since the PVC's last backup, for backup, it will not be able to identify a suitable
 	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
 	var parentSnapshotID string
 	if pvcUID, ok := pvb.Labels[velerov1api.PVCUIDLabel]; ok {
 		parentSnapshotID = r.getParentSnapshot(ctx, log, pvb.Namespace, pvcUID, pvb.Spec.BackupStorageLocation)
 		if parentSnapshotID == "" {
-			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
+			log.Info("No parent snapshot found for PVC, not based on parent snapshot for this backup")
 		} else {
-			log.WithField("parentSnapshotID", parentSnapshotID).Info("Setting --parent flag for this backup")
+			log.WithField("parentSnapshotID", parentSnapshotID).Info("Based on parent snapshot for this backup")
 		}
 	}
 
@@ -197,14 +186,9 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}()
 
-	var emptySnapshot bool
-	snapshotID, err := uploaderProv.RunBackup(ctx, path, pvb.Spec.Tags, parentSnapshotID, r.NewBackupProgressUpdater(&pvb, log, ctx))
+	snapshotID, emptySnapshot, err := uploaderProv.RunBackup(ctx, path, pvb.Spec.Tags, parentSnapshotID, r.NewBackupProgressUpdater(&pvb, log, ctx))
 	if err != nil {
-		if strings.Contains(err.Error(), "snapshot is empty") {
-			emptySnapshot = true
-		} else {
-			return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("running Restic backup, stderr=%v", err), log)
-		}
+		return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("running backup, stderr=%v", err), log)
 	}
 
 	// Update status to Completed with path & snapshot ID.
@@ -224,7 +208,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	latencyDuration := pvb.Status.CompletionTimestamp.Time.Sub(pvb.Status.StartTimestamp.Time)
 	latencySeconds := float64(latencyDuration / time.Second)
 	backupName := fmt.Sprintf("%s/%s", req.Namespace, pvb.OwnerReferences[0].Name)
-	generateOpName := fmt.Sprintf("%s-%s-%s-%s-backup", pvb.Name, backupRepo.Name, pvb.Spec.BackupStorageLocation, pvb.Namespace)
+	generateOpName := fmt.Sprintf("%s-%s-%s-%s-%s-backup", pvb.Name, backupRepo.Name, pvb.Spec.BackupStorageLocation, pvb.Namespace, pvb.Spec.UploaderType)
 	r.Metrics.ObserveResticOpLatency(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
 	r.Metrics.RegisterResticOpLatencyGauge(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
 	r.Metrics.RegisterPodVolumeBackupDequeue(r.NodeName)
