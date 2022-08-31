@@ -362,14 +362,14 @@ To do so in all your shell sessions, add the following to your `~/.zshrc` file:
   source <(velero completion zsh)
   ```
 
-If you have an alias for kubectl, you can extend shell completion to work with that alias:
+If you have an alias for velero, you can extend shell completion to work with that alias:
 
   ```shell
   echo 'alias v=velero' >>~/.zshrc
   echo 'complete -F __start_velero v' >>~/.zshrc
   ```
 
-After reloading your shell, kubectl autocompletion should be working.
+After reloading your shell, velero autocompletion should be working.
 
 If you get an error like `complete:13: command not found: compdef`, then add the following to the beginning of your `~/.zshrc` file:
 
