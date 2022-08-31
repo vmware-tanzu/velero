@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
@@ -60,8 +61,8 @@ func TestRestartableGetObjectStore(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableObjectStore{
 				key:                 key,
@@ -85,7 +86,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -94,7 +95,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 		},
 	}
 
-	err := r.reinitialize(3)
+	err := r.Reinitialize(3)
 	assert.EqualError(t, err, "int is not a ObjectStore!")
 
 	objectStore := new(providermocks.ObjectStore)
@@ -102,11 +103,11 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	defer objectStore.AssertExpectations(t)
 
 	objectStore.On("Init", r.config).Return(errors.Errorf("init error")).Once()
-	err = r.reinitialize(objectStore)
+	err = r.Reinitialize(objectStore)
 	assert.EqualError(t, err, "init error")
 
 	objectStore.On("Init", r.config).Return(nil)
-	err = r.reinitialize(objectStore)
+	err = r.Reinitialize(objectStore)
 	assert.NoError(t, err)
 }
 
@@ -116,9 +117,9 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -128,11 +129,11 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(objectStore, nil)
+	p.On("GetByKindAndName", key).Return(objectStore, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -146,24 +147,24 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 
 	// getObjectStore error
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
 	}
-	p.On("getByKindAndName", key).Return(nil, errors.Errorf("getByKindAndName error")).Once()
+	p.On("GetByKindAndName", key).Return(nil, errors.Errorf("GetByKindAndName error")).Once()
 
 	config := map[string]string{
 		"color": "blue",
 	}
 	err := r.Init(config)
-	assert.EqualError(t, err, "getByKindAndName error")
+	assert.EqualError(t, err, "GetByKindAndName error")
 
 	// Delegate returns error
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(objectStore, nil)
+	p.On("GetByKindAndName", key).Return(objectStore, nil)
 	objectStore.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
@@ -187,7 +188,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 	runRestartableDelegateTests(
 		t,
 		framework.PluginKindObjectStore,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableObjectStore{
 				key:                 key,
 				sharedPluginProcess: p,

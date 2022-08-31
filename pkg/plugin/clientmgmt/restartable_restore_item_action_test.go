@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/restore/mocks"
@@ -59,10 +60,10 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := kindAndName{kind: framework.PluginKindRestoreItemAction, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := newRestartableRestoreItemAction(name, p)
+			r := NewRestartableRestoreItemAction(name, p)
 			a, err := r.getRestoreItemAction()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
@@ -80,18 +81,18 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "pod"
-	r := newRestartableRestoreItemAction(name, p)
+	r := NewRestartableRestoreItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.ItemAction)
-	key := kindAndName{kind: framework.PluginKindRestoreItemAction, name: name}
-	p.On("getByKindAndName", key).Return(expected, nil)
+	key := process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name}
+	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -122,7 +123,7 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 	runRestartableDelegateTests(
 		t,
 		framework.PluginKindRestoreItemAction,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableRestoreItemAction{
 				key:                 key,
 				sharedPluginProcess: p,

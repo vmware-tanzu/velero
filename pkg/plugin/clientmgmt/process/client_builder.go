@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package clientmgmt contains the plugin client for Velero.
-package clientmgmt
+package process
 
 import (
 	"os"

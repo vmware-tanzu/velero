@@ -19,6 +19,7 @@ package clientmgmt
 import (
 	"github.com/pkg/errors"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -28,15 +29,15 @@ import (
 // call, the restartableDeleteItemAction asks its restartableProcess to restart itself if needed (e.g. if the
 // process terminated for any reason), then it proceeds with the actual call.
 type restartableDeleteItemAction struct {
-	key                 kindAndName
-	sharedPluginProcess RestartableProcess
+	key                 process.KindAndName
+	sharedPluginProcess process.RestartableProcess
 	config              map[string]string
 }
 
-// newRestartableDeleteItemAction returns a new restartableDeleteItemAction.
-func newRestartableDeleteItemAction(name string, sharedPluginProcess RestartableProcess) *restartableDeleteItemAction {
+// NewRestartableDeleteItemAction returns a new restartableDeleteItemAction.
+func NewRestartableDeleteItemAction(name string, sharedPluginProcess process.RestartableProcess) *restartableDeleteItemAction {
 	r := &restartableDeleteItemAction{
-		key:                 kindAndName{kind: framework.PluginKindDeleteItemAction, name: name},
+		key:                 process.KindAndName{Kind: framework.PluginKindDeleteItemAction, Name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r
@@ -45,7 +46,7 @@ func newRestartableDeleteItemAction(name string, sharedPluginProcess Restartable
 // getDeleteItemAction returns the delete item action for this restartableDeleteItemAction. It does *not* restart the
 // plugin process.
 func (r *restartableDeleteItemAction) getDeleteItemAction() (velero.DeleteItemAction, error) {
-	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
+	plugin, err := r.sharedPluginProcess.GetByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +61,7 @@ func (r *restartableDeleteItemAction) getDeleteItemAction() (velero.DeleteItemAc
 
 // getDelegate restarts the plugin process (if needed) and returns the delete item action for this restartableDeleteItemAction.
 func (r *restartableDeleteItemAction) getDelegate() (velero.DeleteItemAction, error) {
-	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
+	if err := r.sharedPluginProcess.ResetIfNeeded(); err != nil {
 		return nil, err
 	}
 

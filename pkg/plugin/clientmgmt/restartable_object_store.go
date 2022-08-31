@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -31,29 +32,29 @@ import (
 // call, the restartableObjectStore asks its restartableProcess to restart itself if needed (e.g. if the
 // process terminated for any reason), then it proceeds with the actual call.
 type restartableObjectStore struct {
-	key                 kindAndName
-	sharedPluginProcess RestartableProcess
+	key                 process.KindAndName
+	sharedPluginProcess process.RestartableProcess
 	// config contains the data used to initialize the plugin. It is used to reinitialize the plugin in the event its
 	// sharedPluginProcess gets restarted.
 	config map[string]string
 }
 
-// newRestartableObjectStore returns a new restartableObjectStore.
-func newRestartableObjectStore(name string, sharedPluginProcess RestartableProcess) *restartableObjectStore {
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+// NewRestartableObjectStore returns a new restartableObjectStore.
+func NewRestartableObjectStore(name string, sharedPluginProcess process.RestartableProcess) *restartableObjectStore {
+	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,
 	}
 
 	// Register our reinitializer so we can reinitialize after a restart with r.config.
-	sharedPluginProcess.addReinitializer(key, r)
+	sharedPluginProcess.AddReinitializer(key, r)
 
 	return r
 }
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
-func (r *restartableObjectStore) reinitialize(dispensed interface{}) error {
+func (r *restartableObjectStore) Reinitialize(dispensed interface{}) error {
 	objectStore, ok := dispensed.(velero.ObjectStore)
 	if !ok {
 		return errors.Errorf("%T is not a ObjectStore!", dispensed)
@@ -65,7 +66,7 @@ func (r *restartableObjectStore) reinitialize(dispensed interface{}) error {
 // getObjectStore returns the object store for this restartableObjectStore. It does *not* restart the
 // plugin process.
 func (r *restartableObjectStore) getObjectStore() (velero.ObjectStore, error) {
-	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
+	plugin, err := r.sharedPluginProcess.GetByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (r *restartableObjectStore) getObjectStore() (velero.ObjectStore, error) {
 
 // getDelegate restarts the plugin process (if needed) and returns the object store for this restartableObjectStore.
 func (r *restartableObjectStore) getDelegate() (velero.ObjectStore, error) {
-	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
+	if err := r.sharedPluginProcess.ResetIfNeeded(); err != nil {
 		return nil, err
 	}
 

@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
@@ -72,11 +74,11 @@ type mockRestartableProcessFactory struct {
 	mock.Mock
 }
 
-func (f *mockRestartableProcessFactory) newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
+func (f *mockRestartableProcessFactory) NewRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (process.RestartableProcess, error) {
 	args := f.Called(command, logger, logLevel)
-	var rp RestartableProcess
+	var rp process.RestartableProcess
 	if args.Get(0) != nil {
-		rp = args.Get(0).(RestartableProcess)
+		rp = args.Get(0).(process.RestartableProcess)
 	}
 	return rp, args.Error(1)
 }
@@ -85,26 +87,26 @@ type mockRestartableProcess struct {
 	mock.Mock
 }
 
-func (rp *mockRestartableProcess) addReinitializer(key kindAndName, r reinitializer) {
+func (rp *mockRestartableProcess) AddReinitializer(key process.KindAndName, r process.Reinitializer) {
 	rp.Called(key, r)
 }
 
-func (rp *mockRestartableProcess) reset() error {
+func (rp *mockRestartableProcess) Reset() error {
 	args := rp.Called()
 	return args.Error(0)
 }
 
-func (rp *mockRestartableProcess) resetIfNeeded() error {
+func (rp *mockRestartableProcess) ResetIfNeeded() error {
 	args := rp.Called()
 	return args.Error(0)
 }
 
-func (rp *mockRestartableProcess) getByKindAndName(key kindAndName) (interface{}, error) {
+func (rp *mockRestartableProcess) GetByKindAndName(key process.KindAndName) (interface{}, error) {
 	args := rp.Called(key)
 	return args.Get(0), args.Error(1)
 }
 
-func (rp *mockRestartableProcess) stop() {
+func (rp *mockRestartableProcess) Stop() {
 	rp.Called()
 }
 
@@ -135,7 +137,7 @@ func TestGetRestartableProcess(t *testing.T) {
 		Name:    pluginName,
 	}
 	registry.On("Get", pluginKind, pluginName).Return(podID, nil)
-	factory.On("newRestartableProcess", podID.Command, logger, logLevel).Return(nil, errors.Errorf("factory")).Once()
+	factory.On("NewRestartableProcess", podID.Command, logger, logLevel).Return(nil, errors.Errorf("factory")).Once()
 	rp, err = m.getRestartableProcess(pluginKind, pluginName)
 	assert.Nil(t, rp)
 	assert.EqualError(t, err, "factory")
@@ -143,7 +145,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	// Test 3: registry ok, factory ok
 	restartableProcess := &mockRestartableProcess{}
 	defer restartableProcess.AssertExpectations(t)
-	factory.On("newRestartableProcess", podID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+	factory.On("NewRestartableProcess", podID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
 	rp, err = m.getRestartableProcess(pluginKind, pluginName)
 	require.NoError(t, err)
 	assert.Equal(t, restartableProcess, rp)
@@ -166,7 +168,7 @@ func TestCleanupClients(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		rp := &mockRestartableProcess{}
 		defer rp.AssertExpectations(t)
-		rp.On("stop")
+		rp.On("Stop")
 		m.restartableProcesses[fmt.Sprintf("rp%d", i)] = rp
 	}
 
@@ -180,9 +182,9 @@ func TestGetObjectStore(t *testing.T) {
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetObjectStore(name)
 		},
-		func(name string, sharedPluginProcess RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableObjectStore{
-				key:                 kindAndName{kind: framework.PluginKindObjectStore, name: name},
+				key:                 process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -197,9 +199,9 @@ func TestGetVolumeSnapshotter(t *testing.T) {
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetVolumeSnapshotter(name)
 		},
-		func(name string, sharedPluginProcess RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableVolumeSnapshotter{
-				key:                 kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name},
+				key:                 process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -214,10 +216,10 @@ func TestGetBackupItemAction(t *testing.T) {
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetBackupItemAction(name)
 		},
-		func(name string, sharedPluginProcess RestartableProcess) interface{} {
-			return &restartableBackupItemAction{
-				key:                 kindAndName{kind: framework.PluginKindBackupItemAction, name: name},
-				sharedPluginProcess: sharedPluginProcess,
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &biav1cli.RestartableBackupItemAction{
+				Key:                 process.KindAndName{Kind: framework.PluginKindBackupItemAction, Name: name},
+				SharedPluginProcess: sharedPluginProcess,
 			}
 		},
 		false,
@@ -231,9 +233,9 @@ func TestGetRestoreItemAction(t *testing.T) {
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetRestoreItemAction(name)
 		},
-		func(name string, sharedPluginProcess RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableRestoreItemAction{
-				key:                 kindAndName{kind: framework.PluginKindRestoreItemAction, name: name},
+				key:                 process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -246,7 +248,7 @@ func getPluginTest(
 	kind framework.PluginKind,
 	name string,
 	getPluginFunc func(m Manager, name string) (interface{}, error),
-	expectedResultFunc func(name string, sharedPluginProcess RestartableProcess) interface{},
+	expectedResultFunc func(name string, sharedPluginProcess process.RestartableProcess) interface{},
 	reinitializable bool,
 ) {
 	logger := test.NewLogger()
@@ -273,18 +275,18 @@ func getPluginTest(
 	defer restartableProcess.AssertExpectations(t)
 
 	// Test 1: error getting restartable process
-	factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("newRestartableProcess")).Once()
+	factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
 	actual, err := getPluginFunc(m, pluginName)
 	assert.Nil(t, actual)
-	assert.EqualError(t, err, "newRestartableProcess")
+	assert.EqualError(t, err, "NewRestartableProcess")
 
 	// Test 2: happy path
-	factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+	factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
 
 	expected := expectedResultFunc(name, restartableProcess)
 	if reinitializable {
-		key := kindAndName{kind: pluginID.Kind, name: pluginID.Name}
-		restartableProcess.On("addReinitializer", key, expected)
+		key := process.KindAndName{Kind: pluginID.Kind, Name: pluginID.Name}
+		restartableProcess.On("AddReinitializer", key, expected)
 	}
 
 	actual, err = getPluginFunc(m, pluginName)
@@ -306,8 +308,8 @@ func TestGetBackupItemActions(t *testing.T) {
 		{
 			name:                       "Error getting restartable process",
 			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
-			newRestartableProcessError: errors.Errorf("newRestartableProcess"),
-			expectedError:              "newRestartableProcess",
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
 		},
 		{
 			name:  "Happy path",
@@ -349,20 +351,20 @@ func TestGetBackupItemActions(t *testing.T) {
 				restartableProcess := &mockRestartableProcess{}
 				defer restartableProcess.AssertExpectations(t)
 
-				expected := &restartableBackupItemAction{
-					key:                 kindAndName{kind: pluginKind, name: pluginName},
-					sharedPluginProcess: restartableProcess,
+				expected := &biav1cli.RestartableBackupItemAction{
+					Key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					SharedPluginProcess: restartableProcess,
 				}
 
 				if tc.newRestartableProcessError != nil {
 					// Test 1: error getting restartable process
-					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("newRestartableProcess")).Once()
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
 					break
 				}
 
 				// Test 2: happy path
 				if i == 0 {
-					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
 				}
 
 				expectedActions = append(expectedActions, expected)
@@ -371,7 +373,7 @@ func TestGetBackupItemActions(t *testing.T) {
 			backupItemActions, err := m.GetBackupItemActions()
 			if tc.newRestartableProcessError != nil {
 				assert.Nil(t, backupItemActions)
-				assert.EqualError(t, err, "newRestartableProcess")
+				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
 				var actual []interface{}
@@ -398,8 +400,8 @@ func TestGetRestoreItemActions(t *testing.T) {
 		{
 			name:                       "Error getting restartable process",
 			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
-			newRestartableProcessError: errors.Errorf("newRestartableProcess"),
-			expectedError:              "newRestartableProcess",
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
 		},
 		{
 			name:  "Happy path",
@@ -442,19 +444,19 @@ func TestGetRestoreItemActions(t *testing.T) {
 				defer restartableProcess.AssertExpectations(t)
 
 				expected := &restartableRestoreItemAction{
-					key:                 kindAndName{kind: pluginKind, name: pluginName},
+					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
 					sharedPluginProcess: restartableProcess,
 				}
 
 				if tc.newRestartableProcessError != nil {
 					// Test 1: error getting restartable process
-					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("newRestartableProcess")).Once()
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
 					break
 				}
 
 				// Test 2: happy path
 				if i == 0 {
-					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
 				}
 
 				expectedActions = append(expectedActions, expected)
@@ -463,7 +465,7 @@ func TestGetRestoreItemActions(t *testing.T) {
 			restoreItemActions, err := m.GetRestoreItemActions()
 			if tc.newRestartableProcessError != nil {
 				assert.Nil(t, restoreItemActions)
-				assert.EqualError(t, err, "newRestartableProcess")
+				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
 				var actual []interface{}
@@ -483,9 +485,9 @@ func TestGetDeleteItemAction(t *testing.T) {
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetDeleteItemAction(name)
 		},
-		func(name string, sharedPluginProcess RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableDeleteItemAction{
-				key:                 kindAndName{kind: framework.PluginKindDeleteItemAction, name: name},
+				key:                 process.KindAndName{Kind: framework.PluginKindDeleteItemAction, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -541,19 +543,19 @@ func TestGetDeleteItemActions(t *testing.T) {
 				defer restartableProcess.AssertExpectations(t)
 
 				expected := &restartableRestoreItemAction{
-					key:                 kindAndName{kind: pluginKind, name: pluginName},
+					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
 					sharedPluginProcess: restartableProcess,
 				}
 
 				if tc.newRestartableProcessError != nil {
 					// Test 1: error getting restartable process
-					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("newRestartableProcess")).Once()
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
 					break
 				}
 
 				// Test 2: happy path
 				if i == 0 {
-					factory.On("newRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
 				}
 
 				expectedActions = append(expectedActions, expected)
@@ -562,7 +564,7 @@ func TestGetDeleteItemActions(t *testing.T) {
 			deleteItemActions, err := m.GetDeleteItemActions()
 			if tc.newRestartableProcessError != nil {
 				assert.Nil(t, deleteItemActions)
-				assert.EqualError(t, err, "newRestartableProcess")
+				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
 				var actual []interface{}

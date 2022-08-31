@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,8 +30,10 @@ import (
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1/mocks"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
 
 func TestRestartableGetItemSnapshotter(t *testing.T) {
@@ -65,10 +65,10 @@ func TestRestartableGetItemSnapshotter(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pvc"
-			key := kindAndName{kind: framework.PluginKindItemSnapshotter, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: framework.PluginKindItemSnapshotter, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := newRestartableItemSnapshotter(name, p)
+			r := NewRestartableItemSnapshotter(name, p)
 			a, err := r.getItemSnapshotter()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
@@ -86,18 +86,18 @@ func TestRestartableItemSnapshotterGetDelegate(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "pvc"
-	r := newRestartableItemSnapshotter(name, p)
+	r := NewRestartableItemSnapshotter(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.ItemSnapshotter)
-	key := kindAndName{kind: framework.PluginKindItemSnapshotter, name: name}
-	p.On("getByKindAndName", key).Return(expected, nil)
+	key := process.KindAndName{Kind: framework.PluginKindItemSnapshotter, Name: name}
+	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -178,7 +178,7 @@ func TestRestartableItemSnasphotterDelegatedFunctions(t *testing.T) {
 	runRestartableDelegateTests(
 		t,
 		framework.PluginKindItemSnapshotter,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableItemSnapshotter{
 				key:                 key,
 				sharedPluginProcess: p,
