@@ -320,7 +320,9 @@ func (ib *itemBackupper) executeActions(
 		}
 		log.Info("Executing custom action")
 
-		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backupRequest.Backup)
+		// Note: we're ignoring the operationID returned from Execute for now, it will be used
+		// with the async plugin action implementation
+		updatedItem, additionalItemIdentifiers, _, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
