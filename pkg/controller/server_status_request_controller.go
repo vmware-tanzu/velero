@@ -109,7 +109,7 @@ func (r *serverStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 
 		if err := r.client.Patch(r.ctx, statusRequest, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Error updating ServerStatusRequest status")
-			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+			return ctrl.Result{}, err
 		}
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
