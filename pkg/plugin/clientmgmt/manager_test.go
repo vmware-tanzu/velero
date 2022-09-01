@@ -28,6 +28,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
+	biav2cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
 	vsv1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/volumesnapshotter/v1"
@@ -203,6 +204,23 @@ func TestGetBackupItemAction(t *testing.T) {
 	)
 }
 
+func TestGetBackupItemActionV2(t *testing.T) {
+	getPluginTest(t,
+		common.PluginKindBackupItemActionV2,
+		"velero.io/pod",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetBackupItemActionV2(name)
+		},
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &biav2cli.RestartableBackupItemAction{
+				Key:                 process.KindAndName{Kind: common.PluginKindBackupItemActionV2, Name: name},
+				SharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
 func TestGetRestoreItemAction(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindRestoreItemAction,
@@ -348,6 +366,98 @@ func TestGetBackupItemActions(t *testing.T) {
 			}
 
 			backupItemActions, err := m.GetBackupItemActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, backupItemActions)
+				assert.EqualError(t, err, "NewRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range backupItemActions {
+					actual = append(actual, backupItemActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
+func TestGetBackupItemActionsV2(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+		{
+			name:                       "Error getting restartable process",
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
+		},
+		{
+			name:  "Happy path",
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := common.PluginKindBackupItemActionV2
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &restartabletest.MockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &biav2cli.RestartableBackupItemAction{
+					Key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					SharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			backupItemActions, err := m.GetBackupItemActionsV2()
 			if tc.newRestartableProcessError != nil {
 				assert.Nil(t, backupItemActions)
 				assert.EqualError(t, err, "NewRestartableProcess")

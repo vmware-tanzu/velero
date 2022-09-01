@@ -48,6 +48,10 @@ RUN apt-get update && apt-get install -y unzip
 RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip && \
     unzip protoc-3.14.0-linux-x86_64.zip && \
     mv bin/protoc /usr/bin/protoc && \
+    mv include/google /usr/include && \
+    chmod a+x  /usr/include/google && \
+    chmod a+x  /usr/include/google/protobuf && \
+    chmod a+r -R /usr/include/google && \
     chmod +x /usr/bin/protoc
 RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.3
 
