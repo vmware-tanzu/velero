@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
@@ -61,7 +61,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
+			key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableObjectStore{
@@ -86,7 +86,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -119,7 +119,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	// Reset error
 	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -147,7 +147,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 
 	// getObjectStore error
 	name := "aws"
-	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -187,7 +187,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindObjectStore,
+		common.PluginKindObjectStore,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableObjectStore{
 				key:                 key,

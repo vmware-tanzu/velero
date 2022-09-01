@@ -26,7 +26,7 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
@@ -60,7 +60,7 @@ func TestRestartableGetDeleteItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := process.KindAndName{Kind: framework.PluginKindDeleteItemAction, Name: name}
+			key := process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := NewRestartableDeleteItemAction(name, p)
@@ -92,7 +92,7 @@ func TestRestartableDeleteItemActionGetDelegate(t *testing.T) {
 	// Currently broken since this mocks out the restore item action interface
 	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.DeleteItemAction)
-	key := process.KindAndName{Kind: framework.PluginKindDeleteItemAction, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name}
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -116,7 +116,7 @@ func TestRestartableDeleteItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindDeleteItemAction,
+		common.PluginKindDeleteItemAction,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableDeleteItemAction{
 				key:                 key,

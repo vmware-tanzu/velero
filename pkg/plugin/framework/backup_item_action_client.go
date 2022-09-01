@@ -27,39 +27,40 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // NewBackupItemActionPlugin constructs a BackupItemActionPlugin.
-func NewBackupItemActionPlugin(options ...PluginOption) *BackupItemActionPlugin {
+func NewBackupItemActionPlugin(options ...common.PluginOption) *BackupItemActionPlugin {
 	return &BackupItemActionPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: common.NewPluginBase(options...),
 	}
 }
 
 // BackupItemActionGRPCClient implements the backup/ItemAction interface and uses a
 // gRPC client to make calls to the plugin server.
 type BackupItemActionGRPCClient struct {
-	*clientBase
+	*common.ClientBase
 	grpcClient protobiav1.BackupItemActionClient
 }
 
-func newBackupItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+func newBackupItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
 	return &BackupItemActionGRPCClient{
-		clientBase: base,
+		ClientBase: base,
 		grpcClient: protobiav1.NewBackupItemActionClient(clientConn),
 	}
 }
 
 func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
 	req := &protobiav1.BackupItemActionAppliesToRequest{
-		Plugin: c.plugin,
+		Plugin: c.Plugin,
 	}
 
 	res, err := c.grpcClient.AppliesTo(context.Background(), req)
 	if err != nil {
-		return velero.ResourceSelector{}, fromGRPCError(err)
+		return velero.ResourceSelector{}, common.FromGRPCError(err)
 	}
 
 	if res.ResourceSelector == nil {
@@ -87,14 +88,14 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 	}
 
 	req := &protobiav1.ExecuteRequest{
-		Plugin: c.plugin,
+		Plugin: c.Plugin,
 		Item:   itemJSON,
 		Backup: backupJSON,
 	}
 
 	res, err := c.grpcClient.Execute(context.Background(), req)
 	if err != nil {
-		return nil, nil, fromGRPCError(err)
+		return nil, nil, common.FromGRPCError(err)
 	}
 
 	var updatedItem unstructured.Unstructured

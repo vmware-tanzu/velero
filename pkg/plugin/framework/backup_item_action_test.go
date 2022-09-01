@@ -29,10 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/backup/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	mocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/backupitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -147,16 +148,16 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			itemAction := &mocks.ItemAction{}
+			itemAction := &mocks.BackupItemAction{}
 			defer itemAction.AssertExpectations(t)
 
 			if !test.skipMock {
 				itemAction.On("Execute", &validItemObject, &validBackupObject).Return(test.implUpdatedItem, test.implAdditionalItems, test.implError)
 			}
 
-			s := &BackupItemActionGRPCServer{mux: &serverMux{
-				serverLog: velerotest.NewLogger(),
-				handlers: map[string]interface{}{
+			s := &BackupItemActionGRPCServer{mux: &common.ServerMux{
+				ServerLog: velerotest.NewLogger(),
+				Handlers: map[string]interface{}{
 					"xyz": itemAction,
 				},
 			}}

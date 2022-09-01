@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 // clientBuilder builds go-plugin Clients.
@@ -67,13 +68,13 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 		HandshakeConfig:  framework.Handshake(),
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
-			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(b.clientLogger)),
-			string(framework.PluginKindVolumeSnapshotter): framework.NewVolumeSnapshotterPlugin(framework.ClientLogger(b.clientLogger)),
-			string(framework.PluginKindObjectStore):       framework.NewObjectStorePlugin(framework.ClientLogger(b.clientLogger)),
-			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
-			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(b.clientLogger)),
-			string(framework.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(framework.ClientLogger(b.clientLogger)),
-			string(framework.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(framework.ClientLogger(b.clientLogger)),
+			string(common.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindVolumeSnapshotter): framework.NewVolumeSnapshotterPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindObjectStore):       framework.NewObjectStorePlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindPluginLister):      &framework.PluginListerPlugin{},
+			string(common.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...),

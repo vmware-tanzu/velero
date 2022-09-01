@@ -29,6 +29,7 @@ import (
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -41,12 +42,12 @@ func (r *mockRegistry) DiscoverPlugins() error {
 	return args.Error(0)
 }
 
-func (r *mockRegistry) List(kind framework.PluginKind) []framework.PluginIdentifier {
+func (r *mockRegistry) List(kind common.PluginKind) []framework.PluginIdentifier {
 	args := r.Called(kind)
 	return args.Get(0).([]framework.PluginIdentifier)
 }
 
-func (r *mockRegistry) Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error) {
+func (r *mockRegistry) Get(kind common.PluginKind, name string) (framework.PluginIdentifier, error) {
 	args := r.Called(kind, name)
 	var id framework.PluginIdentifier
 	if args.Get(0) != nil {
@@ -123,7 +124,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	m.restartableProcessFactory = factory
 
 	// Test 1: registry error
-	pluginKind := framework.PluginKindBackupItemAction
+	pluginKind := common.PluginKindBackupItemAction
 	pluginName := "pod"
 	registry.On("Get", pluginKind, pluginName).Return(nil, errors.Errorf("registry")).Once()
 	rp, err := m.getRestartableProcess(pluginKind, pluginName)
@@ -177,14 +178,14 @@ func TestCleanupClients(t *testing.T) {
 
 func TestGetObjectStore(t *testing.T) {
 	getPluginTest(t,
-		framework.PluginKindObjectStore,
+		common.PluginKindObjectStore,
 		"velero.io/aws",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetObjectStore(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableObjectStore{
-				key:                 process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name},
+				key:                 process.KindAndName{Kind: common.PluginKindObjectStore, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -194,14 +195,14 @@ func TestGetObjectStore(t *testing.T) {
 
 func TestGetVolumeSnapshotter(t *testing.T) {
 	getPluginTest(t,
-		framework.PluginKindVolumeSnapshotter,
+		common.PluginKindVolumeSnapshotter,
 		"velero.io/aws",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetVolumeSnapshotter(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableVolumeSnapshotter{
-				key:                 process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name},
+				key:                 process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -211,14 +212,14 @@ func TestGetVolumeSnapshotter(t *testing.T) {
 
 func TestGetBackupItemAction(t *testing.T) {
 	getPluginTest(t,
-		framework.PluginKindBackupItemAction,
+		common.PluginKindBackupItemAction,
 		"velero.io/pod",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetBackupItemAction(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &biav1cli.RestartableBackupItemAction{
-				Key:                 process.KindAndName{Kind: framework.PluginKindBackupItemAction, Name: name},
+				Key:                 process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -228,14 +229,14 @@ func TestGetBackupItemAction(t *testing.T) {
 
 func TestGetRestoreItemAction(t *testing.T) {
 	getPluginTest(t,
-		framework.PluginKindRestoreItemAction,
+		common.PluginKindRestoreItemAction,
 		"velero.io/pod",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetRestoreItemAction(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableRestoreItemAction{
-				key:                 process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name},
+				key:                 process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -245,7 +246,7 @@ func TestGetRestoreItemAction(t *testing.T) {
 
 func getPluginTest(
 	t *testing.T,
-	kind framework.PluginKind,
+	kind common.PluginKind,
 	name string,
 	getPluginFunc func(m Manager, name string) (interface{}, error),
 	expectedResultFunc func(name string, sharedPluginProcess process.RestartableProcess) interface{},
@@ -329,7 +330,7 @@ func TestGetBackupItemActions(t *testing.T) {
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory
 
-			pluginKind := framework.PluginKindBackupItemAction
+			pluginKind := common.PluginKindBackupItemAction
 			var pluginIDs []framework.PluginIdentifier
 			for i := range tc.names {
 				pluginID := framework.PluginIdentifier{
@@ -421,7 +422,7 @@ func TestGetRestoreItemActions(t *testing.T) {
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory
 
-			pluginKind := framework.PluginKindRestoreItemAction
+			pluginKind := common.PluginKindRestoreItemAction
 			var pluginIDs []framework.PluginIdentifier
 			for i := range tc.names {
 				pluginID := framework.PluginIdentifier{
@@ -480,14 +481,14 @@ func TestGetRestoreItemActions(t *testing.T) {
 
 func TestGetDeleteItemAction(t *testing.T) {
 	getPluginTest(t,
-		framework.PluginKindDeleteItemAction,
+		common.PluginKindDeleteItemAction,
 		"velero.io/deleter",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetDeleteItemAction(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &restartableDeleteItemAction{
-				key:                 process.KindAndName{Kind: framework.PluginKindDeleteItemAction, Name: name},
+				key:                 process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -520,7 +521,7 @@ func TestGetDeleteItemActions(t *testing.T) {
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory
 
-			pluginKind := framework.PluginKindDeleteItemAction
+			pluginKind := common.PluginKindDeleteItemAction
 			var pluginIDs []framework.PluginIdentifier
 			for i := range tc.names {
 				pluginID := framework.PluginIdentifier{

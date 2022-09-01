@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type ProcessFactory interface {
@@ -132,7 +132,7 @@ func (r *process) dispense(key KindAndName) (interface{}, error) {
 	}
 
 	// Currently all plugins except for PluginLister dispense clientDispenser instances.
-	if clientDispenser, ok := dispensed.(framework.ClientDispenser); ok {
+	if clientDispenser, ok := dispensed.(common.ClientDispenser); ok {
 		if key.Name == "" {
 			return nil, errors.Errorf("%s plugin requested but name is missing", key.Kind.String())
 		}

@@ -14,35 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package common
 
 import (
 	"github.com/sirupsen/logrus"
 )
 
-type pluginBase struct {
-	clientLogger logrus.FieldLogger
-	*serverMux
+type PluginBase struct {
+	ClientLogger logrus.FieldLogger
+	*ServerMux
 }
 
-func newPluginBase(options ...PluginOption) *pluginBase {
-	base := new(pluginBase)
+func NewPluginBase(options ...PluginOption) *PluginBase {
+	base := new(PluginBase)
 	for _, option := range options {
 		option(base)
 	}
 	return base
 }
 
-type PluginOption func(base *pluginBase)
+type PluginOption func(base *PluginBase)
 
 func ClientLogger(logger logrus.FieldLogger) PluginOption {
-	return func(base *pluginBase) {
-		base.clientLogger = logger
+	return func(base *PluginBase) {
+		base.ClientLogger = logger
 	}
 }
 
-func serverLogger(logger logrus.FieldLogger) PluginOption {
-	return func(base *pluginBase) {
-		base.serverMux = newServerMux(logger)
+func ServerLogger(logger logrus.FieldLogger) PluginOption {
+	return func(base *PluginBase) {
+		base.ServerMux = NewServerMux(logger)
 	}
 }

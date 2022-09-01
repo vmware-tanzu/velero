@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/backup/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	mocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/backupitemaction/v1"
 )
 
 func TestRestartableGetBackupItemAction(t *testing.T) {
@@ -51,7 +51,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 		},
 		{
 			name:   "happy path",
-			plugin: new(mocks.ItemAction),
+			plugin: new(mocks.BackupItemAction),
 		},
 	}
 
@@ -61,7 +61,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := process.KindAndName{Kind: framework.PluginKindBackupItemAction, Name: name}
+			key := process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := NewRestartableBackupItemAction(name, p)
@@ -91,8 +91,8 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
-	expected := new(mocks.ItemAction)
-	key := process.KindAndName{Kind: framework.PluginKindBackupItemAction, Name: name}
+	expected := new(mocks.BackupItemAction)
+	key := process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name}
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -123,7 +123,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindBackupItemAction,
+		common.PluginKindBackupItemAction,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &RestartableBackupItemAction{
 				Key:                 key,
@@ -131,7 +131,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 			}
 		},
 		func() mockable {
-			return new(mocks.ItemAction)
+			return new(mocks.BackupItemAction)
 		},
 		restartableDelegateTest{
 			function:                "AppliesTo",

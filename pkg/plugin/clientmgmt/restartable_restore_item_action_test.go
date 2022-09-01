@@ -26,7 +26,7 @@ import (
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/restore/mocks"
 )
@@ -60,7 +60,7 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name}
+			key := process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := NewRestartableRestoreItemAction(name, p)
@@ -91,7 +91,7 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.ItemAction)
-	key := process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name}
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -122,7 +122,7 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindRestoreItemAction,
+		common.PluginKindRestoreItemAction,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableRestoreItemAction{
 				key:                 key,

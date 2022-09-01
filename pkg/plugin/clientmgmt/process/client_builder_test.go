@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -60,13 +61,13 @@ func TestClientConfig(t *testing.T) {
 		HandshakeConfig:  framework.Handshake(),
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
-			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(logger)),
-			string(framework.PluginKindVolumeSnapshotter): framework.NewVolumeSnapshotterPlugin(framework.ClientLogger(logger)),
-			string(framework.PluginKindObjectStore):       framework.NewObjectStorePlugin(framework.ClientLogger(logger)),
-			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
-			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(logger)),
-			string(framework.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(framework.ClientLogger(logger)),
-			string(framework.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(framework.ClientLogger(logger)),
+			string(common.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(common.ClientLogger(logger)),
+			string(common.PluginKindVolumeSnapshotter): framework.NewVolumeSnapshotterPlugin(common.ClientLogger(logger)),
+			string(common.PluginKindObjectStore):       framework.NewObjectStorePlugin(common.ClientLogger(logger)),
+			string(common.PluginKindPluginLister):      &framework.PluginListerPlugin{},
+			string(common.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(common.ClientLogger(logger)),
+			string(common.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(common.ClientLogger(logger)),
+			string(common.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(common.ClientLogger(logger)),
 		},
 		Logger: cb.pluginLogger,
 		Cmd:    exec.Command(cb.commandName, cb.commandArgs...),

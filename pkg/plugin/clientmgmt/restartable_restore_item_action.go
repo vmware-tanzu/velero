@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -37,7 +37,7 @@ type restartableRestoreItemAction struct {
 // NewRestartableRestoreItemAction returns a new RestartableRestoreItemAction.
 func NewRestartableRestoreItemAction(name string, sharedPluginProcess process.RestartableProcess) *restartableRestoreItemAction {
 	r := &restartableRestoreItemAction{
-		key:                 process.KindAndName{Kind: framework.PluginKindRestoreItemAction, Name: name},
+		key:                 process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r

@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -37,7 +37,7 @@ type restartableDeleteItemAction struct {
 // NewRestartableDeleteItemAction returns a new restartableDeleteItemAction.
 func NewRestartableDeleteItemAction(name string, sharedPluginProcess process.RestartableProcess) *restartableDeleteItemAction {
 	r := &restartableDeleteItemAction{
-		key:                 process.KindAndName{Kind: framework.PluginKindDeleteItemAction, Name: name},
+		key:                 process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r

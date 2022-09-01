@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
@@ -35,7 +35,7 @@ type restartableItemSnapshotter struct {
 // NewRestartableItemSnapshotter returns a new restartableItemSnapshotter.
 func NewRestartableItemSnapshotter(name string, sharedPluginProcess process.RestartableProcess) *restartableItemSnapshotter {
 	r := &restartableItemSnapshotter{
-		key:                 process.KindAndName{Kind: framework.PluginKindItemSnapshotter, Name: name},
+		key:                 process.KindAndName{Kind: common.PluginKindItemSnapshotter, Name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r

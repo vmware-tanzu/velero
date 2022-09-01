@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type mockRestartableProcess struct {
@@ -70,7 +70,7 @@ type mockable interface {
 
 func runRestartableDelegateTests(
 	t *testing.T,
-	kind framework.PluginKind,
+	kind common.PluginKind,
 	newRestartable func(key process.KindAndName, p process.RestartableProcess) interface{},
 	newMock func() mockable,
 	tests ...restartableDelegateTest,

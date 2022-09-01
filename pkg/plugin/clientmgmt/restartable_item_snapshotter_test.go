@@ -31,7 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1/mocks"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
@@ -65,7 +65,7 @@ func TestRestartableGetItemSnapshotter(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pvc"
-			key := process.KindAndName{Kind: framework.PluginKindItemSnapshotter, Name: name}
+			key := process.KindAndName{Kind: common.PluginKindItemSnapshotter, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := NewRestartableItemSnapshotter(name, p)
@@ -96,7 +96,7 @@ func TestRestartableItemSnapshotterGetDelegate(t *testing.T) {
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.ItemSnapshotter)
-	key := process.KindAndName{Kind: framework.PluginKindItemSnapshotter, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindItemSnapshotter, Name: name}
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -177,7 +177,7 @@ func TestRestartableItemSnasphotterDelegatedFunctions(t *testing.T) {
 	}
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindItemSnapshotter,
+		common.PluginKindItemSnapshotter,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableItemSnapshotter{
 				key:                 key,

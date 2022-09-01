@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
@@ -60,7 +60,7 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name}
+			key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableVolumeSnapshotter{
@@ -85,7 +85,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -118,7 +118,7 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 	// Reset error
 	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -146,7 +146,7 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 
 	// getVolumeSnapshottererror
 	name := "aws"
-	key := process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -198,7 +198,7 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindVolumeSnapshotter,
+		common.PluginKindVolumeSnapshotter,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableVolumeSnapshotter{
 				key:                 key,

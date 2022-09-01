@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package common
 
 import (
 	"strings"
@@ -29,42 +29,42 @@ import (
 // (ObjectStore, VolumeSnapshotter, BackupItemAction, RestoreItemAction).
 type HandlerInitializer func(logger logrus.FieldLogger) (interface{}, error)
 
-// serverMux manages multiple implementations of a single plugin kind, such as pod and pvc BackupItemActions.
-type serverMux struct {
+// ServerMux manages multiple implementations of a single plugin kind, such as pod and pvc BackupItemActions.
+type ServerMux struct {
 	kind         PluginKind
 	initializers map[string]HandlerInitializer
-	handlers     map[string]interface{}
-	serverLog    logrus.FieldLogger
+	Handlers     map[string]interface{}
+	ServerLog    logrus.FieldLogger
 }
 
-// newServerMux returns a new serverMux.
-func newServerMux(logger logrus.FieldLogger) *serverMux {
-	return &serverMux{
+// NewServerMux returns a new ServerMux.
+func NewServerMux(logger logrus.FieldLogger) *ServerMux {
+	return &ServerMux{
 		initializers: make(map[string]HandlerInitializer),
-		handlers:     make(map[string]interface{}),
-		serverLog:    logger,
+		Handlers:     make(map[string]interface{}),
+		ServerLog:    logger,
 	}
 }
 
 // register validates the plugin name and registers the
 // initializer for the given name.
-func (m *serverMux) register(name string, f HandlerInitializer) {
-	if err := ValidatePluginName(name, m.names()); err != nil {
-		m.serverLog.Errorf("invalid plugin name %q: %s", name, err)
+func (m *ServerMux) Register(name string, f HandlerInitializer) {
+	if err := ValidatePluginName(name, m.Names()); err != nil {
+		m.ServerLog.Errorf("invalid plugin name %q: %s", name, err)
 		return
 	}
 	m.initializers[name] = f
 }
 
 // names returns a list of all registered implementations.
-func (m *serverMux) names() []string {
+func (m *ServerMux) Names() []string {
 	return sets.StringKeySet(m.initializers).List()
 }
 
-// getHandler returns the instance for a plugin with the given name. If an instance has already been initialized,
+// GetHandler returns the instance for a plugin with the given name. If an instance has already been initialized,
 // that is returned. Otherwise, the instance is initialized by calling its initialization function.
-func (m *serverMux) getHandler(name string) (interface{}, error) {
-	if instance, found := m.handlers[name]; found {
+func (m *ServerMux) GetHandler(name string) (interface{}, error) {
+	if instance, found := m.Handlers[name]; found {
 		return instance, nil
 	}
 
@@ -73,14 +73,14 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 		return nil, errors.Errorf("%v plugin: %s was not found or has an invalid name format", m.kind, name)
 	}
 
-	instance, err := initializer(m.serverLog)
+	instance, err := initializer(m.ServerLog)
 	if err != nil {
 		return nil, err
 	}
 
-	m.handlers[name] = instance
+	m.Handlers[name] = instance
 
-	return m.handlers[name], nil
+	return m.Handlers[name], nil
 }
 
 // ValidatePluginName checks if the given name:

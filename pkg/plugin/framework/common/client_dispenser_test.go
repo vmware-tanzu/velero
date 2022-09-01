@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package framework
+package common
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 )
 
 type fakeClient struct {
-	base       *clientBase
+	base       *ClientBase
 	clientConn *grpc.ClientConn
 }
 
@@ -36,11 +36,11 @@ func TestNewClientDispenser(t *testing.T) {
 	clientConn := new(grpc.ClientConn)
 
 	c := 3
-	initFunc := func(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	initFunc := func(base *ClientBase, clientConn *grpc.ClientConn) interface{} {
 		return c
 	}
 
-	cd := newClientDispenser(logger, clientConn, initFunc)
+	cd := NewClientDispenser(logger, clientConn, initFunc)
 	assert.Equal(t, clientConn, cd.clientConn)
 	assert.NotNil(t, cd.clients)
 	assert.Empty(t, cd.clients)
@@ -52,23 +52,23 @@ func TestClientFor(t *testing.T) {
 
 	c := new(fakeClient)
 	count := 0
-	initFunc := func(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	initFunc := func(base *ClientBase, clientConn *grpc.ClientConn) interface{} {
 		c.base = base
 		c.clientConn = clientConn
 		count++
 		return c
 	}
 
-	cd := newClientDispenser(logger, clientConn, initFunc)
+	cd := NewClientDispenser(logger, clientConn, initFunc)
 
 	actual := cd.ClientFor("pod")
 	require.IsType(t, &fakeClient{}, actual)
 	typed := actual.(*fakeClient)
 	assert.Equal(t, 1, count)
 	assert.Equal(t, &typed, &c)
-	expectedBase := &clientBase{
-		plugin: "pod",
-		logger: logger,
+	expectedBase := &ClientBase{
+		Plugin: "pod",
+		Logger: logger,
 	}
 	assert.Equal(t, expectedBase, typed.base)
 	assert.Equal(t, clientConn, typed.clientConn)

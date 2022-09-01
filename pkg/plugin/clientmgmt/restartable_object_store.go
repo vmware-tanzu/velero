@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -41,7 +41,7 @@ type restartableObjectStore struct {
 
 // NewRestartableObjectStore returns a new restartableObjectStore.
 func NewRestartableObjectStore(name string, sharedPluginProcess process.RestartableProcess) *restartableObjectStore {
-	key := process.KindAndName{Kind: framework.PluginKindObjectStore, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,

@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
@@ -33,14 +34,14 @@ type Registry interface {
 	// DiscoverPlugins discovers all available plugins.
 	DiscoverPlugins() error
 	// List returns all PluginIdentifiers for kind.
-	List(kind framework.PluginKind) []framework.PluginIdentifier
+	List(kind common.PluginKind) []framework.PluginIdentifier
 	// Get returns the PluginIdentifier for kind and name.
-	Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error)
+	Get(kind common.PluginKind, name string) (framework.PluginIdentifier, error)
 }
 
 // KindAndName is a convenience struct that combines a PluginKind and a name.
 type KindAndName struct {
-	Kind framework.PluginKind
+	Kind common.PluginKind
 	Name string
 }
 
@@ -54,7 +55,7 @@ type registry struct {
 	processFactory ProcessFactory
 	fs             filesystem.Interface
 	pluginsByID    map[KindAndName]framework.PluginIdentifier
-	pluginsByKind  map[framework.PluginKind][]framework.PluginIdentifier
+	pluginsByKind  map[common.PluginKind][]framework.PluginIdentifier
 }
 
 // NewRegistry returns a new registry.
@@ -67,7 +68,7 @@ func NewRegistry(dir string, logger logrus.FieldLogger, logLevel logrus.Level) R
 		processFactory: newProcessFactory(),
 		fs:             filesystem.NewFileSystem(),
 		pluginsByID:    make(map[KindAndName]framework.PluginIdentifier),
-		pluginsByKind:  make(map[framework.PluginKind][]framework.PluginIdentifier),
+		pluginsByKind:  make(map[common.PluginKind][]framework.PluginIdentifier),
 	}
 }
 
@@ -110,13 +111,13 @@ func (r *registry) discoverPlugins(commands []string) error {
 
 // List returns info about all plugin binaries that implement the given
 // PluginKind.
-func (r *registry) List(kind framework.PluginKind) []framework.PluginIdentifier {
+func (r *registry) List(kind common.PluginKind) []framework.PluginIdentifier {
 	return r.pluginsByKind[kind]
 }
 
 // Get returns info about a plugin with the given name and kind, or an
 // error if one cannot be found.
-func (r *registry) Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error) {
+func (r *registry) Get(kind common.PluginKind, name string) (framework.PluginIdentifier, error) {
 	p, found := r.pluginsByID[KindAndName{Kind: kind, Name: name}]
 	if !found {
 		return framework.PluginIdentifier{}, newPluginNotFoundError(kind, name)
@@ -182,7 +183,7 @@ func (r *registry) listPlugins(command string) ([]framework.PluginIdentifier, er
 	}
 	defer process.kill()
 
-	plugin, err := process.dispense(KindAndName{Kind: framework.PluginKindPluginLister})
+	plugin, err := process.dispense(KindAndName{Kind: common.PluginKindPluginLister})
 	if err != nil {
 		return nil, err
 	}
@@ -203,24 +204,33 @@ func (r *registry) register(id framework.PluginIdentifier) error {
 	}
 
 	// no need to pass list of existing plugins since the check if this exists was done above
-	if err := framework.ValidatePluginName(id.Name, nil); err != nil {
+	if err := common.ValidatePluginName(id.Name, nil); err != nil {
 		return errors.Errorf("invalid plugin name %q: %s", id.Name, err)
 	}
 
 	r.pluginsByID[key] = id
 	r.pluginsByKind[id.Kind] = append(r.pluginsByKind[id.Kind], id)
 
+	// if id.Kind is adaptable to newer plugin versions, list it under the other versions as well
+	// If BackupItemAction is adaptable to BackupItemActionV2, then it would be listed under both
+	// kinds
+	if kinds, ok := common.PluginKindsAdaptableTo[id.Kind]; ok {
+		for _, kind := range kinds {
+			r.pluginsByKind[kind] = append(r.pluginsByKind[kind], id)
+		}
+	}
+
 	return nil
 }
 
 // pluginNotFoundError indicates a plugin could not be located for kind and name.
 type PluginNotFoundError struct {
-	kind framework.PluginKind
+	kind common.PluginKind
 	name string
 }
 
 // newPluginNotFoundError returns a new pluginNotFoundError for kind and name.
-func newPluginNotFoundError(kind framework.PluginKind, name string) *PluginNotFoundError {
+func newPluginNotFoundError(kind common.PluginKind, name string) *PluginNotFoundError {
 	return &PluginNotFoundError{
 		kind: kind,
 		name: name,

@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -35,9 +35,9 @@ type restartableVolumeSnapshotter struct {
 	config              map[string]string
 }
 
-// NewRestartableVolumeSnapshotter returns a new RestartableVolumeSnapshotter.
+// NewRestartableVolumeSnapshotter returns a new restartableVolumeSnapshotter.
 func NewRestartableVolumeSnapshotter(name string, sharedPluginProcess process.RestartableProcess) *restartableVolumeSnapshotter {
-	key := process.KindAndName{Kind: framework.PluginKindVolumeSnapshotter, Name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,

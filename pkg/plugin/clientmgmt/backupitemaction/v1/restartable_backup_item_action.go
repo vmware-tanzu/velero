@@ -22,14 +22,14 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 )
 
 // AdaptedBackupItemAction is a backup item action adapted to the v1 BackupItemAction API
 type AdaptedBackupItemAction struct {
-	Kind framework.PluginKind
+	Kind common.PluginKind
 
 	// Get returns a restartable BackupItemAction for the given name and process, wrapping if necessary
 	GetRestartable func(name string, restartableProcess process.RestartableProcess) biav1.BackupItemAction
@@ -38,7 +38,7 @@ type AdaptedBackupItemAction struct {
 func AdaptedBackupItemActions() []AdaptedBackupItemAction {
 	return []AdaptedBackupItemAction{
 		{
-			Kind: framework.PluginKindBackupItemAction,
+			Kind: common.PluginKindBackupItemAction,
 			GetRestartable: func(name string, restartableProcess process.RestartableProcess) biav1.BackupItemAction {
 				return NewRestartableBackupItemAction(name, restartableProcess)
 			},
@@ -58,7 +58,7 @@ type RestartableBackupItemAction struct {
 // NewRestartableBackupItemAction returns a new RestartableBackupItemAction.
 func NewRestartableBackupItemAction(name string, sharedPluginProcess process.RestartableProcess) *RestartableBackupItemAction {
 	r := &RestartableBackupItemAction{
-		Key:                 process.KindAndName{Kind: framework.PluginKindBackupItemAction, Name: name},
+		Key:                 process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name},
 		SharedPluginProcess: sharedPluginProcess,
 	}
 	return r

@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type mockClientProtocol struct {
@@ -96,7 +97,7 @@ func TestDispense(t *testing.T) {
 
 			key := KindAndName{}
 			if tc.clientDispenser {
-				key.Kind = framework.PluginKindObjectStore
+				key.Kind = common.PluginKindObjectStore
 				protocolClient.On("Dispense", key.Kind.String()).Return(clientDispenser, tc.dispenseError)
 
 				if !tc.missingKeyName {
@@ -105,7 +106,7 @@ func TestDispense(t *testing.T) {
 					clientDispenser.On("ClientFor", key.Name).Return(client)
 				}
 			} else {
-				key.Kind = framework.PluginKindPluginLister
+				key.Kind = common.PluginKindPluginLister
 				client = &framework.PluginListerGRPCClient{}
 				protocolClient.On("Dispense", key.Kind.String()).Return(client, tc.dispenseError)
 			}
