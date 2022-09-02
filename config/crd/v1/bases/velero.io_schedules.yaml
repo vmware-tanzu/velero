@@ -32,6 +32,9 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - jsonPath: .spec.paused
+      name: Paused
+      type: boolean
     name: v1
     schema:
       openAPIV3Schema:
@@ -53,6 +56,9 @@ spec:
           spec:
             description: ScheduleSpec defines the specification for a Velero schedule
             properties:
+              paused:
+                description: Paused specifies whether the schedule is paused or not
+                type: boolean
               schedule:
                 description: Schedule is a Cron expression defining when to run the
                   Backup.

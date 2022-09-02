@@ -34,6 +34,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 		NewGetCommand(f, "get"),
 		NewDescribeCommand(f, "describe"),
 		NewDeleteCommand(f, "delete"),
+		NewPauseCommand(f, "pause"),
+		NewUnpauseCommand(f, "unpause"),
 	)
 
 	return c
