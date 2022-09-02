@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,11 +36,13 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/restic/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 )
 
 const name = "pvb-1"
@@ -68,12 +71,29 @@ func bslBuilder() *builder.BackupStorageLocationBuilder {
 		ForBackupStorageLocation(velerov1api.DefaultNamespace, "bsl-loc")
 }
 
+func buildBackupRepo() *velerov1api.BackupRepository {
+	return &velerov1api.BackupRepository{
+		Spec: velerov1api.BackupRepositorySpec{ResticIdentifier: ""},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: velerov1api.SchemeGroupVersion.String(),
+			Kind:       "BackupRepository",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      fmt.Sprintf("%s-bsl-loc-dn24h", velerov1api.DefaultNamespace),
+			Labels: map[string]string{
+				velerov1api.StorageLocationLabel: "bsl-loc",
+			},
+		},
+	}
+}
+
 var _ = Describe("PodVolumeBackup Reconciler", func() {
 	type request struct {
-		pvb *velerov1api.PodVolumeBackup
-		pod *corev1.Pod
-		bsl *velerov1api.BackupStorageLocation
-
+		pvb               *velerov1api.PodVolumeBackup
+		pod               *corev1.Pod
+		bsl               *velerov1api.BackupStorageLocation
+		backupRepo        *velerov1api.BackupRepository
 		expectedProcessed bool
 		expected          *velerov1api.PodVolumeBackup
 		expectedRequeue   ctrl.Result
@@ -100,31 +120,41 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			err = fakeClient.Create(ctx, test.bsl)
 			Expect(err).To(BeNil())
 
+			err = fakeClient.Create(ctx, test.backupRepo)
+			Expect(err).To(BeNil())
+
 			fakeFS := velerotest.NewFakeFileSystem()
 			pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", "pvb-1-volume")
 			_, err = fakeFS.Create(pathGlob)
 			Expect(err).To(BeNil())
 
+			credentialFileStore, err := credentials.NewNamespacedFileStore(
+				fakeClient,
+				velerov1api.DefaultNamespace,
+				"/tmp/credentials",
+				fakeFS,
+			)
+
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 			r := PodVolumeBackupReconciler{
-				Client:         fakeClient,
-				Clock:          clock.NewFakeClock(now),
-				Metrics:        metrics.NewResticServerMetrics(),
-				CredsFileStore: fakeCredsFileStore{},
-				NodeName:       "test_node",
-				FileSystem:     fakeFS,
-				ResticExec:     mocks.FakeResticBackupExec{},
-				Log:            velerotest.NewLogger(),
+				Client:           fakeClient,
+				Clock:            clock.NewFakeClock(now),
+				Metrics:          metrics.NewResticServerMetrics(),
+				CredentialGetter: &credentials.CredentialGetter{FromFile: credentialFileStore},
+				NodeName:         "test_node",
+				FileSystem:       fakeFS,
+				Log:              velerotest.NewLogger(),
 			}
-
+			NewUploaderProviderFunc = func(ctx context.Context, client kbclient.Client, uploaderType, repoIdentifier string, bsl *velerov1api.BackupStorageLocation, backupRepo *velerov1api.BackupRepository, credGetter *credentials.CredentialGetter, repoKeySelector *corev1.SecretKeySelector, log logrus.FieldLogger) (provider.Provider, error) {
+				return &fakeProvider{}, nil
+			}
 			actualResult, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      test.pvb.Name,
 				},
 			})
-
 			Expect(actualResult).To(BeEquivalentTo(test.expectedRequeue))
 			if test.expectedErrMsg == "" {
 				Expect(err).To(BeNil())
@@ -137,7 +167,6 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Name:      test.pvb.Name,
 				Namespace: test.pvb.Namespace,
 			}, &pvb)
-
 			// Assertions
 			if test.expected == nil {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
@@ -160,6 +189,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			pvb:               pvbBuilder().Phase("").Node("test_node").Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: true,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -173,6 +203,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: true,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -186,6 +217,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
@@ -199,6 +231,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -212,6 +245,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
@@ -225,6 +259,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
@@ -238,6 +273,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseNew).
@@ -251,6 +287,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseInProgress).
@@ -264,6 +301,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
@@ -277,6 +315,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				Result(),
 			pod:               podBuilder().Result(),
 			bsl:               bslBuilder().Result(),
+			backupRepo:        buildBackupRepo(),
 			expectedProcessed: false,
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase(velerov1api.PodVolumeBackupPhaseFailed).
@@ -286,8 +325,26 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 	)
 })
 
-type fakeCredsFileStore struct{}
+type fakeProvider struct {
+}
 
-func (f fakeCredsFileStore) Path(selector *corev1.SecretKeySelector) (string, error) {
-	return "/fake/path", nil
+func (f *fakeProvider) RunBackup(
+	ctx context.Context,
+	path string,
+	tags map[string]string,
+	parentSnapshot string,
+	updater uploader.ProgressUpdater) (string, bool, error) {
+	return "", false, nil
+}
+
+func (f *fakeProvider) RunRestore(
+	ctx context.Context,
+	snapshotID string,
+	volumePath string,
+	updater uploader.ProgressUpdater) error {
+	return nil
+}
+
+func (f *fakeProvider) Close(ctx context.Context) error {
+	return nil
 }

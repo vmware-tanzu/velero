@@ -97,19 +97,20 @@ func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struc
 	}
 }
 
-func (kp *kopiaProvider) Close(ctx context.Context) {
-	kp.bkRepo.Close(ctx)
+func (kp *kopiaProvider) Close(ctx context.Context) error {
+	return kp.bkRepo.Close(ctx)
 }
 
-//RunBackup which will backup specific path and update backup progress
+// RunBackup which will backup specific path and update backup progress
+// return snapshotID, isEmptySnapshot, error
 func (kp *kopiaProvider) RunBackup(
 	ctx context.Context,
 	path string,
 	tags map[string]string,
 	parentSnapshot string,
-	updater uploader.ProgressUpdater) (string, error) {
+	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
-		return "", errors.New("Need to initial backup progress updater first")
+		return "", false, errors.New("Need to initial backup progress updater first")
 	}
 
 	log := kp.log.WithFields(logrus.Fields{
@@ -130,13 +131,16 @@ func (kp *kopiaProvider) RunBackup(
 		close(quit)
 	}()
 
-	snapshotInfo, err := BackupFunc(ctx, kpUploader, repoWriter, path, parentSnapshot, log)
-
+	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, parentSnapshot, log)
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to run kopia backup")
+		return "", false, errors.Wrapf(err, "Failed to run kopia backup")
+	} else if isSnapshotEmpty {
+		log.Debugf("Kopia backup got empty dir with path %s", path)
+		return "", true, nil
 	} else if snapshotInfo == nil {
-		return "", fmt.Errorf("failed to get kopia backup snapshot info for path %v", path)
+		return "", false, fmt.Errorf("failed to get kopia backup snapshot info for path %v", path)
 	}
+
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
 	updater.UpdateProgress(
 		&uploader.UploaderProgress{
@@ -146,7 +150,7 @@ func (kp *kopiaProvider) RunBackup(
 	)
 
 	log.Debugf("Kopia backup finished, snapshot ID %s, backup size %d", snapshotInfo.ID, snapshotInfo.Size)
-	return snapshotInfo.ID, nil
+	return snapshotInfo.ID, false, nil
 }
 
 func (kp *kopiaProvider) GetPassword(param interface{}) (string, error) {
