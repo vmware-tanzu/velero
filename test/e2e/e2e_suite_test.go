@@ -80,6 +80,7 @@ func init() {
 }
 
 var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", APIGropuVersionsTest)
+var _ = Describe("[APIGroup][APIExtensions] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
 
 // Test backup and restore of Kibishi using restic
 var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
@@ -117,7 +118,6 @@ var _ = Describe("[BSL][Deletion][Snapshot] Local backups will be deleted once t
 var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
 
 var _ = Describe("[Migration][Restic]", MigrationWithRestic)
-
 var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
 
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
