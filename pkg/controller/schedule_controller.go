@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -65,7 +66,21 @@ func NewScheduleReconciler(
 }
 
 func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource(
+		c.logger,
+		mgr.GetClient(),
+		&velerov1.ScheduleList{},
+		scheduleSyncPeriod,
+		kube.PeriodicalEnqueueSourceOption{
+			FilterFuncs: []func(object client.Object) bool{
+				func(object client.Object) bool {
+					schedule := object.(*velerov1.Schedule)
+					// If there are backup created by this schedule still in New or InProgress state,
+					// skip current backup creation to avoid running overlap backups.
+					return !c.checkIfBackupInNewOrProgress(schedule)
+				},
+			},
+		})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1.Schedule{}).
 		Watches(s, nil).
@@ -124,9 +139,13 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// check for the schedule being due to run, and submit a Backup if so
-	if err := c.submitBackupIfDue(ctx, schedule, cronSchedule); err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "error running submitBackupIfDue for schedule %s", req.String())
+	// Check for the schedule being due to run.
+	// If there are backup created by this schedule still in New or InProgress state,
+	// skip current backup creation to avoid running overlap backups.
+	if c.ifDue(schedule, cronSchedule) && !c.checkIfBackupInNewOrProgress(schedule) {
+		if err := c.submitBackup(ctx, schedule); err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "error submit backup for schedule %s", req.String())
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -172,35 +191,61 @@ func parseCronSchedule(itm *velerov1.Schedule, logger logrus.FieldLogger) (cron.
 	return schedule, nil
 }
 
-func (c *scheduleReconciler) submitBackupIfDue(ctx context.Context, item *velerov1.Schedule, cronSchedule cron.Schedule) error {
-	var (
-		now                = c.clock.Now()
-		isDue, nextRunTime = getNextRunTime(item, cronSchedule, now)
-		log                = c.logger.WithField("schedule", kubeutil.NamespaceAndName(item))
-	)
+// checkIfBackupInNewOrProgress check whether there are backups created by this schedule still in New or InProgress state,
+func (c *scheduleReconciler) checkIfBackupInNewOrProgress(schedule *velerov1.Schedule) bool {
+	log := c.logger.WithField("schedule", kubeutil.NamespaceAndName(schedule))
+	backupList := &velerov1.BackupList{}
+	options := &client.ListOptions{
+		Namespace: schedule.Namespace,
+		LabelSelector: labels.Set(map[string]string{
+			velerov1.ScheduleNameLabel: schedule.Name,
+		}).AsSelector(),
+	}
+
+	err := c.List(context.Background(), backupList, options)
+	if err != nil {
+		log.Errorf("fail to list backup for schedule %s/%s: %s", schedule.Namespace, schedule.Name, err.Error())
+		return true
+	}
+
+	for _, backup := range backupList.Items {
+		if backup.Status.Phase == velerov1.BackupPhaseNew || backup.Status.Phase == velerov1.BackupPhaseInProgress {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ifDue check whether schedule is due to create a new backup.
+func (c *scheduleReconciler) ifDue(schedule *velerov1.Schedule, cronSchedule cron.Schedule) bool {
+	isDue, nextRunTime := getNextRunTime(schedule, cronSchedule, c.clock.Now())
+	log := c.logger.WithField("schedule", kubeutil.NamespaceAndName(schedule))
 
 	if !isDue {
 		log.WithField("nextRunTime", nextRunTime).Debug("Schedule is not due, skipping")
-		return nil
+		return false
 	}
 
+	log.WithField("nextRunTime", nextRunTime).Info("Schedule is due, going to submit backup.")
+	return true
+}
+
+// submitBackup create a backup from schedule.
+func (c *scheduleReconciler) submitBackup(ctx context.Context, schedule *velerov1.Schedule) error {
+	now := c.clock.Now()
 	// Don't attempt to "catch up" if there are any missed or failed runs - simply
 	// trigger a Backup if it's time.
-	//
-	// It might also make sense in the future to explicitly check for currently-running
-	// backups so that we don't overlap runs (for disk snapshots in particular, this can
-	// lead to performance issues).
-	log.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
-	backup := getBackup(item, now)
+	backup := getBackup(schedule, now)
 	if err := c.Create(ctx, backup); err != nil {
 		return errors.Wrap(err, "error creating Backup")
 	}
 
-	original := item.DeepCopy()
-	item.Status.LastBackup = &metav1.Time{Time: now}
+	original := schedule.DeepCopy()
+	schedule.Status.LastBackup = &metav1.Time{Time: now}
 
-	if err := c.Patch(ctx, item, client.MergeFrom(original)); err != nil {
-		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", item.Status.LastBackup)
+	if err := c.Patch(ctx, schedule, client.MergeFrom(original)); err != nil {
+		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", schedule.Status.LastBackup)
 	}
 
 	return nil
