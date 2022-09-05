@@ -110,7 +110,6 @@ func DescribeBackup(
 			d.Println()
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
-
 	})
 }
 
@@ -164,6 +163,9 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 
 	d.Println()
 	d.Printf("TTL:\t%s\n", spec.TTL.Duration)
+
+	d.Println()
+	d.Printf("CSISnapshotTimeout:\t%s\n", &spec.CSISnapshotTimeout.Duration)
 
 	d.Println()
 	if len(spec.Hooks.Resources) == 0 {
@@ -241,7 +243,6 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			d.Printf("\t%s: %s\n", key, value)
 		}
 	}
-
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
