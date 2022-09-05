@@ -19,6 +19,7 @@ package kopialib
 import (
 	"context"
 	"os"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -382,12 +383,7 @@ func (kor *kopiaObjectReader) Read(p []byte) (int, error) {
 		return 0, errors.New("object reader is closed or not open")
 	}
 
-	n, err := kor.rawReader.Read(p)
-	if err != nil {
-		return 0, errors.Wrap(err, "error to read object")
-	}
-
-	return n, nil
+	return kor.rawReader.Read(p)
 }
 
 func (kor *kopiaObjectReader) Seek(offset int64, whence int) (int64, error) {
@@ -395,12 +391,7 @@ func (kor *kopiaObjectReader) Seek(offset int64, whence int) (int64, error) {
 		return -1, errors.New("object reader is closed or not open")
 	}
 
-	p, err := kor.rawReader.Seek(offset, whence)
-	if err != nil {
-		return -1, errors.Wrap(err, "error to seek object")
-	}
-
-	return p, nil
+	return kor.rawReader.Seek(offset, whence)
 }
 
 func (kor *kopiaObjectReader) Close() error {
@@ -410,7 +401,7 @@ func (kor *kopiaObjectReader) Close() error {
 
 	err := kor.rawReader.Close()
 	if err != nil {
-		return errors.Wrap(err, "error to close object reader")
+		return err
 	}
 
 	kor.rawReader = nil
@@ -431,12 +422,7 @@ func (kow *kopiaObjectWriter) Write(p []byte) (int, error) {
 		return 0, errors.New("object writer is closed or not open")
 	}
 
-	n, err := kow.rawWriter.Write(p)
-	if err != nil {
-		return 0, errors.Wrap(err, "error to write object")
-	}
-
-	return n, nil
+	return kow.rawWriter.Write(p)
 }
 
 func (kow *kopiaObjectWriter) Seek(offset int64, whence int) (int64, error) {
@@ -476,7 +462,7 @@ func (kow *kopiaObjectWriter) Close() error {
 
 	err := kow.rawWriter.Close()
 	if err != nil {
-		return errors.Wrap(err, "error to close object writer")
+		return err
 	}
 
 	kow.rawWriter = nil
@@ -484,9 +470,9 @@ func (kow *kopiaObjectWriter) Close() error {
 	return nil
 }
 
-// getAsyncWrites returns the number of async writes, at present, we don't support async writes
+// getAsyncWrites returns the number of concurrent async writes
 func getAsyncWrites() int {
-	return 0
+	return runtime.NumCPU()
 }
 
 // getCompressorForObject returns the compressor for an object, at present, we don't support compression
