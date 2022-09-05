@@ -53,6 +53,7 @@ type RepositoryEnsurer struct {
 type repoKey struct {
 	volumeNamespace string
 	backupLocation  string
+	repositoryType  string
 }
 
 func NewRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInformer, repoClient velerov1client.BackupRepositoriesGetter, log logrus.FieldLogger) *RepositoryEnsurer {
@@ -83,7 +84,7 @@ func NewRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInforme
 				r.repoChansLock.Lock()
 				defer r.repoChansLock.Unlock()
 
-				key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
+				key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation, newObj.Spec.RepositoryType).String()
 				repoChan, ok := r.repoChans[key]
 				if !ok {
 					log.Debugf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
@@ -98,20 +99,25 @@ func NewRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInforme
 	return r
 }
 
-func repoLabels(volumeNamespace, backupLocation string) labels.Set {
+func repoLabels(volumeNamespace, backupLocation, repositoryType string) labels.Set {
 	return map[string]string{
-		velerov1api.ResticVolumeNamespaceLabel: label.GetValidName(volumeNamespace),
-		velerov1api.StorageLocationLabel:       label.GetValidName(backupLocation),
+		velerov1api.VolumeNamespaceLabel: label.GetValidName(volumeNamespace),
+		velerov1api.StorageLocationLabel: label.GetValidName(backupLocation),
+		velerov1api.RepositoryTypeLabel:  label.GetValidName(repositoryType),
 	}
 }
 
-func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.BackupRepository, error) {
-	log := r.log.WithField("volumeNamespace", volumeNamespace).WithField("backupLocation", backupLocation)
+func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation, repositoryType string) (*velerov1api.BackupRepository, error) {
+	if volumeNamespace == "" || backupLocation == "" || repositoryType == "" {
+		return nil, errors.Errorf("wrong parameters, namespace %q, backup storage location %q, repository type %q", volumeNamespace, backupLocation, repositoryType)
+	}
+
+	log := r.log.WithField("volumeNamespace", volumeNamespace).WithField("backupLocation", backupLocation).WithField("repositoryType", repositoryType)
 
 	// It's only safe to have one instance of this method executing concurrently for a
-	// given volumeNamespace + backupLocation, so synchronize based on that. It's fine
+	// given volumeNamespace + backupLocation + repositoryType, so synchronize based on that. It's fine
 	// to run concurrently for *different* namespaces/locations. If you had 2 goroutines
-	// running this for the same inputs, both might find no ResticRepository exists, then
+	// running this for the same inputs, both might find no BackupRepository exists, then
 	// both would create new ones for the same namespace/location.
 	//
 	// This issue could probably be avoided if we had a deterministic name for
@@ -121,7 +127,7 @@ func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	// GenerateName) which poses a backwards compatibility problem.
 	log.Debug("Acquiring lock")
 
-	repoMu := r.repoLock(volumeNamespace, backupLocation)
+	repoMu := r.repoLock(volumeNamespace, backupLocation, repositoryType)
 	repoMu.Lock()
 	defer func() {
 		repoMu.Unlock()
@@ -130,14 +136,14 @@ func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 
 	log.Debug("Acquired lock")
 
-	selector := labels.SelectorFromSet(repoLabels(volumeNamespace, backupLocation))
+	selector := labels.SelectorFromSet(repoLabels(volumeNamespace, backupLocation, repositoryType))
 
 	repos, err := r.repoLister.BackupRepositories(namespace).List(selector)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	if len(repos) > 1 {
-		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q", volumeNamespace, backupLocation)
+		return nil, errors.Errorf("more than one BackupRepository found for workload namespace %q, backup storage location %q, repository type %q", volumeNamespace, backupLocation, repositoryType)
 	}
 	if len(repos) == 1 {
 		if repos[0].Status.Phase != velerov1api.BackupRepositoryPhaseReady {
@@ -154,12 +160,13 @@ func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	repo := &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
-			GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
-			Labels:       repoLabels(volumeNamespace, backupLocation),
+			GenerateName: fmt.Sprintf("%s-%s-%s-", volumeNamespace, backupLocation, repositoryType),
+			Labels:       repoLabels(volumeNamespace, backupLocation, repositoryType),
 		},
 		Spec: velerov1api.BackupRepositorySpec{
 			VolumeNamespace:       volumeNamespace,
 			BackupStorageLocation: backupLocation,
+			RepositoryType:        repositoryType,
 		},
 	}
 
@@ -198,13 +205,14 @@ func (r *RepositoryEnsurer) getRepoChan(name string) chan *velerov1api.BackupRep
 	return r.repoChans[name]
 }
 
-func (r *RepositoryEnsurer) repoLock(volumeNamespace, backupLocation string) *sync.Mutex {
+func (r *RepositoryEnsurer) repoLock(volumeNamespace, backupLocation, repositoryType string) *sync.Mutex {
 	r.repoLocksMu.Lock()
 	defer r.repoLocksMu.Unlock()
 
 	key := repoKey{
 		volumeNamespace: volumeNamespace,
 		backupLocation:  backupLocation,
+		repositoryType:  repositoryType,
 	}
 
 	if r.repoLocks[key] == nil {

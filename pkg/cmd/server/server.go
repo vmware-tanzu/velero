@@ -131,7 +131,7 @@ type serverConfig struct {
 	clientPageSize                                                          int
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
-	defaultResticMaintenanceFrequency                                       time.Duration
+	repoMaintenanceFrequency                                                time.Duration
 	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
 	uploaderType                                                            string
@@ -147,25 +147,24 @@ func NewCommand(f client.Factory) *cobra.Command {
 		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(':')
 		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
 		config                  = serverConfig{
-			pluginDir:                         "/plugins",
-			metricsAddress:                    defaultMetricsAddress,
-			defaultBackupLocation:             "default",
-			defaultVolumeSnapshotLocations:    make(map[string]string),
-			backupSyncPeriod:                  defaultBackupSyncPeriod,
-			defaultBackupTTL:                  defaultBackupTTL,
-			defaultCSISnapshotTimeout:         defaultCSISnapshotTimeout,
-			storeValidationFrequency:          defaultStoreValidationFrequency,
-			podVolumeOperationTimeout:         defaultPodVolumeOperationTimeout,
-			restoreResourcePriorities:         defaultRestorePriorities,
-			clientQPS:                         defaultClientQPS,
-			clientBurst:                       defaultClientBurst,
-			clientPageSize:                    defaultClientPageSize,
-			profilerAddress:                   defaultProfilerAddress,
-			resourceTerminatingTimeout:        defaultResourceTerminatingTimeout,
-			formatFlag:                        logging.NewFormatFlag(),
-			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
-			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
-			uploaderType:                      uploader.ResticType,
+			pluginDir:                      "/plugins",
+			metricsAddress:                 defaultMetricsAddress,
+			defaultBackupLocation:          "default",
+			defaultVolumeSnapshotLocations: make(map[string]string),
+			backupSyncPeriod:               defaultBackupSyncPeriod,
+			defaultBackupTTL:               defaultBackupTTL,
+			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
+			storeValidationFrequency:       defaultStoreValidationFrequency,
+			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
+			restoreResourcePriorities:      defaultRestorePriorities,
+			clientQPS:                      defaultClientQPS,
+			clientBurst:                    defaultClientBurst,
+			clientPageSize:                 defaultClientPageSize,
+			profilerAddress:                defaultProfilerAddress,
+			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
+			formatFlag:                     logging.NewFormatFlag(),
+			defaultVolumesToRestic:         restic.DefaultVolumesToRestic,
+			uploaderType:                   uploader.ResticType,
 		}
 	)
 
@@ -228,7 +227,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "The address to expose the pprof profiler.")
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "How long to wait on persistent volumes and namespaces to terminate during a restore before timing out.")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
-	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
+	command.Flags().DurationVar(&config.repoMaintenanceFrequency, "default-restic-prune-frequency", config.repoMaintenanceFrequency, "How often 'prune' is run for backup repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
@@ -260,6 +259,7 @@ type server struct {
 	config                              serverConfig
 	mgr                                 manager.Manager
 	credentialFileStore                 credentials.FileStore
+	credentialSecretStore               credentials.SecretStore
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -349,6 +349,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
+	credentialSecretStore, err := credentials.NewNamespacedSecretStore(mgr.GetClient(), f.Namespace())
+
 	s := &server{
 		namespace:                           f.Namespace(),
 		metricsAddress:                      config.metricsAddress,
@@ -368,6 +370,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		config:                              config,
 		mgr:                                 mgr,
 		credentialFileStore:                 credentialFileStore,
+		credentialSecretStore:               credentialSecretStore,
 	}
 
 	return s, nil
@@ -546,7 +549,7 @@ func (s *server) initRestic() error {
 	s.repoLocker = repository.NewRepoLocker()
 	s.repoEnsurer = repository.NewRepositoryEnsurer(s.sharedInformerFactory.Velero().V1().BackupRepositories(), s.veleroClient.VeleroV1(), s.logger)
 
-	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.logger)
+	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
 	return nil
 }
@@ -620,6 +623,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
 			s.config.clientPageSize,
+			s.config.uploaderType,
 		)
 		cmd.CheckError(err)
 
@@ -781,7 +785,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.ResticRepo]; ok {
-		if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
 		}
 	}

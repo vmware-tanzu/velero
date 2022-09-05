@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 const (
@@ -48,10 +50,33 @@ const (
 	InitContainer = "restic-wait"
 )
 
+// volumeBackupInfo describes the backup info of a volume backed up by PodVolumeBackups
+type volumeBackupInfo struct {
+	snapshotID     string
+	uploaderType   string
+	repositoryType string
+}
+
 // GetVolumeBackupsForPod returns a map, of volume name -> snapshot id,
 // of the PodVolumeBackups that exist for the provided pod.
 func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *corev1api.Pod, sourcePodNs string) map[string]string {
+	volumeBkInfo := getVolumeBackupInfoForPod(podVolumeBackups, pod, sourcePodNs)
+	if volumeBkInfo == nil {
+		return nil
+	}
+
 	volumes := make(map[string]string)
+	for k, v := range volumeBkInfo {
+		volumes[k] = v.snapshotID
+	}
+
+	return volumes
+}
+
+// getVolumeBackupInfoForPod returns a map, of volume name -> VolumeBackupInfo,
+// of the PodVolumeBackups that exist for the provided pod.
+func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *corev1api.Pod, sourcePodNs string) map[string]volumeBackupInfo {
+	volumes := make(map[string]volumeBackupInfo)
 
 	for _, pvb := range podVolumeBackups {
 		if !isPVBMatchPod(pvb, pod.GetName(), sourcePodNs) {
@@ -71,14 +96,74 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 			continue
 		}
 
-		volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
+		volumes[pvb.Spec.Volume] = volumeBackupInfo{
+			snapshotID:     pvb.Status.SnapshotID,
+			uploaderType:   getUploaderTypeOrDefault(pvb.Spec.UploaderType),
+			repositoryType: getRepositoryType(pvb.Spec.UploaderType),
+		}
 	}
 
 	if len(volumes) > 0 {
 		return volumes
 	}
 
-	return getPodSnapshotAnnotations(pod)
+	fromAnnntation := getPodSnapshotAnnotations(pod)
+	if fromAnnntation == nil {
+		return nil
+	}
+
+	for k, v := range fromAnnntation {
+		volumes[k] = volumeBackupInfo{v, uploader.ResticType, velerov1api.BackupRepositoryTypeRestic}
+	}
+
+	return volumes
+}
+
+// GetSnapshotIdentifier returns the snapshots represented by SnapshotIdentifier for the given PVBs
+func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) []repository.SnapshotIdentifier {
+	var res []repository.SnapshotIdentifier
+	for _, item := range podVolumeBackups.Items {
+		if item.Status.SnapshotID == "" {
+			continue
+		}
+
+		res = append(res, repository.SnapshotIdentifier{
+			VolumeNamespace:       item.Spec.Pod.Namespace,
+			BackupStorageLocation: item.Spec.BackupStorageLocation,
+			SnapshotID:            item.Status.SnapshotID,
+			RepositoryType:        getRepositoryType(item.Spec.UploaderType),
+		})
+	}
+
+	return res
+}
+
+func getUploaderTypeOrDefault(uploaderType string) string {
+	if uploaderType != "" {
+		return uploaderType
+	} else {
+		return uploader.ResticType
+	}
+}
+
+// getRepositoryType returns the hardcode repositoryType for different backup methods - Restic or Kopia,uploaderType
+// indicates the method.
+// For Restic backup method, it is always hardcode to BackupRepositoryTypeRestic, never changed.
+// For Kopia backup method, this means we hardcode repositoryType as BackupRepositoryTypeKopia for Unified Repo,
+// at present (Kopia backup method is using Unified Repo). However, it doesn't mean we could deduce repositoryType
+// from uploaderType for Unified Repo.
+// TODO: post v1.10, refactor this function for Kopia backup method. In future, when we have multiple implementations of
+// Unified Repo (besides Kopia), we will add the repositoryType to BSL, because by then, we are not able to hardcode
+// the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
+func getRepositoryType(uploaderType string) string {
+	switch uploaderType {
+	case "", uploader.ResticType:
+		return velerov1api.BackupRepositoryTypeRestic
+	case uploader.KopiaType:
+		return velerov1api.BackupRepositoryTypeKopia
+	default:
+		return ""
+	}
 }
 
 func isPVBMatchPod(pvb *velerov1api.PodVolumeBackup, podName string, namespace string) bool {

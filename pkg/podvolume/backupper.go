@@ -49,6 +49,7 @@ type backupper struct {
 	veleroClient clientset.Interface
 	pvcClient    corev1client.PersistentVolumeClaimsGetter
 	pvClient     corev1client.PersistentVolumesGetter
+	uploaderType string
 
 	results     map[string]chan *velerov1api.PodVolumeBackup
 	resultsLock sync.Mutex
@@ -62,6 +63,7 @@ func newBackupper(
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
+	uploaderType string,
 	log logrus.FieldLogger,
 ) *backupper {
 	b := &backupper{
@@ -71,6 +73,7 @@ func newBackupper(
 		veleroClient: veleroClient,
 		pvcClient:    pvcClient,
 		pvClient:     pvClient,
+		uploaderType: uploaderType,
 
 		results: make(map[string]chan *velerov1api.PodVolumeBackup),
 	}
@@ -107,7 +110,13 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, nil
 	}
 
-	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace, backup.Spec.StorageLocation)
+	repositoryType := getRepositoryType(b.uploaderType)
+	if repositoryType == "" {
+		err := errors.Errorf("empty repository type, uploader %s", b.uploaderType)
+		return nil, []error{err}
+	}
+
+	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace, backup.Spec.StorageLocation, repositoryType)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -182,8 +191,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		// TODO: Remove the hard-coded uploader type before v1.10 FC
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, "restic", pvc)
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, b.uploaderType, pvc)
 		if volumeBackup, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue

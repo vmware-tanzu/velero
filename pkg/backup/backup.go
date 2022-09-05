@@ -79,6 +79,7 @@ type kubernetesBackupper struct {
 	resticTimeout          time.Duration
 	defaultVolumesToRestic bool
 	clientPageSize         int
+	uploaderType           string
 }
 
 func (i *itemKey) String() string {
@@ -105,6 +106,7 @@ func NewKubernetesBackupper(
 	resticTimeout time.Duration,
 	defaultVolumesToRestic bool,
 	clientPageSize int,
+	uploaderType string,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
 		backupClient:           backupClient,
@@ -115,6 +117,7 @@ func NewKubernetesBackupper(
 		resticTimeout:          resticTimeout,
 		defaultVolumesToRestic: defaultVolumesToRestic,
 		clientPageSize:         clientPageSize,
+		uploaderType:           uploaderType,
 	}, nil
 }
 
@@ -240,7 +243,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 
 	var resticBackupper podvolume.Backupper
 	if kb.resticBackupperFactory != nil {
-		resticBackupper, err = kb.resticBackupperFactory.NewBackupper(ctx, backupRequest.Backup)
+		resticBackupper, err = kb.resticBackupperFactory.NewBackupper(ctx, backupRequest.Backup, kb.uploaderType)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Debugf("Error from NewBackupper")
 			return errors.WithStack(err)

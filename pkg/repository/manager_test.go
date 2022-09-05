@@ -26,7 +26,7 @@ import (
 )
 
 func TestGetRepositoryProvider(t *testing.T) {
-	mgr := NewManager("", nil, nil, nil, nil, nil).(*manager)
+	mgr := NewManager("", nil, nil, nil, nil, nil, nil).(*manager)
 	repo := &velerov1.BackupRepository{}
 
 	// empty repository type

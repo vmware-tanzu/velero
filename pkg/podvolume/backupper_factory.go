@@ -35,7 +35,7 @@ import (
 // BackupperFactory can construct pod volumes backuppers.
 type BackupperFactory interface {
 	// NewBackupper returns a pod volumes backupper for use during a single Velero backup.
-	NewBackupper(context.Context, *velerov1api.Backup) (Backupper, error)
+	NewBackupper(context.Context, *velerov1api.Backup, string) (Backupper, error)
 }
 
 func NewBackupperFactory(repoLocker *repository.RepoLocker,
@@ -66,7 +66,7 @@ type backupperFactory struct {
 	log                logrus.FieldLogger
 }
 
-func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1api.Backup) (Backupper, error) {
+func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1api.Backup, uploaderType string) (Backupper, error) {
 	informer := velerov1informers.NewFilteredPodVolumeBackupInformer(
 		bf.veleroClient,
 		backup.Namespace,
@@ -77,7 +77,7 @@ func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1ap
 		},
 	)
 
-	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, informer, bf.veleroClient, bf.pvcClient, bf.pvClient, bf.log)
+	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, informer, bf.veleroClient, bf.pvcClient, bf.pvClient, uploaderType, bf.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, bf.repoInformerSynced) {
