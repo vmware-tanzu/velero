@@ -429,7 +429,7 @@ Instead, a new method for 'Progress' will be added to interface. Velero server r
 
 But, this involves good amount of changes and needs a way for backward compatibility.
 
-As volume plugins are mostly K8s native, its fine to go ahead with current limiation.
+As volume plugins are mostly K8s native, its fine to go ahead with current limitation.
 
 ### Update Backup CR
 Instead of creating new CRs, plugins can directly update the status of Backup CR. But, this deviates from current approach of having separate CRs like PodVolumeBackup/PodVolumeRestore to know operations progress.
