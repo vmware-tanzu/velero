@@ -98,7 +98,7 @@ STANDBY_CLUSTER ?=
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
-	go get github.com/onsi/ginkgo/ginkgo
+	go install github.com/onsi/ginkgo/ginkgo@v1.16.5
 
 .PHONY: run
 run: ginkgo
