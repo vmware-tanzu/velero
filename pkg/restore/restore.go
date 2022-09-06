@@ -1252,29 +1252,22 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// check if we want to treat the error as a warning, in some cases the creation call might not get executed due to object API validations
 	// and Velero might not get the already exists error type but in reality the object already exists
-	objectExists := false
 	var fromCluster *unstructured.Unstructured
 
-	if restoreErr != nil && !isAlreadyExistsError {
+	if restoreErr != nil {
 		// check for the existence of the object in cluster, if no error then it implies that object exists
-		// and if err then we want to fallthrough and do another get call later
+		// and if err then we want to judge whether there is an existing error in the previous creation.
+		// if so, we will return the 'get' error.
+		// otherwise, we will return the original creation error.
 		fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
-		if err == nil {
-			objectExists = true
+		if err != nil && isAlreadyExistsError {
+			ctx.log.Errorf("Error retrieving in-cluster version of %s: %v", kube.NamespaceAndName(obj), err)
+			errs.Add(namespace, err)
+			return warnings, errs
 		}
 	}
 
-	if isAlreadyExistsError || objectExists {
-		// do a get call if we did not run this previously i.e.
-		// we've only run this for errors other than isAlreadyExistError
-		if fromCluster == nil {
-			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
-			if err != nil {
-				ctx.log.Errorf("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-				errs.Add(namespace, err)
-				return warnings, errs
-			}
-		}
+	if fromCluster != nil {
 		// Remove insubstantial metadata.
 		fromCluster, err = resetMetadataAndStatus(fromCluster)
 		if err != nil {
@@ -1462,7 +1455,7 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 		}
 	}
 
-	// the "already allocated" error may caused by other services, check whether the expected service exists or not
+	// the "already allocated" error may be caused by other services, check whether the expected service exists or not
 	if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			ctx.log.Debugf("Service %s not found", kube.NamespaceAndName(obj))
