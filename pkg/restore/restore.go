@@ -1448,30 +1448,55 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 	// 2. For LoadBalancer service, the "healthCheckNodePort" already exists. - Get internal error
 	// If this is the case, the function returns true to avoid reporting error.
 	// Refer to https://github.com/vmware-tanzu/velero/issues/2308 for more details
-	if obj.GetKind() != "Service" {
+	// The "forbidden error" rather than "already exists" error returns when restoring priorityClass in the following case:
+	// 1. For globalDefault priorityClass, the default priorityClass already exists. - Get forbidden error
+	// Refer to https://github.com/vmware-tanzu/velero/issues/5288 for more details
+	if obj.GetKind() != "Service" && obj.GetKind() != "PriorityClass" {
 		return false, nil
 	}
 	statusErr, ok := err.(*apierrors.StatusError)
 	if !ok || statusErr.Status().Details == nil || len(statusErr.Status().Details.Causes) == 0 {
 		return false, nil
 	}
-	// make sure all the causes are "port allocated" error
+
+	var errMsg string
+	switch obj.GetKind() {
+	case "Service":
+		// make sure all the causes are "port allocated" or "marked as default" error for service error
+		errMsg = "provided port is already allocated"
+	case "PriorityClass":
+		// make sure all the causes are "already marked as default" error for priorityClass error
+		errMsg = "is already marked as default. Only one default can exist"
+	}
+
 	for _, cause := range statusErr.Status().Details.Causes {
-		if !strings.Contains(cause.Message, "provided port is already allocated") {
+		if !strings.Contains(cause.Message, errMsg) {
 			return false, nil
 		}
 	}
 
-	// the "already allocated" error may caused by other services, check whether the expected service exists or not
+	// the "already allocated" or "already marked as default" error may be caused by other services/priorityClasses, check whether the expected service/priorityClass exists or not
 	if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			ctx.log.Debugf("Service %s not found", kube.NamespaceAndName(obj))
+			ctx.log.Debugf("%s %s not found", obj.GetKind(), kube.NamespaceAndName(obj))
 			return false, nil
 		}
-		return false, errors.Wrapf(err, "Unable to get the service %s while checking the NodePort is already allocated error", kube.NamespaceAndName(obj))
+
+		switch obj.GetKind() {
+		case "Service":
+			return false, errors.Wrapf(err, "Unable to get the service %s while checking the NodePort is already allocated error", kube.NamespaceAndName(obj))
+		case "PriorityClass":
+			return false, errors.Wrapf(err, "Unable to get the priorityClass %s while checking the priorityClass is already marked as default error", kube.NamespaceAndName(obj))
+		}
 	}
 
-	ctx.log.Infof("Service %s exists, ignore the provided port is already allocated error", kube.NamespaceAndName(obj))
+	switch obj.GetKind() {
+	case "Service":
+		ctx.log.Infof("Service %s exists, ignore the provided port is already allocated error", kube.NamespaceAndName(obj))
+	case "PriorityClass":
+		ctx.log.Infof("PriorityClass %s exists, ignore the priorityClass is already marked as default error", kube.NamespaceAndName(obj))
+	}
+
 	return true, nil
 }
 
