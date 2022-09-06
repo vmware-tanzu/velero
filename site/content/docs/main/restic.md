@@ -529,6 +529,34 @@ on to running other init containers/the main containers.
 
 Velero won't restore a resource if a that resource is scaled to 0 and already exists in the cluster. If Velero restored the requested pods in this scenario, the Kubernetes reconciliation loops that manage resources would delete the running pods because its scaled to be 0. Velero will be able to restore once the resources is scaled up, and the pods are created and remain running.
 
+## Inspect data with restic CLI ##
+As mentioned above, restic encrypt your data before sending to datastore, which makes it hard to inspect/verify the backup just by looking at the datastore, but this can be accomplished with the restic CLI tool.
+
+This section is only meant to give a few pointers, and takes offset in a s3/minio setup - for more depth refer to the [restic documentation][12].
+
+1. Install restic cli
+1. Obtain your restic encryption password
+   - `kubectl get secret/velero-restic-credentials -n velero -o yaml`
+1. List your `PodVolumeBackup`s
+   - `kubectl get PodVolumeBackup -n velero`
+1. Inspect the `PodVolumeBackup` you're interested in
+   - note the following:
+   - restic repo url in .spec.repoIdentifier ( eg s3:http://192.168.1.40:9000/backups/restic/default )
+   - snapshot ID in .status.snapshotID (eg 8c6fe589)
+1. Configure you environment
+    ```
+    export AWS_ACCESS_KEY_ID="<yourkey>"
+    export AWS_SECRET_ACCESS_KEY="<your-access-key>"
+    export RESTIC_PASSWORD="<your-restic-password>" # from secret/velero-restic-credentials
+    export RESTIC_REPOSITORY="s3:http://192.168.1.40:9000/backups/restic/default"
+    ```
+1. (Optional) List the available snapshots
+   - `restic list snapshots`
+1. List content of your snapshot
+   - `restic ls <snapshotID>`
+1. Restore content of snapshot
+   - `restic restore  <snapshotID> --target restoredir`
+
 ## 3rd party controllers
 
 ### Monitor backup annotation
@@ -547,3 +575,4 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
 [11]: customize-installation.md#default-pod-volume-backup-to-restic
+[12]: https://restic.readthedocs.io/en/latest/045_working_with_repos.html
