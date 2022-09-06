@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apex/log"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -651,6 +650,16 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		if err != nil {
 			backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
 		}
+
+		// checkVolumeSnapshotReadyToUse could run for a long time. Update VolumeSnapshot array after it finishes.
+		err = c.kbClient.List(context.Background(), vsList, &kbclient.ListOptions{LabelSelector: selector})
+		if err != nil {
+			backupLog.Error(err)
+		}
+		if len(vsList.Items) >= 0 {
+			volumeSnapshots = vsList.Items
+		}
+
 		backup.CSISnapshots = volumeSnapshots
 
 		err = c.kbClient.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector})
@@ -680,7 +689,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 
 		// Delete the VolumeSnapshots created in the backup, when CSI feature is enabled.
-		c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, *backup, backupLog)
+		c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, backupLog)
 
 	}
 
@@ -904,14 +913,14 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 					return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name))
 				}
 				if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
-					log.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
+					c.logger.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
 					return false, nil
 				}
 
 				return true, nil
 			})
 			if err == wait.ErrWaitTimeout {
-				log.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
+				c.logger.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			}
 			return err
 		})
@@ -925,8 +934,7 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 // If DeletionPolicy is Retain, just delete it. If DeletionPolicy is Delete, need to
 // change DeletionPolicy to Retain before deleting VS, then change DeletionPolicy back to Delete.
 func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.VolumeSnapshot,
-	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
-	backup pkgbackup.Request, logger logrus.FieldLogger) {
+	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, logger logrus.FieldLogger) {
 	var wg sync.WaitGroup
 	vscMap := make(map[string]snapshotv1api.VolumeSnapshotContent)
 	for _, vsc := range volumeSnapshotContents {
@@ -939,7 +947,8 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 			defer wg.Done()
 			var vsc snapshotv1api.VolumeSnapshotContent
 			modifyVSCFlag := false
-			if vs.Status.BoundVolumeSnapshotContentName != nil &&
+			if vs.Status != nil &&
+				vs.Status.BoundVolumeSnapshotContentName != nil &&
 				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
 				var found bool
 				if vsc, found = vscMap[*vs.Status.BoundVolumeSnapshotContentName]; !found {
@@ -950,6 +959,9 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 				if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
 					modifyVSCFlag = true
 				}
+			} else {
+				logger.Errorf("VS %s/%s is not ready. This is not expected.", vs.Namespace, vs.Name)
+				return
 			}
 
 			// Change VolumeSnapshotContent's DeletionPolicy to Retain before deleting VolumeSnapshot,

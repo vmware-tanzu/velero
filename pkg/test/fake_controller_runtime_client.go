@@ -19,6 +19,7 @@ package test
 import (
 	"testing"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +35,8 @@ func NewFakeControllerRuntimeClientBuilder(t *testing.T) *k8sfake.ClientBuilder 
 	require.NoError(t, err)
 	err = corev1api.AddToScheme(scheme)
 	require.NoError(t, err)
+	err = snapshotv1api.AddToScheme(scheme)
+	require.NoError(t, err)
 	return k8sfake.NewClientBuilder().WithScheme(scheme)
 }
 
@@ -42,6 +45,8 @@ func NewFakeControllerRuntimeClient(t *testing.T, initObjs ...runtime.Object) cl
 	err := velerov1api.AddToScheme(scheme)
 	require.NoError(t, err)
 	err = corev1api.AddToScheme(scheme)
+	require.NoError(t, err)
+	err = snapshotv1api.AddToScheme(scheme)
 	require.NoError(t, err)
 	return k8sfake.NewFakeClientWithScheme(scheme, initObjs...)
 }
