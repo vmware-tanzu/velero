@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -43,6 +44,7 @@ func BindFlags(flags *pflag.FlagSet) {
 	labelColumns := flag.NewStringArray()
 	flags.Var(&labelColumns, "label-columns", "A comma-separated list of labels to be displayed as columns")
 	flags.Bool("show-labels", false, "Show labels in the last column")
+	flags.String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
 }
 
 // BindFlagsSimple defines the output format flag only.
@@ -65,6 +67,12 @@ func ClearOutputFlagDefault(cmd *cobra.Command) {
 // in the provided command, or the zero value if not present.
 func GetOutputFlagValue(cmd *cobra.Command) string {
 	return flag.GetOptionalStringFlag(cmd, "output")
+}
+
+// GetSortByFlagValue returns the value of the "sort-by" flag
+// in the provided command, or the zero value if not present.
+func GetSortByFlagValue(cmd *cobra.Command) string {
+	return flag.GetOptionalStringFlag(cmd, "sort-by")
 }
 
 // GetLabelColumnsValues returns the value of the "label-columns" flag
@@ -108,6 +116,19 @@ func PrintWithFormat(c *cobra.Command, obj runtime.Object) (bool, error) {
 	format := GetOutputFlagValue(c)
 	if format == "" {
 		return false, nil
+	}
+
+	sortField := GetSortByFlagValue(c)
+	if sortField != "" {
+		sorter := &Sorter{
+			Decoder:   scheme.Codecs.UniversalDecoder(),
+			SortField: sortField,
+		}
+
+		err := sorter.SortObj(obj)
+		if err != nil {
+			return false, errors.Errorf("failed to sort by given sort-field: %q, the field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}').", sortField)
+		}
 	}
 
 	switch format {

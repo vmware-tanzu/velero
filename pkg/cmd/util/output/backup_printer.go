@@ -45,7 +45,7 @@ var (
 )
 
 func printBackupList(list *velerov1api.BackupList) []metav1.TableRow {
-	sortBackupsByPrefixAndTimestamp(list)
+	// sortBackupsByPrefixAndTimestamp(list)
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
