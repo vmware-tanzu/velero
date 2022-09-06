@@ -53,6 +53,7 @@ import (
 	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -79,7 +80,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/vmware-tanzu/velero/internal/storage"
 	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
@@ -112,6 +112,9 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
+
+	// daemonSet is the name of the Velero restic daemonset.
+	daemonSet = "restic"
 )
 
 type serverConfig struct {
@@ -128,7 +131,7 @@ type serverConfig struct {
 	clientPageSize                                                          int
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
-	defaultResticMaintenanceFrequency                                       time.Duration
+	repoMaintenanceFrequency                                                time.Duration
 	garbageCollectionFrequency                                              time.Duration
 	defaultVolumesToRestic                                                  bool
 	uploaderType                                                            string
@@ -144,25 +147,24 @@ func NewCommand(f client.Factory) *cobra.Command {
 		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(':')
 		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
 		config                  = serverConfig{
-			pluginDir:                         "/plugins",
-			metricsAddress:                    defaultMetricsAddress,
-			defaultBackupLocation:             "default",
-			defaultVolumeSnapshotLocations:    make(map[string]string),
-			backupSyncPeriod:                  defaultBackupSyncPeriod,
-			defaultBackupTTL:                  defaultBackupTTL,
-			defaultCSISnapshotTimeout:         defaultCSISnapshotTimeout,
-			storeValidationFrequency:          defaultStoreValidationFrequency,
-			podVolumeOperationTimeout:         defaultPodVolumeOperationTimeout,
-			restoreResourcePriorities:         defaultRestorePriorities,
-			clientQPS:                         defaultClientQPS,
-			clientBurst:                       defaultClientBurst,
-			clientPageSize:                    defaultClientPageSize,
-			profilerAddress:                   defaultProfilerAddress,
-			resourceTerminatingTimeout:        defaultResourceTerminatingTimeout,
-			formatFlag:                        logging.NewFormatFlag(),
-			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
-			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
-			uploaderType:                      uploader.ResticType,
+			pluginDir:                      "/plugins",
+			metricsAddress:                 defaultMetricsAddress,
+			defaultBackupLocation:          "default",
+			defaultVolumeSnapshotLocations: make(map[string]string),
+			backupSyncPeriod:               defaultBackupSyncPeriod,
+			defaultBackupTTL:               defaultBackupTTL,
+			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
+			storeValidationFrequency:       defaultStoreValidationFrequency,
+			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
+			restoreResourcePriorities:      defaultRestorePriorities,
+			clientQPS:                      defaultClientQPS,
+			clientBurst:                    defaultClientBurst,
+			clientPageSize:                 defaultClientPageSize,
+			profilerAddress:                defaultProfilerAddress,
+			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
+			formatFlag:                     logging.NewFormatFlag(),
+			defaultVolumesToRestic:         restic.DefaultVolumesToRestic,
+			uploaderType:                   uploader.ResticType,
 		}
 	)
 
@@ -225,7 +227,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "The address to expose the pprof profiler.")
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "How long to wait on persistent volumes and namespaces to terminate during a restore before timing out.")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
-	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default.")
+	command.Flags().DurationVar(&config.repoMaintenanceFrequency, "default-restic-prune-frequency", config.repoMaintenanceFrequency, "How often 'prune' is run for backup repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "Backup all volumes with restic by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
@@ -257,6 +259,7 @@ type server struct {
 	config                              serverConfig
 	mgr                                 manager.Manager
 	credentialFileStore                 credentials.FileStore
+	credentialSecretStore               credentials.SecretStore
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -346,6 +349,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
+	credentialSecretStore, err := credentials.NewNamespacedSecretStore(mgr.GetClient(), f.Namespace())
+
 	s := &server{
 		namespace:                           f.Namespace(),
 		metricsAddress:                      config.metricsAddress,
@@ -365,6 +370,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		config:                              config,
 		mgr:                                 mgr,
 		credentialFileStore:                 credentialFileStore,
+		credentialSecretStore:               credentialSecretStore,
 	}
 
 	return s, nil
@@ -529,7 +535,7 @@ var defaultRestorePriorities = []string{
 
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
-	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, daemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
 	} else if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
@@ -541,9 +547,9 @@ func (s *server) initRestic() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.sharedInformerFactory.Velero().V1().BackupRepositories(), s.veleroClient.VeleroV1(), s.logger)
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger)
 
-	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.logger)
+	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
 	return nil
 }
@@ -604,29 +610,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
-	backupSyncControllerRunInfo := func() controllerRunInfo {
-		backupSyncContoller := controller.NewBackupSyncController(
-			s.veleroClient.VeleroV1(),
-			s.mgr.GetClient(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			csiVSLister,
-			s.config.backupSyncPeriod,
-			s.namespace,
-			s.csiSnapshotClient,
-			s.kubeClient,
-			s.config.defaultBackupLocation,
-			newPluginManager,
-			backupStoreGetter,
-			s.logger,
-		)
-
-		return controllerRunInfo{
-			controller: backupSyncContoller,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	backupTracker := controller.NewBackupTracker()
 
 	backupControllerRunInfo := func() controllerRunInfo {
@@ -640,6 +623,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
 			s.config.clientPageSize,
+			s.config.uploaderType,
 		)
 		cmd.CheckError(err)
 
@@ -666,6 +650,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			csiVSCLister,
 			csiVSClassLister,
 			backupStoreGetter,
+			s.credentialFileStore,
 		)
 
 		return controllerRunInfo{
@@ -688,6 +673,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.kubeClient.CoreV1().RESTClient(),
+			s.credentialFileStore,
 		)
 		cmd.CheckError(err)
 
@@ -714,16 +700,24 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
+	// By far, PodVolumeBackup, PodVolumeRestore, BackupStorageLocation controllers
+	// are not included in --disable-controllers list.
+	// This is because of PVB and PVR are used by Restic DaemonSet,
+	// and BSL controller is mandatory for Velero to work.
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.BackupSync: backupSyncControllerRunInfo,
-		controller.Backup:     backupControllerRunInfo,
-		controller.Restore:    restoreControllerRunInfo,
+		controller.Backup:  backupControllerRunInfo,
+		controller.Restore: restoreControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
-	enabledRuntimeControllers := make(map[string]struct{})
-	enabledRuntimeControllers[controller.ServerStatusRequest] = struct{}{}
-	enabledRuntimeControllers[controller.DownloadRequest] = struct{}{}
-	enabledRuntimeControllers[controller.GarbageCollection] = struct{}{}
+	enabledRuntimeControllers := map[string]struct{}{
+		controller.ServerStatusRequest: {},
+		controller.DownloadRequest:     {},
+		controller.Schedule:            {},
+		controller.ResticRepo:          {},
+		controller.BackupDeletion:      {},
+		controller.GarbageCollection:   {},
+		controller.BackupSync:          {},
+	}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
@@ -736,7 +730,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	// Remove disabled controllers so they are not initialized. If a match is not found we want
-	// to hault the system so the user knows this operation was not possible.
+	// to halt the system so the user knows this operation was not possible.
 	if err := removeControllers(s.config.disabledControllers, enabledControllers, enabledRuntimeControllers, s.logger); err != nil {
 		log.Fatal(err, "unable to disable a controller")
 	}
@@ -770,73 +764,95 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
-	bslr := controller.BackupStorageLocationReconciler{
-		Ctx:    s.ctx,
-		Client: s.mgr.GetClient(),
-		Scheme: s.mgr.GetScheme(),
-		DefaultBackupLocationInfo: storage.DefaultBackupLocationInfo{
+	bslr := controller.NewBackupStorageLocationReconciler(
+		s.ctx,
+		s.mgr.GetClient(),
+		s.mgr.GetScheme(),
+		storage.DefaultBackupLocationInfo{
 			StorageLocation:           s.config.defaultBackupLocation,
 			ServerValidationFrequency: s.config.storeValidationFrequency,
 		},
-		NewPluginManager:  newPluginManager,
-		BackupStoreGetter: backupStoreGetter,
-		Log:               s.logger,
-	}
+		newPluginManager,
+		backupStoreGetter,
+		s.logger,
+	)
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
 
-	if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+	if _, ok := enabledRuntimeControllers[controller.Schedule]; ok {
+		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+		}
 	}
 
-	if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.defaultResticMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
+	if _, ok := enabledRuntimeControllers[controller.ResticRepo]; ok {
+		if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
+		}
 	}
 
-	if err := controller.NewBackupDeletionReconciler(
-		s.logger,
-		s.mgr.GetClient(),
-		backupTracker,
-		s.repoManager,
-		s.metrics,
-		s.discoveryHelper,
-		newPluginManager,
-		backupStoreGetter,
-	).SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+	if _, ok := enabledRuntimeControllers[controller.BackupDeletion]; ok {
+		if err := controller.NewBackupDeletionReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			backupTracker,
+			s.repoManager,
+			s.metrics,
+			s.discoveryHelper,
+			newPluginManager,
+			backupStoreGetter,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+		}
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
-		r := controller.ServerStatusRequestReconciler{
-			Scheme:         s.mgr.GetScheme(),
-			Client:         s.mgr.GetClient(),
-			Ctx:            s.ctx,
-			PluginRegistry: s.pluginRegistry,
-			Clock:          clock.RealClock{},
-			Log:            s.logger,
-		}
-		if err := r.SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewServerStatusRequestReconciler(
+			s.mgr.GetClient(),
+			s.ctx,
+			s.pluginRegistry,
+			clock.RealClock{},
+			s.logger,
+		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
 		}
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
-		r := controller.DownloadRequestReconciler{
-			Scheme:            s.mgr.GetScheme(),
-			Client:            s.mgr.GetClient(),
-			Clock:             clock.RealClock{},
-			NewPluginManager:  newPluginManager,
-			BackupStoreGetter: backupStoreGetter,
-			Log:               s.logger,
-		}
+		r := controller.NewDownloadRequestReconciler(
+			s.mgr.GetClient(),
+			clock.RealClock{},
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
 		}
 	}
 
+	if _, ok := enabledRuntimeControllers[controller.BackupSync]; ok {
+		syncPeriod := s.config.backupSyncPeriod
+		if syncPeriod <= 0 {
+			syncPeriod = time.Minute
+		}
+
+		backupSyncReconciler := controller.NewBackupSyncReconciler(
+			s.mgr.GetClient(),
+			s.namespace,
+			syncPeriod,
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+		)
+		if err := backupSyncReconciler.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, " unable to create controller ", "controller ", controller.BackupSync)
+		}
+	}
+
 	if _, ok := enabledRuntimeControllers[controller.GarbageCollection]; ok {
-		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient())
+		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient(), s.config.garbageCollectionFrequency)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.GarbageCollection)
 		}

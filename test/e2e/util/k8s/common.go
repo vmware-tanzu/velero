@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	corev1 "k8s.io/api/core/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -153,4 +154,68 @@ func KubectlConfigUseContext(ctx context.Context, kubectlContext string) error {
 	fmt.Print(stdout)
 	fmt.Print(stderr)
 	return err
+}
+
+func GetPVByPodName(client TestClient, namespace, podName string) (string, error) {
+	pvcList, err := GetPvcByPodName(context.Background(), namespace, podName)
+	if err != nil {
+		return "", err
+	}
+	if len(pvcList) != 1 {
+		return "", errors.New(fmt.Sprintf("Only 1 PVC of pod %s should be found under namespace %s", podName, namespace))
+	}
+	pvList, err := GetPvByPvc(context.Background(), namespace, pvcList[0])
+	if err != nil {
+		return "", err
+	}
+	if len(pvList) != 1 {
+		return "", errors.New(fmt.Sprintf("Only 1 PV of PVC %s pod %s should be found under namespace %s", pvcList[0], podName, namespace))
+	}
+	pv_value, err := GetPersistentVolume(context.Background(), client, "", pvList[0])
+	fmt.Println(pv_value.Annotations["pv.kubernetes.io/provisioned-by"])
+	if err != nil {
+		return "", err
+	}
+	return pv_value.Name, nil
+}
+func CreatePodWithPVC(client TestClient, ns, podName, sc string, volumeNameList []string) (*corev1.Pod, error) {
+	volumes := []corev1.Volume{}
+	for _, volume := range volumeNameList {
+		pvc, err := CreatePVC(client, ns, fmt.Sprintf("pvc-%s", volume), sc)
+		if err != nil {
+			return nil, err
+		}
+		volumes = append(volumes, corev1.Volume{
+			Name: volume,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
+	pod, err := CreatePod(client, ns, podName, volumes)
+	if err != nil {
+		return nil, err
+	}
+	return pod, nil
+}
+
+func CreateFileToPod(ctx context.Context, namespace, podName, volume, filename, content string) error {
+	arg := []string{"exec", "-n", namespace, "-c", podName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	return cmd.Run()
+}
+func ReadFileFromPodVolume(ctx context.Context, namespace, podName, volume, filename string) (string, error) {
+	arg := []string{"exec", "-n", namespace, "-c", podName, podName,
+		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Print(stdout)
+	fmt.Print(stderr)
+	return stdout, err
 }

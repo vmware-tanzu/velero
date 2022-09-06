@@ -58,12 +58,11 @@ func (b *TTL) Init() {
 }
 
 func TTLTest() {
+	var err error
 	useVolumeSnapshots := true
 	test := new(TTL)
-	client, err := NewTestClient(VeleroCfg.DefaultCluster)
-	if err != nil {
-		println(err.Error())
-	}
+	client := *VeleroCfg.ClientToInstallVelero
+
 	//Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
