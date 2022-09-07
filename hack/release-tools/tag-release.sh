@@ -95,7 +95,7 @@ eval $(go run $DIR/chk_version.go)
 printf "To clarify, you've provided a version string of $VELERO_VERSION.\n"
 printf "Based on this, the following assumptions have been made: \n"
 
-# $VELERO_PATCH gets populated by the chk_version.go scrip that parses and verifies the given version format
+# $VELERO_PATCH gets populated by the chk_version.go script that parses and verifies the given version format
 # If we've got a patch release, we assume the tag is on release branch.
 if [[ "$VELERO_PATCH" != 0 ]]; then
     printf "*\t This is a patch release.\n"
