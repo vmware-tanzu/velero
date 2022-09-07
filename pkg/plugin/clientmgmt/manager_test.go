@@ -26,8 +26,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/test"
@@ -84,33 +86,6 @@ func (f *mockRestartableProcessFactory) NewRestartableProcess(command string, lo
 	return rp, args.Error(1)
 }
 
-type mockRestartableProcess struct {
-	mock.Mock
-}
-
-func (rp *mockRestartableProcess) AddReinitializer(key process.KindAndName, r process.Reinitializer) {
-	rp.Called(key, r)
-}
-
-func (rp *mockRestartableProcess) Reset() error {
-	args := rp.Called()
-	return args.Error(0)
-}
-
-func (rp *mockRestartableProcess) ResetIfNeeded() error {
-	args := rp.Called()
-	return args.Error(0)
-}
-
-func (rp *mockRestartableProcess) GetByKindAndName(key process.KindAndName) (interface{}, error) {
-	args := rp.Called(key)
-	return args.Get(0), args.Error(1)
-}
-
-func (rp *mockRestartableProcess) Stop() {
-	rp.Called()
-}
-
 func TestGetRestartableProcess(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
@@ -144,7 +119,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	assert.EqualError(t, err, "factory")
 
 	// Test 3: registry ok, factory ok
-	restartableProcess := &mockRestartableProcess{}
+	restartableProcess := &restartabletest.MockRestartableProcess{}
 	defer restartableProcess.AssertExpectations(t)
 	factory.On("NewRestartableProcess", podID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
 	rp, err = m.getRestartableProcess(pluginKind, pluginName)
@@ -167,7 +142,7 @@ func TestCleanupClients(t *testing.T) {
 	m := NewManager(logger, logLevel, registry).(*manager)
 
 	for i := 0; i < 5; i++ {
-		rp := &mockRestartableProcess{}
+		rp := &restartabletest.MockRestartableProcess{}
 		defer rp.AssertExpectations(t)
 		rp.On("Stop")
 		m.restartableProcesses[fmt.Sprintf("rp%d", i)] = rp
@@ -235,9 +210,9 @@ func TestGetRestoreItemAction(t *testing.T) {
 			return m.GetRestoreItemAction(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
-			return &restartableRestoreItemAction{
-				key:                 process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name},
-				sharedPluginProcess: sharedPluginProcess,
+			return &riav1cli.RestartableRestoreItemAction{
+				Key:                 process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name},
+				SharedPluginProcess: sharedPluginProcess,
 			}
 		},
 		false,
@@ -272,7 +247,7 @@ func getPluginTest(
 	}
 	registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
 
-	restartableProcess := &mockRestartableProcess{}
+	restartableProcess := &restartabletest.MockRestartableProcess{}
 	defer restartableProcess.AssertExpectations(t)
 
 	// Test 1: error getting restartable process
@@ -349,7 +324,7 @@ func TestGetBackupItemActions(t *testing.T) {
 
 				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
 
-				restartableProcess := &mockRestartableProcess{}
+				restartableProcess := &restartabletest.MockRestartableProcess{}
 				defer restartableProcess.AssertExpectations(t)
 
 				expected := &biav1cli.RestartableBackupItemAction{
@@ -441,12 +416,12 @@ func TestGetRestoreItemActions(t *testing.T) {
 
 				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
 
-				restartableProcess := &mockRestartableProcess{}
+				restartableProcess := &restartabletest.MockRestartableProcess{}
 				defer restartableProcess.AssertExpectations(t)
 
-				expected := &restartableRestoreItemAction{
-					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
-					sharedPluginProcess: restartableProcess,
+				expected := &riav1cli.RestartableRestoreItemAction{
+					Key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					SharedPluginProcess: restartableProcess,
 				}
 
 				if tc.newRestartableProcessError != nil {
@@ -540,12 +515,12 @@ func TestGetDeleteItemActions(t *testing.T) {
 
 				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
 
-				restartableProcess := &mockRestartableProcess{}
+				restartableProcess := &restartabletest.MockRestartableProcess{}
 				defer restartableProcess.AssertExpectations(t)
 
-				expected := &restartableRestoreItemAction{
-					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
-					sharedPluginProcess: restartableProcess,
+				expected := &riav1cli.RestartableRestoreItemAction{
+					Key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					SharedPluginProcess: restartableProcess,
 				}
 
 				if tc.newRestartableProcessError != nil {

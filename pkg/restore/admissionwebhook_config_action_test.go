@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -163,7 +163,7 @@ func TestNewAdmissionWebhookConfigurationActionExecute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			o := map[string]interface{}{}
 			json.Unmarshal([]byte(tt.itemJSON), &o)
-			input := &velero.RestoreItemActionExecuteInput{
+			input := &riav1.RestoreItemActionExecuteInput{
 				Item: &unstructured.Unstructured{
 					Object: o,
 				},

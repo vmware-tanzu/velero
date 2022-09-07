@@ -24,6 +24,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 type AddPVCFromPodAction struct {
@@ -40,7 +41,7 @@ func (a *AddPVCFromPodAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *AddPVCFromPodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *AddPVCFromPodAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing AddPVCFromPodAction")
 
 	var pod corev1api.Pod
@@ -63,7 +64,7 @@ func (a *AddPVCFromPodAction) Execute(input *velero.RestoreItemActionExecuteInpu
 		})
 	}
 
-	return &velero.RestoreItemActionExecuteOutput{
+	return &riav1.RestoreItemActionExecuteOutput{
 		UpdatedItem:     input.Item,
 		AdditionalItems: additionalItems,
 	}, nil

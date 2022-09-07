@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // RoleBindingAction handle namespace remappings for role bindings
@@ -41,10 +42,10 @@ func (a *RoleBindingAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *RoleBindingAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *RoleBindingAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	namespaceMapping := input.Restore.Spec.NamespaceMapping
 	if len(namespaceMapping) == 0 {
-		return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: input.Item.UnstructuredContent()}), nil
+		return riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: input.Item.UnstructuredContent()}), nil
 	}
 
 	roleBinding := new(rbac.RoleBinding)
@@ -63,5 +64,5 @@ func (a *RoleBindingAction) Execute(input *velero.RestoreItemActionExecuteInput)
 		return nil, errors.WithStack(err)
 	}
 
-	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

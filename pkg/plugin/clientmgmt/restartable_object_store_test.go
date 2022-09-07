@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
@@ -56,7 +57,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			p.Test(t)
 			defer p.AssertExpectations(t)
 
@@ -81,7 +82,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 }
 
 func TestRestartableObjectStoreReinitialize(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
@@ -112,7 +113,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 }
 
 func TestRestartableObjectStoreGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
@@ -141,7 +142,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 }
 
 func TestRestartableObjectStoreInit(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
@@ -185,7 +186,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 }
 
 func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindObjectStore,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
@@ -194,44 +195,44 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 				sharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			return new(providermocks.ObjectStore)
 		},
-		restartableDelegateTest{
-			function:                "PutObject",
-			inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "PutObject",
+			Inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "GetObject",
-			inputs:                  []interface{}{"bucket", "key"},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{ioutil.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "GetObject",
+			Inputs:                  []interface{}{"bucket", "key"},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{ioutil.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "ListCommonPrefixes",
-			inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
-			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "ListCommonPrefixes",
+			Inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
+			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "ListObjects",
-			inputs:                  []interface{}{"bucket", "prefix"},
-			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "ListObjects",
+			Inputs:                  []interface{}{"bucket", "prefix"},
+			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "DeleteObject",
-			inputs:                  []interface{}{"bucket", "key"},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "DeleteObject",
+			Inputs:                  []interface{}{"bucket", "key"},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "CreateSignedURL",
-			inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateSignedURL",
+			Inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
 		},
 	)
 }

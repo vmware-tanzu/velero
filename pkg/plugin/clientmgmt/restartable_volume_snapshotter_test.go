@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
@@ -55,7 +56,7 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			p.Test(t)
 			defer p.AssertExpectations(t)
 
@@ -80,7 +81,7 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 }
 
 func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
@@ -111,7 +112,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 }
 
 func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
@@ -140,7 +141,7 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 }
 
 func TestRestartableVolumeSnapshotterInit(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
@@ -196,7 +197,7 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 		},
 	}
 
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindVolumeSnapshotter,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
@@ -205,44 +206,44 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 				sharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			return new(providermocks.VolumeSnapshotter)
 		},
-		restartableDelegateTest{
-			function:                "CreateVolumeFromSnapshot",
-			inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Int64Ptr(10000)},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateVolumeFromSnapshot",
+			Inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Int64Ptr(10000)},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "GetVolumeID",
-			inputs:                  []interface{}{pv},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "GetVolumeID",
+			Inputs:                  []interface{}{pv},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "SetVolumeID",
-			inputs:                  []interface{}{pv, "volumeID"},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{pvToReturn, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "SetVolumeID",
+			Inputs:                  []interface{}{pv, "volumeID"},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{pvToReturn, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "GetVolumeInfo",
-			inputs:                  []interface{}{"volumeID", "volumeAZ"},
-			expectedErrorOutputs:    []interface{}{"", (*int64)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "GetVolumeInfo",
+			Inputs:                  []interface{}{"volumeID", "volumeAZ"},
+			ExpectedErrorOutputs:    []interface{}{"", (*int64)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "CreateSnapshot",
-			inputs:                  []interface{}{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"snapshotID", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateSnapshot",
+			Inputs:                  []interface{}{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"snapshotID", errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "DeleteSnapshot",
-			inputs:                  []interface{}{"snapshotID"},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "DeleteSnapshot",
+			Inputs:                  []interface{}{"snapshotID"},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
 	)
 }

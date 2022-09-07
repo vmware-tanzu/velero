@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
@@ -57,7 +58,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			defer p.AssertExpectations(t)
 
 			name := "pod"
@@ -78,7 +79,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 }
 
 func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	defer p.AssertExpectations(t)
 
 	// Reset error
@@ -121,7 +122,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 		},
 	}
 
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindBackupItemAction,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
@@ -130,20 +131,20 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 				SharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			return new(mocks.BackupItemAction)
 		},
-		restartableDelegateTest{
-			function:                "AppliesTo",
-			inputs:                  []interface{}{},
-			expectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "AppliesTo",
+			Inputs:                  []interface{}{},
+			ExpectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "Execute",
-			inputs:                  []interface{}{pv, b},
-			expectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "Execute",
+			Inputs:                  []interface{}{pv, b},
+			ExpectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, errors.Errorf("delegate error")},
 		},
 	)
 }

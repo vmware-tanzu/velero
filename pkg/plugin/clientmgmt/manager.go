@@ -26,10 +26,12 @@ import (
 
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // Manager manages the lifecycles of plugins.
@@ -47,10 +49,10 @@ type Manager interface {
 	GetBackupItemAction(name string) (biav1.BackupItemAction, error)
 
 	// GetRestoreItemActions returns all restore item action plugins.
-	GetRestoreItemActions() ([]velero.RestoreItemAction, error)
+	GetRestoreItemActions() ([]riav1.RestoreItemAction, error)
 
 	// GetRestoreItemAction returns the restore item action plugin for name.
-	GetRestoreItemAction(name string) (velero.RestoreItemAction, error)
+	GetRestoreItemAction(name string) (riav1.RestoreItemAction, error)
 
 	// GetDeleteItemActions returns all delete item action plugins.
 	GetDeleteItemActions() ([]velero.DeleteItemAction, error)
@@ -211,10 +213,10 @@ func (m *manager) GetBackupItemAction(name string) (biav1.BackupItemAction, erro
 }
 
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
-func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
+func (m *manager) GetRestoreItemActions() ([]riav1.RestoreItemAction, error) {
 	list := m.registry.List(common.PluginKindRestoreItemAction)
 
-	actions := make([]velero.RestoreItemAction, 0, len(list))
+	actions := make([]riav1.RestoreItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -231,16 +233,21 @@ func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
 }
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
-func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, error) {
+func (m *manager) GetRestoreItemAction(name string) (riav1.RestoreItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(common.PluginKindRestoreItemAction, name)
-	if err != nil {
-		return nil, err
+	for _, adaptedRestoreItemAction := range riav1cli.AdaptedRestoreItemActions() {
+		restartableProcess, err := m.getRestartableProcess(adaptedRestoreItemAction.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedRestoreItemAction.GetRestartable(name, restartableProcess), nil
 	}
-
-	r := NewRestartableRestoreItemAction(name, restartableProcess)
-	return r, nil
+	return nil, fmt.Errorf("unable to get valid RestoreItemAction for %q", name)
 }
 
 // GetDeleteItemActions returns all delete item actions as restartableDeleteItemActions.

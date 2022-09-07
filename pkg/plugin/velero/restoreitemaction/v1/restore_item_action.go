@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package velero
+package v1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // RestoreItemAction is an actor that performs an operation on an individual item being restored.
@@ -27,7 +28,7 @@ type RestoreItemAction interface {
 	// AppliesTo returns information about which resources this action should be invoked for.
 	// A RestoreItemAction's Execute function will only be invoked on items that match the returned
 	// selector. A zero-valued ResourceSelector matches all resources.
-	AppliesTo() (ResourceSelector, error)
+	AppliesTo() (velero.ResourceSelector, error)
 
 	// Execute allows the ItemAction to perform arbitrary logic with the item being restored,
 	// including mutating the item itself prior to restore. The item (unmodified or modified)
@@ -56,7 +57,7 @@ type RestoreItemActionExecuteOutput struct {
 
 	// AdditionalItems is a list of additional related items that should
 	// be restored.
-	AdditionalItems []ResourceIdentifier
+	AdditionalItems []velero.ResourceIdentifier
 
 	// SkipRestore tells velero to stop executing further actions
 	// on this item, and skip the restore step. When this field's

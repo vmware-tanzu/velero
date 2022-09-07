@@ -26,6 +26,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
@@ -108,7 +109,7 @@ func NewBackupItemActionResolver(actions []biav1.BackupItemAction) BackupItemAct
 	}
 }
 
-func NewRestoreItemActionResolver(actions []velero.RestoreItemAction) RestoreItemActionResolver {
+func NewRestoreItemActionResolver(actions []riav1.RestoreItemAction) RestoreItemActionResolver {
 	return RestoreItemActionResolver{
 		actions: actions,
 	}
@@ -155,12 +156,12 @@ func (recv BackupItemActionResolver) ResolveActions(helper discovery.Helper, log
 }
 
 type RestoreItemResolvedAction struct {
-	velero.RestoreItemAction
+	riav1.RestoreItemAction
 	resolvedAction
 }
 
 type RestoreItemActionResolver struct {
-	actions []velero.RestoreItemAction
+	actions []riav1.RestoreItemAction
 }
 
 func (recv RestoreItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]RestoreItemResolvedAction, error) {
