@@ -50,7 +50,6 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	snapshotv1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
-	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
@@ -554,36 +553,6 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) getCSISnapshotListers() (snapshotv1listers.VolumeSnapshotLister, snapshotv1listers.VolumeSnapshotContentLister, snapshotv1listers.VolumeSnapshotClassLister) {
-	// Make empty listers that will only be populated if CSI is properly enabled.
-	var vsLister snapshotv1listers.VolumeSnapshotLister
-	var vscLister snapshotv1listers.VolumeSnapshotContentLister
-	var vsClassLister snapshotv1listers.VolumeSnapshotClassLister
-	var err error
-
-	// If CSI is enabled, check for the CSI groups and generate the listers
-	// If CSI isn't enabled, return empty listers.
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
-		switch {
-		case apierrors.IsNotFound(err):
-			// CSI is enabled, but the required CRDs aren't installed, so halt.
-			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
-		case err == nil:
-			// CSI is enabled, and the resources were found.
-			// Instantiate the listers fully
-			s.logger.Debug("Creating CSI listers")
-			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshots().Lister()
-			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotContents().Lister()
-			vsClassLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshotClasses().Lister()
-		case err != nil:
-			cmd.CheckError(err)
-		}
-	}
-	return vsLister, vscLister, vsClassLister
-}
-
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
 	s.logger.Info("Starting controllers")
 
@@ -607,8 +576,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	backupStoreGetter := persistence.NewObjectBackupStoreGetter(s.credentialFileStore)
-
-	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
 	backupTracker := controller.NewBackupTracker()
 
@@ -645,10 +612,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			defaultVolumeSnapshotLocations,
 			s.metrics,
 			s.config.formatFlag.Parse(),
-			csiVSLister,
-			s.csiSnapshotClient,
-			csiVSCLister,
-			csiVSClassLister,
 			backupStoreGetter,
 		)
 
