@@ -22,6 +22,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/pkg/errors"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -294,4 +295,18 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 		podVolumes = append(podVolumes, pv.Name)
 	}
 	return podVolumes
+}
+
+// IsPodQualified checks if the pod's status is qualified for a PVB/PVR to backup/restore its volumes.
+// If no, return the error found
+func IsPodQualified(pod *corev1api.Pod) error {
+	if pod.Spec.NodeName == "" {
+		return errors.Errorf("pod is not scheduled, name=%s, namespace=%s, status=%s", pod.Name, pod.Namespace, pod.Status.Phase)
+	}
+
+	if pod.Status.Phase != corev1api.PodRunning {
+		return errors.Errorf("pod is not running, name=%s, namespace=%s, status=%s", pod.Name, pod.Namespace, pod.Status.Phase)
+	}
+
+	return nil
 }

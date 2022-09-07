@@ -85,6 +85,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 )
 
 const (
@@ -112,9 +114,6 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
-
-	// daemonSet is the name of the Velero restic daemonset.
-	daemonSet = "restic"
 )
 
 type serverConfig struct {
@@ -535,7 +534,7 @@ var defaultRestorePriorities = []string{
 
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
-	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, daemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
 		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
 	} else if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
@@ -619,7 +618,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			podvolume.NewBackupperFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(), s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
+				s.kubeClient.CoreV1(), s.kubeClient.CoreV1(),
+				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
 			s.config.clientPageSize,
