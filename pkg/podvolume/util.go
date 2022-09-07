@@ -73,6 +73,16 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 	return volumes
 }
 
+// GetPvbRepositoryType returns the repositoryType according to the PVB information
+func GetPvbRepositoryType(pvb *velerov1api.PodVolumeBackup) string {
+	return getRepositoryType(pvb.Spec.UploaderType)
+}
+
+// GetPvrRepositoryType returns the repositoryType according to the PVR information
+func GetPvrRepositoryType(pvr *velerov1api.PodVolumeRestore) string {
+	return getRepositoryType(pvr.Spec.UploaderType)
+}
+
 // getVolumeBackupInfoForPod returns a map, of volume name -> VolumeBackupInfo,
 // of the PodVolumeBackups that exist for the provided pod.
 func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *corev1api.Pod, sourcePodNs string) map[string]volumeBackupInfo {

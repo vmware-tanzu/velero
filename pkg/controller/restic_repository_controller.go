@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -173,23 +172,10 @@ func (r *ResticRepoReconciler) getRepositoryMaintenanceFrequency(req *velerov1ap
 	}
 }
 
-// ensureRepo checks to see if a repository exists, and attempts to initialize it if
-// it does not exist. An error is returned if the repository can't be connected to
-// or initialized.
+// ensureRepo calls repo manager's PrepareRepo to ensure the repo is ready for use.
+// An error is returned if the repository can't be connected to or initialized.
 func ensureRepo(repo *velerov1api.BackupRepository, repoManager repository.Manager) error {
-	if err := repoManager.ConnectToRepo(repo); err != nil {
-		// If the repository has not yet been initialized, the error message will always include
-		// the following string. This is the only scenario where we should try to initialize it.
-		// Other errors (e.g. "already locked") should be returned as-is since the repository
-		// does already exist, but it can't be connected to.
-		if strings.Contains(err.Error(), "Is there a repository at the following location?") {
-			return repoManager.InitRepo(repo)
-		}
-
-		return err
-	}
-
-	return nil
+	return repoManager.PrepareRepo(repo)
 }
 
 func (r *ResticRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {

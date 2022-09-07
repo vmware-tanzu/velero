@@ -120,7 +120,10 @@ func (rp *resticProvider) RunBackup(
 	backupCmd := ResticBackupCMDFunc(rp.repoIdentifier, rp.credentialsFile, path, tags)
 	backupCmd.Env = rp.cmdEnv
 	backupCmd.CACertFile = rp.caCertFile
-	backupCmd.ExtraFlags = rp.extraFlags
+	if len(rp.extraFlags) != 0 {
+		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, rp.extraFlags...)
+	}
+
 	if parentSnapshot != "" {
 		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshot))
 	}

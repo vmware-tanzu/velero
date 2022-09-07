@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,10 +33,10 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	"github.com/vmware-tanzu/velero/pkg/repository/util"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -145,22 +144,19 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}, backupLocation); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup storage location")
 	}
-	selector := labels.SelectorFromSet(
-		map[string]string{
-			//TODO
-			//velerov1api.VolumeNamespaceLabel: label.GetValidName(volumeNamespace),
-			velerov1api.StorageLocationLabel: label.GetValidName(pvb.Spec.BackupStorageLocation),
-			//velerov1api.RepositoryTypeLabel:  label.GetValidName(repositoryType),
-		},
-	)
-	backupRepo, err := util.GetBackupRepositoryByLabel(ctx, r.Client, pvb.Namespace, selector)
+
+	backupRepo, err := repository.GetBackupRepository(ctx, r.Client, pvb.Namespace, repository.BackupRepositoryKey{
+		VolumeNamespace: pvb.Spec.Pod.Namespace,
+		BackupLocation:  pvb.Spec.BackupStorageLocation,
+		RepositoryType:  podvolume.GetPvbRepositoryType(&pvb),
+	})
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup repository")
 	}
 
 	var uploaderProv provider.Provider
 	uploaderProv, err = NewUploaderProviderFunc(ctx, r.Client, pvb.Spec.UploaderType, pvb.Spec.RepoIdentifier,
-		backupLocation, &backupRepo, r.CredentialGetter, repokey.RepoKeySelector(), log)
+		backupLocation, backupRepo, r.CredentialGetter, repokey.RepoKeySelector(), log)
 	if err != nil {
 		return r.updateStatusToFailed(ctx, &pvb, err, "error creating uploader", log)
 	}

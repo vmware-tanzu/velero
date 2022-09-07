@@ -34,7 +34,7 @@ import (
 const testMaintenanceFrequency = 10 * time.Minute
 
 func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
-	mgr := &repomokes.RepositoryManager{}
+	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
 	}
@@ -75,7 +75,7 @@ func TestPatchResticRepository(t *testing.T) {
 
 func TestCheckNotReadyRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
@@ -107,7 +107,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 func TestInitializeRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -225,7 +225,7 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mgr := repomokes.RepositoryManager{}
+			mgr := repomokes.Manager{}
 			mgr.On("DefaultMaintenanceFrequency", mock.Anything).Return(test.freqReturn, test.freqError)
 			reconciler := NewResticRepoReconciler(
 				velerov1api.DefaultNamespace,

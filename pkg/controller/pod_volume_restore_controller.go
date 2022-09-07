@@ -39,10 +39,9 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
-	"github.com/vmware-tanzu/velero/pkg/repository/util"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -250,21 +249,17 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	selector := labels.SelectorFromSet(
-		map[string]string{
-			//TODO
-			//velerov1api.VolumeNamespaceLabel: label.GetValidName(volumeNamespace),
-			velerov1api.StorageLocationLabel: label.GetValidName(req.Spec.BackupStorageLocation),
-			//velerov1api.RepositoryTypeLabel:  label.GetValidName(repositoryType),
-		},
-	)
-	backupRepo, err := util.GetBackupRepositoryByLabel(ctx, c.Client, req.Namespace, selector)
+	backupRepo, err := repository.GetBackupRepository(ctx, c.Client, req.Namespace, repository.BackupRepositoryKey{
+		VolumeNamespace: req.Spec.Pod.Namespace,
+		BackupLocation:  req.Spec.BackupStorageLocation,
+		RepositoryType:  podvolume.GetPvrRepositoryType(req),
+	})
 	if err != nil {
 		return errors.Wrap(err, "error getting backup repository")
 	}
 
 	uploaderProv, err := provider.NewUploaderProvider(ctx, c.Client, req.Spec.UploaderType,
-		req.Spec.RepoIdentifier, backupLocation, &backupRepo, c.credentialGetter, repokey.RepoKeySelector(), log)
+		req.Spec.RepoIdentifier, backupLocation, backupRepo, c.credentialGetter, repokey.RepoKeySelector(), log)
 	if err != nil {
 		return errors.Wrap(err, "error creating uploader")
 	}
