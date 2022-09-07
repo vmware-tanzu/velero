@@ -18,8 +18,10 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,7 +37,8 @@ type BackupRepositoryKey struct {
 }
 
 var (
-	backupRepoNotFoundError = errors.New("backup repository not found")
+	backupRepoNotFoundError       = errors.New("backup repository not found")
+	backupRepoNotProvisionedError = errors.New("backup repository not provisioned")
 )
 
 func repoLabelsFromKey(key BackupRepositoryKey) labels.Set {
@@ -76,10 +79,37 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 	repo := &backupRepoList.Items[0]
 
 	if ensureReady {
-		if repo.Status.Phase != velerov1api.BackupRepositoryPhaseReady {
+		if repo.Status.Phase == velerov1api.BackupRepositoryPhaseNotReady {
 			return nil, errors.Errorf("backup repository is not ready: %s", repo.Status.Message)
+		}
+
+		if repo.Status.Phase == velerov1api.BackupRepositoryPhaseNew {
+			return nil, backupRepoNotProvisionedError
 		}
 	}
 
 	return repo, nil
+}
+
+func newBackupRepository(namespace string, key BackupRepositoryKey) *velerov1api.BackupRepository {
+	return &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    namespace,
+			GenerateName: fmt.Sprintf("%s-%s-%s-", key.VolumeNamespace, key.BackupLocation, key.RepositoryType),
+			Labels:       repoLabelsFromKey(key),
+		},
+		Spec: velerov1api.BackupRepositorySpec{
+			VolumeNamespace:       key.VolumeNamespace,
+			BackupStorageLocation: key.BackupLocation,
+			RepositoryType:        key.RepositoryType,
+		},
+	}
+}
+
+func isBackupRepositoryNotFoundError(err error) bool {
+	return (err == backupRepoNotFoundError)
+}
+
+func isBackupRepositoryNotProvisionedError(err error) bool {
+	return (err == backupRepoNotProvisionedError)
 }
