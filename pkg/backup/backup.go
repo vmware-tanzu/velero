@@ -44,8 +44,8 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -165,7 +165,7 @@ func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelpe
 }
 
 type VolumeSnapshotterGetter interface {
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file

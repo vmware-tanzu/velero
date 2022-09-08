@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientmgmt
+package v1
 
 import (
 	"testing"
@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
-	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/volumesnapshotter/v1"
 )
 
 func TestRestartableGetVolumeSnapshotter(t *testing.T) {
@@ -64,9 +64,9 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 			key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := &restartableVolumeSnapshotter{
-				key:                 key,
-				sharedPluginProcess: p,
+			r := &RestartableVolumeSnapshotter{
+				Key:                 key,
+				SharedPluginProcess: p,
 			}
 			a, err := r.getVolumeSnapshotter()
 			if tc.expectedError != "" {
@@ -87,9 +87,9 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 
 	name := "aws"
 	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
-	r := &restartableVolumeSnapshotter{
-		key:                 key,
-		sharedPluginProcess: p,
+	r := &RestartableVolumeSnapshotter{
+		Key:                 key,
+		SharedPluginProcess: p,
 		config: map[string]string{
 			"color": "blue",
 		},
@@ -120,9 +120,9 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
 	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
-	r := &restartableVolumeSnapshotter{
-		key:                 key,
-		sharedPluginProcess: p,
+	r := &RestartableVolumeSnapshotter{
+		Key:                 key,
+		SharedPluginProcess: p,
 	}
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
@@ -148,9 +148,9 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 	// getVolumeSnapshottererror
 	name := "aws"
 	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
-	r := &restartableVolumeSnapshotter{
-		key:                 key,
-		sharedPluginProcess: p,
+	r := &RestartableVolumeSnapshotter{
+		Key:                 key,
+		SharedPluginProcess: p,
 	}
 	p.On("GetByKindAndName", key).Return(nil, errors.Errorf("GetByKindAndName error")).Once()
 
@@ -201,9 +201,9 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 		t,
 		common.PluginKindVolumeSnapshotter,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
-			return &restartableVolumeSnapshotter{
-				key:                 key,
-				sharedPluginProcess: p,
+			return &RestartableVolumeSnapshotter{
+				Key:                 key,
+				SharedPluginProcess: p,
 			}
 		},
 		func() restartabletest.Mockable {

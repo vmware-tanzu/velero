@@ -30,6 +30,7 @@ import (
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
+	vsv1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/test"
@@ -176,9 +177,9 @@ func TestGetVolumeSnapshotter(t *testing.T) {
 			return m.GetVolumeSnapshotter(name)
 		},
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
-			return &restartableVolumeSnapshotter{
-				key:                 process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name},
-				sharedPluginProcess: sharedPluginProcess,
+			return &vsv1cli.RestartableVolumeSnapshotter{
+				Key:                 process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name},
+				SharedPluginProcess: sharedPluginProcess,
 			}
 		},
 		true,

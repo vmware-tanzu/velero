@@ -39,7 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -282,7 +282,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
 			errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
 		} else {
-			volumeSnapshotters := make(map[string]velero.VolumeSnapshotter)
+			volumeSnapshotters := make(map[string]vsv1.VolumeSnapshotter)
 
 			for _, snapshot := range snapshots {
 				log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
@@ -392,7 +392,7 @@ func volumeSnapshottersForVSL(
 	namespace, vslName string,
 	client client.Client,
 	pluginManager clientmgmt.Manager,
-) (velero.VolumeSnapshotter, error) {
+) (vsv1.VolumeSnapshotter, error) {
 	vsl := &velerov1api.VolumeSnapshotLocation{}
 	if err := client.Get(ctx, types.NamespacedName{
 		Namespace: namespace,

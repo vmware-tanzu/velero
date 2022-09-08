@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 )
 
 // VolumeSnapshotterGRPCServer implements the proto-generated VolumeSnapshotterServer interface, and accepts
@@ -34,13 +34,13 @@ type VolumeSnapshotterGRPCServer struct {
 	mux *common.ServerMux
 }
 
-func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (velero.VolumeSnapshotter, error) {
+func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (vsv1.VolumeSnapshotter, error) {
 	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	volumeSnapshotter, ok := impl.(velero.VolumeSnapshotter)
+	volumeSnapshotter, ok := impl.(vsv1.VolumeSnapshotter)
 	if !ok {
 		return nil, errors.Errorf("%T is not a volume snapshotter", impl)
 	}
