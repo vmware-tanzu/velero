@@ -35,6 +35,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // Backupper can execute restic backups of volumes in a pod.
@@ -125,7 +126,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, []error{err}
 	}
 
-	err = IsPodQualified(pod)
+	err = kube.IsPodRunning(pod)
 	if err != nil {
 		return nil, []error{err}
 	}

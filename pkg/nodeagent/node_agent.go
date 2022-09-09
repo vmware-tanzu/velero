@@ -23,13 +23,15 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
-	// daemonSet is the name of the Velero restic daemonset.
+	// daemonSet is the name of the Velero node agent daemonset.
 	daemonSet = "restic"
 )
 
@@ -48,7 +50,7 @@ func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace s
 	}
 }
 
-// IsRunningInNode checks if the node agent daemonset pod is running properly in a specified node. If not, return the error found
+// IsRunningInNode checks if the node agent pod is running properly in a specified node. If not, return the error found
 func IsRunningInNode(ctx context.Context, namespace string, nodeName string, podClient corev1client.PodsGetter) error {
 	if nodeName == "" {
 		return errors.New("node name is empty")
@@ -60,10 +62,14 @@ func IsRunningInNode(ctx context.Context, namespace string, nodeName string, pod
 	}
 
 	for _, pod := range pods.Items {
+		if kube.IsPodRunning(&pod) != nil {
+			continue
+		}
+
 		if pod.Spec.NodeName == nodeName {
 			return nil
 		}
 	}
 
-	return errors.Errorf("daemonset pod not found in node %s", nodeName)
+	return errors.Errorf("daemonset pod not found in running state in node %s", nodeName)
 }

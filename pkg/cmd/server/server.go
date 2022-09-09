@@ -533,11 +533,11 @@ var defaultRestorePriorities = []string{
 }
 
 func (s *server) initRestic() error {
-	// warn if restic daemonset does not exist
+	// warn if node agent does not exist
 	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
-		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
+		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
 	} else if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
+		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
 	}
 
 	// ensure the repo key secret is set up
