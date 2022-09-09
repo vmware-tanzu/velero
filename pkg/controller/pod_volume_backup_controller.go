@@ -168,7 +168,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
 	var parentSnapshotID string
 	if pvcUID, ok := pvb.Labels[velerov1api.PVCUIDLabel]; ok {
-		parentSnapshotID = r.getParentSnapshot(ctx, log, pvb.Namespace, pvcUID, pvb.Spec.BackupStorageLocation)
+		parentSnapshotID = r.getParentSnapshot(ctx, log, pvcUID, &pvb)
 		if parentSnapshotID == "" {
 			log.Info("No parent snapshot found for PVC, not based on parent snapshot for this backup")
 		} else {
@@ -221,14 +221,14 @@ func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // getParentSnapshot finds the most recent completed PodVolumeBackup for the
-// specified PVC and returns its Restic snapshot ID. Any errors encountered are
+// specified PVC and returns its snapshot ID. Any errors encountered are
 // logged but not returned since they do not prevent a backup from proceeding.
-func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log logrus.FieldLogger, pvbNamespace, pvcUID, bsl string) string {
+func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log logrus.FieldLogger, pvcUID string, podVolumeBackup *velerov1api.PodVolumeBackup) string {
 	log = log.WithField("pvcUID", pvcUID)
 	log.Infof("Looking for most recent completed PodVolumeBackup for this PVC")
 
 	listOpts := &client.ListOptions{
-		Namespace: pvbNamespace,
+		Namespace: podVolumeBackup.Namespace,
 	}
 	matchingLabels := client.MatchingLabels(map[string]string{velerov1api.PVCUIDLabel: pvcUID})
 	matchingLabels.ApplyToList(listOpts)
@@ -242,11 +242,14 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 	// recent completed one to use as the parent.
 	var mostRecentPVB velerov1api.PodVolumeBackup
 	for _, pvb := range pvbList.Items {
+		if pvb.Spec.UploaderType != podVolumeBackup.Spec.UploaderType {
+			continue
+		}
 		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
 			continue
 		}
 
-		if bsl != pvb.Spec.BackupStorageLocation {
+		if podVolumeBackup.Spec.BackupStorageLocation != pvb.Spec.BackupStorageLocation {
 			// Check the backup storage location is the same as spec in order to
 			// support backup to multiple backup-locations. Otherwise, there exists
 			// a case that backup volume snapshot to the second location would
