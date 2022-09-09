@@ -74,6 +74,10 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	defaultRetryInterval = time.Second * 10
+)
+
 type backupController struct {
 	*genericController
 	discoveryHelper             discovery.Helper
@@ -257,6 +261,19 @@ func (c *backupController) processBackup(key string) error {
 		// only process new backups
 	default:
 		return nil
+	}
+
+	backups, err := c.lister.List(labels.Everything())
+	if err != nil {
+		return errors.Wrap(err, "error listing backup")
+	}
+
+	for _, backup := range backups {
+		if backup.Status.Phase == velerov1api.BackupPhaseInProgress {
+			c.queue.AddAfter(original, defaultRetryInterval)
+			log.Debug("Backup's storage is in using, retry to backup after %s", defaultRetryInterval)
+			return nil
+		}
 	}
 
 	log.Debug("Preparing backup request")
