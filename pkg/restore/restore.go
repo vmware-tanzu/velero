@@ -1249,12 +1249,31 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		errs.Add(namespace, err)
 		return warnings, errs
 	}
-	if isAlreadyExistsError {
-		fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
-		if err != nil {
-			ctx.log.Infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-			warnings.Add(namespace, err)
-			return warnings, errs
+
+	// check if we want to treat the error as a warning, in some cases the creation call might not get executed due to object API validations
+	// and Velero might not get the already exists error type but in reality the object already exists
+	objectExists := false
+	var fromCluster *unstructured.Unstructured
+
+	if restoreErr != nil && !isAlreadyExistsError {
+		// check for the existence of the object in cluster, if no error then it implies that object exists
+		// and if err then we want to fallthrough and do another get call later
+		fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
+		if err == nil {
+			objectExists = true
+		}
+	}
+
+	if isAlreadyExistsError || objectExists {
+		// do a get call if we did not run this previously i.e.
+		// we've only run this for errors other than isAlreadyExistError
+		if fromCluster == nil {
+			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
+			if err != nil {
+				ctx.log.Errorf("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
+				errs.Add(namespace, err)
+				return warnings, errs
+			}
 		}
 		// Remove insubstantial metadata.
 		fromCluster, err = resetMetadataAndStatus(fromCluster)
@@ -2024,7 +2043,7 @@ func (ctx *restoreContext) processUpdateResourcePolicy(fromCluster, fromClusterW
 	// try patching the in-cluster resource (resource diff plus latest backup/restore labels)
 	_, err = resourceClient.Patch(obj.GetName(), patchBytes)
 	if err != nil {
-		ctx.log.Errorf("patch attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+		ctx.log.Warnf("patch attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
 		warnings.Add(namespace, err)
 		// try just patching the labels
 		warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, fromClusterWithLabels, namespace, resourceClient)
