@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package builder
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	corev1api "k8s.io/api/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -60,5 +62,11 @@ func (b *VolumeSnapshotLocationBuilder) ObjectMeta(opts ...ObjectMetaOpt) *Volum
 // Provider sets the VolumeSnapshotLocation's provider.
 func (b *VolumeSnapshotLocationBuilder) Provider(name string) *VolumeSnapshotLocationBuilder {
 	b.object.Spec.Provider = name
+	return b
+}
+
+// Credential sets the VolumeSnapshotLocation's credential selector.
+func (b *VolumeSnapshotLocationBuilder) Credential(selector *corev1api.SecretKeySelector) *VolumeSnapshotLocationBuilder {
+	b.object.Spec.Credential = selector
 	return b
 }

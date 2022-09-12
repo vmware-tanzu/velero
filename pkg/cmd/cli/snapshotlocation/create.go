@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -54,16 +55,18 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name     string
-	Provider string
-	Config   flag.Map
-	Labels   flag.Map
+	Name       string
+	Provider   string
+	Config     flag.Map
+	Labels     flag.Map
+	Credential flag.Map
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		Config: flag.NewMap(),
-		Labels: flag.NewMap(),
+		Config:     flag.NewMap(),
+		Labels:     flag.NewMap(),
+		Credential: flag.NewMap(),
 	}
 }
 
@@ -71,6 +74,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "Name of the volume snapshot provider (e.g. aws, azure, gcp).")
 	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the volume snapshot location.")
+	flags.Var(&o.Credential, "credential", "The credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -82,6 +86,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return errors.New("--provider is required")
 	}
 
+	if len(o.Credential.Data()) > 1 {
+		return errors.New("--credential can only contain 1 key/value pair")
+	}
+
 	return nil
 }
 
@@ -90,10 +98,10 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 	return nil
 }
 
-func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
+func (o *CreateOptions) BuildVolumeSnapshotLocation(namespace string) *api.VolumeSnapshotLocation {
 	volumeSnapshotLocation := &api.VolumeSnapshotLocation{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace(),
+			Namespace: namespace,
 			Name:      o.Name,
 			Labels:    o.Labels.Data(),
 		},
@@ -102,6 +110,15 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Config:   o.Config.Data(),
 		},
 	}
+	for secretName, secretKey := range o.Credential.Data() {
+		volumeSnapshotLocation.Spec.Credential = builder.ForSecretKeySelector(secretName, secretKey).Result()
+		break
+	}
+	return volumeSnapshotLocation
+}
+
+func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
+	volumeSnapshotLocation := o.BuildVolumeSnapshotLocation(f.Namespace())
 
 	if printed, err := output.PrintWithFormat(c, volumeSnapshotLocation); printed || err != nil {
 		return err

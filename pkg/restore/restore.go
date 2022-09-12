@@ -46,6 +46,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
@@ -113,6 +114,7 @@ type kubernetesRestorer struct {
 	logger                     logrus.FieldLogger
 	podCommandExecutor         podexec.PodCommandExecutor
 	podGetter                  cache.Getter
+	credentialFileStore        credentials.FileStore
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -128,6 +130,7 @@ func NewKubernetesRestorer(
 	logger logrus.FieldLogger,
 	podCommandExecutor podexec.PodCommandExecutor,
 	podGetter cache.Getter,
+	credentialStore credentials.FileStore,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		restoreClient:              restoreClient,
@@ -147,9 +150,10 @@ func NewKubernetesRestorer(
 			veleroCloneName := "velero-clone-" + veleroCloneUuid.String()
 			return veleroCloneName, nil
 		},
-		fileSystem:         filesystem.NewFileSystem(),
-		podCommandExecutor: podCommandExecutor,
-		podGetter:          podGetter,
+		fileSystem:          filesystem.NewFileSystem(),
+		podCommandExecutor:  podCommandExecutor,
+		podGetter:           podGetter,
+		credentialFileStore: credentialStore,
 	}, nil
 }
 
@@ -276,6 +280,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		snapshotLocationLister:  snapshotLocationLister,
+		credentialFileStore:     kr.credentialFileStore,
 	}
 
 	restoreCtx := &restoreContext{
