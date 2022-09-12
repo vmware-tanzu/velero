@@ -40,6 +40,7 @@ import (
 // ErrNotFound is exported for external packages to check for when a file is
 // not found
 var ErrNotFound = errors.New("file not found")
+var ErrDownloadRequestDownloadURLTimeout = errors.New("download request download url timeout, check velero server logs for errors. backup storage location may not be available")
 
 func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name string, kind velerov1api.DownloadTargetKind, w io.Writer, timeout time.Duration, insecureSkipTLSVerify bool, caCertFile string) error {
 	uuid, err := uuid.NewRandom()
@@ -58,7 +59,14 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	defer cancel()
 
 	key := kbclient.ObjectKey{Name: created.Name, Namespace: namespace}
+	timeStreamFirstCheck := time.Now()
+	downloadUrlTimeout := false
 	checkFunc := func() {
+		// if timeout has been reached, cancel request
+		if time.Now().After(timeStreamFirstCheck.Add(timeout)) {
+			downloadUrlTimeout = true
+			cancel()
+		}
 		updated := &velerov1api.DownloadRequest{}
 		if err := kbClient.Get(ctx, key, updated); err != nil {
 			return
@@ -77,9 +85,8 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	}
 
 	wait.Until(checkFunc, 25*time.Millisecond, ctx.Done())
-
-	if created.Status.DownloadURL == "" {
-		return ErrNotFound
+	if downloadUrlTimeout {
+		return ErrDownloadRequestDownloadURLTimeout
 	}
 
 	var caPool *x509.CertPool
