@@ -125,10 +125,10 @@ func APIExtensionsVersionsTest() {
 				BackupCfg.IncludeClusterResources = true
 				BackupCfg.Selector = label
 				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupCfg)).ShouldNot(HaveOccurred(), func() string {
-					VeleroBackupLogs(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace, backupName)
-					return "Get backup logs"
+					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), VeleroCfg.VeleroCLI,
+						VeleroCfg.VeleroNamespace, backupName, "")
+					return "Fail to backup workload"
 				})
 			})
 
@@ -367,11 +367,13 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 		BackupCfg.BackupLocation = ""
 		BackupCfg.UseVolumeSnapshots = false
 		BackupCfg.Selector = ""
-		err = VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg)
-		if err != nil {
-			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, "")
-			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)
-		}
+
+		Expect(VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI,
+			VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI,
+				VeleroCfg.VeleroNamespace, backup, "")
+			return "Fail to backup workload"
+		})
 
 		if err := deleteCRD(ctx, tc.srcCrdYaml); err != nil {
 			return errors.Wrapf(err, "delete music-system CRD from source cluster")
