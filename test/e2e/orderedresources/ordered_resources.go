@@ -112,10 +112,8 @@ func ScheduleOrderedResources() {
 func (o *OrderedResources) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
-	client, err := NewTestClient(VeleroCfg.DefaultCluster)
-	if err != nil {
-		return fmt.Errorf("failed to init ordered resources test with err %v", err)
-	}
+	client := *VeleroCfg.ClientToInstallVelero
+
 	o.Client = client
 	o.ScheduleName = "schedule-ordered-resources-" + UUIDgen.String()
 	o.NSBaseName = "schedule-ordered-resources"

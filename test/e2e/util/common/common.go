@@ -6,6 +6,10 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+
+	"github.com/pkg/errors"
+
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 type OsCommandLine struct {
@@ -51,4 +55,16 @@ func GetListBy2Pipes(ctx context.Context, cmdline1, cmdline2, cmdline3 OsCommand
 	}
 
 	return ret, nil
+}
+
+func KubectlApplyFile(ctx context.Context, yaml string) error {
+	fmt.Printf("Kube apply file %s.\n", yaml)
+	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", yaml)
+
+	_, stderr, err := veleroexec.RunCommand(cmd)
+	if err != nil {
+		return errors.Wrap(err, stderr)
+	}
+
+	return nil
 }

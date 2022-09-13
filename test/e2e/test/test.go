@@ -164,10 +164,12 @@ func (t *TestCase) Destroy() error {
 }
 
 func (t *TestCase) Restore() error {
-	if err := VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.RestoreArgs); err != nil {
-		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
-		return errors.Wrapf(err, "Failed to restore resources")
-	}
+	By("Start to restore ......", func() {
+		Expect(VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.RestoreArgs)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
+			return "Fail to restore workload"
+		})
+	})
 	return nil
 }
 

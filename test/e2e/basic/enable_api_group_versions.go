@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/common"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
@@ -464,14 +465,8 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 
 func installCRD(ctx context.Context, yaml string) error {
 	fmt.Printf("Install CRD with %s.\n", yaml)
-	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", yaml)
-
-	_, stderr, err := veleroexec.RunCommand(cmd)
-	if err != nil {
-		return errors.Wrap(err, stderr)
-	}
-
-	return nil
+	err := KubectlApplyFile(ctx, yaml)
+	return err
 }
 
 func deleteCRD(ctx context.Context, yaml string) error {
