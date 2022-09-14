@@ -22,7 +22,7 @@ https://velero.io/docs/v1.9/upgrade-to-1.9/
   * check vsc null pointer (#5303, @lilongfeng0902)
   * Fix edge cases for already exists resources (#5304, @shubham-pampattiwar)
   * Increase ensure restic repository timeout to 5m (#5336, @shubham-pampattiwar)
-
+  * Added DownloadTargetKindCSIBackupVolumeSnapshots for retrieving the signed URL to download only the `<backup name>`-csi-volumesnapshots.json.gz  and DownloadTargetKindCSIBackupVolumeSnapshotContents to download only `<backup name>`-csi-volumesnapshotcontents.json.gz in the DownloadRequest CR structure. These files are already present in the backup layout. (#5307, @anshulahuja98)
 ## v1.9.1
 ### 2022-08-03
 
