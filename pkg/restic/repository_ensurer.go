@@ -176,7 +176,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	select {
 	// repositories should become either ready or not ready quickly if they're
 	// newly created.
-	case <-time.After(time.Minute):
+	case <-time.After(time.Minute * 5):
 		return nil, errors.New("timed out waiting for restic repository to become ready")
 	case <-ctx.Done():
 		return nil, errors.New("timed out waiting for restic repository to become ready")
