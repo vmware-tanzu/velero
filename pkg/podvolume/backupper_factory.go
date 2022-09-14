@@ -43,6 +43,7 @@ func NewBackupperFactory(repoLocker *repository.RepoLocker,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
+	podClient corev1client.PodsGetter,
 	repoInformerSynced cache.InformerSynced,
 	log logrus.FieldLogger) BackupperFactory {
 	return &backupperFactory{
@@ -51,6 +52,7 @@ func NewBackupperFactory(repoLocker *repository.RepoLocker,
 		veleroClient:       veleroClient,
 		pvcClient:          pvcClient,
 		pvClient:           pvClient,
+		podClient:          podClient,
 		repoInformerSynced: repoInformerSynced,
 		log:                log,
 	}
@@ -62,6 +64,7 @@ type backupperFactory struct {
 	veleroClient       clientset.Interface
 	pvcClient          corev1client.PersistentVolumeClaimsGetter
 	pvClient           corev1client.PersistentVolumesGetter
+	podClient          corev1client.PodsGetter
 	repoInformerSynced cache.InformerSynced
 	log                logrus.FieldLogger
 }
@@ -77,7 +80,7 @@ func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1ap
 		},
 	)
 
-	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, informer, bf.veleroClient, bf.pvcClient, bf.pvClient, uploaderType, bf.log)
+	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, informer, bf.veleroClient, bf.pvcClient, bf.pvClient, bf.podClient, uploaderType, bf.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, bf.repoInformerSynced) {
