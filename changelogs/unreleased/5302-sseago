@@ -1,1 +1,0 @@
-Check for empty ns list before checking nslist[0]

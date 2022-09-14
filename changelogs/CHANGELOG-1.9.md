@@ -1,3 +1,28 @@
+## v1.9.2
+### 2022-09-14
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.9.2
+
+### Container Image
+`velero/velero:v1.9.2`
+
+### Documentation
+https://velero.io/docs/v1.9/
+
+### Upgrading
+https://velero.io/docs/v1.9/upgrade-to-1.9/
+
+### All changes
+
+  * Fix CVE-2022-1962 by bumping up golang version to 1.17.13 (#5286, @qiuming-best)
+  * Fix code spell check fail (#5300, @qiuming-best)
+  * Fix nil pointer panic when restoring StatefulSets (#5301, @divolgin)
+  * Check for empty ns list before checking nslist[0] (#5302, @sseago)
+  * check vsc null pointer (#5303, @lilongfeng0902)
+  * Fix edge cases for already exists resources (#5304, @shubham-pampattiwar)
+  * Increase ensure restic repository timeout to 5m (#5336, @shubham-pampattiwar)
+
 ## v1.9.1
 ### 2022-08-03
 
