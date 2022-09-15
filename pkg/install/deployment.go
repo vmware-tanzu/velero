@@ -32,19 +32,19 @@ import (
 type podTemplateOption func(*podTemplateConfig)
 
 type podTemplateConfig struct {
-	image                             string
-	envVars                           []corev1.EnvVar
-	restoreOnly                       bool
-	annotations                       map[string]string
-	labels                            map[string]string
-	resources                         corev1.ResourceRequirements
-	withSecret                        bool
-	defaultResticMaintenanceFrequency time.Duration
-	garbageCollectionFrequency        time.Duration
-	plugins                           []string
-	features                          []string
-	defaultVolumesToRestic            bool
-	uploaderType                      string
+	image                           string
+	envVars                         []corev1.EnvVar
+	restoreOnly                     bool
+	annotations                     map[string]string
+	labels                          map[string]string
+	resources                       corev1.ResourceRequirements
+	withSecret                      bool
+	defaultRepoMaintenanceFrequency time.Duration
+	garbageCollectionFrequency      time.Duration
+	plugins                         []string
+	features                        []string
+	defaultVolumesToFsBackup        bool
+	uploaderType                    string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -99,9 +99,9 @@ func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
 	}
 }
 
-func WithDefaultResticMaintenanceFrequency(val time.Duration) podTemplateOption {
+func WithDefaultRepoMaintenanceFrequency(val time.Duration) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.defaultResticMaintenanceFrequency = val
+		c.defaultRepoMaintenanceFrequency = val
 	}
 }
 
@@ -129,9 +129,9 @@ func WithUploaderType(t string) podTemplateOption {
 	}
 }
 
-func WithDefaultVolumesToRestic() podTemplateOption {
+func WithDefaultVolumesToFsBackup() podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.defaultVolumesToRestic = true
+		c.defaultVolumesToFsBackup = true
 	}
 }
 
@@ -157,8 +157,8 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
 	}
 
-	if c.defaultVolumesToRestic {
-		args = append(args, "--default-volumes-to-restic=true")
+	if c.defaultVolumesToFsBackup {
+		args = append(args, "--default-volumes-to-fs-backup=true")
 	}
 
 	if len(c.uploaderType) > 0 {
@@ -288,8 +288,8 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--restore-only")
 	}
 
-	if c.defaultResticMaintenanceFrequency > 0 {
-		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--default-restic-prune-frequency=%v", c.defaultResticMaintenanceFrequency))
+	if c.defaultRepoMaintenanceFrequency > 0 {
+		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--default-repo-maintain-frequency=%v", c.defaultRepoMaintenanceFrequency))
 	}
 
 	if c.garbageCollectionFrequency > 0 {

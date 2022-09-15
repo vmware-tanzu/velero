@@ -64,7 +64,7 @@ func (l *LabelSelector) Init() error {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", l.BackupName,
 		"--selector", "resourcefiltering=true",
 		"--include-namespaces", strings.Join(*l.NSIncluded, ","),
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	l.RestoreArgs = []string{

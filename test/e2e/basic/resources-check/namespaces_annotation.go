@@ -56,7 +56,7 @@ func (n *NSAnnotationCase) Init() error {
 	n.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	n.RestoreArgs = []string{

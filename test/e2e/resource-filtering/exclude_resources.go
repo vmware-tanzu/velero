@@ -66,7 +66,7 @@ func (e *ExcludeResources) Init() error {
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
 			"--exclude-resources", "secrets",
-			"--default-volumes-to-restic", "--wait",
+			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		e.RestoreArgs = []string{
@@ -86,7 +86,7 @@ func (e *ExcludeResources) Init() error {
 		e.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
-			"--default-volumes-to-restic", "--wait",
+			"--default-volumes-to-fs-backup", "--wait",
 		}
 		e.RestoreArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
