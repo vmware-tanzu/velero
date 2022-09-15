@@ -41,7 +41,7 @@ const downloadRequestTimeout = 30 * time.Second
 func BindFlags(flags *pflag.FlagSet) {
 	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 	labelColumns := flag.NewStringArray()
-	flags.Var(&labelColumns, "label-columns", "A comma-separated list of labels to be displayed as columns")
+	flags.VarP(&labelColumns, "label-columns", "L", "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	flags.Bool("show-labels", false, "Show labels in the last column")
 }
 
