@@ -25,7 +25,7 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 )
