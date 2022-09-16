@@ -762,14 +762,15 @@ func TestInvalidTarballContents(t *testing.T) {
 		tarball      io.Reader
 		want         map[*test.APIResource][]string
 		wantErrs     Result
+		wantWarnings Result
 	}{
 		{
-			name:    "empty tarball returns an error",
+			name:    "empty tarball returns a warning",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
 				Done(),
-			wantErrs: Result{
+			wantWarnings: Result{
 				Velero: []string{archive.ErrNotExist.Error()},
 			},
 		},
@@ -820,33 +821,32 @@ func TestInvalidTarballContents(t *testing.T) {
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
-
-			assertEmptyResults(t, warnings)
-			assertWantErrs(t, tc.wantErrs, errs)
+			assertWantErrsOrWarnings(t, tc.wantWarnings, warnings)
+			assertWantErrsOrWarnings(t, tc.wantErrs, errs)
 			assertAPIContents(t, h, tc.want)
 		})
 	}
 }
 
-func assertWantErrs(t *testing.T, wantErrRes Result, errRes Result) {
+func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
 	t.Helper()
-	if wantErrRes.Velero != nil {
-		assert.Equal(t, len(wantErrRes.Velero), len(errRes.Velero))
-		for i := range errRes.Velero {
-			assert.Contains(t, errRes.Velero[i], wantErrRes.Velero[i])
+	if wantRes.Velero != nil {
+		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		for i := range res.Velero {
+			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
 		}
 	}
-	if wantErrRes.Namespaces != nil {
-		assert.Equal(t, len(wantErrRes.Namespaces), len(errRes.Namespaces))
-		for ns := range errRes.Namespaces {
-			assert.Equal(t, len(wantErrRes.Namespaces[ns]), len(errRes.Namespaces[ns]))
-			for i := range errRes.Namespaces[ns] {
-				assert.Contains(t, errRes.Namespaces[ns][i], wantErrRes.Namespaces[ns][i])
+	if wantRes.Namespaces != nil {
+		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		for ns := range res.Namespaces {
+			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			for i := range res.Namespaces[ns] {
+				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
 			}
 		}
 	}
-	if wantErrRes.Cluster != nil {
-		assert.Equal(t, wantErrRes.Cluster, errRes.Cluster)
+	if wantRes.Cluster != nil {
+		assert.Equal(t, wantRes.Cluster, res.Cluster)
 	}
 }
 

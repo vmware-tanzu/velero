@@ -408,6 +408,12 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	ctx.restoreDir = dir
 
 	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
+	// If ErrNotExist occurs, it implies that the backup to be restored includes zero items.
+	// Need to add a warning about it and jump out of the function.
+	if errors.Cause(err) == archive.ErrNotExist {
+		warnings.AddVeleroError(errors.Wrap(err, "zero items to be restored"))
+		return warnings, errs
+	}
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
