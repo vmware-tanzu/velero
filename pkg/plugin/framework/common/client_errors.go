@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package common
 
 import (
 	"google.golang.org/grpc/status"
@@ -22,7 +22,7 @@ import (
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
-// fromGRPCError takes a gRPC status error, extracts a stack trace
+// FromGRPCError takes a gRPC status error, extracts a stack trace
 // from the details if it exists, and returns an error that can
 // provide information about where it was created.
 //
@@ -30,7 +30,7 @@ import (
 // all errors returned from the plugin server before they're passed back to
 // the rest of the Velero codebase. This will enable them to display location
 // information when they're logged.
-func fromGRPCError(err error) error {
+func FromGRPCError(err error) error {
 	statusErr, ok := status.FromError(err)
 	if !ok {
 		return statusErr.Err()
@@ -39,7 +39,7 @@ func fromGRPCError(err error) error {
 	for _, detail := range statusErr.Details() {
 		switch t := detail.(type) {
 		case *proto.Stack:
-			return &protoStackError{
+			return &ProtoStackError{
 				error: err,
 				stack: t,
 			}
@@ -49,12 +49,12 @@ func fromGRPCError(err error) error {
 	return err
 }
 
-type protoStackError struct {
+type ProtoStackError struct {
 	error
 	stack *proto.Stack
 }
 
-func (e *protoStackError) File() string {
+func (e *ProtoStackError) File() string {
 	if e.stack == nil || len(e.stack.Frames) < 1 {
 		return ""
 	}
@@ -62,7 +62,7 @@ func (e *protoStackError) File() string {
 	return e.stack.Frames[0].File
 }
 
-func (e *protoStackError) Line() int32 {
+func (e *ProtoStackError) Line() int32 {
 	if e.stack == nil || len(e.stack.Frames) < 1 {
 		return 0
 	}
@@ -70,7 +70,7 @@ func (e *protoStackError) Line() int32 {
 	return e.stack.Frames[0].Line
 }
 
-func (e *protoStackError) Function() string {
+func (e *ProtoStackError) Function() string {
 	if e.stack == nil || len(e.stack.Frames) < 1 {
 		return ""
 	}

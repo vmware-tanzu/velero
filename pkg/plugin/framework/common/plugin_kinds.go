@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package common
 
 // PluginKind is a type alias for a string that describes
 // the kind of a Velero-supported plugin.
@@ -47,6 +47,11 @@ const (
 	// PluginKindPluginLister represents a plugin lister plugin.
 	PluginKindPluginLister PluginKind = "PluginLister"
 )
+
+// If there are plugin kinds that are adaptable to newer API versions, list them here.
+// The older (adaptable) version is the key, and the value is the full list of newer
+// plugin kinds that are capable of adapting it.
+var PluginKindsAdaptableTo = map[PluginKind][]PluginKind{}
 
 // AllPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
 // kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).

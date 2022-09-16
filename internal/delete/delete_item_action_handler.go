@@ -48,7 +48,7 @@ type Context struct {
 func InvokeDeleteActions(ctx *Context) error {
 	var err error
 	resolver := framework.NewDeleteItemActionResolver(ctx.Actions)
-	ctx.resolvedActions, err = resolver.ResolveActions(ctx.DiscoveryHelper)
+	ctx.resolvedActions, err = resolver.ResolveActions(ctx.DiscoveryHelper, ctx.Log)
 	// No actions installed and no error means we don't have to continue;
 	// just do the backup deletion without worrying about plugins.
 	if len(ctx.resolvedActions) == 0 && err == nil {

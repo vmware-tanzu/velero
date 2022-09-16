@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package common
 
 import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
-// clientBase implements client and contains shared fields common to all clients.
-type clientBase struct {
-	plugin string
-	logger logrus.FieldLogger
+// ClientBase implements client and contains shared fields common to all clients.
+type ClientBase struct {
+	Plugin string
+	Logger logrus.FieldLogger
 }
 
 type ClientDispenser interface {
@@ -44,10 +44,10 @@ type clientDispenser struct {
 	clients map[string]interface{}
 }
 
-type clientInitFunc func(base *clientBase, clientConn *grpc.ClientConn) interface{}
+type clientInitFunc func(base *ClientBase, clientConn *grpc.ClientConn) interface{}
 
 // newClientDispenser creates a new clientDispenser.
-func newClientDispenser(logger logrus.FieldLogger, clientConn *grpc.ClientConn, initFunc clientInitFunc) *clientDispenser {
+func NewClientDispenser(logger logrus.FieldLogger, clientConn *grpc.ClientConn, initFunc clientInitFunc) *clientDispenser {
 	return &clientDispenser{
 		clientConn: clientConn,
 		logger:     logger,
@@ -63,9 +63,9 @@ func (cd *clientDispenser) ClientFor(name string) interface{} {
 		return client
 	}
 
-	base := &clientBase{
-		plugin: name,
-		logger: cd.logger,
+	base := &ClientBase{
+		Plugin: name,
+		Logger: cd.logger,
 	}
 	// Initialize the plugin (e.g. newBackupItemActionGRPCClient())
 	client := cd.initFunc(base, cd.clientConn)

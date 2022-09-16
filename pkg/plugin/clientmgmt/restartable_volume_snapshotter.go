@@ -20,36 +20,37 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
-// restartableVolumeSnapshotter is a volume snapshotter for a given implementation (such as "aws"). It is associated with
+// RestartableVolumeSnapshotter is a volume snapshotter for a given implementation (such as "aws"). It is associated with
 // a restartableProcess, which may be shared and used to run multiple plugins. At the beginning of each method
 // call, the restartableVolumeSnapshotter asks its restartableProcess to restart itself if needed (e.g. if the
 // process terminated for any reason), then it proceeds with the actual call.
 type restartableVolumeSnapshotter struct {
-	key                 kindAndName
-	sharedPluginProcess RestartableProcess
+	key                 process.KindAndName
+	sharedPluginProcess process.RestartableProcess
 	config              map[string]string
 }
 
-// newRestartableVolumeSnapshotter returns a new restartableVolumeSnapshotter.
-func newRestartableVolumeSnapshotter(name string, sharedPluginProcess RestartableProcess) *restartableVolumeSnapshotter {
-	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+// NewRestartableVolumeSnapshotter returns a new restartableVolumeSnapshotter.
+func NewRestartableVolumeSnapshotter(name string, sharedPluginProcess process.RestartableProcess) *restartableVolumeSnapshotter {
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,
 	}
 
 	// Register our reinitializer so we can reinitialize after a restart with r.config.
-	sharedPluginProcess.addReinitializer(key, r)
+	sharedPluginProcess.AddReinitializer(key, r)
 
 	return r
 }
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
-func (r *restartableVolumeSnapshotter) reinitialize(dispensed interface{}) error {
+func (r *restartableVolumeSnapshotter) Reinitialize(dispensed interface{}) error {
 	volumeSnapshotter, ok := dispensed.(velero.VolumeSnapshotter)
 	if !ok {
 		return errors.Errorf("%T is not a VolumeSnapshotter!", dispensed)
@@ -60,7 +61,7 @@ func (r *restartableVolumeSnapshotter) reinitialize(dispensed interface{}) error
 // getVolumeSnapshotter returns the volume snapshotter for this restartableVolumeSnapshotter. It does *not* restart the
 // plugin process.
 func (r *restartableVolumeSnapshotter) getVolumeSnapshotter() (velero.VolumeSnapshotter, error) {
-	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
+	plugin, err := r.sharedPluginProcess.GetByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +76,7 @@ func (r *restartableVolumeSnapshotter) getVolumeSnapshotter() (velero.VolumeSnap
 
 // getDelegate restarts the plugin process (if needed) and returns the volume snapshotter for this restartableVolumeSnapshotter.
 func (r *restartableVolumeSnapshotter) getDelegate() (velero.VolumeSnapshotter, error) {
-	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
+	if err := r.sharedPluginProcess.ResetIfNeeded(); err != nil {
 		return nil, err
 	}
 

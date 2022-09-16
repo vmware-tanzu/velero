@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -247,7 +248,7 @@ type fakePluginLister struct {
 	plugins []framework.PluginIdentifier
 }
 
-func (l *fakePluginLister) List(kind framework.PluginKind) []framework.PluginIdentifier {
+func (l *fakePluginLister) List(kind common.PluginKind) []framework.PluginIdentifier {
 	var plugins []framework.PluginIdentifier
 	for _, plugin := range l.plugins {
 		if plugin.Kind == kind {

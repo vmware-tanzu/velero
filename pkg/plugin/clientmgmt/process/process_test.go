@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package clientmgmt
+package process
 
 import (
 	"testing"
@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type mockClientProtocol struct {
@@ -94,20 +95,20 @@ func TestDispense(t *testing.T) {
 
 			var client interface{}
 
-			key := kindAndName{}
+			key := KindAndName{}
 			if tc.clientDispenser {
-				key.kind = framework.PluginKindObjectStore
-				protocolClient.On("Dispense", key.kind.String()).Return(clientDispenser, tc.dispenseError)
+				key.Kind = common.PluginKindObjectStore
+				protocolClient.On("Dispense", key.Kind.String()).Return(clientDispenser, tc.dispenseError)
 
 				if !tc.missingKeyName {
-					key.name = "aws"
+					key.Name = "aws"
 					client = &framework.BackupItemActionGRPCClient{}
-					clientDispenser.On("ClientFor", key.name).Return(client)
+					clientDispenser.On("ClientFor", key.Name).Return(client)
 				}
 			} else {
-				key.kind = framework.PluginKindPluginLister
+				key.Kind = common.PluginKindPluginLister
 				client = &framework.PluginListerGRPCClient{}
-				protocolClient.On("Dispense", key.kind.String()).Return(client, tc.dispenseError)
+				protocolClient.On("Dispense", key.Kind.String()).Return(client, tc.dispenseError)
 			}
 
 			dispensed, err := p.dispense(key)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientmgmt
+package process
 
 import (
 	"strings"
@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type ProcessFactory interface {
@@ -42,7 +42,7 @@ func (pf *processFactory) newProcess(command string, logger logrus.FieldLogger, 
 }
 
 type Process interface {
-	dispense(key kindAndName) (interface{}, error)
+	dispense(key KindAndName) (interface{}, error)
 	exited() bool
 	kill()
 }
@@ -124,21 +124,21 @@ func removeFeaturesFlag(args []string) []string {
 	return commandArgs
 }
 
-func (r *process) dispense(key kindAndName) (interface{}, error) {
+func (r *process) dispense(key KindAndName) (interface{}, error) {
 	// This calls GRPCClient(clientConn) on the plugin instance registered for key.name.
-	dispensed, err := r.protocolClient.Dispense(key.kind.String())
+	dispensed, err := r.protocolClient.Dispense(key.Kind.String())
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	// Currently all plugins except for PluginLister dispense clientDispenser instances.
-	if clientDispenser, ok := dispensed.(framework.ClientDispenser); ok {
-		if key.name == "" {
-			return nil, errors.Errorf("%s plugin requested but name is missing", key.kind.String())
+	if clientDispenser, ok := dispensed.(common.ClientDispenser); ok {
+		if key.Name == "" {
+			return nil, errors.Errorf("%s plugin requested but name is missing", key.Kind.String())
 		}
 		// Get the instance that implements our plugin interface (e.g. ObjectStore) that is a gRPC-based
 		// client
-		dispensed = clientDispenser.ClientFor(key.name)
+		dispensed = clientDispenser.ClientFor(key.Name)
 	}
 
 	return dispensed, nil

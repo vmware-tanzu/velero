@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package clientmgmt
+package v1
 
 import (
 	"reflect"
@@ -27,6 +27,33 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
+
+type mockRestartableProcess struct {
+	mock.Mock
+}
+
+func (rp *mockRestartableProcess) AddReinitializer(key process.KindAndName, r process.Reinitializer) {
+	rp.Called(key, r)
+}
+
+func (rp *mockRestartableProcess) Reset() error {
+	args := rp.Called()
+	return args.Error(0)
+}
+
+func (rp *mockRestartableProcess) ResetIfNeeded() error {
+	args := rp.Called()
+	return args.Error(0)
+}
+
+func (rp *mockRestartableProcess) GetByKindAndName(key process.KindAndName) (interface{}, error) {
+	args := rp.Called(key)
+	return args.Get(0), args.Error(1)
+}
+
+func (rp *mockRestartableProcess) Stop() {
+	rp.Called()
+}
 
 type restartableDelegateTest struct {
 	function                string

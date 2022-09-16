@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientmgmt
+package v1
 
 import (
 	"testing"
@@ -26,9 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/backup/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	mocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/backupitemaction/v1"
 )
 
 func TestRestartableGetBackupItemAction(t *testing.T) {
@@ -50,7 +51,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 		},
 		{
 			name:   "happy path",
-			plugin: new(mocks.ItemAction),
+			plugin: new(mocks.BackupItemAction),
 		},
 	}
 
@@ -60,10 +61,10 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := kindAndName{kind: framework.PluginKindBackupItemAction, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := newRestartableBackupItemAction(name, p)
+			r := NewRestartableBackupItemAction(name, p)
 			a, err := r.getBackupItemAction()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
@@ -81,18 +82,18 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "pod"
-	r := newRestartableBackupItemAction(name, p)
+	r := NewRestartableBackupItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
-	expected := new(mocks.ItemAction)
-	key := kindAndName{kind: framework.PluginKindBackupItemAction, name: name}
-	p.On("getByKindAndName", key).Return(expected, nil)
+	p.On("ResetIfNeeded").Return(nil)
+	expected := new(mocks.BackupItemAction)
+	key := process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name}
+	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -122,15 +123,15 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindBackupItemAction,
-		func(key kindAndName, p RestartableProcess) interface{} {
-			return &restartableBackupItemAction{
-				key:                 key,
-				sharedPluginProcess: p,
+		common.PluginKindBackupItemAction,
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
+			return &RestartableBackupItemAction{
+				Key:                 key,
+				SharedPluginProcess: p,
 			}
 		},
 		func() mockable {
-			return new(mocks.ItemAction)
+			return new(mocks.BackupItemAction)
 		},
 		restartableDelegateTest{
 			function:                "AppliesTo",

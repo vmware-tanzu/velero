@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package common
 
 import (
 	goproto "github.com/golang/protobuf/proto"
@@ -26,13 +26,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
-// newGRPCErrorWithCode wraps err in a gRPC status error with the error's stack trace
+// NewGRPCErrorWithCode wraps err in a gRPC status error with the error's stack trace
 // included in the details if it exists. This provides an easy way to send
 // stack traces from plugin servers across the wire to the plugin client.
 //
 // This function should be used in the internal plugin server code to wrap
 // all errors before they're returned.
-func newGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message) error {
+func NewGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message) error {
 	// if it's already a gRPC status error, use it; otherwise, create a new one
 	statusErr, ok := status.FromError(err)
 	if !ok {
@@ -40,7 +40,7 @@ func newGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message
 	}
 
 	// get a Stack for the error and add it to details
-	if stack := errorStack(err); stack != nil {
+	if stack := ErrorStack(err); stack != nil {
 		details = append(details, stack)
 	}
 
@@ -52,16 +52,16 @@ func newGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message
 	return statusErr.Err()
 }
 
-// newGRPCError is a convenience function for creating a new gRPC error
+// NewGRPCError is a convenience function for creating a new gRPC error
 // with code = codes.Unknown
-func newGRPCError(err error, details ...goproto.Message) error {
-	return newGRPCErrorWithCode(err, codes.Unknown, details...)
+func NewGRPCError(err error, details ...goproto.Message) error {
+	return NewGRPCErrorWithCode(err, codes.Unknown, details...)
 }
 
-// errorStack gets a stack trace, if it exists, from the provided error, and
+// ErrorStack gets a stack trace, if it exists, from the provided error, and
 // returns it as a *proto.Stack.
-func errorStack(err error) *proto.Stack {
-	stackTracer, ok := err.(stackTracer)
+func ErrorStack(err error) *proto.Stack {
+	stackTracer, ok := err.(StackTracer)
 	if !ok {
 		return nil
 	}
@@ -80,6 +80,6 @@ func errorStack(err error) *proto.Stack {
 	return stackTrace
 }
 
-type stackTracer interface {
+type StackTracer interface {
 	StackTrace() errors.StackTrace
 }

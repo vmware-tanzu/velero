@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package framework
+package common
 
 import (
 	"testing"
@@ -24,17 +24,17 @@ import (
 )
 
 func TestClientLogger(t *testing.T) {
-	base := &pluginBase{}
+	base := &PluginBase{}
 	logger := test.NewLogger()
 	f := ClientLogger(logger)
 	f(base)
-	assert.Equal(t, logger, base.clientLogger)
+	assert.Equal(t, logger, base.ClientLogger)
 }
 
 func TestServerLogger(t *testing.T) {
-	base := &pluginBase{}
+	base := &PluginBase{}
 	logger := test.NewLogger()
-	f := serverLogger(logger)
+	f := ServerLogger(logger)
 	f(base)
-	assert.Equal(t, newServerMux(logger), base.serverMux)
+	assert.Equal(t, NewServerMux(logger), base.ServerMux)
 }

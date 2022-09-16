@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientmgmt
+package process
 
 import (
 	"sync"
@@ -24,26 +24,26 @@ import (
 )
 
 type RestartableProcessFactory interface {
-	newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error)
+	NewRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error)
 }
 
 type restartableProcessFactory struct {
 }
 
-func newRestartableProcessFactory() RestartableProcessFactory {
+func NewRestartableProcessFactory() RestartableProcessFactory {
 	return &restartableProcessFactory{}
 }
 
-func (rpf *restartableProcessFactory) newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
+func (rpf *restartableProcessFactory) NewRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
 	return newRestartableProcess(command, logger, logLevel)
 }
 
 type RestartableProcess interface {
-	addReinitializer(key kindAndName, r reinitializer)
-	reset() error
-	resetIfNeeded() error
-	getByKindAndName(key kindAndName) (interface{}, error)
-	stop()
+	AddReinitializer(key KindAndName, r Reinitializer)
+	Reset() error
+	ResetIfNeeded() error
+	GetByKindAndName(key KindAndName) (interface{}, error)
+	Stop()
 }
 
 // restartableProcess encapsulates the lifecycle for all plugins contained in a single executable file. It is able
@@ -57,15 +57,15 @@ type restartableProcess struct {
 	// lock guards all of the fields below
 	lock           sync.RWMutex
 	process        Process
-	plugins        map[kindAndName]interface{}
-	reinitializers map[kindAndName]reinitializer
+	plugins        map[KindAndName]interface{}
+	reinitializers map[KindAndName]Reinitializer
 	resetFailures  int
 }
 
 // reinitializer is capable of reinitializing a restartable plugin instance using the newly dispensed plugin.
-type reinitializer interface {
+type Reinitializer interface {
 	// reinitialize reinitializes a restartable plugin instance using the newly dispensed plugin.
-	reinitialize(dispensed interface{}) error
+	Reinitialize(dispensed interface{}) error
 }
 
 // newRestartableProcess creates a new restartableProcess for the given command and options.
@@ -74,26 +74,26 @@ func newRestartableProcess(command string, logger logrus.FieldLogger, logLevel l
 		command:        command,
 		logger:         logger,
 		logLevel:       logLevel,
-		plugins:        make(map[kindAndName]interface{}),
-		reinitializers: make(map[kindAndName]reinitializer),
+		plugins:        make(map[KindAndName]interface{}),
+		reinitializers: make(map[KindAndName]Reinitializer),
 	}
 
 	// This launches the process
-	err := p.reset()
+	err := p.Reset()
 
 	return p, err
 }
 
-// addReinitializer registers the reinitializer r for key.
-func (p *restartableProcess) addReinitializer(key kindAndName, r reinitializer) {
+// AddReinitializer registers the reinitializer r for key.
+func (p *restartableProcess) AddReinitializer(key KindAndName, r Reinitializer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.reinitializers[key] = r
 }
 
-// reset acquires the lock and calls resetLH.
-func (p *restartableProcess) reset() error {
+// Reset acquires the lock and calls resetLH.
+func (p *restartableProcess) Reset() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -118,7 +118,7 @@ func (p *restartableProcess) resetLH() error {
 
 	// Redispense any previously dispensed plugins, reinitializing if necessary.
 	// Start by creating a new map to hold the newly dispensed plugins.
-	newPlugins := make(map[kindAndName]interface{})
+	newPlugins := make(map[KindAndName]interface{})
 	for key := range p.plugins {
 		// Re-dispense
 		dispensed, err := p.process.dispense(key)
@@ -131,7 +131,7 @@ func (p *restartableProcess) resetLH() error {
 
 		// Reinitialize
 		if r, found := p.reinitializers[key]; found {
-			if err := r.reinitialize(dispensed); err != nil {
+			if err := r.Reinitialize(dispensed); err != nil {
 				p.resetFailures++
 				return err
 			}
@@ -146,8 +146,8 @@ func (p *restartableProcess) resetLH() error {
 	return nil
 }
 
-// resetIfNeeded checks if the plugin process has exited and resets p if it has.
-func (p *restartableProcess) resetIfNeeded() error {
+// ResetIfNeeded checks if the plugin process has exited and resets p if it has.
+func (p *restartableProcess) ResetIfNeeded() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -159,8 +159,8 @@ func (p *restartableProcess) resetIfNeeded() error {
 	return nil
 }
 
-// getByKindAndName acquires the lock and calls getByKindAndNameLH.
-func (p *restartableProcess) getByKindAndName(key kindAndName) (interface{}, error) {
+// GetByKindAndName acquires the lock and calls getByKindAndNameLH.
+func (p *restartableProcess) GetByKindAndName(key KindAndName) (interface{}, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -169,7 +169,7 @@ func (p *restartableProcess) getByKindAndName(key kindAndName) (interface{}, err
 
 // getByKindAndNameLH returns the dispensed plugin for key. If the plugin hasn't been dispensed before, it dispenses a
 // new one.
-func (p *restartableProcess) getByKindAndNameLH(key kindAndName) (interface{}, error) {
+func (p *restartableProcess) getByKindAndNameLH(key KindAndName) (interface{}, error) {
 	dispensed, found := p.plugins[key]
 	if found {
 		return dispensed, nil
@@ -184,7 +184,7 @@ func (p *restartableProcess) getByKindAndNameLH(key kindAndName) (interface{}, e
 }
 
 // stop terminates the plugin process.
-func (p *restartableProcess) stop() {
+func (p *restartableProcess) Stop() {
 	p.lock.Lock()
 	p.process.kill()
 	p.lock.Unlock()

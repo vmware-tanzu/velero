@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -30,30 +31,30 @@ import (
 var _ velero.DeleteItemAction = &DeleteItemActionGRPCClient{}
 
 // NewDeleteItemActionPlugin constructs a DeleteItemActionPlugin.
-func NewDeleteItemActionPlugin(options ...PluginOption) *DeleteItemActionPlugin {
+func NewDeleteItemActionPlugin(options ...common.PluginOption) *DeleteItemActionPlugin {
 	return &DeleteItemActionPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: common.NewPluginBase(options...),
 	}
 }
 
 // DeleteItemActionGRPCClient implements the backup/ItemAction interface and uses a
 // gRPC client to make calls to the plugin server.
 type DeleteItemActionGRPCClient struct {
-	*clientBase
+	*common.ClientBase
 	grpcClient proto.DeleteItemActionClient
 }
 
-func newDeleteItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+func newDeleteItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
 	return &DeleteItemActionGRPCClient{
-		clientBase: base,
+		ClientBase: base,
 		grpcClient: proto.NewDeleteItemActionClient(clientConn),
 	}
 }
 
 func (c *DeleteItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
-	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.DeleteItemActionAppliesToRequest{Plugin: c.plugin})
+	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.DeleteItemActionAppliesToRequest{Plugin: c.Plugin})
 	if err != nil {
-		return velero.ResourceSelector{}, fromGRPCError(err)
+		return velero.ResourceSelector{}, common.FromGRPCError(err)
 	}
 
 	if res.ResourceSelector == nil {
@@ -81,14 +82,14 @@ func (c *DeleteItemActionGRPCClient) Execute(input *velero.DeleteItemActionExecu
 	}
 
 	req := &proto.DeleteItemActionExecuteRequest{
-		Plugin: c.plugin,
+		Plugin: c.Plugin,
 		Item:   itemJSON,
 		Backup: backupJSON,
 	}
 
 	// First return item is just an empty struct no matter what.
 	if _, err = c.grpcClient.Execute(context.Background(), req); err != nil {
-		return fromGRPCError(err)
+		return common.FromGRPCError(err)
 	}
 
 	return nil
