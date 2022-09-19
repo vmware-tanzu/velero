@@ -175,9 +175,9 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
     <Output should be your credentials>
     ```
 
-### Troubleshooting `BackupStorageLocation` credentials
+### Troubleshooting `BackupStorageLocation` and `VolumeSnapshotLocation` credentials
 
-Follow the below troubleshooting steps to confirm that Velero is using the correct credentials if using credentials specific to a [`BackupStorageLocation`][10]:
+Follow the below troubleshooting steps to confirm that Velero is using the correct credentials if using credentials specific to a [`BackupStorageLocation` or `VolumeSnapshotLocation`][10]:
 1. Confirm that the object storage provider plugin being used supports multiple credentials.
 
    If the logs from the Velero deployment contain the error message `"config has invalid keys credentialsFile"`, the version of your object storage plugin does not yet support multiple credentials.
@@ -186,7 +186,7 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 
    If you are using a plugin from a different provider, please contact them for further advice.
 
-1. Confirm that the secret and key referenced by the `BackupStorageLocation` exists in the Velero namespace and has the correct content:
+1. Confirm that the secret and key referenced by the `BackupStorageLocation` or `VolumeSnapshotLocation` exists in the Velero namespace and has the correct content:
    ```bash
    # Determine which secret and key the BackupStorageLocation is using
    BSL_SECRET=$(kubectl get backupstoragelocations.velero.io -n velero <bsl-name> -o yaml -o jsonpath={.spec.credential.name})
@@ -197,11 +197,21 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 
    # Print the content of the secret and ensure it is correct
    kubectl -n velero get secret $BSL_SECRET -ojsonpath={.data.$BSL_SECRET_KEY} | base64 --decode
+
+   # Determine which secret and key the VolumeSnapshotLocation is using
+   VSL_SECRET=$(kubectl get volumesnapshotlocations.velero.io -n velero <vsl-name> -o yaml -o jsonpath={.spec.credential.name})
+   VSL_SECRET_KEY=$(kubectl get volumesnapshotlocations.velero.io -n velero <vsl-name> -o yaml -o jsonpath={.spec.credential.key})
+
+   # Confirm that the secret exists
+   kubectl -n velero get secret $VSL_SECRET
+
+   # Print the content of the secret and ensure it is correct
+   kubectl -n velero get secret $VSL_SECRET -ojsonpath={.data.$VSL_SECRET_KEY} | base64 --decode
    ```
    If the secret can't be found, the secret does not exist within the Velero namespace and must be created.
 
    If no output is produced when printing the contents of the secret, the key within the secret may not exist or may have no content.
-   Ensure that the key exists within the secret's data by checking the output from `kubectl -n velero describe secret $BSL_SECRET`.
+   Ensure that the key exists within the secret's data by checking the output from `kubectl -n velero describe secret $BSL_SECRET` or `kubectl -n velero describe secret $VSL_SECRET`.
    If it does not exist, follow the instructions for [editing a Kubernetes secret][12] to add the base64 encoded credentials data.
 
 

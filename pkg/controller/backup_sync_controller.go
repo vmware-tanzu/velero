@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/apex/log"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -418,19 +417,19 @@ func (b *backupSyncReconciler) locationFilterFunc(location *velerov1api.BackupSt
 	if location.Spec.BackupSyncPeriod != nil {
 		syncPeriod = location.Spec.BackupSyncPeriod.Duration
 		if syncPeriod == 0 {
-			log.Debug("Backup sync period for this location is set to 0, skipping sync")
+			b.logger.Debug("Backup sync period for this location is set to 0, skipping sync")
 			return false
 		}
 
 		if syncPeriod < 0 {
-			log.Debug("Backup sync period must be non-negative")
+			b.logger.Debug("Backup sync period must be non-negative")
 			syncPeriod = b.defaultBackupSyncPeriod
 		}
 	}
 
 	lastSync := location.Status.LastSyncedTime
 	if lastSync != nil {
-		log.Debug("Checking if backups need to be synced at this time for this location")
+		b.logger.Debug("Checking if backups need to be synced at this time for this location")
 		nextSync := lastSync.Add(syncPeriod)
 		if time.Now().UTC().Before(nextSync) {
 			return false

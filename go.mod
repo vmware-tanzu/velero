@@ -10,7 +10,6 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.21
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
 	github.com/Azure/go-autorest/autorest/to v0.3.0
-	github.com/apex/log v1.9.0
 	github.com/aws/aws-sdk-go v1.43.31
 	github.com/bombsimon/logrusr v1.1.0
 	github.com/evanphx/json-patch v4.11.0+incompatible

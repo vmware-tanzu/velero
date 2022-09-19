@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
@@ -29,16 +30,16 @@ import (
 // interface.
 type ItemSnapshotterPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*common.PluginBase
 }
 
 // GRPCClient returns a clientDispenser for ItemSnapshotter gRPC clients.
 func (p *ItemSnapshotterPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, clientConn, newItemSnapshotterGRPCClient), nil
+	return common.NewClientDispenser(p.ClientLogger, clientConn, newItemSnapshotterGRPCClient), nil
 }
 
 // GRPCServer registers an ItemSnapshotter gRPC server.
 func (p *ItemSnapshotterPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
-	proto.RegisterItemSnapshotterServer(server, &ItemSnapshotterGRPCServer{mux: p.serverMux})
+	proto.RegisterItemSnapshotterServer(server, &ItemSnapshotterGRPCServer{mux: p.ServerMux})
 	return nil
 }

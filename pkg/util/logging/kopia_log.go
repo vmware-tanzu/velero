@@ -40,22 +40,22 @@ func SetupKopiaLog(ctx context.Context, logger logrus.FieldLogger) context.Conte
 }
 
 func (kl *kopiaLog) Debugf(msg string, args ...interface{}) {
-	logger := kl.logger.WithField("logSource", kl.getLogSource())
+	logger := kl.logger.WithField("logModule", kl.getLogModule())
 	logger.Debugf(msg, args...)
 }
 
 func (kl *kopiaLog) Debugw(msg string, keyValuePairs ...interface{}) {
-	logger := kl.logger.WithField("logSource", kl.getLogSource())
+	logger := kl.logger.WithField("logModule", kl.getLogModule())
 	logger.WithFields(getLogFields(keyValuePairs...)).Debug(msg)
 }
 
 func (kl *kopiaLog) Infof(msg string, args ...interface{}) {
-	logger := kl.logger.WithField("logSource", kl.getLogSource())
+	logger := kl.logger.WithField("logModule", kl.getLogModule())
 	logger.Infof(msg, args...)
 }
 
 func (kl *kopiaLog) Warnf(msg string, args ...interface{}) {
-	logger := kl.logger.WithField("logSource", kl.getLogSource())
+	logger := kl.logger.WithField("logModule", kl.getLogModule())
 	logger.Warnf(msg, args...)
 }
 
@@ -64,14 +64,14 @@ func (kl *kopiaLog) Warnf(msg string, args ...interface{}) {
 // affect Velero's workflow.
 func (kl *kopiaLog) Errorf(msg string, args ...interface{}) {
 	logger := kl.logger.WithFields(logrus.Fields{
-		"logSource": kl.getLogSource(),
+		"logModule": kl.getLogModule(),
 		"sublevel":  "error",
 	})
 
 	logger.Warnf(msg, args...)
 }
 
-func (kl *kopiaLog) getLogSource() string {
+func (kl *kopiaLog) getLogModule() string {
 	return "kopia/" + kl.module
 }
 

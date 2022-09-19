@@ -91,11 +91,18 @@ func NewResticUploaderProvider(
 }
 
 func (rp *resticProvider) Close(ctx context.Context) error {
-	if err := os.Remove(rp.credentialsFile); err != nil {
-		rp.log.Warnf("Failed to remove file %s with err %v", rp.credentialsFile, err)
+	_, err := os.Stat(rp.credentialsFile)
+	if err == nil {
+		return os.Remove(rp.credentialsFile)
+	} else if !os.IsNotExist(err) {
+		return errors.Errorf("failed to get file %s info with error %v", rp.credentialsFile, err)
 	}
-	if err := os.Remove(rp.caCertFile); err != nil {
-		rp.log.Warnf("Failed to remove file %s with err %v", rp.caCertFile, err)
+
+	_, err = os.Stat(rp.caCertFile)
+	if err == nil {
+		return os.Remove(rp.caCertFile)
+	} else if !os.IsNotExist(err) {
+		return errors.Errorf("failed to get file %s info with error %v", rp.caCertFile, err)
 	}
 	return nil
 }
@@ -120,7 +127,10 @@ func (rp *resticProvider) RunBackup(
 	backupCmd := ResticBackupCMDFunc(rp.repoIdentifier, rp.credentialsFile, path, tags)
 	backupCmd.Env = rp.cmdEnv
 	backupCmd.CACertFile = rp.caCertFile
-	backupCmd.ExtraFlags = rp.extraFlags
+	if len(rp.extraFlags) != 0 {
+		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, rp.extraFlags...)
+	}
+
 	if parentSnapshot != "" {
 		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshot))
 	}
@@ -131,7 +141,7 @@ func (rp *resticProvider) RunBackup(
 			log.Debugf("Restic backup got empty dir with %s path", path)
 			return "", true, nil
 		}
-		return "", false, errors.WithStack(fmt.Errorf("error running restic backup with error: %v", err))
+		return "", false, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
 	}
 	// GetSnapshotID
 	snapshotIdCmd := restic.GetSnapshotCommand(rp.repoIdentifier, rp.credentialsFile, tags)
@@ -142,7 +152,7 @@ func (rp *resticProvider) RunBackup(
 	if err != nil {
 		return "", false, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
 	}
-	log.Debugf("Run command=%s, stdout=%s, stderr=%s", backupCmd.String(), summary, stderrBuf)
+	log.Infof("Run command=%s, stdout=%s, stderr=%s", backupCmd.String(), summary, stderrBuf)
 	return snapshotID, false, nil
 }
 
@@ -164,10 +174,11 @@ func (rp *resticProvider) RunRestore(
 	restoreCmd := ResticRestoreCMDFunc(rp.repoIdentifier, rp.credentialsFile, snapshotID, volumePath)
 	restoreCmd.Env = rp.cmdEnv
 	restoreCmd.CACertFile = rp.caCertFile
-	restoreCmd.ExtraFlags = rp.extraFlags
-
+	if len(rp.extraFlags) != 0 {
+		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, rp.extraFlags...)
+	}
 	stdout, stderr, err := restic.RunRestore(restoreCmd, log, updater)
 
-	log.Debugf("Run command=%s, stdout=%s, stderr=%s", restoreCmd.Command, stdout, stderr)
+	log.Infof("Run command=%s, stdout=%s, stderr=%s", restoreCmd.Command, stdout, stderr)
 	return err
 }

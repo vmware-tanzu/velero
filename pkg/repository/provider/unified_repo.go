@@ -38,6 +38,7 @@ type unifiedRepoProvider struct {
 	credentialGetter credentials.CredentialGetter
 	workPath         string
 	repoService      udmrepo.BackupRepoService
+	repoBackend      string
 	log              logrus.FieldLogger
 }
 
@@ -50,7 +51,7 @@ var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 var getAzureStorageDomain = repoconfig.GetAzureStorageDomain
 
 type localFuncTable struct {
-	getStorageVariables   func(*velerov1api.BackupStorageLocation, string) (map[string]string, error)
+	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string) (map[string]string, error)
 	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
 }
 
@@ -69,10 +70,12 @@ const (
 // NewUnifiedRepoProvider creates the service provider for Unified Repo
 func NewUnifiedRepoProvider(
 	credentialGetter credentials.CredentialGetter,
+	repoBackend string,
 	log logrus.FieldLogger,
 ) Provider {
 	repo := unifiedRepoProvider{
 		credentialGetter: credentialGetter,
+		repoBackend:      repoBackend,
 		log:              log,
 	}
 
@@ -303,7 +306,7 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]s
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
-	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, repoParam.BackupRepo.Spec.VolumeNamespace)
+	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace)
 	if err != nil {
 		return map[string]string{}, errors.Wrap(err, "error to get storage variables")
 	}
@@ -406,7 +409,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 	return result, nil
 }
 
-func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoName string) (map[string]string, error) {
+func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
@@ -426,7 +429,7 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		prefix = strings.Trim(backupLocation.Spec.ObjectStorage.Prefix, "/")
 	}
 
-	prefix = path.Join(prefix, udmrepo.StoreOptionPrefixName, repoName) + "/"
+	prefix = path.Join(prefix, repoBackend, repoName) + "/"
 
 	region := config["region"]
 

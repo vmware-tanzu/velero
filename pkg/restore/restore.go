@@ -46,6 +46,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
@@ -113,6 +114,7 @@ type kubernetesRestorer struct {
 	logger                     logrus.FieldLogger
 	podCommandExecutor         podexec.PodCommandExecutor
 	podGetter                  cache.Getter
+	credentialFileStore        credentials.FileStore
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -128,6 +130,7 @@ func NewKubernetesRestorer(
 	logger logrus.FieldLogger,
 	podCommandExecutor podexec.PodCommandExecutor,
 	podGetter cache.Getter,
+	credentialStore credentials.FileStore,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		restoreClient:              restoreClient,
@@ -147,9 +150,10 @@ func NewKubernetesRestorer(
 			veleroCloneName := "velero-clone-" + veleroCloneUuid.String()
 			return veleroCloneName, nil
 		},
-		fileSystem:         filesystem.NewFileSystem(),
-		podCommandExecutor: podCommandExecutor,
-		podGetter:          podGetter,
+		fileSystem:          filesystem.NewFileSystem(),
+		podCommandExecutor:  podCommandExecutor,
+		podGetter:           podGetter,
+		credentialFileStore: credentialStore,
 	}, nil
 }
 
@@ -222,12 +226,12 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		Includes(req.Restore.Spec.IncludedNamespaces...).
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
-	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper)
+	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
-	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper)
+	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -276,6 +280,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		snapshotLocationLister:  snapshotLocationLister,
+		credentialFileStore:     kr.credentialFileStore,
 	}
 
 	restoreCtx := &restoreContext{
@@ -403,6 +408,12 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	ctx.restoreDir = dir
 
 	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
+	// If ErrNotExist occurs, it implies that the backup to be restored includes zero items.
+	// Need to add a warning about it and jump out of the function.
+	if errors.Cause(err) == archive.ErrNotExist {
+		warnings.AddVeleroError(errors.Wrap(err, "zero items to be restored"))
+		return warnings, errs
+	}
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
@@ -1252,29 +1263,22 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// check if we want to treat the error as a warning, in some cases the creation call might not get executed due to object API validations
 	// and Velero might not get the already exists error type but in reality the object already exists
-	objectExists := false
 	var fromCluster *unstructured.Unstructured
 
-	if restoreErr != nil && !isAlreadyExistsError {
+	if restoreErr != nil {
 		// check for the existence of the object in cluster, if no error then it implies that object exists
-		// and if err then we want to fallthrough and do another get call later
+		// and if err then we want to judge whether there is an existing error in the previous creation.
+		// if so, we will return the 'get' error.
+		// otherwise, we will return the original creation error.
 		fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
-		if err == nil {
-			objectExists = true
+		if err != nil && isAlreadyExistsError {
+			ctx.log.Errorf("Error retrieving in-cluster version of %s: %v", kube.NamespaceAndName(obj), err)
+			errs.Add(namespace, err)
+			return warnings, errs
 		}
 	}
 
-	if isAlreadyExistsError || objectExists {
-		// do a get call if we did not run this previously i.e.
-		// we've only run this for errors other than isAlreadyExistError
-		if fromCluster == nil {
-			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
-			if err != nil {
-				ctx.log.Errorf("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-				errs.Add(namespace, err)
-				return warnings, errs
-			}
-		}
+	if fromCluster != nil {
 		// Remove insubstantial metadata.
 		fromCluster, err = resetMetadataAndStatus(fromCluster)
 		if err != nil {
@@ -1462,7 +1466,7 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 		}
 	}
 
-	// the "already allocated" error may caused by other services, check whether the expected service exists or not
+	// the "already allocated" error may be caused by other services, check whether the expected service exists or not
 	if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			ctx.log.Debugf("Service %s not found", kube.NamespaceAndName(obj))

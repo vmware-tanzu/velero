@@ -24,5 +24,5 @@ type Interface interface {
 
 	// names returns a list of all the registered implementations for this plugin (such as "pod" and "pvc" for
 	// BackupItemAction).
-	names() []string
+	Names() []string
 }

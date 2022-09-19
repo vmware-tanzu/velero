@@ -35,7 +35,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1api "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -68,6 +67,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/restore"
@@ -84,6 +84,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 )
 
 const (
@@ -111,9 +113,6 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
-
-	// daemonSet is the name of the Velero restic daemonset.
-	daemonSet = "restic"
 )
 
 type serverConfig struct {
@@ -250,7 +249,7 @@ type server struct {
 	cancelFunc                          context.CancelFunc
 	logger                              logrus.FieldLogger
 	logLevel                            logrus.Level
-	pluginRegistry                      clientmgmt.Registry
+	pluginRegistry                      process.Registry
 	repoManager                         repository.Manager
 	repoLocker                          *repository.RepoLocker
 	repoEnsurer                         *repository.RepositoryEnsurer
@@ -295,7 +294,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	pluginRegistry := clientmgmt.NewRegistry(config.pluginDir, logger, logger.Level)
+	pluginRegistry := process.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
@@ -533,11 +532,11 @@ var defaultRestorePriorities = []string{
 }
 
 func (s *server) initRestic() error {
-	// warn if restic daemonset does not exist
-	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(s.ctx, daemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
+	// warn if node agent does not exist
+	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
+		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
 	} else if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
+		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
 	}
 
 	// ensure the repo key secret is set up
@@ -546,7 +545,7 @@ func (s *server) initRestic() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.sharedInformerFactory.Velero().V1().BackupRepositories(), s.veleroClient.VeleroV1(), s.logger)
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger)
 
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
@@ -586,7 +585,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			podvolume.NewBackupperFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(), s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
+				s.kubeClient.CoreV1(), s.kubeClient.CoreV1(),
+				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.defaultVolumesToRestic,
 			s.config.clientPageSize,
@@ -613,6 +613,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			s.config.formatFlag.Parse(),
 			backupStoreGetter,
+			s.credentialFileStore,
 		)
 
 		return controllerRunInfo{
@@ -635,6 +636,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.kubeClient.CoreV1().RESTClient(),
+			s.credentialFileStore,
 		)
 		cmd.CheckError(err)
 

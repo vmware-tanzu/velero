@@ -212,6 +212,7 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 			SnapshotID:            snapshot,
 			BackupStorageLocation: backupLocation,
 			RepoIdentifier:        repoIdentifier,
+			UploaderType:          uploaderType,
 		},
 	}
 	if pvc != nil {
