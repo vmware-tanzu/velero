@@ -83,7 +83,7 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 			return nil, errors.Errorf("backup repository is not ready: %s", repo.Status.Message)
 		}
 
-		if repo.Status.Phase == velerov1api.BackupRepositoryPhaseNew {
+		if repo.Status.Phase == "" || repo.Status.Phase == velerov1api.BackupRepositoryPhaseNew {
 			return nil, backupRepoNotProvisionedError
 		}
 	}
