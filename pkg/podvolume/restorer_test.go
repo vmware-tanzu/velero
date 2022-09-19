@@ -28,6 +28,7 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 		volumes     map[string]volumeBackupInfo
 		expected    string
 		expectedErr string
+		prefixOnly  bool
 	}{
 		{
 			name:        "empty volume",
@@ -65,7 +66,8 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 				"volume1": {"", "", "fake-type1"},
 				"volume2": {"fake-snapshot-id-2", "fake-uploader-2", "fake-type2"},
 			},
-			expectedErr: "multiple repository type in one backup, current type fake-type1, differential one [type fake-type2, snapshot ID fake-snapshot-id-2, uploader fake-uploader-2]",
+			prefixOnly:  true,
+			expectedErr: "multiple repository type in one backup",
 		},
 		{
 			name: "success",
@@ -84,9 +86,17 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 
 			if err != nil {
-				assert.EqualError(t, err, tc.expectedErr)
+				if tc.prefixOnly {
+					errMsg := err.Error()
+					if len(errMsg) >= len(tc.expectedErr) {
+						errMsg = errMsg[0:len(tc.expectedErr)]
+					}
+
+					assert.Equal(t, tc.expectedErr, errMsg)
+				} else {
+					assert.EqualError(t, err, tc.expectedErr)
+				}
 			}
 		})
-
 	}
 }
