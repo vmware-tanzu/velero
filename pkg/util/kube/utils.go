@@ -34,15 +34,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 // These annotations are taken from the Kubernetes persistent volume/persistent volume claim controller.
 // They cannot be directly importing because they are part of the kubernetes/kubernetes package, and importing that package is unsupported.
 // Their values are well-known and slow changing. They're duplicated here as constants to provide compile-time checking.
 // Originals can be found in kubernetes/kubernetes/pkg/controller/volume/persistentvolume/util/util.go.
-const KubeAnnBindCompleted = "pv.kubernetes.io/bind-completed"
-const KubeAnnBoundByController = "pv.kubernetes.io/bound-by-controller"
-const KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
+const (
+	KubeAnnBindCompleted          = "pv.kubernetes.io/bind-completed"
+	KubeAnnBoundByController      = "pv.kubernetes.io/bound-by-controller"
+	KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
+	KubeAnnMigratedTo             = "pv.kubernetes.io/migrated-to"
+)
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
 func NamespaceAndName(objMeta metav1.Object) string {
@@ -163,6 +168,9 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 	return pvc.Spec.VolumeName, nil
 }
 
+// isProvisionedByCSI function checks whether this is a CSI PV by annotation.
+// Either "pv.kubernetes.io/provisioned-by" or "pv.kubernetes.io/migrated-to" indicates
+// PV is provisioned by CSI.
 func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, kbClient client.Client) (bool, error) {
 	if pv.Spec.CSI != nil {
 		return true, nil
@@ -171,20 +179,36 @@ func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, 
 	// Refer to https://github.com/vmware-tanzu/velero/issues/4496 for more details
 	if pv.Annotations != nil {
 		driverName := pv.Annotations[KubeAnnDynamicallyProvisioned]
-		if len(driverName) > 0 {
+		migratedDriver := pv.Annotations[KubeAnnMigratedTo]
+		if len(driverName) > 0 || len(migratedDriver) > 0 {
 			list := &storagev1api.CSIDriverList{}
 			if err := kbClient.List(context.TODO(), list); err != nil {
 				return false, err
 			}
 			for _, driver := range list.Items {
-				if driverName == driver.Name {
-					log.Debugf("the annotation %s=%s indicates the volume is provisioned by a CSI driver", KubeAnnDynamicallyProvisioned, driverName)
+				if driverName == driver.Name || migratedDriver == driver.Name {
+					log.Debugf("the annotation %s or %s equals to %s indicates the volume is provisioned by a CSI driver", KubeAnnDynamicallyProvisioned, KubeAnnMigratedTo, driverName)
 					return true, nil
 				}
 			}
 		}
 	}
 	return false, nil
+}
+
+// SinglePathMatch function will be called by PVB and PVR controller to check whether pass-in volume path is valid.
+// Check whether there is only one match by the path's pattern (/host_pods/%s/volumes/*/volume_name/[mount|]).
+func SinglePathMatch(path string, fs filesystem.Interface, log logrus.FieldLogger) (string, error) {
+	matches, err := fs.Glob(path)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	if len(matches) != 1 {
+		return "", errors.Errorf("expected one matching path: %s, got %d", path, len(matches))
+	}
+
+	log.Debugf("This is a valid volume path: %s.", matches[0])
+	return matches[0], nil
 }
 
 // IsV1CRDReady checks a v1 CRD to see if it's ready, with both the Established and NamesAccepted conditions.

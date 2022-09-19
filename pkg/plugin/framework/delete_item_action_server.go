@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -31,11 +32,11 @@ import (
 // DeleteItemActionGRPCServer implements the proto-generated DeleteItemActionServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type DeleteItemActionGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
 func (s *DeleteItemActionGRPCServer) getImpl(name string) (velero.DeleteItemAction, error) {
-	impl, err := s.mux.getHandler(name)
+	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
@@ -50,23 +51,23 @@ func (s *DeleteItemActionGRPCServer) getImpl(name string) (velero.DeleteItemActi
 
 func (s *DeleteItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.DeleteItemActionAppliesToRequest) (response *proto.DeleteItemActionAppliesToResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.DeleteItemActionAppliesToResponse{
-		&proto.ResourceSelector{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
@@ -78,14 +79,14 @@ func (s *DeleteItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.D
 
 func (s *DeleteItemActionGRPCServer) Execute(ctx context.Context, req *proto.DeleteItemActionExecuteRequest) (_ *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var (
@@ -94,18 +95,18 @@ func (s *DeleteItemActionGRPCServer) Execute(ctx context.Context, req *proto.Del
 	)
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	if err = json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	if err := impl.Execute(&velero.DeleteItemActionExecuteInput{
 		Item:   &item,
 		Backup: &backup,
 	}); err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil

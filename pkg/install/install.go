@@ -208,7 +208,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 }
 
 // DaemonSetIsReady will poll the kubernetes API server to ensure the restic daemonset is ready, i.e. that
-// pods are scheduled and available on all of the the desired nodes.
+// pods are scheduled and available on all of the desired nodes.
 func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "DaemonSet")
 	apiResource := metav1.APIResource{

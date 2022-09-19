@@ -112,7 +112,7 @@ func ScheduleOrderedResources() {
 func (o *OrderedResources) Init() error {
 	rand.Seed(time.Now().UnixNano())
 	UUIDgen, _ = uuid.NewRandom()
-	client, err := NewTestClient()
+	client, err := NewTestClient(VeleroCfg.DefaultCluster)
 	if err != nil {
 		return fmt.Errorf("failed to init ordered resources test with err %v", err)
 	}

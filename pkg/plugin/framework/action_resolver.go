@@ -22,10 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
@@ -98,11 +98,11 @@ func resolveAction(helper discovery.Helper, action velero.Applicable) (resources
 }
 
 type BackupItemResolvedAction struct {
-	velero.BackupItemAction
+	biav1.BackupItemAction
 	resolvedAction
 }
 
-func NewBackupItemActionResolver(actions []velero.BackupItemAction) BackupItemActionResolver {
+func NewBackupItemActionResolver(actions []biav1.BackupItemAction) BackupItemActionResolver {
 	return BackupItemActionResolver{
 		actions: actions,
 	}
@@ -127,14 +127,14 @@ func NewItemSnapshotterResolver(actions []isv1.ItemSnapshotter) ItemSnapshotterR
 }
 
 type ActionResolver interface {
-	ResolveAction(helper discovery.Helper, action velero.Applicable) (ResolvedAction, error)
+	ResolveAction(helper discovery.Helper, action velero.Applicable, log logrus.FieldLogger) (ResolvedAction, error)
 }
 
 type BackupItemActionResolver struct {
-	actions []velero.BackupItemAction
+	actions []biav1.BackupItemAction
 }
 
-func (recv BackupItemActionResolver) ResolveActions(helper discovery.Helper) ([]BackupItemResolvedAction, error) {
+func (recv BackupItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]BackupItemResolvedAction, error) {
 	var resolved []BackupItemResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -163,7 +163,7 @@ type RestoreItemActionResolver struct {
 	actions []velero.RestoreItemAction
 }
 
-func (recv RestoreItemActionResolver) ResolveActions(helper discovery.Helper) ([]RestoreItemResolvedAction, error) {
+func (recv RestoreItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]RestoreItemResolvedAction, error) {
 	var resolved []RestoreItemResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -192,7 +192,7 @@ type DeleteItemActionResolver struct {
 	actions []velero.DeleteItemAction
 }
 
-func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper) ([]DeleteItemResolvedAction, error) {
+func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]DeleteItemResolvedAction, error) {
 	var resolved []DeleteItemResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -221,7 +221,7 @@ type ItemSnapshotterResolver struct {
 	actions []isv1.ItemSnapshotter
 }
 
-func (recv ItemSnapshotterResolver) ResolveActions(helper discovery.Helper) ([]ItemSnapshotterResolvedAction, error) {
+func (recv ItemSnapshotterResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]ItemSnapshotterResolvedAction, error) {
 	var resolved []ItemSnapshotterResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)

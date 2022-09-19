@@ -21,21 +21,21 @@ import (
 
 	"github.com/pkg/errors"
 
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
 
 type restartableItemSnapshotter struct {
-	key                 kindAndName
-	sharedPluginProcess RestartableProcess
+	key                 process.KindAndName
+	sharedPluginProcess process.RestartableProcess
 }
 
-// newRestartableItemSnapshotter returns a new newRestartableItemSnapshotter.
-func newRestartableItemSnapshotter(name string, sharedPluginProcess RestartableProcess) *restartableItemSnapshotter {
+// NewRestartableItemSnapshotter returns a new restartableItemSnapshotter.
+func NewRestartableItemSnapshotter(name string, sharedPluginProcess process.RestartableProcess) *restartableItemSnapshotter {
 	r := &restartableItemSnapshotter{
-		key:                 kindAndName{kind: framework.PluginKindItemSnapshotter, name: name},
+		key:                 process.KindAndName{Kind: common.PluginKindItemSnapshotter, Name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r
@@ -44,7 +44,7 @@ func newRestartableItemSnapshotter(name string, sharedPluginProcess RestartableP
 // getItemSnapshotter returns the item snapshotter for this restartableItemSnapshotter. It does *not* restart the
 // plugin process.
 func (r *restartableItemSnapshotter) getItemSnapshotter() (isv1.ItemSnapshotter, error) {
-	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
+	plugin, err := r.sharedPluginProcess.GetByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (r *restartableItemSnapshotter) getItemSnapshotter() (isv1.ItemSnapshotter,
 
 // getDelegate restarts the plugin process (if needed) and returns the item snapshotter for this restartableItemSnapshotter.
 func (r *restartableItemSnapshotter) getDelegate() (isv1.ItemSnapshotter, error) {
-	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
+	if err := r.sharedPluginProcess.ResetIfNeeded(); err != nil {
 		return nil, err
 	}
 

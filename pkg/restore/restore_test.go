@@ -48,8 +48,8 @@ import (
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/restic"
-	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -762,14 +762,15 @@ func TestInvalidTarballContents(t *testing.T) {
 		tarball      io.Reader
 		want         map[*test.APIResource][]string
 		wantErrs     Result
+		wantWarnings Result
 	}{
 		{
-			name:    "empty tarball returns an error",
+			name:    "empty tarball returns a warning",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
 				Done(),
-			wantErrs: Result{
+			wantWarnings: Result{
 				Velero: []string{archive.ErrNotExist.Error()},
 			},
 		},
@@ -820,33 +821,32 @@ func TestInvalidTarballContents(t *testing.T) {
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
-
-			assertEmptyResults(t, warnings)
-			assertWantErrs(t, tc.wantErrs, errs)
+			assertWantErrsOrWarnings(t, tc.wantWarnings, warnings)
+			assertWantErrsOrWarnings(t, tc.wantErrs, errs)
 			assertAPIContents(t, h, tc.want)
 		})
 	}
 }
 
-func assertWantErrs(t *testing.T, wantErrRes Result, errRes Result) {
+func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
 	t.Helper()
-	if wantErrRes.Velero != nil {
-		assert.Equal(t, len(wantErrRes.Velero), len(errRes.Velero))
-		for i := range errRes.Velero {
-			assert.Contains(t, errRes.Velero[i], wantErrRes.Velero[i])
+	if wantRes.Velero != nil {
+		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		for i := range res.Velero {
+			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
 		}
 	}
-	if wantErrRes.Namespaces != nil {
-		assert.Equal(t, len(wantErrRes.Namespaces), len(errRes.Namespaces))
-		for ns := range errRes.Namespaces {
-			assert.Equal(t, len(wantErrRes.Namespaces[ns]), len(errRes.Namespaces[ns]))
-			for i := range errRes.Namespaces[ns] {
-				assert.Contains(t, errRes.Namespaces[ns][i], wantErrRes.Namespaces[ns][i])
+	if wantRes.Namespaces != nil {
+		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		for ns := range res.Namespaces {
+			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			for i := range res.Namespaces[ns] {
+				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
 			}
 		}
 	}
-	if wantErrRes.Cluster != nil {
-		assert.Equal(t, wantErrRes.Cluster, errRes.Cluster)
+	if wantRes.Cluster != nil {
+		assert.Equal(t, wantRes.Cluster, res.Cluster)
 	}
 }
 
@@ -2681,10 +2681,10 @@ func TestRestorePersistentVolumes(t *testing.T) {
 }
 
 type fakeResticRestorerFactory struct {
-	restorer *resticmocks.Restorer
+	restorer *uploadermocks.Restorer
 }
 
-func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (restic.Restorer, error) {
+func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (podvolume.Restorer, error) {
 	return f.restorer, nil
 }
 
@@ -2749,7 +2749,7 @@ func TestRestoreWithRestic(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			restorer := new(resticmocks.Restorer)
+			restorer := new(uploadermocks.Restorer)
 			defer restorer.AssertExpectations(t)
 			h.restorer.resticRestorerFactory = &fakeResticRestorerFactory{
 				restorer: restorer,
@@ -2773,7 +2773,7 @@ func TestRestoreWithRestic(t *testing.T) {
 
 				// the restore process adds these labels before restoring, so we must add them here too otherwise they won't match
 				pod.Labels = map[string]string{"velero.io/backup-name": tc.backup.Name, "velero.io/restore-name": tc.restore.Name}
-				expectedArgs := restic.RestoreData{
+				expectedArgs := podvolume.RestoreData{
 					Restore:          tc.restore,
 					Pod:              pod,
 					PodVolumeBackups: tc.podVolumeBackups,

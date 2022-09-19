@@ -25,7 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
@@ -59,10 +60,10 @@ func TestRestartableGetDeleteItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := kindAndName{kind: framework.PluginKindDeleteItemAction, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := newRestartableDeleteItemAction(name, p)
+			r := NewRestartableDeleteItemAction(name, p)
 			a, err := r.getDeleteItemAction()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
@@ -80,19 +81,19 @@ func TestRestartableDeleteItemActionGetDelegate(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "pod"
-	r := newRestartableDeleteItemAction(name, p)
+	r := NewRestartableDeleteItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
 	// Currently broken since this mocks out the restore item action interface
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.DeleteItemAction)
-	key := kindAndName{kind: framework.PluginKindDeleteItemAction, name: name}
-	p.On("getByKindAndName", key).Return(expected, nil)
+	key := process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name}
+	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -115,8 +116,8 @@ func TestRestartableDeleteItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindDeleteItemAction,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		common.PluginKindDeleteItemAction,
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableDeleteItemAction{
 				key:                 key,
 				sharedPluginProcess: p,

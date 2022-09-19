@@ -145,6 +145,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				VolumeSnapshotLocations: o.BackupOptions.SnapshotLocations,
 				DefaultVolumesToRestic:  o.BackupOptions.DefaultVolumesToRestic.Value,
 				OrderedResources:        orders,
+				CSISnapshotTimeout:      metav1.Duration{Duration: o.BackupOptions.CSISnapshotTimeout},
 			},
 			Schedule:                   o.Schedule,
 			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,

@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apex/log"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -50,6 +49,7 @@ import (
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -70,6 +70,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
+	corev1api "k8s.io/api/core/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -87,6 +88,7 @@ type backupController struct {
 	defaultBackupLocation       string
 	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
+	defaultCSISnapshotTimeout   time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
@@ -96,6 +98,7 @@ type backupController struct {
 	volumeSnapshotClient        *snapshotterClientSet.Clientset
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
 	volumeSnapshotClassLister   snapshotv1listers.VolumeSnapshotClassLister
+	credentialFileStore         credentials.FileStore
 }
 
 func NewBackupController(
@@ -111,6 +114,7 @@ func NewBackupController(
 	defaultBackupLocation string,
 	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
+	defaultCSISnapshotTimeout time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -120,6 +124,7 @@ func NewBackupController(
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	volumesnapshotClassLister snapshotv1listers.VolumeSnapshotClassLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
+	credentialStore credentials.FileStore,
 ) Interface {
 	c := &backupController{
 		genericController:           newGenericController(Backup, logger),
@@ -135,6 +140,7 @@ func NewBackupController(
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
+		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
 		snapshotLocationLister:      volumeSnapshotLocationLister,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
 		metrics:                     metrics,
@@ -144,6 +150,7 @@ func NewBackupController(
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
 		volumeSnapshotClassLister:   volumesnapshotClassLister,
 		backupStoreGetter:           backupStoreGetter,
+		credentialFileStore:         credentialStore,
 	}
 
 	c.syncHandler = c.processBackup
@@ -257,7 +264,6 @@ func (c *backupController) processBackup(key string) error {
 
 	log.Debug("Preparing backup request")
 	request := c.prepareBackupRequest(original)
-
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
@@ -359,6 +365,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Spec.TTL.Duration = c.defaultBackupTTL
 	}
 
+	if request.Spec.CSISnapshotTimeout.Duration == 0 {
+		// set default CSI VolumeSnapshot timeout
+		request.Spec.CSISnapshotTimeout.Duration = c.defaultCSISnapshotTimeout
+	}
+
 	// calculate expiration
 	request.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(request.Spec.TTL.Duration)}
 
@@ -435,6 +446,17 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	request.Annotations[velerov1api.SourceClusterK8sGitVersionAnnotation] = c.discoveryHelper.ServerVersion().String()
 	request.Annotations[velerov1api.SourceClusterK8sMajorVersionAnnotation] = c.discoveryHelper.ServerVersion().Major
 	request.Annotations[velerov1api.SourceClusterK8sMinorVersionAnnotation] = c.discoveryHelper.ServerVersion().Minor
+
+	// Add namespaces with label velero.io/exclude-from-backup=true into request.Spec.ExcludedNamespaces
+	// Essentially, adding the label velero.io/exclude-from-backup=true to a namespace would be equivalent to setting spec.ExcludedNamespaces
+	namespaces := corev1api.NamespaceList{}
+	if err := c.kbClient.List(context.Background(), &namespaces, kbclient.MatchingLabels{"velero.io/exclude-from-backup": "true"}); err == nil {
+		for _, ns := range namespaces.Items {
+			request.Spec.ExcludedNamespaces = append(request.Spec.ExcludedNamespaces, ns.Name)
+		}
+	} else {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting namespace list: %v", err))
+	}
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
@@ -547,6 +569,15 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 		return nil, errors
 	}
 
+	// add credential to config for each location
+	for _, location := range providerLocations {
+		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, c.credentialFileStore, c.logger)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error adding credentials to volume snapshot location named %s: %v", location.Name, err))
+			continue
+		}
+	}
+
 	return providerLocations, nil
 }
 
@@ -638,7 +669,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 				backupLog.Error(err)
 			}
 
-			err = c.checkVolumeSnapshotReadyToUse(context.Background(), volumeSnapshots)
+			err = c.checkVolumeSnapshotReadyToUse(context.Background(), volumeSnapshots, backup.Spec.CSISnapshotTimeout.Duration)
 			if err != nil {
 				backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
 			}
@@ -879,9 +910,10 @@ func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
 // using goroutine here instead of waiting in CSI plugin, because it's not easy to make BackupItemAction
 // parallel by now. After BackupItemAction parallel is implemented, this logic should be moved to CSI plugin
 // as https://github.com/vmware-tanzu/velero-plugin-for-csi/pull/100
-func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, volumesnapshots []*snapshotv1api.VolumeSnapshot) error {
+func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, volumesnapshots []*snapshotv1api.VolumeSnapshot,
+	csiSnapshotTimeout time.Duration) error {
 	eg, _ := errgroup.WithContext(ctx)
-	timeout := 10 * time.Minute
+	timeout := csiSnapshotTimeout
 	interval := 5 * time.Second
 
 	for _, vs := range volumesnapshots {
@@ -893,14 +925,14 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 					return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name))
 				}
 				if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
-					log.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
+					c.logger.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
 					return false, nil
 				}
 
 				return true, nil
 			})
 			if err == wait.ErrWaitTimeout {
-				log.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
+				c.logger.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			}
 			return err
 		})
@@ -931,6 +963,10 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 			if vs.Status.BoundVolumeSnapshotContentName != nil &&
 				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
 				vsc = vscMap[*vs.Status.BoundVolumeSnapshotContentName]
+				if nil == vsc {
+					logger.Errorf("Not find %s from the vscMap", vs.Status.BoundVolumeSnapshotContentName)
+					return
+				}
 				if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
 					modifyVSCFlag = true
 				}

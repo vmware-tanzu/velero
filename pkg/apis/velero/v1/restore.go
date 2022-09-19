@@ -17,8 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RestoreSpec defines the specification for a Velero restore.
@@ -208,9 +208,10 @@ type ExecRestoreHook struct {
 // InitRestoreHook is a hook that adds an init container to a PodSpec to run commands before the
 // workload pod is able to start.
 type InitRestoreHook struct {
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// InitContainers is list of init containers to be added to a pod during its restore.
 	// +optional
-	InitContainers []v1.Container `json:"initContainers"`
+	InitContainers []runtime.RawExtension `json:"initContainers"`
 
 	// Timeout defines the maximum amount of time Velero should wait for the initContainers to complete.
 	// +optional

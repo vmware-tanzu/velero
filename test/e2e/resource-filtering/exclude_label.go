@@ -19,11 +19,13 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -62,7 +64,7 @@ func (e *ExcludeFromBackup) Init() error {
 
 	e.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
-		"--include-namespaces", strings.Join(*e.NSIncluded, ","),
+		"--include-namespaces", e.NSBaseName,
 		"--default-volumes-to-restic", "--wait",
 	}
 
@@ -75,63 +77,87 @@ func (e *ExcludeFromBackup) Init() error {
 
 func (e *ExcludeFromBackup) CreateResources() error {
 	e.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
-		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-		labels := e.labels
-		if nsNum%2 == 0 {
-			labels = map[string]string{
-				"velero.io/exclude-from-backup": "false",
-			}
-		}
-		if err := CreateNamespaceWithLabel(e.Ctx, e.Client, namespace, labels); err != nil {
-			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
-		}
-		serviceAccountName := "default"
-		// wait until the service account is created before patch the image pull secret
-		if err := WaitUntilServiceAccountCreated(e.Ctx, e.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
-			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
-		}
-		// add the image pull secret to avoid the image pull limit issue of Docker Hub
-		if err := PatchServiceAccountWithImagePullSecret(e.Ctx, e.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
-			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
-		}
-		//Create deployment
-		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-
-		deployment := NewDeployment(e.NSBaseName, namespace, e.replica, labels)
-		deployment, err := CreateDeployment(e.Client.ClientGo, namespace, deployment)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
-		}
-		err = WaitForReadyDeployment(e.Client.ClientGo, namespace, deployment.Name)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to ensure deployment completion in namespace: %q", namespace))
-		}
+	namespace := e.NSBaseName
+	// These 2 labels for resources to be included
+	label1 := map[string]string{
+		"meaningless-label-resource-to-include": "true",
+	}
+	label2 := map[string]string{
+		"velero.io/exclude-from-backup": "false",
+	}
+	fmt.Printf("Creating resources in namespace ...%s\n", namespace)
+	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
+		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
+	}
+	serviceAccountName := "default"
+	// wait until the service account is created before patch the image pull secret
+	if err := WaitUntilServiceAccountCreated(e.Ctx, e.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
+	}
+	// add the image pull secret to avoid the image pull limit issue of Docker Hub
+	if err := PatchServiceAccountWithImagePullSecret(e.Ctx, e.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
+	}
+	//Create deployment: to be included
+	fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
+	deployment := NewDeployment(e.NSBaseName, namespace, e.replica, label2)
+	deployment, err := CreateDeployment(e.Client.ClientGo, namespace, deployment)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
+	}
+	err = WaitForReadyDeployment(e.Client.ClientGo, namespace, deployment.Name)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
+	}
+	//Create Secret
+	secretName := e.NSBaseName
+	fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
+	_, err = CreateSecret(e.Client.ClientGo, namespace, secretName, e.labels)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to create secret in the namespace %q", namespace))
+	}
+	err = WaitForSecretsComplete(e.Client.ClientGo, namespace, secretName)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
+	}
+	By(fmt.Sprintf("Checking secret %s should exists in namespaces ...%s\n", secretName, namespace), func() {
+		_, err = GetSecret(e.Client.ClientGo, namespace, e.NSBaseName)
+		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
+	})
+	//Create Configmap: to be included
+	configmaptName := e.NSBaseName
+	fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
+	_, err = CreateConfigMap(e.Client.ClientGo, namespace, configmaptName, label1)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to create configmap in the namespace %q", namespace))
+	}
+	err = WaitForConfigMapComplete(e.Client.ClientGo, namespace, configmaptName)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
 	}
 	return nil
 }
 
 func (e *ExcludeFromBackup) Verify() error {
-	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
-		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
-		//Check deployment
-		_, err := GetDeployment(e.Client.ClientGo, namespace, e.NSBaseName)
-		if nsNum%2 == 0 { //include
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
-			}
-		} else { //exclude
-			if err == nil {
-				return fmt.Errorf("failed to exclude deployment in namespaces %q", namespace)
-			} else {
-				if apierrors.IsNotFound(err) { //resource should be excluded
-					return nil
-				}
-				return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
-			}
-		}
-	}
+	namespace := e.NSBaseName
+	By(fmt.Sprintf("Checking resources in namespaces ...%s\n", namespace), func() {
+		//Check namespace
+		checkNS, err := GetNamespace(e.Ctx, e.Client, namespace)
+		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Could not retrieve test namespace %s", namespace))
+		Expect(checkNS.Name == namespace).To(Equal(true), fmt.Sprintf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name))
+
+		//Check deployment: should be included
+		_, err = GetDeployment(e.Client.ClientGo, namespace, e.NSBaseName)
+		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
+
+		//Check secrets: secrets should not be included
+		_, err = GetSecret(e.Client.ClientGo, namespace, e.NSBaseName)
+		Expect(err).Should(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
+		Expect(apierrors.IsNotFound(err)).To(Equal(true))
+
+		//Check configmap: should be included
+		_, err = GetConfigmap(e.Client.ClientGo, namespace, e.NSBaseName)
+		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list configmap in namespace: %q", namespace))
+	})
 	return nil
 }

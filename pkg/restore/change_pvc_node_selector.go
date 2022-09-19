@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -130,7 +130,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExe
 
 func getNewNodeFromConfigMap(client corev1client.ConfigMapInterface, node string) (string, error) {
 	// fetch node mapping from configMap
-	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-pvc-node-selector", client)
+	config, err := getPluginConfig(common.PluginKindRestoreItemAction, "velero.io/change-pvc-node-selector", client)
 	if err != nil {
 		return "", err
 	}

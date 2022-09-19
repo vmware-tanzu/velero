@@ -29,7 +29,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	storagev1client "k8s.io/client-go/kubernetes/typed/storage/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -69,7 +69,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	defer a.logger.Info("Done executing ChangeStorageClassAction")
 
 	a.logger.Debug("Getting plugin config")
-	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-storage-class", a.configMapClient)
+	config, err := getPluginConfig(common.PluginKindRestoreItemAction, "velero.io/change-storage-class", a.configMapClient)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 
 		if len(sts.Spec.VolumeClaimTemplates) > 0 {
 			for index, pvc := range sts.Spec.VolumeClaimTemplates {
-				exists, newStorageClass, err := a.isStorageClassExist(log, *pvc.Spec.StorageClassName, config)
+				exists, newStorageClass, err := a.isStorageClassExist(log, pvc.Spec.StorageClassName, config)
 				if err != nil {
 					return nil, err
 				} else if !exists {
@@ -124,7 +124,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 			return nil, errors.Wrap(err, "error getting item's spec.storageClassName")
 		}
 
-		exists, newStorageClass, err := a.isStorageClassExist(log, storageClass, config)
+		exists, newStorageClass, err := a.isStorageClassExist(log, &storageClass, config)
 		if err != nil {
 			return nil, err
 		} else if !exists {
@@ -140,15 +140,15 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	return velero.NewRestoreItemActionExecuteOutput(obj), nil
 }
 
-func (a *ChangeStorageClassAction) isStorageClassExist(log *logrus.Entry, storageClass string, cm *corev1.ConfigMap) (exists bool, newStorageClass string, err error) {
-	if storageClass == "" {
+func (a *ChangeStorageClassAction) isStorageClassExist(log *logrus.Entry, storageClass *string, cm *corev1.ConfigMap) (exists bool, newStorageClass string, err error) {
+	if storageClass == nil || *storageClass == "" {
 		log.Debug("Item has no storage class specified")
 		return false, "", nil
 	}
 
-	newStorageClass, ok := cm.Data[storageClass]
+	newStorageClass, ok := cm.Data[*storageClass]
 	if !ok {
-		log.Debugf("No mapping found for storage class %s", storageClass)
+		log.Debugf("No mapping found for storage class %s", *storageClass)
 		return false, "", nil
 	}
 

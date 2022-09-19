@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -71,7 +71,7 @@ func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
 
 // RunBackup runs a `restic backup` command and watches the output to provide
 // progress updates to the caller.
-func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.ProgressUpdater) (string, string, error) {
 	// buffers for copying command stdout/err output into
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
@@ -104,9 +104,9 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 					// if the line contains a non-empty bytes_done field, we can update the
 					// caller with the progress
 					if stat.BytesDone != 0 {
-						updateFunc(velerov1api.PodVolumeOperationProgress{
-							TotalBytes: stat.TotalBytes,
-							BytesDone:  stat.BytesDone,
+						updater.UpdateProgress(&uploader.UploaderProgress{
+							TotalBytes: stat.TotalBytesProcessed,
+							BytesDone:  stat.TotalBytesProcessed,
 						})
 					}
 				}
@@ -136,7 +136,7 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 	}
 
 	// update progress to 100%
-	updateFunc(velerov1api.PodVolumeOperationProgress{
+	updater.UpdateProgress(&uploader.UploaderProgress{
 		TotalBytes: stat.TotalBytesProcessed,
 		BytesDone:  stat.TotalBytesProcessed,
 	})
@@ -184,7 +184,7 @@ func getSummaryLine(b []byte) ([]byte, error) {
 
 // RunRestore runs a `restic restore` command and monitors the volume size to
 // provide progress updates to the caller.
-func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updater uploader.ProgressUpdater) (string, string, error) {
 	insecureTLSFlag := ""
 
 	for _, extraFlag := range restoreCmd.ExtraFlags {
@@ -198,7 +198,7 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 		return "", "", errors.Wrap(err, "error getting snapshot size")
 	}
 
-	updateFunc(velerov1api.PodVolumeOperationProgress{
+	updater.UpdateProgress(&uploader.UploaderProgress{
 		TotalBytes: snapshotSize,
 	})
 
@@ -216,10 +216,12 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 					log.WithError(err).Errorf("error getting restic restore progress")
 				}
 
-				updateFunc(velerov1api.PodVolumeOperationProgress{
-					TotalBytes: snapshotSize,
-					BytesDone:  volumeSize,
-				})
+				if volumeSize != 0 {
+					updater.UpdateProgress(&uploader.UploaderProgress{
+						TotalBytes: snapshotSize,
+						BytesDone:  volumeSize,
+					})
+				}
 			case <-quit:
 				ticker.Stop()
 				return
@@ -231,7 +233,7 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 	quit <- struct{}{}
 
 	// update progress to 100%
-	updateFunc(velerov1api.PodVolumeOperationProgress{
+	updater.UpdateProgress(&uploader.UploaderProgress{
 		TotalBytes: snapshotSize,
 		BytesDone:  snapshotSize,
 	})

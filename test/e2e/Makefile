@@ -62,6 +62,9 @@ UPGRADE_FROM_VELERO_VERSION ?= v1.7.1,v1.8.1
 # to the end, nil string will be set if UPGRADE_FROM_VELERO_CLI is shorter than UPGRADE_FROM_VELERO_VERSION
 UPGRADE_FROM_VELERO_CLI ?=
 
+MIGRATE_FROM_VELERO_VERSION ?= v1.8.1,self
+MIGRATE_FROM_VELERO_CLI ?=
+
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
 BSL_BUCKET ?=
@@ -86,6 +89,13 @@ ADDITIONAL_BSL_CONFIG ?=
 FEATURES ?=
 DEBUG_E2E_TEST ?= false
 
+# Parameters to run migration tests along with all other E2E tests, and both of them should
+#   be provided or left them all empty to skip migration tests with no influence to other
+#   E2E tests.
+DEFAULT_CLUSTER ?=
+STANDBY_CLUSTER ?=
+
+
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
 	go get github.com/onsi/ginkgo/ginkgo
@@ -105,6 +115,8 @@ run: ginkgo
 		-restic-helper-image=$(RESTIC_HELPER_IMAGE) \
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
 		-upgrade-from-velero-version=$(UPGRADE_FROM_VELERO_VERSION) \
+		-migrate-from-velero-cli=$(MIGRATE_FROM_VELERO_CLI) \
+		-migrate-from-velero-version=$(MIGRATE_FROM_VELERO_VERSION) \
 		-velero-namespace=$(VELERO_NAMESPACE) \
 		-credentials-file=$(CREDS_FILE) \
 		-bucket=$(BSL_BUCKET) \
@@ -123,7 +135,9 @@ run: ginkgo
 		-install-velero=$(INSTALL_VELERO) \
 		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
 		-kibishii-directory=$(KIBISHII_DIRECTORY) \
-		-debug-e2e-test=$(DEBUG_E2E_TEST)
+		-debug-e2e-test=$(DEBUG_E2E_TEST) \
+		-default-cluster=$(DEFAULT_CLUSTER) \
+		-standby-cluster=$(STANDBY_CLUSTER)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

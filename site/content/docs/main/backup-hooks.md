@@ -52,9 +52,6 @@ spec.
 This examples walks you through using both pre and post hooks for freezing a file system. Freezing the
 file system is useful to ensure that all pending disk I/O operations have completed prior to taking a snapshot.
 
-This example uses [examples/nginx-app/with-pv.yaml][2]. Follow the [steps for your provider][3] to
-setup this example.
-
 ### Annotations
 
 The Velero [example/nginx-app/with-pv.yaml][2] serves as an example of adding the pre and post hook annotations directly
@@ -108,4 +105,3 @@ Note that the container must support the shell command you use.
 
 [1]: api-types/backup.md
 [2]: https://github.com/vmware-tanzu/velero/blob/main/examples/nginx-app/with-pv.yaml
-[3]: cloud-common.md

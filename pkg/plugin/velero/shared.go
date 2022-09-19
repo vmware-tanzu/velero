@@ -20,6 +20,8 @@ limitations under the License.
 // plugins of any type can be implemented.
 package velero
 
+import "k8s.io/apimachinery/pkg/runtime/schema"
+
 // ResourceSelector is a collection of included/excluded namespaces,
 // included/excluded resources, and a label-selector that can be used
 // to match a set of items from a cluster.
@@ -53,4 +55,11 @@ type ResourceSelector struct {
 type Applicable interface {
 	// AppliesTo returns information about which resources this Responder should be invoked for.
 	AppliesTo() (ResourceSelector, error)
+}
+
+// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
+type ResourceIdentifier struct {
+	schema.GroupResource
+	Namespace string
+	Name      string
 }

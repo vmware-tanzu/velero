@@ -65,7 +65,7 @@ func NewScheduleReconciler(
 }
 
 func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod)
+	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1.Schedule{}).
 		Watches(s, nil).

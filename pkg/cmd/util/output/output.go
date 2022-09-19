@@ -41,7 +41,7 @@ const downloadRequestTimeout = 30 * time.Second
 func BindFlags(flags *pflag.FlagSet) {
 	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 	labelColumns := flag.NewStringArray()
-	flags.Var(&labelColumns, "label-columns", "A comma-separated list of labels to be displayed as columns")
+	flags.VarP(&labelColumns, "label-columns", "L", "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	flags.Bool("show-labels", false, "Show labels in the last column")
 }
 
@@ -177,15 +177,15 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 			ColumnDefinitions: scheduleColumns,
 			Rows:              printScheduleList(obj.(*velerov1api.ScheduleList)),
 		}
-	case *velerov1api.ResticRepository:
+	case *velerov1api.BackupRepository:
 		table = &metav1.Table{
 			ColumnDefinitions: resticRepoColumns,
-			Rows:              printResticRepo(obj.(*velerov1api.ResticRepository)),
+			Rows:              printResticRepo(obj.(*velerov1api.BackupRepository)),
 		}
-	case *velerov1api.ResticRepositoryList:
+	case *velerov1api.BackupRepositoryList:
 		table = &metav1.Table{
 			ColumnDefinitions: resticRepoColumns,
-			Rows:              printResticRepoList(obj.(*velerov1api.ResticRepositoryList)),
+			Rows:              printResticRepoList(obj.(*velerov1api.BackupRepositoryList)),
 		}
 	case *velerov1api.BackupStorageLocation:
 		table = &metav1.Table{

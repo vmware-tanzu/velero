@@ -45,11 +45,11 @@ RUN go get golang.org/x/tools/cmd/goimports@11e9d9cc0042e6bd10337d4d2c3e5d929550
 # get protoc compiler and golang plugin
 WORKDIR /root
 RUN apt-get update && apt-get install -y unzip
-RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/protoc-3.9.1-linux-x86_64.zip && \
-    unzip protoc-3.9.1-linux-x86_64.zip && \
+RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip && \
+    unzip protoc-3.14.0-linux-x86_64.zip && \
     mv bin/protoc /usr/bin/protoc && \
     chmod +x /usr/bin/protoc
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.0.0
+RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.3
 
 # get goreleaser
 RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v0.120.8/goreleaser_Linux_x86_64.tar.gz && \

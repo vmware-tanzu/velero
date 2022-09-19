@@ -47,14 +47,9 @@ func BackupDeletionWithRestic() {
 func backup_deletion_test(useVolumeSnapshots bool) {
 	var (
 		backupName string
-		client     TestClient
 		err        error
 	)
 
-	By("Create test client instance", func() {
-		client, err = NewTestClient()
-		Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
-	})
 	BeforeEach(func() {
 		if useVolumeSnapshots && VeleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
@@ -69,18 +64,22 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		if VeleroCfg.InstallVelero {
-			if !VeleroCfg.Debug {
+		if !VeleroCfg.Debug {
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
+			})
+			if VeleroCfg.InstallVelero {
 				err = VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 				Expect(err).To(Succeed())
 			}
 		}
+
 	})
 
 	When("kibishii is the sample workload", func() {
 		It("Deleted backups are deleted from object storage and backups deleted from object storage can be deleted locally", func() {
 			backupName = "backup-" + UUIDgen.String()
-			Expect(runBackupDeletionTests(client, VeleroCfg, backupName, "", useVolumeSnapshots, VeleroCfg.KibishiiDirectory)).To(Succeed(),
+			Expect(runBackupDeletionTests(*VeleroCfg.ClientToInstallVelero, VeleroCfg, backupName, "", useVolumeSnapshots, VeleroCfg.KibishiiDirectory)).To(Succeed(),
 				"Failed to run backup deletion test")
 		})
 	})
@@ -110,7 +109,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	}
 
 	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest,
-		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots); err != nil {
+		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
 	err := ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)

@@ -46,6 +46,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
@@ -59,7 +60,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -104,7 +105,7 @@ type kubernetesRestorer struct {
 	discoveryHelper            discovery.Helper
 	dynamicFactory             client.DynamicFactory
 	namespaceClient            corev1.NamespaceInterface
-	resticRestorerFactory      restic.RestorerFactory
+	resticRestorerFactory      podvolume.RestorerFactory
 	resticTimeout              time.Duration
 	resourceTerminatingTimeout time.Duration
 	resourcePriorities         []string
@@ -113,6 +114,7 @@ type kubernetesRestorer struct {
 	logger                     logrus.FieldLogger
 	podCommandExecutor         podexec.PodCommandExecutor
 	podGetter                  cache.Getter
+	credentialFileStore        credentials.FileStore
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -122,12 +124,13 @@ func NewKubernetesRestorer(
 	dynamicFactory client.DynamicFactory,
 	resourcePriorities []string,
 	namespaceClient corev1.NamespaceInterface,
-	resticRestorerFactory restic.RestorerFactory,
+	resticRestorerFactory podvolume.RestorerFactory,
 	resticTimeout time.Duration,
 	resourceTerminatingTimeout time.Duration,
 	logger logrus.FieldLogger,
 	podCommandExecutor podexec.PodCommandExecutor,
 	podGetter cache.Getter,
+	credentialStore credentials.FileStore,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		restoreClient:              restoreClient,
@@ -147,9 +150,10 @@ func NewKubernetesRestorer(
 			veleroCloneName := "velero-clone-" + veleroCloneUuid.String()
 			return veleroCloneName, nil
 		},
-		fileSystem:         filesystem.NewFileSystem(),
-		podCommandExecutor: podCommandExecutor,
-		podGetter:          podGetter,
+		fileSystem:          filesystem.NewFileSystem(),
+		podCommandExecutor:  podCommandExecutor,
+		podGetter:           podGetter,
+		credentialFileStore: credentialStore,
 	}, nil
 }
 
@@ -222,12 +226,12 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		Includes(req.Restore.Spec.IncludedNamespaces...).
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
-	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper)
+	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
-	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper)
+	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -248,7 +252,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	ctx, cancelFunc := go_context.WithTimeout(go_context.Background(), podVolumeTimeout)
 	defer cancelFunc()
 
-	var resticRestorer restic.Restorer
+	var resticRestorer podvolume.Restorer
 	if kr.resticRestorerFactory != nil {
 		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, req.Restore)
 		if err != nil {
@@ -276,6 +280,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		snapshotLocationLister:  snapshotLocationLister,
+		credentialFileStore:     kr.credentialFileStore,
 	}
 
 	restoreCtx := &restoreContext{
@@ -338,7 +343,7 @@ type restoreContext struct {
 	restoreItemActions             []framework.RestoreItemResolvedAction
 	itemSnapshotterActions         []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter        VolumeSnapshotterGetter
-	resticRestorer                 restic.Restorer
+	resticRestorer                 podvolume.Restorer
 	resticWaitGroup                sync.WaitGroup
 	resticErrs                     chan error
 	pvsToProvision                 sets.String
@@ -403,6 +408,12 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	ctx.restoreDir = dir
 
 	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
+	// If ErrNotExist occurs, it implies that the backup to be restored includes zero items.
+	// Need to add a warning about it and jump out of the function.
+	if errors.Cause(err) == archive.ErrNotExist {
+		warnings.AddVeleroError(errors.Wrap(err, "zero items to be restored"))
+		return warnings, errs
+	}
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
@@ -1249,13 +1260,25 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		errs.Add(namespace, err)
 		return warnings, errs
 	}
-	if isAlreadyExistsError {
-		fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
-		if err != nil {
-			ctx.log.Infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-			warnings.Add(namespace, err)
+
+	// check if we want to treat the error as a warning, in some cases the creation call might not get executed due to object API validations
+	// and Velero might not get the already exists error type but in reality the object already exists
+	var fromCluster *unstructured.Unstructured
+
+	if restoreErr != nil {
+		// check for the existence of the object in cluster, if no error then it implies that object exists
+		// and if err then we want to judge whether there is an existing error in the previous creation.
+		// if so, we will return the 'get' error.
+		// otherwise, we will return the original creation error.
+		fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
+		if err != nil && isAlreadyExistsError {
+			ctx.log.Errorf("Error retrieving in-cluster version of %s: %v", kube.NamespaceAndName(obj), err)
+			errs.Add(namespace, err)
 			return warnings, errs
 		}
+	}
+
+	if fromCluster != nil {
 		// Remove insubstantial metadata.
 		fromCluster, err = resetMetadataAndStatus(fromCluster)
 		if err != nil {
@@ -1394,7 +1417,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// Do not create podvolumerestore when current restore excludes pv/pvc
 		if ctx.resourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()) &&
 			ctx.resourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumes.String()) &&
-			len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
+			len(podvolume.GetVolumeBackupsForPod(ctx.podVolumeBackups, pod, originalNamespace)) > 0 {
 			restorePodVolumeBackups(ctx, createdObj, originalNamespace)
 		}
 	}
@@ -1443,7 +1466,7 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 		}
 	}
 
-	// the "already allocated" error may caused by other services, check whether the expected service exists or not
+	// the "already allocated" error may be caused by other services, check whether the expected service exists or not
 	if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			ctx.log.Debugf("Service %s not found", kube.NamespaceAndName(obj))
@@ -1549,7 +1572,7 @@ func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstr
 				return
 			}
 
-			data := restic.RestoreData{
+			data := podvolume.RestoreData{
 				Restore:          ctx.restore,
 				Pod:              pod,
 				PodVolumeBackups: ctx.podVolumeBackups,
@@ -1631,7 +1654,7 @@ func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreCont
 
 	var found bool
 	for _, pvb := range ctx.podVolumeBackups {
-		if pvb.Spec.Pod.Namespace == pv.Spec.ClaimRef.Namespace && pvb.GetAnnotations()[restic.PVCNameAnnotation] == pv.Spec.ClaimRef.Name {
+		if pvb.Spec.Pod.Namespace == pv.Spec.ClaimRef.Namespace && pvb.GetAnnotations()[podvolume.PVCNameAnnotation] == pv.Spec.ClaimRef.Name {
 			found = true
 			break
 		}
@@ -2024,7 +2047,7 @@ func (ctx *restoreContext) processUpdateResourcePolicy(fromCluster, fromClusterW
 	// try patching the in-cluster resource (resource diff plus latest backup/restore labels)
 	_, err = resourceClient.Patch(obj.GetName(), patchBytes)
 	if err != nil {
-		ctx.log.Errorf("patch attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+		ctx.log.Warnf("patch attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
 		warnings.Add(namespace, err)
 		// try just patching the labels
 		warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, fromClusterWithLabels, namespace, resourceClient)

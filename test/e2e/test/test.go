@@ -73,9 +73,7 @@ var TestClientInstance TestClient
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		By("Create test client instance", func() {
-			var err error
-			TestClientInstance, err = NewTestClient()
-			Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+			TestClientInstance = *VeleroCfg.ClientToInstallVelero
 		})
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		BeforeEach(func() {
@@ -85,8 +83,8 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 			}
 		})
 		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				if !VeleroCfg.Debug {
+			if !VeleroCfg.Debug {
+				if VeleroCfg.InstallVelero {
 					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
 				}
 			}
@@ -99,13 +97,11 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		var err error
 		var countIt int
 		By("Create test client instance", func() {
-			TestClientInstance, err = NewTestClient()
-			Expect(err).NotTo(HaveOccurred(), "Failed to instantiate cluster client for backup tests")
+			TestClientInstance = *VeleroCfg.ClientToInstallVelero
 		})
-		//Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
 		}
@@ -121,9 +117,11 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		})
 
 		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				if countIt == len(tests) && !VeleroCfg.Debug {
-					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+			if !VeleroCfg.Debug {
+				if VeleroCfg.InstallVelero {
+					if countIt == len(tests) && !VeleroCfg.Debug {
+						Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+					}
 				}
 			}
 		})
@@ -178,7 +176,15 @@ func (t *TestCase) Verify() error {
 }
 
 func (t *TestCase) Clean() error {
-	return CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+	if !VeleroCfg.Debug {
+		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.NSBaseName), func() {
+			CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+		})
+		By("Clean backups after test", func() {
+			DeleteBackups(t.Ctx, t.Client)
+		})
+	}
+	return nil
 }
 
 func (t *TestCase) GetTestMsg() *TestMSG {

@@ -25,6 +25,10 @@ spec:
       jsonPath: .spec.pod.name
       name: Pod
       type: string
+    - description: The type of the uploader to handle data transfer
+      jsonPath: .spec.uploaderType
+      name: Uploader Type
+      type: string
     - description: Name of the volume to be restored
       jsonPath: .spec.volume
       name: Volume
@@ -67,7 +71,7 @@ spec:
             properties:
               backupStorageLocation:
                 description: BackupStorageLocation is the name of the backup storage
-                  location where the restic repository is stored.
+                  location where the backup repository is stored.
                 type: string
               pod:
                 description: Pod is a reference to the pod containing the volume to
@@ -107,10 +111,18 @@ spec:
                     type: string
                 type: object
               repoIdentifier:
-                description: RepoIdentifier is the restic repository identifier.
+                description: RepoIdentifier is the backup repository identifier.
                 type: string
               snapshotID:
                 description: SnapshotID is the ID of the volume snapshot to be restored.
+                type: string
+              uploaderType:
+                description: UploaderType is the type of the uploader to handle the
+                  data transfer.
+                enum:
+                - kopia
+                - restic
+                - ""
                 type: string
               volume:
                 description: Volume is the name of the volume within the Pod to be

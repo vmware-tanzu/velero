@@ -36,7 +36,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -126,15 +126,15 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 	// restored data to be consumed by the application container(s).
 	// So if there is a "restic-wait" init container already on the pod at index 0, we'll preserve that and run
 	// it before running any other init container.
-	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == restic.InitContainer {
+	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == podvolume.InitContainer {
 		initContainers = append(initContainers, pod.Spec.InitContainers[0])
 		pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
 	}
 
-	hooksFromAnnotations := getInitRestoreHookFromAnnotation(kube.NamespaceAndName(pod), metadata.GetAnnotations(), log)
-	if hooksFromAnnotations != nil {
+	initContainerFromAnnotations := getInitContainerFromAnnotation(kube.NamespaceAndName(pod), metadata.GetAnnotations(), log)
+	if initContainerFromAnnotations != nil {
 		log.Infof("Handling InitRestoreHooks from pod annotations")
-		initContainers = append(initContainers, hooksFromAnnotations.InitContainers...)
+		initContainers = append(initContainers, *initContainerFromAnnotations)
 	} else {
 		log.Infof("Handling InitRestoreHooks from RestoreSpec")
 		// pod did not have the annotations appropriate for restore hooks
@@ -155,7 +155,22 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 			}
 			for _, hook := range rh.RestoreHooks {
 				if hook.Init != nil {
-					initContainers = append(initContainers, hook.Init.InitContainers...)
+					containers := make([]corev1api.Container, 0)
+					for _, raw := range hook.Init.InitContainers {
+						container := corev1api.Container{}
+						err := ValidateContainer(raw.Raw)
+						if err != nil {
+							log.Errorf("invalid Restore Init hook: %s", err.Error())
+							return nil, err
+						}
+						err = json.Unmarshal(raw.Raw, &container)
+						if err != nil {
+							log.Errorf("fail to Unmarshal hook Init into container: %s", err.Error())
+							return nil, errors.WithStack(err)
+						}
+						containers = append(containers, container)
+					}
+					initContainers = append(initContainers, containers...)
 				}
 			}
 		}
@@ -350,7 +365,7 @@ type ResourceRestoreHook struct {
 	RestoreHooks []velerov1api.RestoreResourceHook
 }
 
-func getInitRestoreHookFromAnnotation(podName string, annotations map[string]string, log logrus.FieldLogger) *velerov1api.InitRestoreHook {
+func getInitContainerFromAnnotation(podName string, annotations map[string]string, log logrus.FieldLogger) *corev1api.Container {
 	containerImage := annotations[podRestoreHookInitContainerImageAnnotationKey]
 	containerName := annotations[podRestoreHookInitContainerNameAnnotationKey]
 	command := annotations[podRestoreHookInitContainerCommandAnnotationKey]
@@ -373,15 +388,13 @@ func getInitRestoreHookFromAnnotation(podName string, annotations map[string]str
 		log.Infof("Pod %s has no %s annotation, using generated name %s for initContainer", podName, podRestoreHookInitContainerNameAnnotationKey, containerName)
 	}
 
-	return &velerov1api.InitRestoreHook{
-		InitContainers: []corev1api.Container{
-			{
-				Image:   containerImage,
-				Name:    containerName,
-				Command: parseStringToCommand(command),
-			},
-		},
+	initContainer := corev1api.Container{
+		Image:   containerImage,
+		Name:    containerName,
+		Command: parseStringToCommand(command),
 	}
+
+	return &initContainer
 }
 
 // GetRestoreHooksFromSpec returns a list of ResourceRestoreHooks from the restore Spec.
@@ -406,7 +419,7 @@ func GetRestoreHooksFromSpec(hooksSpec *velerov1api.RestoreHooks) ([]ResourceRes
 		if rs.LabelSelector != nil {
 			ls, err := metav1.LabelSelectorAsSelector(rs.LabelSelector)
 			if err != nil {
-				return nil, errors.WithStack(err)
+				return []ResourceRestoreHook{}, errors.WithStack(err)
 			}
 			rh.Selector.LabelSelector = ls
 		}
@@ -525,4 +538,18 @@ func GroupRestoreExecHooks(
 	}
 
 	return byContainer, nil
+}
+
+// ValidateContainer validate whether a map contains mandatory k8s Container fields.
+// mandatory fields include name, image and commands.
+func ValidateContainer(raw []byte) error {
+	container := corev1api.Container{}
+	err := json.Unmarshal(raw, &container)
+	if err != nil {
+		return err
+	}
+	if len(container.Command) <= 0 || len(container.Name) <= 0 || len(container.Image) <= 0 {
+		return fmt.Errorf("invalid InitContainer in restore hook, it doesn't have Command, Name or Image field")
+	}
+	return nil
 }

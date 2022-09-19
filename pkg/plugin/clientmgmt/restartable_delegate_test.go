@@ -24,7 +24,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type restartableDelegateTest struct {
@@ -42,8 +43,8 @@ type mockable interface {
 
 func runRestartableDelegateTests(
 	t *testing.T,
-	kind framework.PluginKind,
-	newRestartable func(key kindAndName, p RestartableProcess) interface{},
+	kind common.PluginKind,
+	newRestartable func(key process.KindAndName, p process.RestartableProcess) interface{},
 	newMock func() mockable,
 	tests ...restartableDelegateTest,
 ) {
@@ -54,9 +55,9 @@ func runRestartableDelegateTests(
 			defer p.AssertExpectations(t)
 
 			// getDelegate error
-			p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+			p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 			name := "delegateName"
-			key := kindAndName{kind: kind, name: name}
+			key := process.KindAndName{Kind: kind, Name: name}
 			r := newRestartable(key, p)
 
 			// Get the method we're going to call using reflection
@@ -107,13 +108,13 @@ func runRestartableDelegateTests(
 			checkOutputs(tc.expectedErrorOutputs, actual)
 
 			// Invoke delegate, make sure all returned values are passed through
-			p.On("resetIfNeeded").Return(nil)
+			p.On("ResetIfNeeded").Return(nil)
 
 			delegate := newMock()
 			delegate.Test(t)
 			defer delegate.AssertExpectations(t)
 
-			p.On("getByKindAndName", key).Return(delegate, nil)
+			p.On("GetByKindAndName", key).Return(delegate, nil)
 
 			// Set up the mocked method in the delegate
 			delegate.On(tc.function, tc.inputs...).Return(tc.expectedDelegateOutputs...)

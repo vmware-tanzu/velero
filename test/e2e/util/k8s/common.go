@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	common "github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
 
@@ -48,7 +49,6 @@ func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace str
 
 		data[key] = contents
 	}
-
 	secret := builder.ForSecret(namespace, name).Data(data).Result()
 	_, err := client.ClientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	return err
@@ -56,11 +56,11 @@ func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace str
 
 // WaitForPods waits until all of the pods have gone to PodRunning state
 func WaitForPods(ctx context.Context, client TestClient, namespace string, pods []string) error {
-	timeout := 10 * time.Minute
+	timeout := 5 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		for _, podName := range pods {
-			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
 				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
 				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...", namespace, podName, corev1api.PodRunning)))
@@ -123,6 +123,45 @@ func GetPvByPvc(ctx context.Context, namespace, pvc string) ([]string, error) {
 	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
 }
 
+func CRDShouldExist(ctx context.Context, name string) error {
+	return CRDCountShouldBe(ctx, name, 1)
+}
+
+func CRDShouldNotExist(ctx context.Context, name string) error {
+	return CRDCountShouldBe(ctx, name, 0)
+}
+
+func CRDCountShouldBe(ctx context.Context, name string, count int) error {
+	crdList, err := GetCRD(ctx, name)
+	if err != nil {
+		return errors.Wrap(err, "Fail to get CRDs")
+	}
+	len := len(crdList)
+	if len != count {
+		return errors.New(fmt.Sprintf("CRD count is expected as %d instead of %d", count, len))
+	}
+	return nil
+}
+
+func GetCRD(ctx context.Context, name string) ([]string, error) {
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "crd"},
+	}
+
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{name},
+	}
+
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+
+	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+}
+
 func AddLabelToPv(ctx context.Context, pv, label string) error {
 	return exec.CommandContext(ctx, "kubectl", "label", "pv", pv, label).Run()
 }
@@ -139,7 +178,42 @@ func AddLabelToPod(ctx context.Context, podName, namespace, label string) error 
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }
 
+func AddLabelToCRD(ctx context.Context, crd, label string) error {
+	args := []string{"label", "crd", crd, label}
+	fmt.Println(args)
+	return exec.CommandContext(ctx, "kubectl", args...).Run()
+}
+
 func KubectlApplyByFile(ctx context.Context, file string) error {
 	args := []string{"apply", "-f", file, "--force=true"}
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
+}
+
+func KubectlConfigUseContext(ctx context.Context, kubectlContext string) error {
+	cmd := exec.CommandContext(ctx, "kubectl",
+		"config", "use-context", kubectlContext)
+	fmt.Printf("Kubectl config use-context cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Print(stdout)
+	fmt.Print(stderr)
+	return err
+}
+
+func GetAPIVersions(client *TestClient, name string) ([]string, error) {
+	var version []string
+	APIGroup, err := client.ClientGo.Discovery().ServerGroups()
+	if err != nil {
+		return nil, errors.Wrap(err, "Fail to get server API groups")
+	}
+	for _, group := range APIGroup.Groups {
+		fmt.Println(group.Name)
+		if group.Name == name {
+			for _, v := range group.Versions {
+				fmt.Println(v.Version)
+				version = append(version, v.Version)
+			}
+			return version, nil
+		}
+	}
+	return nil, errors.New("Server API groups is empty")
 }

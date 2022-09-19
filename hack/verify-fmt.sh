@@ -15,4 +15,4 @@
 # limitations under the License.
 
 HACK_DIR=$(dirname "${BASH_SOURCE[0]}")
-"${HACK_DIR}"/update-fmt.sh --verify
+"${HACK_DIR}"/update-1fmt.sh --verify

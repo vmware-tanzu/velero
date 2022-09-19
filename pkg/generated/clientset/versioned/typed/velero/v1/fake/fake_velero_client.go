@@ -32,6 +32,10 @@ func (c *FakeVeleroV1) Backups(namespace string) v1.BackupInterface {
 	return &FakeBackups{c, namespace}
 }
 
+func (c *FakeVeleroV1) BackupRepositories(namespace string) v1.BackupRepositoryInterface {
+	return &FakeBackupRepositories{c, namespace}
+}
+
 func (c *FakeVeleroV1) BackupStorageLocations(namespace string) v1.BackupStorageLocationInterface {
 	return &FakeBackupStorageLocations{c, namespace}
 }
@@ -50,10 +54,6 @@ func (c *FakeVeleroV1) PodVolumeBackups(namespace string) v1.PodVolumeBackupInte
 
 func (c *FakeVeleroV1) PodVolumeRestores(namespace string) v1.PodVolumeRestoreInterface {
 	return &FakePodVolumeRestores{c, namespace}
-}
-
-func (c *FakeVeleroV1) ResticRepositories(namespace string) v1.ResticRepositoryInterface {
-	return &FakeResticRepositories{c, namespace}
 }
 
 func (c *FakeVeleroV1) Restores(namespace string) v1.RestoreInterface {

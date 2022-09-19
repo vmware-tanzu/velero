@@ -15,23 +15,26 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	resticmokes "github.com/vmware-tanzu/velero/pkg/restic/mocks"
+	"github.com/vmware-tanzu/velero/pkg/repository"
+	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-const defaultMaintenanceFrequency = 10 * time.Minute
+const testMaintenanceFrequency = 10 * time.Minute
 
-func mockResticRepoReconciler(t *testing.T, rr *velerov1api.ResticRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
-	mgr := &resticmokes.RepositoryManager{}
+func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
+	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
 	}
@@ -39,19 +42,19 @@ func mockResticRepoReconciler(t *testing.T, rr *velerov1api.ResticRepository, mo
 		velerov1api.DefaultNamespace,
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),
-		defaultMaintenanceFrequency,
+		testMaintenanceFrequency,
 		mgr,
 	)
 }
 
-func mockResticRepositoryCR() *velerov1api.ResticRepository {
-	return &velerov1api.ResticRepository{
+func mockResticRepositoryCR() *velerov1api.BackupRepository {
+	return &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "repo",
 		},
-		Spec: velerov1api.ResticRepositorySpec{
-			MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+		Spec: velerov1api.BackupRepositorySpec{
+			MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 		},
 	}
 
@@ -64,24 +67,24 @@ func TestPatchResticRepository(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.patchResticRepository(context.Background(), rr, repoReady())
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 	err = reconciler.patchResticRepository(context.Background(), rr, repoNotReady("not ready"))
 	assert.NoError(t, err)
-	assert.NotEqual(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.NotEqual(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhase(""))
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhase(""))
 	rr.Spec.ResticIdentifier = "s3:test.amazonaws.com/bucket/restic"
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestRunMaintenanceIfDue(t *testing.T) {
@@ -104,7 +107,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 func TestInitializeRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -121,53 +124,53 @@ func TestInitializeRepo(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.ResticRepositoryPhaseReady)
+	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestResticRepoReconcile(t *testing.T) {
 	tests := []struct {
 		name      string
-		repo      *velerov1api.ResticRepository
+		repo      *velerov1api.BackupRepository
 		expectNil bool
 	}{
 		{
 			name: "test on api server not found",
-			repo: &velerov1api.ResticRepository{
+			repo: &velerov1api.BackupRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "unknown",
 				},
-				Spec: velerov1api.ResticRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 				},
 			},
 			expectNil: true,
 		},
 		{
 			name: "test on initialize repo",
-			repo: &velerov1api.ResticRepository{
+			repo: &velerov1api.BackupRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
 				},
-				Spec: velerov1api.ResticRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 				},
 			},
 			expectNil: true,
 		},
 		{
 			name: "test on repo with new phase",
-			repo: &velerov1api.ResticRepository{
+			repo: &velerov1api.BackupRepository{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "repo",
 				},
-				Spec: velerov1api.ResticRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 				},
-				Status: velerov1api.ResticRepositoryStatus{
-					Phase: velerov1api.ResticRepositoryPhaseNew,
+				Status: velerov1api.BackupRepositoryStatus{
+					Phase: velerov1api.BackupRepositoryPhaseNew,
 				},
 			},
 			expectNil: true,
@@ -184,6 +187,56 @@ func TestResticRepoReconcile(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 			}
+		})
+	}
+}
+
+func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
+	tests := []struct {
+		name            string
+		mgr             repository.Manager
+		repo            *velerov1api.BackupRepository
+		freqReturn      time.Duration
+		freqError       error
+		userDefinedFreq time.Duration
+		expectFreq      time.Duration
+	}{
+		{
+			name:            "user defined valid",
+			userDefinedFreq: time.Duration(time.Hour),
+			expectFreq:      time.Duration(time.Hour),
+		},
+		{
+			name:       "repo return valid",
+			freqReturn: time.Duration(time.Hour * 2),
+			expectFreq: time.Duration(time.Hour * 2),
+		},
+		{
+			name:            "fall to default",
+			userDefinedFreq: -1,
+			freqError:       errors.New("fake-error"),
+			expectFreq:      defaultMaintainFrequency,
+		},
+		{
+			name:       "fall to default, no freq error",
+			freqReturn: -1,
+			expectFreq: defaultMaintainFrequency,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mgr := repomokes.Manager{}
+			mgr.On("DefaultMaintenanceFrequency", mock.Anything).Return(test.freqReturn, test.freqError)
+			reconciler := NewResticRepoReconciler(
+				velerov1api.DefaultNamespace,
+				velerotest.NewLogger(),
+				velerotest.NewFakeControllerRuntimeClient(t),
+				test.userDefinedFreq,
+				&mgr,
+			)
+
+			freq := reconciler.getRepositoryMaintenanceFrequency(test.repo)
+			assert.Equal(t, test.expectFreq, freq)
 		})
 	}
 }

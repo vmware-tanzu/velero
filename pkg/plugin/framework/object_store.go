@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
@@ -29,17 +30,17 @@ import (
 // interface.
 type ObjectStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*common.PluginBase
 }
 
 // GRPCClient returns an ObjectStore gRPC client.
 func (p *ObjectStorePlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, clientConn, newObjectStoreGRPCClient), nil
+	return common.NewClientDispenser(p.ClientLogger, clientConn, newObjectStoreGRPCClient), nil
 
 }
 
 // GRPCServer registers an ObjectStore gRPC server.
 func (p *ObjectStorePlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
-	proto.RegisterObjectStoreServer(server, &ObjectStoreGRPCServer{mux: p.serverMux})
+	proto.RegisterObjectStoreServer(server, &ObjectStoreGRPCServer{mux: p.ServerMux})
 	return nil
 }

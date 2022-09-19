@@ -40,11 +40,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
 )
 
 const (
@@ -56,7 +58,7 @@ type backupDeletionReconciler struct {
 	client.Client
 	logger            logrus.FieldLogger
 	backupTracker     BackupTracker
-	resticMgr         restic.RepositoryManager
+	repoMgr           repository.Manager
 	metrics           *metrics.ServerMetrics
 	clock             clock.Clock
 	discoveryHelper   discovery.Helper
@@ -69,7 +71,7 @@ func NewBackupDeletionReconciler(
 	logger logrus.FieldLogger,
 	client client.Client,
 	backupTracker BackupTracker,
-	resticMgr restic.RepositoryManager,
+	repoMgr repository.Manager,
 	metrics *metrics.ServerMetrics,
 	helper discovery.Helper,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
@@ -79,7 +81,7 @@ func NewBackupDeletionReconciler(
 		Client:            client,
 		logger:            logger,
 		backupTracker:     backupTracker,
-		resticMgr:         resticMgr,
+		repoMgr:           repoMgr,
 		metrics:           metrics,
 		clock:             clock.RealClock{},
 		discoveryHelper:   helper,
@@ -90,7 +92,7 @@ func NewBackupDeletionReconciler(
 
 func (r *backupDeletionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Make sure the expired requests can be deleted eventually
-	s := kube.NewPeriodicalEnqueueSource(r.logger, mgr.GetClient(), &velerov1api.DeleteBackupRequestList{}, time.Hour)
+	s := kube.NewPeriodicalEnqueueSource(r.logger, mgr.GetClient(), &velerov1api.DeleteBackupRequestList{}, time.Hour, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.DeleteBackupRequest{}).
 		Watches(s, nil).
@@ -198,7 +200,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// if the request object has no labels defined, initialise an empty map since
+	// if the request object has no labels defined, initialize an empty map since
 	// we will be updating labels
 	if dbr.Labels == nil {
 		dbr.Labels = map[string]string{}
@@ -435,11 +437,11 @@ func (r *backupDeletionReconciler) deleteExistingDeletionRequests(ctx context.Co
 }
 
 func (r *backupDeletionReconciler) deleteResticSnapshots(ctx context.Context, backup *velerov1api.Backup) []error {
-	if r.resticMgr == nil {
+	if r.repoMgr == nil {
 		return nil
 	}
 
-	snapshots, err := restic.GetSnapshotsInBackup(ctx, backup, r.Client)
+	snapshots, err := getSnapshotsInBackup(ctx, backup, r.Client)
 	if err != nil {
 		return []error{err}
 	}
@@ -449,7 +451,7 @@ func (r *backupDeletionReconciler) deleteResticSnapshots(ctx context.Context, ba
 
 	var errs []error
 	for _, snapshot := range snapshots {
-		if err := r.resticMgr.Forget(ctx2, snapshot); err != nil {
+		if err := r.repoMgr.Forget(ctx2, snapshot); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -489,4 +491,22 @@ func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *vele
 		return nil, errors.Wrap(err, "error patching Backup")
 	}
 	return backup, nil
+}
+
+// getSnapshotsInBackup returns a list of all restic snapshot ids associated with
+// a given Velero backup.
+func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbClient client.Client) ([]repository.SnapshotIdentifier, error) {
+	podVolumeBackups := &velerov1api.PodVolumeBackupList{}
+	options := &client.ListOptions{
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
+		}).AsSelector(),
+	}
+
+	err := kbClient.List(ctx, podVolumeBackups, options)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return podvolume.GetSnapshotIdentifier(podVolumeBackups), nil
 }

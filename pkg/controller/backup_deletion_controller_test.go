@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"time"
 
 	"context"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +54,7 @@ import (
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -691,4 +694,176 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Equal(t, "backup not found", res.Status.Errors[0])
 
 	})
+}
+
+func TestGetSnapshotsInBackup(t *testing.T) {
+	tests := []struct {
+		name                  string
+		podVolumeBackups      []velerov1api.PodVolumeBackup
+		expected              []repository.SnapshotIdentifier
+		longBackupNameEnabled bool
+	}{
+		{
+			name:             "no pod volume backups",
+			podVolumeBackups: nil,
+			expected:         nil,
+		},
+		{
+			name: "no pod volume backups with matching label",
+			podVolumeBackups: []velerov1api.PodVolumeBackup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-2"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-2", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "some pod volume backups with matching label",
+			podVolumeBackups: []velerov1api.PodVolumeBackup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-2"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-2", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-3"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb-2", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-4"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "incomplete-or-failed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
+				},
+			},
+			expected: []repository.SnapshotIdentifier{
+				{
+					VolumeNamespace: "ns-1",
+					SnapshotID:      "snap-3",
+					RepositoryType:  "restic",
+				},
+				{
+					VolumeNamespace: "ns-1",
+					SnapshotID:      "snap-4",
+					RepositoryType:  "restic",
+				},
+			},
+		},
+		{
+			name:                  "some pod volume backups with matching label and backup name greater than 63 chars",
+			longBackupNameEnabled: true,
+			podVolumeBackups: []velerov1api.PodVolumeBackup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-2"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-2", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "the-really-long-backup-name-that-is-much-more-than-63-cha6ca4bc"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-3"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb-2", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-4"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "incomplete-or-failed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
+				},
+			},
+			expected: []repository.SnapshotIdentifier{
+				{
+					VolumeNamespace: "ns-1",
+					SnapshotID:      "snap-3",
+					RepositoryType:  "restic",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				clientBuilder = velerotest.NewFakeControllerRuntimeClientBuilder(t)
+				veleroBackup  = &velerov1api.Backup{}
+			)
+
+			veleroBackup.Name = "backup-1"
+
+			if test.longBackupNameEnabled {
+				veleroBackup.Name = "the-really-long-backup-name-that-is-much-more-than-63-characters"
+			}
+			clientBuilder.WithLists(&velerov1api.PodVolumeBackupList{
+				Items: test.podVolumeBackups,
+			})
+
+			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
+			assert.NoError(t, err)
+
+			// sort to ensure good compare of slices
+			less := func(snapshots []repository.SnapshotIdentifier) func(i, j int) bool {
+				return func(i, j int) bool {
+					if snapshots[i].VolumeNamespace == snapshots[j].VolumeNamespace {
+						return snapshots[i].SnapshotID < snapshots[j].SnapshotID
+					}
+					return snapshots[i].VolumeNamespace < snapshots[j].VolumeNamespace
+				}
+
+			}
+
+			sort.Slice(test.expected, less(test.expected))
+			sort.Slice(res, less(res))
+
+			assert.Equal(t, test.expected, res)
+		})
+	}
 }
