@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
@@ -29,16 +30,16 @@ import (
 // interface.
 type VolumeSnapshotterPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*common.PluginBase
 }
 
 // GRPCClient returns a VolumeSnapshotter gRPC client.
 func (p *VolumeSnapshotterPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, clientConn, newVolumeSnapshotterGRPCClient), nil
+	return common.NewClientDispenser(p.ClientLogger, clientConn, newVolumeSnapshotterGRPCClient), nil
 }
 
 // GRPCServer registers a VolumeSnapshotter gRPC server.
 func (p *VolumeSnapshotterPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
-	proto.RegisterVolumeSnapshotterServer(server, &VolumeSnapshotterGRPCServer{mux: p.serverMux})
+	proto.RegisterVolumeSnapshotterServer(server, &VolumeSnapshotterGRPCServer{mux: p.ServerMux})
 	return nil
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/restore"
 )
 
@@ -76,7 +77,7 @@ func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return backup.NewPodAction(logger), nil
 }
 
-func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
 		clientset, err := f.KubeClient()
@@ -101,7 +102,7 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 	}
 }
 
-func newRemapCRDVersionAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newRemapCRDVersionAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		config, err := f.ClientConfig()
 		if err != nil {
@@ -138,7 +139,7 @@ func newInitRestoreHookPodAction(logger logrus.FieldLogger) (interface{}, error)
 	return restore.NewInitRestoreHookPodAction(logger), nil
 }
 
-func newResticRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newResticRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		client, err := f.KubeClient()
 		if err != nil {
@@ -174,7 +175,7 @@ func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interfa
 	return restore.NewCRDV1PreserveUnknownFieldsAction(logger), nil
 }
 
-func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newChangeStorageClassRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		client, err := f.KubeClient()
 		if err != nil {
@@ -197,7 +198,7 @@ func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, er
 	return restore.NewClusterRoleBindingAction(logger), nil
 }
 
-func newChangePVCNodeSelectorItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newChangePVCNodeSelectorItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		client, err := f.KubeClient()
 		if err != nil {

@@ -55,11 +55,13 @@ type Manager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
 	InitRepo(repo *velerov1api.BackupRepository) error
 
-	// ConnectToRepo runs the 'restic snapshots' command against the
-	// specified repo, and returns an error if it fails. This is
-	// intended to be used to ensure that the repo exists/can be
-	// authenticated to.
+	// ConnectToRepo tries to connect to the specified repo, and returns an error if it fails.
+	// This is intended to be used to ensure that the repo exists/can be authenticated to.
 	ConnectToRepo(repo *velerov1api.BackupRepository) error
+
+	// PrepareRepo tries to connect to the specific repo first, if it fails because of the
+	// repo is not initialized, it turns to initialize the repo
+	PrepareRepo(repo *velerov1api.BackupRepository) error
 
 	// PruneRepo deletes unused data from a repo.
 	PruneRepo(repo *velerov1api.BackupRepository) error
@@ -108,7 +110,7 @@ func NewManager(
 	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,
-	}, mgr.log)
+	}, velerov1api.BackupRepositoryTypeKopia, mgr.log)
 
 	return mgr
 }
@@ -141,6 +143,21 @@ func (m *manager) ConnectToRepo(repo *velerov1api.BackupRepository) error {
 		return errors.WithStack(err)
 	}
 	return prd.ConnectToRepo(context.Background(), param)
+}
+
+func (m *manager) PrepareRepo(repo *velerov1api.BackupRepository) error {
+	m.repoLocker.Lock(repo.Name)
+	defer m.repoLocker.Unlock(repo.Name)
+
+	prd, err := m.getRepositoryProvider(repo)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	param, err := m.assembleRepoParam(repo)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return prd.PrepareRepo(context.Background(), param)
 }
 
 func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {

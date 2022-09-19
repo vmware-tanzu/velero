@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -40,43 +41,43 @@ type Server interface {
 
 	// RegisterBackupItemAction registers a backup item action. Accepted format
 	// for the plugin name is <DNS subdomain>/<non-empty name>.
-	RegisterBackupItemAction(pluginName string, initializer HandlerInitializer) Server
+	RegisterBackupItemAction(pluginName string, initializer common.HandlerInitializer) Server
 
 	// RegisterBackupItemActions registers multiple backup item actions.
-	RegisterBackupItemActions(map[string]HandlerInitializer) Server
+	RegisterBackupItemActions(map[string]common.HandlerInitializer) Server
 
 	// RegisterVolumeSnapshotter registers a volume snapshotter. Accepted format
 	// for the plugin name is <DNS subdomain>/<non-empty name>.
-	RegisterVolumeSnapshotter(pluginName string, initializer HandlerInitializer) Server
+	RegisterVolumeSnapshotter(pluginName string, initializer common.HandlerInitializer) Server
 
 	// RegisterVolumeSnapshotters registers multiple volume snapshotters.
-	RegisterVolumeSnapshotters(map[string]HandlerInitializer) Server
+	RegisterVolumeSnapshotters(map[string]common.HandlerInitializer) Server
 
 	// RegisterObjectStore registers an object store. Accepted format
 	// for the plugin name is <DNS subdomain>/<non-empty name>.
-	RegisterObjectStore(pluginName string, initializer HandlerInitializer) Server
+	RegisterObjectStore(pluginName string, initializer common.HandlerInitializer) Server
 
 	// RegisterObjectStores registers multiple object stores.
-	RegisterObjectStores(map[string]HandlerInitializer) Server
+	RegisterObjectStores(map[string]common.HandlerInitializer) Server
 
 	// RegisterRestoreItemAction registers a restore item action. Accepted format
 	// for the plugin name is <DNS subdomain>/<non-empty name>.
-	RegisterRestoreItemAction(pluginName string, initializer HandlerInitializer) Server
+	RegisterRestoreItemAction(pluginName string, initializer common.HandlerInitializer) Server
 
 	// RegisterRestoreItemActions registers multiple restore item actions.
-	RegisterRestoreItemActions(map[string]HandlerInitializer) Server
+	RegisterRestoreItemActions(map[string]common.HandlerInitializer) Server
 
 	// RegisterDeleteItemAction registers a delete item action. Accepted format
 	// for the plugin name is <DNS subdomain>/<non-empty name>.
-	RegisterDeleteItemAction(pluginName string, initializer HandlerInitializer) Server
+	RegisterDeleteItemAction(pluginName string, initializer common.HandlerInitializer) Server
 
 	// RegisterDeleteItemActions registers multiple Delete item actions.
-	RegisterDeleteItemActions(map[string]HandlerInitializer) Server
+	RegisterDeleteItemActions(map[string]common.HandlerInitializer) Server
 
-	RegisterItemSnapshotter(pluginName string, initializer HandlerInitializer) Server
+	RegisterItemSnapshotter(pluginName string, initializer common.HandlerInitializer) Server
 
 	// RegisterItemSnapshotters registers multiple Item Snapshotters
-	RegisterItemSnapshotters(map[string]HandlerInitializer) Server
+	RegisterItemSnapshotters(map[string]common.HandlerInitializer) Server
 
 	// Server runs the plugin server.
 	Serve()
@@ -102,12 +103,12 @@ func NewServer() Server {
 	return &server{
 		log:               log,
 		logLevelFlag:      logging.LogLevelFlag(log.Level),
-		backupItemAction:  NewBackupItemActionPlugin(serverLogger(log)),
-		volumeSnapshotter: NewVolumeSnapshotterPlugin(serverLogger(log)),
-		objectStore:       NewObjectStorePlugin(serverLogger(log)),
-		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
-		deleteItemAction:  NewDeleteItemActionPlugin(serverLogger(log)),
-		itemSnapshotter:   NewItemSnapshotterPlugin(serverLogger(log)),
+		backupItemAction:  NewBackupItemActionPlugin(common.ServerLogger(log)),
+		volumeSnapshotter: NewVolumeSnapshotterPlugin(common.ServerLogger(log)),
+		objectStore:       NewObjectStorePlugin(common.ServerLogger(log)),
+		restoreItemAction: NewRestoreItemActionPlugin(common.ServerLogger(log)),
+		deleteItemAction:  NewDeleteItemActionPlugin(common.ServerLogger(log)),
+		itemSnapshotter:   NewItemSnapshotterPlugin(common.ServerLogger(log)),
 	}
 }
 
@@ -119,71 +120,71 @@ func (s *server) BindFlags(flags *pflag.FlagSet) Server {
 	return s
 }
 
-func (s *server) RegisterBackupItemAction(name string, initializer HandlerInitializer) Server {
-	s.backupItemAction.register(name, initializer)
+func (s *server) RegisterBackupItemAction(name string, initializer common.HandlerInitializer) Server {
+	s.backupItemAction.Register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterBackupItemActions(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterBackupItemActions(m map[string]common.HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterBackupItemAction(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterVolumeSnapshotter(name string, initializer HandlerInitializer) Server {
-	s.volumeSnapshotter.register(name, initializer)
+func (s *server) RegisterVolumeSnapshotter(name string, initializer common.HandlerInitializer) Server {
+	s.volumeSnapshotter.Register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterVolumeSnapshotters(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterVolumeSnapshotters(m map[string]common.HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterVolumeSnapshotter(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterObjectStore(name string, initializer HandlerInitializer) Server {
-	s.objectStore.register(name, initializer)
+func (s *server) RegisterObjectStore(name string, initializer common.HandlerInitializer) Server {
+	s.objectStore.Register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterObjectStores(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterObjectStores(m map[string]common.HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterObjectStore(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterRestoreItemAction(name string, initializer HandlerInitializer) Server {
-	s.restoreItemAction.register(name, initializer)
+func (s *server) RegisterRestoreItemAction(name string, initializer common.HandlerInitializer) Server {
+	s.restoreItemAction.Register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterRestoreItemActions(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterRestoreItemActions(m map[string]common.HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterRestoreItemAction(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterDeleteItemAction(name string, initializer HandlerInitializer) Server {
-	s.deleteItemAction.register(name, initializer)
+func (s *server) RegisterDeleteItemAction(name string, initializer common.HandlerInitializer) Server {
+	s.deleteItemAction.Register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterDeleteItemActions(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterDeleteItemActions(m map[string]common.HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterDeleteItemAction(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterItemSnapshotter(name string, initializer HandlerInitializer) Server {
-	s.itemSnapshotter.register(name, initializer)
+func (s *server) RegisterItemSnapshotter(name string, initializer common.HandlerInitializer) Server {
+	s.itemSnapshotter.Register(name, initializer)
 	return s
 }
-func (s *server) RegisterItemSnapshotters(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterItemSnapshotters(m map[string]common.HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterItemSnapshotter(name, m[name])
 	}
@@ -191,10 +192,10 @@ func (s *server) RegisterItemSnapshotters(m map[string]HandlerInitializer) Serve
 }
 
 // getNames returns a list of PluginIdentifiers registered with plugin.
-func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentifier {
+func getNames(command string, kind common.PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
 
-	for _, name := range plugin.names() {
+	for _, name := range plugin.Names() {
 		id := PluginIdentifier{Command: command, Kind: kind, Name: name}
 		pluginIdentifiers = append(pluginIdentifiers, id)
 	}
@@ -214,25 +215,25 @@ func (s *server) Serve() {
 	command := os.Args[0]
 
 	var pluginIdentifiers []PluginIdentifier
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindBackupItemAction, s.backupItemAction)...)
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindVolumeSnapshotter, s.volumeSnapshotter)...)
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStore, s.objectStore)...)
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindRestoreItemAction, s.restoreItemAction)...)
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindDeleteItemAction, s.deleteItemAction)...)
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindItemSnapshotter, s.itemSnapshotter)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindBackupItemAction, s.backupItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindVolumeSnapshotter, s.volumeSnapshotter)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindObjectStore, s.objectStore)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindRestoreItemAction, s.restoreItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindDeleteItemAction, s.deleteItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindItemSnapshotter, s.itemSnapshotter)...)
 
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake(),
 		Plugins: map[string]plugin.Plugin{
-			string(PluginKindBackupItemAction):  s.backupItemAction,
-			string(PluginKindVolumeSnapshotter): s.volumeSnapshotter,
-			string(PluginKindObjectStore):       s.objectStore,
-			string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
-			string(PluginKindRestoreItemAction): s.restoreItemAction,
-			string(PluginKindDeleteItemAction):  s.deleteItemAction,
-			string(PluginKindItemSnapshotter):   s.itemSnapshotter,
+			string(common.PluginKindBackupItemAction):  s.backupItemAction,
+			string(common.PluginKindVolumeSnapshotter): s.volumeSnapshotter,
+			string(common.PluginKindObjectStore):       s.objectStore,
+			string(common.PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
+			string(common.PluginKindRestoreItemAction): s.restoreItemAction,
+			string(common.PluginKindDeleteItemAction):  s.deleteItemAction,
+			string(common.PluginKindItemSnapshotter):   s.itemSnapshotter,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})

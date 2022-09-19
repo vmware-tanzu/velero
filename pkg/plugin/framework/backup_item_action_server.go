@@ -24,8 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v1"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 )
@@ -33,11 +34,11 @@ import (
 // BackupItemActionGRPCServer implements the proto-generated BackupItemAction interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BackupItemActionGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
 func (s *BackupItemActionGRPCServer) getImpl(name string) (biav1.BackupItemAction, error) {
-	impl, err := s.mux.getHandler(name)
+	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
@@ -54,19 +55,19 @@ func (s *BackupItemActionGRPCServer) AppliesTo(
 	ctx context.Context, req *protobiav1.BackupItemActionAppliesToRequest) (
 	response *protobiav1.BackupItemActionAppliesToResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &protobiav1.BackupItemActionAppliesToResponse{
@@ -83,29 +84,29 @@ func (s *BackupItemActionGRPCServer) AppliesTo(
 func (s *BackupItemActionGRPCServer) Execute(
 	ctx context.Context, req *protobiav1.ExecuteRequest) (response *protobiav1.ExecuteResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var item unstructured.Unstructured
 	var backup api.Backup
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	if err := json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	updatedItem, additionalItems, err := impl.Execute(&item, &backup)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	// If the plugin implementation returned a nil updatedItem (meaning no modifications), reset updatedItem to the
@@ -116,7 +117,7 @@ func (s *BackupItemActionGRPCServer) Execute(
 	} else {
 		updatedItemJSON, err = json.Marshal(updatedItem.UnstructuredContent())
 		if err != nil {
-			return nil, newGRPCError(errors.WithStack(err))
+			return nil, common.NewGRPCError(errors.WithStack(err))
 		}
 	}
 

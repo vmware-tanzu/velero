@@ -73,7 +73,10 @@ func NewUploaderProvider(
 		return nil, errors.New("uninitialized FileStore credentail is not supported")
 	}
 	if uploaderType == uploader.KopiaType {
-		if err := provider.NewUnifiedRepoProvider(*credGetter, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
+		// We use the hardcode repositoryType velerov1api.BackupRepositoryTypeKopia for now, because we have only one implementation of unified repo.
+		// TODO: post v1.10, replace the hardcode. In future, when we have multiple implementations of Unified Repo (besides Kopia), we will add the
+		// repositoryType to BSL, because by then, we are not able to hardcode the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
+		if err := provider.NewUnifiedRepoProvider(*credGetter, velerov1api.BackupRepositoryTypeKopia, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
 			return nil, errors.Wrap(err, "failed to connect repository")
 		}
 		return NewKopiaUploaderProvider(ctx, credGetter, backupRepo, log)

@@ -1008,12 +1008,15 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			formatFlag := logging.FormatText
 			var (
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
 			c := &backupController{
+				genericController:        newGenericController("backup-test", logger),
 				snapshotLocationLister:   sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultSnapshotLocations: test.defaultLocations,
 			}

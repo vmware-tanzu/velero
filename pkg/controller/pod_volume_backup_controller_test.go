@@ -80,10 +80,15 @@ func buildBackupRepo() *velerov1api.BackupRepository {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1api.DefaultNamespace,
-			Name:      fmt.Sprintf("%s-bsl-loc-dn24h", velerov1api.DefaultNamespace),
+			Name:      fmt.Sprintf("%s-bsl-loc-restic-dn24h", velerov1api.DefaultNamespace),
 			Labels: map[string]string{
 				velerov1api.StorageLocationLabel: "bsl-loc",
+				velerov1api.VolumeNamespaceLabel: velerov1api.DefaultNamespace,
+				velerov1api.RepositoryTypeLabel:  "restic",
 			},
+		},
+		Status: velerov1api.BackupRepositoryStatus{
+			Phase: velerov1api.BackupRepositoryPhaseReady,
 		},
 	}
 }

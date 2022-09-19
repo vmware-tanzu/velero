@@ -135,8 +135,11 @@ type ObjectStore interface {
 
 The proto service definitions of the plugins will also be versioned and arranged by their plugin kind.
 Currently, all the proto definitions reside under `pkg/plugin/proto` in a file corresponding to their plugin kind.
-These files will be rearranged to be grouped by kind and then versioned: `pkg/plugin/proto/<plugin_kind>/<version>`.
-The scripts to compile the proto service definitions will need to be updated to place the generated Go code under a matching directory structure.
+These files will be rearranged to be grouped by kind and then versioned: `pkg/plugin/proto/<plugin_kind>/<version>`,
+except for the current v1 plugins. Those will remain in their current package/location for backwards compatibility.
+This will allow plugin images built with earlier versions of velero to work with the latest velero (for v1 plugins
+only). The go_package option will be added to all proto service definitions to allow the proto compilation script
+to place the generated go code for each plugin api version in the proper go package directory.
 
 It is not possible to import an existing proto service into a new one, so any methods will need to be duplicated across versions if they are required by the new version.
 The message definitions can be shared however, so these could be extracted from the service definition files and placed in a file that can be shared across all versions of the service.

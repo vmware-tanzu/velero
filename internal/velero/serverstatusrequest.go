@@ -19,17 +19,18 @@ package velero
 import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 type PluginLister interface {
 	// List returns all PluginIdentifiers for kind.
-	List(kind framework.PluginKind) []framework.PluginIdentifier
+	List(kind common.PluginKind) []framework.PluginIdentifier
 }
 
 // GetInstalledPluginInfo returns a list of installed plugins
 func GetInstalledPluginInfo(pluginLister PluginLister) []velerov1api.PluginInfo {
 	var plugins []velerov1api.PluginInfo
-	for _, v := range framework.AllPluginKinds() {
+	for _, v := range common.AllPluginKinds() {
 		list := pluginLister.List(v)
 		for _, plugin := range list {
 			pluginInfo := velerov1api.PluginInfo{
