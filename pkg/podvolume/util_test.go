@@ -549,6 +549,23 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			},
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
+		{
+			name:                   "should exclude emptyDir volumes",
+			defaultVolumesToRestic: true,
+			pod: &corev1api.Pod{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: "emptyDir",
+							VolumeSource: corev1api.VolumeSource{
+								EmptyDir: &corev1api.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{},
+		},
 	}
 
 	for _, tc := range testCases {

@@ -283,6 +283,10 @@ func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) [
 		if pv.DownwardAPI != nil {
 			continue
 		}
+		// don't backup emptyDir volumes, they are empty and not a persistent volume.
+		if pv.EmptyDir != nil {
+			continue
+		}
 		// don't backup volumes that are included in the exclude list.
 		if contains(volsToExclude, pv.Name) {
 			continue
