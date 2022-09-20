@@ -178,3 +178,22 @@ func TestSpecChangePredicate(t *testing.T) {
 		})
 	}
 }
+
+func TestNewGenericEventPredicate(t *testing.T) {
+	predicate := NewGenericEventPredicate(func(object client.Object) bool {
+		return false
+	})
+
+	assert.False(t, predicate.Generic(event.GenericEvent{}))
+}
+
+func TestNewAllEventPredicate(t *testing.T) {
+	predicate := NewAllEventPredicate(func(object client.Object) bool {
+		return false
+	})
+
+	assert.False(t, predicate.Create(event.CreateEvent{}))
+	assert.False(t, predicate.Update(event.UpdateEvent{}))
+	assert.False(t, predicate.Delete(event.DeleteEvent{}))
+	assert.False(t, predicate.Generic(event.GenericEvent{}))
+}
