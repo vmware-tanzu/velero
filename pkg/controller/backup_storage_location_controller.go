@@ -207,18 +207,15 @@ func (r *backupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) err
 		mgr.GetClient(),
 		&velerov1api.BackupStorageLocationList{},
 		bslValidationEnqueuePeriod,
-		kube.PeriodicalEnqueueSourceOption{
-			FilterFuncs: []func(object client.Object) bool{
-				func(object client.Object) bool {
-					location := object.(*velerov1api.BackupStorageLocation)
-					return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.defaultBackupLocationInfo.ServerValidationFrequency, r.log.WithField("controller", BackupStorageLocation))
-				},
-			},
-		},
+		kube.PeriodicalEnqueueSourceOption{},
 	)
+	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
+		location := object.(*velerov1api.BackupStorageLocation)
+		return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.defaultBackupLocationInfo.ServerValidationFrequency, r.log.WithField("controller", BackupStorageLocation))
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		// As the "status.LastValidationTime" field is always updated, this triggers new reconciling process, skip the update event that include no spec change to avoid the reconcile loop
 		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.SpecChangePredicate{})).
-		Watches(g, nil).
+		Watches(g, nil, builder.WithPredicates(gp)).
 		Complete(r)
 }

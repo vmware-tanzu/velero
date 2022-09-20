@@ -15,23 +15,26 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-const defaultMaintenanceFrequency = 10 * time.Minute
+const testMaintenanceFrequency = 10 * time.Minute
 
 func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
-	mgr := &repomokes.RepositoryManager{}
+	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
 	}
@@ -39,7 +42,7 @@ func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mo
 		velerov1api.DefaultNamespace,
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),
-		defaultMaintenanceFrequency,
+		testMaintenanceFrequency,
 		mgr,
 	)
 }
@@ -51,7 +54,7 @@ func mockResticRepositoryCR() *velerov1api.BackupRepository {
 			Name:      "repo",
 		},
 		Spec: velerov1api.BackupRepositorySpec{
-			MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+			MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 		},
 	}
 
@@ -72,7 +75,7 @@ func TestPatchResticRepository(t *testing.T) {
 
 func TestCheckNotReadyRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
@@ -104,7 +107,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 func TestInitializeRepo(t *testing.T) {
 	rr := mockResticRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
-	reconciler := mockResticRepoReconciler(t, rr, "ConnectToRepo", rr, nil)
+	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -138,7 +141,7 @@ func TestResticRepoReconcile(t *testing.T) {
 					Name:      "unknown",
 				},
 				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 				},
 			},
 			expectNil: true,
@@ -151,7 +154,7 @@ func TestResticRepoReconcile(t *testing.T) {
 					Name:      "repo",
 				},
 				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 				},
 			},
 			expectNil: true,
@@ -164,7 +167,7 @@ func TestResticRepoReconcile(t *testing.T) {
 					Name:      "repo",
 				},
 				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{defaultMaintenanceFrequency},
+					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
 				},
 				Status: velerov1api.BackupRepositoryStatus{
 					Phase: velerov1api.BackupRepositoryPhaseNew,
@@ -184,6 +187,56 @@ func TestResticRepoReconcile(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 			}
+		})
+	}
+}
+
+func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
+	tests := []struct {
+		name            string
+		mgr             repository.Manager
+		repo            *velerov1api.BackupRepository
+		freqReturn      time.Duration
+		freqError       error
+		userDefinedFreq time.Duration
+		expectFreq      time.Duration
+	}{
+		{
+			name:            "user defined valid",
+			userDefinedFreq: time.Duration(time.Hour),
+			expectFreq:      time.Duration(time.Hour),
+		},
+		{
+			name:       "repo return valid",
+			freqReturn: time.Duration(time.Hour * 2),
+			expectFreq: time.Duration(time.Hour * 2),
+		},
+		{
+			name:            "fall to default",
+			userDefinedFreq: -1,
+			freqError:       errors.New("fake-error"),
+			expectFreq:      defaultMaintainFrequency,
+		},
+		{
+			name:       "fall to default, no freq error",
+			freqReturn: -1,
+			expectFreq: defaultMaintainFrequency,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mgr := repomokes.Manager{}
+			mgr.On("DefaultMaintenanceFrequency", mock.Anything).Return(test.freqReturn, test.freqError)
+			reconciler := NewResticRepoReconciler(
+				velerov1api.DefaultNamespace,
+				velerotest.NewLogger(),
+				velerotest.NewFakeControllerRuntimeClient(t),
+				test.userDefinedFreq,
+				&mgr,
+			)
+
+			freq := reconciler.getRepositoryMaintenanceFrequency(test.repo)
+			assert.Equal(t, test.expectFreq, freq)
 		})
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -52,7 +51,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
@@ -197,22 +195,27 @@ func (s *resticServer) run() {
 		s.logger.Fatalf("Failed to create credentials file store: %v", err)
 	}
 
+	credSecretStore, err := credentials.NewNamespacedSecretStore(s.mgr.GetClient(), s.namespace)
+	if err != nil {
+		s.logger.Fatalf("Failed to create secret file store: %v", err)
+	}
+
+	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
 	pvbReconciler := controller.PodVolumeBackupReconciler{
-		Scheme:         s.mgr.GetScheme(),
-		Client:         s.mgr.GetClient(),
-		Clock:          clock.RealClock{},
-		Metrics:        s.metrics,
-		CredsFileStore: credentialFileStore,
-		NodeName:       s.nodeName,
-		FileSystem:     filesystem.NewFileSystem(),
-		ResticExec:     restic.BackupExec{},
-		Log:            s.logger,
+		Scheme:           s.mgr.GetScheme(),
+		Client:           s.mgr.GetClient(),
+		Clock:            clock.RealClock{},
+		Metrics:          s.metrics,
+		CredentialGetter: credentialGetter,
+		NodeName:         s.nodeName,
+		FileSystem:       filesystem.NewFileSystem(),
+		Log:              s.logger,
 	}
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
 	}
 
-	if err = controller.NewPodVolumeRestoreReconciler(s.logger, s.mgr.GetClient(), credentialFileStore).SetupWithManager(s.mgr); err != nil {
+	if err = controller.NewPodVolumeRestoreReconciler(s.logger, s.mgr.GetClient(), credentialGetter).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
@@ -276,7 +279,7 @@ func (s *resticServer) markInProgressCRsFailed() {
 	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
 	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
 	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("failed to create client")
+		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
 		return
 	}
 
@@ -288,16 +291,16 @@ func (s *resticServer) markInProgressCRsFailed() {
 func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 	pvbs := &velerov1api.PodVolumeBackupList{}
 	if err := client.List(s.ctx, pvbs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
-		log.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
+		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
 		return
 	}
 	for _, pvb := range pvbs.Items {
 		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseInProgress {
-			log.Debugf("the status of podvolumebackup %q is %q, skip", pvb.GetName(), pvb.Status.Phase)
+			s.logger.Debugf("the status of podvolumebackup %q is %q, skip", pvb.GetName(), pvb.Status.Phase)
 			continue
 		}
 		if pvb.Spec.Node != s.nodeName {
-			log.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
+			s.logger.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
 			continue
 		}
 		original := pvb.DeepCopy()
@@ -305,22 +308,22 @@ func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 		pvb.Status.Message = fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
 		pvb.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(s.ctx, &pvb, ctrlclient.MergeFrom(original)); err != nil {
-			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
+			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
 			continue
 		}
-		log.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
+		s.logger.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
 	}
 }
 
 func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 	pvrs := &velerov1api.PodVolumeRestoreList{}
 	if err := client.List(s.ctx, pvrs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
-		log.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")
+		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")
 		return
 	}
 	for _, pvr := range pvrs.Items {
 		if pvr.Status.Phase != velerov1api.PodVolumeRestorePhaseInProgress {
-			log.Debugf("the status of podvolumerestore %q is %q, skip", pvr.GetName(), pvr.Status.Phase)
+			s.logger.Debugf("the status of podvolumerestore %q is %q, skip", pvr.GetName(), pvr.Status.Phase)
 			continue
 		}
 
@@ -329,12 +332,12 @@ func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			Namespace: pvr.Spec.Pod.Namespace,
 			Name:      pvr.Spec.Pod.Name,
 		}, pod); err != nil {
-			log.WithError(errors.WithStack(err)).Errorf("failed to get pod \"%s/%s\" of podvolumerestore %q",
+			s.logger.WithError(errors.WithStack(err)).Errorf("failed to get pod \"%s/%s\" of podvolumerestore %q",
 				pvr.Spec.Pod.Namespace, pvr.Spec.Pod.Name, pvr.GetName())
 			continue
 		}
 		if pod.Spec.NodeName != s.nodeName {
-			log.Debugf("the node of pod referenced by podvolumebackup %q is %q, not %q, skip", pvr.GetName(), pod.Spec.NodeName, s.nodeName)
+			s.logger.Debugf("the node of pod referenced by podvolumebackup %q is %q, not %q, skip", pvr.GetName(), pod.Spec.NodeName, s.nodeName)
 			continue
 		}
 
@@ -343,9 +346,9 @@ func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 		pvr.Status.Message = fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, pvr.Status.Phase)
 		pvr.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(s.ctx, &pvr, ctrlclient.MergeFrom(original)); err != nil {
-			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
+			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
 			continue
 		}
-		log.WithField("podvolumerestore", pvr.GetName()).Warn(pvr.Status.Message)
+		s.logger.WithField("podvolumerestore", pvr.GetName()).Warn(pvr.Status.Message)
 	}
 }

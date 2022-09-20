@@ -1,0 +1,1 @@
+Fix issue 4874 and 4752: check the daemonset pod is running in the node where the workload pod resides before running the PVB for the pod

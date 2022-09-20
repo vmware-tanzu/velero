@@ -25,10 +25,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/kopia"
@@ -37,30 +37,30 @@ import (
 func TestRunBackup(t *testing.T) {
 	var kp kopiaProvider
 	kp.log = logrus.New()
-	updater := controller.BackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
+	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
 	testCases := []struct {
 		name           string
-		hookBackupFunc func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, error)
+		hookBackupFunc func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error)
 		notError       bool
 	}{
 		{
 			name: "success to backup",
-			hookBackupFunc: func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, error) {
-				return &uploader.SnapshotInfo{}, nil
+			hookBackupFunc: func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+				return &uploader.SnapshotInfo{}, false, nil
 			},
 			notError: true,
 		},
 		{
 			name: "get error to backup",
-			hookBackupFunc: func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, error) {
-				return &uploader.SnapshotInfo{}, errors.New("failed to backup")
+			hookBackupFunc: func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+				return &uploader.SnapshotInfo{}, false, errors.New("failed to backup")
 			},
 			notError: false,
 		},
 		{
 			name: "got empty snapshot",
-			hookBackupFunc: func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, error) {
-				return nil, nil
+			hookBackupFunc: func(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath, parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+				return nil, true, errors.New("snapshot is empty")
 			},
 			notError: false,
 		},
@@ -68,7 +68,7 @@ func TestRunBackup(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			BackupFunc = tc.hookBackupFunc
-			_, err := kp.RunBackup(context.Background(), "var", nil, "", &updater)
+			_, _, err := kp.RunBackup(context.Background(), "var", nil, "", &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -81,7 +81,7 @@ func TestRunBackup(t *testing.T) {
 func TestRunRestore(t *testing.T) {
 	var kp kopiaProvider
 	kp.log = logrus.New()
-	updater := controller.RestoreProgressUpdater{PodVolumeRestore: &velerov1api.PodVolumeRestore{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
+	updater := FakeRestoreProgressUpdater{PodVolumeRestore: &velerov1api.PodVolumeRestore{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
 
 	testCases := []struct {
 		name            string
@@ -116,3 +116,21 @@ func TestRunRestore(t *testing.T) {
 		})
 	}
 }
+
+type FakeBackupProgressUpdater struct {
+	PodVolumeBackup *velerov1api.PodVolumeBackup
+	Log             logrus.FieldLogger
+	Ctx             context.Context
+	Cli             client.Client
+}
+
+func (f *FakeBackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {}
+
+type FakeRestoreProgressUpdater struct {
+	PodVolumeRestore *velerov1api.PodVolumeRestore
+	Log              logrus.FieldLogger
+	Ctx              context.Context
+	Cli              client.Client
+}
+
+func (f *FakeRestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {}

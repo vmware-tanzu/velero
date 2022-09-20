@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,37 +31,32 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
-	repoSyncPeriod = 5 * time.Minute
+	repoSyncPeriod           = 5 * time.Minute
+	defaultMaintainFrequency = 7 * 24 * time.Hour
 )
 
 type ResticRepoReconciler struct {
 	client.Client
-	namespace                   string
-	logger                      logrus.FieldLogger
-	clock                       clock.Clock
-	defaultMaintenanceFrequency time.Duration
-	repositoryManager           repository.Manager
+	namespace            string
+	logger               logrus.FieldLogger
+	clock                clock.Clock
+	maintenanceFrequency time.Duration
+	repositoryManager    repository.Manager
 }
 
 func NewResticRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	defaultMaintenanceFrequency time.Duration, repositoryManager repository.Manager) *ResticRepoReconciler {
+	maintenanceFrequency time.Duration, repositoryManager repository.Manager) *ResticRepoReconciler {
 	c := &ResticRepoReconciler{
 		client,
 		namespace,
 		logger,
 		clock.RealClock{},
-		defaultMaintenanceFrequency,
+		maintenanceFrequency,
 		repositoryManager,
-	}
-
-	if c.defaultMaintenanceFrequency <= 0 {
-		logger.Infof("Invalid default restic maintenance frequency, setting to %v", restic.DefaultMaintenanceFrequency)
-		c.defaultMaintenanceFrequency = restic.DefaultMaintenanceFrequency
 	}
 
 	return c
@@ -135,7 +129,7 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 			rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 
 			if rr.Spec.MaintenanceFrequency.Duration <= 0 {
-				rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.defaultMaintenanceFrequency}
+				rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
 			}
 		})
 	}
@@ -145,7 +139,7 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 		rr.Spec.ResticIdentifier = repoIdentifier
 
 		if rr.Spec.MaintenanceFrequency.Duration <= 0 {
-			rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.defaultMaintenanceFrequency}
+			rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
 		}
 	}); err != nil {
 		return err
@@ -161,23 +155,27 @@ func (r *ResticRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 	})
 }
 
-// ensureRepo checks to see if a repository exists, and attempts to initialize it if
-// it does not exist. An error is returned if the repository can't be connected to
-// or initialized.
-func ensureRepo(repo *velerov1api.BackupRepository, repoManager repository.Manager) error {
-	if err := repoManager.ConnectToRepo(repo); err != nil {
-		// If the repository has not yet been initialized, the error message will always include
-		// the following string. This is the only scenario where we should try to initialize it.
-		// Other errors (e.g. "already locked") should be returned as-is since the repository
-		// does already exist, but it can't be connected to.
-		if strings.Contains(err.Error(), "Is there a repository at the following location?") {
-			return repoManager.InitRepo(repo)
+func (r *ResticRepoReconciler) getRepositoryMaintenanceFrequency(req *velerov1api.BackupRepository) time.Duration {
+	if r.maintenanceFrequency > 0 {
+		r.logger.WithField("frequency", r.maintenanceFrequency).Info("Set user defined maintenance frequency")
+		return r.maintenanceFrequency
+	} else {
+		frequency, err := r.repositoryManager.DefaultMaintenanceFrequency(req)
+		if err != nil || frequency <= 0 {
+			r.logger.WithError(err).WithField("returned frequency", frequency).Warn("Failed to get maitanance frequency, use the default one")
+			frequency = defaultMaintainFrequency
+		} else {
+			r.logger.WithField("frequency", frequency).Info("Set matainenance according to repository suggestion")
 		}
 
-		return err
+		return frequency
 	}
+}
 
-	return nil
+// ensureRepo calls repo manager's PrepareRepo to ensure the repo is ready for use.
+// An error is returned if the repository can't be connected to or initialized.
+func ensureRepo(repo *velerov1api.BackupRepository, repoManager repository.Manager) error {
+	return repoManager.PrepareRepo(repo)
 }
 
 func (r *ResticRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {

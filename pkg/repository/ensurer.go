@@ -18,198 +18,116 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/util/wait"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 // RepositoryEnsurer ensures that backup repositories are created and ready.
 type RepositoryEnsurer struct {
 	log        logrus.FieldLogger
-	repoLister velerov1listers.BackupRepositoryLister
-	repoClient velerov1client.BackupRepositoriesGetter
-
-	repoChansLock sync.Mutex
-	repoChans     map[string]chan *velerov1api.BackupRepository
+	repoClient client.Client
 
 	// repoLocksMu synchronizes reads/writes to the repoLocks map itself
 	// since maps are not threadsafe.
 	repoLocksMu sync.Mutex
-	repoLocks   map[repoKey]*sync.Mutex
+	repoLocks   map[BackupRepositoryKey]*sync.Mutex
 }
 
-type repoKey struct {
-	volumeNamespace string
-	backupLocation  string
-}
-
-func NewRepositoryEnsurer(repoInformer velerov1informers.BackupRepositoryInformer, repoClient velerov1client.BackupRepositoriesGetter, log logrus.FieldLogger) *RepositoryEnsurer {
-	r := &RepositoryEnsurer{
+func NewRepositoryEnsurer(repoClient client.Client, log logrus.FieldLogger) *RepositoryEnsurer {
+	return &RepositoryEnsurer{
 		log:        log,
-		repoLister: repoInformer.Lister(),
 		repoClient: repoClient,
-		repoChans:  make(map[string]chan *velerov1api.BackupRepository),
-		repoLocks:  make(map[repoKey]*sync.Mutex),
-	}
-
-	repoInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(old, upd interface{}) {
-				oldObj := old.(*velerov1api.BackupRepository)
-				newObj := upd.(*velerov1api.BackupRepository)
-
-				// we're only interested in phase-changing updates
-				if oldObj.Status.Phase == newObj.Status.Phase {
-					return
-				}
-
-				// we're only interested in updates where the updated object is either Ready or NotReady
-				if newObj.Status.Phase != velerov1api.BackupRepositoryPhaseReady && newObj.Status.Phase != velerov1api.BackupRepositoryPhaseNotReady {
-					return
-				}
-
-				r.repoChansLock.Lock()
-				defer r.repoChansLock.Unlock()
-
-				key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
-				repoChan, ok := r.repoChans[key]
-				if !ok {
-					log.Debugf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
-					return
-				}
-
-				repoChan <- newObj
-			},
-		},
-	)
-
-	return r
-}
-
-func repoLabels(volumeNamespace, backupLocation string) labels.Set {
-	return map[string]string{
-		velerov1api.ResticVolumeNamespaceLabel: label.GetValidName(volumeNamespace),
-		velerov1api.StorageLocationLabel:       label.GetValidName(backupLocation),
+		repoLocks:  make(map[BackupRepositoryKey]*sync.Mutex),
 	}
 }
 
-func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.BackupRepository, error) {
-	log := r.log.WithField("volumeNamespace", volumeNamespace).WithField("backupLocation", backupLocation)
+func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation, repositoryType string) (*velerov1api.BackupRepository, error) {
+	if volumeNamespace == "" || backupLocation == "" || repositoryType == "" {
+		return nil, errors.Errorf("wrong parameters, namespace %q, backup storage location %q, repository type %q", volumeNamespace, backupLocation, repositoryType)
+	}
+
+	backupRepoKey := BackupRepositoryKey{volumeNamespace, backupLocation, repositoryType}
+
+	log := r.log.WithField("volumeNamespace", volumeNamespace).WithField("backupLocation", backupLocation).WithField("repositoryType", repositoryType)
 
 	// It's only safe to have one instance of this method executing concurrently for a
-	// given volumeNamespace + backupLocation, so synchronize based on that. It's fine
-	// to run concurrently for *different* namespaces/locations. If you had 2 goroutines
-	// running this for the same inputs, both might find no ResticRepository exists, then
-	// both would create new ones for the same namespace/location.
+	// given BackupRepositoryKey, so synchronize based on that. It's fine
+	// to run concurrently for *different* BackupRepositoryKey. If you had 2 goroutines
+	// running this for the same inputs, both might find no BackupRepository exists, then
+	// both would create new ones for the same BackupRepositoryKey.
 	//
 	// This issue could probably be avoided if we had a deterministic name for
-	// each restic repository, and we just tried to create it, checked for an
+	// each BackupRepository and we just tried to create it, checked for an
 	// AlreadyExists err, and then waited for it to be ready. However, there are
 	// already repositories in the wild with non-deterministic names (i.e. using
 	// GenerateName) which poses a backwards compatibility problem.
 	log.Debug("Acquiring lock")
 
-	repoMu := r.repoLock(volumeNamespace, backupLocation)
+	repoMu := r.repoLock(backupRepoKey)
 	repoMu.Lock()
 	defer func() {
 		repoMu.Unlock()
 		log.Debug("Released lock")
 	}()
 
-	log.Debug("Acquired lock")
-
-	selector := labels.SelectorFromSet(repoLabels(volumeNamespace, backupLocation))
-
-	repos, err := r.repoLister.BackupRepositories(namespace).List(selector)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if len(repos) > 1 {
-		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q", volumeNamespace, backupLocation)
-	}
-	if len(repos) == 1 {
-		if repos[0].Status.Phase != velerov1api.BackupRepositoryPhaseReady {
-			return nil, errors.Errorf("restic repository is not ready: %s", repos[0].Status.Message)
-		}
-
+	repo, err := GetBackupRepository(ctx, r.repoClient, namespace, backupRepoKey, true)
+	if err == nil {
 		log.Debug("Ready repository found")
-		return repos[0], nil
+		return repo, nil
+	}
+
+	if !isBackupRepositoryNotFoundError(err) {
+		return nil, errors.WithStack(err)
 	}
 
 	log.Debug("No repository found, creating one")
 
 	// no repo found: create one and wait for it to be ready
-	repo := &velerov1api.BackupRepository{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    namespace,
-			GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
-			Labels:       repoLabels(volumeNamespace, backupLocation),
-		},
-		Spec: velerov1api.BackupRepositorySpec{
-			VolumeNamespace:       volumeNamespace,
-			BackupStorageLocation: backupLocation,
-		},
-	}
-
-	repoChan := r.getRepoChan(selector.String())
-	defer func() {
-		delete(r.repoChans, selector.String())
-		close(repoChan)
-	}()
-
-	if _, err := r.repoClient.BackupRepositories(namespace).Create(context.TODO(), repo, metav1.CreateOptions{}); err != nil {
-		return nil, errors.Wrapf(err, "unable to create restic repository resource")
-	}
-
-	select {
-	// repositories should become either ready or not ready quickly if they're
-	// newly created.
-	case <-time.After(time.Minute):
-		return nil, errors.New("timed out waiting for restic repository to become ready")
-	case <-ctx.Done():
-		return nil, errors.New("timed out waiting for restic repository to become ready")
-	case res := <-repoChan:
-
-		if res.Status.Phase == velerov1api.BackupRepositoryPhaseNotReady {
-			return nil, errors.Errorf("restic repository is not ready: %s", res.Status.Message)
-		}
-
-		return res, nil
-	}
+	return r.createBackupRepositoryAndWait(ctx, namespace, backupRepoKey)
 }
 
-func (r *RepositoryEnsurer) getRepoChan(name string) chan *velerov1api.BackupRepository {
-	r.repoChansLock.Lock()
-	defer r.repoChansLock.Unlock()
-
-	r.repoChans[name] = make(chan *velerov1api.BackupRepository)
-	return r.repoChans[name]
-}
-
-func (r *RepositoryEnsurer) repoLock(volumeNamespace, backupLocation string) *sync.Mutex {
+func (r *RepositoryEnsurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
 	r.repoLocksMu.Lock()
 	defer r.repoLocksMu.Unlock()
-
-	key := repoKey{
-		volumeNamespace: volumeNamespace,
-		backupLocation:  backupLocation,
-	}
 
 	if r.repoLocks[key] == nil {
 		r.repoLocks[key] = new(sync.Mutex)
 	}
 
 	return r.repoLocks[key]
+}
+
+func (r *RepositoryEnsurer) createBackupRepositoryAndWait(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
+	toCreate := newBackupRepository(namespace, backupRepoKey)
+	if err := r.repoClient.Create(ctx, toCreate, &client.CreateOptions{}); err != nil {
+		return nil, errors.Wrap(err, "unable to create backup repository resource")
+	}
+
+	var repo *velerov1api.BackupRepository
+	checkFunc := func(ctx context.Context) (bool, error) {
+		found, err := GetBackupRepository(ctx, r.repoClient, namespace, backupRepoKey, true)
+		if err == nil {
+			repo = found
+			return true, nil
+		} else if isBackupRepositoryNotFoundError(err) || isBackupRepositoryNotProvisionedError(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+
+	err := wait.PollWithContext(ctx, time.Millisecond*500, time.Minute, checkFunc)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wait BackupRepository")
+	} else {
+		return repo, nil
+	}
 }

@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apex/log"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -50,6 +49,7 @@ import (
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -98,6 +98,7 @@ type backupController struct {
 	volumeSnapshotClient        *snapshotterClientSet.Clientset
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
 	volumeSnapshotClassLister   snapshotv1listers.VolumeSnapshotClassLister
+	credentialFileStore         credentials.FileStore
 }
 
 func NewBackupController(
@@ -123,6 +124,7 @@ func NewBackupController(
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	volumesnapshotClassLister snapshotv1listers.VolumeSnapshotClassLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
+	credentialStore credentials.FileStore,
 ) Interface {
 	c := &backupController{
 		genericController:           newGenericController(Backup, logger),
@@ -148,6 +150,7 @@ func NewBackupController(
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
 		volumeSnapshotClassLister:   volumesnapshotClassLister,
 		backupStoreGetter:           backupStoreGetter,
+		credentialFileStore:         credentialStore,
 	}
 
 	c.syncHandler = c.processBackup
@@ -566,6 +569,15 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 		return nil, errors
 	}
 
+	// add credential to config for each location
+	for _, location := range providerLocations {
+		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, c.credentialFileStore, c.logger)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error adding credentials to volume snapshot location named %s: %v", location.Name, err))
+			continue
+		}
+	}
+
 	return providerLocations, nil
 }
 
@@ -913,14 +925,14 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 					return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name))
 				}
 				if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
-					log.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
+					c.logger.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
 					return false, nil
 				}
 
 				return true, nil
 			})
 			if err == wait.ErrWaitTimeout {
-				log.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
+				c.logger.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			}
 			return err
 		})

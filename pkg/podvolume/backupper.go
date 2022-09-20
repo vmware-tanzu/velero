@@ -32,8 +32,10 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // Backupper can execute restic backups of volumes in a pod.
@@ -49,6 +51,8 @@ type backupper struct {
 	veleroClient clientset.Interface
 	pvcClient    corev1client.PersistentVolumeClaimsGetter
 	pvClient     corev1client.PersistentVolumesGetter
+	podClient    corev1client.PodsGetter
+	uploaderType string
 
 	results     map[string]chan *velerov1api.PodVolumeBackup
 	resultsLock sync.Mutex
@@ -62,6 +66,8 @@ func newBackupper(
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
+	podClient corev1client.PodsGetter,
+	uploaderType string,
 	log logrus.FieldLogger,
 ) *backupper {
 	b := &backupper{
@@ -71,6 +77,8 @@ func newBackupper(
 		veleroClient: veleroClient,
 		pvcClient:    pvcClient,
 		pvClient:     pvClient,
+		podClient:    podClient,
+		uploaderType: uploaderType,
 
 		results: make(map[string]chan *velerov1api.PodVolumeBackup),
 	}
@@ -107,7 +115,23 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, nil
 	}
 
-	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace, backup.Spec.StorageLocation)
+	repositoryType := getRepositoryType(b.uploaderType)
+	if repositoryType == "" {
+		err := errors.Errorf("empty repository type, uploader %s", b.uploaderType)
+		return nil, []error{err}
+	}
+
+	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace, backup.Spec.StorageLocation, repositoryType)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	err = kube.IsPodRunning(pod)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	err = nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.podClient)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -158,11 +182,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
-		// ignore non-running pods
-		if pod.Status.Phase != corev1api.PodRunning {
-			log.Warnf("Skipping volume %s in pod %s/%s - pod not running", volumeName, pod.Namespace, pod.Name)
-			continue
-		}
 		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
 		// daemonset pod has no way to access their data.
 		isHostPath, err := isHostPathVolume(&volume, pvc, b.pvClient.PersistentVolumes())
@@ -182,8 +201,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		// TODO: Remove the hard-coded uploader type before v1.10 FC
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, "restic", pvc)
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, b.uploaderType, pvc)
 		if volumeBackup, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
