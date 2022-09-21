@@ -127,7 +127,7 @@ func (o *OrderedResources) Init() error {
 	}
 
 	o.ScheduleArgs = []string{"--schedule", "@every 1m",
-		"--include-namespaces", o.Namespace, "--default-volumes-to-restic", "--ordered-resources"}
+		"--include-namespaces", o.Namespace, "--default-volumes-to-fs-backup", "--ordered-resources"}
 	var orderStr string
 	for kind, resource := range o.OrderMap {
 		orderStr += fmt.Sprintf("%s=%s;", kind, resource)
