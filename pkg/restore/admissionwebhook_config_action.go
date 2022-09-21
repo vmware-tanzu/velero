@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // AdmissionWebhookConfigurationAction is a RestoreItemAction plugin applicable to mutatingwebhookconfiguration and
@@ -46,7 +47,7 @@ func (a *AdmissionWebhookConfigurationAction) AppliesTo() (velero.ResourceSelect
 
 // Execute will reset the value of "sideEffects" attribute of each item in the "webhooks" list to "None" if they are invalid values for
 // v1, such as "Unknown" or "Some"
-func (a *AdmissionWebhookConfigurationAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *AdmissionWebhookConfigurationAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing ChangeStorageClassAction")
 	defer a.logger.Info("Done executing ChangeStorageClassAction")
 
@@ -59,7 +60,7 @@ func (a *AdmissionWebhookConfigurationAction) Execute(input *velero.RestoreItemA
 	logger := a.logger.WithField("resource_name", name)
 	if apiVersion != "admissionregistration.k8s.io/v1" {
 		logger.Infof("unable to handle api version: %s, skip", apiVersion)
-		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 	webhooks, ok, err := unstructured.NestedSlice(item.UnstructuredContent(), "webhooks")
 	if err != nil {
@@ -67,7 +68,7 @@ func (a *AdmissionWebhookConfigurationAction) Execute(input *velero.RestoreItemA
 	}
 	if !ok {
 		logger.Info("webhooks is not set, skip")
-		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 	newWebhooks := make([]interface{}, 0)
 	for i, entry := range webhooks {
@@ -85,5 +86,5 @@ func (a *AdmissionWebhookConfigurationAction) Execute(input *velero.RestoreItemA
 		newWebhooks = append(newWebhooks, obj)
 	}
 	item.UnstructuredContent()["webhooks"] = newWebhooks
-	return velero.NewRestoreItemActionExecuteOutput(item), nil
+	return riav1.NewRestoreItemActionExecuteOutput(item), nil
 }

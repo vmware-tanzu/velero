@@ -28,6 +28,7 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -89,7 +90,7 @@ func TestRoleBindingActionExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			action := NewRoleBindingAction(test.NewLogger())
-			res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
+			res, err := action.Execute(&riav1.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: roleBindingUnstructured},
 				ItemFromBackup: &unstructured.Unstructured{Object: roleBindingUnstructured},
 				Restore: &api.Restore{

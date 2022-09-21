@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
@@ -56,7 +57,7 @@ func TestRestartableGetDeleteItemAction(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			defer p.AssertExpectations(t)
 
 			name := "pod"
@@ -77,7 +78,7 @@ func TestRestartableGetDeleteItemAction(t *testing.T) {
 }
 
 func TestRestartableDeleteItemActionGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	defer p.AssertExpectations(t)
 
 	// Reset error
@@ -114,7 +115,7 @@ func TestRestartableDeleteItemActionDelegatedFunctions(t *testing.T) {
 		Backup: backup,
 	}
 
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindDeleteItemAction,
 		func(key process.KindAndName, p process.RestartableProcess) interface{} {
@@ -123,21 +124,21 @@ func TestRestartableDeleteItemActionDelegatedFunctions(t *testing.T) {
 				sharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			// Currently broken because this mocks the restore item action interface
 			return new(mocks.DeleteItemAction)
 		},
-		restartableDelegateTest{
-			function:                "AppliesTo",
-			inputs:                  []interface{}{},
-			expectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "AppliesTo",
+			Inputs:                  []interface{}{},
+			ExpectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "Execute",
-			inputs:                  []interface{}{input},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "Execute",
+			Inputs:                  []interface{}{input},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
 	)
 }
