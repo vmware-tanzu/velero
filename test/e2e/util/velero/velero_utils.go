@@ -431,17 +431,19 @@ func VeleroScheduleCreate(ctx context.Context, veleroCLI string, veleroNamespace
 
 func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
 	cmd := exec.CommandContext(ctx, veleroCLI, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var errBuf, outBuf bytes.Buffer
+	cmd.Stderr = io.MultiWriter(os.Stderr, &errBuf)
+	cmd.Stdout = io.MultiWriter(os.Stdout, &outBuf)
 	fmt.Printf("velero cmd =%v\n", cmd)
 	err := cmd.Run()
-	if strings.Contains(fmt.Sprint(cmd.Stdout), "Failed") {
+	retAll := outBuf.String() + " " + errBuf.String()
+	if strings.Contains(strings.ToLower(retAll), "failed") {
 		return errors.New(fmt.Sprintf("velero cmd =%v return with failure\n", cmd))
 	}
 	if err != nil {
 		return err
 	}
-	return err
+	return nil
 }
 
 func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
