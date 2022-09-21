@@ -136,6 +136,9 @@ spec:
           # processed. Only "exec" hooks are supported.
           post:
             # Same content as pre above.
+    # Specifies whether to use OwnerReferences on backups created by this Schedule. 
+    # Notice: if set to true, when schedule is deleted, backups will be deleted too. Optional.
+    useOwnerReferencesInBackup: false
 status:
   # The current phase of the latest scheduled backup. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
   phase: ""
