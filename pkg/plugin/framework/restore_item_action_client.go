@@ -25,37 +25,39 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
-var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}
+var _ riav1.RestoreItemAction = &RestoreItemActionGRPCClient{}
 
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
-func NewRestoreItemActionPlugin(options ...PluginOption) *RestoreItemActionPlugin {
+func NewRestoreItemActionPlugin(options ...common.PluginOption) *RestoreItemActionPlugin {
 	return &RestoreItemActionPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: common.NewPluginBase(options...),
 	}
 }
 
 // RestoreItemActionGRPCClient implements the backup/ItemAction interface and uses a
 // gRPC client to make calls to the plugin server.
 type RestoreItemActionGRPCClient struct {
-	*clientBase
+	*common.ClientBase
 	grpcClient proto.RestoreItemActionClient
 }
 
-func newRestoreItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+func newRestoreItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
 	return &RestoreItemActionGRPCClient{
-		clientBase: base,
+		ClientBase: base,
 		grpcClient: proto.NewRestoreItemActionClient(clientConn),
 	}
 }
 
 func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
-	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.RestoreItemActionAppliesToRequest{Plugin: c.plugin})
+	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.RestoreItemActionAppliesToRequest{Plugin: c.Plugin})
 	if err != nil {
-		return velero.ResourceSelector{}, fromGRPCError(err)
+		return velero.ResourceSelector{}, common.FromGRPCError(err)
 	}
 
 	if res.ResourceSelector == nil {
@@ -71,7 +73,7 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, erro
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (c *RestoreItemActionGRPCClient) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -88,7 +90,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 	}
 
 	req := &proto.RestoreItemActionExecuteRequest{
-		Plugin:         c.plugin,
+		Plugin:         c.Plugin,
 		Item:           itemJSON,
 		ItemFromBackup: itemFromBackupJSON,
 		Restore:        restoreJSON,
@@ -96,7 +98,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 
 	res, err := c.grpcClient.Execute(context.Background(), req)
 	if err != nil {
-		return nil, fromGRPCError(err)
+		return nil, common.FromGRPCError(err)
 	}
 
 	var updatedItem unstructured.Unstructured
@@ -118,7 +120,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 		additionalItems = append(additionalItems, newItem)
 	}
 
-	return &velero.RestoreItemActionExecuteOutput{
+	return &riav1.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &updatedItem,
 		AdditionalItems: additionalItems,
 		SkipRestore:     res.SkipRestore,

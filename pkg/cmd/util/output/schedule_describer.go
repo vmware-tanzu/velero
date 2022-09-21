@@ -53,6 +53,9 @@ func DescribeSchedule(schedule *v1.Schedule) string {
 		}
 
 		d.Println()
+		d.Printf("Paused:\t%t\n", schedule.Spec.Paused)
+
+		d.Println()
 		DescribeScheduleSpec(d, schedule.Spec)
 
 		d.Println()

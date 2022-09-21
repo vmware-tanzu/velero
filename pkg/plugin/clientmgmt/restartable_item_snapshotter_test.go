@@ -21,19 +21,20 @@ import (
 	"testing"
 	"time"
 
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1/mocks"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
 
 func TestRestartableGetItemSnapshotter(t *testing.T) {
@@ -61,14 +62,14 @@ func TestRestartableGetItemSnapshotter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			defer p.AssertExpectations(t)
 
 			name := "pvc"
-			key := kindAndName{kind: framework.PluginKindItemSnapshotter, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: common.PluginKindItemSnapshotter, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := newRestartableItemSnapshotter(name, p)
+			r := NewRestartableItemSnapshotter(name, p)
 			a, err := r.getItemSnapshotter()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
@@ -82,22 +83,22 @@ func TestRestartableGetItemSnapshotter(t *testing.T) {
 }
 
 func TestRestartableItemSnapshotterGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "pvc"
-	r := newRestartableItemSnapshotter(name, p)
+	r := NewRestartableItemSnapshotter(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	expected := new(mocks.ItemSnapshotter)
-	key := kindAndName{kind: framework.PluginKindItemSnapshotter, name: name}
-	p.On("getByKindAndName", key).Return(expected, nil)
+	key := process.KindAndName{Kind: common.PluginKindItemSnapshotter, Name: name}
+	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -175,59 +176,59 @@ func TestRestartableItemSnasphotterDelegatedFunctions(t *testing.T) {
 		SnapshotMetadata: nil,
 		Params:           nil,
 	}
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
-		framework.PluginKindItemSnapshotter,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		common.PluginKindItemSnapshotter,
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableItemSnapshotter{
 				key:                 key,
 				sharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			return new(mocks.ItemSnapshotter)
 		},
-		restartableDelegateTest{
-			function:                "Init",
-			inputs:                  []interface{}{map[string]string{}},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "Init",
+			Inputs:                  []interface{}{map[string]string{}},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "AppliesTo",
-			inputs:                  []interface{}{},
-			expectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "AppliesTo",
+			Inputs:                  []interface{}{},
+			ExpectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "AlsoHandles",
-			inputs:                  []interface{}{&isv1.AlsoHandlesInput{}},
-			expectedErrorOutputs:    []interface{}{[]velero.ResourceIdentifier([]velero.ResourceIdentifier(nil)), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{[]velero.ResourceIdentifier([]velero.ResourceIdentifier(nil)), errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "AlsoHandles",
+			Inputs:                  []interface{}{&isv1.AlsoHandlesInput{}},
+			ExpectedErrorOutputs:    []interface{}{[]velero.ResourceIdentifier([]velero.ResourceIdentifier(nil)), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{[]velero.ResourceIdentifier([]velero.ResourceIdentifier(nil)), errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "SnapshotItem",
-			inputs:                  []interface{}{ctx, sii},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{sio, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "SnapshotItem",
+			Inputs:                  []interface{}{ctx, sii},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{sio, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "CreateItemFromSnapshot",
-			inputs:                  []interface{}{ctx, cii},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{cio, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateItemFromSnapshot",
+			Inputs:                  []interface{}{ctx, cii},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{cio, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "Progress",
-			inputs:                  []interface{}{pi},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{po, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "Progress",
+			Inputs:                  []interface{}{pi},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{po, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "DeleteSnapshot",
-			inputs:                  []interface{}{ctx, dsi},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "DeleteSnapshot",
+			Inputs:                  []interface{}{ctx, dsi},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
 	)
 }

@@ -27,24 +27,20 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 )
 
 // DeleteOptions contains parameters used for deleting a restore.
 type DeleteOptions struct {
-	Names            []string
-	all              bool
-	Selector         flag.LabelSelector
-	Confirm          bool
-	Client           clientset.Interface
-	Namespace        string
-	singularTypeName string
+	*SelectOptions
+	Confirm   bool
+	Client    clientset.Interface
+	Namespace string
 }
 
 func NewDeleteOptions(singularTypeName string) *DeleteOptions {
 	o := &DeleteOptions{}
-	o.singularTypeName = singularTypeName
+	o.SelectOptions = NewSelectOptions("delete", singularTypeName)
 	return o
 }
 
@@ -56,8 +52,7 @@ func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 		return err
 	}
 	o.Client = client
-	o.Names = args
-	return nil
+	return o.SelectOptions.Complete(args)
 }
 
 // Validate validates the fields of the DeleteOptions struct.
@@ -65,23 +60,14 @@ func (o *DeleteOptions) Validate(c *cobra.Command, f client.Factory, args []stri
 	if o.Client == nil {
 		return errors.New("Velero client is not set; unable to proceed")
 	}
-	var (
-		hasNames    = len(o.Names) > 0
-		hasAll      = o.all
-		hasSelector = o.Selector.LabelSelector != nil
-	)
-	if !xor(hasNames, hasAll, hasSelector) {
-		return errors.New("you must specify exactly one of: specific " + o.singularTypeName + " name(s), the --all flag, or the --selector flag")
-	}
 
-	return nil
+	return o.SelectOptions.Validate()
 }
 
 // BindFlags binds options for this command to flags.
 func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm deletion")
-	flags.BoolVar(&o.all, "all", o.all, "Delete all "+o.singularTypeName+"s")
-	flags.VarP(&o.Selector, "selector", "l", "Delete all "+o.singularTypeName+"s matching this label selector.")
+	o.SelectOptions.BindFlags(flags)
 }
 
 // GetConfirmation ensures that the user confirms the action before proceeding.

@@ -59,6 +59,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -86,7 +87,7 @@ type Request struct {
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
 	Restore(req Request,
-		actions []velero.RestoreItemAction,
+		actions []riav1.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
@@ -162,7 +163,7 @@ func NewKubernetesRestorer(
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(
 	req Request,
-	actions []velero.RestoreItemAction,
+	actions []riav1.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
@@ -226,12 +227,12 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		Includes(req.Restore.Spec.IncludedNamespaces...).
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
-	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper)
+	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
-	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper)
+	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -408,6 +409,12 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	ctx.restoreDir = dir
 
 	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
+	// If ErrNotExist occurs, it implies that the backup to be restored includes zero items.
+	// Need to add a warning about it and jump out of the function.
+	if errors.Cause(err) == archive.ErrNotExist {
+		warnings.AddVeleroError(errors.Wrap(err, "zero items to be restored"))
+		return warnings, errs
+	}
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
@@ -1144,7 +1151,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 
 		ctx.log.Infof("Executing item action for %v", &groupResource)
-		executeOutput, err := action.RestoreItemAction.Execute(&velero.RestoreItemActionExecuteInput{
+		executeOutput, err := action.RestoreItemAction.Execute(&riav1.RestoreItemActionExecuteInput{
 			Item:           obj,
 			ItemFromBackup: itemFromBackup,
 			Restore:        ctx.restore,

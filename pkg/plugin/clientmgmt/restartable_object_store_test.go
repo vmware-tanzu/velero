@@ -26,7 +26,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
@@ -55,13 +57,13 @@ func TestRestartableGetObjectStore(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			p.Test(t)
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableObjectStore{
 				key:                 key,
@@ -80,12 +82,12 @@ func TestRestartableGetObjectStore(t *testing.T) {
 }
 
 func TestRestartableObjectStoreReinitialize(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -94,7 +96,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 		},
 	}
 
-	err := r.reinitialize(3)
+	err := r.Reinitialize(3)
 	assert.EqualError(t, err, "int is not a ObjectStore!")
 
 	objectStore := new(providermocks.ObjectStore)
@@ -102,23 +104,23 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	defer objectStore.AssertExpectations(t)
 
 	objectStore.On("Init", r.config).Return(errors.Errorf("init error")).Once()
-	err = r.reinitialize(objectStore)
+	err = r.Reinitialize(objectStore)
 	assert.EqualError(t, err, "init error")
 
 	objectStore.On("Init", r.config).Return(nil)
-	err = r.reinitialize(objectStore)
+	err = r.Reinitialize(objectStore)
 	assert.NoError(t, err)
 }
 
 func TestRestartableObjectStoreGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -128,11 +130,11 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(objectStore, nil)
+	p.On("GetByKindAndName", key).Return(objectStore, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -140,30 +142,30 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 }
 
 func TestRestartableObjectStoreInit(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	// getObjectStore error
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
+	key := process.KindAndName{Kind: common.PluginKindObjectStore, Name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
 	}
-	p.On("getByKindAndName", key).Return(nil, errors.Errorf("getByKindAndName error")).Once()
+	p.On("GetByKindAndName", key).Return(nil, errors.Errorf("GetByKindAndName error")).Once()
 
 	config := map[string]string{
 		"color": "blue",
 	}
 	err := r.Init(config)
-	assert.EqualError(t, err, "getByKindAndName error")
+	assert.EqualError(t, err, "GetByKindAndName error")
 
 	// Delegate returns error
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(objectStore, nil)
+	p.On("GetByKindAndName", key).Return(objectStore, nil)
 	objectStore.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
@@ -184,53 +186,53 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 }
 
 func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
-		framework.PluginKindObjectStore,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		common.PluginKindObjectStore,
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableObjectStore{
 				key:                 key,
 				sharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			return new(providermocks.ObjectStore)
 		},
-		restartableDelegateTest{
-			function:                "PutObject",
-			inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "PutObject",
+			Inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "GetObject",
-			inputs:                  []interface{}{"bucket", "key"},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{ioutil.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "GetObject",
+			Inputs:                  []interface{}{"bucket", "key"},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{ioutil.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "ListCommonPrefixes",
-			inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
-			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "ListCommonPrefixes",
+			Inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
+			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "ListObjects",
-			inputs:                  []interface{}{"bucket", "prefix"},
-			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "ListObjects",
+			Inputs:                  []interface{}{"bucket", "prefix"},
+			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "DeleteObject",
-			inputs:                  []interface{}{"bucket", "key"},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "DeleteObject",
+			Inputs:                  []interface{}{"bucket", "key"},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "CreateSignedURL",
-			inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateSignedURL",
+			Inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
 		},
 	)
 }

@@ -29,8 +29,9 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	storagev1client "k8s.io/client-go/kubernetes/typed/storage/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // ChangeStorageClassAction updates a PV or PVC's storage class name
@@ -64,19 +65,19 @@ func (a *ChangeStorageClassAction) AppliesTo() (velero.ResourceSelector, error) 
 
 // Execute updates the item's spec.storageClassName if a mapping is found
 // in the config map for the plugin.
-func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *ChangeStorageClassAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing ChangeStorageClassAction")
 	defer a.logger.Info("Done executing ChangeStorageClassAction")
 
 	a.logger.Debug("Getting plugin config")
-	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-storage-class", a.configMapClient)
+	config, err := getPluginConfig(common.PluginKindRestoreItemAction, "velero.io/change-storage-class", a.configMapClient)
 	if err != nil {
 		return nil, err
 	}
 
 	if config == nil || len(config.Data) == 0 {
 		a.logger.Debug("No storage class mappings found")
-		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	obj, ok := input.Item.(*unstructured.Unstructured)
@@ -128,7 +129,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 		if err != nil {
 			return nil, err
 		} else if !exists {
-			return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+			return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
 		}
 
 		log.Infof("Updating item's storage class name to %s", newStorageClass)
@@ -137,7 +138,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 			return nil, errors.Wrap(err, "unable to set item's spec.storageClassName")
 		}
 	}
-	return velero.NewRestoreItemActionExecuteOutput(obj), nil
+	return riav1.NewRestoreItemActionExecuteOutput(obj), nil
 }
 
 func (a *ChangeStorageClassAction) isStorageClassExist(log *logrus.Entry, storageClass *string, cm *corev1.ConfigMap) (exists bool, newStorageClass string, err error) {

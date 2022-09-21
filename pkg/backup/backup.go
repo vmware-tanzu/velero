@@ -214,13 +214,13 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 		return err
 	}
 
-	backupRequest.ResolvedActions, err = backupItemActionResolver.ResolveActions(kb.discoveryHelper)
+	backupRequest.ResolvedActions, err = backupItemActionResolver.ResolveActions(kb.discoveryHelper, log)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Debugf("Error from backupItemActionResolver.ResolveActions")
 		return err
 	}
 
-	backupRequest.ResolvedItemSnapshotters, err = itemSnapshotterResolver.ResolveActions(kb.discoveryHelper)
+	backupRequest.ResolvedItemSnapshotters, err = itemSnapshotterResolver.ResolveActions(kb.discoveryHelper, log)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Debugf("Error from itemSnapshotterResolver.ResolveActions")
 		return err

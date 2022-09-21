@@ -22,13 +22,14 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // PluginIdentifier uniquely identifies a plugin by command, kind, and name.
 type PluginIdentifier struct {
 	Command string
-	Kind    PluginKind
+	Kind    common.PluginKind
 	Name    string
 }
 
@@ -87,13 +88,13 @@ func (c *PluginListerGRPCClient) ListPlugins() ([]PluginIdentifier, error) {
 
 	ret := make([]PluginIdentifier, len(resp.Plugins))
 	for i, id := range resp.Plugins {
-		if _, ok := AllPluginKinds()[id.Kind]; !ok {
+		if _, ok := common.AllPluginKinds()[id.Kind]; !ok {
 			return nil, errors.Errorf("invalid plugin kind: %s", id.Kind)
 		}
 
 		ret[i] = PluginIdentifier{
 			Command: id.Command,
-			Kind:    PluginKind(id.Kind),
+			Kind:    common.PluginKind(id.Kind),
 			Name:    id.Name,
 		}
 	}
@@ -126,7 +127,7 @@ func (s *PluginListerGRPCServer) ListPlugins(ctx context.Context, req *proto.Emp
 
 	plugins := make([]*proto.PluginIdentifier, len(list))
 	for i, id := range list {
-		if _, ok := AllPluginKinds()[id.Kind.String()]; !ok {
+		if _, ok := common.AllPluginKinds()[id.Kind.String()]; !ok {
 			return nil, errors.Errorf("invalid plugin kind: %s", id.Kind)
 		}
 

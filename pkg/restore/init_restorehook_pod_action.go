@@ -24,6 +24,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // InitRestoreHookPodAction is a RestoreItemAction plugin applicable to pods that runs
@@ -45,7 +46,7 @@ func (a *InitRestoreHookPodAction) AppliesTo() (velero.ResourceSelector, error) 
 }
 
 // Execute implements the RestoreItemAction plugin interface method.
-func (a *InitRestoreHookPodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *InitRestoreHookPodAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	a.logger.Infof("Executing InitRestoreHookPodAction")
 	// handle any init container restore hooks for the pod
 	restoreHooks, err := hook.GetRestoreHooksFromSpec(&input.Restore.Spec.Hooks)
@@ -60,5 +61,5 @@ func (a *InitRestoreHookPodAction) Execute(input *velero.RestoreItemActionExecut
 	}
 	a.logger.Infof("Returning from InitRestoreHookPodAction")
 
-	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: postHooksItem.UnstructuredContent()}), nil
+	return riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: postHooksItem.UnstructuredContent()}), nil
 }

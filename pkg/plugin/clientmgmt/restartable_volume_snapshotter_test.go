@@ -25,7 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/internal/restartabletest"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
@@ -54,13 +56,13 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+			p := new(restartabletest.MockRestartableProcess)
 			p.Test(t)
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
-			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
+			key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
+			p.On("GetByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableVolumeSnapshotter{
 				key:                 key,
@@ -79,12 +81,12 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 }
 
 func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -93,7 +95,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 		},
 	}
 
-	err := r.reinitialize(3)
+	err := r.Reinitialize(3)
 	assert.EqualError(t, err, "int is not a VolumeSnapshotter!")
 
 	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
@@ -101,23 +103,23 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 	defer volumeSnapshotter.AssertExpectations(t)
 
 	volumeSnapshotter.On("Init", r.config).Return(errors.Errorf("init error")).Once()
-	err = r.reinitialize(volumeSnapshotter)
+	err = r.Reinitialize(volumeSnapshotter)
 	assert.EqualError(t, err, "init error")
 
 	volumeSnapshotter.On("Init", r.config).Return(nil)
-	err = r.reinitialize(volumeSnapshotter)
+	err = r.Reinitialize(volumeSnapshotter)
 	assert.NoError(t, err)
 }
 
 func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	// Reset error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
+	p.On("ResetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -127,11 +129,11 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 	assert.EqualError(t, err, "reset error")
 
 	// Happy path
-	p.On("resetIfNeeded").Return(nil)
+	p.On("ResetIfNeeded").Return(nil)
 	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)
 	defer volumeSnapshotter.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(volumeSnapshotter, nil)
+	p.On("GetByKindAndName", key).Return(volumeSnapshotter, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
@@ -139,30 +141,30 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 }
 
 func TestRestartableVolumeSnapshotterInit(t *testing.T) {
-	p := new(mockRestartableProcess)
+	p := new(restartabletest.MockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	// getVolumeSnapshottererror
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	key := process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name}
 	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
 	}
-	p.On("getByKindAndName", key).Return(nil, errors.Errorf("getByKindAndName error")).Once()
+	p.On("GetByKindAndName", key).Return(nil, errors.Errorf("GetByKindAndName error")).Once()
 
 	config := map[string]string{
 		"color": "blue",
 	}
 	err := r.Init(config)
-	assert.EqualError(t, err, "getByKindAndName error")
+	assert.EqualError(t, err, "GetByKindAndName error")
 
 	// Delegate returns error
 	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)
 	defer volumeSnapshotter.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(volumeSnapshotter, nil)
+	p.On("GetByKindAndName", key).Return(volumeSnapshotter, nil)
 	volumeSnapshotter.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
@@ -195,53 +197,53 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 		},
 	}
 
-	runRestartableDelegateTests(
+	restartabletest.RunRestartableDelegateTests(
 		t,
-		framework.PluginKindVolumeSnapshotter,
-		func(key kindAndName, p RestartableProcess) interface{} {
+		common.PluginKindVolumeSnapshotter,
+		func(key process.KindAndName, p process.RestartableProcess) interface{} {
 			return &restartableVolumeSnapshotter{
 				key:                 key,
 				sharedPluginProcess: p,
 			}
 		},
-		func() mockable {
+		func() restartabletest.Mockable {
 			return new(providermocks.VolumeSnapshotter)
 		},
-		restartableDelegateTest{
-			function:                "CreateVolumeFromSnapshot",
-			inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Int64Ptr(10000)},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateVolumeFromSnapshot",
+			Inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Int64Ptr(10000)},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "GetVolumeID",
-			inputs:                  []interface{}{pv},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "GetVolumeID",
+			Inputs:                  []interface{}{pv},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "SetVolumeID",
-			inputs:                  []interface{}{pv, "volumeID"},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{pvToReturn, errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "SetVolumeID",
+			Inputs:                  []interface{}{pv, "volumeID"},
+			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{pvToReturn, errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "GetVolumeInfo",
-			inputs:                  []interface{}{"volumeID", "volumeAZ"},
-			expectedErrorOutputs:    []interface{}{"", (*int64)(nil), errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "GetVolumeInfo",
+			Inputs:                  []interface{}{"volumeID", "volumeAZ"},
+			ExpectedErrorOutputs:    []interface{}{"", (*int64)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "CreateSnapshot",
-			inputs:                  []interface{}{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
-			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{"snapshotID", errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "CreateSnapshot",
+			Inputs:                  []interface{}{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
+			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"snapshotID", errors.Errorf("delegate error")},
 		},
-		restartableDelegateTest{
-			function:                "DeleteSnapshot",
-			inputs:                  []interface{}{"snapshotID"},
-			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+		restartabletest.RestartableDelegateTest{
+			Function:                "DeleteSnapshot",
+			Inputs:                  []interface{}{"snapshotID"},
+			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
 	)
 }

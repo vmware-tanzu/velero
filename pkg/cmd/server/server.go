@@ -69,6 +69,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -249,7 +250,7 @@ type server struct {
 	cancelFunc                          context.CancelFunc
 	logger                              logrus.FieldLogger
 	logLevel                            logrus.Level
-	pluginRegistry                      clientmgmt.Registry
+	pluginRegistry                      process.Registry
 	repoManager                         repository.Manager
 	repoLocker                          *repository.RepoLocker
 	repoEnsurer                         *repository.RepositoryEnsurer
@@ -294,7 +295,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	pluginRegistry := clientmgmt.NewRegistry(config.pluginDir, logger, logger.Level)
+	pluginRegistry := process.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}

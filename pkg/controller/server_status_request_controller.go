@@ -33,6 +33,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 
 type PluginLister interface {
 	// List returns all PluginIdentifiers for kind.
-	List(kind framework.PluginKind) []framework.PluginIdentifier
+	List(kind common.PluginKind) []framework.PluginIdentifier
 }
 
 // serverStatusRequestReconciler reconciles a ServerStatusRequest object
