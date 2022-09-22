@@ -67,6 +67,7 @@ type DownloadOptions struct {
 	InsecureSkipTLSVerify bool
 	writeOptions          int
 	caCertFile            string
+	targetKind            string
 }
 
 func NewDownloadOptions() *DownloadOptions {
@@ -81,10 +82,16 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "Maximum time to wait to process download request.")
 	flags.BoolVar(&o.InsecureSkipTLSVerify, "insecure-skip-tls-verify", o.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
 	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
-
+	flags.StringVar(&o.targetKind, "target-kind", string(velerov1api.DownloadTargetKindBackupContents), "Input the type of file to download. The available enumeration values are: BackupLog;BackupContents;BackupVolumeSnapshots;BackupItemSnapshots;BackupResourceList;RestoreLog;RestoreResults;CSIBackupVolumeSnapshots;CSIBackupVolumeSnapshotContents.")
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	switch velerov1api.DownloadTargetKind(o.targetKind) {
+	case velerov1api.DownloadTargetKindBackupLog, velerov1api.DownloadTargetKindBackupContents, velerov1api.DownloadTargetKindBackupVolumeSnapshots, velerov1api.DownloadTargetKindBackupItemSnapshots, velerov1api.DownloadTargetKindBackupResourceList:
+	default:
+		return fmt.Errorf("Invalid download target kind: %s. Supported kinds are: BackupLog;BackupContents;BackupVolumeSnapshots;BackupItemSnapshots;BackupResourceList.", o.targetKind)
+	}
+
 	veleroClient, err := f.Client()
 	cmd.CheckError(err)
 
@@ -108,7 +115,14 @@ func (o *DownloadOptions) Complete(args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "error getting current directory")
 		}
-		o.Output = filepath.Join(path, fmt.Sprintf("%s-data.tar.gz", o.Name))
+		switch velerov1api.DownloadTargetKind(o.targetKind) {
+		case velerov1api.DownloadTargetKindBackupContents:
+			o.Output = filepath.Join(path, fmt.Sprintf("%s-data.tar.gz", o.Name))
+		case velerov1api.DownloadTargetKindBackupLog:
+			o.Output = filepath.Join(path, fmt.Sprintf("%s-%s.log", o.Name, o.targetKind))
+		case velerov1api.DownloadTargetKindBackupVolumeSnapshots, velerov1api.DownloadTargetKindBackupItemSnapshots, velerov1api.DownloadTargetKindBackupResourceList:
+			o.Output = filepath.Join(path, fmt.Sprintf("%s-%s.json", o.Name, o.targetKind))
+		}
 	}
 
 	return nil
@@ -124,7 +138,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
+	err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKind(o.targetKind), backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)
