@@ -31,6 +31,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 const restoreProgressCheckInterval = 10 * time.Second
@@ -81,7 +82,7 @@ func NewUploaderProvider(
 		}
 		return NewKopiaUploaderProvider(ctx, credGetter, backupRepo, log)
 	} else {
-		if err := provider.NewResticRepositoryProvider(credGetter.FromFile, nil, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
+		if err := provider.NewResticRepositoryProvider(credGetter.FromFile, filesystem.NewFileSystem(), log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
 			return nil, errors.Wrap(err, "failed to connect repository")
 		}
 		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)

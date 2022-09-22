@@ -43,6 +43,9 @@ type PodVolumeRestoreSpec struct {
 
 	// SnapshotID is the ID of the volume snapshot to be restored.
 	SnapshotID string `json:"snapshotID"`
+
+	// SourceNamespace is the original namespace for namaspace mapping.
+	SourceNamespace string `json:"sourceNamespace"`
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.

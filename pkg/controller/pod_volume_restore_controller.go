@@ -249,8 +249,10 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
+	// need to check backup repository in source namespace rather than in pod namespace
+	// such as in case of namespace mapping issue
 	backupRepo, err := repository.GetBackupRepository(ctx, c.Client, req.Namespace, repository.BackupRepositoryKey{
-		VolumeNamespace: req.Spec.Pod.Namespace,
+		VolumeNamespace: req.Spec.SourceNamespace,
 		BackupLocation:  req.Spec.BackupStorageLocation,
 		RepositoryType:  podvolume.GetPvrRepositoryType(req),
 	})
