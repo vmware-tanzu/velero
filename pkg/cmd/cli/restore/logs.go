@@ -49,6 +49,15 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			restoreName := args[0]
 
+			logFile, err := c.Flags().GetString("log_file")
+			cmd.CheckError(err)
+			var restoreDest = os.Stdout
+			if logFile != "" {
+				restoreDest, err = os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY, 0600)
+				cmd.CheckError(err)
+				defer restoreDest.Close()
+			}
+
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
@@ -70,7 +79,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 					"until the restore has a phase of Completed or Failed and try again.", restoreName)
 			}
 
-			err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
+			err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, restoreDest, timeout, insecureSkipTLSVerify, caCertFile)
 			cmd.CheckError(err)
 		},
 	}
