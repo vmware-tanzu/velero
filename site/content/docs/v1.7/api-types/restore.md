@@ -69,6 +69,9 @@ spec:
   # RestorePVs specifies whether to restore all included PVs
   # from snapshot (via the cloudprovider).
   restorePVs: true
+  # PreserveNodePorts specifies whether to restore old
+  # nodePorts from backup.
+  preserveNodePorts: true
   # ScheduleName is the unique name of the Velero schedule
   # to restore from. If specified, and BackupName is empty, Velero will
   # restore from the most recent successful backup created from this schedule.
