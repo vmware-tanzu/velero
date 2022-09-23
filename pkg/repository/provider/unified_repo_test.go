@@ -250,7 +250,7 @@ func TestGetStorageVariables(t *testing.T) {
 			expectedErr: "invalid storage provider",
 		},
 		{
-			name: "aws, ObjectStorage section not exists in BSL, s3Url exist",
+			name: "aws, ObjectStorage section not exists in BSL, s3Url exist, https",
 			backupLocation: velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/aws",
@@ -258,7 +258,7 @@ func TestGetStorageVariables(t *testing.T) {
 						"bucket":                "fake-bucket",
 						"prefix":                "fake-prefix",
 						"region":                "fake-region/",
-						"s3Url":                 "fake-url",
+						"s3Url":                 "https://fake-url/",
 						"insecureSkipTLSVerify": "true",
 					},
 				},
@@ -270,8 +270,27 @@ func TestGetStorageVariables(t *testing.T) {
 				"region":        "fake-region",
 				"fspath":        "",
 				"endpoint":      "fake-url",
+				"doNotUseTLS":   "false",
 				"skipTLSVerify": "true",
 			},
+		},
+		{
+			name: "aws, ObjectStorage section not exists in BSL, s3Url exist, invalid",
+			backupLocation: velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "velero.io/aws",
+					Config: map[string]string{
+						"bucket":                "fake-bucket",
+						"prefix":                "fake-prefix",
+						"region":                "fake-region/",
+						"s3Url":                 "https://fake-url/fake-path",
+						"insecureSkipTLSVerify": "true",
+					},
+				},
+			},
+			repoBackend: "fake-repo-type",
+			expected:    map[string]string{},
+			expectedErr: "path is not expected in s3Url https://fake-url/fake-path",
 		},
 		{
 			name: "aws, ObjectStorage section not exists in BSL, s3Url not exist",
@@ -295,6 +314,7 @@ func TestGetStorageVariables(t *testing.T) {
 				"region":        "region from bucket: fake-bucket",
 				"fspath":        "",
 				"endpoint":      "s3-region from bucket: fake-bucket.amazonaws.com",
+				"doNotUseTLS":   "false",
 				"skipTLSVerify": "false",
 			},
 		},
@@ -313,7 +333,7 @@ func TestGetStorageVariables(t *testing.T) {
 			expectedErr: "error get s3 bucket region: fake error",
 		},
 		{
-			name: "aws, ObjectStorage section exists in BSL, s3Url exist",
+			name: "aws, ObjectStorage section exists in BSL, s3Url exist, http",
 			backupLocation: velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/aws",
@@ -321,7 +341,7 @@ func TestGetStorageVariables(t *testing.T) {
 						"bucket":                "fake-bucket-config",
 						"prefix":                "fake-prefix-config",
 						"region":                "fake-region",
-						"s3Url":                 "fake-url",
+						"s3Url":                 "http://fake-url/",
 						"insecureSkipTLSVerify": "false",
 					},
 					StorageType: velerov1api.StorageType{
@@ -342,6 +362,7 @@ func TestGetStorageVariables(t *testing.T) {
 				"region":        "fake-region",
 				"fspath":        "",
 				"endpoint":      "fake-url",
+				"doNotUseTLS":   "true",
 				"skipTLSVerify": "false",
 			},
 		},
