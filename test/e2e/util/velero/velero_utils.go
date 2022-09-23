@@ -323,10 +323,10 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 	if backupCfg.UseVolumeSnapshots {
 		args = append(args, "--snapshot-volumes")
 	} else {
-		args = append(args, "--default-volumes-to-restic")
+		args = append(args, "--default-volumes-to-fs-backup")
 		// To workaround https://github.com/vmware-tanzu/velero-plugin-for-vsphere/issues/347 for vsphere plugin v1.1.1
 		// if the "--snapshot-volumes=false" isn't specified explicitly, the vSphere plugin will always take snapshots
-		// for the volumes even though the "--default-volumes-to-restic" is specified
+		// for the volumes even though the "--default-volumes-to-fs-backup" is specified
 		// TODO This can be removed if the logic of vSphere plugin bump up to 1.3
 		args = append(args, "--snapshot-volumes=false")
 	}
@@ -362,7 +362,7 @@ func VeleroBackupExcludeNamespaces(ctx context.Context, veleroCLI string, velero
 	args := []string{
 		"--namespace", veleroNamespace, "create", "backup", backupName,
 		"--exclude-namespaces", namespaces,
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupName, args)
 }
@@ -373,7 +373,7 @@ func VeleroBackupIncludeNamespaces(ctx context.Context, veleroCLI string, velero
 	args := []string{
 		"--namespace", veleroNamespace, "create", "backup", backupName,
 		"--include-namespaces", namespaces,
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 	return VeleroBackupExec(ctx, veleroCLI, veleroNamespace, backupName, args)
 }

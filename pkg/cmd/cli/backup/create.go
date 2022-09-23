@@ -82,23 +82,23 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name                    string
-	TTL                     time.Duration
-	SnapshotVolumes         flag.OptionalBool
-	DefaultVolumesToRestic  flag.OptionalBool
-	IncludeNamespaces       flag.StringArray
-	ExcludeNamespaces       flag.StringArray
-	IncludeResources        flag.StringArray
-	ExcludeResources        flag.StringArray
-	Labels                  flag.Map
-	Selector                flag.LabelSelector
-	IncludeClusterResources flag.OptionalBool
-	Wait                    bool
-	StorageLocation         string
-	SnapshotLocations       []string
-	FromSchedule            string
-	OrderedResources        string
-	CSISnapshotTimeout      time.Duration
+	Name                     string
+	TTL                      time.Duration
+	SnapshotVolumes          flag.OptionalBool
+	DefaultVolumesToFsBackup flag.OptionalBool
+	IncludeNamespaces        flag.StringArray
+	ExcludeNamespaces        flag.StringArray
+	IncludeResources         flag.StringArray
+	ExcludeResources         flag.StringArray
+	Labels                   flag.Map
+	Selector                 flag.LabelSelector
+	IncludeClusterResources  flag.OptionalBool
+	Wait                     bool
+	StorageLocation          string
+	SnapshotLocations        []string
+	FromSchedule             string
+	OrderedResources         string
+	CSISnapshotTimeout       time.Duration
 
 	client veleroclient.Interface
 }
@@ -132,7 +132,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup")
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.DefaultVolumesToRestic, "default-volumes-to-restic", "", "Use restic by default to backup all pod volumes")
+	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
 	f.NoOptDefVal = "true"
 }
 
@@ -350,8 +350,8 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		if o.IncludeClusterResources.Value != nil {
 			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
 		}
-		if o.DefaultVolumesToRestic.Value != nil {
-			backupBuilder.DefaultVolumesToRestic(*o.DefaultVolumesToRestic.Value)
+		if o.DefaultVolumesToFsBackup.Value != nil {
+			backupBuilder.DefaultVolumesToFsBackup(*o.DefaultVolumesToFsBackup.Value)
 		}
 	}
 
