@@ -68,7 +68,7 @@ func TestStart(t *testing.T) {
 	require.Equal(t, 0, queue.Len())
 }
 
-func TestFilter(t *testing.T) {
+func TestPredicate(t *testing.T) {
 	require.Nil(t, velerov1.AddToScheme(scheme.Scheme))
 
 	ctx, cancelFunc := context.WithCancel(context.TODO())
@@ -79,15 +79,13 @@ func TestFilter(t *testing.T) {
 		client,
 		&velerov1.BackupStorageLocationList{},
 		1*time.Second,
-		PeriodicalEnqueueSourceOption{
-			FilterFuncs: []func(object crclient.Object) bool{func(object crclient.Object) bool {
-				location := object.(*velerov1.BackupStorageLocation)
-				return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, 1*time.Minute, logrus.WithContext(ctx).WithField("BackupStorageLocation", location.Name))
-			}},
-		},
+		PeriodicalEnqueueSourceOption{},
 	)
 
-	require.Nil(t, source.Start(ctx, nil, queue))
+	require.Nil(t, source.Start(ctx, nil, queue, NewGenericEventPredicate(func(object crclient.Object) bool {
+		location := object.(*velerov1.BackupStorageLocation)
+		return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, 1*time.Minute, logrus.WithContext(ctx).WithField("BackupStorageLocation", location.Name))
+	})))
 
 	// Should not patch a backup storage location object status phase
 	// if the location's validation frequency is specifically set to zero

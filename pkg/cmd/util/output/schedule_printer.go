@@ -36,6 +36,7 @@ var (
 		{Name: "Backup TTL"},
 		{Name: "Last Backup"},
 		{Name: "Selector"},
+		{Name: "Paused"},
 	}
 )
 
@@ -71,6 +72,7 @@ func printSchedule(schedule *v1.Schedule) []metav1.TableRow {
 		schedule.Spec.Template.TTL.Duration,
 		humanReadableTimeFromNow(lastBackupTime),
 		metav1.FormatLabelSelector(schedule.Spec.Template.LabelSelector),
+		schedule.Spec.Paused,
 	)
 
 	return []metav1.TableRow{row}

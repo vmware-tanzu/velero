@@ -30,19 +30,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
@@ -285,33 +283,18 @@ func (b *backupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		backupSyncReconcilePeriod,
 		kube.PeriodicalEnqueueSourceOption{
 			OrderFunc: backupSyncSourceOrderFunc,
-			FilterFuncs: []func(object client.Object) bool{
-				func(object client.Object) bool {
-					location := object.(*velerov1api.BackupStorageLocation)
-					return b.locationFilterFunc(location)
-				},
-			},
 		},
 	)
 
+	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
+		location := object.(*velerov1api.BackupStorageLocation)
+		return b.locationFilterFunc(location)
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&velerov1api.BackupStorageLocation{}).
 		// Filter all BSL events, because this controller is supposed to run periodically, not by event.
-		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(ce event.CreateEvent) bool {
-				return false
-			},
-			UpdateFunc: func(ue event.UpdateEvent) bool {
-				return false
-			},
-			DeleteFunc: func(de event.DeleteEvent) bool {
-				return false
-			},
-			GenericFunc: func(ge event.GenericEvent) bool {
-				return false
-			},
-		}).
-		Watches(backupSyncSource, nil).
+		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.FalsePredicate{})).
+		Watches(backupSyncSource, nil, builder.WithPredicates(gp)).
 		Complete(b)
 }
 
