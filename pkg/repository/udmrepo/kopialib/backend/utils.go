@@ -39,12 +39,14 @@ func optionalHaveString(key string, flags map[string]string) string {
 
 func optionalHaveBool(ctx context.Context, key string, flags map[string]string) bool {
 	if value, exist := flags[key]; exist {
-		ret, err := strconv.ParseBool(value)
-		if err == nil {
-			return ret
-		}
+		if value != "" {
+			ret, err := strconv.ParseBool(value)
+			if err == nil {
+				return ret
+			}
 
-		backendLog()(ctx).Errorf("Ignore %s, value [%s] is invalid, err %v", key, value, err)
+			backendLog()(ctx).Errorf("Ignore %s, value [%s] is invalid, err %v", key, value, err)
+		}
 	}
 
 	return false
