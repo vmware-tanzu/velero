@@ -28,9 +28,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
-var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}
+var _ riav1.RestoreItemAction = &RestoreItemActionGRPCClient{}
 
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
 func NewRestoreItemActionPlugin(options ...common.PluginOption) *RestoreItemActionPlugin {
@@ -72,7 +73,7 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, erro
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (c *RestoreItemActionGRPCClient) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -119,7 +120,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 		additionalItems = append(additionalItems, newItem)
 	}
 
-	return &velero.RestoreItemActionExecuteOutput{
+	return &riav1.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &updatedItem,
 		AdditionalItems: additionalItems,
 		SkipRestore:     res.SkipRestore,

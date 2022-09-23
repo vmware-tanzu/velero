@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -89,7 +90,7 @@ func TestAddPVFromPVCActionExecute(t *testing.T) {
 
 			action := &AddPVFromPVCAction{logger: velerotest.NewLogger()}
 
-			input := &velero.RestoreItemActionExecuteInput{
+			input := &riav1.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: itemData},
 				ItemFromBackup: &unstructured.Unstructured{Object: itemFromBackupData},
 			}

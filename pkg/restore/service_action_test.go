@@ -29,7 +29,7 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -377,7 +377,7 @@ func TestServiceActionExecute(t *testing.T) {
 			unstructuredSvc, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
+			res, err := action.Execute(&riav1.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: unstructuredSvc},
 				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredSvc},
 				Restore:        test.restore,

@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package v1
+package restartabletest
 
 import (
 	"reflect"
@@ -28,56 +28,56 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
-type mockRestartableProcess struct {
+type MockRestartableProcess struct {
 	mock.Mock
 }
 
-func (rp *mockRestartableProcess) AddReinitializer(key process.KindAndName, r process.Reinitializer) {
+func (rp *MockRestartableProcess) AddReinitializer(key process.KindAndName, r process.Reinitializer) {
 	rp.Called(key, r)
 }
 
-func (rp *mockRestartableProcess) Reset() error {
+func (rp *MockRestartableProcess) Reset() error {
 	args := rp.Called()
 	return args.Error(0)
 }
 
-func (rp *mockRestartableProcess) ResetIfNeeded() error {
+func (rp *MockRestartableProcess) ResetIfNeeded() error {
 	args := rp.Called()
 	return args.Error(0)
 }
 
-func (rp *mockRestartableProcess) GetByKindAndName(key process.KindAndName) (interface{}, error) {
+func (rp *MockRestartableProcess) GetByKindAndName(key process.KindAndName) (interface{}, error) {
 	args := rp.Called(key)
 	return args.Get(0), args.Error(1)
 }
 
-func (rp *mockRestartableProcess) Stop() {
+func (rp *MockRestartableProcess) Stop() {
 	rp.Called()
 }
 
-type restartableDelegateTest struct {
-	function                string
-	inputs                  []interface{}
-	expectedErrorOutputs    []interface{}
-	expectedDelegateOutputs []interface{}
+type RestartableDelegateTest struct {
+	Function                string
+	Inputs                  []interface{}
+	ExpectedErrorOutputs    []interface{}
+	ExpectedDelegateOutputs []interface{}
 }
 
-type mockable interface {
+type Mockable interface {
 	Test(t mock.TestingT)
 	On(method string, args ...interface{}) *mock.Call
 	AssertExpectations(t mock.TestingT) bool
 }
 
-func runRestartableDelegateTests(
+func RunRestartableDelegateTests(
 	t *testing.T,
 	kind common.PluginKind,
 	newRestartable func(key process.KindAndName, p process.RestartableProcess) interface{},
-	newMock func() mockable,
-	tests ...restartableDelegateTest,
+	newMock func() Mockable,
+	tests ...RestartableDelegateTest,
 ) {
 	for _, tc := range tests {
-		t.Run(tc.function, func(t *testing.T) {
-			p := new(mockRestartableProcess)
+		t.Run(tc.Function, func(t *testing.T) {
+			p := new(MockRestartableProcess)
 			p.Test(t)
 			defer p.AssertExpectations(t)
 
@@ -88,19 +88,19 @@ func runRestartableDelegateTests(
 			r := newRestartable(key, p)
 
 			// Get the method we're going to call using reflection
-			method := reflect.ValueOf(r).MethodByName(tc.function)
+			method := reflect.ValueOf(r).MethodByName(tc.Function)
 			require.NotEmpty(t, method)
 
 			// Convert the test case inputs ([]interface{}) to []reflect.Value
 			var inputValues []reflect.Value
-			for i := range tc.inputs {
-				inputValues = append(inputValues, reflect.ValueOf(tc.inputs[i]))
+			for i := range tc.Inputs {
+				inputValues = append(inputValues, reflect.ValueOf(tc.Inputs[i]))
 			}
 
 			// Invoke the method being tested
 			actual := method.Call(inputValues)
 
-			// This function asserts that the actual outputs match the expected outputs
+			// This Function asserts that the actual outputs match the expected outputs
 			checkOutputs := func(expected []interface{}, actual []reflect.Value) {
 				require.Equal(t, len(expected), len(actual))
 
@@ -118,7 +118,7 @@ func runRestartableDelegateTests(
 						continue
 					}
 
-					// If function returns nil as struct return type, we cannot just
+					// If Function returns nil as struct return type, we cannot just
 					// compare the interface to nil as its type will not be nil,
 					// only the value will be
 					if expected[i] == nil && reflect.ValueOf(a).Kind() == reflect.Ptr {
@@ -132,7 +132,7 @@ func runRestartableDelegateTests(
 			}
 
 			// Make sure we get what we expected when getDelegate returned an error
-			checkOutputs(tc.expectedErrorOutputs, actual)
+			checkOutputs(tc.ExpectedErrorOutputs, actual)
 
 			// Invoke delegate, make sure all returned values are passed through
 			p.On("ResetIfNeeded").Return(nil)
@@ -144,13 +144,13 @@ func runRestartableDelegateTests(
 			p.On("GetByKindAndName", key).Return(delegate, nil)
 
 			// Set up the mocked method in the delegate
-			delegate.On(tc.function, tc.inputs...).Return(tc.expectedDelegateOutputs...)
+			delegate.On(tc.Function, tc.Inputs...).Return(tc.ExpectedDelegateOutputs...)
 
 			// Invoke the method being tested
 			actual = method.Call(inputValues)
 
 			// Make sure we get what we expected when invoking the delegate
-			checkOutputs(tc.expectedDelegateOutputs, actual)
+			checkOutputs(tc.ExpectedDelegateOutputs, actual)
 		})
 	}
 }

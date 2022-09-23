@@ -44,8 +44,8 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -71,15 +71,15 @@ type Backupper interface {
 
 // kubernetesBackupper implements Backupper.
 type kubernetesBackupper struct {
-	backupClient           velerov1client.BackupsGetter
-	dynamicFactory         client.DynamicFactory
-	discoveryHelper        discovery.Helper
-	podCommandExecutor     podexec.PodCommandExecutor
-	resticBackupperFactory podvolume.BackupperFactory
-	resticTimeout          time.Duration
-	defaultVolumesToRestic bool
-	clientPageSize         int
-	uploaderType           string
+	backupClient             velerov1client.BackupsGetter
+	dynamicFactory           client.DynamicFactory
+	discoveryHelper          discovery.Helper
+	podCommandExecutor       podexec.PodCommandExecutor
+	resticBackupperFactory   podvolume.BackupperFactory
+	resticTimeout            time.Duration
+	defaultVolumesToFsBackup bool
+	clientPageSize           int
+	uploaderType             string
 }
 
 func (i *itemKey) String() string {
@@ -104,20 +104,20 @@ func NewKubernetesBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	resticBackupperFactory podvolume.BackupperFactory,
 	resticTimeout time.Duration,
-	defaultVolumesToRestic bool,
+	defaultVolumesToFsBackup bool,
 	clientPageSize int,
 	uploaderType string,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
-		backupClient:           backupClient,
-		discoveryHelper:        discoveryHelper,
-		dynamicFactory:         dynamicFactory,
-		podCommandExecutor:     podCommandExecutor,
-		resticBackupperFactory: resticBackupperFactory,
-		resticTimeout:          resticTimeout,
-		defaultVolumesToRestic: defaultVolumesToRestic,
-		clientPageSize:         clientPageSize,
-		uploaderType:           uploaderType,
+		backupClient:             backupClient,
+		discoveryHelper:          discoveryHelper,
+		dynamicFactory:           dynamicFactory,
+		podCommandExecutor:       podCommandExecutor,
+		resticBackupperFactory:   resticBackupperFactory,
+		resticTimeout:            resticTimeout,
+		defaultVolumesToFsBackup: defaultVolumesToFsBackup,
+		clientPageSize:           clientPageSize,
+		uploaderType:             uploaderType,
 	}, nil
 }
 
@@ -165,7 +165,7 @@ func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelpe
 }
 
 type VolumeSnapshotterGetter interface {
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
@@ -205,7 +205,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	backupRequest.ResourceIncludesExcludes = collections.GetResourceIncludesExcludes(kb.discoveryHelper, backupRequest.Spec.IncludedResources, backupRequest.Spec.ExcludedResources)
 	log.Infof("Including resources: %s", backupRequest.ResourceIncludesExcludes.IncludesString())
 	log.Infof("Excluding resources: %s", backupRequest.ResourceIncludesExcludes.ExcludesString())
-	log.Infof("Backing up all pod volumes using Restic: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToRestic))
+	log.Infof("Backing up all volumes using pod volume backup: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToFsBackup))
 
 	var err error
 	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)

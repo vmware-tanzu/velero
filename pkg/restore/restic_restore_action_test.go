@@ -35,7 +35,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	velerofake "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -278,7 +278,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				unstructuredPodFromBackup = unstructuredPod
 			}
 
-			input := &velero.RestoreItemActionExecuteInput{
+			input := &riav1.RestoreItemActionExecuteInput{
 				Item: &unstructured.Unstructured{
 					Object: unstructuredPod,
 				},

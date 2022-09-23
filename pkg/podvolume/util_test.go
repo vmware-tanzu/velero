@@ -348,16 +348,16 @@ func TestGetVolumesToBackup(t *testing.T) {
 	}
 }
 
-func TestGetPodVolumesUsingRestic(t *testing.T) {
+func TestGetVolumesByPod(t *testing.T) {
 	testCases := []struct {
-		name                   string
-		pod                    *corev1api.Pod
-		expected               []string
-		defaultVolumesToRestic bool
+		name                     string
+		pod                      *corev1api.Pod
+		expected                 []string
+		defaultVolumesToFsBackup bool
 	}{
 		{
-			name:                   "should get PVs from VolumesToBackupAnnotation when defaultVolumesToRestic is false",
-			defaultVolumesToRestic: false,
+			name:                     "should get PVs from VolumesToBackupAnnotation when defaultVolumesToFsBackup is false",
+			defaultVolumesToFsBackup: false,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -368,8 +368,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should get all pod volumes when defaultVolumesToRestic is true and no PVs are excluded",
-			defaultVolumesToRestic: true,
+			name:                     "should get all pod volumes when defaultVolumesToFsBackup is true and no PVs are excluded",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
@@ -381,8 +381,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should get all pod volumes except ones excluded when defaultVolumesToRestic is true",
-			defaultVolumesToRestic: true,
+			name:                     "should get all pod volumes except ones excluded when defaultVolumesToFsBackup is true",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -401,8 +401,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should exclude default service account token from restic backup",
-			defaultVolumesToRestic: true,
+			name:                     "should exclude default service account token from restic backup",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
@@ -416,8 +416,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should exclude host path volumes from restic backups",
-			defaultVolumesToRestic: true,
+			name:                     "should exclude host path volumes from restic backups",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -438,8 +438,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should exclude volumes mounting secrets",
-			defaultVolumesToRestic: true,
+			name:                     "should exclude volumes mounting secrets",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -460,8 +460,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should exclude volumes mounting config maps",
-			defaultVolumesToRestic: true,
+			name:                     "should exclude volumes mounting config maps",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -482,8 +482,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should exclude projected volumes",
-			defaultVolumesToRestic: true,
+			name:                     "should exclude projected volumes",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -517,8 +517,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:                   "should exclude DownwardAPI volumes",
-			defaultVolumesToRestic: true,
+			name:                     "should exclude DownwardAPI volumes",
+			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -553,7 +553,7 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := GetPodVolumesUsingRestic(tc.pod, tc.defaultVolumesToRestic)
+			actual := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup)
 
 			sort.Strings(tc.expected)
 			sort.Strings(actual)

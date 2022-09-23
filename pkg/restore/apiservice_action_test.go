@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -40,7 +40,7 @@ func TestAPIServiceActionExecuteSkipsRestore(t *testing.T) {
 	require.NoError(t, err)
 
 	action := NewAPIServiceAction(velerotest.NewLogger())
-	res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
+	res, err := action.Execute(&riav1.RestoreItemActionExecuteInput{
 		Item:           &unstructured.Unstructured{Object: unstructuredAPIService},
 		ItemFromBackup: &unstructured.Unstructured{Object: unstructuredAPIService},
 	})

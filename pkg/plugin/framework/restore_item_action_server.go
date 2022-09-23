@@ -27,6 +27,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // RestoreItemActionGRPCServer implements the proto-generated RestoreItemActionServer interface, and accepts
@@ -35,13 +36,13 @@ type RestoreItemActionGRPCServer struct {
 	mux *common.ServerMux
 }
 
-func (s *RestoreItemActionGRPCServer) getImpl(name string) (velero.RestoreItemAction, error) {
+func (s *RestoreItemActionGRPCServer) getImpl(name string) (riav1.RestoreItemAction, error) {
 	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.RestoreItemAction)
+	itemAction, ok := impl.(riav1.RestoreItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a restore item action", impl)
 	}
@@ -107,7 +108,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
-	executeOutput, err := impl.Execute(&velero.RestoreItemActionExecuteInput{
+	executeOutput, err := impl.Execute(&riav1.RestoreItemActionExecuteInput{
 		Item:           &item,
 		ItemFromBackup: &itemFromBackup,
 		Restore:        &restoreObj,

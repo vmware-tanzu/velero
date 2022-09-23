@@ -38,6 +38,10 @@ type ScheduleSpec struct {
 	// +optional
 	// +nullable
 	UseOwnerReferencesInBackup *bool `json:"useOwnerReferencesInBackup,omitempty"`
+
+	// Paused specifies whether the schedule is paused or not
+	// +optional
+	Paused bool `json:"paused,omitempty"`
 }
 
 // SchedulePhase is a string representation of the lifecycle phase
@@ -87,6 +91,7 @@ type ScheduleStatus struct {
 // +kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description="A Cron expression defining when to run the Backup"
 // +kubebuilder:printcolumn:name="LastBackup",type="date",JSONPath=".status.lastBackup",description="The last time a Backup was run for this schedule"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Paused",type="boolean",JSONPath=".spec.paused"
 
 // Schedule is a Velero resource that represents a pre-scheduled or
 // periodic Backup that should be run.

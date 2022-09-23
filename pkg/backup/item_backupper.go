@@ -41,7 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -58,7 +58,7 @@ type itemBackupper struct {
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 
 	itemHookHandler                    hook.ItemHookHandler
-	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
+	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
 }
 
 const (
@@ -146,10 +146,10 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 			// nil it on error since it's not valid
 			pod = nil
 		} else {
-			// Get the list of volumes to back up using restic from the pod's annotations. Remove from this list
+			// Get the list of volumes to back up using pod volume backup from the pod's annotations. Remove from this list
 			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			for _, volume := range podvolume.GetPodVolumesUsingRestic(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToRestic)) {
+			for _, volume := range podvolume.GetVolumesByPod(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup)) {
 				if found, pvcName := ib.resticSnapshotTracker.HasPVCForPodVolume(pod, volume); found {
 					log.WithFields(map[string]interface{}{
 						"podVolume": volume,
@@ -357,7 +357,7 @@ func (ib *itemBackupper) executeActions(
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
+func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (vsv1.VolumeSnapshotter, error) {
 	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -372,7 +372,7 @@ func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeS
 	}
 
 	if ib.snapshotLocationVolumeSnapshotters == nil {
-		ib.snapshotLocationVolumeSnapshotters = make(map[string]velero.VolumeSnapshotter)
+		ib.snapshotLocationVolumeSnapshotters = make(map[string]vsv1.VolumeSnapshotter)
 	}
 	ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name] = bs
 
@@ -447,7 +447,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 	var (
 		volumeID, location string
-		volumeSnapshotter  velero.VolumeSnapshotter
+		volumeSnapshotter  vsv1.VolumeSnapshotter
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {

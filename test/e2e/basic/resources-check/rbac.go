@@ -71,7 +71,7 @@ func (r *RBACCase) Init() error {
 	r.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--include-namespaces", strings.Join(*r.NSIncluded, ","),
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	r.RestoreArgs = []string{

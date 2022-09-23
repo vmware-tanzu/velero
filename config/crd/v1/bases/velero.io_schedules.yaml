@@ -32,6 +32,9 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - jsonPath: .spec.paused
+      name: Paused
+      type: boolean
     name: v1
     schema:
       openAPIV3Schema:
@@ -53,6 +56,9 @@ spec:
           spec:
             description: ScheduleSpec defines the specification for a Velero schedule
             properties:
+              paused:
+                description: Paused specifies whether the schedule is paused or not
+                type: boolean
               schedule:
                 description: Schedule is a Cron expression defining when to run the
                   Backup.
@@ -66,9 +72,17 @@ spec:
                       for CSI VolumeSnapshot status turns to ReadyToUse during creation,
                       before returning error as timeout. The default value is 10 minute.
                     type: string
+                  defaultVolumesToFsBackup:
+                    description: DefaultVolumesToFsBackup specifies whether pod volume
+                      file system backup should be used for all volumes by default.
+                    nullable: true
+                    type: boolean
                   defaultVolumesToRestic:
-                    description: DefaultVolumesToRestic specifies whether restic should
-                      be used to take a backup of all pod volumes by default.
+                    description: "DefaultVolumesToRestic specifies whether restic
+                      should be used to take a backup of all pod volumes by default.
+                      \n Deprecated: this field is no longer used and will be removed
+                      entirely in future. Use DefaultVolumesToFsBackup instead."
+                    nullable: true
                     type: boolean
                   excludedNamespaces:
                     description: ExcludedNamespaces contains a list of namespaces

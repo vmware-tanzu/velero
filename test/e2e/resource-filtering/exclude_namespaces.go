@@ -83,7 +83,7 @@ func (e *ExcludeNamespaces) Init() error {
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--exclude-namespaces", strings.Join(*e.nsExcluded, ","),
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
-			"--default-volumes-to-restic", "--wait",
+			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		e.RestoreArgs = []string{
@@ -96,7 +96,7 @@ func (e *ExcludeNamespaces) Init() error {
 		e.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
-			"--default-volumes-to-restic", "--wait",
+			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		e.RestoreArgs = []string{

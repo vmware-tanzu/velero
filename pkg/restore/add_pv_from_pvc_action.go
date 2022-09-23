@@ -24,6 +24,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 type AddPVFromPVCAction struct {
@@ -40,7 +41,7 @@ func (a *AddPVFromPVCAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *AddPVFromPVCAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *AddPVFromPVCAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing AddPVFromPVCAction")
 
 	// use input.ItemFromBackup because we need to look at status fields, which have already been
@@ -53,7 +54,7 @@ func (a *AddPVFromPVCAction) Execute(input *velero.RestoreItemActionExecuteInput
 	// TODO: consolidate this logic in a helper function to share with backup_pv_action.go
 	if pvc.Status.Phase != corev1api.ClaimBound || pvc.Spec.VolumeName == "" {
 		a.logger.Info("PVC is not bound or its volume name is empty")
-		return &velero.RestoreItemActionExecuteOutput{
+		return &riav1.RestoreItemActionExecuteOutput{
 			UpdatedItem: input.Item,
 		}, nil
 	}
@@ -64,7 +65,7 @@ func (a *AddPVFromPVCAction) Execute(input *velero.RestoreItemActionExecuteInput
 	}
 
 	a.logger.Infof("Adding PV %s as an additional item to restore", pvc.Spec.VolumeName)
-	return &velero.RestoreItemActionExecuteOutput{
+	return &riav1.RestoreItemActionExecuteOutput{
 		UpdatedItem:     input.Item,
 		AdditionalItems: []velero.ResourceIdentifier{pv},
 	}, nil

@@ -65,7 +65,7 @@ func (e *ExcludeFromBackup) Init() error {
 	e.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 		"--include-namespaces", e.NSBaseName,
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	e.RestoreArgs = []string{

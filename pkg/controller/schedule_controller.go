@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	bld "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -67,7 +68,16 @@ func NewScheduleReconciler(
 func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&velerov1.Schedule{}).
+		// global predicate, works for both For and Watch
+		WithEventFilter(kube.NewAllEventPredicate(func(obj client.Object) bool {
+			schedule := obj.(*velerov1.Schedule)
+			if pause := schedule.Spec.Paused; pause {
+				c.logger.Infof("schedule %s is paused, skip", schedule.Name)
+				return false
+			}
+			return true
+		})).
+		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{})).
 		Watches(s, nil).
 		Complete(c)
 }
@@ -87,13 +97,6 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, errors.Wrapf(err, "error getting schedule %s", req.String())
-	}
-
-	if schedule.Status.Phase != "" &&
-		schedule.Status.Phase != velerov1.SchedulePhaseNew &&
-		schedule.Status.Phase != velerov1.SchedulePhaseEnabled {
-		log.Debugf("the schedule phase is %s, isn't %s or %s, skip", schedule.Status.Phase, velerov1.SchedulePhaseNew, velerov1.SchedulePhaseEnabled)
-		return ctrl.Result{}, nil
 	}
 
 	c.metrics.InitSchedule(schedule.Name)
@@ -124,7 +127,8 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// check for the schedule being due to run, and submit a Backup if so
+	// check for the schedule being due to run, and submit a Backup if so.
+	// As the schedule must be validated before checking whether it's due, we cannot put the checking log in Predicate
 	if err := c.submitBackupIfDue(ctx, schedule, cronSchedule); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error running submitBackupIfDue for schedule %s", req.String())
 	}

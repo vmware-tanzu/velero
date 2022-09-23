@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 type JobAction struct {
@@ -40,7 +41,7 @@ func (a *JobAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (a *JobAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
 	job := new(batchv1api.Job)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), job); err != nil {
 		return nil, errors.WithStack(err)
@@ -56,5 +57,5 @@ func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 		return nil, errors.WithStack(err)
 	}
 
-	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

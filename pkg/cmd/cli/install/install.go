@@ -43,40 +43,40 @@ import (
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace                         string
-	Image                             string
-	BucketName                        string
-	Prefix                            string
-	ProviderName                      string
-	PodAnnotations                    flag.Map
-	PodLabels                         flag.Map
-	ServiceAccountAnnotations         flag.Map
-	VeleroPodCPURequest               string
-	VeleroPodMemRequest               string
-	VeleroPodCPULimit                 string
-	VeleroPodMemLimit                 string
-	ResticPodCPURequest               string
-	ResticPodMemRequest               string
-	ResticPodCPULimit                 string
-	ResticPodMemLimit                 string
-	RestoreOnly                       bool
-	SecretFile                        string
-	NoSecret                          bool
-	DryRun                            bool
-	BackupStorageConfig               flag.Map
-	VolumeSnapshotConfig              flag.Map
-	UseRestic                         bool
-	Wait                              bool
-	UseVolumeSnapshots                bool
-	DefaultResticMaintenanceFrequency time.Duration
-	GarbageCollectionFrequency        time.Duration
-	Plugins                           flag.StringArray
-	NoDefaultBackupLocation           bool
-	CRDsOnly                          bool
-	CACertFile                        string
-	Features                          string
-	DefaultVolumesToRestic            bool
-	UploaderType                      string
+	Namespace                       string
+	Image                           string
+	BucketName                      string
+	Prefix                          string
+	ProviderName                    string
+	PodAnnotations                  flag.Map
+	PodLabels                       flag.Map
+	ServiceAccountAnnotations       flag.Map
+	VeleroPodCPURequest             string
+	VeleroPodMemRequest             string
+	VeleroPodCPULimit               string
+	VeleroPodMemLimit               string
+	ResticPodCPURequest             string
+	ResticPodMemRequest             string
+	ResticPodCPULimit               string
+	ResticPodMemLimit               string
+	RestoreOnly                     bool
+	SecretFile                      string
+	NoSecret                        bool
+	DryRun                          bool
+	BackupStorageConfig             flag.Map
+	VolumeSnapshotConfig            flag.Map
+	UseRestic                       bool
+	Wait                            bool
+	UseVolumeSnapshots              bool
+	DefaultRepoMaintenanceFrequency time.Duration
+	GarbageCollectionFrequency      time.Duration
+	Plugins                         flag.StringArray
+	NoDefaultBackupLocation         bool
+	CRDsOnly                        bool
+	CACertFile                      string
+	Features                        string
+	DefaultVolumesToFsBackup        bool
+	UploaderType                    string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -106,13 +106,13 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "Generate resources, but don't send them to the cluster. Use with -o. Optional.")
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "Create restic daemonset. Optional.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
-	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "How often 'restic prune' is run for restic repositories by default. Optional.")
+	flags.DurationVar(&o.DefaultRepoMaintenanceFrequency, "default-repo-maintain-frequency", o.DefaultRepoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default. Optional.")
 	flags.DurationVar(&o.GarbageCollectionFrequency, "garbage-collection-frequency", o.GarbageCollectionFrequency, "How often the garbage collection runs for expired backups.(default 1h)")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "Only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
-	flags.BoolVar(&o.DefaultVolumesToRestic, "default-volumes-to-restic", o.DefaultVolumesToRestic, "Bool flag to configure Velero server to use restic by default to backup all pod volumes on all backups. Optional.")
+	flags.BoolVar(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", o.DefaultVolumesToFsBackup, "Bool flag to configure Velero server to use pod volume file system backup by default for all volumes on all backups. Optional.")
 	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
 }
 
@@ -135,11 +135,11 @@ func NewInstallOptions() *InstallOptions {
 		ResticPodCPULimit:         install.DefaultResticPodCPULimit,
 		ResticPodMemLimit:         install.DefaultResticPodMemLimit,
 		// Default to creating a VSL unless we're told otherwise
-		UseVolumeSnapshots:      true,
-		NoDefaultBackupLocation: false,
-		CRDsOnly:                false,
-		DefaultVolumesToRestic:  false,
-		UploaderType:            uploader.ResticType,
+		UseVolumeSnapshots:       true,
+		NoDefaultBackupLocation:  false,
+		CRDsOnly:                 false,
+		DefaultVolumesToFsBackup: false,
+		UploaderType:             uploader.ResticType,
 	}
 }
 
@@ -177,30 +177,30 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 	}
 
 	return &install.VeleroOptions{
-		Namespace:                         o.Namespace,
-		Image:                             o.Image,
-		ProviderName:                      o.ProviderName,
-		Bucket:                            o.BucketName,
-		Prefix:                            o.Prefix,
-		PodAnnotations:                    o.PodAnnotations.Data(),
-		PodLabels:                         o.PodLabels.Data(),
-		ServiceAccountAnnotations:         o.ServiceAccountAnnotations.Data(),
-		VeleroPodResources:                veleroPodResources,
-		ResticPodResources:                resticPodResources,
-		SecretData:                        secretData,
-		RestoreOnly:                       o.RestoreOnly,
-		UseRestic:                         o.UseRestic,
-		UseVolumeSnapshots:                o.UseVolumeSnapshots,
-		BSLConfig:                         o.BackupStorageConfig.Data(),
-		VSLConfig:                         o.VolumeSnapshotConfig.Data(),
-		DefaultResticMaintenanceFrequency: o.DefaultResticMaintenanceFrequency,
-		GarbageCollectionFrequency:        o.GarbageCollectionFrequency,
-		Plugins:                           o.Plugins,
-		NoDefaultBackupLocation:           o.NoDefaultBackupLocation,
-		CACertData:                        caCertData,
-		Features:                          strings.Split(o.Features, ","),
-		DefaultVolumesToRestic:            o.DefaultVolumesToRestic,
-		UploaderType:                      o.UploaderType,
+		Namespace:                       o.Namespace,
+		Image:                           o.Image,
+		ProviderName:                    o.ProviderName,
+		Bucket:                          o.BucketName,
+		Prefix:                          o.Prefix,
+		PodAnnotations:                  o.PodAnnotations.Data(),
+		PodLabels:                       o.PodLabels.Data(),
+		ServiceAccountAnnotations:       o.ServiceAccountAnnotations.Data(),
+		VeleroPodResources:              veleroPodResources,
+		ResticPodResources:              resticPodResources,
+		SecretData:                      secretData,
+		RestoreOnly:                     o.RestoreOnly,
+		UseRestic:                       o.UseRestic,
+		UseVolumeSnapshots:              o.UseVolumeSnapshots,
+		BSLConfig:                       o.BackupStorageConfig.Data(),
+		VSLConfig:                       o.VolumeSnapshotConfig.Data(),
+		DefaultRepoMaintenanceFrequency: o.DefaultRepoMaintenanceFrequency,
+		GarbageCollectionFrequency:      o.GarbageCollectionFrequency,
+		Plugins:                         o.Plugins,
+		NoDefaultBackupLocation:         o.NoDefaultBackupLocation,
+		CACertData:                      caCertData,
+		Features:                        strings.Split(o.Features, ","),
+		DefaultVolumesToFsBackup:        o.DefaultVolumesToFsBackup,
+		UploaderType:                    o.UploaderType,
 	}, nil
 }
 
@@ -393,8 +393,8 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		}
 	}
 
-	if o.DefaultVolumesToRestic && !o.UseRestic {
-		return errors.New("--use-restic is required when using --default-volumes-to-restic")
+	if o.DefaultVolumesToFsBackup && !o.UseRestic {
+		return errors.New("--use-restic is required when using --default-volumes-to-fs-backup")
 	}
 
 	switch {
@@ -404,8 +404,8 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		return errors.New("Cannot use both --secret-file and --no-secret")
 	}
 
-	if o.DefaultResticMaintenanceFrequency < 0 {
-		return errors.New("--default-restic-prune-frequency must be non-negative")
+	if o.DefaultRepoMaintenanceFrequency < 0 {
+		return errors.New("--default-repo-maintain-frequency must be non-negative")
 	}
 
 	if o.GarbageCollectionFrequency < 0 {

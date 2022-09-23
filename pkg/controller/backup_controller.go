@@ -84,7 +84,7 @@ type backupController struct {
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker             BackupTracker
 	defaultBackupLocation     string
-	defaultVolumesToRestic    bool
+	defaultVolumesToFsBackup  bool
 	defaultBackupTTL          time.Duration
 	defaultCSISnapshotTimeout time.Duration
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
@@ -106,7 +106,7 @@ func NewBackupController(
 	backupTracker BackupTracker,
 	kbClient kbclient.Client,
 	defaultBackupLocation string,
-	defaultVolumesToRestic bool,
+	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
 	defaultCSISnapshotTimeout time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
@@ -128,7 +128,7 @@ func NewBackupController(
 		backupTracker:             backupTracker,
 		kbClient:                  kbClient,
 		defaultBackupLocation:     defaultBackupLocation,
-		defaultVolumesToRestic:    defaultVolumesToRestic,
+		defaultVolumesToFsBackup:  defaultVolumesToFsBackup,
 		defaultBackupTTL:          defaultBackupTTL,
 		defaultCSISnapshotTimeout: defaultCSISnapshotTimeout,
 		snapshotLocationLister:    volumeSnapshotLocationLister,
@@ -249,7 +249,7 @@ func (c *backupController) processBackup(key string) error {
 	}
 
 	log.Debug("Preparing backup request")
-	request := c.prepareBackupRequest(original)
+	request := c.prepareBackupRequest(original, log)
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
@@ -335,7 +335,7 @@ func patchBackup(original, updated *velerov1api.Backup, client velerov1client.Ba
 	return res, nil
 }
 
-func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkgbackup.Request {
+func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
 	request := &pkgbackup.Request{
 		Backup: backup.DeepCopy(), // don't modify items in the cache
 	}
@@ -359,8 +359,15 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// calculate expiration
 	request.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(request.Spec.TTL.Duration)}
 
-	if request.Spec.DefaultVolumesToRestic == nil {
-		request.Spec.DefaultVolumesToRestic = &c.defaultVolumesToRestic
+	// TODO: post v1.10. Remove this code block after DefaultVolumesToRestic is removed from CRD
+	// For now, for CRs created by old versions, we need to respect the DefaultVolumesToRestic value if it is set true
+	if boolptr.IsSetToTrue(request.Spec.DefaultVolumesToRestic) {
+		logger.Warn("DefaultVolumesToRestic field will be deprecated, use DefaultVolumesToFsBackup instead. Automatically remap it to DefaultVolumesToFsBackup")
+		request.Spec.DefaultVolumesToFsBackup = request.Spec.DefaultVolumesToRestic
+	}
+
+	if request.Spec.DefaultVolumesToFsBackup == nil {
+		request.Spec.DefaultVolumesToFsBackup = &c.defaultVolumesToFsBackup
 	}
 
 	// find which storage location to use
