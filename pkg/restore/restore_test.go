@@ -49,6 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
@@ -1876,10 +1877,10 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 }
 
 // volumeSnapshotterGetter is a simple implementation of the VolumeSnapshotterGetter
-// interface that returns velero.VolumeSnapshotters from a map if they exist.
-type volumeSnapshotterGetter map[string]velero.VolumeSnapshotter
+// interface that returns vsv1.VolumeSnapshotters from a map if they exist.
+type volumeSnapshotterGetter map[string]vsv1.VolumeSnapshotter
 
-func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error) {
 	snapshotter, ok := vsg[name]
 	if !ok {
 		return nil, errors.New("volume snapshotter not found")
@@ -1888,7 +1889,7 @@ func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.Vol
 	return snapshotter, nil
 }
 
-// volumeSnapshotter is a test fake for the velero.VolumeSnapshotter interface
+// volumeSnapshotter is a test fake for the vsv1.VolumeSnapshotter interface
 type volumeSnapshotter struct {
 	// a map from snapshotID to volumeID
 	snapshotVolumes map[string]string
@@ -2052,7 +2053,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2101,7 +2102,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2155,7 +2156,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
 				// mappings as a way to verify that the snapshot is not restored, since if it were
 				// restored, we'd get an error of "snapshot not found".
@@ -2207,7 +2208,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
 				// mappings as a way to verify that the snapshot is not restored, since if it were
 				// restored, we'd get an error of "snapshot not found".
@@ -2258,7 +2259,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2319,7 +2320,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2467,7 +2468,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-pvname"},
 					pvName:          map[string]string{"new-pvname": "new-pvname"},
@@ -2539,7 +2540,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 					},
 				},
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
 				// mappings as a way to verify that the snapshot is not restored, since if it were
 				// restored, we'd get an error of "snapshot not found".
@@ -2591,7 +2592,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 					pvName:          map[string]string{"new-volume": "volumesnapshotter-renamed-source-pv"},

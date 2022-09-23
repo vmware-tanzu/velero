@@ -60,6 +60,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -70,7 +71,7 @@ import (
 )
 
 type VolumeSnapshotterGetter interface {
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 }
 
 type Request struct {

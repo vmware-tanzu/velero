@@ -27,11 +27,13 @@ import (
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
+	vsv1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 )
 
 // Manager manages the lifecycles of plugins.
@@ -40,7 +42,7 @@ type Manager interface {
 	GetObjectStore(name string) (velero.ObjectStore, error)
 
 	// GetVolumeSnapshotter returns the VolumeSnapshotter plugin for name.
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 
 	// GetBackupItemActions returns all v1 backup item action plugins.
 	GetBackupItemActions() ([]biav1.BackupItemAction, error)
@@ -161,17 +163,21 @@ func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
 }
 
 // GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.
-func (m *manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+func (m *manager) GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(common.PluginKindVolumeSnapshotter, name)
-	if err != nil {
-		return nil, err
+	for _, adaptedVolumeSnapshotter := range vsv1cli.AdaptedVolumeSnapshotters() {
+		restartableProcess, err := m.getRestartableProcess(adaptedVolumeSnapshotter.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedVolumeSnapshotter.GetRestartable(name, restartableProcess), nil
 	}
-
-	r := NewRestartableVolumeSnapshotter(name, restartableProcess)
-
-	return r, nil
+	return nil, fmt.Errorf("unable to get valid VolumeSnapshotter for %q", name)
 }
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
