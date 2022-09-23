@@ -111,6 +111,7 @@ var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup dele
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
 var _ = Describe("[Backups][TTL] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
 var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
+var _ = Describe("[Backups][Schedule] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
 
 var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
 

@@ -873,6 +873,43 @@ func GetBackupsFromBsl(ctx context.Context, veleroCLI, bslName string) ([]string
 	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
 }
 
+func GetScheduledBackupsCreationTime(ctx context.Context, veleroCLI, bslName, scheduleName string) ([]string, error) {
+	var creationTimes []string
+	backups, err := GetBackupsCreationTime(ctx, veleroCLI, bslName)
+	if err != nil {
+		return nil, err
+	}
+	for _, b := range backups {
+		if strings.Contains(b, scheduleName) {
+			creationTimes = append(creationTimes, b)
+		}
+	}
+	return creationTimes, nil
+}
+func GetBackupsCreationTime(ctx context.Context, veleroCLI, bslName string) ([]string, error) {
+	args1 := []string{"get", "backups"}
+	createdTime := "$1,\",\" $5,$6,$7,$8"
+	if strings.TrimSpace(bslName) != "" {
+		args1 = append(args1, "-l", "velero.io/storage-location="+bslName)
+	}
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  veleroCLI,
+		Args: args1,
+	}
+
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print " + createdTime + "}"},
+	}
+
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "tail",
+		Args: []string{"-n", "+2"},
+	}
+
+	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+}
+
 func GetAllBackups(ctx context.Context, veleroCLI string) ([]string, error) {
 	return GetBackupsFromBsl(ctx, veleroCLI, "")
 }
@@ -978,7 +1015,6 @@ func GetSnapshotCheckPoint(client TestClient, VeleroCfg VerleroConfig, expectCou
 }
 
 func GetBackupTTL(ctx context.Context, veleroNamespace, backupName string) (string, error) {
-
 	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 		"get", "backup", "-n", veleroNamespace, backupName, "-o=jsonpath='{.spec.ttl}'")
 	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -986,15 +1022,8 @@ func GetBackupTTL(ctx context.Context, veleroNamespace, backupName string) (stri
 	if err != nil {
 		fmt.Print(stdout)
 		fmt.Print(stderr)
-		return "", errors.Wrap(err, "failed to verify")
+		return "", errors.Wrap(err, fmt.Sprintf("failed to run command %s", checkSnapshotCmd))
 	}
-	// lines := strings.Split(stdout, "\n")
-	// complete := true
-	// for _, curLine := range lines {
-	// 	fmt.Println(curLine)
-
-	// }
-	// return complete, nil
 	return stdout, err
 }
 
@@ -1021,10 +1050,23 @@ func DeleteBackups(ctx context.Context, client TestClient) error {
 		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
-		fmt.Printf("Backup %s is going to be deleted...", backup.Name)
+		fmt.Printf("Backup %s is going to be deleted...\n", backup.Name)
 		if err := VeleroBackupDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func GetSchedule(ctx context.Context, veleroNamespace, scheduleName string) (string, error) {
+	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
+		"get", "schedule", "-n", veleroNamespace, scheduleName, "-o=jsonpath='{.metadata.creationTimestamp}'")
+	fmt.Printf("Cmd =%v\n", checkSnapshotCmd)
+	stdout, stderr, err := veleroexec.RunCommand(checkSnapshotCmd)
+	if err != nil {
+		fmt.Print(stdout)
+		fmt.Print(stderr)
+		return "", errors.Wrap(err, fmt.Sprintf("failed to run command %s", checkSnapshotCmd))
+	}
+	return stdout, err
 }

@@ -38,7 +38,7 @@ func GetListBy2Pipes(ctx context.Context, cmdline1, cmdline2, cmdline3 OsCommand
 	_ = c2.Wait()
 	_ = c3.Wait()
 
-	fmt.Println(&b2)
+	//fmt.Println(&b2)
 	scanner := bufio.NewScanner(&b2)
 	var ret []string
 	for scanner.Scan() {
