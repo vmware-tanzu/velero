@@ -5,22 +5,22 @@ metadata:
   creationTimestamp: null
   labels:
     component: velero
-  name: restic
+  name: node-agent
   namespace: velero
 spec:
   selector:
     matchLabels:
-      name: restic
+      name: node-agent
   template:
     metadata:
       creationTimestamp: null
       labels:
         component: velero
-        name: restic
+        name: node-agent
     spec:
       containers:
         - args:
-            - restic
+            - node-agent
             - server
           command:
             - /velero
@@ -35,15 +35,15 @@ spec:
                   fieldPath: metadata.namespace
             - name: VELERO_SCRATCH_DIR
               value: /scratch
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /credentials/cloud
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
             - name: AZURE_CREDENTIALS_FILE
               value: /credentials/cloud
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /credentials/cloud
           image: velero/velero:latest
           imagePullPolicy: Always
-          name: restic
+          name: node-agent
           resources: {}
           volumeMounts:
             - mountPath: /host_pods

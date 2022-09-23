@@ -87,7 +87,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 	veleroInstallOptions.UseVolumeSnapshots = useVolumeSnapshots
-	veleroInstallOptions.UseRestic = !useVolumeSnapshots
+	veleroInstallOptions.UseNodeAgent = !useVolumeSnapshots
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
 	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
@@ -171,8 +171,8 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	if len(options.Image) > 0 {
 		args = append(args, "--image", options.Image)
 	}
-	if options.UseRestic {
-		args = append(args, "--use-restic")
+	if options.UseNodeAgent {
+		args = append(args, "--use-node-agent")
 	}
 	if options.UseVolumeSnapshots {
 		args = append(args, "--use-volume-snapshots")
@@ -217,7 +217,7 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 		return err
 	}
 
-	return waitVeleroReady(ctx, namespace, options.UseRestic)
+	return waitVeleroReady(ctx, namespace, options.UseNodeAgent)
 }
 
 func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, resticHelperImage string) error {
@@ -371,7 +371,7 @@ func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
 	return un, err
 }
 
-func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) error {
+func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) error {
 	fmt.Println("Waiting for Velero deployment to be ready.")
 	// when doing upgrade by the "kubectl apply" the command "kubectl wait --for=condition=available deployment/velero -n velero --timeout=600s" returns directly
 	// use "rollout status" instead to avoid this. For more detail information, refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment
@@ -381,25 +381,25 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 		return errors.Wrapf(err, "fail to wait for the velero deployment ready, stdout=%s, stderr=%s", stdout, stderr)
 	}
 
-	if useRestic {
-		fmt.Println("Waiting for Velero restic daemonset to be ready.")
+	if useNodeAgent {
+		fmt.Println("Waiting for node-agent daemonset to be ready.")
 		err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
-			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/restic",
+			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/node-agent",
 				"-o", "json", "-n", namespace))
 			if err != nil {
-				return false, errors.Wrapf(err, "failed to get the restic daemonset, stdout=%s, stderr=%s", stdout, stderr)
+				return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
 			}
-			restic := &apps.DaemonSet{}
-			if err = json.Unmarshal([]byte(stdout), restic); err != nil {
-				return false, errors.Wrapf(err, "failed to unmarshal the restic daemonset")
+			daemonset := &apps.DaemonSet{}
+			if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
+				return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
 			}
-			if restic.Status.DesiredNumberScheduled == restic.Status.NumberAvailable {
+			if daemonset.Status.DesiredNumberScheduled == daemonset.Status.NumberAvailable {
 				return true, nil
 			}
 			return false, nil
 		})
 		if err != nil {
-			return errors.Wrap(err, "fail to wait for the velero restic ready")
+			return errors.Wrap(err, "fail to wait for the node-agent ready")
 		}
 	}
 
