@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/version"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -283,6 +284,117 @@ func TestBackupLocationLabel(t *testing.T) {
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedBackupLocation, res.Labels[velerov1api.StorageLocationLabel])
+		})
+	}
+}
+
+func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
+	var (
+		defaultBackupTTL      = metav1.Duration{Duration: 24 * 30 * time.Hour}
+		defaultBackupLocation = "default-location"
+	)
+
+	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                             string
+		backup                           *velerov1api.Backup
+		backupLocationNameInBackup       string
+		backupLocationInApiServer        *velerov1api.BackupStorageLocation
+		defaultBackupLocationInApiServer *velerov1api.BackupStorageLocation
+		expectedBackupLocation           string
+		expectedSuccess                  bool
+		expectedValidationError          string
+	}{
+		{
+			name:                             "BackupLocation is specified in backup CR'spec and it can be found in ApiServer",
+			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backupLocationNameInBackup:       "test-backup-location",
+			backupLocationInApiServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
+			defaultBackupLocationInApiServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
+			expectedBackupLocation:           "test-backup-location",
+			expectedSuccess:                  true,
+		},
+		{
+			name:                             "BackupLocation is specified in backup CR'spec and it can't be found in ApiServer",
+			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backupLocationNameInBackup:       "test-backup-location",
+			backupLocationInApiServer:        nil,
+			defaultBackupLocationInApiServer: nil,
+			expectedSuccess:                  false,
+			expectedValidationError:          "an existing backup storage location wasn't specified at backup creation time and the default 'test-backup-location' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"test-backup-location\" not found",
+		},
+		{
+			name:                             "Using default BackupLocation and it can be found in ApiServer",
+			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backupLocationNameInBackup:       "",
+			backupLocationInApiServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
+			defaultBackupLocationInApiServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
+			expectedBackupLocation:           defaultBackupLocation,
+			expectedSuccess:                  true,
+		},
+		{
+			name:                             "Using default BackupLocation and it can't be found in ApiServer",
+			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backupLocationNameInBackup:       "",
+			backupLocationInApiServer:        nil,
+			defaultBackupLocationInApiServer: nil,
+			expectedSuccess:                  false,
+			expectedValidationError:          fmt.Sprintf("an existing backup storage location wasn't specified at backup creation time and the server default '%s' doesn't exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"%s\" not found", defaultBackupLocation, defaultBackupLocation),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			var (
+				formatFlag      = logging.FormatText
+				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				apiServer       = velerotest.NewAPIServer(t)
+				sharedInformers = informers.NewSharedInformerFactory(apiServer.VeleroClient, 0)
+			)
+
+			// objects that should init with client
+			objects := make([]runtime.Object, 0)
+			if test.backupLocationInApiServer != nil {
+				objects = append(objects, test.backupLocationInApiServer)
+			}
+			if test.defaultBackupLocationInApiServer != nil {
+				objects = append(objects, test.defaultBackupLocationInApiServer)
+			}
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objects...)
+
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
+			c := &backupController{
+				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
+				defaultBackupLocation:  defaultBackupLocation,
+				kbClient:               fakeClient,
+				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
+				defaultBackupTTL:       defaultBackupTTL.Duration,
+				clock:                  clock.NewFakeClock(now),
+				formatFlag:             formatFlag,
+			}
+
+			test.backup.Spec.StorageLocation = test.backupLocationNameInBackup
+
+			// Run
+			res := c.prepareBackupRequest(test.backup)
+
+			// Assert
+			if test.expectedSuccess {
+				assert.Equal(t, test.expectedBackupLocation, res.Spec.StorageLocation)
+				assert.NotNil(t, res)
+			} else {
+				// in every test case, we only trigger one error at once
+				if len(res.Status.ValidationErrors) > 1 {
+					assert.Fail(t, "multi error found in request")
+				}
+				assert.Equal(t, test.expectedValidationError, res.Status.ValidationErrors[0])
+			}
 		})
 	}
 }
