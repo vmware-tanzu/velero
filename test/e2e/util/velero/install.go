@@ -90,6 +90,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 	veleroInstallOptions.UseRestic = !useVolumeSnapshots
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
+	veleroInstallOptions.UploaderType = veleroCfg.UploaderType
 	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
 	veleroInstallOptions.GarbageCollectionFrequency = GCFrequency
 
@@ -211,6 +212,10 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	}
 	if options.GarbageCollectionFrequency > 0 {
 		args = append(args, fmt.Sprintf("--garbage-collection-frequency=%v", options.GarbageCollectionFrequency))
+	}
+
+	if len(options.UploaderType) > 0 {
+		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
 	}
 
 	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.ResticHelperImage); err != nil {

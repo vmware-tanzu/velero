@@ -95,6 +95,8 @@ DEBUG_E2E_TEST ?= false
 DEFAULT_CLUSTER ?=
 STANDBY_CLUSTER ?=
 
+UPLOADER_TYPE ?=
+
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -137,7 +139,8 @@ run: ginkgo
 		-kibishii-directory=$(KIBISHII_DIRECTORY) \
 		-debug-e2e-test=$(DEBUG_E2E_TEST) \
 		-default-cluster=$(DEFAULT_CLUSTER) \
-		-standby-cluster=$(STANDBY_CLUSTER)
+		-standby-cluster=$(STANDBY_CLUSTER) \
+		-uploader-type=$(UPLOADER_TYPE)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

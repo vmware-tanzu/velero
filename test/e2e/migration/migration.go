@@ -126,6 +126,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					OriginVeleroCfg.VeleroImage = ""
 					OriginVeleroCfg.ResticHelperImage = ""
 					OriginVeleroCfg.Plugins = ""
+					//TODO: Remove this once origin Velero version is 1.10 and upper
+					OriginVeleroCfg.UploaderType = ""
 				}
 				fmt.Println(OriginVeleroCfg)
 				Expect(VeleroInstall(context.Background(), &OriginVeleroCfg, useVolumeSnapshots)).To(Succeed())
@@ -156,11 +158,11 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupStorageClassCfg.BackupName = backupScName
 				BackupStorageClassCfg.IncludeResources = "StorageClass"
 				BackupStorageClassCfg.IncludeClusterResources = true
+
 				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupStorageClassCfg)).ShouldNot(HaveOccurred(), func() string {
-					err = VeleroBackupLogs(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace, backupName)
-					return "Get backup logs"
+					VeleroCfg.VeleroNamespace, BackupStorageClassCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupStorageClassCfg.BackupName, "")
+					return "Fail to backup workload"
 				})
 
 				var BackupCfg BackupConfig
@@ -169,14 +171,11 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 				BackupCfg.BackupLocation = ""
 				BackupCfg.Selector = ""
-				//BackupCfg.ExcludeResources = "tierentitlementbindings,tierentitlements,tiers,capabilities,customresourcedefinitions"
 				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupCfg)).ShouldNot(HaveOccurred(), func() string {
-					err = VeleroBackupLogs(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace, backupName)
-					return "Get backup logs"
+					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
+					return "Fail to backup workload"
 				})
-
 			})
 
 			if useVolumeSnapshots {
