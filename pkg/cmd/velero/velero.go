@@ -23,7 +23,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/debug"
 
