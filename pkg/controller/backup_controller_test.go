@@ -382,7 +382,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			test.backup.Spec.StorageLocation = test.backupLocationNameInBackup
 
 			// Run
-			res := c.prepareBackupRequest(test.backup)
+			res := c.prepareBackupRequest(test.backup, logger)
 
 			// Assert
 			if test.expectedSuccess {
