@@ -46,7 +46,7 @@ type VerleroConfig struct {
 	AdditionalBSLConfig      string
 	AdditionalBSLCredentials string
 	RegistryCredentialFile   string
-	ResticHelperImage        string
+	RestoreHelperImage       string
 	UpgradeFromVeleroVersion string
 	UpgradeFromVeleroCLI     string
 	MigrateFromVeleroVersion string

@@ -45,10 +45,6 @@ const (
 	// should be excluded from restic backup.
 	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
 
-	// InitContainer is the name of the init container added
-	// to workload pods to help with restores.
-	InitContainer = "restic-wait"
-
 	// DefaultVolumesToFsBackup specifies whether pod volume backup should be used, by default, to
 	// take backup of all pod volumes.
 	DefaultVolumesToFsBackup = false

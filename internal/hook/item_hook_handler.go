@@ -36,7 +36,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -121,12 +121,12 @@ func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
 	}
 
 	initContainers := []corev1api.Container{}
-	// If this pod had pod volumes backed up using restic, then we want to the pod volumes restored prior to
+	// If this pod is backed up with data movement, then we want to the pod volumes restored prior to
 	// running the restore hook init containers. This allows the restore hook init containers to prepare the
 	// restored data to be consumed by the application container(s).
-	// So if there is a "restic-wait" init container already on the pod at index 0, we'll preserve that and run
+	// So if there is a "restore-wait" init container already on the pod at index 0, we'll preserve that and run
 	// it before running any other init container.
-	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == podvolume.InitContainer {
+	if len(pod.Spec.InitContainers) > 0 && pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainer {
 		initContainers = append(initContainers, pod.Spec.InitContainers[0])
 		pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
 	}

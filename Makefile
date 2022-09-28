@@ -112,17 +112,17 @@ GOPROXY ?= https://proxy.golang.org
 # If you want to build all containers, see the 'all-containers' rule.
 all:
 	@$(MAKE) build
-	@$(MAKE) build BIN=velero-restic-restore-helper
+	@$(MAKE) build BIN=velero-restore-helper
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
-	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restic-restore-helper
+	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restore-helper
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
 all-containers: container-builder-env
 	@$(MAKE) --no-print-directory container
-	@$(MAKE) --no-print-directory container BIN=velero-restic-restore-helper
+	@$(MAKE) --no-print-directory container BIN=velero-restore-helper
 
 local: build-dirs
 # Add DEBUG=1 to enable debug locally

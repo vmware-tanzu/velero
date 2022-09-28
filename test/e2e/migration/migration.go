@@ -124,7 +124,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				if veleroCLI2Version.VeleroVersion != "self" {
 					fmt.Printf("Using default images address of Velero CLI %s\n", veleroCLI2Version.VeleroVersion)
 					OriginVeleroCfg.VeleroImage = ""
-					OriginVeleroCfg.ResticHelperImage = ""
+					OriginVeleroCfg.RestoreHelperImage = ""
 					OriginVeleroCfg.Plugins = ""
 					//TODO: Remove this once origin Velero version is 1.10 and upper
 					OriginVeleroCfg.UploaderType = ""
