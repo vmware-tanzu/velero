@@ -36,7 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/common"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
@@ -450,8 +449,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 			// No custom resource should have been restored. Expect "no resource found"
 			// error during restore.
 			err := VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup, "")
-
-			if err.Error() != "Unexpected restore phase got PartiallyFailed, expecting Completed" {
+			if !strings.Contains(err.Error(), "Unexpected restore phase got PartiallyFailed, expecting Completed") {
 				return errors.New("expected error but not none")
 			}
 		}
@@ -467,7 +465,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 
 func installCRD(ctx context.Context, yaml string) error {
 	fmt.Printf("Install CRD with %s.\n", yaml)
-	err := KubectlApplyFile(ctx, yaml)
+	err := KubectlApplyByFile(ctx, yaml)
 	return err
 }
 
