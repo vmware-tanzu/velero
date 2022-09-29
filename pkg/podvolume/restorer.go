@@ -152,7 +152,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			}
 		}
 
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repo.Spec.ResticIdentifier, backupInfo.uploaderType, pvc)
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repo.Spec.ResticIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
 
 		if err := errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -181,7 +181,7 @@ ForEachVolume:
 	return errs
 }
 
-func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier, uploaderType string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeRestore {
+func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier, uploaderType, sourceNamespace string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeRestore {
 	pvr := &velerov1api.PodVolumeRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    restore.Namespace,
@@ -213,6 +213,7 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 			BackupStorageLocation: backupLocation,
 			RepoIdentifier:        repoIdentifier,
 			UploaderType:          uploaderType,
+			SourceNamespace:       sourceNamespace,
 		},
 	}
 	if pvc != nil {
