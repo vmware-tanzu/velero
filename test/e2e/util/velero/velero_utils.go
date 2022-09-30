@@ -443,7 +443,7 @@ func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
 	err := cmd.Run()
 	retAll := outBuf.String() + " " + errBuf.String()
 	if strings.Contains(strings.ToLower(retAll), "failed") {
-		return errors.New(fmt.Sprintf("velero cmd =%v return with failure\n", cmd))
+		return errors.Wrap(err, fmt.Sprintf("velero cmd =%v return with failure\n", cmd))
 	}
 	if err != nil {
 		return err

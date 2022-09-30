@@ -113,11 +113,9 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					}
 				})
 			}
-
+			OriginVeleroCfg := VeleroCfg
 			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", VeleroCfg.DefaultCluster), func() {
 				Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
-
-				OriginVeleroCfg := VeleroCfg
 				OriginVeleroCfg.MigrateFromVeleroVersion = veleroCLI2Version.VeleroVersion
 				OriginVeleroCfg.VeleroCLI = veleroCLI2Version.VeleroCLI
 				OriginVeleroCfg.ClientToInstallVelero = OriginVeleroCfg.DefaultClient
@@ -158,9 +156,14 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupStorageClassCfg.BackupName = backupScName
 				BackupStorageClassCfg.IncludeResources = "StorageClass"
 				BackupStorageClassCfg.IncludeClusterResources = true
+				//TODO Remove UseRestic parameter once minor version is 1.10 or upper
+				BackupStorageClassCfg.UseRestic = true
+				if veleroCLI2Version.VeleroVersion == "self" {
+					BackupStorageClassCfg.UseRestic = false
+				}
 
-				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupStorageClassCfg)).To(Succeed(), func() string {
+				Expect(VeleroBackupNamespace(context.Background(), OriginVeleroCfg.VeleroCLI,
+					OriginVeleroCfg.VeleroNamespace, BackupStorageClassCfg)).To(Succeed(), func() string {
 					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupStorageClassCfg.BackupName, "")
 					return "Fail to backup workload"
 				})
@@ -171,9 +174,14 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 				BackupCfg.BackupLocation = ""
 				BackupCfg.Selector = ""
-				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
-					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
+				//TODO Remove UseRestic parameter once minor version is 1.10 or upper
+				BackupCfg.UseRestic = true
+				if veleroCLI2Version.VeleroVersion == "self" {
+					BackupCfg.UseRestic = false
+				}
+				Expect(VeleroBackupNamespace(context.Background(), OriginVeleroCfg.VeleroCLI,
+					OriginVeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), OriginVeleroCfg.VeleroCLI, OriginVeleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
 					return "Fail to backup workload"
 				})
 			})

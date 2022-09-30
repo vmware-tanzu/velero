@@ -12,7 +12,6 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/common"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
@@ -46,7 +45,7 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) StartRun() error {
-	err := installStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
+	err := installStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return err
 	}
@@ -57,8 +56,10 @@ func (p *PVBackupFiltering) StartRun() error {
 		"--include-namespaces", strings.Join(*p.NSIncluded, ","),
 		"--snapshot-volumes=false", "--wait",
 	}
+	// "--default-volumes-to-fs-backup" is an overall switch, if it's set, then opt-in
+	//   annotation will be ignored, so it's only set for opt-out test
 	if p.annotation == OPT_OUT_ANN {
-		p.BackupArgs = append(p.BackupArgs, "--default-volumes-to-restic")
+		p.BackupArgs = append(p.BackupArgs, "--default-volumes-to-fs-backup")
 
 	}
 	p.RestoreArgs = []string{
@@ -204,6 +205,6 @@ func fileNotExist(ctx context.Context, namespace, podName, volume string) error 
 
 func installStorageClass(ctx context.Context, yaml string) error {
 	fmt.Printf("Install storage class with %s.\n", yaml)
-	err := KubectlApplyFile(ctx, yaml)
+	err := KubectlApplyByFile(ctx, yaml)
 	return err
 }
