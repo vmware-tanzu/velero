@@ -323,7 +323,7 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 	if backupCfg.UseVolumeSnapshots {
 		args = append(args, "--snapshot-volumes")
 	} else {
-		if backupCfg.UseRestic {
+		if backupCfg.UseResticIfFSBackup {
 			args = append(args, "--default-volumes-to-restic")
 		} else {
 			args = append(args, "--default-volumes-to-fs-backup")
@@ -399,6 +399,7 @@ func VeleroRestoreExec(ctx context.Context, veleroCLI, veleroNamespace, restoreN
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		return err
 	}
+
 	return checkRestorePhase(ctx, veleroCLI, veleroNamespace, restoreName, velerov1api.RestorePhaseCompleted)
 }
 
@@ -436,19 +437,14 @@ func VeleroScheduleCreate(ctx context.Context, veleroCLI string, veleroNamespace
 
 func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
 	cmd := exec.CommandContext(ctx, veleroCLI, args...)
-	var errBuf, outBuf bytes.Buffer
-	cmd.Stderr = io.MultiWriter(os.Stderr, &errBuf)
-	cmd.Stdout = io.MultiWriter(os.Stdout, &outBuf)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	fmt.Printf("velero cmd =%v\n", cmd)
 	err := cmd.Run()
-	retAll := outBuf.String() + " " + errBuf.String()
-	if strings.Contains(strings.ToLower(retAll), "failed") {
-		return errors.Wrap(err, fmt.Sprintf("velero cmd =%v return with failure\n", cmd))
+	if strings.Contains(fmt.Sprint(cmd.Stdout), "Failed") {
+		return errors.New(fmt.Sprintf("velero cmd =%v return with failure\n", cmd))
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string) error {
@@ -509,6 +505,16 @@ func VeleroCreateBackupLocation(ctx context.Context,
 		args = append(args, "--credential", fmt.Sprintf("%s=%s", secretName, secretKey))
 	}
 	return VeleroCmdExec(ctx, veleroCLI, args)
+}
+
+func VeleroVersion(ctx context.Context, veleroCLI, veleroNamespace string) error {
+	args := []string{
+		"version", "--namespace", veleroNamespace,
+	}
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+	return nil
 }
 
 func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, providerPlugins, feature string) ([]string, error) {
@@ -788,12 +794,11 @@ func GetBackup(ctx context.Context, veleroCLI string, backupName string) (string
 func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bool, error) {
 	out, outerr, err := GetBackup(ctx, veleroCLI, backupName)
 	if err != nil {
-		if err != nil {
-			if strings.Contains(outerr, "not found") {
-				return false, nil
-			}
-			return false, err
+		if strings.Contains(outerr, "not found") {
+			fmt.Printf("Backup CR %s was not found\n", backupName)
+			return false, nil
 		}
+		return false, err
 	}
 	fmt.Printf("Backup <%s> exist locally according to output \n[%s]\n", backupName, out)
 	return true, nil
@@ -807,6 +812,7 @@ func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string,
 			if exist {
 				return false, nil
 			} else {
+				fmt.Printf("Backup %s does not exist\n", backupName)
 				return true, nil
 			}
 		}

@@ -364,10 +364,10 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	snapshotCountFound := 0
 	backupNameInSnapshot := ""
 	if err != nil {
-		errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
+		return errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
 	}
 	if result.Value == nil {
-		errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
+		return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
 	}
 	for _, v := range *result.Value {
 		if snapshotCheck.EnableCSI {

@@ -43,29 +43,31 @@ import (
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace                       string
-	Image                           string
-	BucketName                      string
-	Prefix                          string
-	ProviderName                    string
-	PodAnnotations                  flag.Map
-	PodLabels                       flag.Map
-	ServiceAccountAnnotations       flag.Map
-	VeleroPodCPURequest             string
-	VeleroPodMemRequest             string
-	VeleroPodCPULimit               string
-	VeleroPodMemLimit               string
-	NodeAgentPodCPURequest          string
-	NodeAgentPodMemRequest          string
-	NodeAgentPodCPULimit            string
-	NodeAgentPodMemLimit            string
-	RestoreOnly                     bool
-	SecretFile                      string
-	NoSecret                        bool
-	DryRun                          bool
-	BackupStorageConfig             flag.Map
-	VolumeSnapshotConfig            flag.Map
-	UseNodeAgent                    bool
+	Namespace                 string
+	Image                     string
+	BucketName                string
+	Prefix                    string
+	ProviderName              string
+	PodAnnotations            flag.Map
+	PodLabels                 flag.Map
+	ServiceAccountAnnotations flag.Map
+	VeleroPodCPURequest       string
+	VeleroPodMemRequest       string
+	VeleroPodCPULimit         string
+	VeleroPodMemLimit         string
+	NodeAgentPodCPURequest    string
+	NodeAgentPodMemRequest    string
+	NodeAgentPodCPULimit      string
+	NodeAgentPodMemLimit      string
+	RestoreOnly               bool
+	SecretFile                string
+	NoSecret                  bool
+	DryRun                    bool
+	BackupStorageConfig       flag.Map
+	VolumeSnapshotConfig      flag.Map
+	UseNodeAgent              bool
+	//TODO remove UseRestic when migration test out of using it
+	UseRestic                       bool
 	Wait                            bool
 	UseVolumeSnapshots              bool
 	DefaultRepoMaintenanceFrequency time.Duration

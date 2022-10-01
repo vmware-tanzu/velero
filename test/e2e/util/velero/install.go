@@ -87,7 +87,10 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 	veleroInstallOptions.UseVolumeSnapshots = useVolumeSnapshots
-	veleroInstallOptions.UseNodeAgent = !useVolumeSnapshots
+	if !veleroCfg.UseRestic {
+		veleroInstallOptions.UseNodeAgent = !useVolumeSnapshots
+	}
+	veleroInstallOptions.UseRestic = veleroCfg.UseRestic
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
 	veleroInstallOptions.UploaderType = veleroCfg.UploaderType
@@ -174,6 +177,9 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	}
 	if options.UseNodeAgent {
 		args = append(args, "--use-node-agent")
+	}
+	if options.UseRestic {
+		args = append(args, "--use-restic")
 	}
 	if options.UseVolumeSnapshots {
 		args = append(args, "--use-volume-snapshots")
@@ -285,7 +291,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 	cmd.Stderr = os.Stderr
 	fmt.Printf("Running cmd %q \n", cmd.String())
 	if err = cmd.Run(); err != nil {
-		return errors.Wrapf(err, "failed to apply velere resources")
+		return errors.Wrapf(err, "failed to apply Velero resources")
 	}
 
 	return nil
