@@ -35,4 +35,5 @@
 | Kubernetes CSI Liaison |  |
 | Deployment |  |
 | Community Management | Orlin Vasilev [OrlinVasilev](https://github.com/OrlinVasilev) |
-| Product Management | Eleanor Millman [pradeepkchaturvedi](https://github.com/pradeepkchaturvedi) |
+| Product Management | Pradeep Kumar Chaturvedi [pradeepkchaturvedi](https://github.com/pradeepkchaturvedi) |
+
