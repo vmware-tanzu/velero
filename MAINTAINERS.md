@@ -30,9 +30,9 @@
 
 | Feature Area | Lead |
 | ----------------------------- | :---------------------: |
-| Architect | Dave Smith-Uchida (dsu-igeek) |
-| Technical Lead | Daniel Jiang (reasonerjt) |
+| Architect | Dave Smith-Uchida [dsu-igeek](https://github.com/dsu-igeek) |
+| Technical Lead | Daniel Jiang [reasonerjt](https://github.com/reasonerjt) |
 | Kubernetes CSI Liaison |  |
 | Deployment |  |
-| Community Management | Orlin Vasilev (OrlinVasilev) |
-| Product Management | Eleanor Millman (eleanor-millman) |
+| Community Management | Orlin Vasilev [OrlinVasilev](https://github.com/OrlinVasilev) |
+| Product Management | Eleanor Millman [pradeepkchaturvedi](https://github.com/pradeepkchaturvedi) |
