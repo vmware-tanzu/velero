@@ -29,7 +29,8 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
+	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	google.golang.org/grpc v1.28.0
 	k8s.io/api v0.18.4
 	k8s.io/apiextensions-apiserver v0.18.4
