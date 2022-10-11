@@ -52,7 +52,7 @@ VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 VELERO_VERSION ?= $(VERSION)
 PLUGINS ?=
-RESTIC_HELPER_IMAGE ?=
+RESTORE_HELPER_IMAGE ?=
 #Released version only
 UPGRADE_FROM_VELERO_VERSION ?= v1.7.1,v1.8.1
 # UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
@@ -114,7 +114,7 @@ run: ginkgo
 		-velero-image=$(VELERO_IMAGE) \
 		-plugins=$(PLUGINS) \
 		-velero-version=$(VELERO_VERSION) \
-		-restic-helper-image=$(RESTIC_HELPER_IMAGE) \
+		-restore-helper-image=$(RESTORE_HELPER_IMAGE) \
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
 		-upgrade-from-velero-version=$(UPGRADE_FROM_VELERO_VERSION) \
 		-migrate-from-velero-cli=$(MIGRATE_FROM_VELERO_CLI) \

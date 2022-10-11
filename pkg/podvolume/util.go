@@ -38,16 +38,12 @@ const (
 	podAnnotationPrefix = "snapshot.velero.io/"
 
 	// VolumesToBackupAnnotation is the annotation on a pod whose mounted volumes
-	// need to be backed up using restic.
+	// need to be backed up using pod volume backup.
 	VolumesToBackupAnnotation = "backup.velero.io/backup-volumes"
 
 	// VolumesToExcludeAnnotation is the annotation on a pod whose mounted volumes
-	// should be excluded from restic backup.
+	// should be excluded from pod volume backup.
 	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
-
-	// InitContainer is the name of the init container added
-	// to workload pods to help with restores.
-	InitContainer = "restic-wait"
 
 	// DefaultVolumesToFsBackup specifies whether pod volume backup should be used, by default, to
 	// take backup of all pod volumes.
@@ -201,7 +197,7 @@ func volumeHasNonRestorableSource(volumeName string, podVolumes []corev1api.Volu
 // getPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
 // of all snapshots for this pod.
 // TODO(2.0) to remove
-// Deprecated: we will stop using pod annotations to record restic snapshot IDs after they're taken,
+// Deprecated: we will stop using pod annotations to record pod volume snapshot IDs after they're taken,
 // therefore we won't need to check if these annotations exist.
 func getPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	var res map[string]string
@@ -224,7 +220,7 @@ func getPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 
 // GetVolumesToBackup returns a list of volume names to backup for
 // the provided pod.
-// Deprecated: Use GetPodVolumesUsingRestic instead.
+// Deprecated: Use GetVolumesByPod instead.
 func GetVolumesToBackup(obj metav1.Object) []string {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
@@ -267,7 +263,7 @@ func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) []string
 	podVolumes := []string{}
 	for _, pv := range pod.Spec.Volumes {
 		// cannot backup hostpath volumes as they are not mounted into /var/lib/kubelet/pods
-		// and therefore not accessible to the restic daemon set.
+		// and therefore not accessible to the node agent daemon set.
 		if pv.HostPath != nil {
 			continue
 		}

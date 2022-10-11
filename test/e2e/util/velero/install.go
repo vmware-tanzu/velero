@@ -46,7 +46,7 @@ import (
 type installOptions struct {
 	*install.InstallOptions
 	RegistryCredentialFile string
-	ResticHelperImage      string
+	RestoreHelperImage     string
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnapshots bool) error {
@@ -97,7 +97,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
 		InstallOptions:         veleroInstallOptions,
 		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
-		ResticHelperImage:      veleroCfg.ResticHelperImage,
+		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
 	})
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
@@ -218,14 +218,14 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
 	}
 
-	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.ResticHelperImage); err != nil {
+	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.RestoreHelperImage); err != nil {
 		return err
 	}
 
 	return waitVeleroReady(ctx, namespace, options.UseNodeAgent)
 }
 
-func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, resticHelperImage string) error {
+func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, RestoreHelperImage string) error {
 	args = append(args, "--dry-run", "--output", "json", "--crds-only")
 
 	// get the CRD definitions
@@ -270,7 +270,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to unmarshal the resources: %s", string(stdout))
 	}
 
-	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.ResticHelperImage); err != nil {
+	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.RestoreHelperImage); err != nil {
 		return errors.Wrapf(err, "failed to patch resources")
 	}
 
@@ -292,7 +292,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 }
 
 // patch the velero resources
-func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, resticHelperImage string) error {
+func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, RestoreHelperImage string) error {
 	// apply the image pull secret to avoid the image pull limit of Docker Hub
 	if len(registryCredentialFile) > 0 {
 		credential, err := ioutil.ReadFile(registryCredentialFile)
@@ -336,7 +336,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 	}
 
 	// customize the restic restore helper image
-	if len(VeleroCfg.ResticHelperImage) > 0 {
+	if len(VeleroCfg.RestoreHelperImage) > 0 {
 		restoreActionConfig := corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
@@ -351,7 +351,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 				},
 			},
 			Data: map[string]string{
-				"image": VeleroCfg.ResticHelperImage,
+				"image": VeleroCfg.RestoreHelperImage,
 			},
 		}
 
