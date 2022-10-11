@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package nodeagent
 
 import (
 	"context"
@@ -74,15 +74,15 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 
 	command := &cobra.Command{
 		Use:    "server",
-		Short:  "Run the velero restic server",
-		Long:   "Run the velero restic server",
+		Short:  "Run the velero node-agent server",
+		Long:   "Run the velero node-agent server",
 		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger := logging.DefaultLogger(logLevel, formatFlag.Parse())
-			logger.Infof("Starting Velero restic server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Velero node-agent server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			s, err := newResticServer(logger, f, defaultMetricsAddress)

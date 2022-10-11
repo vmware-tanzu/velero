@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package nodeagent
 
 import (
-	"os"
-	"path/filepath"
+	"github.com/spf13/cobra"
 
-	"k8s.io/klog/v2"
-
-	"github.com/vmware-tanzu/velero/pkg/cmd"
-	"github.com/vmware-tanzu/velero/pkg/cmd/velero"
+	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
-func main() {
-	defer klog.Flush()
+func NewCommand(f client.Factory) *cobra.Command {
+	c := &cobra.Command{
+		Use:   "node-agent",
+		Short: "Work with node-agent",
+		Long:  "Work with node-agent",
+	}
 
-	baseName := filepath.Base(os.Args[0])
+	c.AddCommand(
+		NewServerCommand(f),
+	)
 
-	err := velero.NewCommand(baseName).Execute()
-	cmd.CheckError(err)
+	return c
 }

@@ -78,6 +78,12 @@ var nonRestorableResources = []string{
 	// https://github.com/vmware-tanzu/velero/issues/1113
 	"resticrepositories.velero.io",
 
+	// CSINode delegates cluster node for CSI operation.
+	// VolumeAttachement records PV mounts to which node.
+	// https://github.com/vmware-tanzu/velero/issues/4823
+	"csinodes.storage.k8s.io",
+	"volumeattachments.storage.k8s.io",
+
 	// Backup repositories were renamed from Restic repositories
 	"backuprepositories.velero.io",
 }

@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -40,19 +39,20 @@ import (
 func TestReconcileOfSchedule(t *testing.T) {
 	require.Nil(t, velerov1.AddToScheme(scheme.Scheme))
 
-	newScheduleBuilder := func(phase velerov1api.SchedulePhase) *builder.ScheduleBuilder {
+	newScheduleBuilder := func(phase velerov1.SchedulePhase) *builder.ScheduleBuilder {
 		return builder.ForSchedule("ns", "name").Phase(phase)
 	}
 
 	tests := []struct {
 		name                     string
 		scheduleKey              string
-		schedule                 *velerov1api.Schedule
+		schedule                 *velerov1.Schedule
 		fakeClockTime            string
 		expectedPhase            string
 		expectedValidationErrors []string
-		expectedBackupCreate     *velerov1api.Backup
+		expectedBackupCreate     *velerov1.Backup
 		expectedLastBackup       string
+		backup                   *velerov1.Backup
 	}{
 		{
 			name:        "missing schedule triggers no backup",
@@ -60,48 +60,54 @@ func TestReconcileOfSchedule(t *testing.T) {
 		},
 		{
 			name:     "schedule with phase FailedValidation triggers no backup",
-			schedule: newScheduleBuilder(velerov1api.SchedulePhaseFailedValidation).Result(),
+			schedule: newScheduleBuilder(velerov1.SchedulePhaseFailedValidation).Result(),
 		},
 		{
 			name:                     "schedule with phase New gets validated and failed if invalid",
-			schedule:                 newScheduleBuilder(velerov1api.SchedulePhaseNew).Result(),
-			expectedPhase:            string(velerov1api.SchedulePhaseFailedValidation),
+			schedule:                 newScheduleBuilder(velerov1.SchedulePhaseNew).Result(),
+			expectedPhase:            string(velerov1.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                     "schedule with phase <blank> gets validated and failed if invalid",
-			schedule:                 newScheduleBuilder(velerov1api.SchedulePhase("")).Result(),
-			expectedPhase:            string(velerov1api.SchedulePhaseFailedValidation),
+			schedule:                 newScheduleBuilder(velerov1.SchedulePhase("")).Result(),
+			expectedPhase:            string(velerov1.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                     "schedule with phase Enabled gets re-validated and failed if invalid",
-			schedule:                 newScheduleBuilder(velerov1api.SchedulePhaseEnabled).Result(),
-			expectedPhase:            string(velerov1api.SchedulePhaseFailedValidation),
+			schedule:                 newScheduleBuilder(velerov1.SchedulePhaseEnabled).Result(),
+			expectedPhase:            string(velerov1.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                 "schedule with phase New gets validated and triggers a backup",
-			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseNew).CronSchedule("@every 5m").Result(),
+			schedule:             newScheduleBuilder(velerov1.SchedulePhaseNew).CronSchedule("@every 5m").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
-			expectedPhase:        string(velerov1api.SchedulePhaseEnabled),
-			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
+			expectedPhase:        string(velerov1.SchedulePhaseEnabled),
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name:                 "schedule with phase Enabled gets re-validated and triggers a backup if valid",
-			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@every 5m").Result(),
+			schedule:             newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
-			expectedPhase:        string(velerov1api.SchedulePhaseEnabled),
-			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
+			expectedPhase:        string(velerov1.SchedulePhaseEnabled),
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name:                 "schedule that's already run gets LastBackup updated",
-			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").Result(),
+			schedule:             newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
-			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "name")).Result(),
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
+		},
+		{
+			name:          "schedule already has backup in New state.",
+			schedule:      newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").Result(),
+			expectedPhase: string(velerov1.SchedulePhaseEnabled),
+			backup:        builder.ForBackup("ns", "name-20220905120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Phase(velerov1.BackupPhaseNew).Result(),
 		},
 	}
 
@@ -126,11 +132,15 @@ func TestReconcileOfSchedule(t *testing.T) {
 				require.Nil(t, client.Create(ctx, test.schedule))
 			}
 
+			if test.backup != nil {
+				require.Nil(t, client.Create(ctx, test.backup))
+			}
+
 			_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "ns", Name: "name"}})
 			require.Nil(t, err)
 
-			schedule := &velerov1api.Schedule{}
-			err = client.Get(ctx, types.NamespacedName{"ns", "name"}, schedule)
+			schedule := &velerov1.Schedule{}
+			err = client.Get(ctx, types.NamespacedName{Namespace: "ns", Name: "name"}, schedule)
 			if len(test.expectedPhase) > 0 {
 				require.Nil(t, err)
 				assert.Equal(t, test.expectedPhase, string(schedule.Status.Phase))
@@ -144,8 +154,19 @@ func TestReconcileOfSchedule(t *testing.T) {
 				assert.Equal(t, parseTime(test.expectedLastBackup).Unix(), schedule.Status.LastBackup.Unix())
 			}
 
-			backups := &velerov1api.BackupList{}
+			backups := &velerov1.BackupList{}
 			require.Nil(t, client.List(ctx, backups))
+
+			// If backup associated with schedule's status is in New or InProgress,
+			// new backup shouldn't be submitted.
+			if test.backup != nil &&
+				(test.backup.Status.Phase == velerov1.BackupPhaseNew || test.backup.Status.Phase == velerov1.BackupPhaseInProgress) {
+				assert.Equal(t, 1, len(backups.Items))
+				require.Nil(t, client.Delete(ctx, test.backup))
+			}
+
+			require.Nil(t, client.List(ctx, backups))
+
 			if test.expectedBackupCreate == nil {
 				assert.Equal(t, 0, len(backups.Items))
 			} else {
@@ -161,13 +182,13 @@ func parseTime(timeString string) time.Time {
 }
 
 func TestGetNextRunTime(t *testing.T) {
-	defaultSchedule := func() *velerov1api.Schedule {
+	defaultSchedule := func() *velerov1.Schedule {
 		return builder.ForSchedule("velero", "schedule-1").CronSchedule("@every 5m").Result()
 	}
 
 	tests := []struct {
 		name                      string
-		schedule                  *velerov1api.Schedule
+		schedule                  *velerov1.Schedule
 		lastRanOffset             string
 		expectedDue               bool
 		expectedNextRunTimeOffset string
@@ -294,21 +315,21 @@ func TestParseCronSchedule(t *testing.T) {
 func TestGetBackup(t *testing.T) {
 	tests := []struct {
 		name           string
-		schedule       *velerov1api.Schedule
+		schedule       *velerov1.Schedule
 		testClockTime  string
-		expectedBackup *velerov1api.Backup
+		expectedBackup *velerov1.Backup
 	}{
 		{
 			name:           "ensure name is formatted correctly (AM time)",
 			schedule:       builder.ForSchedule("foo", "bar").Result(),
 			testClockTime:  "2017-07-25 09:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "bar")).Result(),
 		},
 		{
 			name:           "ensure name is formatted correctly (PM time)",
 			schedule:       builder.ForSchedule("foo", "bar").Result(),
 			testClockTime:  "2017-07-25 14:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "bar")).Result(),
 		},
 		{
 			name: "ensure schedule backup template is copied",
@@ -325,7 +346,7 @@ func TestGetBackup(t *testing.T) {
 				Result(),
 			testClockTime: "2017-07-25 09:15:00",
 			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").
-				ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).
+				ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "bar")).
 				IncludedNamespaces("ns-1", "ns-2").
 				ExcludedNamespaces("ns-3").
 				IncludedResources("foo", "bar").
@@ -338,13 +359,13 @@ func TestGetBackup(t *testing.T) {
 			name:           "ensure schedule labels are copied",
 			schedule:       builder.ForSchedule("foo", "bar").ObjectMeta(builder.WithLabels("foo", "bar", "bar", "baz")).Result(),
 			testClockTime:  "2017-07-25 14:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar", "bar", "baz", "foo", "bar")).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "bar", "bar", "baz", "foo", "bar")).Result(),
 		},
 		{
 			name:           "ensure schedule annotations are copied",
 			schedule:       builder.ForSchedule("foo", "bar").ObjectMeta(builder.WithAnnotations("foo", "bar", "bar", "baz")).Result(),
 			testClockTime:  "2017-07-25 14:15:00",
-			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar"), builder.WithAnnotations("bar", "baz", "foo", "bar")).Result(),
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "bar"), builder.WithAnnotations("bar", "baz", "foo", "bar")).Result(),
 		},
 	}
 
@@ -362,4 +383,42 @@ func TestGetBackup(t *testing.T) {
 			assert.Equal(t, test.expectedBackup.Spec, backup.Spec)
 		})
 	}
+}
+
+func TestCheckIfBackupInNewOrProgress(t *testing.T) {
+	require.Nil(t, velerov1.AddToScheme(scheme.Scheme))
+
+	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	logger := velerotest.NewLogger()
+
+	// Create testing schedule
+	testSchedule := builder.ForSchedule("ns", "name").Phase(velerov1.SchedulePhaseEnabled).Result()
+	err := client.Create(ctx, testSchedule)
+	require.NoError(t, err, "fail to create schedule in TestCheckIfBackupInNewOrProgress: %v", err)
+
+	// Create backup in New phase.
+	newBackup := builder.ForBackup("ns", "backup-1").
+		ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).
+		Phase(velerov1.BackupPhaseNew).Result()
+	err = client.Create(ctx, newBackup)
+	require.NoError(t, err, "fail to create backup in New phase in TestCheckIfBackupInNewOrProgress: %v", err)
+
+	reconciler := NewScheduleReconciler("ns", logger, client, metrics.NewServerMetrics())
+	result := reconciler.checkIfBackupInNewOrProgress(testSchedule)
+	assert.True(t, result)
+
+	// Clean backup in New phase.
+	err = client.Delete(ctx, newBackup)
+	require.NoError(t, err, "fail to delete backup in New phase in TestCheckIfBackupInNewOrProgress: %v", err)
+
+	// Create backup in InProgress phase.
+	inProgressBackup := builder.ForBackup("ns", "backup-2").
+		ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).
+		Phase(velerov1.BackupPhaseInProgress).Result()
+	err = client.Create(ctx, inProgressBackup)
+	require.NoError(t, err, "fail to create backup in InProgress phase in TestCheckIfBackupInNewOrProgress: %v", err)
+
+	reconciler = NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics())
+	result = reconciler.checkIfBackupInNewOrProgress(testSchedule)
+	assert.True(t, result)
 }

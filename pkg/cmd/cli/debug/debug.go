@@ -152,7 +152,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "debug",
 		Short: "Generate debug bundle",
-		Long: `Generate a tarball containing the logs of velero deployment, plugin logs, restic DaemonSet, 
+		Long: `Generate a tarball containing the logs of velero deployment, plugin logs, node-agent DaemonSet, 
 specs of resources created by velero server, and optionally the logs of backup and restore.`,
 		Run: func(c *cobra.Command, args []string) {
 			flags := c.Flags()

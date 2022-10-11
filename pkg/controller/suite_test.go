@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 

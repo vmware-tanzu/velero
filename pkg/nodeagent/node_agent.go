@@ -32,7 +32,7 @@ import (
 
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
-	daemonSet = "restic"
+	daemonSet = "node-agent"
 )
 
 var (
