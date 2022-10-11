@@ -207,7 +207,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	return isReady, err
 }
 
-// DaemonSetIsReady will poll the kubernetes API server to ensure the restic daemonset is ready, i.e. that
+// DaemonSetIsReady will poll the kubernetes API server to ensure the node-agent daemonset is ready, i.e. that
 // pods are scheduled and available on all of the desired nodes.
 func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "DaemonSet")
@@ -226,7 +226,7 @@ func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, er
 	var readyObservations int32
 
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		unstructuredDaemonSet, err := c.Get("restic", metav1.GetOptions{})
+		unstructuredDaemonSet, err := c.Get("node-agent", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {

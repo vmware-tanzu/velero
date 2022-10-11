@@ -49,6 +49,8 @@ import (
 	runplugin "github.com/vmware-tanzu/velero/pkg/cmd/server/plugin"
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/features"
+
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/nodeagent"
 )
 
 func NewCommand(name string) *cobra.Command {
@@ -103,6 +105,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		schedule.NewCommand(f),
 		restore.NewCommand(f),
 		server.NewCommand(f),
+		nodeagent.NewCommand(f),
 		version.NewCommand(f),
 		get.NewCommand(f),
 		install.NewCommand(f),

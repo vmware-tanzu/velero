@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package nodeagent
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restic/repo"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "restic",
-		Short: "Work with restic",
-		Long:  "Work with restic",
+		Use:   "node-agent",
+		Short: "Work with node-agent",
+		Long:  "Work with node-agent",
 	}
 
 	c.AddCommand(
-		repo.NewRepositoryCommand(f),
+		NewServerCommand(f),
 	)
 
 	return c

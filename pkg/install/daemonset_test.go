@@ -26,7 +26,7 @@ import (
 func TestDaemonSet(t *testing.T) {
 	ds := DaemonSet("velero")
 
-	assert.Equal(t, "restic", ds.Spec.Template.Spec.Containers[0].Name)
+	assert.Equal(t, "node-agent", ds.Spec.Template.Spec.Containers[0].Name)
 	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)
 
 	ds = DaemonSet("velero", WithImage("velero/velero:v0.11"))
