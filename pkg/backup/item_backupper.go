@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -47,6 +49,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
+const (
+	mustIncludeAdditionalItemAnnotation = "backup.velero.io/must-include-additional-items"
+	excludeFromBackupLabel              = "velero.io/exclude-from-backup"
+)
+
 // itemBackupper can back up individual items to a tar writer.
 type itemBackupper struct {
 	backupRequest           *Request
@@ -65,7 +72,7 @@ type itemBackupper struct {
 // namespaces IncludesExcludes list.
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error) {
+func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude bool) (bool, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return false, err
@@ -78,28 +85,31 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	log = log.WithField("resource", groupResource.String())
 	log = log.WithField("namespace", namespace)
 
-	if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
-		log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
-		return false, nil
-	}
+	if mustInclude {
+		log.Infof("Skipping the exclusion checks for this resource")
+	} else {
+		if metadata.GetLabels()[excludeFromBackupLabel] == "true" {
+			log.Infof("Excluding item because it has label %s=true", excludeFromBackupLabel)
+			return false, nil
+		}
 
-	// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
-	// backupItem can be invoked by a custom action.
-	if namespace != "" && !ib.backupRequest.NamespaceIncludesExcludes.ShouldInclude(namespace) {
-		log.Info("Excluding item because namespace is excluded")
-		return false, nil
-	}
+		// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
+		// backupItem can be invoked by a custom action.
+		if namespace != "" && !ib.backupRequest.NamespaceIncludesExcludes.ShouldInclude(namespace) {
+			log.Info("Excluding item because namespace is excluded")
+			return false, nil
+		}
+		// NOTE: we specifically allow namespaces to be backed up even if IncludeClusterResources is
+		// false.
+		if namespace == "" && groupResource != kuberesource.Namespaces && ib.backupRequest.Spec.IncludeClusterResources != nil && !*ib.backupRequest.Spec.IncludeClusterResources {
+			log.Info("Excluding item because resource is cluster-scoped and backup.spec.includeClusterResources is false")
+			return false, nil
+		}
 
-	// NOTE: we specifically allow namespaces to be backed up even if IncludeClusterResources is
-	// false.
-	if namespace == "" && groupResource != kuberesource.Namespaces && ib.backupRequest.Spec.IncludeClusterResources != nil && !*ib.backupRequest.Spec.IncludeClusterResources {
-		log.Info("Excluding item because resource is cluster-scoped and backup.spec.includeClusterResources is false")
-		return false, nil
-	}
-
-	if !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-		log.Info("Excluding item because resource is excluded")
-		return false, nil
+		if !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+			log.Info("Excluding item because resource is excluded")
+			return false, nil
+		}
 	}
 
 	if metadata.GetDeletionTimestamp() != nil {
@@ -315,7 +325,8 @@ func (ib *itemBackupper) executeActions(
 		if err != nil {
 			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
-		obj = updatedItem
+		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
+		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true"
 
 		for _, additionalItem := range additionalItemIdentifiers {
 			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
@@ -329,6 +340,7 @@ func (ib *itemBackupper) executeActions(
 			}
 
 			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+
 			if apierrors.IsNotFound(err) {
 				log.WithFields(logrus.Fields{
 					"groupResource": additionalItem.GroupResource,
@@ -341,12 +353,17 @@ func (ib *itemBackupper) executeActions(
 				return nil, errors.WithStack(err)
 			}
 
-			if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr); err != nil {
+			if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude); err != nil {
 				return nil, err
 			}
 		}
+		// remove the annotation as it's for communication between BIA and velero server,
+		// we don't want the resource be restored with this annotation.
+		if _, ok := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation]; ok {
+			delete(u.GetAnnotations(), mustIncludeAdditionalItemAnnotation)
+		}
+		obj = u
 	}
-
 	return obj, nil
 }
 
