@@ -38,7 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-// Backupper can execute restic backups of volumes in a pod.
+// Backupper can execute pod volume backups of volumes in a pod.
 type Backupper interface {
 	// BackupPodVolumes backs up all specified volumes in a pod.
 	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
@@ -190,7 +190,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 		if isHostPath {
-			log.Warnf("Volume %s in pod %s/%s is a hostPath volume which is not supported for restic backup, skipping", volumeName, pod.Namespace, pod.Name)
+			log.Warnf("Volume %s in pod %s/%s is a hostPath volume which is not supported for pod volume backup, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
 		}
 
@@ -304,7 +304,7 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 
 	if pvc != nil {
 		// this annotation is used in pkg/restore to identify if a PVC
-		// has a restic backup.
+		// has a pod volume backup.
 		pvb.Annotations = map[string]string{
 			PVCNameAnnotation: pvc.Name,
 		}

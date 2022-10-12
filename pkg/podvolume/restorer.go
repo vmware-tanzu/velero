@@ -41,7 +41,7 @@ type RestoreData struct {
 	SourceNamespace, BackupLocation string
 }
 
-// Restorer can execute restic restores of volumes in a pod.
+// Restorer can execute pod volume restores of volumes in a pod.
 type Restorer interface {
 	// RestorePodVolumes restores all annotated volumes in a pod.
 	RestorePodVolumes(RestoreData) []error

@@ -25,7 +25,7 @@ const (
 	GarbageCollection     = "gc"
 	PodVolumeBackup       = "pod-volume-backup"
 	PodVolumeRestore      = "pod-volume-restore"
-	ResticRepo            = "restic-repo"
+	BackupRepo            = "backup-repo"
 	Restore               = "restore"
 	Schedule              = "schedule"
 	ServerStatusRequest   = "server-status-request"
@@ -38,7 +38,7 @@ var DisableableControllers = []string{
 	BackupSync,
 	DownloadRequest,
 	GarbageCollection,
-	ResticRepo,
+	BackupRepo,
 	Restore,
 	Schedule,
 	ServerStatusRequest,

@@ -130,11 +130,11 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 			errs = append(errs, deleteErrs...)
 		}
 
-		// Delete Restic repositories associated with the deleted BSL.
-		resticRepoList, err := findAssociatedResticRepos(kbClient, location.Name, f.Namespace())
+		// Delete backup repositories associated with the deleted BSL.
+		backupRepoList, err := findAssociatedBackupRepos(kbClient, location.Name, f.Namespace())
 		if err != nil {
-			errs = append(errs, fmt.Errorf("find Restic repositories associated with BSL %q: %w", location.Name, err))
-		} else if deleteErrs := deleteResticRepos(kbClient, resticRepoList); deleteErrs != nil {
+			errs = append(errs, fmt.Errorf("find backup repositories associated with BSL %q: %w", location.Name, err))
+		} else if deleteErrs := deleteBackupRepos(kbClient, backupRepoList); deleteErrs != nil {
 			errs = append(errs, deleteErrs...)
 		}
 	}
@@ -151,7 +151,7 @@ func findAssociatedBackups(client kbclient.Client, bslName, ns string) (velerov1
 	return backups, err
 }
 
-func findAssociatedResticRepos(client kbclient.Client, bslName, ns string) (velerov1api.BackupRepositoryList, error) {
+func findAssociatedBackupRepos(client kbclient.Client, bslName, ns string) (velerov1api.BackupRepositoryList, error) {
 	var repos velerov1api.BackupRepositoryList
 	err := client.List(context.Background(), &repos, &kbclient.ListOptions{
 		Namespace: ns,
@@ -172,14 +172,14 @@ func deleteBackups(client kbclient.Client, backups velerov1api.BackupList) []err
 	return errs
 }
 
-func deleteResticRepos(client kbclient.Client, repos velerov1api.BackupRepositoryList) []error {
+func deleteBackupRepos(client kbclient.Client, repos velerov1api.BackupRepositoryList) []error {
 	var errs []error
 	for _, repo := range repos.Items {
 		if err := client.Delete(context.Background(), &repo, &kbclient.DeleteOptions{}); err != nil {
-			errs = append(errs, errors.WithStack(fmt.Errorf("delete Restic repository %q associated with deleted BSL: %w", repo.Name, err)))
+			errs = append(errs, errors.WithStack(fmt.Errorf("delete backup repository %q associated with deleted BSL: %w", repo.Name, err)))
 			continue
 		}
-		fmt.Printf("Restic repository associated with deleted BSL(s) %q deleted successfully.\n", repo.Name)
+		fmt.Printf("Backup repository associated with deleted BSL(s) %q deleted successfully.\n", repo.Name)
 	}
 	return errs
 }

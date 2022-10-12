@@ -85,7 +85,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logger.Infof("Starting Velero node-agent server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
-			s, err := newResticServer(logger, f, defaultMetricsAddress)
+			s, err := newNodeAgentServer(logger, f, defaultMetricsAddress)
 			cmd.CheckError(err)
 
 			s.run()
@@ -98,7 +98,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	return command
 }
 
-type resticServer struct {
+type nodeAgentServer struct {
 	logger         logrus.FieldLogger
 	ctx            context.Context
 	cancelFunc     context.CancelFunc
@@ -110,7 +110,7 @@ type resticServer struct {
 	nodeName       string
 }
 
-func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAddress string) (*resticServer, error) {
+func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metricAddress string) (*nodeAgentServer, error) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	clientConfig, err := factory.ClientConfig()
@@ -142,7 +142,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 		return nil, err
 	}
 
-	s := &resticServer{
+	s := &nodeAgentServer{
 		logger:         logger,
 		ctx:            ctx,
 		cancelFunc:     cancelFunc,
@@ -166,20 +166,20 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory, metricAd
 	return s, nil
 }
 
-func (s *resticServer) run() {
+func (s *nodeAgentServer) run() {
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
 	go func() {
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
-		s.logger.Infof("Starting metric server for restic at address [%s]", s.metricsAddress)
+		s.logger.Infof("Starting metric server for node agent at address [%s]", s.metricsAddress)
 		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
-			s.logger.Fatalf("Failed to start metric server for restic at [%s]: %v", s.metricsAddress, err)
+			s.logger.Fatalf("Failed to start metric server for node agent at [%s]: %v", s.metricsAddress, err)
 		}
 	}()
-	s.metrics = metrics.NewResticServerMetrics()
+	s.metrics = metrics.NewPodVolumeMetrics()
 	s.metrics.RegisterAllMetrics()
-	s.metrics.InitResticMetricsForNode(s.nodeName)
+	s.metrics.InitPodVolumeMetricsForNode(s.nodeName)
 
 	s.markInProgressCRsFailed()
 
@@ -228,7 +228,7 @@ func (s *resticServer) run() {
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
-func (s *resticServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
+func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
 	files, err := s.fileSystem.ReadDir("/host_pods/")
 	if err != nil {
 		return errors.Wrap(err, "could not read pod volumes host path")
@@ -275,7 +275,7 @@ func (s *resticServer) validatePodVolumesHostPath(client kubernetes.Interface) e
 
 // if there is a restarting during the reconciling of pvbs/pvrs/etc, these CRs may be stuck in progress status
 // markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
-func (s *resticServer) markInProgressCRsFailed() {
+func (s *nodeAgentServer) markInProgressCRsFailed() {
 	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
 	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
 	if err != nil {
@@ -288,7 +288,7 @@ func (s *resticServer) markInProgressCRsFailed() {
 	s.markInProgressPVRsFailed(client)
 }
 
-func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
+func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 	pvbs := &velerov1api.PodVolumeBackupList{}
 	if err := client.List(s.ctx, pvbs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
@@ -315,7 +315,7 @@ func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 	}
 }
 
-func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
+func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 	pvrs := &velerov1api.PodVolumeRestoreList{}
 	if err := client.List(s.ctx, pvrs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")

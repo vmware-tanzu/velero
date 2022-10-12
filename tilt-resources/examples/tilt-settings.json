@@ -15,7 +15,7 @@
     "allowed_contexts": [
         "development"
     ],
-    "enable_restic": false,
+    "use_node_agent": false,
     "create_backup_locations": true,
     "setup-minio": true,
     "enable_debug": false,

@@ -19,7 +19,7 @@ package repository
 import "sync"
 
 // RepoLocker manages exclusive/non-exclusive locks for
-// operations against restic repositories. The semantics
+// operations against backup repositories. The semantics
 // of exclusive/non-exclusive locks are the same as for
 // a sync.RWMutex, where a non-exclusive lock is equivalent
 // to a read lock, and an exclusive lock is equivalent to

@@ -2682,17 +2682,17 @@ func TestRestorePersistentVolumes(t *testing.T) {
 	}
 }
 
-type fakeResticRestorerFactory struct {
+type fakePodVolumeRestorerFactory struct {
 	restorer *uploadermocks.Restorer
 }
 
-func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (podvolume.Restorer, error) {
+func (f *fakePodVolumeRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (podvolume.Restorer, error) {
 	return f.restorer, nil
 }
 
-// TestRestoreWithRestic verifies that a call to RestorePodVolumes was made as and when
-// expected for the given pods by using a mock for the restic restorer.
-func TestRestoreWithRestic(t *testing.T) {
+// TestRestoreWithPodVolume verifies that a call to RestorePodVolumes was made as and when
+// expected for the given pods by using a mock for the pod volume restorer.
+func TestRestoreWithPodVolume(t *testing.T) {
 	tests := []struct {
 		name                        string
 		restore                     *velerov1api.Restore
@@ -2753,7 +2753,7 @@ func TestRestoreWithRestic(t *testing.T) {
 			h := newHarness(t)
 			restorer := new(uploadermocks.Restorer)
 			defer restorer.AssertExpectations(t)
-			h.restorer.resticRestorerFactory = &fakeResticRestorerFactory{
+			h.restorer.podVolumeRestorerFactory = &fakePodVolumeRestorerFactory{
 				restorer: restorer,
 			}
 
@@ -3121,8 +3121,8 @@ func newHarness(t *testing.T) *harness {
 			fileSystem:                 testutil.NewFakeFileSystem(),
 
 			// unsupported
-			resticRestorerFactory: nil,
-			resticTimeout:         0,
+			podVolumeRestorerFactory: nil,
+			podVolumeTimeout:         0,
 		},
 		log: log,
 	}
