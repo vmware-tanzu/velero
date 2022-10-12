@@ -108,7 +108,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
-	executeOutput, err := impl.Execute(&riav1.RestoreItemActionExecuteInput{
+	executeOutput, err := impl.Execute(&velero.RestoreItemActionExecuteInput{
 		Item:           &item,
 		ItemFromBackup: &itemFromBackup,
 		Restore:        &restoreObj,
