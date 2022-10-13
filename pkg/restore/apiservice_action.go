@@ -21,7 +21,6 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 type APIServiceAction struct {
@@ -43,10 +42,10 @@ func (a *APIServiceAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *APIServiceAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (a *APIServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing APIServiceAction")
 	defer a.logger.Info("Done executing APIServiceAction")
 
 	a.logger.Infof("Skipping restore of APIService as it is managed by Kubernetes")
-	return riav1.NewRestoreItemActionExecuteOutput(input.Item).WithoutRestore(), nil
+	return velero.NewRestoreItemActionExecuteOutput(input.Item).WithoutRestore(), nil
 }

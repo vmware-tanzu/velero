@@ -28,7 +28,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // ChangePVCNodeSelectorAction updates/reset PVC's node selector
@@ -62,23 +61,23 @@ func (p *ChangePVCNodeSelectorAction) AppliesTo() (velero.ResourceSelector, erro
 // Execute updates the pvc's selected-node annotation:
 //    a) if node mapping found in the config map for the plugin
 //	  b) if node mentioned in annotation doesn't exist
-func (p *ChangePVCNodeSelectorAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	p.logger.Info("Executing ChangePVCNodeSelectorAction")
 	defer p.logger.Info("Done executing ChangePVCNodeSelectorAction")
 
 	typeAcc, err := meta.TypeAccessor(input.Item)
 	if err != nil {
-		return &riav1.RestoreItemActionExecuteOutput{}, err
+		return &velero.RestoreItemActionExecuteOutput{}, err
 	}
 
 	metadata, err := meta.Accessor(input.Item)
 	if err != nil {
-		return &riav1.RestoreItemActionExecuteOutput{}, err
+		return &velero.RestoreItemActionExecuteOutput{}, err
 	}
 
 	annotations := metadata.GetAnnotations()
 	if annotations == nil {
-		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	log := p.logger.WithFields(map[string]interface{}{
@@ -91,7 +90,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *riav1.RestoreItemActionExec
 	node, ok := annotations["volume.kubernetes.io/selected-node"]
 	if !ok {
 		log.Debug("PVC doesn't have node selector")
-		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	// fetch node mapping from configMap
@@ -106,7 +105,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *riav1.RestoreItemActionExec
 		annotations["volume.kubernetes.io/selected-node"] = newNode
 		metadata.SetAnnotations(annotations)
 		log.Infof("Updating selected-node to %s from %s", newNode, node)
-		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	// configMap doesn't have node-mapping
@@ -126,7 +125,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *riav1.RestoreItemActionExec
 		}
 	}
 
-	return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
+	return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 }
 
 func getNewNodeFromConfigMap(client corev1client.ConfigMapInterface, node string) (string, error) {

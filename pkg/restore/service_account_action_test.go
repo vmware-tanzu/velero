@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -91,7 +90,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			action := NewServiceAccountAction(test.NewLogger())
-			res, err := action.Execute(&riav1.RestoreItemActionExecuteInput{
+			res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: saUnstructured},
 				ItemFromBackup: &unstructured.Unstructured{Object: saUnstructured},
 				Restore:        nil,
