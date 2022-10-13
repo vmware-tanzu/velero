@@ -39,7 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/get"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/plugin"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restic"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/repo"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restore"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/schedule"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/snapshotlocation"
@@ -117,7 +117,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		delete.NewCommand(f),
 		cliclient.NewCommand(),
 		completion.NewCommand(),
-		restic.NewCommand(f),
+		repo.NewCommand(f),
 		bug.NewCommand(),
 		backuplocation.NewCommand(f),
 		snapshotlocation.NewCommand(f),
