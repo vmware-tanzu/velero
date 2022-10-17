@@ -25,7 +25,7 @@ type ScheduleBackup struct {
 	verifyTimes    int
 }
 
-var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "ns", NSIncluded: &[]string{"ns1"}}})
+var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "schedule-test-ns", NSIncluded: &[]string{"ns1"}}})
 
 func (n *ScheduleBackup) Init() error {
 	n.Client = TestClientInstance
@@ -45,7 +45,6 @@ func (n *ScheduleBackup) StartRun() error {
 	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
 
 	n.ScheduleArgs = []string{
-		"schedule", "create", "--namespace", VeleroCfg.VeleroNamespace, n.ScheduleName,
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
 		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
 	}
@@ -78,7 +77,10 @@ func (n *ScheduleBackup) Backup() error {
 			now := time.Now().Minute()
 			triggerNow := now % n.Period
 			if triggerNow == 0 {
-				Expect(VeleroCmdExec(n.Ctx, VeleroCfg.VeleroCLI, n.ScheduleArgs)).To(Succeed())
+				Expect(VeleroScheduleCreate(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
+					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
+					return "Fail to restore workload"
+				})
 				break
 			}
 		}

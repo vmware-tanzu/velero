@@ -48,11 +48,12 @@ OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
 GINKGO_SKIP ?=
 SKIP_STR := $(foreach var, $(subst ., ,$(GINKGO_SKIP)),-skip "$(var)")
+FOCUS_STR := $(foreach var, $(subst ., ,$(GINKGO_FOCUS)),-focus "$(var)")
 VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 VELERO_VERSION ?= $(VERSION)
 PLUGINS ?=
-RESTIC_HELPER_IMAGE ?=
+RESTORE_HELPER_IMAGE ?=
 #Released version only
 UPGRADE_FROM_VELERO_VERSION ?= v1.7.1,v1.8.1
 # UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
@@ -110,11 +111,11 @@ run: ginkgo
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
 		@[ "${CLOUD_PROVIDER}" ] && echo "Using cloud provider ${CLOUD_PROVIDER}" || \
 			(echo "Cloud provider for target cloud/plug-in provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
-	@$(GINKGO) -v -focus="$(GINKGO_FOCUS)" $(SKIP_STR) . -- -velerocli=$(VELERO_CLI) \
+	@$(GINKGO) -v $(FOCUS_STR) $(SKIP_STR) . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-plugins=$(PLUGINS) \
 		-velero-version=$(VELERO_VERSION) \
-		-restic-helper-image=$(RESTIC_HELPER_IMAGE) \
+		-restore-helper-image=$(RESTORE_HELPER_IMAGE) \
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
 		-upgrade-from-velero-version=$(UPGRADE_FROM_VELERO_VERSION) \
 		-migrate-from-velero-cli=$(MIGRATE_FROM_VELERO_CLI) \

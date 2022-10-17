@@ -27,7 +27,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 type PodAction struct {
@@ -44,7 +43,7 @@ func (a *PodAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *PodAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	pod := new(v1.Pod)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), pod); err != nil {
 		return nil, errors.WithStack(err)
@@ -87,7 +86,7 @@ func (a *PodAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	restoreExecuteOutput := riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res})
+	restoreExecuteOutput := velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res})
 	if pod.Spec.PriorityClassName != "" {
 		a.logger.Infof("Adding priorityclass %s to AdditionalItems", pod.Spec.PriorityClassName)
 		restoreExecuteOutput.AdditionalItems = []velero.ResourceIdentifier{

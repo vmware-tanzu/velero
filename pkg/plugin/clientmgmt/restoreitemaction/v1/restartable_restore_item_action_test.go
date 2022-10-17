@@ -30,7 +30,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	mocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/restoreitemaction/v1"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 func TestRestartableGetRestoreItemAction(t *testing.T) {
@@ -108,13 +107,13 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 		},
 	}
 
-	input := &riav1.RestoreItemActionExecuteInput{
+	input := &velero.RestoreItemActionExecuteInput{
 		Item:           pv,
 		ItemFromBackup: pv,
 		Restore:        new(v1.Restore),
 	}
 
-	output := &riav1.RestoreItemActionExecuteOutput{
+	output := &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"color": "green",

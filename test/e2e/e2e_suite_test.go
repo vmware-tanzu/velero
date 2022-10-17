@@ -37,6 +37,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
+
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
 
@@ -54,7 +55,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.Plugins, "plugins", "", "provider plugins to be tested.")
 	flag.StringVar(&VeleroCfg.AddBSLPlugins, "additional-bsl-plugins", "", "additional plugins to be tested.")
 	flag.StringVar(&VeleroCfg.VeleroVersion, "velero-version", "main", "image version for the velero server to be tested with.")
-	flag.StringVar(&VeleroCfg.ResticHelperImage, "restic-helper-image", "", "image for the velero restic restore helper to be tested.")
+	flag.StringVar(&VeleroCfg.RestoreHelperImage, "restore-helper-image", "", "image for the velero restore helper to be tested.")
 	flag.StringVar(&VeleroCfg.UpgradeFromVeleroCLI, "upgrade-from-velero-cli", "", "path to the pre-upgrade velero application to use.")
 	flag.StringVar(&VeleroCfg.UpgradeFromVeleroVersion, "upgrade-from-velero-version", "v1.7.1", "image for the pre-upgrade velero server to be tested.")
 	flag.StringVar(&VeleroCfg.MigrateFromVeleroCLI, "migrate-from-velero-cli", "", "path to the origin velero application to use.")
@@ -126,8 +127,10 @@ var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
 
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
-var _ = Describe("[NamespaceMapping][Single] Backup resources should follow the specific order in schedule", OneNamespaceMappingTest)
-var _ = Describe("[NamespaceMapping][Multiple] Backup resources should follow the specific order in schedule", MultiNamespacesMappingTest)
+var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
+var _ = Describe("[NamespaceMapping][Multiple][Restic]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
+var _ = Describe("[NamespaceMapping][Single][Snapshot]  Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Multiple][Snapshot]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
 
 var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
 var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)

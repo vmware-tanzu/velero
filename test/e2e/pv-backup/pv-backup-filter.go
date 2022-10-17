@@ -49,8 +49,8 @@ func (p *PVBackupFiltering) StartRun() error {
 	if err != nil {
 		return err
 	}
-	p.BackupName = p.BackupName + "backup-opt-in-" + UUIDgen.String()
-	p.RestoreName = p.RestoreName + "restore-opt-in-" + UUIDgen.String()
+	p.BackupName = p.BackupName + "backup-" + p.id + "-" + UUIDgen.String()
+	p.RestoreName = p.RestoreName + "restore-" + p.id + "-" + UUIDgen.String()
 	p.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", strings.Join(*p.NSIncluded, ","),
@@ -84,7 +84,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				for j := 0; j <= VOLUME_COUNT_PER_POD-1; j++ {
 					volume := fmt.Sprintf("volume-%s-%d-%d", p.id, i, j)
 					volumes = append(volumes, volume)
-					//Volumes cherry pick policy for opt-in/out annotation to pods
+					//Volumes cherry-pick policy for opt-in/out annotation to apply
 					if j%2 == 0 {
 						volumeToAnnotationList = append(volumeToAnnotationList, volume)
 					}

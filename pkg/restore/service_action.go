@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
@@ -48,7 +47,7 @@ func (a *ServiceAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *ServiceAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	service := new(corev1api.Service)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), service); err != nil {
 		return nil, errors.WithStack(err)
@@ -73,7 +72,7 @@ func (a *ServiceAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*ri
 		return nil, errors.WithStack(err)
 	}
 
-	return riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
 
 func deleteNodePorts(service *corev1api.Service) error {
