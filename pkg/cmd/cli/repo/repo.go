@@ -22,11 +22,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
-func NewRepositoryCommand(f client.Factory) *cobra.Command {
+func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "repo",
-		Short: "Work with restic repositories",
-		Long:  "Work with restic repositories",
+		Short: "Work with repositories",
+		Long:  "Work with repositories",
 	}
 
 	c.AddCommand(

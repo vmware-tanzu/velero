@@ -33,7 +33,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   use,
-		Short: "Get restic repositories",
+		Short: "Get repositories",
 		Run: func(c *cobra.Command, args []string) {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
