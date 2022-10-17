@@ -37,6 +37,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
+
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
 
@@ -126,8 +127,10 @@ var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
 
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
-var _ = Describe("[NamespaceMapping][Single] Backup resources should follow the specific order in schedule", OneNamespaceMappingTest)
-var _ = Describe("[NamespaceMapping][Multiple] Backup resources should follow the specific order in schedule", MultiNamespacesMappingTest)
+var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
+var _ = Describe("[NamespaceMapping][Multiple][Restic]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
+var _ = Describe("[NamespaceMapping][Single][Snapshot]  Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Multiple][Snapshot]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
 
 var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
 var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)

@@ -64,6 +64,8 @@ type VerleroConfig struct {
 	DefaultClient            *TestClient
 	StandbyClient            *TestClient
 	UploaderType             string
+	UseNodeAgent             bool
+	UseRestic                bool
 }
 
 type SnapshotCheckPoint struct {
@@ -87,7 +89,7 @@ type BackupConfig struct {
 	ExcludeResources        string
 	IncludeClusterResources bool
 	OrderedResources        string
-	UseRestic               bool
+	UseResticIfFSBackup     bool
 }
 
 type VeleroCLI2Version struct {

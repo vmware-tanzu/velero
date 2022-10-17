@@ -113,6 +113,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfgForOldVeleroInstall.ResticHelperImage = ""
 				tmpCfgForOldVeleroInstall.Plugins = ""
 				tmpCfgForOldVeleroInstall.UploaderType = ""
+				tmpCfgForOldVeleroInstall.UseNodeAgent = false
+				tmpCfgForOldVeleroInstall.UseRestic = !useVolumeSnapshots
 
 				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall,
 					useVolumeSnapshots)).To(Succeed())
@@ -144,8 +146,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				BackupCfg.BackupLocation = ""
 				BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 				BackupCfg.Selector = ""
-				//TODO: pay attention to this param
-				BackupCfg.UseRestic = true
+				//TODO: pay attention to this param, remove it when restic is not the default backup tool any more.
+				BackupCfg.UseResticIfFSBackup = true
 				Expect(VeleroBackupNamespace(oneHourTimeout, tmpCfg.UpgradeFromVeleroCLI,
 					tmpCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
 					RunDebug(context.Background(), tmpCfg.UpgradeFromVeleroCLI, tmpCfg.VeleroNamespace,
@@ -196,6 +198,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 
 			By(fmt.Sprintf("Upgrade Velero by CLI %s", tmpCfg.VeleroCLI), func() {
 				tmpCfg.GCFrequency = ""
+				tmpCfg.UseNodeAgent = !useVolumeSnapshots
+				tmpCfg.UseRestic = false
 				Expect(VeleroInstall(context.Background(), &tmpCfg, useVolumeSnapshots)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
 					tmpCfg.VeleroVersion)).To(Succeed())

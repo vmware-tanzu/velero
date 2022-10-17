@@ -126,6 +126,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					OriginVeleroCfg.Plugins = ""
 					//TODO: Remove this once origin Velero version is 1.10 and upper
 					OriginVeleroCfg.UploaderType = ""
+					OriginVeleroCfg.UseNodeAgent = false
+					OriginVeleroCfg.UseRestic = !useVolumeSnapshots
 				}
 				fmt.Println(OriginVeleroCfg)
 				Expect(VeleroInstall(context.Background(), &OriginVeleroCfg, useVolumeSnapshots)).To(Succeed())
@@ -157,9 +159,9 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupStorageClassCfg.IncludeResources = "StorageClass"
 				BackupStorageClassCfg.IncludeClusterResources = true
 				//TODO Remove UseRestic parameter once minor version is 1.10 or upper
-				BackupStorageClassCfg.UseRestic = true
+				BackupStorageClassCfg.UseResticIfFSBackup = true
 				if veleroCLI2Version.VeleroVersion == "self" {
-					BackupStorageClassCfg.UseRestic = false
+					BackupStorageClassCfg.UseResticIfFSBackup = false
 				}
 
 				Expect(VeleroBackupNamespace(context.Background(), OriginVeleroCfg.VeleroCLI,
@@ -175,9 +177,9 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupCfg.BackupLocation = ""
 				BackupCfg.Selector = ""
 				//TODO Remove UseRestic parameter once minor version is 1.10 or upper
-				BackupCfg.UseRestic = true
+				BackupCfg.UseResticIfFSBackup = true
 				if veleroCLI2Version.VeleroVersion == "self" {
-					BackupCfg.UseRestic = false
+					BackupCfg.UseResticIfFSBackup = false
 				}
 				Expect(VeleroBackupNamespace(context.Background(), OriginVeleroCfg.VeleroCLI,
 					OriginVeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
@@ -235,6 +237,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 
 				VeleroCfg.ObjectStoreProvider = ""
 				VeleroCfg.ClientToInstallVelero = VeleroCfg.StandbyClient
+				VeleroCfg.UseNodeAgent = !useVolumeSnapshots
+				VeleroCfg.UseRestic = false
 				Expect(VeleroInstall(context.Background(), &VeleroCfg, useVolumeSnapshots)).To(Succeed())
 			})
 

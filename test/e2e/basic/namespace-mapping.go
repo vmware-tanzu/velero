@@ -21,17 +21,24 @@ type NamespaceMapping struct {
 	kibishiiData        *KibishiiData
 }
 
-var OneNamespaceMappingTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: "ns", NSIncluded: &[]string{"ns1"}}})
-var MultiNamespacesMappingTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: "ns", NSIncluded: &[]string{"ns1", "ns2"}}})
+const NamespaceBaseName string = "ns-mp-"
+
+var OneNamespaceMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1"}, UseVolumeSnapshots: false}})
+var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1", NamespaceBaseName + "2"}, UseVolumeSnapshots: false}})
+var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1"}, UseVolumeSnapshots: true}})
+var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1", NamespaceBaseName + "2"}, UseVolumeSnapshots: true}})
 
 func (n *NamespaceMapping) Init() error {
 	n.Client = TestClientInstance
 	n.kibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
-
+	backupType := "restic"
+	if n.UseVolumeSnapshots {
+		backupType = "snapshot"
+	}
 	n.TestMsg = &TestMSG{
-		Desc:      "Backup resources with include namespace test",
-		FailedMSG: "Failed to backup with namespace include",
-		Text:      fmt.Sprintf("should backup namespaces %s", *n.NSIncluded),
+		Desc:      fmt.Sprintf("Restore namespace %s with namespace mapping by %s test", *n.NSIncluded, backupType),
+		FailedMSG: "Failed to restore with namespace mapping",
+		Text:      fmt.Sprintf("should restore namespace %s with namespace mapping by %s", *n.NSIncluded, backupType),
 	}
 	return nil
 }
@@ -49,15 +56,20 @@ func (n *NamespaceMapping) StartRun() error {
 		n.BackupName = n.BackupName + ns
 		n.RestoreName = n.RestoreName + ns
 	}
-	n.BackupName = n.BackupName + "backup-ns-mapping-" + UUIDgen.String()
-	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
+	n.BackupName = n.BackupName + UUIDgen.String()
+	n.RestoreName = n.RestoreName + UUIDgen.String()
 
 	n.MappedNamespaceList = mappedNSList
 	fmt.Println(mappedNSList)
 	n.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
-		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
-		"--default-volumes-to-fs-backup", "--wait",
+		"--include-namespaces", strings.Join(*n.NSIncluded, ","), "--wait",
+	}
+	if n.UseVolumeSnapshots {
+		n.BackupArgs = append(n.BackupArgs, "--snapshot-volumes")
+	} else {
+		n.BackupArgs = append(n.BackupArgs, "--snapshot-volumes=false")
+		n.BackupArgs = append(n.BackupArgs, "--default-volumes-to-fs-backup")
 	}
 	n.RestoreArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", n.RestoreName,

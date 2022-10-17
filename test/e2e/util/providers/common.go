@@ -46,7 +46,7 @@ func ObjectsShouldBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bsl
 func ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string, retryTimes int) error {
 	var err error
 	var exist bool
-	fmt.Printf("|| VERIFICATION || - %s %s should not exist in storage %s\n", subPrefix, backupName, bslPrefix)
+	fmt.Printf("|| VERIFICATION || - %s %s should not exist in object store %s\n", subPrefix, backupName, bslPrefix)
 	for i := 0; i < retryTimes; i++ {
 		exist, err = IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 		if err != nil {
@@ -114,9 +114,9 @@ func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBuck
 	snapshotCheckPoint.ExpectCount = 0
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s is existed in cloud after backup as expected", backupName))
+		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s exist in cloud after backup as expected", backupName))
 	}
-	fmt.Printf("|| EXPECTED || - Snapshots are not existed in cloud, backup %s\n", backupName)
+	fmt.Printf("|| EXPECTED || - Snapshots do not exist in cloud, backup %s\n", backupName)
 	return nil
 }
 
@@ -124,9 +124,9 @@ func SnapshotsShouldBeCreatedInCloud(cloudProvider, cloudCredentialsFile, bslBuc
 	fmt.Printf("|| VERIFICATION || - Snapshots should exist in cloud, backup %s\n", backupName)
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s are not existed in cloud after backup as expected", backupName))
+		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s do not exist in cloud after backup as expected", backupName))
 	}
-	fmt.Printf("|| EXPECTED || - Snapshots are existed in cloud, backup %s\n", backupName)
+	fmt.Printf("|| EXPECTED || - Snapshots exist in cloud, backup %s\n", backupName)
 	return nil
 }
 
