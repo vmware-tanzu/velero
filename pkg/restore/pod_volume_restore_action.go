@@ -36,7 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -68,7 +67,7 @@ func (a *PodVolumeRestoreAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *PodVolumeRestoreAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing PodVolumeRestoreAction")
 	defer a.logger.Info("Done executing PodVolumeRestoreAction")
 
@@ -101,7 +100,7 @@ func (a *PodVolumeRestoreAction) Execute(input *riav1.RestoreItemActionExecuteIn
 	volumeSnapshots := podvolume.GetVolumeBackupsForPod(podVolumeBackups, &pod, podFromBackup.Namespace)
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No pod volume backups found for pod")
-		return riav1.NewRestoreItemActionExecuteOutput(input.Item), nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	log.Info("Pod volume backups for pod found")
@@ -173,7 +172,7 @@ func (a *PodVolumeRestoreAction) Execute(input *riav1.RestoreItemActionExecuteIn
 		return nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
 	}
 
-	return riav1.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
 
 func getCommand(log logrus.FieldLogger, config *corev1.ConfigMap) []string {

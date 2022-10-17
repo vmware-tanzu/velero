@@ -1152,7 +1152,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 
 		ctx.log.Infof("Executing item action for %v", &groupResource)
-		executeOutput, err := action.RestoreItemAction.Execute(&riav1.RestoreItemActionExecuteInput{
+		executeOutput, err := action.RestoreItemAction.Execute(&velero.RestoreItemActionExecuteInput{
 			Item:           obj,
 			ItemFromBackup: itemFromBackup,
 			Restore:        ctx.restore,

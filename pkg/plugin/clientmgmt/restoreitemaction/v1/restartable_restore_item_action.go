@@ -99,7 +99,7 @@ func (r RestartableRestoreItemAction) AppliesTo() (velero.ResourceSelector, erro
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *RestartableRestoreItemAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (r *RestartableRestoreItemAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err

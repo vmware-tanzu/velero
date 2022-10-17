@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -48,6 +48,6 @@ func TestExecuteForACRDWithAnIntOnAFloat64FieldShouldWork(t *testing.T) {
 
 	a := NewCRDV1PreserveUnknownFieldsAction(test.NewLogger())
 
-	_, err = a.Execute(&riav1.RestoreItemActionExecuteInput{Item: &u})
+	_, err = a.Execute(&velero.RestoreItemActionExecuteInput{Item: &u})
 	require.NoError(t, err)
 }

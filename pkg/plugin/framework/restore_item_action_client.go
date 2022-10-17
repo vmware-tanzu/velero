@@ -73,7 +73,7 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, erro
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -120,7 +120,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *riav1.RestoreItemActionExec
 		additionalItems = append(additionalItems, newItem)
 	}
 
-	return &riav1.RestoreItemActionExecuteOutput{
+	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &updatedItem,
 		AdditionalItems: additionalItems,
 		SkipRestore:     res.SkipRestore,

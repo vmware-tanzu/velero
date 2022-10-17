@@ -28,7 +28,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -230,7 +229,7 @@ func TestPodActionExecute(t *testing.T) {
 			unstructuredPod, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, err := action.Execute(&riav1.RestoreItemActionExecuteInput{
+			res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: unstructuredPod},
 				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredPod},
 				Restore:        nil,

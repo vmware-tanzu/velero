@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // CRDV1PreserveUnknownFieldsAction will take a CRD and inspect it for the API version and the PreserveUnknownFields value.
@@ -46,7 +45,7 @@ func (c *CRDV1PreserveUnknownFieldsAction) AppliesTo() (velero.ResourceSelector,
 	}, nil
 }
 
-func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *riav1.RestoreItemActionExecuteInput) (*riav1.RestoreItemActionExecuteOutput, error) {
+func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	c.logger.Info("Executing CRDV1PreserveUnknownFieldsAction")
 
 	name, _, err := unstructured.NestedString(input.Item.UnstructuredContent(), "name")
@@ -63,7 +62,7 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *riav1.RestoreItemActio
 
 	// We don't want to "fix" anything in beta CRDs at the moment, just v1 versions with preserveunknownfields = true
 	if version != "apiextensions.k8s.io/v1" {
-		return &riav1.RestoreItemActionExecuteOutput{
+		return &velero.RestoreItemActionExecuteOutput{
 			UpdatedItem: input.Item,
 		}, nil
 	}
@@ -103,7 +102,7 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *riav1.RestoreItemActio
 		return nil, errors.Wrap(err, "unable to convert crd to runtime.Unstructured")
 	}
 
-	return &riav1.RestoreItemActionExecuteOutput{
+	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &unstructured.Unstructured{Object: res},
 	}, nil
 }

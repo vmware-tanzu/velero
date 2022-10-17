@@ -28,7 +28,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -101,7 +100,7 @@ func TestAddPVCFromPodActionExecute(t *testing.T) {
 
 			action := &AddPVCFromPodAction{logger: velerotest.NewLogger()}
 
-			input := &riav1.RestoreItemActionExecuteInput{
+			input := &velero.RestoreItemActionExecuteInput{
 				Item: &unstructured.Unstructured{Object: itemData},
 			}
 
