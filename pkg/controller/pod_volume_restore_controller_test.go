@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -120,7 +120,7 @@ func TestShouldProcess(t *testing.T) {
 					NodeName: controllerNode,
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 					},
 				},
@@ -160,7 +160,7 @@ func TestShouldProcess(t *testing.T) {
 					NodeName: controllerNode,
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 					},
 				},
@@ -205,7 +205,7 @@ func TestShouldProcess(t *testing.T) {
 	}
 }
 
-func TestIsResticContainerRunning(t *testing.T) {
+func TestIsInitContainerRunning(t *testing.T) {
 	tests := []struct {
 		name     string
 		pod      *corev1api.Pod
@@ -222,7 +222,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "pod with running init container that's not restic should return false",
+			name: "pod with running init container that's not restore init should return false",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -231,7 +231,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 					},
 				},
@@ -248,7 +248,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "pod with running restic init container that's not first should still work",
+			name: "pod with running init container that's not first should still work",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -257,10 +257,10 @@ func TestIsResticContainerRunning(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 					},
 				},
@@ -282,7 +282,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "pod with restic init container as first initContainer that's not running should return false",
+			name: "pod with init container as first initContainer that's not running should return false",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -291,10 +291,10 @@ func TestIsResticContainerRunning(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 					},
 				},
@@ -314,7 +314,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "pod with running restic init container as first initContainer should return true",
+			name: "pod with running init container as first initContainer should return true",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -323,10 +323,10 @@ func TestIsResticContainerRunning(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 					},
 				},
@@ -348,7 +348,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "pod with restic init container with empty InitContainerStatuses should return 0",
+			name: "pod with init container with empty InitContainerStatuses should return 0",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -357,7 +357,7 @@ func TestIsResticContainerRunning(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 					},
 				},
@@ -371,12 +371,12 @@ func TestIsResticContainerRunning(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, isResticInitContainerRunning(test.pod))
+			assert.Equal(t, test.expected, isInitContainerRunning(test.pod))
 		})
 	}
 }
 
-func TestGetResticInitContainerIndex(t *testing.T) {
+func TestGetInitContainerIndex(t *testing.T) {
 	tests := []struct {
 		name     string
 		pod      *corev1api.Pod
@@ -393,7 +393,7 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 			expected: -1,
 		},
 		{
-			name: "pod with no restic init container return -1",
+			name: "pod with no init container return -1",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -402,7 +402,7 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 					},
 				},
@@ -410,7 +410,7 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 			expected: -1,
 		},
 		{
-			name: "pod with restic container as second initContainern should return 1",
+			name: "pod with container as second initContainern should return 1",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -419,10 +419,10 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 					},
 				},
@@ -430,7 +430,7 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name: "pod with restic init container as first initContainer should return 0",
+			name: "pod with init container as first initContainer should return 0",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -439,10 +439,10 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 					},
 				},
@@ -450,7 +450,7 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 			expected: 0,
 		},
 		{
-			name: "pod with restic init container as first initContainer should return 0",
+			name: "pod with init container as first initContainer should return 0",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
@@ -459,10 +459,10 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
 						{
-							Name: podvolume.InitContainer,
+							Name: restorehelper.WaitInitContainer,
 						},
 						{
-							Name: "non-restic-init",
+							Name: "non-restore-init",
 						},
 					},
 				},
@@ -473,7 +473,7 @@ func TestGetResticInitContainerIndex(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, getResticInitContainerIndex(test.pod))
+			assert.Equal(t, test.expected, getInitContainerIndex(test.pod))
 		})
 	}
 }

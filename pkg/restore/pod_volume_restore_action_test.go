@@ -49,7 +49,7 @@ func TestGetImage(t *testing.T) {
 		}
 	}
 
-	defaultImage := veleroimage.DefaultResticRestoreHelperImage()
+	defaultImage := veleroimage.DefaultRestoreHelperImage()
 
 	tests := []struct {
 		name             string
@@ -110,8 +110,8 @@ func TestGetImage(t *testing.T) {
 	}
 }
 
-// TestResticRestoreActionExecute tests the restic restore item action plugin's Execute method.
-func TestResticRestoreActionExecute(t *testing.T) {
+// TestPodVolumeRestoreActionExecute tests the pod volume restore item action plugin's Execute method.
+func TestPodVolumeRestoreActionExecute(t *testing.T) {
 	resourceReqs, _ := kube.ParseResourceRequirements(
 		defaultCPURequestLimit, defaultMemRequestLimit, // requests
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
@@ -125,7 +125,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		veleroNs    = "velero"
 	)
 
-	defaultResticRestoreHelperImage := veleroimage.DefaultResticRestoreHelperImage()
+	defaultRestoreHelperImage := veleroimage.DefaultRestoreHelperImage()
 
 	tests := []struct {
 		name             string
@@ -135,7 +135,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		want             *corev1api.Pod
 	}{
 		{
-			name: "Restoring pod with no other initContainers adds the restic initContainer",
+			name: "Restoring pod with no other initContainers adds the restore initContainer",
 			pod: builder.ForPod("ns-1", "my-pod").ObjectMeta(
 				builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				Result(),
@@ -143,14 +143,14 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				InitContainers(
-					newResticInitContainerBuilder(defaultResticRestoreHelperImage, "").
+					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
-						Command([]string{"/velero-restic-restore-helper"}).Result()).Result(),
+						Command([]string{"/velero-restore-helper"}).Result()).Result(),
 		},
 		{
-			name: "Restoring pod with other initContainers adds the restic initContainer as the first one",
+			name: "Restoring pod with other initContainers adds the restore initContainer as the first one",
 			pod: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
@@ -160,16 +160,16 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				InitContainers(
-					newResticInitContainerBuilder(defaultResticRestoreHelperImage, "").
+					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
-						Command([]string{"/velero-restic-restore-helper"}).Result(),
+						Command([]string{"/velero-restore-helper"}).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
 		{
-			name: "Restoring pod with other initContainers adds the restic initContainer as the first one using PVB to identify the volumes and not annotations",
+			name: "Restoring pod with other initContainers adds the restore initContainer as the first one using PVB to identify the volumes and not annotations",
 			pod: builder.ForPod("ns-1", "my-pod").
 				Volumes(
 					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
@@ -203,16 +203,16 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/not-used", "")).
 				InitContainers(
-					newResticInitContainerBuilder(defaultResticRestoreHelperImage, "").
+					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).
-						Command([]string{"/velero-restic-restore-helper"}).Result(),
+						Command([]string{"/velero-restore-helper"}).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
 		{
-			name: "Restoring pod in another namespace adds the restic initContainer and uses the namespace of the backup pod for matching PVBs",
+			name: "Restoring pod in another namespace adds the restore initContainer and uses the namespace of the backup pod for matching PVBs",
 			pod: builder.ForPod("new-ns", "my-pod").
 				Volumes(
 					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
@@ -247,11 +247,11 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
 				).
 				InitContainers(
-					newResticInitContainerBuilder(defaultResticRestoreHelperImage, "").
+					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
 						Resources(&resourceReqs).
 						SecurityContext(&securityContext).
 						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).
-						Command([]string{"/velero-restic-restore-helper"}).Result()).
+						Command([]string{"/velero-restore-helper"}).Result()).
 				Result(),
 		},
 	}
@@ -291,7 +291,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					Result(),
 			}
 
-			a := NewResticRestoreAction(
+			a := NewPodVolumeRestoreAction(
 				logrus.StandardLogger(),
 				clientset.CoreV1().ConfigMaps(veleroNs),
 				clientsetVelero.VeleroV1().PodVolumeBackups(veleroNs),

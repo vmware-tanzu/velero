@@ -1675,7 +1675,7 @@ func TestHandleRestoreHooks(t *testing.T) {
 			},
 		},
 		{
-			name: "should preserve restic-wait init container when it is the only existing init container",
+			name: "should preserve restore-wait init container when it is the only existing init container",
 			podInput: corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "app1",
@@ -1683,8 +1683,8 @@ func TestHandleRestoreHooks(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
-						*builder.ForContainer("restic-wait", "bus-box").
-							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("restore-wait", "bus-box").
+							Command([]string{"pod-volume-restore"}).Result(),
 					},
 				},
 			},
@@ -1696,8 +1696,8 @@ func TestHandleRestoreHooks(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
-						*builder.ForContainer("restic-wait", "bus-box").
-							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("restore-wait", "bus-box").
+							Command([]string{"pod-volume-restore"}).Result(),
 						*builder.ForContainer("restore-init-container-1", "nginx").
 							Command([]string{"a", "b", "c"}).Result(),
 						*builder.ForContainer("restore-init-container-2", "nginx").
@@ -1729,7 +1729,7 @@ func TestHandleRestoreHooks(t *testing.T) {
 		},
 
 		{
-			name: "should preserve restic-wait init container when it exits with other init containers",
+			name: "should preserve restore-wait init container when it exits with other init containers",
 			podInput: corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "app1",
@@ -1737,8 +1737,8 @@ func TestHandleRestoreHooks(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
-						*builder.ForContainer("restic-wait", "bus-box").
-							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("restore-wait", "bus-box").
+							Command([]string{"pod-volume-restore"}).Result(),
 						*builder.ForContainer("init-app-step1", "busy-box").
 							Command([]string{"init-step1"}).Result(),
 						*builder.ForContainer("init-app-step2", "busy-box").
@@ -1754,8 +1754,8 @@ func TestHandleRestoreHooks(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					InitContainers: []corev1api.Container{
-						*builder.ForContainer("restic-wait", "bus-box").
-							Command([]string{"restic-restore"}).Result(),
+						*builder.ForContainer("restore-wait", "bus-box").
+							Command([]string{"pod-volume-restore"}).Result(),
 						*builder.ForContainer("restore-init-container-1", "nginx").
 							Command([]string{"a", "b", "c"}).Result(),
 						*builder.ForContainer("restore-init-container-2", "nginx").
