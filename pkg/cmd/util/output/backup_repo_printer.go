@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	resticRepoColumns = []metav1.TableColumnDefinition{
+	backupRepoColumns = []metav1.TableColumnDefinition{
 		// name needs Type and Format defined for the decorator to identify it:
 		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
 		{Name: "Name", Type: "string", Format: "name"},
@@ -33,16 +33,16 @@ var (
 	}
 )
 
-func printResticRepoList(list *v1.BackupRepositoryList) []metav1.TableRow {
+func printBackupRepoList(list *v1.BackupRepositoryList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		rows = append(rows, printResticRepo(&list.Items[i])...)
+		rows = append(rows, printBackupRepo(&list.Items[i])...)
 	}
 	return rows
 }
 
-func printResticRepo(repo *v1.BackupRepository) []metav1.TableRow {
+func printBackupRepo(repo *v1.BackupRepository) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: repo},
 	}

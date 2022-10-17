@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	credentialsSecretName = "velero-restic-credentials"
+	credentialsSecretName = "velero-repo-credentials"
 	credentialsKey        = "repository-password"
 
 	encryptionKey = "static-passw0rd"
@@ -65,10 +65,10 @@ func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespac
 }
 
 // RepoKeySelector returns the SecretKeySelector which can be used to fetch
-// the restic repository key.
+// the backup repository key.
 func RepoKeySelector() *corev1api.SecretKeySelector {
-	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
-	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
+	// For now, all backup repos share the same key so we don't need the repoName to fetch it.
+	// When we move to full-backup encryption, we'll likely have a separate key per backup repo
 	// (all within the Velero server's namespace) so RepoKeySelector will need to select the key
 	// for that repo.
 	return builder.ForSecretKeySelector(credentialsSecretName, credentialsKey).Result()

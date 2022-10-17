@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	resticTimeout             = time.Minute
+	snapshotDeleteTimeout     = time.Minute
 	deleteBackupRequestMaxAge = 24 * time.Hour
 )
 
@@ -302,8 +302,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 		}
 	}
-	log.Info("Removing restic snapshots")
-	if deleteErrs := r.deleteResticSnapshots(ctx, backup); len(deleteErrs) > 0 {
+	log.Info("Removing pod volume snapshots")
+	if deleteErrs := r.deletePodVolumeSnapshots(ctx, backup); len(deleteErrs) > 0 {
 		for _, err := range deleteErrs {
 			errs = append(errs, err.Error())
 		}
@@ -436,7 +436,7 @@ func (r *backupDeletionReconciler) deleteExistingDeletionRequests(ctx context.Co
 	return errs
 }
 
-func (r *backupDeletionReconciler) deleteResticSnapshots(ctx context.Context, backup *velerov1api.Backup) []error {
+func (r *backupDeletionReconciler) deletePodVolumeSnapshots(ctx context.Context, backup *velerov1api.Backup) []error {
 	if r.repoMgr == nil {
 		return nil
 	}
@@ -446,7 +446,7 @@ func (r *backupDeletionReconciler) deleteResticSnapshots(ctx context.Context, ba
 		return []error{err}
 	}
 
-	ctx2, cancelFunc := context.WithTimeout(ctx, resticTimeout)
+	ctx2, cancelFunc := context.WithTimeout(ctx, snapshotDeleteTimeout)
 	defer cancelFunc()
 
 	var errs []error
@@ -493,7 +493,7 @@ func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *vele
 	return backup, nil
 }
 
-// getSnapshotsInBackup returns a list of all restic snapshot ids associated with
+// getSnapshotsInBackup returns a list of all pod volume snapshot ids associated with
 // a given Velero backup.
 func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbClient client.Client) ([]repository.SnapshotIdentifier, error) {
 	podVolumeBackups := &velerov1api.PodVolumeBackupList{}

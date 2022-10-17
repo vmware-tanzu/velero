@@ -24,7 +24,7 @@ import (
 )
 
 // pvcSnapshotTracker keeps track of persistent volume claims that have been snapshotted
-// with restic.
+// with pod volume backup.
 type pvcSnapshotTracker struct {
 	pvcs sets.String
 }

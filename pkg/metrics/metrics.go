@@ -28,8 +28,8 @@ type ServerMetrics struct {
 }
 
 const (
-	metricNamespace        = "velero"
-	resticMetricsNamespace = "restic"
+	metricNamespace           = "velero"
+	podVolumeMetricsNamespace = "podVolume"
 	//Velero metrics
 	backupTarballSizeBytesGauge   = "backup_tarball_size_bytes"
 	backupTotal                   = "backup_total"
@@ -58,18 +58,18 @@ const (
 	csiSnapshotSuccessTotal       = "csi_snapshot_success_total"
 	csiSnapshotFailureTotal       = "csi_snapshot_failure_total"
 
-	// Restic metrics
-	podVolumeBackupEnqueueTotal        = "pod_volume_backup_enqueue_count"
-	podVolumeBackupDequeueTotal        = "pod_volume_backup_dequeue_count"
-	resticOperationLatencySeconds      = "restic_operation_latency_seconds"
-	resticOperationLatencyGaugeSeconds = "restic_operation_latency_seconds_gauge"
+	// pod volume metrics
+	podVolumeBackupEnqueueTotal           = "pod_volume_backup_enqueue_count"
+	podVolumeBackupDequeueTotal           = "pod_volume_backup_dequeue_count"
+	podVolumeOperationLatencySeconds      = "pod_volume_operation_latency_seconds"
+	podVolumeOperationLatencyGaugeSeconds = "pod_volume_operation_latency_seconds_gauge"
 
 	// Labels
-	nodeMetricLabel      = "node"
-	resticOperationLabel = "operation"
-	pvbNameLabel         = "pod_volume_backup"
-	scheduleLabel        = "schedule"
-	backupNameLabel      = "backupName"
+	nodeMetricLabel         = "node"
+	podVolumeOperationLabel = "operation"
+	pvbNameLabel            = "pod_volume_backup"
+	scheduleLabel           = "schedule"
+	backupNameLabel         = "backupName"
 )
 
 // NewServerMetrics returns new ServerMetrics
@@ -297,12 +297,12 @@ func NewServerMetrics() *ServerMetrics {
 	}
 }
 
-func NewResticServerMetrics() *ServerMetrics {
+func NewPodVolumeMetrics() *ServerMetrics {
 	return &ServerMetrics{
 		metrics: map[string]prometheus.Collector{
 			podVolumeBackupEnqueueTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: resticMetricsNamespace,
+					Namespace: podVolumeMetricsNamespace,
 					Name:      podVolumeBackupEnqueueTotal,
 					Help:      "Total number of pod_volume_backup objects enqueued",
 				},
@@ -310,25 +310,25 @@ func NewResticServerMetrics() *ServerMetrics {
 			),
 			podVolumeBackupDequeueTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: resticMetricsNamespace,
+					Namespace: podVolumeMetricsNamespace,
 					Name:      podVolumeBackupDequeueTotal,
 					Help:      "Total number of pod_volume_backup objects dequeued",
 				},
 				[]string{nodeMetricLabel},
 			),
-			resticOperationLatencyGaugeSeconds: prometheus.NewGaugeVec(
+			podVolumeOperationLatencyGaugeSeconds: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
-					Namespace: resticMetricsNamespace,
-					Name:      resticOperationLatencyGaugeSeconds,
-					Help:      "Gauge metric indicating time taken, in seconds, to perform restic operations",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      podVolumeOperationLatencyGaugeSeconds,
+					Help:      "Gauge metric indicating time taken, in seconds, to perform pod volume operations",
 				},
-				[]string{nodeMetricLabel, resticOperationLabel, backupNameLabel, pvbNameLabel},
+				[]string{nodeMetricLabel, podVolumeOperationLabel, backupNameLabel, pvbNameLabel},
 			),
-			resticOperationLatencySeconds: prometheus.NewHistogramVec(
+			podVolumeOperationLatencySeconds: prometheus.NewHistogramVec(
 				prometheus.HistogramOpts{
-					Namespace: resticMetricsNamespace,
-					Name:      resticOperationLatencySeconds,
-					Help:      "Time taken to complete restic operations, in seconds",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      podVolumeOperationLatencySeconds,
+					Help:      "Time taken to complete pod volume operations, in seconds",
 					Buckets: []float64{
 						toSeconds(1 * time.Minute),
 						toSeconds(5 * time.Minute),
@@ -341,7 +341,7 @@ func NewResticServerMetrics() *ServerMetrics {
 						toSeconds(4 * time.Hour),
 					},
 				},
-				[]string{nodeMetricLabel, resticOperationLabel, backupNameLabel, pvbNameLabel},
+				[]string{nodeMetricLabel, podVolumeOperationLabel, backupNameLabel, pvbNameLabel},
 			),
 		},
 	}
@@ -422,7 +422,7 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 }
 
 // InitSchedule initializes counter metrics for a node.
-func (m *ServerMetrics) InitResticMetricsForNode(node string) {
+func (m *ServerMetrics) InitPodVolumeMetricsForNode(node string) {
 	if c, ok := m.metrics[podVolumeBackupEnqueueTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(node).Add(0)
 	}
@@ -445,16 +445,16 @@ func (m *ServerMetrics) RegisterPodVolumeBackupDequeue(node string) {
 	}
 }
 
-// ObserveResticOpLatency records the number of seconds a restic operation took.
-func (m *ServerMetrics) ObserveResticOpLatency(node, pvbName, opName, backupName string, seconds float64) {
-	if h, ok := m.metrics[resticOperationLatencySeconds].(*prometheus.HistogramVec); ok {
+// ObservePodVolumeOpLatency records the number of seconds a pod volume operation took.
+func (m *ServerMetrics) ObservePodVolumeOpLatency(node, pvbName, opName, backupName string, seconds float64) {
+	if h, ok := m.metrics[podVolumeOperationLatencySeconds].(*prometheus.HistogramVec); ok {
 		h.WithLabelValues(node, opName, backupName, pvbName).Observe(seconds)
 	}
 }
 
-// RegisterResticOpLatencyGauge registers the restic operation latency as a gauge metric.
-func (m *ServerMetrics) RegisterResticOpLatencyGauge(node, pvbName, opName, backupName string, seconds float64) {
-	if g, ok := m.metrics[resticOperationLatencyGaugeSeconds].(*prometheus.GaugeVec); ok {
+// RegisterPodVolumeOpLatencyGauge registers the pod volume operation latency as a gauge metric.
+func (m *ServerMetrics) RegisterPodVolumeOpLatencyGauge(node, pvbName, opName, backupName string, seconds float64) {
+	if g, ok := m.metrics[podVolumeOperationLatencyGaugeSeconds].(*prometheus.GaugeVec); ok {
 		g.WithLabelValues(node, opName, backupName, pvbName).Set(seconds)
 	}
 }

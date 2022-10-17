@@ -94,7 +94,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				}
 			}
 
-			s := &resticServer{
+			s := &nodeAgentServer{
 				logger:     testutil.NewLogger(),
 				fileSystem: fs,
 			}

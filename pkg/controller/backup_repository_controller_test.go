@@ -33,12 +33,12 @@ import (
 
 const testMaintenanceFrequency = 10 * time.Minute
 
-func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *ResticRepoReconciler {
+func mockBackupRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
 	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
 	}
-	return NewResticRepoReconciler(
+	return NewBackupRepoReconciler(
 		velerov1api.DefaultNamespace,
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),
@@ -47,7 +47,7 @@ func mockResticRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mo
 	)
 }
 
-func mockResticRepositoryCR() *velerov1api.BackupRepository {
+func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 	return &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1api.DefaultNamespace,
@@ -60,22 +60,22 @@ func mockResticRepositoryCR() *velerov1api.BackupRepository {
 
 }
 
-func TestPatchResticRepository(t *testing.T) {
-	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "", nil, nil)
+func TestPatchBackupRepository(t *testing.T) {
+	rr := mockBackupRepositoryCR()
+	reconciler := mockBackupRepoReconciler(t, rr, "", nil, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
-	err = reconciler.patchResticRepository(context.Background(), rr, repoReady())
+	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
-	err = reconciler.patchResticRepository(context.Background(), rr, repoNotReady("not ready"))
+	err = reconciler.patchBackupRepository(context.Background(), rr, repoNotReady("not ready"))
 	assert.NoError(t, err)
 	assert.NotEqual(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
-	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
+	rr := mockBackupRepositoryCR()
+	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
@@ -88,8 +88,8 @@ func TestCheckNotReadyRepo(t *testing.T) {
 }
 
 func TestRunMaintenanceIfDue(t *testing.T) {
-	rr := mockResticRepositoryCR()
-	reconciler := mockResticRepoReconciler(t, rr, "PruneRepo", rr, nil)
+	rr := mockBackupRepositoryCR()
+	reconciler := mockBackupRepoReconciler(t, rr, "PruneRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
@@ -105,9 +105,9 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 }
 
 func TestInitializeRepo(t *testing.T) {
-	rr := mockResticRepositoryCR()
+	rr := mockBackupRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
-	reconciler := mockResticRepoReconciler(t, rr, "PrepareRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -127,7 +127,7 @@ func TestInitializeRepo(t *testing.T) {
 	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 }
 
-func TestResticRepoReconcile(t *testing.T) {
+func TestBackupRepoReconcile(t *testing.T) {
 	tests := []struct {
 		name      string
 		repo      *velerov1api.BackupRepository
@@ -178,7 +178,7 @@ func TestResticRepoReconcile(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			reconciler := mockResticRepoReconciler(t, test.repo, "", test.repo, nil)
+			reconciler := mockBackupRepoReconciler(t, test.repo, "", test.repo, nil)
 			err := reconciler.Client.Create(context.TODO(), test.repo)
 			assert.NoError(t, err)
 			_, err = reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: test.repo.Name}})
@@ -227,7 +227,7 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mgr := repomokes.Manager{}
 			mgr.On("DefaultMaintenanceFrequency", mock.Anything).Return(test.freqReturn, test.freqError)
-			reconciler := NewResticRepoReconciler(
+			reconciler := NewBackupRepoReconciler(
 				velerov1api.DefaultNamespace,
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),

@@ -94,7 +94,7 @@ func TestRemoveControllers(t *testing.T) {
 				controller.BackupSync,
 				controller.DownloadRequest,
 				controller.GarbageCollection,
-				controller.ResticRepo,
+				controller.BackupRepo,
 				controller.Restore,
 				controller.Schedule,
 				controller.ServerStatusRequest,
@@ -130,7 +130,7 @@ func TestRemoveControllers(t *testing.T) {
 				controller.ServerStatusRequest: {},
 				controller.Schedule:            {},
 				controller.BackupDeletion:      {},
-				controller.ResticRepo:          {},
+				controller.BackupRepo:          {},
 				controller.DownloadRequest:     {},
 			}
 
