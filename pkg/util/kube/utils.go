@@ -125,7 +125,7 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 
 	for _, item := range pod.Spec.Volumes {
 		if item.Name == volumeName {
-			volume = &item
+			volume = &item //nolint
 			break
 		}
 	}

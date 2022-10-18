@@ -102,7 +102,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					}
 				}
 
-				s := output.DescribeBackup(context.Background(), kbClient, &backup, deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+				s := output.DescribeBackup(context.Background(), kbClient, &backup, deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile) //nolint
 				if first {
 					first = false
 					fmt.Print(s)

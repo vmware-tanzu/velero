@@ -463,7 +463,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 func (c *restoreController) runValidatedRestore(restore *api.Restore, info backupInfo) error {
 	// instantiate the per-restore logger that will output both to a temp file
 	// (for upload to object storage) and to stdout.
-	restoreLog, err := newRestoreLogger(restore, c.logger, c.restoreLogLevel, c.logFormat)
+	restoreLog, err := newRestoreLogger(restore, c.restoreLogLevel, c.logFormat)
 	if err != nil {
 		return err
 	}
@@ -577,14 +577,14 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		"errors":   restoreErrors,
 	}
 
-	if err := putResults(restore, m, info.backupStore, c.logger); err != nil {
+	if err := putResults(restore, m, info.backupStore); err != nil {
 		c.logger.WithError(err).Error("Error uploading restore results to backup storage")
 	}
 
 	return nil
 }
 
-func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore, log logrus.FieldLogger) error {
+func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore) error {
 	buf := new(bytes.Buffer)
 	gzw := gzip.NewWriter(buf)
 	defer gzw.Close()
@@ -669,7 +669,7 @@ type restoreLogger struct {
 	w    *gzip.Writer
 }
 
-func newRestoreLogger(restore *api.Restore, baseLogger logrus.FieldLogger, logLevel logrus.Level, logFormat logging.Format) (*restoreLogger, error) {
+func newRestoreLogger(restore *api.Restore, logLevel logrus.Level, logFormat logging.Format) (*restoreLogger, error) {
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp file")

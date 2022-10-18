@@ -323,7 +323,7 @@ func (b *backupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locati
 			continue
 		}
 
-		if err := b.client.Delete(ctx, &backup, &client.DeleteOptions{}); err != nil {
+		if err := b.client.Delete(ctx, &backup, &client.DeleteOptions{}); err != nil { //nolint
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")
@@ -347,7 +347,7 @@ func (b *backupSyncReconciler) deleteCSISnapshotsByBackup(ctx context.Context, b
 		for _, vs := range vsList.Items {
 			name := kube.NamespaceAndName(vs.GetObjectMeta())
 			log.Debugf("Deleting volumesnapshot %s", name)
-			if err := b.client.Delete(context.TODO(), &vs); err != nil {
+			if err := b.client.Delete(context.TODO(), &vs); err != nil { //nolint
 				log.WithError(err).Warnf("Failed to delete volumesnapshot %s", name)
 			}
 		}
@@ -379,11 +379,11 @@ func backupSyncSourceOrderFunc(objList client.ObjectList) client.ObjectList {
 			bslArray = append(bslArray, &inputBSLList.Items[i])
 			// append everything before the default
 			for _, bsl := range inputBSLList.Items[:i] {
-				bslArray = append(bslArray, &bsl)
+				bslArray = append(bslArray, &bsl) //nolint
 			}
 			// append everything after the default
 			for _, bsl := range inputBSLList.Items[i+1:] {
-				bslArray = append(bslArray, &bsl)
+				bslArray = append(bslArray, &bsl) //nolint
 			}
 			meta.SetList(resultBSLList, bslArray)
 

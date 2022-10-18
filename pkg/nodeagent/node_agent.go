@@ -62,7 +62,7 @@ func IsRunningInNode(ctx context.Context, namespace string, nodeName string, pod
 	}
 
 	for _, pod := range pods.Items {
-		if kube.IsPodRunning(&pod) != nil {
+		if kube.IsPodRunning(&pod) != nil { //nolint
 			continue
 		}
 

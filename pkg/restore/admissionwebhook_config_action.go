@@ -72,13 +72,13 @@ func (a *AdmissionWebhookConfigurationAction) Execute(input *velero.RestoreItemA
 	newWebhooks := make([]interface{}, 0)
 	for i, entry := range webhooks {
 		logger2 := logger.WithField("index", i)
-		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&entry)
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&entry) //nolint
 		if err != nil {
 			logger2.Errorf("failed to convert the webhook entry, error: %v, it will be dropped", err)
 			continue
 		}
 		s, _, _ := unstructured.NestedString(obj, "sideEffects")
-		if s != "None" && s != "NoneOnDryRun" {
+		if s != "None" && s != "NoneOnDryRun" { //nolint
 			logger2.Infof("reset the invalid sideEffects value '%s' to 'None'", s)
 			obj["sideEffects"] = "None"
 		}

@@ -116,7 +116,7 @@ func Run(f client.Factory, o *cli.DeleteOptions) error {
 
 	// Create a backup-location deletion request for each
 	for _, location := range locations.Items {
-		if err := kbClient.Delete(context.Background(), &location, &kbclient.DeleteOptions{}); err != nil {
+		if err := kbClient.Delete(context.Background(), &location, &kbclient.DeleteOptions{}); err != nil { //nolint
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}
@@ -163,7 +163,7 @@ func findAssociatedBackupRepos(client kbclient.Client, bslName, ns string) (vele
 func deleteBackups(client kbclient.Client, backups velerov1api.BackupList) []error {
 	var errs []error
 	for _, backup := range backups.Items {
-		if err := client.Delete(context.Background(), &backup, &kbclient.DeleteOptions{}); err != nil {
+		if err := client.Delete(context.Background(), &backup, &kbclient.DeleteOptions{}); err != nil { //nolint
 			errs = append(errs, errors.WithStack(fmt.Errorf("delete backup %q associated with deleted BSL: %w", backup.Name, err)))
 			continue
 		}
@@ -175,7 +175,7 @@ func deleteBackups(client kbclient.Client, backups velerov1api.BackupList) []err
 func deleteBackupRepos(client kbclient.Client, repos velerov1api.BackupRepositoryList) []error {
 	var errs []error
 	for _, repo := range repos.Items {
-		if err := client.Delete(context.Background(), &repo, &kbclient.DeleteOptions{}); err != nil {
+		if err := client.Delete(context.Background(), &repo, &kbclient.DeleteOptions{}); err != nil { //nolint
 			errs = append(errs, errors.WithStack(fmt.Errorf("delete backup repository %q associated with deleted BSL: %w", repo.Name, err)))
 			continue
 		}
