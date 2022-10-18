@@ -63,12 +63,12 @@ func (fs *osFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
 
-func (fs *osFileSystem) Create(name string) (io.WriteCloser, error) {
+func (fs *osFileSystem) Create(name string) (io.WriteCloser, error) { //nolint
 	return os.Create(name)
 }
 
 func (fs *osFileSystem) OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
-	return os.OpenFile(name, flag, perm)
+	return os.OpenFile(name, flag, perm) //nolint
 }
 
 func (fs *osFileSystem) RemoveAll(path string) error {
@@ -80,7 +80,7 @@ func (fs *osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
 }
 
 func (fs *osFileSystem) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return ioutil.ReadFile(filename) //nolint
 }
 
 func (fs *osFileSystem) DirExists(path string) (bool, error) {

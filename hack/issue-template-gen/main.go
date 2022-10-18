@@ -29,11 +29,11 @@ import (
 
 func main() {
 	outTemplateFilename := os.Args[1]
-	outFile, err := os.OpenFile(outTemplateFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	outFile, err := os.OpenFile(outTemplateFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644) //nolint
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer outFile.Close()
+	defer outFile.Close() //nolint
 	tmpl, err := template.New("ghissue").Parse(bug.IssueTemplate)
 	if err != nil {
 		log.Fatal(err)

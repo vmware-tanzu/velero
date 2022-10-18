@@ -58,7 +58,7 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	if _, err := file.Write(caCert); err != nil {
 		// nothing we can do about an error closing the file here, and we're
 		// already returning an error about the write failing.
-		file.Close()
+		file.Close() //nolint
 		return "", errors.WithStack(err)
 	}
 

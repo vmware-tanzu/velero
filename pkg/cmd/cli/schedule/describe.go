@@ -54,7 +54,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 			first := true
 			for _, schedule := range schedules.Items {
-				s := output.DescribeSchedule(&schedule)
+				s := output.DescribeSchedule(&schedule) //nolint
 				if first {
 					first = false
 					fmt.Print(s)

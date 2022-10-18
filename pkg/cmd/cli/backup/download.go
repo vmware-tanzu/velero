@@ -122,11 +122,11 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	if err != nil {
 		return err
 	}
-	defer backupDest.Close()
+	defer backupDest.Close() //nolint
 
 	err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
 	if err != nil {
-		os.Remove(o.Output)
+		os.Remove(o.Output) //nolint
 		cmd.CheckError(err)
 	}
 

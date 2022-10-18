@@ -114,8 +114,8 @@ func main() {
 		if _, err := io.Copy(gzw, file); err != nil {
 			log.Fatalln(err)
 		}
-		file.Close()
-		gzw.Close()
+		file.Close() //nolint
+		gzw.Close()  //nolint
 
 		data.RawCRDs = append(data.RawCRDs, fmt.Sprintf("%q", buf.Bytes()))
 	}

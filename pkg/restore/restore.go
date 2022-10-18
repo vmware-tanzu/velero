@@ -703,7 +703,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	var nsBytes []byte
 	var err error
 
-	if nsBytes, err = ioutil.ReadFile(path); err != nil {
+	if nsBytes, err = ioutil.ReadFile(path); err != nil { //nolint
 		return &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: remappedName,

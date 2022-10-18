@@ -206,7 +206,7 @@ func getNames(command string, kind common.PluginKind, plugin Interface) []Plugin
 func (s *server) Serve() {
 	if s.flagSet != nil && !s.flagSet.Parsed() {
 		s.log.Debugf("Parsing flags")
-		s.flagSet.Parse(os.Args[1:])
+		s.flagSet.Parse(os.Args[1:]) //nolint
 	}
 
 	s.log.Level = s.logLevelFlag.Parse()

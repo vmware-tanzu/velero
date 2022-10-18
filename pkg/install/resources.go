@@ -242,7 +242,7 @@ func AllCRDs() *unstructured.UnstructuredList {
 
 	for _, crd := range v1crds.CRDs {
 		crd.SetLabels(Labels())
-		appendUnstructured(resources, crd)
+		appendUnstructured(resources, crd) //nolint
 	}
 
 	return resources
@@ -254,28 +254,28 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	resources := AllCRDs()
 
 	ns := Namespace(o.Namespace)
-	appendUnstructured(resources, ns)
+	appendUnstructured(resources, ns) //nolint
 
 	crb := ClusterRoleBinding(o.Namespace)
-	appendUnstructured(resources, crb)
+	appendUnstructured(resources, crb) //nolint
 
 	sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
-	appendUnstructured(resources, sa)
+	appendUnstructured(resources, sa) //nolint
 
 	if o.SecretData != nil {
 		sec := Secret(o.Namespace, o.SecretData)
-		appendUnstructured(resources, sec)
+		appendUnstructured(resources, sec) //nolint
 	}
 
 	if !o.NoDefaultBackupLocation {
 		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig, o.CACertData)
-		appendUnstructured(resources, bsl)
+		appendUnstructured(resources, bsl) //nolint
 	}
 
 	// A snapshot location may not be desirable for users relying on pod volume backup/restore
 	if o.UseVolumeSnapshots {
 		vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
-		appendUnstructured(resources, vsl)
+		appendUnstructured(resources, vsl) //nolint
 	}
 
 	secretPresent := o.SecretData != nil
@@ -309,7 +309,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 
 	deploy := Deployment(o.Namespace, deployOpts...)
 
-	appendUnstructured(resources, deploy)
+	appendUnstructured(resources, deploy) //nolint
 
 	if o.UseNodeAgent {
 		dsOpts := []podTemplateOption{
@@ -323,7 +323,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
 		}
 		ds := DaemonSet(o.Namespace, dsOpts...)
-		appendUnstructured(resources, ds)
+		appendUnstructured(resources, ds) //nolint
 	}
 
 	return resources

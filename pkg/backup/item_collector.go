@@ -372,7 +372,7 @@ func (r *itemCollector) writeToFile(item *unstructured.Unstructured) (string, er
 	if err != nil {
 		return "", errors.Wrap(err, "error creating temp file")
 	}
-	defer f.Close()
+	defer f.Close() //nolint
 
 	jsonBytes, err := json.Marshal(item)
 	if err != nil {

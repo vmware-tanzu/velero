@@ -20,7 +20,7 @@ import "os"
 
 const (
 	// GCP specific environment variable
-	gcpCredentialsFileEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
+	gcpCredentialsFileEnvVar = "GOOGLE_APPLICATION_CREDENTIALS" //nolint
 )
 
 // GetGCPResticEnvVars gets the environment variables that restic relies

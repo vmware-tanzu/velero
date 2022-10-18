@@ -153,10 +153,10 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 	}
 
 	scheme := runtime.NewScheme()
-	velerov1api.AddToScheme(scheme)
-	k8scheme.AddToScheme(scheme)
-	apiextv1beta1.AddToScheme(scheme)
-	apiextv1.AddToScheme(scheme)
+	velerov1api.AddToScheme(scheme)   //nolint
+	k8scheme.AddToScheme(scheme)      //nolint
+	apiextv1beta1.AddToScheme(scheme) //nolint
+	apiextv1.AddToScheme(scheme)      //nolint
 	kubebuilderClient, err := kbclient.New(clientConfig, kbclient.Options{
 		Scheme: scheme,
 	})

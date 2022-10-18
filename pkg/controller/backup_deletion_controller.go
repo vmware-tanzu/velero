@@ -329,7 +329,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if restore.Spec.BackupName != backup.Name {
 				continue
 			}
-			restoreLog := log.WithField("restore", kube.NamespaceAndName(&restore))
+			restoreLog := log.WithField("restore", kube.NamespaceAndName(&restore)) //nolint
 
 			restoreLog.Info("Deleting restore log/results from backup storage")
 			if err := backupStore.DeleteRestore(restore.Name); err != nil {
@@ -339,8 +339,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 
 			restoreLog.Info("Deleting restore referencing backup")
-			if err := r.Delete(ctx, &restore); err != nil {
-				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(&restore)).Error())
+			if err := r.Delete(ctx, &restore); err != nil { //nolint
+				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(&restore)).Error()) //nolint
 			}
 		}
 	}
@@ -427,7 +427,7 @@ func (r *backupDeletionReconciler) deleteExistingDeletionRequests(ctx context.Co
 		if dbr.Name == req.Name {
 			continue
 		}
-		if err := r.Delete(ctx, &dbr); err != nil {
+		if err := r.Delete(ctx, &dbr); err != nil { //nolint
 			errs = append(errs, errors.WithStack(err))
 		} else {
 			log.Infof("deletion request '%s' removed.", dbr.Name)

@@ -98,7 +98,7 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 		if err != nil {
 			return err
 		}
-		caCertData, err = ioutil.ReadFile(realPath)
+		caCertData, err = ioutil.ReadFile(realPath) //nolint
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 				break
 			}
 			location.Spec.Default = false
-			if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil {
+			if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil { //nolint
 				return errors.WithStack(err)
 			}
 			break

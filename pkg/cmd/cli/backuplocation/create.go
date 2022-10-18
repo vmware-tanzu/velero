@@ -141,7 +141,7 @@ func (o *CreateOptions) BuildBackupStorageLocation(namespace string, setBackupSy
 		if err != nil {
 			return nil, err
 		}
-		caCertData, err = ioutil.ReadFile(realPath)
+		caCertData, err = ioutil.ReadFile(realPath) //nolint
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +212,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		for _, location := range locations.Items {
 			if location.Spec.Default {
 				location.Spec.Default = false
-				if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil {
+				if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil { //nolint
 					return errors.WithStack(err)
 				}
 				break

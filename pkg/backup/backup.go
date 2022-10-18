@@ -357,7 +357,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 				log.WithError(errors.WithStack(err)).Error("Error opening file containing item")
 				return
 			}
-			defer f.Close()
+			defer f.Close() //nolint
 			defer os.Remove(f.Name())
 
 			if err := json.NewDecoder(f).Decode(&unstructured); err != nil {

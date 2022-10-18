@@ -31,7 +31,7 @@ const (
 	// AWS specific environment variable
 	awsProfileEnvVar         = "AWS_PROFILE"
 	awsProfileKey            = "profile"
-	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE"
+	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE" //nolint
 )
 
 // GetS3ResticEnvVars gets the environment variables that restic

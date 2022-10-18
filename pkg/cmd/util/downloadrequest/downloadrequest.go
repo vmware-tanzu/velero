@@ -91,7 +91,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 
 	var caPool *x509.CertPool
 	if len(caCertFile) > 0 {
-		caCert, err := ioutil.ReadFile(caCertFile)
+		caCert, err := ioutil.ReadFile(caCertFile) //nolint
 		if err != nil {
 			return errors.Wrapf(err, "couldn't open cacert")
 		}
@@ -111,7 +111,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	httpClient := new(http.Client)
 	httpClient.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: insecureSkipTLSVerify,
+			InsecureSkipVerify: insecureSkipTLSVerify, //nolint
 			RootCAs:            caPool,
 		},
 		IdleConnTimeout:       timeout,

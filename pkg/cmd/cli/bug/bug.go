@@ -162,7 +162,7 @@ func getKubectlVersion() (string, error) {
 	case <-time.After(kubectlTimeout):
 		// we don't care about the possible error returned from Kill() here,
 		// just return an empty string
-		kubectlCmd.Process.Kill()
+		kubectlCmd.Process.Kill() //nolint
 		return "", errors.New("timeout waiting for kubectl version")
 
 	case err := <-done:
@@ -207,14 +207,14 @@ func showIssueInBrowser(body string) error {
 	url := issueURL + "?body=" + url.QueryEscape(body)
 	switch runtime.GOOS {
 	case "darwin":
-		return exec.Command("open", url).Start()
+		return exec.Command("open", url).Start() //nolint
 	case "linux":
 		if cmdExistsOnPath("xdg-open") {
-			return exec.Command("xdg-open", url).Start()
+			return exec.Command("xdg-open", url).Start() //nolint
 		}
 		return fmt.Errorf("velero can't open a browser window using the command '%s'", "xdg-open")
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start() //nolint
 	default:
 		return fmt.Errorf("velero can't open a browser window on platform %s", runtime.GOOS)
 	}

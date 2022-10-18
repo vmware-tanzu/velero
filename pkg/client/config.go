@@ -52,11 +52,11 @@ func LoadConfig() (VeleroConfig, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	configFile, err := os.Open(fileName)
+	configFile, err := os.Open(fileName) //nolint
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	defer configFile.Close()
+	defer configFile.Close() //nolint
 
 	var config VeleroConfig
 	if err := json.NewDecoder(configFile).Decode(&config); err != nil {
@@ -76,11 +76,11 @@ func SaveConfig(config VeleroConfig) error {
 		return errors.WithStack(err)
 	}
 
-	configFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	configFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600) //nolint
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer configFile.Close()
+	defer configFile.Close() //nolint
 
 	return json.NewEncoder(configFile).Encode(&config)
 }

@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	credentialsSecretName = "velero-repo-credentials"
+	credentialsSecretName = "velero-repo-credentials" //nolint
 	credentialsKey        = "repository-password"
 
 	encryptionKey = "static-passw0rd"

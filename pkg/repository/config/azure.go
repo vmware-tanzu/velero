@@ -50,7 +50,7 @@ func getSubscriptionID(config map[string]string) string {
 	return os.Getenv(subscriptionIDEnvVar)
 }
 
-func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
+func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) { //nolint
 	credentialsFile := selectCredentialsFile(config)
 
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
