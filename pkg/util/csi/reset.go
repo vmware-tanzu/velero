@@ -27,7 +27,7 @@ import (
 // It will move the snapshot Handle to the source to avoid the snapshot-controller creating a snapshot when it's
 // synced by the backup sync controller.
 // It will return an error if the snapshot handle is not set, which should not happen when this func is called.
-func ResetVolumeSnapshotContent(snapCont snapshotv1api.VolumeSnapshotContent) error {
+func ResetVolumeSnapshotContent(snapCont *snapshotv1api.VolumeSnapshotContent) error {
 	if snapCont.Status != nil && snapCont.Status.SnapshotHandle != nil && len(*snapCont.Status.SnapshotHandle) > 0 {
 		v := *snapCont.Status.SnapshotHandle
 		snapCont.Spec.Source = snapshotv1api.VolumeSnapshotContentSource{
