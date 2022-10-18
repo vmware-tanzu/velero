@@ -68,14 +68,14 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			}
 
 			first := true
-			for _, restore := range restores.Items {
+			for i, restore := range restores.Items {
 				opts := newPodVolumeRestoreListOptions(restore.Name)
 				podvolumeRestoreList, err := veleroClient.VeleroV1().PodVolumeRestores(f.Namespace()).List(context.TODO(), opts)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}
 
-				s := output.DescribeRestore(context.Background(), kbClient, &restore, podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile) //nolint
+				s := output.DescribeRestore(context.Background(), kbClient, &restores.Items[i], podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)

@@ -73,7 +73,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			}
 
 			first := true
-			for _, backup := range backups.Items {
+			for i, backup := range backups.Items {
 				deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
 				deleteRequestList, err := veleroClient.VeleroV1().DeleteBackupRequests(f.Namespace()).List(context.TODO(), deleteRequestListOptions)
 				if err != nil {
@@ -102,7 +102,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					}
 				}
 
-				s := output.DescribeBackup(context.Background(), kbClient, &backup, deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile) //nolint
+				s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)

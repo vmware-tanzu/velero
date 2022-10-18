@@ -112,10 +112,6 @@ func NewCreateOptions() *CreateOptions {
 	}
 }
 
-const (
-	strTrue = "true"
-)
-
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.TTL, "ttl", o.TTL, "How long before the backup can be garbage collected.")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the backup (use '*' for all namespaces).")
@@ -131,13 +127,13 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup. If the parameter is not set, it is treated as setting to 'true'.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
-	f.NoOptDefVal = strTrue
+	f.NoOptDefVal = "true"
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup")
-	f.NoOptDefVal = strTrue
+	f.NoOptDefVal = "true"
 
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
-	f.NoOptDefVal = strTrue
+	f.NoOptDefVal = "true"
 }
 
 // BindWait binds the wait flag separately so it is not called by other create

@@ -325,11 +325,11 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error listing restore API objects")
 	} else {
-		for _, restore := range restoreList.Items {
+		for i, restore := range restoreList.Items {
 			if restore.Spec.BackupName != backup.Name {
 				continue
 			}
-			restoreLog := log.WithField("restore", kube.NamespaceAndName(&restore)) //nolint
+			restoreLog := log.WithField("restore", kube.NamespaceAndName(&restoreList.Items[i]))
 
 			restoreLog.Info("Deleting restore log/results from backup storage")
 			if err := backupStore.DeleteRestore(restore.Name); err != nil {
@@ -339,8 +339,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 
 			restoreLog.Info("Deleting restore referencing backup")
-			if err := r.Delete(ctx, &restore); err != nil { //nolint
-				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(&restore)).Error()) //nolint
+			if err := r.Delete(ctx, &restoreList.Items[i]); err != nil {
+				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(&restoreList.Items[i])).Error())
 			}
 		}
 	}
@@ -423,11 +423,11 @@ func (r *backupDeletionReconciler) deleteExistingDeletionRequests(ctx context.Co
 		return []error{errors.Wrap(err, "error listing existing DeleteBackupRequests for backup")}
 	}
 	var errs []error
-	for _, dbr := range dbrList.Items {
+	for i, dbr := range dbrList.Items {
 		if dbr.Name == req.Name {
 			continue
 		}
-		if err := r.Delete(ctx, &dbr); err != nil { //nolint
+		if err := r.Delete(ctx, &dbrList.Items[i]); err != nil {
 			errs = append(errs, errors.WithStack(err))
 		} else {
 			log.Infof("deletion request '%s' removed.", dbr.Name)

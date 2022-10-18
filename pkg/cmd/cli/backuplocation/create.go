@@ -209,10 +209,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		if err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
 			return errors.WithStack(err)
 		}
-		for _, location := range locations.Items {
+		for i, location := range locations.Items {
 			if location.Spec.Default {
 				location.Spec.Default = false
-				if err := kbClient.Update(context.Background(), &location, &kbclient.UpdateOptions{}); err != nil { //nolint
+				if err := kbClient.Update(context.Background(), &locations.Items[i], &kbclient.UpdateOptions{}); err != nil {
 					return errors.WithStack(err)
 				}
 				break

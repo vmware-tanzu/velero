@@ -317,13 +317,13 @@ func (b *backupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locati
 		return
 	}
 
-	for _, backup := range backupList.Items {
+	for i, backup := range backupList.Items {
 		log = log.WithField("backup", backup.Name)
 		if backup.Status.Phase != velerov1api.BackupPhaseCompleted || backupStoreBackups.Has(backup.Name) {
 			continue
 		}
 
-		if err := b.client.Delete(ctx, &backup, &client.DeleteOptions{}); err != nil { //nolint
+		if err := b.client.Delete(ctx, &backupList.Items[i], &client.DeleteOptions{}); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")
@@ -344,10 +344,10 @@ func (b *backupSyncReconciler) deleteCSISnapshotsByBackup(ctx context.Context, b
 	if err := b.client.List(ctx, &vsList, listOptions); err != nil {
 		log.WithError(err).Warnf("Failed to list volumesnapshots for backup: %s, the deletion will be skipped", backupName)
 	} else {
-		for _, vs := range vsList.Items {
+		for i, vs := range vsList.Items {
 			name := kube.NamespaceAndName(vs.GetObjectMeta())
 			log.Debugf("Deleting volumesnapshot %s", name)
-			if err := b.client.Delete(context.TODO(), &vs); err != nil { //nolint
+			if err := b.client.Delete(context.TODO(), &vsList.Items[i]); err != nil {
 				log.WithError(err).Warnf("Failed to delete volumesnapshot %s", name)
 			}
 		}
@@ -379,11 +379,13 @@ func backupSyncSourceOrderFunc(objList client.ObjectList) client.ObjectList {
 			bslArray = append(bslArray, &inputBSLList.Items[i])
 			// append everything before the default
 			for _, bsl := range inputBSLList.Items[:i] {
-				bslArray = append(bslArray, &bsl) //nolint
+				cpBsl := bsl
+				bslArray = append(bslArray, &cpBsl)
 			}
 			// append everything after the default
 			for _, bsl := range inputBSLList.Items[i+1:] {
-				bslArray = append(bslArray, &bsl) //nolint
+				cpBsl := bsl
+				bslArray = append(bslArray, &cpBsl)
 			}
 			meta.SetList(resultBSLList, bslArray)
 
