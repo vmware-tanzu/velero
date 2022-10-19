@@ -280,12 +280,12 @@ func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context,
 }
 
 func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
-	repoParam, ok := param.(RepoParam)
+	_, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
-	repoPassword, err := getRepoPassword(urp.credentialGetter.FromSecret, repoParam)
+	repoPassword, err := getRepoPassword(urp.credentialGetter.FromSecret)
 	if err != nil {
 		return "", errors.Wrap(err, "error to get repo password")
 	}
@@ -330,7 +330,7 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]s
 	return storeOptions, nil
 }
 
-func getRepoPassword(secretStore credentials.SecretStore, param RepoParam) (string, error) {
+func getRepoPassword(secretStore credentials.SecretStore) (string, error) {
 	if secretStore == nil {
 		return "", errors.New("invalid credentials interface")
 	}

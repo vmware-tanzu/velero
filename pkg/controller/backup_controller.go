@@ -711,7 +711,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		if len(volumeSnapshots) > 0 && len(volumeSnapshotContents) > 0 {
 			c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, backupLog)
 		}
-
 	}
 
 	// Mark completion timestamp before serializing and uploading.
@@ -762,7 +761,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)), volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses); len(errs) > 0 {
+	if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
 
@@ -806,7 +805,6 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 func persistBackup(backup *pkgbackup.Request,
 	backupContents, backupLog *os.File,
 	backupStore persistence.BackupStore,
-	log logrus.FieldLogger,
 	csiVolumeSnapshots []snapshotv1api.VolumeSnapshot,
 	csiVolumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	csiVolumesnapshotClasses []snapshotv1api.VolumeSnapshotClass,
@@ -938,6 +936,9 @@ func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
 		}
 	}
 
+	vsChannel := make(chan snapshotv1api.VolumeSnapshot, len(volumeSnapshots))
+	defer close(vsChannel)
+
 	for index := range volumeSnapshots {
 		volumeSnapshot := volumeSnapshots[index]
 		eg.Go(func() error {
@@ -952,8 +953,8 @@ func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
 				}
 
 				c.logger.Debugf("VolumeSnapshot %s/%s turned into ReadyToUse.", volumeSnapshot.Namespace, volumeSnapshot.Name)
-				// Update the VolumeSnapshot element in the returned array.
-				volumeSnapshot = *tmpVS
+				// Put the ReadyToUse VolumeSnapshot element in the result channel.
+				vsChannel <- *tmpVS
 				return true, nil
 			})
 			if err == wait.ErrWaitTimeout {
@@ -962,7 +963,16 @@ func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
 			return err
 		})
 	}
-	return volumeSnapshots, eg.Wait()
+
+	err := eg.Wait()
+
+	result := make([]snapshotv1api.VolumeSnapshot, 0)
+	length := len(vsChannel)
+	for index := 0; index < length; index++ {
+		result = append(result, <-vsChannel)
+	}
+
+	return result, err
 }
 
 // deleteVolumeSnapshot delete VolumeSnapshot created during backup.
@@ -971,7 +981,8 @@ func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
 // If DeletionPolicy is Retain, just delete it. If DeletionPolicy is Delete, need to
 // change DeletionPolicy to Retain before deleting VS, then change DeletionPolicy back to Delete.
 func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.VolumeSnapshot,
-	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, logger logrus.FieldLogger) {
+	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
+	logger logrus.FieldLogger) {
 	var wg sync.WaitGroup
 	vscMap := make(map[string]snapshotv1api.VolumeSnapshotContent)
 	for _, vsc := range volumeSnapshotContents {

@@ -61,12 +61,12 @@ func IsRunningInNode(ctx context.Context, namespace string, nodeName string, pod
 		return errors.Wrap(err, "failed to list daemonset pods")
 	}
 
-	for _, pod := range pods.Items {
-		if kube.IsPodRunning(&pod) != nil {
+	for i := range pods.Items {
+		if kube.IsPodRunning(&pods.Items[i]) != nil {
 			continue
 		}
 
-		if pod.Spec.NodeName == nodeName {
+		if pods.Items[i].Spec.NodeName == nodeName {
 			return nil
 		}
 	}
