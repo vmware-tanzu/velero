@@ -107,7 +107,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 		d.Printf("\tIncluded:\t%s\n", s)
 		if len(restore.Spec.ExcludedNamespaces) == 0 {
-			s = "<none>"
+			s = emptyDisplay
 		} else {
 			s = strings.Join(restore.Spec.ExcludedNamespaces, ", ")
 		}
@@ -122,7 +122,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 		d.Printf("\tIncluded:\t%s\n", s)
 		if len(restore.Spec.ExcludedResources) == 0 {
-			s = "<none>"
+			s = emptyDisplay
 		} else {
 			s = strings.Join(restore.Spec.ExcludedResources, ", ")
 		}
@@ -134,7 +134,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.DescribeMap("Namespace mappings", restore.Spec.NamespaceMapping)
 
 		d.Println()
-		s = "<none>"
+		s = emptyDisplay
 		if restore.Spec.LabelSelector != nil {
 			s = metav1.FormatLabelSelector(restore.Spec.LabelSelector)
 		}
@@ -149,7 +149,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 
 		d.Println()
-		s = "<none>"
+		s = emptyDisplay
 		if restore.Spec.ExistingResourcePolicy != "" {
 			s = string(restore.Spec.ExistingResourcePolicy)
 		}

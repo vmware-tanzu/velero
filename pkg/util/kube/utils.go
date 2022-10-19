@@ -123,9 +123,9 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (string, error) {
 	var volume *corev1api.Volume
 
-	for _, item := range pod.Spec.Volumes {
-		if item.Name == volumeName {
-			volume = &item
+	for i := range pod.Spec.Volumes {
+		if pod.Spec.Volumes[i].Name == volumeName {
+			volume = &pod.Spec.Volumes[i]
 			break
 		}
 	}

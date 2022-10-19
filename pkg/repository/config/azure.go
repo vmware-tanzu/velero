@@ -50,18 +50,18 @@ func getSubscriptionID(config map[string]string) string {
 	return os.Getenv(subscriptionIDEnvVar)
 }
 
-func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
+func getStorageAccountKey(config map[string]string) (string, error) {
 	credentialsFile := selectCredentialsFile(config)
 
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
-		return "", nil, err
+		return "", err
 	}
 
 	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
 	// exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
-		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
+		return "", errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
 	// Get storage key from secret using key config[storageAccountKeyEnvVarConfigKey]. If the config does not
@@ -69,21 +69,21 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
 		storageKey := os.Getenv(secretKeyEnvVar)
 		if storageKey == "" {
-			return "", env, errors.Errorf("no storage key secret with key %s found", secretKeyEnvVar)
+			return "", errors.Errorf("no storage key secret with key %s found", secretKeyEnvVar)
 		}
 
-		return storageKey, env, nil
+		return storageKey, nil
 	}
 
 	// get subscription ID from object store config or AZURE_SUBSCRIPTION_ID environment variable
 	subscriptionID := getSubscriptionID(config)
 	if subscriptionID == "" {
-		return "", nil, errors.New("azure subscription ID not found in object store's config or in environment variable")
+		return "", errors.New("azure subscription ID not found in object store's config or in environment variable")
 	}
 
 	// we need config["resourceGroup"], config["storageAccount"]
-	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
-		return "", env, errors.Wrap(err, "unable to get all required config values")
+	if err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+		return "", errors.Wrap(err, "unable to get all required config values")
 	}
 
 	// get authorizer from environment in the following order:
@@ -93,7 +93,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	// 4. MSI (managed service identity)
 	authorizer, err := auth.NewAuthorizerFromEnvironment()
 	if err != nil {
-		return "", nil, errors.Wrap(err, "error getting authorizer from environment")
+		return "", errors.Wrap(err, "error getting authorizer from environment")
 	}
 
 	// get storageAccountsClient
@@ -103,10 +103,10 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	// get storage key
 	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey], storagemgmt.Kerb)
 	if err != nil {
-		return "", env, errors.WithStack(err)
+		return "", errors.WithStack(err)
 	}
 	if res.Keys == nil || len(*res.Keys) == 0 {
-		return "", env, errors.New("No storage keys found")
+		return "", errors.New("No storage keys found")
 	}
 
 	var storageKey string
@@ -120,10 +120,10 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	}
 
 	if storageKey == "" {
-		return "", env, errors.New("No storage key with Full permissions found")
+		return "", errors.New("No storage key with Full permissions found")
 	}
 
-	return storageKey, env, nil
+	return storageKey, nil
 }
 
 func mapLookup(data map[string]string) func(string) string {
@@ -136,12 +136,12 @@ func mapLookup(data map[string]string) func(string) string {
 // relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
 // on info in the provided object storage location config map.
 func GetAzureResticEnvVars(config map[string]string) (map[string]string, error) {
-	storageAccountKey, _, err := getStorageAccountKey(config)
+	storageAccountKey, err := getStorageAccountKey(config)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
+	if err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
 		return nil, errors.Wrap(err, "unable to get all required config values")
 	}
 
@@ -191,7 +191,7 @@ func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
 	return &env, errors.WithStack(err)
 }
 
-func getRequiredValues(getValue func(string) string, keys ...string) (map[string]string, error) {
+func getRequiredValues(getValue func(string) string, keys ...string) error {
 	missing := []string{}
 	results := map[string]string{}
 
@@ -204,10 +204,10 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	}
 
 	if len(missing) > 0 {
-		return nil, errors.Errorf("the following keys do not have values: %s", strings.Join(missing, ", "))
+		return errors.Errorf("the following keys do not have values: %s", strings.Join(missing, ", "))
 	}
 
-	return results, nil
+	return nil
 }
 
 // GetAzureStorageDomain gets the Azure storage domain required by a Azure blob connection,
@@ -221,7 +221,7 @@ func GetAzureStorageDomain(config map[string]string) string {
 }
 
 func GetAzureCredentials(config map[string]string) (string, string, error) {
-	storageAccountKey, _, err := getStorageAccountKey(config)
+	storageAccountKey, err := getStorageAccountKey(config)
 	if err != nil {
 		return "", "", err
 	}

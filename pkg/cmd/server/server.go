@@ -969,7 +969,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 		return
 	}
 
-	for _, backup := range backups.Items {
+	for i, backup := range backups.Items {
 		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
@@ -978,7 +978,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 		updated.Status.Phase = velerov1api.BackupPhaseFailed
 		updated.Status.FailureReason = fmt.Sprintf("get a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backup)); err != nil {
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backups.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
 			continue
 		}
@@ -992,7 +992,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		log.WithError(errors.WithStack(err)).Error("failed to list restores")
 		return
 	}
-	for _, restore := range restores.Items {
+	for i, restore := range restores.Items {
 		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
 			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
 			continue
@@ -1001,7 +1001,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		updated.Status.Phase = velerov1api.RestorePhaseFailed
 		updated.Status.FailureReason = fmt.Sprintf("get a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restore)); err != nil {
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restores.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
 			continue
 		}
