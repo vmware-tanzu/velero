@@ -43,28 +43,30 @@ import (
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace                       string
-	Image                           string
-	BucketName                      string
-	Prefix                          string
-	ProviderName                    string
-	PodAnnotations                  flag.Map
-	PodLabels                       flag.Map
-	ServiceAccountAnnotations       flag.Map
-	VeleroPodCPURequest             string
-	VeleroPodMemRequest             string
-	VeleroPodCPULimit               string
-	VeleroPodMemLimit               string
-	ResticPodCPURequest             string
-	ResticPodMemRequest             string
-	ResticPodCPULimit               string
-	ResticPodMemLimit               string
-	RestoreOnly                     bool
-	SecretFile                      string
-	NoSecret                        bool
-	DryRun                          bool
-	BackupStorageConfig             flag.Map
-	VolumeSnapshotConfig            flag.Map
+	Namespace                 string
+	Image                     string
+	BucketName                string
+	Prefix                    string
+	ProviderName              string
+	PodAnnotations            flag.Map
+	PodLabels                 flag.Map
+	ServiceAccountAnnotations flag.Map
+	VeleroPodCPURequest       string
+	VeleroPodMemRequest       string
+	VeleroPodCPULimit         string
+	VeleroPodMemLimit         string
+	NodeAgentPodCPURequest    string
+	NodeAgentPodMemRequest    string
+	NodeAgentPodCPULimit      string
+	NodeAgentPodMemLimit      string
+	RestoreOnly               bool
+	SecretFile                string
+	NoSecret                  bool
+	DryRun                    bool
+	BackupStorageConfig       flag.Map
+	VolumeSnapshotConfig      flag.Map
+	UseNodeAgent              bool
+	//TODO remove UseRestic when migration test out of using it
 	UseRestic                       bool
 	Wait                            bool
 	UseVolumeSnapshots              bool
@@ -86,32 +88,32 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "File containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
 	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "Flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
 	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
-	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and restic server pods. Optional.")
+	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and node agent pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
-	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
-	flags.Var(&o.PodLabels, "pod-labels", "Labels to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
+	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
+	flags.Var(&o.PodLabels, "pod-labels", "Labels to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "Annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
 	flags.StringVar(&o.VeleroPodCPURequest, "velero-pod-cpu-request", o.VeleroPodCPURequest, `CPU request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, `Memory request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodCPULimit, "velero-pod-cpu-limit", o.VeleroPodCPULimit, `CPU limit for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodMemLimit, "velero-pod-mem-limit", o.VeleroPodMemLimit, `Memory limit for Velero pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.ResticPodCPURequest, "restic-pod-cpu-request", o.ResticPodCPURequest, `CPU request for restic pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.ResticPodMemRequest, "restic-pod-mem-request", o.ResticPodMemRequest, `Memory request for restic pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.ResticPodCPULimit, "restic-pod-cpu-limit", o.ResticPodCPULimit, `CPU limit for restic pod. A value of "0" is treated as unbounded. Optional.`)
-	flags.StringVar(&o.ResticPodMemLimit, "restic-pod-mem-limit", o.ResticPodMemLimit, `Memory limit for restic pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.NodeAgentPodCPURequest, "node-agent-pod-cpu-request", o.NodeAgentPodCPURequest, `CPU request for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.NodeAgentPodMemRequest, "node-agent-pod-mem-request", o.NodeAgentPodMemRequest, `Memory request for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.NodeAgentPodCPULimit, "node-agent-pod-cpu-limit", o.NodeAgentPodCPULimit, `CPU limit for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.NodeAgentPodMemLimit, "node-agent-pod-mem-limit", o.NodeAgentPodMemLimit, `Memory limit for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "Configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "Run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "Generate resources, but don't send them to the cluster. Use with -o. Optional.")
-	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "Create restic daemonset. Optional.")
+	flags.BoolVar(&o.UseNodeAgent, "use-node-agent", o.UseNodeAgent, "Create Velero node-agent daemonset. Optional. Velero node-agent hosts Velero modules that need to run in one or more nodes(i.e. Restic, Kopia).")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultRepoMaintenanceFrequency, "default-repo-maintain-frequency", o.DefaultRepoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default. Optional.")
 	flags.DurationVar(&o.GarbageCollectionFrequency, "garbage-collection-frequency", o.GarbageCollectionFrequency, "How often the garbage collection runs for expired backups.(default 1h)")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "Only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
-	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
+	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the node-agent daemonset, if node-agent is enabled")
 	flags.BoolVar(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", o.DefaultVolumesToFsBackup, "Bool flag to configure Velero server to use pod volume file system backup by default for all volumes on all backups. Optional.")
 	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
 }
@@ -130,10 +132,10 @@ func NewInstallOptions() *InstallOptions {
 		VeleroPodMemRequest:       install.DefaultVeleroPodMemRequest,
 		VeleroPodCPULimit:         install.DefaultVeleroPodCPULimit,
 		VeleroPodMemLimit:         install.DefaultVeleroPodMemLimit,
-		ResticPodCPURequest:       install.DefaultResticPodCPURequest,
-		ResticPodMemRequest:       install.DefaultResticPodMemRequest,
-		ResticPodCPULimit:         install.DefaultResticPodCPULimit,
-		ResticPodMemLimit:         install.DefaultResticPodMemLimit,
+		NodeAgentPodCPURequest:    install.DefaultNodeAgentPodCPURequest,
+		NodeAgentPodMemRequest:    install.DefaultNodeAgentPodMemRequest,
+		NodeAgentPodCPULimit:      install.DefaultNodeAgentPodCPULimit,
+		NodeAgentPodMemLimit:      install.DefaultNodeAgentPodMemLimit,
 		// Default to creating a VSL unless we're told otherwise
 		UseVolumeSnapshots:       true,
 		NoDefaultBackupLocation:  false,
@@ -171,7 +173,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	resticPodResources, err := kubeutil.ParseResourceRequirements(o.ResticPodCPURequest, o.ResticPodMemRequest, o.ResticPodCPULimit, o.ResticPodMemLimit)
+	nodeAgentPodResources, err := kubeutil.ParseResourceRequirements(o.NodeAgentPodCPURequest, o.NodeAgentPodMemRequest, o.NodeAgentPodCPULimit, o.NodeAgentPodMemLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -186,10 +188,10 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		PodLabels:                       o.PodLabels.Data(),
 		ServiceAccountAnnotations:       o.ServiceAccountAnnotations.Data(),
 		VeleroPodResources:              veleroPodResources,
-		ResticPodResources:              resticPodResources,
+		NodeAgentPodResources:           nodeAgentPodResources,
 		SecretData:                      secretData,
 		RestoreOnly:                     o.RestoreOnly,
-		UseRestic:                       o.UseRestic,
+		UseNodeAgent:                    o.UseNodeAgent,
 		UseVolumeSnapshots:              o.UseVolumeSnapshots,
 		BSLConfig:                       o.BackupStorageConfig.Data(),
 		VSLConfig:                       o.VolumeSnapshotConfig.Data(),
@@ -216,7 +218,7 @@ A prefix within the bucket and configuration for the backup store location may a
 Additionally, volume snapshot information for the same provider may be supplied.
 
 All required CustomResourceDefinitions will be installed to the server, as well as the
-Velero Deployment and associated Restic DaemonSet.
+Velero Deployment and associated node-agent DaemonSet.
 
 The provided secret data will be created in a Secret named 'cloud-credentials'.
 
@@ -233,7 +235,7 @@ This is useful as a starting point for more customized installations.
 
   # velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.0.0 --bucket backups --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2
 
-  # velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.0.0 --bucket backups --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2 --use-restic
+  # velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.0.0 --bucket backups --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2 --use-node-agent
 
   # velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --wait
 
@@ -241,7 +243,7 @@ This is useful as a starting point for more customized installations.
 
   # velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --velero-pod-cpu-request=1000m --velero-pod-cpu-limit=5000m --velero-pod-mem-request=512Mi --velero-pod-mem-limit=1024Mi
 
-  # velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --restic-pod-cpu-request=1000m --restic-pod-cpu-limit=5000m --restic-pod-mem-request=512Mi --restic-pod-mem-limit=1024Mi
+  # velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --node-agent-pod-cpu-request=1000m --node-agent-pod-cpu-limit=5000m --node-agent-pod-mem-request=512Mi --node-agent-pod-mem-limit=1024Mi
 
   # velero install --provider azure --plugins velero/velero-plugin-for-microsoft-azure:v1.0.0 --bucket $BLOB_CONTAINER --secret-file ./credentials-velero --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]`,
 		Run: func(c *cobra.Command, args []string) {
@@ -302,8 +304,8 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 			return errors.Wrap(err, errorMsg)
 		}
 
-		if o.UseRestic {
-			fmt.Println("Waiting for Velero restic daemonset to be ready.")
+		if o.UseNodeAgent {
+			fmt.Println("Waiting for node-agent daemonset to be ready.")
 			if _, err = install.DaemonSetIsReady(dynamicFactory, o.Namespace); err != nil {
 				return errors.Wrap(err, errorMsg)
 			}
@@ -393,8 +395,8 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		}
 	}
 
-	if o.DefaultVolumesToFsBackup && !o.UseRestic {
-		return errors.New("--use-restic is required when using --default-volumes-to-fs-backup")
+	if o.DefaultVolumesToFsBackup && !o.UseNodeAgent {
+		return errors.New("--use-node-agent is required when using --default-volumes-to-fs-backup")
 	}
 
 	switch {

@@ -46,7 +46,7 @@ import (
 type installOptions struct {
 	*install.InstallOptions
 	RegistryCredentialFile string
-	ResticHelperImage      string
+	RestoreHelperImage     string
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnapshots bool) error {
@@ -87,16 +87,20 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 	veleroInstallOptions.UseVolumeSnapshots = useVolumeSnapshots
-	veleroInstallOptions.UseRestic = !useVolumeSnapshots
+	if !veleroCfg.UseRestic {
+		veleroInstallOptions.UseNodeAgent = !useVolumeSnapshots
+	}
+	veleroInstallOptions.UseRestic = veleroCfg.UseRestic
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
+	veleroInstallOptions.UploaderType = veleroCfg.UploaderType
 	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
 	veleroInstallOptions.GarbageCollectionFrequency = GCFrequency
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
 		InstallOptions:         veleroInstallOptions,
 		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
-		ResticHelperImage:      veleroCfg.ResticHelperImage,
+		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
 	})
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
@@ -171,6 +175,9 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	if len(options.Image) > 0 {
 		args = append(args, "--image", options.Image)
 	}
+	if options.UseNodeAgent {
+		args = append(args, "--use-node-agent")
+	}
 	if options.UseRestic {
 		args = append(args, "--use-restic")
 	}
@@ -213,14 +220,18 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 		args = append(args, fmt.Sprintf("--garbage-collection-frequency=%v", options.GarbageCollectionFrequency))
 	}
 
-	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.ResticHelperImage); err != nil {
+	if len(options.UploaderType) > 0 {
+		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
+	}
+
+	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.RestoreHelperImage); err != nil {
 		return err
 	}
 
-	return waitVeleroReady(ctx, namespace, options.UseRestic)
+	return waitVeleroReady(ctx, namespace, options.UseNodeAgent)
 }
 
-func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, resticHelperImage string) error {
+func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, RestoreHelperImage string) error {
 	args = append(args, "--dry-run", "--output", "json", "--crds-only")
 
 	// get the CRD definitions
@@ -265,7 +276,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to unmarshal the resources: %s", string(stdout))
 	}
 
-	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.ResticHelperImage); err != nil {
+	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.RestoreHelperImage); err != nil {
 		return errors.Wrapf(err, "failed to patch resources")
 	}
 
@@ -280,14 +291,14 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 	cmd.Stderr = os.Stderr
 	fmt.Printf("Running cmd %q \n", cmd.String())
 	if err = cmd.Run(); err != nil {
-		return errors.Wrapf(err, "failed to apply velere resources")
+		return errors.Wrapf(err, "failed to apply Velero resources")
 	}
 
 	return nil
 }
 
 // patch the velero resources
-func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, resticHelperImage string) error {
+func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, RestoreHelperImage string) error {
 	// apply the image pull secret to avoid the image pull limit of Docker Hub
 	if len(registryCredentialFile) > 0 {
 		credential, err := ioutil.ReadFile(registryCredentialFile)
@@ -331,7 +342,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 	}
 
 	// customize the restic restore helper image
-	if len(VeleroCfg.ResticHelperImage) > 0 {
+	if len(VeleroCfg.RestoreHelperImage) > 0 {
 		restoreActionConfig := corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
@@ -346,7 +357,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 				},
 			},
 			Data: map[string]string{
-				"image": VeleroCfg.ResticHelperImage,
+				"image": VeleroCfg.RestoreHelperImage,
 			},
 		}
 
@@ -371,7 +382,7 @@ func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
 	return un, err
 }
 
-func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) error {
+func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) error {
 	fmt.Println("Waiting for Velero deployment to be ready.")
 	// when doing upgrade by the "kubectl apply" the command "kubectl wait --for=condition=available deployment/velero -n velero --timeout=600s" returns directly
 	// use "rollout status" instead to avoid this. For more detail information, refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment
@@ -381,25 +392,25 @@ func waitVeleroReady(ctx context.Context, namespace string, useRestic bool) erro
 		return errors.Wrapf(err, "fail to wait for the velero deployment ready, stdout=%s, stderr=%s", stdout, stderr)
 	}
 
-	if useRestic {
-		fmt.Println("Waiting for Velero restic daemonset to be ready.")
+	if useNodeAgent {
+		fmt.Println("Waiting for node-agent daemonset to be ready.")
 		err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
-			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/restic",
+			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/node-agent",
 				"-o", "json", "-n", namespace))
 			if err != nil {
-				return false, errors.Wrapf(err, "failed to get the restic daemonset, stdout=%s, stderr=%s", stdout, stderr)
+				return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
 			}
-			restic := &apps.DaemonSet{}
-			if err = json.Unmarshal([]byte(stdout), restic); err != nil {
-				return false, errors.Wrapf(err, "failed to unmarshal the restic daemonset")
+			daemonset := &apps.DaemonSet{}
+			if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
+				return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
 			}
-			if restic.Status.DesiredNumberScheduled == restic.Status.NumberAvailable {
+			if daemonset.Status.DesiredNumberScheduled == daemonset.Status.NumberAvailable {
 				return true, nil
 			}
 			return false, nil
 		})
 		if err != nil {
-			return errors.Wrap(err, "fail to wait for the velero restic ready")
+			return errors.Wrap(err, "fail to wait for the node-agent ready")
 		}
 	}
 

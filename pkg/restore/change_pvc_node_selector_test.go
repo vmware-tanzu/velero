@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // TestChangePVCNodeSelectorActionExecute runs the ChangePVCNodeSelectorAction's Execute
@@ -146,7 +146,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)
 			require.NoError(t, err)
 
-			input := &riav1.RestoreItemActionExecuteInput{
+			input := &velero.RestoreItemActionExecuteInput{
 				Item: &unstructured.Unstructured{
 					Object: unstructuredMap,
 				},

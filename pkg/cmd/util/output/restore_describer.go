@@ -205,10 +205,19 @@ func describeRestoreResult(d *Describer, name string, result pkgrestore.Result) 
 
 // describePodVolumeRestores describes pod volume restores in human-readable format.
 func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRestore, details bool) {
-	if details {
-		d.Printf("Restic Restores:\n")
+	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
+	// take the uploader type from the first element of the array.
+	var uploaderType string
+	if len(restores) > 0 {
+		uploaderType = restores[0].Spec.UploaderType
 	} else {
-		d.Printf("Restic Restores (specify --details for more information):\n")
+		return
+	}
+
+	if details {
+		d.Printf("%s Restores:\n", uploaderType)
+	} else {
+		d.Printf("%s Restores (specify --details for more information):\n", uploaderType)
 	}
 
 	// separate restores by phase (combining <none> and New into a single group)

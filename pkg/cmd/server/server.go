@@ -302,7 +302,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 
 	// cancelFunc is not deferred here because if it was, then ctx would immediately
 	// be cancelled once this function exited, making it useless to any informers using later.
-	// That, in turn, causes the velero server to halt when the first informer tries to use it (probably restic's).
+	// That, in turn, causes the velero server to halt when the first informer tries to use it.
 	// Therefore, we must explicitly call it on the error paths in this function.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -397,7 +397,9 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.initRestic(); err != nil {
+	s.checkNodeAgent()
+
+	if err := s.initRepoManager(); err != nil {
 		return err
 	}
 
@@ -501,7 +503,7 @@ func (s *server) veleroResourcesExist() error {
 // - Service accounts go before pods or controllers so pods can use them.
 // - Limit ranges go before pods or controllers so pods can use them.
 // - Pods go before controllers so they can be explicitly restored and potentially
-//	 have restic restores run before controllers adopt the pods.
+//	 have pod volume restores run before controllers adopt the pods.
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
 // - CAPI ClusterClasses go before Clusters.
@@ -532,7 +534,16 @@ var defaultRestorePriorities = []string{
 	"clusterresourcesets.addons.cluster.x-k8s.io",
 }
 
-func (s *server) initRestic() error {
+func (s *server) checkNodeAgent() {
+	// warn if node agent does not exist
+	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
+		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
+	} else if err != nil {
+		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
+	}
+}
+
+func (s *server) initRepoManager() error {
 	// warn if node agent does not exist
 	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
 		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
@@ -694,7 +705,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	// By far, PodVolumeBackup, PodVolumeRestore, BackupStorageLocation controllers
 	// are not included in --disable-controllers list.
-	// This is because of PVB and PVR are used by Restic DaemonSet,
+	// This is because of PVB and PVR are used by node agent DaemonSet,
 	// and BSL controller is mandatory for Velero to work.
 	enabledControllers := map[string]func() controllerRunInfo{
 		controller.Backup:  backupControllerRunInfo,
@@ -705,7 +716,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.ServerStatusRequest: {},
 		controller.DownloadRequest:     {},
 		controller.Schedule:            {},
-		controller.ResticRepo:          {},
+		controller.BackupRepo:          {},
 		controller.BackupDeletion:      {},
 		controller.GarbageCollection:   {},
 		controller.BackupSync:          {},
@@ -778,9 +789,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	if _, ok := enabledRuntimeControllers[controller.ResticRepo]; ok {
-		if err := controller.NewResticRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.ResticRepo)
+	if _, ok := enabledRuntimeControllers[controller.BackupRepo]; ok {
+		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupRepo)
 		}
 	}
 

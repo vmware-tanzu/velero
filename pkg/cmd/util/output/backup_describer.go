@@ -403,10 +403,19 @@ func failedDeletionCount(requests []velerov1api.DeleteBackupRequest) int {
 
 // DescribePodVolumeBackups describes pod volume backups in human-readable format.
 func DescribePodVolumeBackups(d *Describer, backups []velerov1api.PodVolumeBackup, details bool) {
-	if details {
-		d.Printf("Restic Backups:\n")
+	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
+	// take the uploader type from the first element of the array.
+	var uploaderType string
+	if len(backups) > 0 {
+		uploaderType = backups[0].Spec.UploaderType
 	} else {
-		d.Printf("Restic Backups (specify --details for more information):\n")
+		return
+	}
+
+	if details {
+		d.Printf("%s Backups:\n", uploaderType)
+	} else {
+		d.Printf("%s Backups (specify --details for more information):\n", uploaderType)
 	}
 
 	// separate backups by phase (combining <none> and New into a single group)

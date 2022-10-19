@@ -31,15 +31,15 @@ import (
 )
 
 var (
-	DefaultVeleroPodCPURequest = "500m"
-	DefaultVeleroPodMemRequest = "128Mi"
-	DefaultVeleroPodCPULimit   = "1000m"
-	DefaultVeleroPodMemLimit   = "512Mi"
-	DefaultResticPodCPURequest = "500m"
-	DefaultResticPodMemRequest = "512Mi"
-	DefaultResticPodCPULimit   = "1000m"
-	DefaultResticPodMemLimit   = "1Gi"
-	DefaultVeleroNamespace     = "velero"
+	DefaultVeleroPodCPURequest    = "500m"
+	DefaultVeleroPodMemRequest    = "128Mi"
+	DefaultVeleroPodCPULimit      = "1000m"
+	DefaultVeleroPodMemLimit      = "512Mi"
+	DefaultNodeAgentPodCPURequest = "500m"
+	DefaultNodeAgentPodMemRequest = "512Mi"
+	DefaultNodeAgentPodCPULimit   = "1000m"
+	DefaultNodeAgentPodMemLimit   = "1Gi"
+	DefaultVeleroNamespace        = "velero"
 )
 
 func Labels() map[string]string {
@@ -218,10 +218,10 @@ type VeleroOptions struct {
 	PodLabels                       map[string]string
 	ServiceAccountAnnotations       map[string]string
 	VeleroPodResources              corev1.ResourceRequirements
-	ResticPodResources              corev1.ResourceRequirements
+	NodeAgentPodResources           corev1.ResourceRequirements
 	SecretData                      []byte
 	RestoreOnly                     bool
-	UseRestic                       bool
+	UseNodeAgent                    bool
 	UseVolumeSnapshots              bool
 	BSLConfig                       map[string]string
 	VSLConfig                       map[string]string
@@ -311,12 +311,12 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 
 	appendUnstructured(resources, deploy)
 
-	if o.UseRestic {
+	if o.UseNodeAgent {
 		dsOpts := []podTemplateOption{
 			WithAnnotations(o.PodAnnotations),
 			WithLabels(o.PodLabels),
 			WithImage(o.Image),
-			WithResources(o.ResticPodResources),
+			WithResources(o.NodeAgentPodResources),
 			WithSecret(secretPresent),
 		}
 		if len(o.Features) > 0 {

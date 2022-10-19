@@ -31,14 +31,15 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 const restoreProgressCheckInterval = 10 * time.Second
 const backupProgressCheckInterval = 10 * time.Second
 
-// Provider which is designed for one pod volumn to do the backup or restore
+// Provider which is designed for one pod volume to do the backup or restore
 type Provider interface {
-	// RunBackup which will do backup for one specific volumn and return snapshotID, isSnapshotEmpty, error
+	// RunBackup which will do backup for one specific volume and return snapshotID, isSnapshotEmpty, error
 	// updater is used for updating backup progress which implement by third-party
 	RunBackup(
 		ctx context.Context,
@@ -46,7 +47,7 @@ type Provider interface {
 		tags map[string]string,
 		parentSnapshot string,
 		updater uploader.ProgressUpdater) (string, bool, error)
-	// RunRestore which will do restore for one specific volumn with given snapshot id and return error
+	// RunRestore which will do restore for one specific volume with given snapshot id and return error
 	// updater is used for updating backup progress which implement by third-party
 	RunRestore(
 		ctx context.Context,
@@ -81,7 +82,7 @@ func NewUploaderProvider(
 		}
 		return NewKopiaUploaderProvider(ctx, credGetter, backupRepo, log)
 	} else {
-		if err := provider.NewResticRepositoryProvider(credGetter.FromFile, nil, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
+		if err := provider.NewResticRepositoryProvider(credGetter.FromFile, filesystem.NewFileSystem(), log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
 			return nil, errors.Wrap(err, "failed to connect repository")
 		}
 		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)

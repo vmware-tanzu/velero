@@ -125,10 +125,10 @@ func APIExtensionsVersionsTest() {
 				BackupCfg.IncludeClusterResources = true
 				BackupCfg.Selector = label
 				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupCfg)).ShouldNot(HaveOccurred(), func() string {
-					VeleroBackupLogs(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace, backupName)
-					return "Get backup logs"
+					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), VeleroCfg.VeleroCLI,
+						VeleroCfg.VeleroNamespace, backupName, "")
+					return "Fail to backup workload"
 				})
 			})
 
@@ -367,11 +367,13 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 		BackupCfg.BackupLocation = ""
 		BackupCfg.UseVolumeSnapshots = false
 		BackupCfg.Selector = ""
-		err = VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, BackupCfg)
-		if err != nil {
-			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup, "")
-			return errors.Wrapf(err, "back up %s namespaces on source cluster", namespacesStr)
-		}
+
+		Expect(VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI,
+			VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI,
+				VeleroCfg.VeleroNamespace, backup, "")
+			return "Fail to backup workload"
+		})
 
 		if err := deleteCRD(ctx, tc.srcCrdYaml); err != nil {
 			return errors.Wrapf(err, "delete music-system CRD from source cluster")
@@ -447,8 +449,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 			// No custom resource should have been restored. Expect "no resource found"
 			// error during restore.
 			err := VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup, "")
-
-			if err.Error() != "Unexpected restore phase got PartiallyFailed, expecting Completed" {
+			if !strings.Contains(err.Error(), "Unexpected restore phase got PartiallyFailed, expecting Completed") {
 				return errors.New("expected error but not none")
 			}
 		}
@@ -464,14 +465,8 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 
 func installCRD(ctx context.Context, yaml string) error {
 	fmt.Printf("Install CRD with %s.\n", yaml)
-	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", yaml)
-
-	_, stderr, err := veleroexec.RunCommand(cmd)
-	if err != nil {
-		return errors.Wrap(err, stderr)
-	}
-
-	return nil
+	err := KubectlApplyByFile(ctx, yaml)
+	return err
 }
 
 func deleteCRD(ctx context.Context, yaml string) error {

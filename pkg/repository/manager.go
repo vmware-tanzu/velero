@@ -31,18 +31,18 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-// SnapshotIdentifier uniquely identifies a restic snapshot
+// SnapshotIdentifier uniquely identifies a snapshot
 // taken by Velero.
 type SnapshotIdentifier struct {
 	// VolumeNamespace is the namespace of the pod/volume that
-	// the restic snapshot is for.
+	// the snapshot is for.
 	VolumeNamespace string
 
 	// BackupStorageLocation is the backup's storage location
 	// name.
 	BackupStorageLocation string
 
-	// SnapshotID is the short ID of the restic snapshot.
+	// SnapshotID is the short ID of the snapshot.
 	SnapshotID string
 
 	// RepositoryType is the type of the repository where the

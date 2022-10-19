@@ -1,6 +1,6 @@
 module github.com/vmware-tanzu/velero
 
-go 1.17
+go 1.18
 
 require (
 	cloud.google.com/go/storage v1.21.0
@@ -47,7 +47,7 @@ require (
 	k8s.io/apimachinery v0.22.2
 	k8s.io/cli-runtime v0.22.2
 	k8s.io/client-go v0.22.2
-	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-aggregator v0.19.12
 	sigs.k8s.io/controller-runtime v0.10.2
 	sigs.k8s.io/yaml v1.3.0
@@ -139,7 +139,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	k8s.io/component-base v0.22.2 // indirect
-	k8s.io/klog/v2 v2.9.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e // indirect
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect

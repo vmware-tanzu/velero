@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package restic
+package nodeagent
 
 import (
 	"context"
@@ -94,7 +94,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				}
 			}
 
-			s := &resticServer{
+			s := &nodeAgentServer{
 				logger:     testutil.NewLogger(),
 				fileSystem: fs,
 			}

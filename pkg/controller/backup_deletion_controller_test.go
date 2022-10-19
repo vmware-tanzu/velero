@@ -91,7 +91,7 @@ func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBack
 			velerotest.NewLogger(),
 			fakeClient,
 			NewBackupTracker(),
-			nil, // restic repository manager
+			nil, // repository manager
 			metrics.NewServerMetrics(),
 			nil, // discovery helper
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },

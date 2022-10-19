@@ -35,7 +35,9 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/orderedresources"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
+	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
+
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
 
@@ -53,7 +55,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.Plugins, "plugins", "", "provider plugins to be tested.")
 	flag.StringVar(&VeleroCfg.AddBSLPlugins, "additional-bsl-plugins", "", "additional plugins to be tested.")
 	flag.StringVar(&VeleroCfg.VeleroVersion, "velero-version", "main", "image version for the velero server to be tested with.")
-	flag.StringVar(&VeleroCfg.ResticHelperImage, "restic-helper-image", "", "image for the velero restic restore helper to be tested.")
+	flag.StringVar(&VeleroCfg.RestoreHelperImage, "restore-helper-image", "", "image for the velero restore helper to be tested.")
 	flag.StringVar(&VeleroCfg.UpgradeFromVeleroCLI, "upgrade-from-velero-cli", "", "path to the pre-upgrade velero application to use.")
 	flag.StringVar(&VeleroCfg.UpgradeFromVeleroVersion, "upgrade-from-velero-version", "v1.7.1", "image for the pre-upgrade velero server to be tested.")
 	flag.StringVar(&VeleroCfg.MigrateFromVeleroCLI, "migrate-from-velero-cli", "", "path to the origin velero application to use.")
@@ -77,9 +79,10 @@ func init() {
 	flag.StringVar(&VeleroCfg.GCFrequency, "garbage-collection-frequency", "", "Frequency of garbage collection.")
 	flag.StringVar(&VeleroCfg.DefaultCluster, "default-cluster", "", "Default cluster context for migration test.")
 	flag.StringVar(&VeleroCfg.StandbyCluster, "standby-cluster", "", "Standby cluster context for migration test.")
+	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "", "Identify persistent volume backup uploader.")
 }
 
-var _ = Describe("[APIGroup] Velero tests with various CRD API group versions", APIGropuVersionsTest)
+var _ = Describe("[APIGroup][Common] Velero tests with various CRD API group versions", APIGropuVersionsTest)
 var _ = Describe("[APIGroup][APIExtensions] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
 
 // Test backup and restore of Kibishi using restic
@@ -119,12 +122,18 @@ var _ = Describe("[BSL][Deletion][Snapshot] Local backups will be deleted once t
 var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
 
 var _ = Describe("[Migration][Restic]", MigrationWithRestic)
+
 var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
 
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
-var _ = Describe("[NamespaceMapping][Single] Backup resources should follow the specific order in schedule", OneNamespaceMappingTest)
-var _ = Describe("[NamespaceMapping][Multiple] Backup resources should follow the specific order in schedule", MultiNamespacesMappingTest)
+var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
+var _ = Describe("[NamespaceMapping][Multiple][Restic]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
+var _ = Describe("[NamespaceMapping][Single][Snapshot]  Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Multiple][Snapshot]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
+
+var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
+var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)
 
 func GetKubeconfigContext() error {
 	var err error

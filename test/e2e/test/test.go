@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,6 +48,7 @@ type VeleroBackupRestoreTest interface {
 	Verify() error
 	Clean() error
 	GetTestMsg() *TestMSG
+	GetTestCase() *TestCase
 }
 
 type TestMSG struct {
@@ -56,16 +58,17 @@ type TestMSG struct {
 }
 
 type TestCase struct {
-	BackupName      string
-	RestoreName     string
-	NSBaseName      string
-	BackupArgs      []string
-	RestoreArgs     []string
-	NamespacesTotal int
-	TestMsg         *TestMSG
-	Client          TestClient
-	Ctx             context.Context
-	NSIncluded      *[]string
+	BackupName         string
+	RestoreName        string
+	NSBaseName         string
+	BackupArgs         []string
+	RestoreArgs        []string
+	NamespacesTotal    int
+	TestMsg            *TestMSG
+	Client             TestClient
+	Ctx                context.Context
+	NSIncluded         *[]string
+	UseVolumeSnapshots bool
 }
 
 var TestClientInstance TestClient
@@ -79,7 +82,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
-				Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &VeleroCfg, test.GetTestCase().UseVolumeSnapshots)).To(Succeed())
 			}
 		})
 		AfterEach(func() {
@@ -101,16 +104,17 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		By("Create test client instance", func() {
 			TestClientInstance = *VeleroCfg.ClientToInstallVelero
 		})
-
+		var useVolumeSnapshots bool
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
+			useVolumeSnapshots = tests[k].GetTestCase().UseVolumeSnapshots
 		}
 
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
 				if countIt == 0 {
-					Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
+					Expect(VeleroInstall(context.Background(), &VeleroCfg, useVolumeSnapshots)).To(Succeed())
 				}
 				countIt++
 			}
@@ -148,7 +152,7 @@ func (t *TestCase) StartRun() error {
 }
 
 func (t *TestCase) Backup() error {
-	if err := VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.BackupArgs); err != nil {
+	if err := VeleroBackupExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
 		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
 		return errors.Wrapf(err, "Failed to backup resources")
 	}
@@ -164,10 +168,20 @@ func (t *TestCase) Destroy() error {
 }
 
 func (t *TestCase) Restore() error {
-	if err := VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.RestoreArgs); err != nil {
-		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
-		return errors.Wrapf(err, "Failed to restore resources")
+	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+	if t.UseVolumeSnapshots {
+		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
+		time.Sleep(5 * time.Minute)
 	}
+
+	By("Start to restore ......", func() {
+		Expect(VeleroRestoreExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", t.RestoreName)
+			return "Fail to restore workload"
+		})
+	})
 	return nil
 }
 
@@ -191,6 +205,9 @@ func (t *TestCase) GetTestMsg() *TestMSG {
 	return t.TestMsg
 }
 
+func (t *TestCase) GetTestCase() *TestCase {
+	return t
+}
 func RunTestCase(test VeleroBackupRestoreTest) error {
 	fmt.Printf("Running test case %s\n", test.GetTestMsg().Desc)
 	if test == nil {

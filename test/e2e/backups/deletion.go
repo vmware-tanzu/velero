@@ -122,12 +122,14 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 	BackupCfg.BackupLocation = backupLocation
 	BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 	BackupCfg.Selector = ""
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
-		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
-		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
-		VeleroBackupLogs(context.Background(), VeleroCfg.UpgradeFromVeleroCLI, veleroNamespace, backupName)
-		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", deletionTest)
-	}
+
+	By(fmt.Sprintf("Back up workload with name %s", BackupCfg.BackupName), func() {
+		Expect(VeleroBackupNamespace(oneHourTimeout, veleroCLI,
+			veleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			RunDebug(context.Background(), veleroCLI, veleroNamespace, BackupCfg.BackupName, "")
+			return "Fail to backup workload"
+		})
+	})
 
 	if providerName == "vsphere" && useVolumeSnapshots {
 		// Wait for uploads started by the Velero Plug-in for vSphere to complete
@@ -176,22 +178,27 @@ func runBackupDeletionTests(client TestClient, veleroCfg VerleroConfig, backupNa
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
-
 	backupName = "backup-1-" + UUIDgen.String()
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
-		// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
-		// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
-		VeleroBackupLogs(context.Background(), VeleroCfg.UpgradeFromVeleroCLI, veleroNamespace, backupName)
-		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", deletionTest)
-	}
+	BackupCfg.BackupName = backupName
+
+	By(fmt.Sprintf("Back up workload with name %s", BackupCfg.BackupName), func() {
+		Expect(VeleroBackupNamespace(oneHourTimeout, veleroCLI,
+			veleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			RunDebug(context.Background(), veleroCLI, veleroNamespace, BackupCfg.BackupName, "")
+			return "Fail to backup workload"
+		})
+	})
+
 	err = DeleteObjectsInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
 	if err != nil {
 		return err
 	}
+
 	err = ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 1)
 	if err != nil {
 		return err
 	}
+
 	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
 	if err != nil {
 		return errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName)

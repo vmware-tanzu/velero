@@ -46,7 +46,7 @@ _tiltbuild
 tilt-resources/tilt-settings.json
 tilt-resources/velero_v1_backupstoragelocation.yaml
 tilt-resources/deployment.yaml
-tilt-resources/restic.yaml
+tilt-resources/node-agent.yaml
 tilt-resources/cloud
 
 test/e2e/report.xml

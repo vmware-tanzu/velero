@@ -120,12 +120,11 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
-	time.Sleep(5 * time.Minute)
 
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-	if providerName == "aws" && useVolumeSnapshots {
+	if useVolumeSnapshots {
 		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 		time.Sleep(5 * time.Minute)
 	}
@@ -138,7 +137,6 @@ func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, re
 	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
-
 	fmt.Printf("kibishii test completed successfully\n")
 	return nil
 }
@@ -151,8 +149,7 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
-		kibishiiDirectory+cloudPlatform)
-
+		kibishiiDirectory+cloudPlatform, "--timeout=90s")
 	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
 	fmt.Printf("Install Kibishii cmd: %s\n", kibishiiInstallCmd)
 	if err != nil {

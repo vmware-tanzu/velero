@@ -62,16 +62,14 @@ func SSRTest() {
 		Expect(CreateNamespace(ctx, *VeleroCfg.ClientToInstallVelero, testNS)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", testNS))
 
-		By(fmt.Sprintf("Get version in %s namespace", testNS))
-		cmd := []string{"version", "-n", testNS}
-		Expect(VeleroCmdExec(context.Background(), VeleroCfg.VeleroCLI, cmd)).To(Succeed(),
-			fmt.Sprintf("Failed to create an ssr object in the %s namespace", testNS))
-
-		By(fmt.Sprintf("Get version in %s namespace", VeleroCfg.VeleroNamespace))
-		cmd = []string{"version", "-n", VeleroCfg.VeleroNamespace}
-		Expect(VeleroCmdExec(context.Background(), VeleroCfg.VeleroCLI, cmd)).To(Succeed(),
-			fmt.Sprintf("Failed to create an ssr object in %s namespace", VeleroCfg.VeleroNamespace))
-
+		By(fmt.Sprintf("Get version in %s namespace", testNS), func() {
+			Expect(VeleroVersion(context.Background(), VeleroCfg.VeleroCLI, testNS)).To(Succeed(),
+				fmt.Sprintf("Failed to create an ssr object in the %s namespace", testNS))
+		})
+		By(fmt.Sprintf("Get version in %s namespace", VeleroCfg.VeleroNamespace), func() {
+			Expect(VeleroVersion(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed(),
+				fmt.Sprintf("Failed to create an ssr object in %s namespace", VeleroCfg.VeleroNamespace))
+		})
 		ssrListResp := new(v1.ServerStatusRequestList)
 		By(fmt.Sprintf("Check ssr object in %s namespace", VeleroCfg.VeleroNamespace))
 		err = waitutil.PollImmediate(5*time.Second, time.Minute,

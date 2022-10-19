@@ -1,0 +1,1 @@
+Rename Velero daemonset from "restic" to "node-agent"

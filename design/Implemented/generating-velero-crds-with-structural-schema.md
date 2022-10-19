@@ -28,7 +28,7 @@ This document proposes adding _controller-tools_ to the project to automatically
 _controller-tools_ works by reading the Go files that contain the API type definitions.
 It uses a combination of the struct fields, types, tags and comments to build the OpenAPIv3 schema for the CRDs. The tooling makes some assumptions based on conventions followed in upstream Kubernetes and the ecosystem, which involves some changes to the Velero API type definitions, especially around optional fields.
 
-In order for _controller-tools_ to read the Go files containing Velero API type defintiions, the CRDs need to be generated at build time, as these files are not available at runtime (i.e. the Go files are not accessible by the compiled binary).
+In order for _controller-tools_ to read the Go files containing Velero API type definitions, the CRDs need to be generated at build time, as these files are not available at runtime (i.e. the Go files are not accessible by the compiled binary).
 These generated CRD manifests (YAML) will then need to be available to the `pkg/install` package for it to include when installing Velero resources.
 
 ## Detailed Design

@@ -19,7 +19,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -435,6 +437,7 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 	if backendType == repoconfig.AWSBackend {
 		s3Url := config["s3Url"]
+		disableTls := false
 
 		var err error
 		if s3Url == "" {
@@ -444,10 +447,24 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 			}
 
 			s3Url = fmt.Sprintf("s3-%s.amazonaws.com", region)
+			disableTls = false
+		} else {
+			url, err := url.Parse(s3Url)
+			if err != nil {
+				return map[string]string{}, errors.Wrapf(err, "error to parse s3Url %s", s3Url)
+			}
+
+			if url.Path != "" && url.Path != "/" {
+				return map[string]string{}, errors.Errorf("path is not expected in s3Url %s", s3Url)
+			}
+
+			s3Url = url.Host
+			disableTls = (url.Scheme == "http")
 		}
 
 		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3Url, "/")
 		result[udmrepo.StoreOptionS3DisableTlsVerify] = config["insecureSkipTLSVerify"]
+		result[udmrepo.StoreOptionS3DisableTls] = strconv.FormatBool(disableTls)
 	} else if backendType == repoconfig.AzureBackend {
 		result[udmrepo.StoreOptionAzureDomain] = getAzureStorageDomain(config)
 	}

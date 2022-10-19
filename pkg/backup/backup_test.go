@@ -2595,17 +2595,17 @@ func TestBackupWithHooks(t *testing.T) {
 	}
 }
 
-type fakeResticBackupperFactory struct{}
+type fakePodVolumeBackupperFactory struct{}
 
-func (f *fakeResticBackupperFactory) NewBackupper(context.Context, *velerov1.Backup, string) (podvolume.Backupper, error) {
-	return &fakeResticBackupper{}, nil
+func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, *velerov1.Backup, string) (podvolume.Backupper, error) {
+	return &fakePodVolumeBackupper{}, nil
 }
 
-type fakeResticBackupper struct{}
+type fakePodVolumeBackupper struct{}
 
 // BackupPodVolumes returns one pod volume backup per entry in volumes, with namespace "velero"
 // and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
-func (b *fakeResticBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
+func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
 	var res []*velerov1.PodVolumeBackup
 	for _, vol := range volumes {
 		pvb := builder.ForPodVolumeBackup("velero", fmt.Sprintf("pvb-%s-%s-%s", pod.Namespace, pod.Name, vol)).Result()
@@ -2615,11 +2615,11 @@ func (b *fakeResticBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *cor
 	return res, nil
 }
 
-// TestBackupWithRestic runs backups of pods that are annotated for restic backup,
-// and ensures that the restic backupper is called, that the returned PodVolumeBackups
-// are added to the Request object, and that when PVCs are backed up with restic, the
+// TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
+// and ensures that the pod volume backupper is called, that the returned PodVolumeBackups
+// are added to the Request object, and that when PVCs are backed up with PodVolume, the
 // claimed PVs are not also snapshotted using a VolumeSnapshotter.
-func TestBackupWithRestic(t *testing.T) {
+func TestBackupWithPodVolume(t *testing.T) {
 	tests := []struct {
 		name              string
 		backup            *velerov1.Backup
@@ -2629,7 +2629,7 @@ func TestBackupWithRestic(t *testing.T) {
 		want              []*velerov1.PodVolumeBackup
 	}{
 		{
-			name:   "a pod annotated for restic backup should result in pod volume backups being returned",
+			name:   "a pod annotated for pod volume backup should result in pod volume backups being returned",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -2641,7 +2641,7 @@ func TestBackupWithRestic(t *testing.T) {
 			},
 		},
 		{
-			name:   "when a PVC is used by two pods and annotated for restic backup on both, only one should be backed up",
+			name:   "when a PVC is used by two pods and annotated for pod volume backup on both, only one should be backed up",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -2662,7 +2662,7 @@ func TestBackupWithRestic(t *testing.T) {
 			},
 		},
 		{
-			name:   "when PVC pod volumes are backed up using restic, their claimed PVs are not also snapshotted",
+			name:   "when PVC pod volumes are backed up using pod volume backup, their claimed PVs are not also snapshotted",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -2707,7 +2707,7 @@ func TestBackupWithRestic(t *testing.T) {
 				backupFile = bytes.NewBuffer([]byte{})
 			)
 
-			h.backupper.resticBackupperFactory = new(fakeResticBackupperFactory)
+			h.backupper.podVolumeBackupperFactory = new(fakePodVolumeBackupperFactory)
 
 			for _, resource := range tc.apiResources {
 				h.addItems(t, resource)
@@ -2786,9 +2786,9 @@ func newHarness(t *testing.T) *harness {
 			discoveryHelper: discoveryHelper,
 
 			// unsupported
-			podCommandExecutor:     nil,
-			resticBackupperFactory: nil,
-			resticTimeout:          0,
+			podCommandExecutor:        nil,
+			podVolumeBackupperFactory: nil,
+			podVolumeTimeout:          0,
 		},
 		log: log,
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package repo
+package nodeagent
 
 import (
 	"github.com/spf13/cobra"
@@ -22,15 +22,15 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
-func NewRepositoryCommand(f client.Factory) *cobra.Command {
+func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "repo",
-		Short: "Work with restic repositories",
-		Long:  "Work with restic repositories",
+		Use:   "node-agent",
+		Short: "Work with node-agent",
+		Long:  "Work with node-agent",
 	}
 
 	c.AddCommand(
-		NewGetCommand(f, "get"),
+		NewServerCommand(f),
 	)
 
 	return c

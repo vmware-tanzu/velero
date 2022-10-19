@@ -42,6 +42,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -105,10 +106,10 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	resticInitContainerIndex := getResticInitContainerIndex(pod)
-	if resticInitContainerIndex > 0 {
+	initContainerIndex := getInitContainerIndex(pod)
+	if initContainerIndex > 0 {
 		log.Warnf(`Init containers before the %s container may cause issues
-		          if they interfere with volumes being restored: %s index %d`, podvolume.InitContainer, podvolume.InitContainer, resticInitContainerIndex)
+		          if they interfere with volumes being restored: %s index %d`, restorehelper.WaitInitContainer, restorehelper.WaitInitContainer, initContainerIndex)
 	}
 
 	log.Info("Restore starting")
@@ -162,8 +163,8 @@ func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logr
 		return false, nil, err
 	}
 
-	if !isResticInitContainerRunning(pod) {
-		log.Debug("Pod is not running restic-wait init container, skip")
+	if !isInitContainerRunning(pod) {
+		log.Debug("Pod is not running restore-wait init container, skip")
 		return false, nil, nil
 	}
 
@@ -207,18 +208,18 @@ func isPVRNew(pvr *velerov1api.PodVolumeRestore) bool {
 	return pvr.Status.Phase == "" || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseNew
 }
 
-func isResticInitContainerRunning(pod *corev1api.Pod) bool {
-	// Restic wait container can be anywhere in the list of init containers, but must be running.
-	i := getResticInitContainerIndex(pod)
+func isInitContainerRunning(pod *corev1api.Pod) bool {
+	// Pod volume wait container can be anywhere in the list of init containers, but must be running.
+	i := getInitContainerIndex(pod)
 	return i >= 0 &&
 		len(pod.Status.InitContainerStatuses)-1 >= i &&
 		pod.Status.InitContainerStatuses[i].State.Running != nil
 }
 
-func getResticInitContainerIndex(pod *corev1api.Pod) int {
-	// Restic wait container can be anywhere in the list of init containers so locate it.
+func getInitContainerIndex(pod *corev1api.Pod) int {
+	// Pod volume wait container can be anywhere in the list of init containers so locate it.
 	for i, initContainer := range pod.Spec.InitContainers {
-		if initContainer.Name == podvolume.InitContainer {
+		if initContainer.Name == restorehelper.WaitInitContainer {
 			return i
 		}
 	}
@@ -249,8 +250,10 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
+	// need to check backup repository in source namespace rather than in pod namespace
+	// such as in case of namespace mapping issue
 	backupRepo, err := repository.GetBackupRepository(ctx, c.Client, req.Namespace, repository.BackupRepositoryKey{
-		VolumeNamespace: req.Spec.Pod.Namespace,
+		VolumeNamespace: req.Spec.SourceNamespace,
 		BackupLocation:  req.Spec.BackupStorageLocation,
 		RepositoryType:  podvolume.GetPvrRepositoryType(req),
 	})
@@ -297,7 +300,7 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	}
 
 	// Write a done file with name=<restore-uid> into the just-created .velero dir
-	// within the volume. The velero restic init container on the pod is waiting
+	// within the volume. The velero init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
 	if err := ioutil.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil {
 		return errors.Wrap(err, "error writing done file")

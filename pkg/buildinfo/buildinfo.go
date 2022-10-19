@@ -33,7 +33,7 @@ var (
 	GitTreeState string
 
 	// ImageRegistry is the image registry that this build of Velero should use by default to pull the
-	// Velero and Restic Restore Helper images from.
+	// Velero and Restore Helper images from.
 	ImageRegistry string
 )
 

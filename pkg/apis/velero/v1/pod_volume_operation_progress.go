@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 // PodVolumeOperationProgress represents the progress of a
-// PodVolumeBackup/Restore (restic) operation
+// PodVolumeBackup/Restore operation
 type PodVolumeOperationProgress struct {
 	// +optional
 	TotalBytes int64 `json:"totalBytes,omitempty"`

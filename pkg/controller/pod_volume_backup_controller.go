@@ -205,8 +205,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	latencySeconds := float64(latencyDuration / time.Second)
 	backupName := fmt.Sprintf("%s/%s", req.Namespace, pvb.OwnerReferences[0].Name)
 	generateOpName := fmt.Sprintf("%s-%s-%s-%s-%s-backup", pvb.Name, backupRepo.Name, pvb.Spec.BackupStorageLocation, pvb.Namespace, pvb.Spec.UploaderType)
-	r.Metrics.ObserveResticOpLatency(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
-	r.Metrics.RegisterResticOpLatencyGauge(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
+	r.Metrics.ObservePodVolumeOpLatency(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
+	r.Metrics.RegisterPodVolumeOpLatencyGauge(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
 	r.Metrics.RegisterPodVolumeBackupDequeue(r.NodeName)
 
 	log.Info("PodVolumeBackup completed")

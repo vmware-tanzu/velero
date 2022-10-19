@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/velero"

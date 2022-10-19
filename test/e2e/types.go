@@ -46,7 +46,7 @@ type VerleroConfig struct {
 	AdditionalBSLConfig      string
 	AdditionalBSLCredentials string
 	RegistryCredentialFile   string
-	ResticHelperImage        string
+	RestoreHelperImage       string
 	UpgradeFromVeleroVersion string
 	UpgradeFromVeleroCLI     string
 	MigrateFromVeleroVersion string
@@ -63,6 +63,9 @@ type VerleroConfig struct {
 	ClientToInstallVelero    *TestClient
 	DefaultClient            *TestClient
 	StandbyClient            *TestClient
+	UploaderType             string
+	UseNodeAgent             bool
+	UseRestic                bool
 }
 
 type SnapshotCheckPoint struct {
@@ -86,6 +89,7 @@ type BackupConfig struct {
 	ExcludeResources        string
 	IncludeClusterResources bool
 	OrderedResources        string
+	UseResticIfFSBackup     bool
 }
 
 type VeleroCLI2Version struct {
