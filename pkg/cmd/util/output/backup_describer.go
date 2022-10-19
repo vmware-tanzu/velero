@@ -165,7 +165,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("TTL:\t%s\n", spec.TTL.Duration)
 
 	d.Println()
-	d.Printf("CSISnapshotTimeout:\t%s\n", &spec.CSISnapshotTimeout.Duration)
+	d.Printf("CSISnapshotTimeout:\t%s\n", spec.CSISnapshotTimeout.Duration)
 
 	d.Println()
 	if len(spec.Hooks.Resources) == 0 {

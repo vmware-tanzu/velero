@@ -1,0 +1,1 @@
+change CSISnapshotTimeout from pointer to normal variables.
