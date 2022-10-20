@@ -352,8 +352,8 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 				Name:      "restic-restore-action-config",
 				Namespace: namespace,
 				Labels: map[string]string{
-					"velero.io/plugin-config": "",
-					"velero.io/restic":        "RestoreItemAction",
+					"velero.io/plugin-config":      "",
+					"velero.io/pod-volume-restore": "RestoreItemAction",
 				},
 			},
 			Data: map[string]string{
