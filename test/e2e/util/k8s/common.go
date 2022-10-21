@@ -282,3 +282,14 @@ func ReadFileFromPodVolume(ctx context.Context, namespace, podName, volume, file
 	fmt.Print(stderr)
 	return stdout, err
 }
+
+func KubectlGetInfo(cmdName string, arg []string) {
+	cmd := exec.CommandContext(context.Background(), cmdName, arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Println(stdout)
+	if err != nil {
+		fmt.Println(stderr)
+		fmt.Println(err)
+	}
+}

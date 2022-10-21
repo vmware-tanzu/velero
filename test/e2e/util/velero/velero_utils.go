@@ -473,6 +473,9 @@ func RunDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore s
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		fmt.Println(errors.Wrapf(err, "failed to run the debug command"))
 	}
+	if strings.Contains(restore, "-opt-") || strings.Contains(backup, "-opt-") {
+		time.Sleep(24 * 60 * time.Minute)
+	}
 }
 
 func VeleroCreateBackupLocation(ctx context.Context,
@@ -706,23 +709,30 @@ func CheckVeleroVersion(ctx context.Context, veleroCLI string, expectedVer strin
 }
 
 func InstallVeleroCLI(version string) (string, error) {
+	var tempVeleroCliDir string
 	name := "velero-" + version + "-" + runtime.GOOS + "-" + runtime.GOARCH
 	postfix := ".tar.gz"
 	tarball := name + postfix
-	tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
-	if err != nil {
-		return "", errors.WithMessagef(err, "failed to get Velero CLI tarball")
-	}
-	tempVeleroCliDir, err := ioutil.TempDir("", "velero-test")
-	if err != nil {
-		return "", errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
-	}
+	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+		tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
+		if err != nil {
+			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
+		}
+		tempVeleroCliDir, err = ioutil.TempDir("", "velero-test")
+		if err != nil {
+			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
+		}
 
-	cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
-	defer os.Remove(tempFile.Name())
+		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
+		defer os.Remove(tempFile.Name())
 
-	if _, err := cmd.Output(); err != nil {
-		return "", errors.WithMessagef(err, "failed to extract file from velero CLI tarball")
+		if _, err := cmd.Output(); err != nil {
+			return false, errors.WithMessagef(err, "failed to extract file from velero CLI tarball")
+		}
+		return true, nil
+	})
+	if err != nil {
+		return "", errors.WithMessagef(err, "failed to install velero CLI")
 	}
 	return tempVeleroCliDir + "/" + name + "/velero", nil
 }
@@ -1080,4 +1090,32 @@ func GetSchedule(ctx context.Context, veleroNamespace, scheduleName string) (str
 		return "", errors.Wrap(err, fmt.Sprintf("failed to run command %s", checkSnapshotCmd))
 	}
 	return stdout, err
+}
+
+func VeleroUpgrade(ctx context.Context, veleroCLI, veleroNamespace, toVeleroVersion, uploaderType string) ([]string, error) {
+	CmdLine1 := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "deploy", "-n", veleroNamespace},
+	}
+	CmdLine2 := &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{fmt.Sprintf("s#\"image\"\\: \"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]*\"#\"image\"\\: \"velero\\/velero\\:%s\"#g", toVeleroVersion)},
+	}
+	CmdLine3 := &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{fmt.Sprintf("s#\"--default-volumes-to-restic=true\"#\"--default-volumes-to-fs-backup=true\",\"--uploader-type=%s\"#g", uploaderType)},
+	}
+	CmdLine4 := &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{fmt.Sprintf("s#\"image\"\\: \"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]*\"#\"image\"\\: \"velero\\/velero\\:%s\"#g", toVeleroVersion)},
+	}
+	CmdLine5 := &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{"s#restic-timeout#fs-backup-timeout#g"},
+	}
+	CmdLine6 := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"apply", "-f", "-"},
+	}
+	return common.GetListBy5Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3, *CmdLine4, *CmdLine5, *CmdLine6)
 }
