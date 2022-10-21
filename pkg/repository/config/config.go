@@ -56,7 +56,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 		prefix = layout.GetResticDir()
 	}
 
-	backendType := GetBackendType(location.Spec.Provider)
+	backendType := GetBackendType(location.Spec.Provider, location.Spec.Config)
 
 	if repoPrefix := location.Spec.Config["resticRepoPrefix"]; repoPrefix != "" {
 		return repoPrefix, nil
@@ -87,15 +87,25 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 		return fmt.Sprintf("gs:%s:/%s", bucket, prefix), nil
 	}
 
-	return "", errors.New("restic repository prefix (resticRepoPrefix) not specified in backup storage location's config")
+	return "", errors.Errorf("invalid backend type %s, provider %s", backendType, location.Spec.Provider)
 }
 
-func GetBackendType(provider string) BackendType {
+// GetBackendType returns a backend type that is known by Velero.
+// If the provider doesn't indicate a known backend type, but the endpoint is
+// specified, Velero regards it as a S3 compatible object store and return AWSBackend as the type.
+func GetBackendType(provider string, config map[string]string) BackendType {
 	if !strings.Contains(provider, "/") {
 		provider = "velero.io/" + provider
 	}
 
-	return BackendType(provider)
+	bt := BackendType(provider)
+	if IsBackendTypeValid(bt) {
+		return bt
+	} else if config != nil && config["s3Url"] != "" {
+		return AWSBackend
+	} else {
+		return bt
+	}
 }
 
 func IsBackendTypeValid(backendType BackendType) bool {
