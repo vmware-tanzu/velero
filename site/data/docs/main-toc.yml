@@ -19,8 +19,8 @@ toc:
         url: /supported-providers
       - page: Evaluation install
         url: /contributions/minio
-      - page: Restic integration
-        url: /restic
+      - page: File system backup
+        url: /file-system-backup
       - page: Examples
         url: /examples
       - page: Uninstalling
@@ -65,8 +65,8 @@ toc:
         url: /debugging-install
       - page: Troubleshoot a restore
         url: /debugging-restores
-      - page: Troubleshoot Restic
-        url: /restic#troubleshooting
+      - page: Troubleshoot file system backup
+        url: /file-system-backup#troubleshooting
   - title: Contribute
     subfolderitems:
       - page: Start Contributing
