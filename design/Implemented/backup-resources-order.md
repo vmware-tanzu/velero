@@ -2,7 +2,7 @@
 This document proposes a solution that allows user to specify a backup order for resources of specific resource type.
 
 ## Background
-During backup process, user may need to back up resources of specific type in some specific order to ensure the resources were backup properly because these resources are related and ordering might be required to preserve the consistency for the apps to recover itself �from the backup image 
+During backup process, user may need to back up resources of specific type in some specific order to ensure the resources were backup properly because these resources are related and ordering might be required to preserve the consistency for the apps to recover itself from the backup image 
 (Ex: primary-secondary database pods in a cluster).
 
 ## Goals

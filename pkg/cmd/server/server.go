@@ -27,9 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-
-	"github.com/bombsimon/logrusr"
+	logrusr "github.com/bombsimon/logrusr/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -46,6 +44,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
@@ -326,7 +326,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	corev1api.AddToScheme(scheme)
 	snapshotv1api.AddToScheme(scheme)
 
-	ctrl.SetLogger(logrusr.NewLogger(logger))
+	ctrl.SetLogger(logrusr.New(logger))
 
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme:    scheme,
