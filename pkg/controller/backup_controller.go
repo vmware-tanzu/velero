@@ -95,7 +95,7 @@ type backupController struct {
 	backupStoreGetter         persistence.ObjectBackupStoreGetter
 	formatFlag                logging.Format
 	volumeSnapshotLister      snapshotv1listers.VolumeSnapshotLister
-	volumeSnapshotClient      *snapshotterClientSet.Clientset
+	volumeSnapshotClient      snapshotterClientSet.Interface
 	credentialFileStore       credentials.FileStore
 }
 
@@ -119,7 +119,7 @@ func NewBackupController(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	formatFlag logging.Format,
 	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
-	volumeSnapshotClient *snapshotterClientSet.Clientset,
+	volumeSnapshotClient snapshotterClientSet.Interface,
 	credentialStore credentials.FileStore,
 ) Interface {
 	c := &backupController{
@@ -674,10 +674,11 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 			}
 		}
 
-		err = c.checkVolumeSnapshotReadyToUse(context.Background(), volumeSnapshots, backup.Spec.CSISnapshotTimeout.Duration)
+		volumeSnapshots, err = c.waitVolumeSnapshotReadyToUse(context.Background(), backup.Spec.CSISnapshotTimeout.Duration, backup.Name)
 		if err != nil {
 			backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
 		}
+
 		backup.CSISnapshots = volumeSnapshots
 
 		err = c.kbClient.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector})
@@ -911,18 +912,35 @@ func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
 	return buf, nil
 }
 
-// Waiting for VolumeSnapshot ReadyTosue to true is time consuming. Try to make the process parallel by
+// waitVolumeSnapshotReadyToUse is used to wait VolumeSnapshot turned to ReadyToUse.
+// Waiting for VolumeSnapshot ReadyToUse to true is time consuming. Try to make the process parallel by
 // using goroutine here instead of waiting in CSI plugin, because it's not easy to make BackupItemAction
 // parallel by now. After BackupItemAction parallel is implemented, this logic should be moved to CSI plugin
 // as https://github.com/vmware-tanzu/velero-plugin-for-csi/pull/100
-func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, volumesnapshots []snapshotv1api.VolumeSnapshot,
-	csiSnapshotTimeout time.Duration) error {
+func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
+	csiSnapshotTimeout time.Duration, backupName string) ([]snapshotv1api.VolumeSnapshot, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	timeout := csiSnapshotTimeout
 	interval := 5 * time.Second
+	volumeSnapshots := make([]snapshotv1api.VolumeSnapshot, 0)
 
-	for _, vs := range volumesnapshots {
-		volumeSnapshot := vs
+	if c.volumeSnapshotLister != nil {
+		tmpVSs, err := c.volumeSnapshotLister.List(label.NewSelectorForBackup(backupName))
+		if err != nil {
+			c.logger.Error(err)
+			return volumeSnapshots, err
+		}
+
+		for _, vs := range tmpVSs {
+			volumeSnapshots = append(volumeSnapshots, *vs)
+		}
+	}
+
+	vsChannel := make(chan snapshotv1api.VolumeSnapshot, len(volumeSnapshots))
+	defer close(vsChannel)
+
+	for index := range volumeSnapshots {
+		volumeSnapshot := volumeSnapshots[index]
 		eg.Go(func() error {
 			err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 				tmpVS, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(volumeSnapshot.Namespace).Get(ctx, volumeSnapshot.Name, metav1.GetOptions{})
@@ -934,6 +952,9 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 					return false, nil
 				}
 
+				c.logger.Debugf("VolumeSnapshot %s/%s turned into ReadyToUse.", volumeSnapshot.Namespace, volumeSnapshot.Name)
+				// Put the ReadyToUse VolumeSnapshot element in the result channel.
+				vsChannel <- *tmpVS
 				return true, nil
 			})
 			if err == wait.ErrWaitTimeout {
@@ -942,7 +963,16 @@ func (c *backupController) checkVolumeSnapshotReadyToUse(ctx context.Context, vo
 			return err
 		})
 	}
-	return eg.Wait()
+
+	err := eg.Wait()
+
+	result := make([]snapshotv1api.VolumeSnapshot, 0)
+	length := len(vsChannel)
+	for index := 0; index < length; index++ {
+		result = append(result, <-vsChannel)
+	}
+
+	return result, err
 }
 
 // deleteVolumeSnapshot delete VolumeSnapshot created during backup.
@@ -965,7 +995,8 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 			defer wg.Done()
 			var vsc snapshotv1api.VolumeSnapshotContent
 			modifyVSCFlag := false
-			if vs.Status.BoundVolumeSnapshotContentName != nil &&
+			if vs.Status != nil &&
+				vs.Status.BoundVolumeSnapshotContentName != nil &&
 				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
 				var found bool
 				if vsc, found = vscMap[*vs.Status.BoundVolumeSnapshotContentName]; !found {
@@ -976,6 +1007,8 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 				if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentDelete {
 					modifyVSCFlag = true
 				}
+			} else {
+				logger.Errorf("VolumeSnapshot %s/%s is not ready. This is not expected.", vs.Namespace, vs.Name)
 			}
 
 			// Change VolumeSnapshotContent's DeletionPolicy to Retain before deleting VolumeSnapshot,
@@ -1001,7 +1034,7 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 			}
 
 			// Delete VolumeSnapshot from cluster
-			logger.Debugf("Deleting VolumeSnapshotContent %s", vsc.Name)
+			logger.Debugf("Deleting VolumeSnapshot %s/%s", vs.Namespace, vs.Name)
 			err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(vs.Namespace).Delete(context.TODO(), vs.Name, metav1.DeleteOptions{})
 			if err != nil {
 				logger.Errorf("fail to delete VolumeSnapshot %s/%s: %s", vs.Namespace, vs.Name, err.Error())
