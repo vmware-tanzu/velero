@@ -53,7 +53,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
    # if you are using other plugin
     kubectl set image deployment/velero \
         velero=velero/velero:v1.7.0 \
-        velero-velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.3.0 \
+        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.3.0 \
         --namespace velero
 
     # optional, if using the restic daemon set
