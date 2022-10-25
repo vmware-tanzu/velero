@@ -1000,7 +1000,7 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 				len(*vs.Status.BoundVolumeSnapshotContentName) > 0 {
 				var found bool
 				if vsc, found = vscMap[*vs.Status.BoundVolumeSnapshotContentName]; !found {
-					logger.Errorf("Not find %s from the vscMap", vs.Status.BoundVolumeSnapshotContentName)
+					logger.Errorf("Not find %s from the vscMap", *vs.Status.BoundVolumeSnapshotContentName)
 					return
 				}
 
