@@ -7,7 +7,7 @@ layout: docs
 This document describes how to use [Tilt](https://tilt.dev) with any cluster for a simplified
 workflow that offers easy deployments and rapid iterative builds.
 
-This setup allows for continuing deployment of the Velero server and, if specified, any provider plugin or the restic daemonset.
+This setup allows for continuing deployment of the Velero server and, if specified, any provider plugin or the node-agent daemonset.
 It does this work by:
 
 1. Deploying the necessary Kubernetes resources, such as the Velero CRDs and Velero deployment
@@ -60,7 +60,7 @@ Here is an example:
     "allowed_contexts": [
         "development"
     ],
-    "enable_restic": false,
+    "use_node_agent": false,
     "create_backup_locations": true,
     "setup-minio": true,
     "enable_debug": false,
@@ -82,8 +82,8 @@ Tilt: an existing image and version might be specified in the Velero deployment 
 **allowed_contexts** (Array, default=[]): A list of kubeconfig contexts Tilt is allowed to use. See the Tilt documentation on
 *[allow_k8s_contexts](https://docs.tilt.dev/api.html#api.allow_k8s_contexts) for more details. Note: Kind is automatically allowed.
 
-**enable_restic** (Bool, default=false): Indicate whether to deploy the restic Daemonset. If set to `true`, Tilt will look for a `velero/tilt-resources/restic.yaml`  file
-containing the configuration of the Velero restic DaemonSet.
+**use_node_agent** (Bool, default=false): Indicate whether to deploy the node-agent Daemonset. If set to `true`, Tilt will look for a `velero/tilt-resources/node-agent.yaml`  file
+containing the configuration of the Velero node-agent DaemonSet.
 
 **create_backup_locations** (Bool, default=false): Indicate whether to create one or more backup storage locations. If set to `true`, Tilt will look for a `velero/tilt-resources/velero_v1_backupstoragelocation.yaml` file
 containing at least one configuration for a Velero backup storage location.
@@ -97,7 +97,7 @@ containing at least one configuration for a Velero backup storage location.
 ### Create Kubernetes resource files to deploy
 All needed Kubernetes resource files are provided as ready to use samples in the `velero/tilt-resources/examples` directory. You only have to move them to the `velero/tilt-resources` level.
 
-Because the Velero Kubernetes deployment as well as the restic DaemonSet contain the configuration
+Because the Velero Kubernetes deployment as well as the node-agent DaemonSet contain the configuration
 for any plugin to be used, files for these resources are expected to be provided by the user so you may choose
 which provider plugin to load as a init container. Currently, the sample files provided are configured with all the
 plugins supported by Velero, feel free to remove any of them as needed.

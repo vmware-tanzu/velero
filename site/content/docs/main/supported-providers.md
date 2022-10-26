@@ -54,7 +54,7 @@ _Some storage providers, like Quobyte, may need a different [signature algorithm
 
 ## Non-supported volume snapshots
 
-In the case you want to take volume snapshots but didn't find a plugin for your provider, Velero has support for snapshotting using restic. Please see the [restic integration][30] documentation.
+In the case you want to take volume snapshots but didn't find a plugin for your provider, Velero has support for snapshotting using File System Backup. Please see the [File System Backup][30] documentation.
 
 [0]: https://github.com/aws/aws-sdk-go/aws
 [1]: contributions/ibm-config.md
@@ -65,6 +65,6 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/backupstoragelocation.md
 [7]: contributions/tencent-config.md
 [25]: https://github.com/hpe-storage/velero-plugin
-[30]: restic.md
+[30]: file-system-backup.md
 [36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
 [38]: https://www.cloudian.com/
