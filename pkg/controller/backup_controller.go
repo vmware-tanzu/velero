@@ -663,17 +663,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		selector := label.NewSelectorForBackup(backup.Name)
 		vscList := &snapshotv1api.VolumeSnapshotContentList{}
 
-		if c.volumeSnapshotLister != nil {
-			tmpVSs, err := c.volumeSnapshotLister.List(selector)
-			if err != nil {
-				backupLog.Error(err)
-			}
-
-			for _, vs := range tmpVSs {
-				volumeSnapshots = append(volumeSnapshots, *vs)
-			}
-		}
-
 		volumeSnapshots, err = c.waitVolumeSnapshotReadyToUse(context.Background(), backup.Spec.CSISnapshotTimeout.Duration, backup.Name)
 		if err != nil {
 			backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
