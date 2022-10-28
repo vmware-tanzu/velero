@@ -466,7 +466,12 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		result[udmrepo.StoreOptionS3DisableTlsVerify] = config["insecureSkipTLSVerify"]
 		result[udmrepo.StoreOptionS3DisableTls] = strconv.FormatBool(disableTls)
 	} else if backendType == repoconfig.AzureBackend {
-		result[udmrepo.StoreOptionAzureDomain] = getAzureStorageDomain(config)
+		domain, err := getAzureStorageDomain(config)
+		if err != nil {
+			return map[string]string{}, errors.Wrapf(err, "error to get azure storage domain")
+		}
+
+		result[udmrepo.StoreOptionAzureDomain] = domain
 	}
 
 	result[udmrepo.StoreOptionOssBucket] = bucket
