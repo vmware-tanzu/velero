@@ -16,9 +16,8 @@ You can follow the work we do, see our milestones, and our backlog on our [GitHu
 * Join our [Google Group](https://groups.google.com/forum/#!forum/projectvelero) to get updates on the project and invites to community meetings.
 * Join the Velero community meetings  - [Zoom link](https://VMware.zoom.us/j/94501971662?pwd=aUxVbWVEWHZSbDh4ZGdGU1cxYUFoZz09)  
 Bi-weekly  community meeting alternating every week between Beijing Friendly timezone and EST/Europe Friendly Timezone  
-> * Beijing/US friendly - we start at 8am Beijing Time / 8pm ET / 5pm PT / 2am CEST - [Convert to your time zone](https://dateful.com/convert/beijing-china?t=8am))
-> * US/Europe friendly - we start at 4pm CEST / 10 am ET / 7 am PT / 10pm Beijing Time - [Convert to your time zone](https://dateful.com/convert/est-edt-eastern-time?t=10))
-
-  * Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
-  * See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
-  * Have a question to discuss in the community meeting? Please add it to our [Q&A Discussion board](https://github.com/vmware-tanzu/velero/discussions/categories/community-support-q-a)
+  * Beijing/US friendly - we start at 8am Beijing Time / 8pm ET / 5pm PT / 2am CEST - [Convert to your time zone](https://dateful.com/convert/beijing-china?t=8am))  
+  * US/Europe friendly - we start at 4pm CEST / 10 am ET / 7 am PT / 10pm Beijing Time - [Convert to your time zone](https://dateful.com/convert/est-edt-eastern-time?t=10))  
+* Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
+* See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
+* Have a question to discuss in the community meeting? Please add it to our [Q&A Discussion board](https://github.com/vmware-tanzu/velero/discussions/categories/community-support-q-a)
