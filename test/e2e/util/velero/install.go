@@ -49,7 +49,7 @@ type installOptions struct {
 	RestoreHelperImage     string
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnapshots bool) error {
+func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, useVolumeSnapshots bool) error {
 	if veleroCfg.CloudProvider != "kind" {
 		if veleroCfg.ObjectStoreProvider != "" {
 			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
@@ -395,7 +395,7 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 
 	if useNodeAgent {
 		fmt.Println("Waiting for node-agent daemonset to be ready.")
-		err := wait.PollImmediate(5*time.Second, 10*time.Minute, func() (bool, error) {
+		err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
 			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/node-agent",
 				"-o", "json", "-n", namespace))
 			if err != nil {
@@ -411,21 +411,6 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 			return false, nil
 		})
 		if err != nil {
-			ns := namespace
-			fmt.Printf("start to get log for namespace %s ......", ns)
-			arg0 := []string{"-u"}
-			KubectlGetInfo("date", arg0)
-			arg := []string{"get", "all", "-n", ns}
-			KubectlGetInfo("kubectl", arg)
-			time.Sleep(5 * time.Second)
-			arg1 := []string{"get", "pvc", "-n", ns}
-			KubectlGetInfo("kubectl", arg1)
-			time.Sleep(5 * time.Second)
-			arg2 := []string{"get", "pv"}
-			KubectlGetInfo("kubectl", arg2)
-			time.Sleep(5 * time.Second)
-			arg3 := []string{"get", "events", "-o", "custom-columns=FirstSeen:.firstTimestamp,Count:.count,From:.source.component,Type:.type,Reason:.reason,Message:.message", "--all-namespaces"}
-			KubectlGetInfo("kubectl", arg3)
 			return errors.Wrap(err, "fail to wait for the node-agent ready")
 		}
 	}

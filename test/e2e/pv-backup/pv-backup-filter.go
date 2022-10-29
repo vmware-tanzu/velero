@@ -27,8 +27,8 @@ const POD_COUNT, VOLUME_COUNT_PER_POD = 2, 3
 const OPT_IN_ANN, OPT_OUT_ANN = "backup.velero.io/backup-volumes", "backup.velero.io/backup-volumes-excludes"
 const FILE_NAME = "test-data.txt"
 
-var OptInPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_ANN, id: "debug-opt-in"})
-var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "debug-opt-out"})
+var OptInPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_ANN, id: "opt-in"})
+var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "opt-out"})
 
 func (p *PVBackupFiltering) Init() error {
 	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)

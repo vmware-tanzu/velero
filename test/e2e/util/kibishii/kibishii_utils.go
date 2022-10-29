@@ -51,7 +51,7 @@ var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
 var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
 
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
+func RunKibishiiTests(client TestClient, veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots bool) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 	veleroCLI := VeleroCfg.VeleroCLI

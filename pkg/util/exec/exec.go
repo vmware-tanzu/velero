@@ -49,6 +49,6 @@ func RunCommand(cmd *exec.Cmd) (string, string, error) {
 	} else {
 		stderr = string(res)
 	}
-	cmd.Process.Kill()
+
 	return stdout, stderr, runErr
 }

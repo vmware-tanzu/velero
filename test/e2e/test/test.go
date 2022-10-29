@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -178,45 +177,10 @@ func (t *TestCase) Restore() error {
 	}
 
 	By("Start to restore ......", func() {
-		quitCh := make(chan struct{})
-		if strings.Contains(t.RestoreName, "-opt-") {
-			for _, ns := range *t.NSIncluded {
-				go func() {
-					for {
-						select {
-						case <-quitCh:
-							return
-						default:
-						}
-						fmt.Printf("start to get log for namespace %s ......", ns)
-						arg0 := []string{"-u"}
-						KubectlGetInfo("date", arg0)
-						arg := []string{"get", "all", "-n", ns}
-						KubectlGetInfo("kubectl", arg)
-						time.Sleep(5 * time.Second)
-						arg1 := []string{"get", "pvc", "-n", ns}
-						KubectlGetInfo("kubectl", arg1)
-						time.Sleep(5 * time.Second)
-						arg2 := []string{"get", "pv"}
-						KubectlGetInfo("kubectl", arg2)
-						time.Sleep(5 * time.Second)
-						arg3 := []string{"get", "events", "-o", "custom-columns=FirstSeen:.firstTimestamp,Count:.count,From:.source.component,Type:.type,Reason:.reason,Message:.message", "--all-namespaces"}
-						KubectlGetInfo("kubectl", arg3)
-						time.Sleep(20 * time.Second)
-					}
-				}()
-			}
-		}
-		var err error
-		if err = VeleroRestoreExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs); err != nil {
+		Expect(VeleroRestoreExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs)).To(Succeed(), func() string {
 			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", t.RestoreName)
-		}
-		close(quitCh)
-		Expect(err).To(BeNil())
-		// Expect(VeleroRestoreExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs)).To(Succeed(), func() string {
-		// 	RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", t.RestoreName)
-		// 	return "Fail to restore workload"
-		// })
+			return "Fail to restore workload"
+		})
 	})
 	return nil
 }
