@@ -93,7 +93,7 @@ type backupController struct {
 	backupStoreGetter           persistence.ObjectBackupStoreGetter
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1listers.VolumeSnapshotLister
-	volumeSnapshotClient        *snapshotterClientSet.Clientset
+	volumeSnapshotClient        snapshotterClientSet.Interface
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister
 	volumeSnapshotClassLister   snapshotv1listers.VolumeSnapshotClassLister
 }
@@ -117,7 +117,7 @@ func NewBackupController(
 	metrics *metrics.ServerMetrics,
 	formatFlag logging.Format,
 	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
-	volumeSnapshotClient *snapshotterClientSet.Clientset,
+	volumeSnapshotClient snapshotterClientSet.Interface,
 	volumeSnapshotContentLister snapshotv1listers.VolumeSnapshotContentLister,
 	volumesnapshotClassLister snapshotv1listers.VolumeSnapshotClassLister,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
@@ -631,16 +631,13 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	// Empty slices here so that they can be passed in to the persistBackup call later, regardless of whether or not CSI's enabled.
 	// This way, we only make the Lister call if the feature flag's on.
-	var volumeSnapshots []*snapshotv1api.VolumeSnapshot
+	var volumeSnapshots []snapshotv1api.VolumeSnapshot
 	var volumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent
 	var volumeSnapshotClasses []*snapshotv1api.VolumeSnapshotClass
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		tmpVSArray, err := c.waitVolumeSnapshotReadyToUse(context.Background(), backup.Spec.CSISnapshotTimeout.Duration, backup.Name)
+		volumeSnapshots, err := c.waitVolumeSnapshotReadyToUse(context.Background(), backup.Spec.CSISnapshotTimeout.Duration, backup.Name)
 		if err != nil {
 			backupLog.Errorf("fail to wait VolumeSnapshot change to Ready: %s", err.Error())
-		}
-		for _, vs := range tmpVSArray {
-			volumeSnapshots = append(volumeSnapshots, &vs)
 		}
 
 		backup.CSISnapshots = volumeSnapshots
@@ -671,7 +668,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 
 		// Delete the VolumeSnapshots created in the backup, when CSI feature is enabled.
-		c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, *backup, backupLog)
+		c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, backupLog)
 
 	}
 
@@ -768,7 +765,7 @@ func persistBackup(backup *pkgbackup.Request,
 	backupContents, backupLog *os.File,
 	backupStore persistence.BackupStore,
 	log logrus.FieldLogger,
-	csiVolumeSnapshots []*snapshotv1api.VolumeSnapshot,
+	csiVolumeSnapshots []snapshotv1api.VolumeSnapshot,
 	csiVolumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent,
 	csiVolumesnapshotClasses []*snapshotv1api.VolumeSnapshotClass,
 ) []error {
@@ -943,9 +940,9 @@ func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
 // which will cause snapshot deletion on cloud provider, then backup cannot restore the PV.
 // If DeletionPolicy is Retain, just delete it. If DeletionPolicy is Delete, need to
 // change DeletionPolicy to Retain before deleting VS, then change DeletionPolicy back to Delete.
-func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api.VolumeSnapshot,
+func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.VolumeSnapshot,
 	volumeSnapshotContents []*snapshotv1api.VolumeSnapshotContent,
-	backup pkgbackup.Request, logger logrus.FieldLogger) {
+	logger logrus.FieldLogger) {
 	var wg sync.WaitGroup
 	vscMap := make(map[string]*snapshotv1api.VolumeSnapshotContent)
 	for _, vsc := range volumeSnapshotContents {
@@ -954,7 +951,7 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []*snapshotv1api
 
 	for _, vs := range volumeSnapshots {
 		wg.Add(1)
-		go func(vs *snapshotv1api.VolumeSnapshot) {
+		go func(vs snapshotv1api.VolumeSnapshot) {
 			defer wg.Done()
 			var vsc *snapshotv1api.VolumeSnapshotContent
 			modifyVSCFlag := false
