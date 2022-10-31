@@ -1,0 +1,34 @@
+add new RestoreItemAction of "velero.io/change-image-repository" to handle the issue mentioned at #5519
+
+
+the configmap should like this:
+
+---------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # any name can be used; Velero uses the labels (below)
+  # to identify it rather than the name
+  name: change-image-repository-config
+  # must be in the velero namespace
+  namespace: velero
+  # the below labels should be used verbatim in your
+  # ConfigMap.
+  labels:
+    # this value-less label identifies the ConfigMap as
+    # config for a plugin (i.e. the built-in restore item action plugin)
+    velero.io/plugin-config: ""
+    # this label identifies the name and kind of plugin
+    # that this ConfigMap is for.
+    velero.io/change-image-repository: RestoreItemAction
+data:
+  # add 1+ key-value pairs here, where the key is the old
+  # image repository name and the value is the new image
+  # repository name.
+  "172.13.1.2": "172.14.1.2"
+  # if image repository have letters that configmap not support for key
+  # use "specific": "[old_image_repository]/[old_image_repository]"
+  # e.x: "specific":"1.1.1.1:5000/2.2.2.2:3000"
+  "specific": "1.1.1.1:5000/2.2.2.2:3000"
+
+
