@@ -28,10 +28,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/delete"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -43,6 +44,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -64,6 +66,7 @@ type backupDeletionReconciler struct {
 	discoveryHelper   discovery.Helper
 	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
+	credentialStore   credentials.FileStore
 }
 
 // NewBackupDeletionReconciler creates a new backup deletion reconciler.
@@ -76,6 +79,7 @@ func NewBackupDeletionReconciler(
 	helper discovery.Helper,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
+	credentialStore credentials.FileStore,
 ) *backupDeletionReconciler {
 	return &backupDeletionReconciler{
 		Client:            client,
@@ -87,6 +91,7 @@ func NewBackupDeletionReconciler(
 		discoveryHelper:   helper,
 		newPluginManager:  newPluginManager,
 		backupStoreGetter: backupStoreGetter,
+		credentialStore:   credentialStore,
 	}
 }
 
@@ -289,7 +294,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 				volumeSnapshotter, ok := volumeSnapshotters[snapshot.Spec.Location]
 				if !ok {
-					if volumeSnapshotter, err = volumeSnapshottersForVSL(ctx, backup.Namespace, snapshot.Spec.Location, r.Client, pluginManager); err != nil {
+					if volumeSnapshotter, err = r.volumeSnapshottersForVSL(ctx, backup.Namespace, snapshot.Spec.Location, pluginManager); err != nil {
 						errs = append(errs, err.Error())
 						continue
 					}
@@ -387,19 +392,25 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, nil
 }
 
-func volumeSnapshottersForVSL(
+func (r *backupDeletionReconciler) volumeSnapshottersForVSL(
 	ctx context.Context,
 	namespace, vslName string,
-	client client.Client,
 	pluginManager clientmgmt.Manager,
 ) (vsv1.VolumeSnapshotter, error) {
 	vsl := &velerov1api.VolumeSnapshotLocation{}
-	if err := client.Get(ctx, types.NamespacedName{
+	if err := r.Client.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      vslName,
 	}, vsl); err != nil {
 		return nil, errors.Wrapf(err, "error getting volume snapshot location %s", vslName)
 	}
+
+	// add credential to config
+	err := volume.UpdateVolumeSnapshotLocationWithCredentialConfig(vsl, r.credentialStore, r.logger)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	volumeSnapshotter, err := pluginManager.GetVolumeSnapshotter(vsl.Spec.Provider)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting volume snapshotter for provider %s", vsl.Spec.Provider)
