@@ -11,4 +11,4 @@
 /docs/customize-installation   /docs/{{ $latest }}/customize-installation
 /docs/faq                      /docs/{{ $latest }}/faq
 /docs/csi                      /docs/{{ $latest }}/csi
-/docs/restic                      /docs/{{ $latest }}/restic
+/docs/file-system-backup       /docs/{{ $latest }}/file-system-backup
