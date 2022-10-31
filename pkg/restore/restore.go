@@ -110,7 +110,7 @@ type kubernetesRestorer struct {
 	podVolumeRestorerFactory   podvolume.RestorerFactory
 	podVolumeTimeout           time.Duration
 	resourceTerminatingTimeout time.Duration
-	resourcePriorities         []string
+	resourcePriorities         Priorities
 	fileSystem                 filesystem.Interface
 	pvRenamer                  func(string) (string, error)
 	logger                     logrus.FieldLogger
@@ -124,7 +124,7 @@ func NewKubernetesRestorer(
 	restoreClient velerov1client.RestoresGetter,
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	resourcePriorities []string,
+	resourcePriorities Priorities,
 	namespaceClient corev1.NamespaceInterface,
 	podVolumeRestorerFactory podvolume.RestorerFactory,
 	podVolumeTimeout time.Duration,
@@ -358,7 +358,7 @@ type restoreContext struct {
 	renamedPVs                     map[string]string
 	pvRenamer                      func(string) (string, error)
 	discoveryHelper                discovery.Helper
-	resourcePriorities             []string
+	resourcePriorities             Priorities
 	hooksWaitGroup                 sync.WaitGroup
 	hooksErrs                      chan error
 	resourceRestoreHooks           []hook.ResourceRestoreHook
@@ -374,19 +374,31 @@ type resourceClientKey struct {
 
 // getOrderedResources returns an ordered list of resource identifiers to restore,
 // based on the provided resource priorities and backup contents. The returned list
-// begins with all of the prioritized resources (in order), and appends to that
-// an alphabetized list of all resources in the backup.
-func getOrderedResources(resourcePriorities []string, backupResources map[string]*archive.ResourceItems) []string {
-	// alphabetize resources in the backup
-	orderedBackupResources := make([]string, 0, len(backupResources))
+// begins with all of the high prioritized resources (in order), ends with all of
+// the low prioritized resources(in order), and an alphabetized list of resources
+// in the backup(pick out the prioritized resources) is put in the middle.
+func getOrderedResources(resourcePriorities Priorities, backupResources map[string]*archive.ResourceItems) []string {
+	priorities := map[string]struct{}{}
+	for _, priority := range resourcePriorities.HighPriorities {
+		priorities[priority] = struct{}{}
+	}
+	for _, priority := range resourcePriorities.LowPriorities {
+		priorities[priority] = struct{}{}
+	}
+
+	// pick the prioritized resources out
+	var orderedBackupResources []string
 	for resource := range backupResources {
+		if _, exist := priorities[resource]; exist {
+			continue
+		}
 		orderedBackupResources = append(orderedBackupResources, resource)
 	}
+	// alphabetize resources in the backup
 	sort.Strings(orderedBackupResources)
 
-	// Main list: everything in resource priorities, followed by what's in the
-	// backup (alphabetized).
-	return append(resourcePriorities, orderedBackupResources...)
+	list := append(resourcePriorities.HighPriorities, orderedBackupResources...)
+	return append(list, resourcePriorities.LowPriorities...)
 }
 
 type progressUpdate struct {
@@ -479,7 +491,7 @@ func (ctx *restoreContext) execute() (Result, Result) {
 		backupResources,
 		make([]restoreableResource, 0),
 		sets.NewString(),
-		[]string{"customresourcedefinitions"},
+		Priorities{HighPriorities: []string{"customresourcedefinitions"}},
 		false,
 	)
 	warnings.Merge(&w)
@@ -1796,7 +1808,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 	backupResources map[string]*archive.ResourceItems,
 	restoreResourceCollection []restoreableResource,
 	processedResources sets.String,
-	resourcePriorities []string,
+	resourcePriorities Priorities,
 	includeAllResources bool,
 ) ([]restoreableResource, sets.String, Result, Result) {
 	var warnings, errs Result
@@ -1818,7 +1830,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 	if includeAllResources {
 		resourceList = getOrderedResources(resourcePriorities, backupResources)
 	} else {
-		resourceList = resourcePriorities
+		resourceList = resourcePriorities.HighPriorities
 	}
 	for _, resource := range resourceList {
 		// try to resolve the resource via discovery to a complete group/version/resource
