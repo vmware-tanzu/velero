@@ -235,7 +235,7 @@ func TestGetStorageVariables(t *testing.T) {
 		repoName              string
 		repoBackend           string
 		getS3BucketRegion     func(string) (string, error)
-		getAzureStorageDomain func(map[string]string) string
+		getAzureStorageDomain func(map[string]string) (string, error)
 		expected              map[string]string
 		expectedErr           string
 	}{
@@ -367,16 +367,15 @@ func TestGetStorageVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "azure, ObjectStorage section exists in BSL",
+			name: "azure, getAzureStorageDomain fail",
 			backupLocation: velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/azure",
 					Config: map[string]string{
-						"bucket":        "fake-bucket-config",
-						"prefix":        "fake-prefix-config",
-						"region":        "fake-region",
-						"fspath":        "",
-						"storageDomain": "fake-domain",
+						"bucket": "fake-bucket-config",
+						"prefix": "fake-prefix-config",
+						"region": "fake-region",
+						"fspath": "",
 					},
 					StorageType: velerov1api.StorageType{
 						ObjectStorage: &velerov1api.ObjectStorageLocation{
@@ -386,8 +385,34 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getAzureStorageDomain: func(config map[string]string) string {
-				return config["storageDomain"]
+			getAzureStorageDomain: func(config map[string]string) (string, error) {
+				return "", errors.New("fake error")
+			},
+			repoBackend: "fake-repo-type",
+			expected:    map[string]string{},
+			expectedErr: "error to get azure storage domain: fake error",
+		},
+		{
+			name: "azure, ObjectStorage section exists in BSL",
+			backupLocation: velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "velero.io/azure",
+					Config: map[string]string{
+						"bucket": "fake-bucket-config",
+						"prefix": "fake-prefix-config",
+						"region": "fake-region",
+						"fspath": "",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "fake-bucket-object-store",
+							Prefix: "fake-prefix-object-store",
+						},
+					},
+				},
+			},
+			getAzureStorageDomain: func(config map[string]string) (string, error) {
+				return "fake-domain", nil
 			},
 			repoBackend: "fake-repo-type",
 			expected: map[string]string{
@@ -404,18 +429,17 @@ func TestGetStorageVariables(t *testing.T) {
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/azure",
 					Config: map[string]string{
-						"bucket":        "fake-bucket",
-						"prefix":        "fake-prefix",
-						"region":        "fake-region",
-						"fspath":        "",
-						"storageDomain": "fake-domain",
+						"bucket": "fake-bucket",
+						"prefix": "fake-prefix",
+						"region": "fake-region",
+						"fspath": "",
 					},
 				},
 			},
 			repoName:    "//fake-name//",
 			repoBackend: "fake-repo-type",
-			getAzureStorageDomain: func(config map[string]string) string {
-				return config["storageDomain"]
+			getAzureStorageDomain: func(config map[string]string) (string, error) {
+				return "fake-domain", nil
 			},
 			expected: map[string]string{
 				"bucket":        "fake-bucket",
