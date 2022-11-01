@@ -50,7 +50,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     ```bash
     # uploader_type value could be restic or kopia
     kubectl get deploy -n velero -ojson \
-    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:main\"#g" \
+    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.10.0\"#g" \
     | sed "s#\"server\",#\"server\",\"--uploader-type=$uploader_type\",#g" \
     | sed "s#default-volumes-to-restic#default-volumes-to-fs-backup#g" \
     | sed "s#default-restic-prune-frequency#default-repo-maintain-frequency#g" \
@@ -82,6 +82,12 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     Server:
         Version: v1.10.0
     ```
+## Notes
+If upgraded from v1.9.x, there still remains some resources left over in the cluster and never used in v1.10.x, which could be deleted through kubectl and it is based on your desire:
+
+    - resticrepository CRD and related CRs
+    - velero-restic-credentials secret in velero install namespace
+
 
 [0]: basic-install.md#install-the-cli
 [1]: https://velero.io/docs/v1.5/upgrade-to-1.5
