@@ -147,7 +147,9 @@ func (rp *resticProvider) RunBackup(
 	snapshotIdCmd := restic.GetSnapshotCommand(rp.repoIdentifier, rp.credentialsFile, tags)
 	snapshotIdCmd.Env = rp.cmdEnv
 	snapshotIdCmd.CACertFile = rp.caCertFile
-
+	if len(rp.extraFlags) != 0 {
+		snapshotIdCmd.ExtraFlags = append(snapshotIdCmd.ExtraFlags, rp.extraFlags...)
+	}
 	snapshotID, err := restic.GetSnapshotID(snapshotIdCmd)
 	if err != nil {
 		return "", false, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
