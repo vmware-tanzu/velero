@@ -39,13 +39,13 @@ aws_secret_access_key=<SecretKey>
 
 You need to install the Velero CLI first, see [Install the CLI](https://velero.io/docs/v1.5/basic-install/#install-the-cli)  for how to install.
 
-Follow the Velero installation command below to create velero and restic workloads and other necessary resource objects.
+Follow the Velero installation command below to create velero and node-agent workloads and other necessary resource objects.
 
 ```bash
 velero install  --provider aws --plugins velero/velero-plugin-for-aws:v1.1.0 --bucket  <BucketName> \
 --secret-file ./credentials-velero \
---use-restic \
---default-volumes-to-restic \
+--use-node-agent \
+--default-volumes-to-fs-backup \
 --backup-location-config \
 region=ap-guangzhou,s3ForcePathStyle="true",s3Url=https://cos.ap-guangzhou.myqcloud.com
 ```
@@ -60,9 +60,9 @@ Description of the parameters:
 
 - `--secret-file`: Access tencent cloud COS access credential file for the "credentials-velero" credential file created above.
 
-- `--use-restic`: Back up and restore persistent volume data using the open source free backup tool [restic](https://github.com/restic/restic).  However, 'hostPath' volumes are not supported, see the [restic limit](https://velero.io/docs/v1.5/restic/#limitations) for details), an integration 		that complements Velero's backup capabilities and is recommended to be turned on.
+- `--use-node-agent`: Enable Velero node-agent daemonset. At present, Velero File System Backup requires this daemonset, so if you are using File System Backup, it needs to be turned on. For the usage and limitation of File System Backup, See [File System Backup](../file-system-backup.md).
 
-- `--default-volumes-to-restic`: Enable the use of Restic to back up all Pod volumes, provided that the `--use-restic`parameter needs to be turned on.
+- `--default-volumes-to-fs-backup`: Enable the use of File System Backup to back up all Pod volumes, provided that the `--use-node-agent`parameter needs to be turned on.
 
 - `--backup-location-config`: Back up the bucket access-related configuration:
 
@@ -78,7 +78,7 @@ After executing the installation commands above, the installation process looks 
 
 {{< figure src="/docs/main/contributions/img-for-tencent/9015313121ed7987558c88081b052574.png" width="100%">}}
 
-After the installation command is complete, wait for the velero and restic workloads to be ready to see if the configured storage location is available.
+After the installation command is complete, wait for the velero and node-agent workloads to be ready to see if the configured storage location is available.
 
 Executing the 'velero backup-location get' command to view the storage location status and display "Available" indicates that access to Tencent Cloud COS is OK, as shown in the following image:
 

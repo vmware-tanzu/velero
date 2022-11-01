@@ -16,7 +16,7 @@ If you encounter issues with installing or configuring, see [Debugging Installat
 
 ## Prerequisites
 
-* Access to a Kubernetes cluster, version 1.7 or later.  **Note:** restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. Restic support is not required for this example, but may be of interest later. See [Restic Integration][17].
+* Access to a Kubernetes cluster, version 1.7 or later.  **Note:** File System Backup support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. File System Backup support is not required for this example, but may be of interest later. See [File System Backup][17].
 * A DNS server on the cluster
 * `kubectl` installed
 * Sufficient disk space to store backups in Minio.  You will need sufficient disk space available to handle any
@@ -83,7 +83,7 @@ These instructions start the Velero server and a Minio instance that is accessib
 
     This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no `VolumeSnapshotLocation` is created (`--use-volume-snapshots=false`). You may need to update AWS plugin version to one that is [compatible](https://github.com/vmware-tanzu/velero-plugin-for-aws#compatibility) with the version of Velero you are installing.
 
-    Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
+    Additionally, you can specify `--use-node-agent` to enable File System Backup support, and `--wait` to wait for the deployment to be ready.
 
     This example also assumes you have named your Minio bucket "velero".
 
@@ -289,7 +289,7 @@ In this case:
 
 [1]: #expose-minio-with-service-of-type-nodeport
 [3]: ../customize-installation.md
-[17]: ../restic.md
+[17]: ../file-system-backup.md
 [18]: ../debugging-restores.md
 [26]: https://github.com/vmware-tanzu/velero/releases
 [30]: https://godoc.org/github.com/robfig/cron

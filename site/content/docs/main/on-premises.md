@@ -18,7 +18,7 @@ If you need to back up persistent volume data, you must select a volume backup s
 
 For example, if you use [Portworx][4] for persistent storage, you can install their Velero plugin to get native Portworx snapshots as part of your Velero backups.
 
-If there is no native snapshot plugin available for your storage platform, you can use Velero's [restic integration][1], which provides a platform-agnostic file-level backup solution for volume data.
+If there is no native snapshot plugin available for your storage platform, you can use Velero's [File System Backup][1], which provides a platform-agnostic file-level backup solution for volume data.
 
 ### Air-gapped deployments
 
@@ -54,17 +54,17 @@ docker tag velero/velero-plugin-for-aws:$PLUGIN_VERSION $PRIVATE_REG/velero-plug
 docker push $PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION
 ```
 
-#### Preparing the restic helper image (optional)
+#### Preparing the restore helper image (optional)
 
-If you are using restic, you will also need to upload the restic helper image.
+If you are using File System Backup, you will also need to upload the restore helper image.
 
 ```bash
 PRIVATE_REG=<your private registry>
 VELERO_VERSION=<version of Velero you're targeting, for example v1.4.0>
 
-docker pull velero/velero-restic-restore-helper:$VELERO_VERSION
-docker tag velero/velero-restic-restore-helper:$VELERO_VERSION $PRIVATE_REG/velero-restic-restore-helper:$VELERO_VERSION
-docker push $PRIVATE_REG/velero-restic-restore-helper:$VELERO_VERSION
+docker pull velero/velero-restore-helper:$VELERO_VERSION
+docker tag velero/velero-restore-helper:$VELERO_VERSION $PRIVATE_REG/velero-restore-helper:$VELERO_VERSION
+docker push $PRIVATE_REG/velero-restore-helper:$VELERO_VERSION
 ```
 
 #### Pulling specific architecture images (optional)
@@ -88,7 +88,7 @@ velero install \
 
 
 [0]: supported-providers.md
-[1]: restic.md
+[1]: file-system-backup.md
 [2]: https://min.io
 [3]: contributions/minio.md
 [4]: https://portworx.com
