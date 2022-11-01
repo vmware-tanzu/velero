@@ -178,7 +178,7 @@ func (a *ChangeImageRepositoryAction) Execute(input *velero.RestoreItemActionExe
 	return velero.NewRestoreItemActionExecuteOutput(obj), nil
 }
 
-func (a *ChangeImageRepositoryAction) isImageRepositoryExist(log *logrus.Entry, oldImageName string, cm *corev1.ConfigMap) (exists bool, newStorageClass string, err error) {
+func (a *ChangeImageRepositoryAction) isImageRepositoryExist(log *logrus.Entry, oldImageName string, cm *corev1.ConfigMap) (exists bool, newImageName string, err error) {
 	if oldImageName == "" {
 		log.Infoln("Item has no old image repository specified")
 		return false, "", nil
@@ -197,16 +197,16 @@ func (a *ChangeImageRepositoryAction) isImageRepositoryExist(log *logrus.Entry, 
 			//e.x: "specific":"1.1.1.1:5000/2.2.2.2:3000"
 			if v, ok := cm.Data[SPECIFIC]; !ok {
 				log.Infoln("No mapping found for image ", oldImageRepository)
-				return false, "", nil
+				return false, "", errors.Errorf("No mapping found for image repository: %s", oldImageRepository)
 			} else if strings.Contains(v, "/") && strings.Compare(v[0:strings.Index(v, "/")], oldImageRepository) == 0 && len(v[strings.Index(v, "/"):]) > 1 {
-				log.Infoln("match sepcific case:", cm.Data[SPECIFIC])
+				log.Infoln("match specific case:", cm.Data[SPECIFIC])
 				newImageRepository = v[strings.Index(v, "/")+1:]
-				newImageName := strings.Replace(oldImageName, oldImageRepository, newImageRepository, -1)
+				newImageName = strings.Replace(oldImageName, oldImageRepository, newImageRepository, -1)
 				return true, newImageName, nil
 			}
 
 		} else {
-			newImageName := strings.Replace(oldImageName, oldImageRepository, newImageRepository, -1)
+			newImageName = strings.Replace(oldImageName, oldImageRepository, newImageRepository, -1)
 			return true, newImageName, nil
 		}
 	}
