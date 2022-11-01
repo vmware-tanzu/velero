@@ -344,7 +344,7 @@ func getRepoPassword(secretStore credentials.SecretStore) (string, error) {
 }
 
 func getStorageType(backupLocation *velerov1api.BackupStorageLocation) string {
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 
 	switch backendType {
 	case repoconfig.AWSBackend:
@@ -368,7 +368,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 		return map[string]string{}, errors.New("invalid credentials interface")
 	}
 
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 	if !repoconfig.IsBackendTypeValid(backendType) {
 		return map[string]string{}, errors.New("invalid storage provider")
 	}
@@ -414,7 +414,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string) (map[string]string, error) {
 	result := make(map[string]string)
 
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 	if !repoconfig.IsBackendTypeValid(backendType) {
 		return map[string]string{}, errors.New("invalid storage provider")
 	}
