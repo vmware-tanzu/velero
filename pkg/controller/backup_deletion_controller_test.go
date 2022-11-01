@@ -96,6 +96,7 @@ func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBack
 			nil, // discovery helper
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewFakeSingleObjectBackupStoreGetter(backupStore),
+			velerotest.NewFakeCredentialsFileStore("", nil),
 		),
 		req: ctrl.Request{NamespacedName: types.NamespacedName{Namespace: req.Namespace, Name: req.Name}},
 	}
