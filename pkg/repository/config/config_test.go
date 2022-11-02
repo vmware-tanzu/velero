@@ -48,7 +48,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName:    "repo-1",
-			expectedErr: "restic repository prefix (resticRepoPrefix) not specified in backup storage location's config",
+			expectedErr: "invalid backend type velero.io/unsupported-provider, provider unsupported-provider",
 		},
 		{
 			name: "resticRepoPrefix in BSL config is used if set",
@@ -68,6 +68,25 @@ func TestGetRepoIdentifier(t *testing.T) {
 			},
 			repoName: "repo-1",
 			expected: "custom:prefix:/restic/repo-1",
+		},
+		{
+			name: "s3Url in BSL config is used",
+			bsl: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "custom-repo-identifier",
+					Config: map[string]string{
+						"s3Url": "s3Url",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "prefix",
+						},
+					},
+				},
+			},
+			repoName: "repo-1",
+			expected: "s3:s3Url/bucket/prefix/restic/repo-1",
 		},
 		{
 			name: "s3.amazonaws.com URL format is used if region cannot be determined for AWS BSL",

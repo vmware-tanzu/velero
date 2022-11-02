@@ -18,6 +18,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -211,13 +212,15 @@ func getRequiredValues(getValue func(string) string, keys ...string) error {
 }
 
 // GetAzureStorageDomain gets the Azure storage domain required by a Azure blob connection,
-// if the provided config doean't have the value, get it from system's environment variables
-func GetAzureStorageDomain(config map[string]string) string {
-	if domain, exist := config[storageDomainConfigKey]; exist {
-		return domain
-	} else {
-		return os.Getenv(cloudNameEnvVar)
+// if the provided credential file doesn't have the value, get it from system's environment variables
+func GetAzureStorageDomain(config map[string]string) (string, error) {
+	credentialsFile := selectCredentialsFile(config)
+
+	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
+		return "", err
 	}
+
+	return getStorageDomainFromCloudName(os.Getenv(cloudNameEnvVar))
 }
 
 func GetAzureCredentials(config map[string]string) (string, string, error) {
@@ -227,4 +230,13 @@ func GetAzureCredentials(config map[string]string) (string, string, error) {
 	}
 
 	return config[storageAccountConfigKey], storageAccountKey, nil
+}
+
+func getStorageDomainFromCloudName(cloudName string) (string, error) {
+	env, err := parseAzureEnvironment(cloudName)
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to parse azure env from cloud name %s", cloudName)
+	}
+
+	return fmt.Sprintf("blob.%s", env.StorageEndpointSuffix), nil
 }

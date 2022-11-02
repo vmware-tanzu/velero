@@ -148,9 +148,9 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
       ]
     ```
 
-    If [restic-integration][3] is enabled, then, confirm that the restic daemonset is also mounting the `cloud-credentials` secret.
+    If [File System Backup][3] is enabled, then, confirm that the node-agent daemonset is also mounting the `cloud-credentials` secret.
     ```bash
-    $ kubectl -n velero get ds restic -ojson |jq .spec.template.spec.containers[0].volumeMounts
+    $ kubectl -n velero get ds node-agent -ojson |jq .spec.template.spec.containers[0].volumeMounts
     [
       {
         "mountPath": "/host_pods",
@@ -217,7 +217,7 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 
 [1]: debugging-restores.md
 [2]: debugging-install.md
-[3]: restic.md
+[3]: file-system-backup.md
 [4]: https://github.com/vmware-tanzu/velero/issues
 [5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
 [6]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero

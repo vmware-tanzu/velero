@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -83,6 +84,51 @@ func TestSelectCredentialsFile(t *testing.T) {
 
 			selectedFile := selectCredentialsFile(tc.config)
 			require.Equal(t, tc.expected, selectedFile)
+		})
+	}
+}
+
+func TestGetStorageDomainFromCloudName(t *testing.T) {
+	testCases := []struct {
+		name        string
+		cloudName   string
+		expected    string
+		expectedErr string
+	}{
+		{
+			name:        "get azure env fail",
+			cloudName:   "fake-cloud",
+			expectedErr: "unable to parse azure env from cloud name fake-cloud: autorest/azure: There is no cloud environment matching the name \"FAKE-CLOUD\"",
+		},
+		{
+			name:      "cloud name is empty",
+			cloudName: "",
+			expected:  "blob.core.windows.net",
+		},
+		{
+			name:      "azure public cloud",
+			cloudName: "AzurePublicCloud",
+			expected:  "blob.core.windows.net",
+		},
+		{
+
+			name:      "azure China cloud",
+			cloudName: "AzureChinaCloud",
+			expected:  "blob.core.chinacloudapi.cn",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			domain, err := getStorageDomainFromCloudName(tc.cloudName)
+
+			require.Equal(t, tc.expected, domain)
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+				assert.Empty(t, domain)
+			}
 		})
 	}
 }

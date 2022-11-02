@@ -344,7 +344,7 @@ func getRepoPassword(secretStore credentials.SecretStore) (string, error) {
 }
 
 func getStorageType(backupLocation *velerov1api.BackupStorageLocation) string {
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 
 	switch backendType {
 	case repoconfig.AWSBackend:
@@ -368,7 +368,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 		return map[string]string{}, errors.New("invalid credentials interface")
 	}
 
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 	if !repoconfig.IsBackendTypeValid(backendType) {
 		return map[string]string{}, errors.New("invalid storage provider")
 	}
@@ -414,7 +414,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string) (map[string]string, error) {
 	result := make(map[string]string)
 
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 	if !repoconfig.IsBackendTypeValid(backendType) {
 		return map[string]string{}, errors.New("invalid storage provider")
 	}
@@ -466,7 +466,12 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		result[udmrepo.StoreOptionS3DisableTlsVerify] = config["insecureSkipTLSVerify"]
 		result[udmrepo.StoreOptionS3DisableTls] = strconv.FormatBool(disableTls)
 	} else if backendType == repoconfig.AzureBackend {
-		result[udmrepo.StoreOptionAzureDomain] = getAzureStorageDomain(config)
+		domain, err := getAzureStorageDomain(config)
+		if err != nil {
+			return map[string]string{}, errors.Wrapf(err, "error to get azure storage domain")
+		}
+
+		result[udmrepo.StoreOptionAzureDomain] = domain
 	}
 
 	result[udmrepo.StoreOptionOssBucket] = bucket

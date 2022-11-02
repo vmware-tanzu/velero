@@ -92,7 +92,7 @@ func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileSto
 		config[repoconfig.CredentialsFileKey] = credsFile
 	}
 
-	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider)
+	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
 
 	switch backendType {
 	case repoconfig.AWSBackend:

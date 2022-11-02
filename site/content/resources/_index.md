@@ -71,9 +71,3 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 
 * [Backup and Restore MariaDB Galera Deployments on Kubernetes - by Vikram Vaswani](https://docs.bitnami.com/tutorials/backup-restore-data-mariadb-galera-kubernetes/)
-
-
-* Two great blog posts by community member Imran Pochi:
-    * [Backup and Restore of Kubernetes Applications using Heptio’s Velero with Restic and Rook-Ceph as the storage provider](https://blog.kubernauts.io/backup-and-restore-of-kubernetes-applications-using-heptios-velero-with-restic-and-rook-ceph-as-2e8df15b1487)
-    * [Backup and Restore PVCs using Velero with restic and OpenEBS from Baremetal cluster to AWS
-    ](https://blog.kubernauts.io/backup-and-restore-pvcs-using-velero-with-restic-and-openebs-from-baremetal-cluster-to-aws-d3ac54386109)

@@ -29,7 +29,7 @@ The following is an overview of Velero's restore process that starts after you r
 
 1. The `RestoreController` notices the new Restore object and performs validation.
 
-1. The `RestoreController` fetches basic information about the backup being restored, like the [BackupStorageLocation](locations.md) (BSL). It also fetches a tarball of the cluster resources in the backup, any volumes that will be restored using Restic, and any volume snapshots to be restored.
+1. The `RestoreController` fetches basic information about the backup being restored, like the [BackupStorageLocation](locations.md) (BSL). It also fetches a tarball of the cluster resources in the backup, any volumes that will be restored using File System Backup, and any volume snapshots to be restored.
 
 1. The `RestoreController` then extracts the tarball of backup cluster resources to the /tmp folder and performs some pre-processing on the resources, including:
 
@@ -56,14 +56,14 @@ The following is an overview of Velero's restore process that starts after you r
 
     * The `RestoreController` adds a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` with the restore name to the resource. This can help you easily identify restored resources and which backup they were restored from.
 
-1. The `RestoreController` creates the resource object on the target cluster. If the resource is a PV then the `RestoreController` will restore the PV data from the [durable snapshot](#durable-snapshot-pv-restore), [Restic](#restic-pv-restore), or [CSI snapshot](#csi-pv-restore) depending on how the PV was backed up.
+1. The `RestoreController` creates the resource object on the target cluster. If the resource is a PV then the `RestoreController` will restore the PV data from the [durable snapshot](#durable-snapshot-pv-restore), [File System Backup](#file-system-backup-pv-restore), or [CSI snapshot](#csi-pv-restore) depending on how the PV was backed up.
 
     If the resource already exists in the target cluster, which is determined by the Kubernetes API during resource creation, the `RestoreController` will skip the resource. The only [exception](#restore-existing-resource-policy) are Service Accounts, which Velero will attempt to merge differences between the backed up ServiceAccount into the ServiceAccount on the target cluster. You can [change the default existing resource restore policy](#restore-existing-resource-policy) to update resources instead of skipping them using the `--existing-resource-policy`.
 
 1. Once the resource is created on the target cluster, Velero may take some additional steps or wait for additional processes to complete before moving onto the next resource to restore.
 
     * If the resource is a Pod, the `RestoreController` will execute any [Restore Hooks](restore-hooks.md) and wait for the hook to finish.
-    * If the resource is a PV restored by Restic, the `RestoreController` waits for Restic’s restore to complete. The `RestoreController` sets a timeout for any resources restored with Restic during a restore. The default timeout is 4 hours, but you can configure this be setting using `--restic-timeout` restore option.
+    * If the resource is a PV restored by File System Backup, the `RestoreController` waits for File System Backup’s restore to complete. The `RestoreController` sets a timeout for any resources restored with File System Backup during a restore. The default timeout is 4 hours, but you can configure this be setting using `--fs-backup-timeout` restore option.
     * If the resource is a Custom Resource Definition, the `RestoreController` waits for its availability in the cluster. The timeout is 1 minute.
 
     If any failures happen finishing these steps, the `RestoreController` will log an error in the restore result and will continue restoring.
@@ -106,16 +106,16 @@ clusterresourcesets.addons.cluster.x-k8s.io
 Velero has three approaches when restoring a PV, depending on how the backup was taken.
 
 1. When restoring a snapshot, Velero statically creates the PV and then binds it to a restored PVC. Velero's PV rename and remap process is used only in this case because this is the only case where Velero creates the PV resource directly.
-1. When restoring with Restic, Velero uses Kubernetes’ [dynamic provision process](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) to provision the PV after creating the PVC. In this case, the PV object is not actually created by Velero.
+1. When restoring with File System Backup, Velero uses Kubernetes’ [dynamic provision process](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) to provision the PV after creating the PVC. In this case, the PV object is not actually created by Velero.
 1. When restoring with the [CSI plugin](csi.md), the PV is created from a CSI snapshot by the CSI driver. Velero doesn’t create the PV directly. Instead Velero creates a PVC with its DataSource referring to the CSI VolumeSnapshot object.
 
 ### Snapshot PV Restore
 
 PV data backed up by durable snapshots is restored by VolumeSnapshot plugins. Velero calls the plugins’ interface to create a volume from a snapshot. The plugin returns the volume’s `volumeID`. This ID is created by storage vendors and will be updated in the PV object created by Velero, so that the PV object is connected to the volume restored from a snapshot.
 
-### Restic PV Restore
+### File System Backup PV Restore
 
-For more information on Restic restores, see the [Restic integration](restic.md#restore) page.
+For more information on File System Backup restores, see the [File System Backup](file-system-backup.md#restore) page.
 
 ### CSI PV Restore
 

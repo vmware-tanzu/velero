@@ -11,10 +11,10 @@ This page outlines a cluster migration scenario and some common configurations y
 
 Before migrating you should consider the following,
 
-* Velero does not natively support the migration of persistent volumes snapshots across cloud providers. If you would like to migrate volume data between cloud platforms, enable [restic](restic.md), which will backup volume contents at the filesystem level.
+* Velero does not natively support the migration of persistent volumes snapshots across cloud providers. If you would like to migrate volume data between cloud platforms, enable [File System Backup](file-system-backup.md), which will backup volume contents at the filesystem level.
 * Velero doesn't support restoring into a cluster with a lower Kubernetes version than where the backup was taken.
 * Migrating workloads across clusters that are not running the same version of Kubernetes might be possible, but some factors need to be considered before migration, including the compatibility of API groups between clusters for each custom resource. If a Kubernetes version upgrade breaks the compatibility of core/native API groups, migrating with Velero will not be possible without first updating the impacted custom resources. For more information about API group versions, please see [EnableAPIGroupVersions](enable-api-group-versions-feature.md).
-* The Velero plugin for AWS and Azure does not support migrating data between regions. If you need to do this, you must use [restic](restic.md).
+* The Velero plugin for AWS and Azure does not support migrating data between regions. If you need to do this, you must use [File System Backup](file-system-backup.md).
 
 
 ## Migration Scenario

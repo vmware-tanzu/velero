@@ -82,8 +82,8 @@ spec:
     # a default value of 30 days will be used. The default can be configured on the velero server
     # by passing the flag --default-backup-ttl.
     ttl: 24h0m0s
-    # Whether restic should be used to take a backup of all pod volumes by default.
-    defaultVolumesToRestic: true
+    # whether pod volume file system backup should be used for all volumes by default.
+    defaultVolumesToFsBackup: true
     # The labels you want on backup objects, created from this schedule (instead of copying the labels you have on schedule object itself).
     # When this field is set, the labels from the Schedule resource are not copied to the Backup resource.
     metadata:
