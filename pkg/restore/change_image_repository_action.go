@@ -56,7 +56,7 @@ func NewChangeImageRepositoryAction(
 // be run for.
 func (a *ChangeImageRepositoryAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
-		IncludedResources: []string{"deployment", "statefulsets", "daemonset", "pod"},
+		IncludedResources: []string{"deployment", "statefulsets", "daemonset", "replicaset", "replicationcontroller", "job", "CronJob", "pod"},
 	}, nil
 }
 
@@ -120,6 +120,58 @@ func (a *ChangeImageRepositoryAction) Execute(input *velero.RestoreItemActionExe
 				return nil, errors.Wrap(err, "convert obj to Pod failed")
 			}
 			obj.Object = newObj
+		}
+
+	} else if obj.GetKind() == "Job" || obj.GetKind() == "CronJob" {
+		//handle containers
+		needUpdateObj := false
+		containers, _, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "jobTemplate", "spec", "template", "spec", "containers")
+		if err != nil {
+			a.logger.Infof("UnstructuredConverter meet error: %v", err)
+			return nil, errors.Wrap(err, "error getting item's spec.containers")
+		}
+		for i, container := range containers {
+			a.logger.Infoln("container:", container)
+			if image, ok := container.(map[string]interface{})["image"]; ok {
+				imageName := image.(string)
+				if exists, newImageName, err := a.isImageRepositoryExist(log, imageName, config); exists && err == nil {
+					needUpdateObj = true
+					a.logger.Infof("Updating item's image from %s to %s", imageName, newImageName)
+					container.(map[string]interface{})["image"] = newImageName
+					containers[i] = container
+				}
+			}
+		}
+
+		if needUpdateObj {
+			if err := unstructured.SetNestedField(obj.UnstructuredContent(), containers, "spec", "jobTemplate", "spec", "template", "spec", "containers"); err != nil {
+				return nil, errors.Wrap(err, "unable to set item's container image")
+			}
+			a.logger.Infof("obj.Object %v", obj.Object)
+		}
+
+		//handle initContainers
+		needUpdateObj = false
+		initContainers, _, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "jobTemplate", "spec", "template", "spec", "initContainers")
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting item's spec.initContainers")
+		}
+		for i, container := range initContainers {
+			if image, ok := container.(map[string]interface{})["image"]; ok {
+				imageName := image.(string)
+				if exists, newImageName, err := a.isImageRepositoryExist(log, imageName, config); exists && err == nil {
+					needUpdateObj = true
+					a.logger.Infof("Updating item's image from %s to %s", imageName, newImageName)
+					container.(map[string]interface{})["image"] = newImageName
+					initContainers[i] = container
+				}
+			}
+		}
+
+		if needUpdateObj {
+			if err := unstructured.SetNestedField(obj.UnstructuredContent(), initContainers, "spec", "jobTemplate", "spec", "template", "spec", "initContainers"); err != nil {
+				return nil, errors.Wrap(err, "unable to set item's initContainer image")
+			}
 		}
 
 	} else {
