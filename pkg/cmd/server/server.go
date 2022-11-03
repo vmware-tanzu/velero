@@ -121,7 +121,7 @@ type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
 	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
-	restoreResourcePriorities                                               []string
+	restoreResourcePriorities                                               restore.Priorities
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
 	disabledControllers                                                     []string
@@ -216,7 +216,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "fs-backup-timeout", config.podVolumeOperationTimeout, "How long pod volume file system backups/restores should be allowed to run before timing out.")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "Run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled. DEPRECATED: this flag will be removed in v2.0. Use read-only backup storage locations instead.")
 	command.Flags().StringSliceVar(&config.disabledControllers, "disable-controllers", config.disabledControllers, fmt.Sprintf("List of controllers to disable on startup. Valid values are %s", strings.Join(controller.DisableableControllers, ",")))
-	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "Desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources.")
+	command.Flags().Var(&config.restoreResourcePriorities, "restore-resource-priorities", "Desired order of resource restores, the priority list contains two parts which are split by \"-\" element. The resources before \"-\" element are restored first as high priorities, the resources after \"-\" element are restored last as low priorities, and any resource not in the list will be restored alphabetically between the high and low priorities.")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "Name of the default backup storage location. DEPRECATED: this flag will be removed in v2.0. Use \"velero backup-location set --default\" instead.")
 	command.Flags().DurationVar(&config.storeValidationFrequency, "store-validation-frequency", config.storeValidationFrequency, "How often to verify if the storage is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
 	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "List of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
@@ -488,6 +488,7 @@ func (s *server) veleroResourcesExist() error {
 	return nil
 }
 
+// High priorities:
 // - Custom Resource Definitions come before Custom Resource so that they can be
 //   restored with their corresponding CRD.
 // - Namespaces go second because all namespaced resources depend on them.
@@ -510,28 +511,36 @@ func (s *server) veleroResourcesExist() error {
 // - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 //	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 //   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
-var defaultRestorePriorities = []string{
-	"customresourcedefinitions",
-	"namespaces",
-	"storageclasses",
-	"volumesnapshotclass.snapshot.storage.k8s.io",
-	"volumesnapshotcontents.snapshot.storage.k8s.io",
-	"volumesnapshots.snapshot.storage.k8s.io",
-	"persistentvolumes",
-	"persistentvolumeclaims",
-	"secrets",
-	"configmaps",
-	"serviceaccounts",
-	"limitranges",
-	"pods",
-	// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
-	// existed in the extensions API group, but we back up replicasets from "apps" so we want
-	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
-	// in the backup.
-	"replicasets.apps",
-	"clusterclasses.cluster.x-k8s.io",
-	"clusters.cluster.x-k8s.io",
-	"clusterresourcesets.addons.cluster.x-k8s.io",
+//
+// Low priorities:
+// - Tanzu ClusterBootstrap go last as it can reference any other kind of resources
+var defaultRestorePriorities = restore.Priorities{
+	HighPriorities: []string{
+		"customresourcedefinitions",
+		"namespaces",
+		"storageclasses",
+		"volumesnapshotclass.snapshot.storage.k8s.io",
+		"volumesnapshotcontents.snapshot.storage.k8s.io",
+		"volumesnapshots.snapshot.storage.k8s.io",
+		"persistentvolumes",
+		"persistentvolumeclaims",
+		"secrets",
+		"configmaps",
+		"serviceaccounts",
+		"limitranges",
+		"pods",
+		// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
+		// existed in the extensions API group, but we back up replicasets from "apps" so we want
+		// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
+		// in the backup.
+		"replicasets.apps",
+		"clusterclasses.cluster.x-k8s.io",
+		"clusters.cluster.x-k8s.io",
+		"clusterresourcesets.addons.cluster.x-k8s.io",
+	},
+	LowPriorities: []string{
+		"clusterbootstraps.run.tanzu.vmware.com",
+	},
 }
 
 func (s *server) checkNodeAgent() {
