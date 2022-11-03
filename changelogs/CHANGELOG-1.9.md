@@ -1,3 +1,28 @@
+## v1.9.3
+### 2022-11-03
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.9.3
+
+### Container Image
+`velero/velero:v1.9.3`
+
+### Documentation
+https://velero.io/docs/v1.9/
+
+### Upgrading
+https://velero.io/docs/v1.9/upgrade-to-1.9/
+
+### All changes
+
+  * Enhance the restore priorities list to support specifying the low prioritized resources that need to be restored in the last (#5529, @ywk253100)
+  * Fix v1.9.3 CSI VolumeSnapshot status duplicate issue. (#5518, @blackpiglet)
+  * Bump up the distroless image to the latest version (#5500, @ywk253100)
+  * Add some corner cases checking for CSI snapshot in backup controller. (#5482, @blackpiglet)
+  * Skip the exclusion check for additional resources returned by BIA (#5406, @reasonerjt)
+  * Exclude "csinodes.storage.k8s.io" and "volumeattachments.storage.k8s.io" from restore by default. (#5448, @jxun)
+  * Update the k8s.io dependencies to 0.24.0 and Removed the `WithClusterName` method as it is a "legacy field that was always cleared by the system and never used" as per upstream k8s. (#5472, @kcboyle)
+
 ## v1.9.2
 ### 2022-09-14
 
