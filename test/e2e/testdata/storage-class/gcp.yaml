@@ -9,5 +9,5 @@ parameters:
   type: pd-standard
 provisioner: kubernetes.io/gce-pd
 reclaimPolicy: Delete
-volumeBindingMode: volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: WaitForFirstConsumer
 
