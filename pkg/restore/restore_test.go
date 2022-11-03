@@ -679,7 +679,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		backup             *velerov1api.Backup
 		apiResources       []*test.APIResource
 		tarball            io.Reader
-		resourcePriorities []string
+		resourcePriorities Priorities
 	}{
 		{
 			name:    "resources are restored according to the specified resource priorities",
@@ -713,7 +713,10 @@ func TestRestoreResourcePriorities(t *testing.T) {
 				test.Deployments(),
 				test.ServiceAccounts(),
 			},
-			resourcePriorities: []string{"persistentvolumes", "serviceaccounts", "pods", "deployments.apps"},
+			resourcePriorities: Priorities{
+				HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts"},
+				LowPriorities:  []string{"deployments.apps"},
+			},
 		},
 	}
 
@@ -745,7 +748,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		)
 
 		assertEmptyResults(t, warnings, errs)
-		assertResourceCreationOrder(t, tc.resourcePriorities, recorder.resources)
+		assertResourceCreationOrder(t, []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts", "pods", "deployments.apps"}, recorder.resources)
 	}
 }
 
@@ -2622,7 +2625,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.restorer.resourcePriorities = []string{"persistentvolumes", "persistentvolumeclaims"}
+			h.restorer.resourcePriorities = Priorities{HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims"}}
 			h.restorer.pvRenamer = func(oldName string) (string, error) {
 				renamed := "renamed-" + oldName
 				return renamed, nil
@@ -2940,19 +2943,19 @@ func TestIsCompleted(t *testing.T) {
 func Test_getOrderedResources(t *testing.T) {
 	tests := []struct {
 		name               string
-		resourcePriorities []string
+		resourcePriorities Priorities
 		backupResources    map[string]*archive.ResourceItems
 		want               []string
 	}{
 		{
 			name:               "when only priorities are specified, they're returned in order",
-			resourcePriorities: []string{"prio-3", "prio-2", "prio-1"},
+			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
 			backupResources:    nil,
 			want:               []string{"prio-3", "prio-2", "prio-1"},
 		},
 		{
 			name:               "when only backup resources are specified, they're returned in alphabetical order",
-			resourcePriorities: nil,
+			resourcePriorities: Priorities{},
 			backupResources: map[string]*archive.ResourceItems{
 				"backup-resource-3": nil,
 				"backup-resource-2": nil,
@@ -2962,14 +2965,26 @@ func Test_getOrderedResources(t *testing.T) {
 		},
 		{
 			name:               "when priorities and backup resources are specified, they're returned in the correct order",
-			resourcePriorities: []string{"prio-3", "prio-2", "prio-1"},
+			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
 			backupResources: map[string]*archive.ResourceItems{
 				"prio-3":            nil,
 				"backup-resource-3": nil,
 				"backup-resource-2": nil,
 				"backup-resource-1": nil,
 			},
-			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3", "prio-3"},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3"},
+		},
+		{
+			name:               "when priorities and backup resources are specified, they're returned in the correct order",
+			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}, LowPriorities: []string{"prio-0"}},
+			backupResources: map[string]*archive.ResourceItems{
+				"prio-3":            nil,
+				"prio-0":            nil,
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3", "prio-0"},
 		},
 	}
 
