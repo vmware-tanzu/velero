@@ -474,11 +474,11 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	pluginManager := c.newPluginManager(restoreLog)
 	defer pluginManager.CleanupClients()
 
-	actions, err := pluginManager.GetRestoreItemActions()
+	actions, err := pluginManager.GetRestoreItemActionsV2()
 	if err != nil {
 		return errors.Wrap(err, "error getting restore item actions")
 	}
-	actionsResolver := framework.NewRestoreItemActionResolver(actions)
+	actionsResolver := framework.NewRestoreItemActionResolverV2(actions)
 
 	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
 	if err != nil {

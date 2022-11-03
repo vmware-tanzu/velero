@@ -29,6 +29,7 @@ import (
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
@@ -128,6 +129,12 @@ func NewRestoreItemActionResolver(actions []riav1.RestoreItemAction) RestoreItem
 	}
 }
 
+func NewRestoreItemActionResolverV2(actions []riav2.RestoreItemAction) RestoreItemActionResolverV2 {
+	return RestoreItemActionResolverV2{
+		actions: actions,
+	}
+}
+
 func NewDeleteItemActionResolver(actions []velero.DeleteItemAction) DeleteItemActionResolver {
 	return DeleteItemActionResolver{
 		actions: actions,
@@ -199,6 +206,11 @@ type RestoreItemResolvedAction struct {
 	resolvedAction
 }
 
+type RestoreItemResolvedActionV2 struct {
+	riav2.RestoreItemAction
+	resolvedAction
+}
+
 type RestoreItemActionResolver struct {
 	actions []riav1.RestoreItemAction
 }
@@ -211,6 +223,30 @@ func (recv RestoreItemActionResolver) ResolveActions(helper discovery.Helper, lo
 			return nil, err
 		}
 		res := RestoreItemResolvedAction{
+			RestoreItemAction: action,
+			resolvedAction: resolvedAction{
+				ResourceIncludesExcludes:  resources,
+				NamespaceIncludesExcludes: namespaces,
+				Selector:                  selector,
+			},
+		}
+		resolved = append(resolved, res)
+	}
+	return resolved, nil
+}
+
+type RestoreItemActionResolverV2 struct {
+	actions []riav2.RestoreItemAction
+}
+
+func (recv RestoreItemActionResolverV2) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]RestoreItemResolvedActionV2, error) {
+	var resolved []RestoreItemResolvedActionV2
+	for _, action := range recv.actions {
+		resources, namespaces, selector, err := resolveAction(helper, action)
+		if err != nil {
+			return nil, err
+		}
+		res := RestoreItemResolvedActionV2{
 			RestoreItemAction: action,
 			resolvedAction: resolvedAction{
 				ResourceIncludesExcludes:  resources,
