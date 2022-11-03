@@ -105,8 +105,8 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.Prog
 					// caller with the progress
 					if stat.BytesDone != 0 {
 						updater.UpdateProgress(&uploader.UploaderProgress{
-							TotalBytes: stat.TotalBytesProcessed,
-							BytesDone:  stat.TotalBytesProcessed,
+							TotalBytes: stat.TotalBytes,
+							BytesDone:  stat.BytesDone,
 						})
 					}
 				}
