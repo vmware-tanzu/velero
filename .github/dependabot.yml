@@ -1,3 +1,9 @@
+
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
 version: 2
 updates:
   # Dependencies listed in go.mod
@@ -5,9 +11,8 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-
-  # Dependencies listed in .github/workflows/*.yml
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    labels:
+      - "kind/changelog-not-required"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
