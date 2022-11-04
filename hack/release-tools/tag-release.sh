@@ -38,6 +38,9 @@
 # This script is meant to be a combination of documentation and executable.
 # If you have questions at any point, please stop and ask!
 
+# Fail on any error.
+set -eo pipefail
+
 # Directory in which the script itself resides, so we can use it for calling programs that are in the same directory.
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -92,7 +95,7 @@ eval $(go run $DIR/chk_version.go)
 printf "To clarify, you've provided a version string of $VELERO_VERSION.\n"
 printf "Based on this, the following assumptions have been made: \n"
 
-# $VELERO_PATCH gets populated by the chk_version.go scrip that parses and verifies the given version format
+# $VELERO_PATCH gets populated by the chk_version.go script that parses and verifies the given version format
 # If we've got a patch release, we assume the tag is on release branch.
 if [[ "$VELERO_PATCH" != 0 ]]; then
     printf "*\t This is a patch release.\n"
@@ -135,8 +138,8 @@ if [[ -n $release_branch_name ]]; then
     remote_release_branch_name="$remote/$release_branch_name"
 
     # Determine whether the local and remote release branches already exist
-    local_branch=$(git branch | grep "$release_branch_name")
-    remote_branch=$(git branch -r | grep "$remote_release_branch_name")
+    local_branch=$(git branch | { grep "$release_branch_name" || true; })
+    remote_branch=$(git branch -r | { grep "$remote_release_branch_name" || true;})
     if [[ -z $remote_branch ]]; then
         echo "The branch $remote_release_branch_name must be created before you tag the release."
         exit 1

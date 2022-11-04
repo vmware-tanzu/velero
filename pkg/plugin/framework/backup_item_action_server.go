@@ -24,23 +24,26 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	protobiav1 "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 )
 
 // BackupItemActionGRPCServer implements the proto-generated BackupItemAction interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BackupItemActionGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
-func (s *BackupItemActionGRPCServer) getImpl(name string) (velero.BackupItemAction, error) {
-	impl, err := s.mux.getHandler(name)
+func (s *BackupItemActionGRPCServer) getImpl(name string) (biav1.BackupItemAction, error) {
+	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.BackupItemAction)
+	itemAction, ok := impl.(biav1.BackupItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a backup item action", impl)
 	}
@@ -48,25 +51,27 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (velero.BackupItemActi
 	return itemAction, nil
 }
 
-func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.BackupItemActionAppliesToRequest) (response *proto.BackupItemActionAppliesToResponse, err error) {
+func (s *BackupItemActionGRPCServer) AppliesTo(
+	ctx context.Context, req *protobiav1.BackupItemActionAppliesToRequest) (
+	response *protobiav1.BackupItemActionAppliesToResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
-	return &proto.BackupItemActionAppliesToResponse{
-		&proto.ResourceSelector{
+	return &protobiav1.BackupItemActionAppliesToResponse{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
@@ -76,31 +81,32 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.B
 	}, nil
 }
 
-func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.ExecuteRequest) (response *proto.ExecuteResponse, err error) {
+func (s *BackupItemActionGRPCServer) Execute(
+	ctx context.Context, req *protobiav1.ExecuteRequest) (response *protobiav1.ExecuteResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var item unstructured.Unstructured
 	var backup api.Backup
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	if err := json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	updatedItem, additionalItems, err := impl.Execute(&item, &backup)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	// If the plugin implementation returned a nil updatedItem (meaning no modifications), reset updatedItem to the
@@ -111,11 +117,11 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 	} else {
 		updatedItemJSON, err = json.Marshal(updatedItem.UnstructuredContent())
 		if err != nil {
-			return nil, newGRPCError(errors.WithStack(err))
+			return nil, common.NewGRPCError(errors.WithStack(err))
 		}
 	}
 
-	res := &proto.ExecuteResponse{
+	res := &protobiav1.ExecuteResponse{
 		Item: updatedItemJSON,
 	}
 

@@ -74,6 +74,10 @@ type BackupStorageLocationStatus struct {
 	// +nullable
 	LastValidationTime *metav1.Time `json:"lastValidationTime,omitempty"`
 
+	// Message is a message about the backup storage location's status.
+	// +optional
+	Message string `json:"message,omitempty"`
+
 	// LastSyncedRevision is the value of the `metadata/revision` file in the backup
 	// storage location the last time the BSL's contents were synced into the cluster.
 	//
@@ -98,7 +102,6 @@ type BackupStorageLocationStatus struct {
 // +kubebuilder:resource:shortName=bsl
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
-// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Backup Storage Location status such as Available/Unavailable"
 // +kubebuilder:printcolumn:name="Last Validated",type="date",JSONPath=".status.lastValidationTime",description="LastValidationTime is the last time the backup store location was validated"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"

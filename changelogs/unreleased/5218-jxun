@@ -1,0 +1,1 @@
+Migrate backup sync controller from code-generator to kubebuilder.

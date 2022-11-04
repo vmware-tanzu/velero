@@ -31,7 +31,7 @@ The "Backup and Restore" test cases below describe general backup and restore fu
 #### Backup and Restore
 
 - Verify that a backup and restore using Volume Snapshots can be performed
-- Verify that a backup and restore using Restic can be performed
+- Verify that a backup and restore using File System Backup can be performed
 - Verify that a backup of a cluster workload can be restored in a new cluster
 - Verify that an installation using the latest version can be used to restore from backups created with the last 3 versions.
   - e.g. Install Velero 1.6 and use it to restore backups from Velero v1.3, v1.4, v1.5.
@@ -61,9 +61,9 @@ The following are test cases that are not currently performed as part of a Veler
 - Verify that backups that exceed their TTL are deleted
 - Verify that existing backups in object storage are synced to Velero
 
-### Restic repository test cases
+### Backup repository test cases
 
-- Verify that restic repository maintenance is performed as the specified interval
+- Verify that backup repository maintenance is performed as the specified interval
 
 ### Backup Hooks
 
@@ -76,7 +76,7 @@ The following are test cases that are not currently performed as part of a Veler
 
 - Verify that an InitContainer restore hook provided via pod annotation is performed during restore
 - Verify that an InitContainer restore hook provided via Restore spec is performed during restore
-- Verify that an InitContainer restore hook provided via Restore spec is performed during restore that includes restoring restic volumes
+- Verify that an InitContainer restore hook provided via Restore spec is performed during restore that includes restoring File System Backup volumes
 - Verify that an Exec restore hook provided via pod annotation is performed during restore
 - Verify that an Exec restore hook provided via Restore spec is performed during restore
 

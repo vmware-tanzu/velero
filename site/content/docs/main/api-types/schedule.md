@@ -34,6 +34,10 @@ spec:
   schedule: 0 7 * * *
   # Template is the spec that should be used for each backup triggered by this schedule.
   template:
+    # CSISnapshotTimeout specifies the time used to wait for
+    # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
+    # returning error as timeout. The default value is 10 minute.
+    csiSnapshotTimeout: 10m
     # Array of namespaces to include in the scheduled backup. If unspecified, all namespaces are included.
     # Optional.
     includedNamespaces:
@@ -78,8 +82,8 @@ spec:
     # a default value of 30 days will be used. The default can be configured on the velero server
     # by passing the flag --default-backup-ttl.
     ttl: 24h0m0s
-    # Whether restic should be used to take a backup of all pod volumes by default.
-    defaultVolumesToRestic: true
+    # whether pod volume file system backup should be used for all volumes by default.
+    defaultVolumesToFsBackup: true
     # The labels you want on backup objects, created from this schedule (instead of copying the labels you have on schedule object itself).
     # When this field is set, the labels from the Schedule resource are not copied to the Backup resource.
     metadata:
@@ -132,6 +136,9 @@ spec:
           # processed. Only "exec" hooks are supported.
           post:
             # Same content as pre above.
+    # Specifies whether to use OwnerReferences on backups created by this Schedule. 
+    # Notice: if set to true, when schedule is deleted, backups will be deleted too. Optional.
+    useOwnerReferencesInBackup: false
 status:
   # The current phase of the latest scheduled backup. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
   phase: ""

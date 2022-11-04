@@ -82,8 +82,11 @@ type CreateOptions struct {
 	Labels                  flag.Map
 	IncludeNamespaces       flag.StringArray
 	ExcludeNamespaces       flag.StringArray
+	ExistingResourcePolicy  string
 	IncludeResources        flag.StringArray
 	ExcludeResources        flag.StringArray
+	StatusIncludeResources  flag.StringArray
+	StatusExcludeResources  flag.StringArray
 	NamespaceMappings       flag.Map
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
@@ -97,7 +100,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Labels:                  flag.NewMap(),
 		IncludeNamespaces:       flag.NewStringArray("*"),
-		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
+		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(',').WithKeyValueDelimiter(':'),
 		RestoreVolumes:          flag.NewOptionalBool(nil),
 		PreserveNodePorts:       flag.NewOptionalBool(nil),
 		IncludeClusterResources: flag.NewOptionalBool(nil),
@@ -113,6 +116,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Labels, "labels", "Labels to apply to the restore.")
 	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
 	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io.")
+	flags.StringVar(&o.ExistingResourcePolicy, "existing-resource-policy", "", "Restore Policy to be used during the restore workflow, can be - none or update")
+	flags.Var(&o.StatusIncludeResources, "status-include-resources", "Resources to include in the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
+	flags.Var(&o.StatusExcludeResources, "status-exclude-resources", "Resources to exclude from the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
@@ -170,6 +176,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	if o.client == nil {
 		// This should never happen
 		return errors.New("Velero client is not set; unable to proceed")
+	}
+
+	if len(o.ExistingResourcePolicy) > 0 && !isResourcePolicyValid(o.ExistingResourcePolicy) {
+		return errors.New("existing-resource-policy has invalid value, it accepts only none, update as value")
 	}
 
 	switch {
@@ -264,12 +274,20 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			ExcludedNamespaces:      o.ExcludeNamespaces,
 			IncludedResources:       o.IncludeResources,
 			ExcludedResources:       o.ExcludeResources,
+			ExistingResourcePolicy:  api.PolicyType(o.ExistingResourcePolicy),
 			NamespaceMapping:        o.NamespaceMappings.Data(),
 			LabelSelector:           o.Selector.LabelSelector,
 			RestorePVs:              o.RestoreVolumes.Value,
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
+	}
+
+	if len([]string(o.StatusIncludeResources)) > 0 {
+		restore.Spec.RestoreStatus = &api.RestoreStatusSpec{
+			IncludedResources: o.StatusIncludeResources,
+			ExcludedResources: o.StatusExcludeResources,
+		}
 	}
 
 	if printed, err := output.PrintWithFormat(c, restore); printed || err != nil {
@@ -350,4 +368,11 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	fmt.Printf("Run `velero restore describe %s` or `velero restore logs %s` for more details.\n", restore.Name, restore.Name)
 
 	return nil
+}
+
+func isResourcePolicyValid(resourcePolicy string) bool {
+	if resourcePolicy == string(api.PolicyTypeNone) || resourcePolicy == string(api.PolicyTypeUpdate) {
+		return true
+	}
+	return false
 }

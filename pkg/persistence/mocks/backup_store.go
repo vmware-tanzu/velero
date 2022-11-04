@@ -21,7 +21,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	persistence "github.com/vmware-tanzu/velero/pkg/persistence"
@@ -274,12 +274,17 @@ func (_m *BackupStore) PutRestoreResults(backup string, restore string, results 
 	return r0
 }
 
-func (_m *BackupStore) GetCSIVolumeSnapshots(backup string) ([]*snapshotv1beta1api.VolumeSnapshot, error) {
+func (_m *BackupStore) GetCSIVolumeSnapshots(backup string) ([]*snapshotv1api.VolumeSnapshot, error) {
 	panic("Not implemented")
 	return nil, nil
 }
 
-func (_m *BackupStore) GetCSIVolumeSnapshotContents(backup string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error) {
+func (_m *BackupStore) GetCSIVolumeSnapshotContents(backup string) ([]*snapshotv1api.VolumeSnapshotContent, error) {
+	panic("Not implemented")
+	return nil, nil
+}
+
+func (_m *BackupStore) GetCSIVolumeSnapshotClasses(backup string) ([]*snapshotv1api.VolumeSnapshotClass, error) {
 	panic("Not implemented")
 	return nil, nil
 }

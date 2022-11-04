@@ -82,6 +82,7 @@ type CreateOptions struct {
 	BackupOptions              *backup.CreateOptions
 	Schedule                   string
 	UseOwnerReferencesInBackup bool
+	Paused                     bool
 
 	labelSelector *metav1.LabelSelector
 }
@@ -95,7 +96,8 @@ func NewCreateOptions() *CreateOptions {
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	o.BackupOptions.BindFlags(flags)
 	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "A cron expression specifying a recurring schedule for this backup to run")
-	flags.BoolVar(&o.UseOwnerReferencesInBackup, "use-owner-references-in-backup", o.UseOwnerReferencesInBackup, "Specifies whether to use OwnerReferences on backups created by this Schedule")
+	flags.BoolVar(&o.UseOwnerReferencesInBackup, "use-owner-references-in-backup", o.UseOwnerReferencesInBackup, "Specifies whether to use OwnerReferences on backups created by this Schedule. Notice: if set to true, when schedule is deleted, backups will be deleted too.")
+	flags.BoolVar(&o.Paused, "paused", o.Paused, "Specifies whether the newly created schedule is paused or not.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -111,9 +113,18 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
+	var orders map[string]string
+
 	veleroClient, err := f.Client()
 	if err != nil {
 		return err
+	}
+
+	if len(o.BackupOptions.OrderedResources) > 0 {
+		orders, err = backup.ParseOrderedResources(o.BackupOptions.OrderedResources)
+		if err != nil {
+			return err
+		}
 	}
 
 	schedule := &api.Schedule{
@@ -124,20 +135,23 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		},
 		Spec: api.ScheduleSpec{
 			Template: api.BackupSpec{
-				IncludedNamespaces:      o.BackupOptions.IncludeNamespaces,
-				ExcludedNamespaces:      o.BackupOptions.ExcludeNamespaces,
-				IncludedResources:       o.BackupOptions.IncludeResources,
-				ExcludedResources:       o.BackupOptions.ExcludeResources,
-				IncludeClusterResources: o.BackupOptions.IncludeClusterResources.Value,
-				LabelSelector:           o.BackupOptions.Selector.LabelSelector,
-				SnapshotVolumes:         o.BackupOptions.SnapshotVolumes.Value,
-				TTL:                     metav1.Duration{Duration: o.BackupOptions.TTL},
-				StorageLocation:         o.BackupOptions.StorageLocation,
-				VolumeSnapshotLocations: o.BackupOptions.SnapshotLocations,
-				DefaultVolumesToRestic:  o.BackupOptions.DefaultVolumesToRestic.Value,
+				IncludedNamespaces:       o.BackupOptions.IncludeNamespaces,
+				ExcludedNamespaces:       o.BackupOptions.ExcludeNamespaces,
+				IncludedResources:        o.BackupOptions.IncludeResources,
+				ExcludedResources:        o.BackupOptions.ExcludeResources,
+				IncludeClusterResources:  o.BackupOptions.IncludeClusterResources.Value,
+				LabelSelector:            o.BackupOptions.Selector.LabelSelector,
+				SnapshotVolumes:          o.BackupOptions.SnapshotVolumes.Value,
+				TTL:                      metav1.Duration{Duration: o.BackupOptions.TTL},
+				StorageLocation:          o.BackupOptions.StorageLocation,
+				VolumeSnapshotLocations:  o.BackupOptions.SnapshotLocations,
+				DefaultVolumesToFsBackup: o.BackupOptions.DefaultVolumesToFsBackup.Value,
+				OrderedResources:         orders,
+				CSISnapshotTimeout:       metav1.Duration{Duration: o.BackupOptions.CSISnapshotTimeout},
 			},
 			Schedule:                   o.Schedule,
 			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,
+			Paused:                     o.Paused,
 		},
 	}
 

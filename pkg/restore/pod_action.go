@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -85,6 +86,11 @@ func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-
-	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	restoreExecuteOutput := velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res})
+	if pod.Spec.PriorityClassName != "" {
+		a.logger.Infof("Adding priorityclass %s to AdditionalItems", pod.Spec.PriorityClassName)
+		restoreExecuteOutput.AdditionalItems = []velero.ResourceIdentifier{
+			{GroupResource: kuberesource.PriorityClasses, Name: pod.Spec.PriorityClassName}}
+	}
+	return restoreExecuteOutput, nil
 }

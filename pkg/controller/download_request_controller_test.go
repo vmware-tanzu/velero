@@ -87,7 +87,7 @@ var _ = Describe("Download Request Reconciler", func() {
 				test.downloadRequest.Status.Expiration = &metav1.Time{Time: rClock.Now().Add(-1 * time.Minute)}
 			}
 
-			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 			err = fakeClient.Create(context.TODO(), test.downloadRequest)
 			Expect(err).To(BeNil())
 
@@ -109,13 +109,13 @@ var _ = Describe("Download Request Reconciler", func() {
 
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-			r := DownloadRequestReconciler{
-				Client:            fakeClient,
-				Clock:             rClock,
-				NewPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				BackupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
-				Log:               velerotest.NewLogger(),
-			}
+			r := NewDownloadRequestReconciler(
+				fakeClient,
+				rClock,
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				NewFakeObjectBackupStoreGetter(backupStores),
+				velerotest.NewLogger(),
+			)
 
 			if test.backupLocation != nil && test.expectGetsURL {
 				backupStores[test.backupLocation.Name].On("GetDownloadURL", test.downloadRequest.Spec.Target).Return("a-url", nil)
@@ -136,16 +136,16 @@ var _ = Describe("Download Request Reconciler", func() {
 			}
 
 			instance := &velerov1api.DownloadRequest{}
-			err = r.Client.Get(ctx, kbclient.ObjectKey{Name: test.downloadRequest.Name, Namespace: test.downloadRequest.Namespace}, instance)
+			err = r.client.Get(ctx, kbclient.ObjectKey{Name: test.downloadRequest.Name, Namespace: test.downloadRequest.Namespace}, instance)
 
 			if test.expired {
 				Expect(instance).ToNot(Equal(test.downloadRequest))
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			} else {
 				if test.downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-					Expect(instance).To(Equal(test.downloadRequest))
+					Expect(instance.Status).To(Equal(test.downloadRequest.Status))
 				} else {
-					Expect(instance).ToNot(Equal(test.downloadRequest))
+					Expect(instance.Status).ToNot(Equal(test.downloadRequest.Status))
 				}
 				Expect(err).To(BeNil())
 			}
@@ -153,7 +153,7 @@ var _ = Describe("Download Request Reconciler", func() {
 			if test.expectGetsURL {
 				Expect(string(instance.Status.Phase)).To(Equal(string(velerov1api.DownloadRequestPhaseProcessed)))
 				Expect(instance.Status.DownloadURL).To(Equal("a-url"))
-				Expect(velerotest.TimesAreEqual(instance.Status.Expiration.Time, r.Clock.Now().Add(signedURLTTL))).To(BeTrue())
+				Expect(velerotest.TimesAreEqual(instance.Status.Expiration.Time, r.clock.Now().Add(signedURLTTL))).To(BeTrue())
 			}
 		},
 

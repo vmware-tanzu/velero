@@ -2,10 +2,6 @@
 <html lang="en">
 {{ partial "head-docs.html" . }}
 
-{{ if ne .Params.version "master" }}
-  <!-- Block google from indexing versioned docs -->
-  <meta name="robots" content="noindex">
-{{ end }}
 {{ $fileName := "" }}
 {{ with .File }}{{ $fileName = .LogicalName }}{{ end }}
 {{ if eq $fileName "_index.md" }}

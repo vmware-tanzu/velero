@@ -49,11 +49,12 @@ func (a *InitRestoreHookPodAction) Execute(input *velero.RestoreItemActionExecut
 	a.logger.Infof("Executing InitRestoreHookPodAction")
 	// handle any init container restore hooks for the pod
 	restoreHooks, err := hook.GetRestoreHooksFromSpec(&input.Restore.Spec.Hooks)
+	nsMapping := input.Restore.Spec.NamespaceMapping
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	hookHandler := hook.InitContainerRestoreHookHandler{}
-	postHooksItem, err := hookHandler.HandleRestoreHooks(a.logger, kuberesource.Pods, input.Item, restoreHooks)
+	postHooksItem, err := hookHandler.HandleRestoreHooks(a.logger, kuberesource.Pods, input.Item, restoreHooks, nsMapping)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

@@ -67,7 +67,9 @@ For each major or minor release, create and publish a blog post to let folks kno
 	- Run `make gen-docs`, passing the appropriate variables. Examples:
 		a) `VELERO_VERSION=v1.5.0-rc.1 NEW_DOCS_VERSION=v1.5.0-rc.1 make gen-docs`.
 		b) `VELERO_VERSION=v1.5.0 NEW_DOCS_VERSION=v1.5 make gen-docs`).
-	- Note: `PREVIOUS_DOCS_VERSION=<doc-version-to-copy-from>` is optional; when not set, it will default to the latest doc version.
+	- Note:
+	    - `PREVIOUS_DOCS_VERSION=<doc-version-to-copy-from>` is optional; when not set, it will default to the latest doc version.
+	    - `VELERO_VERSION` and `NEW_DOCS_VERSION` are slightly different, the `VELERO_VERSION` may have lots of small release versions for one specific $major.minor, such as 'v1.5.0' and 'v1.5.1', but `NEW_DOCS_VERSION` may still be 'v1.5' for not document update.
 1. Clean up when there is an existing set of pre-release versioned docs for the version you are releasing
 	- Example: `site/content/docs/v1.5.0-beta.1` exists, and you're releasing `v1.5.0-rc.1` or `v1.5`
     - Remove the directory containing the pre-release docs, i.e. `site/content/docs/<pre-release-version>`.
@@ -98,15 +100,16 @@ https://github.com/vmware-tanzu/velero/blob/release-1.7/Dockerfile#L53-L54
 - If the dry-run fails with random errors, try running it again.
 
 #### Steps
-1.  Create a tagged release in dry-run mode
+1. Manually create the release branch on Github, in the form like `release-$major.$minor`
+1. Create a tagged release in dry-run mode
 	- This won't push anything to GitHub.
-	- Run `VELERO_VERSION=v1.0.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh`.
+	- Run `VELERO_VERSION=v1.9.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ON_RELEASE_BRANCH=TRUE ./hack/release-tools/tag-release.sh`.
 	- Fix any issue.
 1. Create a tagged release and push it to GitHub
-	- Run `VELERO_VERSION=v1.0.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ./hack/release-tools/tag-release.sh publish`.
+	- Run `VELERO_VERSION=v1.9.0-rc.1 REMOTE=<upstream-remote> GITHUB_TOKEN=REDACTED ON_RELEASE_BRANCH=TRUE ./hack/release-tools/tag-release.sh publish`.
 1. Publish the release
 	- Navigate to the draft GitHub release at https://github.com/vmware-tanzu/velero/releases and edit the release.
-	- If this is a patch release (e.g. `v1.4.1`), note that the full `CHANGELOG-1.4.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
+	- If this is a patch release (e.g. `v1.9.1`), note that the full `CHANGELOG-1.9.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.9.0`'s changelog) so that only the latest patch release's changelog shows.
 	- Do a quick review for formatting. 
 	- **Note:** the `goreleaser` process should have detected if it's a pre-release version and, if so, checked the box at the bottom of the GitHub release page appropriately, but it's always worth double-checking.
 	- Verify that GitHub has built and pushed all the images (it takes a while): https://github.com/vmware-tanzu/velero/actions
@@ -129,12 +132,21 @@ These are the steps to update the Velero Homebrew version.
 - Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 - Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
 - Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
--
+
 ## Plugins
 
 To release plugins maintained by the Velero team, follow the [plugin release instructions](plugin-release-instructions.md).
 
 After the plugin images are built, be sure to update any [e2e tests][3] that use these plugins.
+
+## Helm Chart (GA only)
+
+### Steps
+- Update the CRDs under helm chart folder `crds` according to the current Velero GA version, and add the labels for the helm chart CRDs. For example: https://github.com/vmware-tanzu/helm-charts/pull/248.
+- Bump the Chart version `version` on the `Chart.yaml`.
+- Bump the Velero version `appVersion` on the `Chart.yaml` file and `tag` on the `values.yaml` file.
+- Bump the plugin version on the `values.yaml` if needed.
+- Update the _upgrade_ instruction and related tag on the `README.md` file.
 
 ## How to write and release a blog post
 What to include in a release blog:

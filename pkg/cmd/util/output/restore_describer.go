@@ -107,7 +107,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 		d.Printf("\tIncluded:\t%s\n", s)
 		if len(restore.Spec.ExcludedNamespaces) == 0 {
-			s = "<none>"
+			s = emptyDisplay
 		} else {
 			s = strings.Join(restore.Spec.ExcludedNamespaces, ", ")
 		}
@@ -122,7 +122,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 		d.Printf("\tIncluded:\t%s\n", s)
 		if len(restore.Spec.ExcludedResources) == 0 {
-			s = "<none>"
+			s = emptyDisplay
 		} else {
 			s = strings.Join(restore.Spec.ExcludedResources, ", ")
 		}
@@ -134,7 +134,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.DescribeMap("Namespace mappings", restore.Spec.NamespaceMapping)
 
 		d.Println()
-		s = "<none>"
+		s = emptyDisplay
 		if restore.Spec.LabelSelector != nil {
 			s = metav1.FormatLabelSelector(restore.Spec.LabelSelector)
 		}
@@ -147,6 +147,13 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 			d.Println()
 			describePodVolumeRestores(d, podVolumeRestores, details)
 		}
+
+		d.Println()
+		s = emptyDisplay
+		if restore.Spec.ExistingResourcePolicy != "" {
+			s = string(restore.Spec.ExistingResourcePolicy)
+		}
+		d.Printf("Existing Resource Policy: \t%s\n", s)
 
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
@@ -198,10 +205,19 @@ func describeRestoreResult(d *Describer, name string, result pkgrestore.Result) 
 
 // describePodVolumeRestores describes pod volume restores in human-readable format.
 func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRestore, details bool) {
-	if details {
-		d.Printf("Restic Restores:\n")
+	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
+	// take the uploader type from the first element of the array.
+	var uploaderType string
+	if len(restores) > 0 {
+		uploaderType = restores[0].Spec.UploaderType
 	} else {
-		d.Printf("Restic Restores (specify --details for more information):\n")
+		return
+	}
+
+	if details {
+		d.Printf("%s Restores:\n", uploaderType)
+	} else {
+		d.Printf("%s Restores (specify --details for more information):\n", uploaderType)
 	}
 
 	// separate restores by phase (combining <none> and New into a single group)

@@ -14,9 +14,15 @@ exemptLabels:
   - Area/Design
   - Area/Documentation
   - Area/Plugins
+  - Bug
   - Enhancement/User
+  - kind/requirement
+  - kind/refactor
   - kind/tech-debt
+  - limitation
   - Needs investigation
+  - Needs triage
+  - Needs Product
   - P0 - Hair on fire
   - P1 - Important
   - P2 - Long-term important

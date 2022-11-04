@@ -24,23 +24,25 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 )
 
 // RestoreItemActionGRPCServer implements the proto-generated RestoreItemActionServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type RestoreItemActionGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
-func (s *RestoreItemActionGRPCServer) getImpl(name string) (velero.RestoreItemAction, error) {
-	impl, err := s.mux.getHandler(name)
+func (s *RestoreItemActionGRPCServer) getImpl(name string) (riav1.RestoreItemAction, error) {
+	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(velero.RestoreItemAction)
+	itemAction, ok := impl.(riav1.RestoreItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a restore item action", impl)
 	}
@@ -50,23 +52,23 @@ func (s *RestoreItemActionGRPCServer) getImpl(name string) (velero.RestoreItemAc
 
 func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.RestoreItemActionAppliesToRequest) (response *proto.RestoreItemActionAppliesToResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.RestoreItemActionAppliesToResponse{
-		&proto.ResourceSelector{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
@@ -78,14 +80,14 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 
 func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreItemActionExecuteRequest) (response *proto.RestoreItemActionExecuteResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var (
@@ -95,15 +97,15 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 	)
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	if err := json.Unmarshal(req.ItemFromBackup, &itemFromBackup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	if err := json.Unmarshal(req.Restore, &restoreObj); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	executeOutput, err := impl.Execute(&velero.RestoreItemActionExecuteInput{
@@ -112,7 +114,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		Restore:        &restoreObj,
 	})
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	// If the plugin implementation returned a nil updateItem (meaning no modifications), reset updatedItem to the
@@ -123,7 +125,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 	} else {
 		updatedItemJSON, err = json.Marshal(executeOutput.UpdatedItem.UnstructuredContent())
 		if err != nil {
-			return nil, newGRPCError(errors.WithStack(err))
+			return nil, common.NewGRPCError(errors.WithStack(err))
 		}
 	}
 

@@ -1,0 +1,1 @@
+Move 'velero.io/exclude-from-backup' label string to const

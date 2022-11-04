@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
@@ -68,14 +68,14 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			}
 
 			first := true
-			for _, restore := range restores.Items {
-				opts := restic.NewPodVolumeRestoreListOptions(restore.Name)
+			for i, restore := range restores.Items {
+				opts := newPodVolumeRestoreListOptions(restore.Name)
 				podvolumeRestoreList, err := veleroClient.VeleroV1().PodVolumeRestores(f.Namespace()).List(context.TODO(), opts)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}
 
-				s := output.DescribeRestore(context.Background(), kbClient, &restore, podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+				s := output.DescribeRestore(context.Background(), kbClient, &restores.Items[i], podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -93,4 +93,12 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 
 	return c
+}
+
+// newPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
+// find PodVolumeRestores for the restore identified by name.
+func newPodVolumeRestoreListOptions(name string) metav1.ListOptions {
+	return metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, label.GetValidName(name)),
+	}
 }

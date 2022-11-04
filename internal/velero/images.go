@@ -44,8 +44,8 @@ func DefaultVeleroImage() string {
 	return fmt.Sprintf("%s/%s:%s", imageRegistry(), "velero", ImageTag())
 }
 
-// DefaultResticRestoreHelperImage returns the default container image to use for the restic restore helper
+// DefaultRestoreHelperImage returns the default container image to use for the restore helper
 // for this version of Velero.
-func DefaultResticRestoreHelperImage() string {
-	return fmt.Sprintf("%s/%s:%s", imageRegistry(), "velero-restic-restore-helper", ImageTag())
+func DefaultRestoreHelperImage() string {
+	return fmt.Sprintf("%s/%s:%s", imageRegistry(), "velero-restore-helper", ImageTag())
 }

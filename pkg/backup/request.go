@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
@@ -48,6 +50,7 @@ type Request struct {
 	VolumeSnapshots           []*volume.Snapshot
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             map[itemKey]struct{}
+	CSISnapshots              []snapshotv1api.VolumeSnapshot
 }
 
 // BackupResourceList returns the list of backed up resources grouped by the API

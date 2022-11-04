@@ -21,9 +21,10 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
-func ParseSecurityContext(runAsUser string, runAsGroup string, allowPrivilegeEscalation string) (corev1.SecurityContext, error) {
+func ParseSecurityContext(runAsUser string, runAsGroup string, allowPrivilegeEscalation string, secCtx string) (corev1.SecurityContext, error) {
 	securityContext := corev1.SecurityContext{}
 
 	if runAsUser != "" {
@@ -51,6 +52,13 @@ func ParseSecurityContext(runAsUser string, runAsGroup string, allowPrivilegeEsc
 		}
 
 		securityContext.AllowPrivilegeEscalation = &parsedAllowPrivilegeEscalation
+	}
+
+	if secCtx != "" {
+		err := yaml.UnmarshalStrict([]byte(secCtx), &securityContext)
+		if err != nil {
+			return securityContext, errors.WithStack(errors.Errorf(`Security context secCtx error: "%s"`, err))
+		}
 	}
 
 	return securityContext, nil

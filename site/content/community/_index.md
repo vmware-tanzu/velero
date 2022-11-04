@@ -14,10 +14,10 @@ You can follow the work we do, see our milestones, and our backlog on our [GitHu
 * Follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero)
 * Join our Kubernetes Slack channel and talk to over 800 other community members: [#velero](https://kubernetes.slack.com/messages/velero)
 * Join our [Google Group](https://groups.google.com/forum/#!forum/projectvelero) to get updates on the project and invites to community meetings.
-* Join the Velero community meetings:
-  * 1st and 3rd Tuesday at 12PM ET / 9AM PT ([Convert to your time zone](http://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29)) - [Zoom link](https://vmware.zoom.us/j/551441444?pwd=dHJyMWZtdHFPWWFJaTh5TnFuYWMvZz09)
-  * 2nd and 4th Tuesday at 8am China Standard Time / 8pm ET / 5pm PT ([Convert to your time zone](http://www.thetimezoneconverter.com/?t=17:00&tz=PT%20%28Pacific%20Time%29)) - [Zoom link](https://vmware.zoom.us/j/551441444?pwd=dHJyMWZtdHFPWWFJaTh5TnFuYWMvZz09)
-  * Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
-  * See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
-  * Have a question to discuss in the community meeting? Please add it to our [Q&A Discussion board](https://github.com/vmware-tanzu/velero/discussions/categories/community-support-q-a)
-* Have a question about "how do I configure Velero to do X?", or "how can I backup X with Velero?", or "how do I start to contribute to Velero?" and would like to chat with us face to face, come join the [Velero Office Hours](https://hackmd.io/I3u1x0u9T46KhuYZN4LX-A?view) that's held twice per month.
+* Join the Velero community meetings  - [Zoom link](https://VMware.zoom.us/j/94501971662?pwd=aUxVbWVEWHZSbDh4ZGdGU1cxYUFoZz09)  
+Bi-weekly  community meeting alternating every week between Beijing Friendly timezone and EST/Europe Friendly Timezone  
+  * Beijing/US friendly - we start at 8am Beijing Time(bound to CST) / 8pm EDT(7pm EST) / 5pm PDT(4pm PST) / 2am CEST(1am CET) - [Convert to your time zone](https://dateful.com/convert/beijing-china?t=8am)  
+  * US/Europe friendly - we start at 10am ET(bound to ET) / 7am PT / 3pm CET / 10pm(11pm) CST - [Convert to your time zone](https://dateful.com/convert/est-edt-eastern-time?t=10)  
+* Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
+* See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
+* Have a question to discuss in the community meeting? Please add it to our [Q&A Discussion board](https://github.com/vmware-tanzu/velero/discussions/categories/community-support-q-a)

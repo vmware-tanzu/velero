@@ -80,21 +80,21 @@ func TestRemoveControllers(t *testing.T) {
 		errorExpected       bool
 	}{
 		{
-			name: "Remove one disabable controller",
+			name: "Remove one disable controller",
 			disabledControllers: []string{
 				controller.Backup,
 			},
 			errorExpected: false,
 		},
 		{
-			name: "Remove all disabable controllers",
+			name: "Remove all disable controllers",
 			disabledControllers: []string{
 				controller.Backup,
 				controller.BackupDeletion,
 				controller.BackupSync,
 				controller.DownloadRequest,
 				controller.GarbageCollection,
-				controller.ResticRepo,
+				controller.BackupRepo,
 				controller.Restore,
 				controller.Schedule,
 				controller.ServerStatusRequest,
@@ -102,7 +102,7 @@ func TestRemoveControllers(t *testing.T) {
 			errorExpected: false,
 		},
 		{
-			name: "Remove with a non-disabable controller included",
+			name: "Remove with a non-disable controller included",
 			disabledControllers: []string{
 				controller.Backup,
 				controller.BackupStorageLocation,
@@ -110,7 +110,7 @@ func TestRemoveControllers(t *testing.T) {
 			errorExpected: true,
 		},
 		{
-			name: "Remove with a misspelled/inexisting controller name",
+			name: "Remove with a misspelled/non-existing controller name",
 			disabledControllers: []string{
 				"go",
 			},
@@ -122,16 +122,16 @@ func TestRemoveControllers(t *testing.T) {
 			enabledControllers := map[string]func() controllerRunInfo{
 				controller.BackupSync:        func() controllerRunInfo { return controllerRunInfo{} },
 				controller.Backup:            func() controllerRunInfo { return controllerRunInfo{} },
-				controller.Schedule:          func() controllerRunInfo { return controllerRunInfo{} },
 				controller.GarbageCollection: func() controllerRunInfo { return controllerRunInfo{} },
-				controller.BackupDeletion:    func() controllerRunInfo { return controllerRunInfo{} },
 				controller.Restore:           func() controllerRunInfo { return controllerRunInfo{} },
-				controller.ResticRepo:        func() controllerRunInfo { return controllerRunInfo{} },
-				controller.DownloadRequest:   func() controllerRunInfo { return controllerRunInfo{} },
 			}
 
 			enabledRuntimeControllers := map[string]struct{}{
 				controller.ServerStatusRequest: {},
+				controller.Schedule:            {},
+				controller.BackupDeletion:      {},
+				controller.BackupRepo:          {},
+				controller.DownloadRequest:     {},
 			}
 
 			totalNumOriginalControllers := len(enabledControllers) + len(enabledRuntimeControllers)

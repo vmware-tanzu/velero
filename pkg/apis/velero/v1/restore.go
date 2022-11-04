@@ -17,8 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RestoreSpec defines the specification for a Velero restore.
@@ -71,11 +71,26 @@ type RestoreSpec struct {
 	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
+	// OrLabelSelectors is list of metav1.LabelSelector to filter with
+	// when restoring individual objects from the backup. If multiple provided
+	// they will be joined by the OR operator. LabelSelector as well as
+	// OrLabelSelectors cannot co-exist in restore request, only one of them
+	// can be used
+	// +optional
+	// +nullable
+	OrLabelSelectors []*metav1.LabelSelector `json:"orLabelSelectors,omitempty"`
+
 	// RestorePVs specifies whether to restore all included
 	// PVs from snapshot (via the cloudprovider).
 	// +optional
 	// +nullable
 	RestorePVs *bool `json:"restorePVs,omitempty"`
+
+	// RestoreStatus specifies which resources we should restore the status
+	// field. If nil, no objects are included. Optional.
+	// +optional
+	// +nullable
+	RestoreStatus *RestoreStatusSpec `json:"restoreStatus,omitempty"`
 
 	// PreserveNodePorts specifies whether to restore old nodePorts from backup.
 	// +optional
@@ -92,11 +107,29 @@ type RestoreSpec struct {
 	// Hooks represent custom behaviors that should be executed during or post restore.
 	// +optional
 	Hooks RestoreHooks `json:"hooks,omitempty"`
+
+	// ExistingResourcePolicy specifies the restore behaviour for the kubernetes resource to be restored
+	// +optional
+	// +nullable
+	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
 type RestoreHooks struct {
 	Resources []RestoreResourceHookSpec `json:"resources,omitempty"`
+}
+
+type RestoreStatusSpec struct {
+	// IncludedResources specifies the resources to which will restore the status.
+	// If empty, it applies to all resources.
+	// +optional
+	// +nullable
+	IncludedResources []string `json:"includedResources,omitempty"`
+
+	// ExcludedResources specifies the resources to which will not restore the status.
+	// +optional
+	// +nullable
+	ExcludedResources []string `json:"excludedResources,omitempty"`
 }
 
 // RestoreResourceHookSpec defines one or more RestoreResrouceHooks that should be executed based on
@@ -175,9 +208,10 @@ type ExecRestoreHook struct {
 // InitRestoreHook is a hook that adds an init container to a PodSpec to run commands before the
 // workload pod is able to start.
 type InitRestoreHook struct {
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// InitContainers is list of init containers to be added to a pod during its restore.
 	// +optional
-	InitContainers []v1.Container `json:"initContainers"`
+	InitContainers []runtime.RawExtension `json:"initContainers"`
 
 	// Timeout defines the maximum amount of time Velero should wait for the initContainers to complete.
 	// +optional
@@ -212,6 +246,14 @@ const (
 	// RestorePhaseFailed means the restore was unable to execute.
 	// The failing error is recorded in status.FailureReason.
 	RestorePhaseFailed RestorePhase = "Failed"
+
+	// PolicyTypeNone means velero will not overwrite the resource
+	// in cluster with the one in backup whether changed/unchanged.
+	PolicyTypeNone PolicyType = "none"
+
+	// PolicyTypeUpdate means velero will try to attempt a patch on
+	// the changed resources.
+	PolicyTypeUpdate PolicyType = "update"
 )
 
 // RestoreStatus captures the current status of a Velero restore
@@ -302,3 +344,6 @@ type RestoreList struct {
 
 	Items []Restore `json:"items"`
 }
+
+// PolicyType helps specify the ExistingResourcePolicy
+type PolicyType string

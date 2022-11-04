@@ -21,26 +21,26 @@ import (
 	"encoding/json"
 	"time"
 
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 )
 
 // NewItemSnapshotterPlugin constructs a ItemSnapshotterPlugin.
-func NewItemSnapshotterPlugin(options ...PluginOption) *ItemSnapshotterPlugin {
+func NewItemSnapshotterPlugin(options ...common.PluginOption) *ItemSnapshotterPlugin {
 	return &ItemSnapshotterPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: common.NewPluginBase(options...),
 	}
 }
 
-func newItemSnapshotterGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+func newItemSnapshotterGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
 	return &ItemSnapshotterGRPCClient{
-		clientBase: base,
+		ClientBase: base,
 		grpcClient: proto.NewItemSnapshotterClient(clientConn),
 	}
 }
@@ -48,13 +48,13 @@ func newItemSnapshotterGRPCClient(base *clientBase, clientConn *grpc.ClientConn)
 // ItemSnapshotterGRPCClient implements the ItemSnapshotter interface and uses a
 // gRPC client to make calls to the plugin server.
 type ItemSnapshotterGRPCClient struct {
-	*clientBase
+	*common.ClientBase
 	grpcClient proto.ItemSnapshotterClient
 }
 
 func (recv ItemSnapshotterGRPCClient) Init(config map[string]string) error {
 	req := &proto.ItemSnapshotterInitRequest{
-		Plugin: recv.plugin,
+		Plugin: recv.Plugin,
 		Config: config,
 	}
 
@@ -64,12 +64,12 @@ func (recv ItemSnapshotterGRPCClient) Init(config map[string]string) error {
 
 func (recv ItemSnapshotterGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
 	req := &proto.ItemSnapshotterAppliesToRequest{
-		Plugin: recv.plugin,
+		Plugin: recv.Plugin,
 	}
 
 	res, err := recv.grpcClient.AppliesTo(context.Background(), req)
 	if err != nil {
-		return velero.ResourceSelector{}, fromGRPCError(err)
+		return velero.ResourceSelector{}, common.FromGRPCError(err)
 	}
 
 	if res.ResourceSelector == nil {
@@ -96,7 +96,7 @@ func (recv ItemSnapshotterGRPCClient) AlsoHandles(input *isv1.AlsoHandlesInput) 
 		return nil, errors.WithStack(err)
 	}
 	req := &proto.AlsoHandlesRequest{
-		Plugin: recv.plugin,
+		Plugin: recv.Plugin,
 		Item:   itemJSON,
 		Backup: backupJSON,
 	}
@@ -121,7 +121,7 @@ func (recv ItemSnapshotterGRPCClient) SnapshotItem(ctx context.Context, input *i
 		return nil, errors.WithStack(err)
 	}
 	req := &proto.SnapshotItemRequest{
-		Plugin: recv.plugin,
+		Plugin: recv.Plugin,
 		Item:   itemJSON,
 		Backup: backupJSON,
 	}
@@ -153,7 +153,7 @@ func (recv ItemSnapshotterGRPCClient) Progress(input *isv1.ProgressInput) (*isv1
 		return nil, errors.WithStack(err)
 	}
 	req := &proto.ProgressRequest{
-		Plugin:     recv.plugin,
+		Plugin:     recv.Plugin,
 		ItemID:     resourceIdentifierToProto(input.ItemID),
 		SnapshotID: input.SnapshotID,
 		Backup:     backupJSON,
@@ -184,7 +184,7 @@ func (recv ItemSnapshotterGRPCClient) Progress(input *isv1.ProgressInput) (*isv1
 
 func (recv ItemSnapshotterGRPCClient) DeleteSnapshot(ctx context.Context, input *isv1.DeleteSnapshotInput) error {
 	req := &proto.DeleteItemSnapshotRequest{
-		Plugin:     recv.plugin,
+		Plugin:     recv.Plugin,
 		Params:     input.Params,
 		SnapshotID: input.SnapshotID,
 	}
@@ -210,7 +210,7 @@ func (recv ItemSnapshotterGRPCClient) CreateItemFromSnapshot(ctx context.Context
 		return nil, errors.WithStack(err)
 	}
 	req := &proto.CreateItemFromSnapshotRequest{
-		Plugin:           recv.plugin,
+		Plugin:           recv.Plugin,
 		Item:             itemJSON,
 		SnapshotID:       input.SnapshotID,
 		ItemFromBackup:   itemFromBackupJSON,

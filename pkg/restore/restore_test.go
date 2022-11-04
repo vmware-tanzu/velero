@@ -48,8 +48,10 @@ import (
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/restic"
-	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -250,6 +252,36 @@ func TestRestoreResourceFiltering(t *testing.T) {
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-2/deploy-2"},
 				test.PVs():         {"/pv-1"},
+			},
+		},
+		{
+			name: "OrLabelSelectors only restores matching resources",
+			restore: defaultRestore().OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
+				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup: defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a1", "b1")).Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a3", "b3")).Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a5", "b5")).Result(),
+					builder.ForPersistentVolume("pv-2").ObjectMeta(builder.WithLabels("a4", "b4")).Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-2/deploy-2"},
+				test.PVs():         {"/pv-2"},
 			},
 		},
 		{
@@ -649,7 +681,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		backup             *velerov1api.Backup
 		apiResources       []*test.APIResource
 		tarball            io.Reader
-		resourcePriorities []string
+		resourcePriorities Priorities
 	}{
 		{
 			name:    "resources are restored according to the specified resource priorities",
@@ -683,7 +715,10 @@ func TestRestoreResourcePriorities(t *testing.T) {
 				test.Deployments(),
 				test.ServiceAccounts(),
 			},
-			resourcePriorities: []string{"persistentvolumes", "serviceaccounts", "pods", "deployments.apps"},
+			resourcePriorities: Priorities{
+				HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts"},
+				LowPriorities:  []string{"deployments.apps"},
+			},
 		},
 	}
 
@@ -715,7 +750,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		)
 
 		assertEmptyResults(t, warnings, errs)
-		assertResourceCreationOrder(t, tc.resourcePriorities, recorder.resources)
+		assertResourceCreationOrder(t, []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts", "pods", "deployments.apps"}, recorder.resources)
 	}
 }
 
@@ -732,15 +767,16 @@ func TestInvalidTarballContents(t *testing.T) {
 		tarball      io.Reader
 		want         map[*test.APIResource][]string
 		wantErrs     Result
+		wantWarnings Result
 	}{
 		{
-			name:    "empty tarball returns an error",
+			name:    "empty tarball returns a warning",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
 				Done(),
-			wantErrs: Result{
-				Velero: []string{"error parsing backup contents: directory \"resources\" does not exist"},
+			wantWarnings: Result{
+				Velero: []string{archive.ErrNotExist.Error()},
 			},
 		},
 		{
@@ -761,7 +797,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			},
 			wantErrs: Result{
 				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"resources/pods/namespaces/ns-1/pod-1.json\": invalid character 'i' looking for beginning of value"},
+					"ns-1": {"error decoding"},
 				},
 			},
 		},
@@ -790,11 +826,32 @@ func TestInvalidTarballContents(t *testing.T) {
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
-
-			assertEmptyResults(t, warnings)
-			assert.Equal(t, tc.wantErrs, errs)
+			assertWantErrsOrWarnings(t, tc.wantWarnings, warnings)
+			assertWantErrsOrWarnings(t, tc.wantErrs, errs)
 			assertAPIContents(t, h, tc.want)
 		})
+	}
+}
+
+func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
+	t.Helper()
+	if wantRes.Velero != nil {
+		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		for i := range res.Velero {
+			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
+		}
+	}
+	if wantRes.Namespaces != nil {
+		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		for ns := range res.Namespaces {
+			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			for i := range res.Namespaces[ns] {
+				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
+			}
+		}
+	}
+	if wantRes.Cluster != nil {
+		assert.Equal(t, wantRes.Cluster, res.Cluster)
 	}
 }
 
@@ -819,7 +876,6 @@ func TestRestoreItems(t *testing.T) {
 						ObjectMeta(
 							builder.WithLabels("key-1", "val-1"),
 							builder.WithAnnotations("key-1", "val-1"),
-							builder.WithClusterName("cluster-1"),
 							builder.WithFinalizers("finalizer-1"),
 						).
 						Result(),
@@ -943,6 +999,76 @@ func TestRestoreItems(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
+			},
+		},
+		{
+			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("secrets", builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"key-1": []byte("value-1")}).Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
+			},
+			want: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+		},
+		{
+			name:    "update service account labels when service account exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is none",
+			restore: defaultRestore().ExistingResourcePolicy("none").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is not specified, velero behavior is preserved",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
 			},
 		},
 		{
@@ -1196,7 +1322,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				h.AddItems(t, r)
 			}
 
-			actions := []velero.RestoreItemAction{}
+			actions := []riav1.RestoreItemAction{}
 			for action := range tc.actions {
 				actions = append(actions, action)
 			}
@@ -1248,6 +1374,11 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
+func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggableAction {
+	a.selector = selector
+	return a
+}
+
 // TestRestoreActionModifications runs restores with restore item actions that modify resources, and
 // verifies that that the modified item is correctly created in the API. Verification is done by looking
 // at the full object in the API.
@@ -1278,7 +1409,7 @@ func TestRestoreActionModifications(t *testing.T) {
 		backup       *velerov1api.Backup
 		apiResources []*test.APIResource
 		tarball      io.Reader
-		actions      []velero.RestoreItemAction
+		actions      []riav1.RestoreItemAction
 		want         []*test.APIResource
 	}{
 		{
@@ -1287,7 +1418,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(map[string]string{"updated": "true"})
 				}),
@@ -1304,9 +1435,29 @@ func TestRestoreActionModifications(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(nil)
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").Result()),
+			},
+		},
+		{
+			name:         "action with non-matching label selector doesn't prevent restore",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []riav1.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}).addSelector(velero.ResourceSelector{
+					IncludedResources: []string{
+						"Pod",
+					},
+					LabelSelector: "nonmatching=label",
 				}),
 			},
 			want: []*test.APIResource{
@@ -1371,7 +1522,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 		backup       *velerov1api.Backup
 		tarball      io.Reader
 		apiResources []*test.APIResource
-		actions      []velero.RestoreItemAction
+		actions      []riav1.RestoreItemAction
 		want         map[*test.APIResource][]string
 	}{
 		{
@@ -1380,7 +1531,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				&pluggableAction{
 					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1403,7 +1554,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1428,7 +1579,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1454,7 +1605,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1480,7 +1631,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-			actions: []velero.RestoreItemAction{
+			actions: []riav1.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1720,6 +1871,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 			// empty in the structured objects. Remove them to make comparison easier.
 			unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
 			unstructured.RemoveNestedField(want.Object, "status")
+			unstructured.RemoveNestedField(res.Object, "status")
 
 			assert.Equal(t, want, res)
 		}
@@ -1727,10 +1879,10 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 }
 
 // volumeSnapshotterGetter is a simple implementation of the VolumeSnapshotterGetter
-// interface that returns velero.VolumeSnapshotters from a map if they exist.
-type volumeSnapshotterGetter map[string]velero.VolumeSnapshotter
+// interface that returns vsv1.VolumeSnapshotters from a map if they exist.
+type volumeSnapshotterGetter map[string]vsv1.VolumeSnapshotter
 
-func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error) {
 	snapshotter, ok := vsg[name]
 	if !ok {
 		return nil, errors.New("volume snapshotter not found")
@@ -1739,7 +1891,7 @@ func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.Vol
 	return snapshotter, nil
 }
 
-// volumeSnapshotter is a test fake for the velero.VolumeSnapshotter interface
+// volumeSnapshotter is a test fake for the vsv1.VolumeSnapshotter interface
 type volumeSnapshotter struct {
 	// a map from snapshotID to volumeID
 	snapshotVolumes map[string]string
@@ -1903,7 +2055,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -1952,7 +2104,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2006,7 +2158,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
 				// mappings as a way to verify that the snapshot is not restored, since if it were
 				// restored, we'd get an error of "snapshot not found".
@@ -2058,7 +2210,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
 				// mappings as a way to verify that the snapshot is not restored, since if it were
 				// restored, we'd get an error of "snapshot not found".
@@ -2109,7 +2261,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2121,7 +2273,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 						ObjectMeta(
 							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+							// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
 						).ClaimRef("target-ns", "pvc-1").
 						AWSEBSVolumeID("new-volume").
 						Result(),
@@ -2170,7 +2322,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 				},
@@ -2318,7 +2470,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-pvname"},
 					pvName:          map[string]string{"new-pvname": "new-pvname"},
@@ -2390,7 +2542,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 					},
 				},
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
 				// mappings as a way to verify that the snapshot is not restored, since if it were
 				// restored, we'd get an error of "snapshot not found".
@@ -2442,7 +2594,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
-			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
 					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
 					pvName:          map[string]string{"new-volume": "volumesnapshotter-renamed-source-pv"},
@@ -2475,7 +2627,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.restorer.resourcePriorities = []string{"persistentvolumes", "persistentvolumeclaims"}
+			h.restorer.resourcePriorities = Priorities{HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims"}}
 			h.restorer.pvRenamer = func(oldName string) (string, error) {
 				renamed := "renamed-" + oldName
 				return renamed, nil
@@ -2532,17 +2684,17 @@ func TestRestorePersistentVolumes(t *testing.T) {
 	}
 }
 
-type fakeResticRestorerFactory struct {
-	restorer *resticmocks.Restorer
+type fakePodVolumeRestorerFactory struct {
+	restorer *uploadermocks.Restorer
 }
 
-func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (restic.Restorer, error) {
+func (f *fakePodVolumeRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (podvolume.Restorer, error) {
 	return f.restorer, nil
 }
 
-// TestRestoreWithRestic verifies that a call to RestorePodVolumes was made as and when
-// expected for the given pods by using a mock for the restic restorer.
-func TestRestoreWithRestic(t *testing.T) {
+// TestRestoreWithPodVolume verifies that a call to RestorePodVolumes was made as and when
+// expected for the given pods by using a mock for the pod volume restorer.
+func TestRestoreWithPodVolume(t *testing.T) {
 	tests := []struct {
 		name                        string
 		restore                     *velerov1api.Restore
@@ -2601,9 +2753,9 @@ func TestRestoreWithRestic(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			restorer := new(resticmocks.Restorer)
+			restorer := new(uploadermocks.Restorer)
 			defer restorer.AssertExpectations(t)
-			h.restorer.resticRestorerFactory = &fakeResticRestorerFactory{
+			h.restorer.podVolumeRestorerFactory = &fakePodVolumeRestorerFactory{
 				restorer: restorer,
 			}
 
@@ -2625,7 +2777,7 @@ func TestRestoreWithRestic(t *testing.T) {
 
 				// the restore process adds these labels before restoring, so we must add them here too otherwise they won't match
 				pod.Labels = map[string]string{"velero.io/backup-name": tc.backup.Name, "velero.io/restore-name": tc.restore.Name}
-				expectedArgs := restic.RestoreData{
+				expectedArgs := podvolume.RestoreData{
 					Restore:          tc.restore,
 					Pod:              pod,
 					PodVolumeBackups: tc.podVolumeBackups,
@@ -2658,7 +2810,7 @@ func TestRestoreWithRestic(t *testing.T) {
 	}
 }
 
-func TestResetMetadataAndStatus(t *testing.T) {
+func TestResetMetadata(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         *unstructured.Unstructured
@@ -2677,20 +2829,46 @@ func TestResetMetadataAndStatus(t *testing.T) {
 			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
 		},
 		{
-			name:        "don't keep status",
+			name:        "keep status",
 			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
 			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := resetMetadata(test.obj)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestResetStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		obj         *unstructured.Unstructured
+		expectedRes *unstructured.Unstructured
+	}{
+		{
+			name:        "no status don't cause error",
+			obj:         &unstructured.Unstructured{},
+			expectedRes: &unstructured.Unstructured{},
+		},
+		{
+			name:        "remove status",
+			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
 			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := resetMetadataAndStatus(test.obj)
-
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
-			}
+			resetStatus(test.obj)
+			assert.Equal(t, test.expectedRes, test.obj)
 		})
 	}
 }
@@ -2767,19 +2945,19 @@ func TestIsCompleted(t *testing.T) {
 func Test_getOrderedResources(t *testing.T) {
 	tests := []struct {
 		name               string
-		resourcePriorities []string
+		resourcePriorities Priorities
 		backupResources    map[string]*archive.ResourceItems
 		want               []string
 	}{
 		{
 			name:               "when only priorities are specified, they're returned in order",
-			resourcePriorities: []string{"prio-3", "prio-2", "prio-1"},
+			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
 			backupResources:    nil,
 			want:               []string{"prio-3", "prio-2", "prio-1"},
 		},
 		{
 			name:               "when only backup resources are specified, they're returned in alphabetical order",
-			resourcePriorities: nil,
+			resourcePriorities: Priorities{},
 			backupResources: map[string]*archive.ResourceItems{
 				"backup-resource-3": nil,
 				"backup-resource-2": nil,
@@ -2789,14 +2967,26 @@ func Test_getOrderedResources(t *testing.T) {
 		},
 		{
 			name:               "when priorities and backup resources are specified, they're returned in the correct order",
-			resourcePriorities: []string{"prio-3", "prio-2", "prio-1"},
+			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
 			backupResources: map[string]*archive.ResourceItems{
 				"prio-3":            nil,
 				"backup-resource-3": nil,
 				"backup-resource-2": nil,
 				"backup-resource-1": nil,
 			},
-			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3", "prio-3"},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3"},
+		},
+		{
+			name:               "when priorities and backup resources are specified, they're returned in the correct order",
+			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}, LowPriorities: []string{"prio-0"}},
+			backupResources: map[string]*archive.ResourceItems{
+				"prio-3":            nil,
+				"prio-0":            nil,
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3", "prio-0"},
 		},
 	}
 
@@ -2945,8 +3135,8 @@ func newHarness(t *testing.T) *harness {
 			fileSystem:                 testutil.NewFakeFileSystem(),
 
 			// unsupported
-			resticRestorerFactory: nil,
-			resticTimeout:         0,
+			podVolumeRestorerFactory: nil,
+			podVolumeTimeout:         0,
 		},
 		log: log,
 	}

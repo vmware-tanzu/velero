@@ -5,22 +5,22 @@ layout: docs
 
 Velero supports a variety of storage providers for different backup and snapshot operations. Velero has a plugin system which allows anyone to add compatibility for additional backup and volume storage platforms without modifying the Velero codebase.
 
-## Velero supported providers
+## Provider plugins maintained by the Velero maintainers
 
 {{< table caption="Velero supported providers" >}}
 
-| Provider                          | Object Store        | Volume Snapshotter           | Plugin Provider Repo                    | Setup Instructions            |
-|-----------------------------------|---------------------|------------------------------|-----------------------------------------|-------------------------------|
-| [Amazon Web Services (AWS)](https://aws.amazon.com)    | AWS S3              | AWS EBS                      | [Velero plugin for AWS](https://github.com/vmware-tanzu/velero-plugin-for-aws)              | [AWS Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-aws#setup)        |
-| [Google Cloud Platform (GCP)](https://cloud.google.com) | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP](https://github.com/vmware-tanzu/velero-plugin-for-gcp)             | [GCP Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup)        |
-| [Microsoft Azure](https://azure.com)              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure) | [Azure Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup)      |
-| [VMware vSphere](https://www.vmware.com/ca/products/vsphere.html)              | 🚫                  | vSphere Volumes              | [VMware vSphere](https://github.com/vmware-tanzu/velero-plugin-for-vsphere)                    | [vSphere Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-vsphere#velero-plugin-for-vsphere-installation-and-configuration-details)    |
-| [Container Storage Interface (CSI)](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/)| 🚫                 | CSI Volumes                  | [Velero plugin for CSI](https://github.com/vmware-tanzu/velero-plugin-for-csi/)             | [CSI Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-csi#kinds-of-plugins-included)        |
+| Provider                          | Object Store                                                                                     | Volume Snapshotter                                                                                 | Plugin Provider Repo                    | Setup Instructions            | Parameters                                                                                                                                                                                                                                              |
+|-----------------------------------|--------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Amazon Web Services (AWS)](https://aws.amazon.com)    | AWS S3 | AWS EBS | [Velero plugin for AWS](https://github.com/vmware-tanzu/velero-plugin-for-aws)              | [AWS Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-aws#setup)        | [BackupStorageLocation](https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/backupstoragelocation.md) <br/> [VolumeSnapshotLocation](https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/volumesnapshotlocation.md)             |
+| [Google Cloud Platform (GCP)](https://cloud.google.com) | [Google Cloud Storage](https://github.com/vmware-tanzu/velero-plugin-for-gcp/blob/main/backupstoragelocation.md)                                                                         | [Google Compute Engine Disks](https://github.com/vmware-tanzu/velero-plugin-for-gcp/blob/main/volumesnapshotlocation.md)                                                                    | [Velero plugin for GCP](https://github.com/vmware-tanzu/velero-plugin-for-gcp)             | [GCP Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup)        | [BackupStorageLocation](https://github.com/vmware-tanzu/velero-plugin-for-gcp/blob/main/backupstoragelocation.md) <br/> [VolumeSnapshotLocation](https://github.com/vmware-tanzu/velero-plugin-for-gcp/blob/main/volumesnapshotlocation.md)             |
+| [Microsoft Azure](https://azure.com)              | Azure Blob Storage                                                                               | Azure Managed Disks                                                                                | [Velero plugin for Microsoft Azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure) | [Azure Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup)      | [BackupStorageLocation](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/backupstoragelocation.md) <br/> [VolumeSnapshotLocation](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/blob/main/volumesnapshotlocation.md) |
+| [VMware vSphere](https://www.vmware.com/ca/products/vsphere.html)              | 🚫                                                                                               | vSphere Volumes                                                                                    | [VMware vSphere](https://github.com/vmware-tanzu/velero-plugin-for-vsphere)                    | [vSphere Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-vsphere#velero-plugin-for-vsphere-installation-and-configuration-details)    | 🚫 |
+| [Container Storage Interface (CSI)](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/)| 🚫                                                                                               | CSI Volumes                                                                                        | [Velero plugin for CSI](https://github.com/vmware-tanzu/velero-plugin-for-csi/)             | [CSI Plugin Setup](https://github.com/vmware-tanzu/velero-plugin-for-csi#kinds-of-plugins-included)        | 🚫 |
 {{< /table >}}
 
 Contact: [#Velero Slack](https://kubernetes.slack.com/messages/velero), [GitHub Issues](https://github.com/vmware-tanzu/velero/issues)
 
-## Community supported providers
+## Provider plugins maintained by the Velero community
 {{< table caption="Community supported providers" >}}
 
 | Provider                  | Object Store                 | Volume Snapshotter                 | Plugin Documentation   | Contact                         |
@@ -54,7 +54,7 @@ _Some storage providers, like Quobyte, may need a different [signature algorithm
 
 ## Non-supported volume snapshots
 
-In the case you want to take volume snapshots but didn't find a plugin for your provider, Velero has support for snapshotting using restic. Please see the [restic integration][30] documentation.
+In the case you want to take volume snapshots but didn't find a plugin for your provider, Velero has support for snapshotting using File System Backup. Please see the [File System Backup][30] documentation.
 
 [0]: https://github.com/aws/aws-sdk-go/aws
 [1]: contributions/ibm-config.md
@@ -65,6 +65,6 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/main/backupstoragelocation.md
 [7]: contributions/tencent-config.md
 [25]: https://github.com/hpe-storage/velero-plugin
-[30]: restic.md
+[30]: file-system-backup.md
 [36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
 [38]: https://www.cloudian.com/

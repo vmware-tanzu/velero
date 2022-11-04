@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,23 +23,24 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 )
 
 // VolumeSnapshotterGRPCServer implements the proto-generated VolumeSnapshotterServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type VolumeSnapshotterGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
-func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (velero.VolumeSnapshotter, error) {
-	impl, err := s.mux.getHandler(name)
+func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (vsv1.VolumeSnapshotter, error) {
+	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	volumeSnapshotter, ok := impl.(velero.VolumeSnapshotter)
+	volumeSnapshotter, ok := impl.(vsv1.VolumeSnapshotter)
 	if !ok {
 		return nil, errors.Errorf("%T is not a volume snapshotter", impl)
 	}
@@ -52,18 +53,18 @@ func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (velero.VolumeSnapsho
 // cannot be initialized from the provided config.
 func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.VolumeSnapshotterInitRequest) (response *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	if err := impl.Init(req.Config); err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -73,14 +74,14 @@ func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.Volum
 // and with the specified type and IOPS (if using provisioned IOPS).
 func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (response *proto.CreateVolumeResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	snapshotID := req.SnapshotID
@@ -94,7 +95,7 @@ func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(ctx context.Conte
 
 	volumeID, err := impl.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.CreateVolumeResponse{VolumeID: volumeID}, nil
@@ -104,19 +105,19 @@ func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(ctx context.Conte
 // volume.
 func (s *VolumeSnapshotterGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.GetVolumeInfoRequest) (response *proto.GetVolumeInfoResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	volumeType, iops, err := impl.GetVolumeInfo(req.VolumeID, req.VolumeAZ)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	res := &proto.GetVolumeInfoResponse{
@@ -134,19 +135,19 @@ func (s *VolumeSnapshotterGRPCServer) GetVolumeInfo(ctx context.Context, req *pr
 // set of tags to the snapshot.
 func (s *VolumeSnapshotterGRPCServer) CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (response *proto.CreateSnapshotResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	snapshotID, err := impl.CreateSnapshot(req.VolumeID, req.VolumeAZ, req.Tags)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.CreateSnapshotResponse{SnapshotID: snapshotID}, nil
@@ -155,18 +156,18 @@ func (s *VolumeSnapshotterGRPCServer) CreateSnapshot(ctx context.Context, req *p
 // DeleteSnapshot deletes the specified volume snapshot.
 func (s *VolumeSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (response *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	if err := impl.DeleteSnapshot(req.SnapshotID); err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -174,25 +175,25 @@ func (s *VolumeSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *p
 
 func (s *VolumeSnapshotterGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (response *proto.GetVolumeIDResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var pv unstructured.Unstructured
 
 	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	volumeID, err := impl.GetVolumeID(&pv)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.GetVolumeIDResponse{VolumeID: volumeID}, nil
@@ -200,29 +201,29 @@ func (s *VolumeSnapshotterGRPCServer) GetVolumeID(ctx context.Context, req *prot
 
 func (s *VolumeSnapshotterGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (response *proto.SetVolumeIDResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var pv unstructured.Unstructured
 	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	updatedPV, err := impl.SetVolumeID(&pv, req.VolumeID)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	updatedPVBytes, err := json.Marshal(updatedPV.UnstructuredContent())
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.SetVolumeIDResponse{PersistentVolume: updatedPVBytes}, nil

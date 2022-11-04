@@ -17,15 +17,23 @@ limitations under the License.
 package clientmgmt
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
+	vsv1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/volumesnapshotter/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 )
 
 // Manager manages the lifecycles of plugins.
@@ -34,19 +42,19 @@ type Manager interface {
 	GetObjectStore(name string) (velero.ObjectStore, error)
 
 	// GetVolumeSnapshotter returns the VolumeSnapshotter plugin for name.
-	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
+	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 
-	// GetBackupItemActions returns all backup item action plugins.
-	GetBackupItemActions() ([]velero.BackupItemAction, error)
+	// GetBackupItemActions returns all v1 backup item action plugins.
+	GetBackupItemActions() ([]biav1.BackupItemAction, error)
 
 	// GetBackupItemAction returns the backup item action plugin for name.
-	GetBackupItemAction(name string) (velero.BackupItemAction, error)
+	GetBackupItemAction(name string) (biav1.BackupItemAction, error)
 
 	// GetRestoreItemActions returns all restore item action plugins.
-	GetRestoreItemActions() ([]velero.RestoreItemAction, error)
+	GetRestoreItemActions() ([]riav1.RestoreItemAction, error)
 
 	// GetRestoreItemAction returns the restore item action plugin for name.
-	GetRestoreItemAction(name string) (velero.RestoreItemAction, error)
+	GetRestoreItemAction(name string) (riav1.RestoreItemAction, error)
 
 	// GetDeleteItemActions returns all delete item action plugins.
 	GetDeleteItemActions() ([]velero.DeleteItemAction, error)
@@ -55,38 +63,41 @@ type Manager interface {
 	GetDeleteItemAction(name string) (velero.DeleteItemAction, error)
 
 	// GetItemSnapshotter returns the item snapshotter plugin for name
-	GetItemSnapshotter(name string) (v1.ItemSnapshotter, error)
+	GetItemSnapshotter(name string) (isv1.ItemSnapshotter, error)
 
 	// GetItemSnapshotters returns all item snapshotter plugins
-	GetItemSnapshotters() ([]v1.ItemSnapshotter, error)
+	GetItemSnapshotters() ([]isv1.ItemSnapshotter, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
 }
 
+// Used checking for adapted plugin versions
+var pluginNotFoundErrType = &process.PluginNotFoundError{}
+
 // manager implements Manager.
 type manager struct {
 	logger   logrus.FieldLogger
 	logLevel logrus.Level
-	registry Registry
+	registry process.Registry
 
-	restartableProcessFactory RestartableProcessFactory
+	restartableProcessFactory process.RestartableProcessFactory
 
 	// lock guards restartableProcesses
 	lock                 sync.Mutex
-	restartableProcesses map[string]RestartableProcess
+	restartableProcesses map[string]process.RestartableProcess
 }
 
 // NewManager constructs a manager for getting plugins.
-func NewManager(logger logrus.FieldLogger, level logrus.Level, registry Registry) Manager {
+func NewManager(logger logrus.FieldLogger, level logrus.Level, registry process.Registry) Manager {
 	return &manager{
 		logger:   logger,
 		logLevel: level,
 		registry: registry,
 
-		restartableProcessFactory: newRestartableProcessFactory(),
+		restartableProcessFactory: process.NewRestartableProcessFactory(),
 
-		restartableProcesses: make(map[string]RestartableProcess),
+		restartableProcesses: make(map[string]process.RestartableProcess),
 	}
 }
 
@@ -94,7 +105,7 @@ func (m *manager) CleanupClients() {
 	m.lock.Lock()
 
 	for _, restartableProcess := range m.restartableProcesses {
-		restartableProcess.stop()
+		restartableProcess.Stop()
 	}
 
 	m.lock.Unlock()
@@ -102,12 +113,12 @@ func (m *manager) CleanupClients() {
 
 // getRestartableProcess returns a restartableProcess for a plugin identified by kind and name, creating a
 // restartableProcess if it is the first time it has been requested.
-func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) (RestartableProcess, error) {
+func (m *manager) getRestartableProcess(kind common.PluginKind, name string) (process.RestartableProcess, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger := m.logger.WithFields(logrus.Fields{
-		"kind": framework.PluginKindObjectStore.String(),
+		"kind": kind.String(),
 		"name": name,
 	})
 	logger.Debug("looking for plugin in registry")
@@ -127,7 +138,7 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 
 	logger.Debug("creating new restartable plugin process")
 
-	restartableProcess, err = m.restartableProcessFactory.newRestartableProcess(info.Command, m.logger, m.logLevel)
+	restartableProcess, err = m.restartableProcessFactory.NewRestartableProcess(info.Command, m.logger, m.logLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -141,35 +152,39 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
+	restartableProcess, err := m.getRestartableProcess(common.PluginKindObjectStore, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newRestartableObjectStore(name, restartableProcess)
+	r := NewRestartableObjectStore(name, restartableProcess)
 
 	return r, nil
 }
 
 // GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.
-func (m *manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+func (m *manager) GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindVolumeSnapshotter, name)
-	if err != nil {
-		return nil, err
+	for _, adaptedVolumeSnapshotter := range vsv1cli.AdaptedVolumeSnapshotters() {
+		restartableProcess, err := m.getRestartableProcess(adaptedVolumeSnapshotter.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedVolumeSnapshotter.GetRestartable(name, restartableProcess), nil
 	}
-
-	r := newRestartableVolumeSnapshotter(name, restartableProcess)
-
-	return r, nil
+	return nil, fmt.Errorf("unable to get valid VolumeSnapshotter for %q", name)
 }
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
-func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
-	list := m.registry.List(framework.PluginKindBackupItemAction)
+func (m *manager) GetBackupItemActions() ([]biav1.BackupItemAction, error) {
+	list := m.registry.List(common.PluginKindBackupItemAction)
 
-	actions := make([]velero.BackupItemAction, 0, len(list))
+	actions := make([]biav1.BackupItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -186,23 +201,28 @@ func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 }
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
-func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
+func (m *manager) GetBackupItemAction(name string) (biav1.BackupItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemAction, name)
-	if err != nil {
-		return nil, err
+	for _, adaptedBackupItemAction := range biav1cli.AdaptedBackupItemActions() {
+		restartableProcess, err := m.getRestartableProcess(adaptedBackupItemAction.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedBackupItemAction.GetRestartable(name, restartableProcess), nil
 	}
-
-	r := newRestartableBackupItemAction(name, restartableProcess)
-	return r, nil
+	return nil, fmt.Errorf("unable to get valid BackupItemAction for %q", name)
 }
 
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
-func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
-	list := m.registry.List(framework.PluginKindRestoreItemAction)
+func (m *manager) GetRestoreItemActions() ([]riav1.RestoreItemAction, error) {
+	list := m.registry.List(common.PluginKindRestoreItemAction)
 
-	actions := make([]velero.RestoreItemAction, 0, len(list))
+	actions := make([]riav1.RestoreItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -219,21 +239,26 @@ func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
 }
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
-func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, error) {
+func (m *manager) GetRestoreItemAction(name string) (riav1.RestoreItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindRestoreItemAction, name)
-	if err != nil {
-		return nil, err
+	for _, adaptedRestoreItemAction := range riav1cli.AdaptedRestoreItemActions() {
+		restartableProcess, err := m.getRestartableProcess(adaptedRestoreItemAction.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedRestoreItemAction.GetRestartable(name, restartableProcess), nil
 	}
-
-	r := newRestartableRestoreItemAction(name, restartableProcess)
-	return r, nil
+	return nil, fmt.Errorf("unable to get valid RestoreItemAction for %q", name)
 }
 
 // GetDeleteItemActions returns all delete item actions as restartableDeleteItemActions.
 func (m *manager) GetDeleteItemActions() ([]velero.DeleteItemAction, error) {
-	list := m.registry.List(framework.PluginKindDeleteItemAction)
+	list := m.registry.List(common.PluginKindDeleteItemAction)
 
 	actions := make([]velero.DeleteItemAction, 0, len(list))
 
@@ -255,31 +280,31 @@ func (m *manager) GetDeleteItemActions() ([]velero.DeleteItemAction, error) {
 func (m *manager) GetDeleteItemAction(name string) (velero.DeleteItemAction, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindDeleteItemAction, name)
+	restartableProcess, err := m.getRestartableProcess(common.PluginKindDeleteItemAction, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newRestartableDeleteItemAction(name, restartableProcess)
+	r := NewRestartableDeleteItemAction(name, restartableProcess)
 	return r, nil
 }
 
-func (m *manager) GetItemSnapshotter(name string) (v1.ItemSnapshotter, error) {
+func (m *manager) GetItemSnapshotter(name string) (isv1.ItemSnapshotter, error) {
 	name = sanitizeName(name)
 
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindItemSnapshotter, name)
+	restartableProcess, err := m.getRestartableProcess(common.PluginKindItemSnapshotter, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newRestartableItemSnapshotter(name, restartableProcess)
+	r := NewRestartableItemSnapshotter(name, restartableProcess)
 	return r, nil
 }
 
-func (m *manager) GetItemSnapshotters() ([]v1.ItemSnapshotter, error) {
-	list := m.registry.List(framework.PluginKindItemSnapshotter)
+func (m *manager) GetItemSnapshotters() ([]isv1.ItemSnapshotter, error) {
+	list := m.registry.List(common.PluginKindItemSnapshotter)
 
-	actions := make([]v1.ItemSnapshotter, 0, len(list))
+	actions := make([]isv1.ItemSnapshotter, 0, len(list))
 
 	for i := range list {
 		id := list[i]

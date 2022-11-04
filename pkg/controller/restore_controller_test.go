@@ -46,8 +46,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
+	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -286,6 +286,15 @@ func TestProcessQueueItem(t *testing.T) {
 			expectedErr:              false,
 			expectedPhase:            string(velerov1api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
+		},
+		{
+			name:                     "new restore with labelSelector as well as orLabelSelector fails validation",
+			location:                 defaultStorageLocation,
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}}, {MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup:                   defaultBackup().StorageLocation("default").Result(),
+			expectedErr:              false,
+			expectedValidationErrors: []string{"encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"},
+			expectedPhase:            string(velerov1api.RestorePhaseFailedValidation),
 		},
 		{
 			name:                  "valid restore with schedule name gets executed",
@@ -852,7 +861,7 @@ type fakeRestorer struct {
 
 func (r *fakeRestorer) Restore(
 	info pkgrestore.Request,
-	actions []velero.RestoreItemAction,
+	actions []riav1.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (pkgrestore.Result, pkgrestore.Result) {

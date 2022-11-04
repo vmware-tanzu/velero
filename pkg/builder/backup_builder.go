@@ -162,9 +162,21 @@ func (b *BackupBuilder) LabelSelector(selector *metav1.LabelSelector) *BackupBui
 	return b
 }
 
+// OrLabelSelector sets the Backup's orLabelSelector set.
+func (b *BackupBuilder) OrLabelSelector(orSelectors []*metav1.LabelSelector) *BackupBuilder {
+	b.object.Spec.OrLabelSelectors = orSelectors
+	return b
+}
+
 // SnapshotVolumes sets the Backup's "snapshot volumes" flag.
 func (b *BackupBuilder) SnapshotVolumes(val bool) *BackupBuilder {
 	b.object.Spec.SnapshotVolumes = &val
+	return b
+}
+
+// DefaultVolumesToFsBackup sets the Backup's "DefaultVolumesToFsBackup" flag.
+func (b *BackupBuilder) DefaultVolumesToFsBackup(val bool) *BackupBuilder {
+	b.object.Spec.DefaultVolumesToFsBackup = &val
 	return b
 }
 
@@ -225,5 +237,11 @@ func (b *BackupBuilder) Hooks(hooks velerov1api.BackupHooks) *BackupBuilder {
 // OrderedResources sets the Backup's OrderedResources
 func (b *BackupBuilder) OrderedResources(orders map[string]string) *BackupBuilder {
 	b.object.Spec.OrderedResources = orders
+	return b
+}
+
+// CSISnapshotTimeout sets the Backup's CSISnapshotTimeout
+func (b *BackupBuilder) CSISnapshotTimeout(timeout time.Duration) *BackupBuilder {
+	b.object.Spec.CSISnapshotTimeout.Duration = timeout
 	return b
 }

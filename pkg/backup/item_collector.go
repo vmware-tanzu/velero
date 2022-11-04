@@ -151,7 +151,7 @@ func sortResourcesByOrder(log logrus.FieldLogger, items []*kubernetesResource, o
 }
 
 // getOrderedResourcesForType gets order of resourceType from orderResources.
-func getOrderedResourcesForType(log logrus.FieldLogger, orderedResources map[string]string, resourceType string) []string {
+func getOrderedResourcesForType(orderedResources map[string]string, resourceType string) []string {
 	if orderedResources == nil {
 		return nil
 	}
@@ -175,7 +175,7 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 		clusterScoped = !resource.Namespaced
 	)
 
-	orders := getOrderedResourcesForType(log, r.backupRequest.Backup.Spec.OrderedResources, resource.Name)
+	orders := getOrderedResourcesForType(r.backupRequest.Backup.Spec.OrderedResources, resource.Name)
 	// Getting the preferred group version of this resource
 	preferredGVR, _, err := r.discoveryHelper.ResourceFor(gr.WithVersion(""))
 	if err != nil {
@@ -225,8 +225,11 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 
 	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
 
-	// Check if we're backing up namespaces, and only certain ones
-	if gr == kuberesource.Namespaces && namespacesToList[0] != "" {
+	// Check if we're backing up namespaces for a less-than-full backup.
+	// We enter this block if resource is Namespaces and the namespae list is either empty or contains
+	// an explicit namespace list. (We skip this block if the list contains "" since that indicates
+	// a full-cluster backup
+	if gr == kuberesource.Namespaces && (len(namespacesToList) == 0 || namespacesToList[0] != "") {
 		resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
 		if err != nil {
 			log.WithError(err).Error("Error getting dynamic client")
@@ -291,53 +294,44 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			continue
 		}
 
-		var labelSelector string
-		if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
-			labelSelector = metav1.FormatLabelSelector(selector)
+		var orLabelSelectors []string
+		if r.backupRequest.Spec.OrLabelSelectors != nil {
+			for _, s := range r.backupRequest.Spec.OrLabelSelectors {
+				orLabelSelectors = append(orLabelSelectors, metav1.FormatLabelSelector(s))
+			}
+		} else {
+			orLabelSelectors = []string{}
 		}
 
 		log.Info("Listing items")
 		unstructuredItems := make([]unstructured.Unstructured, 0)
 
-		if r.pageSize > 0 {
-			// If limit is positive, use a pager to split list over multiple requests
-			// Use Velero's dynamic list function instead of the default
-			listPager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
-				return resourceClient.List(opts)
-			}))
-			// Use the page size defined in the server config
-			// TODO allow configuration of page buffer size
-			listPager.PageSize = int64(r.pageSize)
-			// Add each item to temporary slice
-			list, paginated, err := listPager.List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		// Listing items for orLabelSelectors
+		errListingForNS := false
+		for _, label := range orLabelSelectors {
+			unstructuredItems, err = r.listItemsForLabel(unstructuredItems, gr, label, resourceClient)
 			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error listing resources")
+				errListingForNS = true
+			}
+		}
+
+		if errListingForNS {
+			log.WithError(err).Error("Error listing items")
+			continue
+		}
+
+		var labelSelector string
+		if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
+			labelSelector = metav1.FormatLabelSelector(selector)
+		}
+
+		// Listing items for labelSelector (singular)
+		if len(orLabelSelectors) == 0 {
+			unstructuredItems, err = r.listItemsForLabel(unstructuredItems, gr, labelSelector, resourceClient)
+			if err != nil {
+				log.WithError(err).Error("Error listing items")
 				continue
 			}
-			if !paginated {
-				log.Infof("list for groupResource %s was not paginated", gr)
-			}
-			err = meta.EachListItem(list, func(object runtime.Object) error {
-				u, ok := object.(*unstructured.Unstructured)
-				if !ok {
-					log.WithError(errors.WithStack(fmt.Errorf("expected *unstructured.Unstructured but got %T", u))).Error("unable to understand entry in the list")
-					return fmt.Errorf("expected *unstructured.Unstructured but got %T", u)
-				}
-				unstructuredItems = append(unstructuredItems, *u)
-				return nil
-			})
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("unable to understand paginated list")
-				continue
-			}
-		} else {
-			// If limit is not positive, do not use paging. Instead, request all items at once
-			unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: labelSelector})
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error listing items")
-				continue
-			}
-			unstructuredItems = append(unstructuredItems, unstructuredList.Items...)
 		}
 
 		log.Infof("Retrieved %d items", len(unstructuredItems))
@@ -466,4 +460,61 @@ func newCohabitatingResource(resource, group1, group2 string) *cohabitatingResou
 		groupResource2: schema.GroupResource{Group: group2, Resource: resource},
 		seen:           false,
 	}
+}
+
+// function to process pager client calls when the pageSize is specified
+func (r *itemCollector) processPagerClientCalls(gr schema.GroupResource, label string, resourceClient client.Dynamic) (runtime.Object, error) {
+	// If limit is positive, use a pager to split list over multiple requests
+	// Use Velero's dynamic list function instead of the default
+	listPager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+		return resourceClient.List(opts)
+	}))
+	// Use the page size defined in the server config
+	// TODO allow configuration of page buffer size
+	listPager.PageSize = int64(r.pageSize)
+	// Add each item to temporary slice
+	list, paginated, err := listPager.List(context.Background(), metav1.ListOptions{LabelSelector: label})
+
+	if err != nil {
+		r.log.WithError(errors.WithStack(err)).Error("Error listing resources")
+		return list, err
+	}
+
+	if !paginated {
+		r.log.Infof("list for groupResource %s was not paginated", gr)
+	}
+
+	return list, nil
+}
+
+func (r *itemCollector) listItemsForLabel(unstructuredItems []unstructured.Unstructured, gr schema.GroupResource, label string, resourceClient client.Dynamic) ([]unstructured.Unstructured, error) {
+	if r.pageSize > 0 {
+		// process pager client calls
+		list, err := r.processPagerClientCalls(gr, label, resourceClient)
+		if err != nil {
+			return unstructuredItems, err
+		}
+
+		err = meta.EachListItem(list, func(object runtime.Object) error {
+			u, ok := object.(*unstructured.Unstructured)
+			if !ok {
+				r.log.WithError(errors.WithStack(fmt.Errorf("expected *unstructured.Unstructured but got %T", u))).Error("unable to understand entry in the list")
+				return fmt.Errorf("expected *unstructured.Unstructured but got %T", u)
+			}
+			unstructuredItems = append(unstructuredItems, *u)
+			return nil
+		})
+		if err != nil {
+			r.log.WithError(errors.WithStack(err)).Error("unable to understand paginated list")
+			return unstructuredItems, err
+		}
+	} else {
+		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: label})
+		if err != nil {
+			r.log.WithError(errors.WithStack(err)).Error("Error listing items")
+			return unstructuredItems, err
+		}
+		unstructuredItems = append(unstructuredItems, unstructuredList.Items...)
+	}
+	return unstructuredItems, nil
 }

@@ -23,11 +23,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	e2e "github.com/vmware-tanzu/velero/test/e2e"
 )
 
 type AWSStorage string
@@ -60,10 +62,7 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	if bslPrefix != "" {
 		objectsInput.Prefix = aws.String(bslPrefix)
 	}
-	s3Config := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewSharedCredentials(cloudCredentialsFile, ""),
-	}
+	var s3Config *aws.Config
 	if region == "minio" {
 		s3url = config.Data()["s3Url"]
 		s3Config = &aws.Config{
@@ -73,8 +72,12 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 			DisableSSL:       aws.Bool(true),
 			S3ForcePathStyle: aws.Bool(true),
 		}
+	} else {
+		s3Config = &aws.Config{
+			Region:      aws.String(region),
+			Credentials: credentials.NewSharedCredentials(cloudCredentialsFile, ""),
+		}
 	}
-
 	sess, err := session.NewSession(s3Config)
 
 	if err != nil {
@@ -92,8 +95,10 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	}
 	var backupNameInStorage string
 	for _, item := range bucketObjects.CommonPrefixes {
+		fmt.Println("item:")
+		fmt.Println(item)
 		backupNameInStorage = strings.TrimPrefix(*item.Prefix, strings.Trim(bslPrefix, "/")+"/")
-		fmt.Println(backupNameInStorage)
+		fmt.Println("backupNameInStorage:" + backupNameInStorage + " backupObject:" + backupObject)
 		if strings.Contains(backupNameInStorage, backupObject) {
 			fmt.Printf("Backup %s was found under prefix %s \n", backupObject, bslPrefix)
 			return true, nil
@@ -138,4 +143,57 @@ func (s AWSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	}
 	fmt.Printf("Deleted object(s) from bucket: %s %s \n", bslBucket, fullPrefix)
 	return nil
+}
+
+func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck e2e.SnapshotCheckPoint) error {
+
+	config := flag.NewMap()
+	config.Set(bslConfig)
+	region := config.Data()["region"]
+	s3Config := &aws.Config{
+		Region:      aws.String(region),
+		Credentials: credentials.NewSharedCredentials(cloudCredentialsFile, ""),
+	}
+	if region == "minio" {
+		return errors.New("No snapshot for Minio provider")
+	}
+	sess, err := session.NewSession(s3Config)
+	if err != nil {
+		return errors.Wrapf(err, "Error waiting for uploads to complete")
+	}
+	svc := ec2.New(sess)
+	params := &ec2.DescribeSnapshotsInput{
+		OwnerIds: []*string{aws.String("self")},
+		Filters: []*ec2.Filter{
+			{
+				Name: aws.String("tag:velero.io/backup"),
+				Values: []*string{
+					aws.String(backupObject),
+				},
+			},
+		},
+	}
+
+	result, err := svc.DescribeSnapshots(params)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	for _, n := range result.Snapshots {
+		fmt.Println(n.SnapshotId)
+		if n.SnapshotId != nil {
+			fmt.Println(*n.SnapshotId)
+		}
+		fmt.Println(n.Tags)
+		fmt.Println(n.VolumeId)
+		if n.VolumeId != nil {
+			fmt.Println(*n.VolumeId)
+		}
+	}
+	if len(result.Snapshots) != snapshotCheck.ExpectCount {
+		return errors.New(fmt.Sprintf("Snapshot count is not as expected %d", snapshotCheck.ExpectCount))
+	} else {
+		fmt.Printf("Snapshot count %d is as expected %d\n", len(result.Snapshots), snapshotCheck.ExpectCount)
+		return nil
+	}
 }

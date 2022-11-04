@@ -22,29 +22,47 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
+
+	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-08-01/compute"
 	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	. "github.com/vmware-tanzu/velero/test/e2e"
 )
 
 type AzureStorage string
 
+const fqdn = "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+
 const (
-	subscriptionIDEnvVar = "AZURE_SUBSCRIPTION_ID"
-	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
-	resourceGroupEnvVar  = "AZURE_RESOURCE_GROUP"
-	storageAccountKey    = "AZURE_STORAGE_ACCOUNT_ACCESS_KEY"
-	storageAccount       = "storageAccount"
-	subscriptionID       = "subscriptionId"
-	resourceGroup        = "resourceGroup"
+	subscriptionIDConfigKey = "subscriptionId"
+	subscriptionIDEnvVar    = "AZURE_SUBSCRIPTION_ID"
+	cloudNameEnvVar         = "AZURE_CLOUD_NAME"
+	resourceGroupEnvVar     = "AZURE_RESOURCE_GROUP"
+	storageAccountKey       = "AZURE_STORAGE_ACCOUNT_ACCESS_KEY"
+	storageAccount          = "storageAccount"
+	subscriptionID          = "subscriptionId"
+	resourceGroup           = "resourceGroup"
+
+	apiTimeoutConfigKey       = "apiTimeout"
+	snapsIncrementalConfigKey = "incremental"
+
+	snapshotsResource = "snapshots"
+	disksResource     = "disks"
+
+	resourceGroupConfigKey   = "resourceGroup"
+	credentialsFileConfigKey = "credentialsFile"
 )
 
 func getStorageCredential(cloudCredentialsFile, bslConfig string) (string, string, error) {
@@ -63,6 +81,7 @@ func getStorageCredential(cloudCredentialsFile, bslConfig string) (string, strin
 	}
 	return accountName, accountKey, nil
 }
+
 func loadCredentialsIntoEnv(credentialsFile string) error {
 	if credentialsFile == "" {
 		return nil
@@ -160,6 +179,42 @@ func handleErrors(err error) {
 	}
 }
 
+func getRequiredValues(getValue func(string) string, keys ...string) (map[string]string, error) {
+	missing := []string{}
+	results := map[string]string{}
+
+	for _, key := range keys {
+		if val := getValue(key); val == "" {
+			missing = append(missing, key)
+		} else {
+			results[key] = val
+		}
+	}
+
+	if len(missing) > 0 {
+		return nil, errors.Errorf("the following keys do not have values: %s", strings.Join(missing, ", "))
+	}
+
+	return results, nil
+}
+
+func validateConfigKeys(config map[string]string, validKeys ...string) error {
+	validKeysSet := sets.NewString(validKeys...)
+
+	var invalidKeys []string
+	for k := range config {
+		if !validKeysSet.Has(k) {
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+
+	if len(invalidKeys) > 0 {
+		return errors.Errorf("config has invalid keys %v; valid keys are %v", invalidKeys, validKeys)
+	}
+
+	return nil
+}
+
 func deleteBlob(p pipeline.Pipeline, accountName, containerName, blobName string) error {
 	ctx := context.Background()
 
@@ -171,12 +226,11 @@ func deleteBlob(p pipeline.Pipeline, accountName, containerName, blobName string
 	_, err = blobURL.Delete(ctx, azblob.DeleteSnapshotsOptionNone, azblob.BlobAccessConditions{})
 	return err
 }
-func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error) {
+func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
 	if err != nil {
 		log.Fatal("Fail to get : accountName and accountKey, " + err.Error())
 	}
-
 	credential, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
@@ -195,7 +249,7 @@ func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPref
 	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
 	handleErrors(err)
 
-	fmt.Printf("Finding backup %s blobs in Azure container/bucket %s\n", backupObject, containerName)
+	fmt.Printf("Finding backup %s blobs in Azure container/bucket %s\n", backupName, containerName)
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
 		if err != nil {
@@ -204,8 +258,8 @@ func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPref
 		marker = listBlob.NextMarker
 
 		for _, blobInfo := range listBlob.Segment.BlobItems {
-			if strings.Contains(blobInfo.Name, backupObject) {
-				fmt.Printf("Blob name: %s exist in %s\n", backupObject, blobInfo.Name)
+			if strings.Contains(blobInfo.Name, backupName) {
+				fmt.Printf("Blob name: %s exist in %s\n", backupName, blobInfo.Name)
 				return true, nil
 			}
 		}
@@ -239,7 +293,7 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "Fail to create gcloud client")
+			return errors.Wrapf(err, "Fail to list blobs client")
 		}
 
 		marker = listBlob.NextMarker
@@ -255,4 +309,92 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 		}
 	}
 	return nil
+}
+
+func mapLookup(data map[string]string) func(string) string {
+	return func(key string) string {
+		return data[key]
+	}
+}
+func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
+
+	ctx := context.Background()
+
+	if err := loadCredentialsIntoEnv(cloudCredentialsFile); err != nil {
+		return err
+	}
+	// we need AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
+	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar, resourceGroupEnvVar)
+	if err != nil {
+		return errors.Wrap(err, "unable to get all required environment variables")
+	}
+
+	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	if err != nil {
+		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
+	}
+
+	// set a different subscriptionId for snapshots if specified
+	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
+
+	// set up clients
+	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
+	snapsClient.PollingDelay = 5 * time.Second
+
+	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	if err != nil {
+		return errors.Wrap(err, "error getting authorizer from environment")
+	}
+	// // if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse i
+	snapsClient.Authorizer = authorizer
+	snaps := &snapsClient
+	//return ListByResourceGroup(ctx, snaps, envVars[resourceGroupEnvVar], backupName, snapshotCount)
+	req, err := snaps.ListByResourceGroupPreparer(ctx, envVars[resourceGroupEnvVar])
+	if err != nil {
+		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", nil, "Failure preparing request")
+	}
+
+	resp, err := snaps.ListByResourceGroupSender(req)
+	if err != nil {
+		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", resp, "Failure sending request")
+	}
+	result, err := snaps.ListByResourceGroupResponder(resp)
+	snapshotCountFound := 0
+	backupNameInSnapshot := ""
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
+	}
+	if result.Value == nil {
+		return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
+	}
+	for _, v := range *result.Value {
+		if snapshotCheck.EnableCSI {
+			for _, s := range snapshotCheck.SnapshotIDList {
+				fmt.Println("Azure CSI local snapshot CR: " + s)
+				fmt.Println("Azure provider snapshot name: " + *v.Name)
+				if s == *v.Name {
+					fmt.Printf("Azure snapshot %s is created.\n", s)
+					snapshotCountFound++
+				}
+			}
+		} else {
+			fmt.Println(v.Tags)
+			backupNameInSnapshot = *v.Tags["velero.io-backup"]
+			fmt.Println(backupNameInSnapshot)
+			if backupName == backupNameInSnapshot {
+				snapshotCountFound++
+			}
+		}
+	}
+	if err != nil {
+		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", resp, "Failure responding to request")
+	}
+	if snapshotCountFound != snapshotCheck.ExpectCount {
+		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount))
+	} else {
+		fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount)
+		return nil
+	}
 }

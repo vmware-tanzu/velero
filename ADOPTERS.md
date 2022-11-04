@@ -14,7 +14,7 @@ If you're using Velero and want to add your organization to this list,
 <a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/static/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/static/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://www.replicated.com/" border="0" target="_blank"><img alt="replicated.com" src="site/static/img/adopters/replicated-logo-red.svg" height="50"></a>
-
+<a href="https://cloudcasa.io/" border="0" target="_blank"><img alt="cloudcasa.io" src="site/static/img/adopters/cloudcasa.svg" height="50"></a>
 ## Success Stories
 
 Below is a list of adopters of Velero in **production environments** that have
@@ -40,7 +40,9 @@ We have integrated our [solution with Velero][11] to provide our customers with 
 Kyma [integrates with Velero][41] to effortlessly back up and restore Kyma clusters with all its resources. Velero capabilities allow Kyma users to define and run manual and scheduled backups in order to successfully handle a disaster-recovery scenario.
 
 **[Red Hat][50]**  
-Red Hat has developed the [Cluster Application Migration Tool][51] which uses [Velero and Restic][52] to drive the migration of applications between OpenShift clusters.
+Red Hat has developed 2 operators for the OpenShift platform:
+- [Migration Toolkit for Containers][51] (Crane): This operator uses [Velero and Restic][52] to drive the migration of applications between OpenShift clusters.
+- [OADP (OpenShift API for Data Protection) Operator][53]: This operator sets up and installs Velero on the OpenShift platform, allowing users to backup and restore applications.
 
 **[Dell EMC][70]**  
 For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Container Storage Interface (CSI) framework to take snapshots to back up the persistent data or the data that the application creates e.g. databases. [Dell EMC leverages Velero][72] to backup the namespace configuration files (also known as Namespace meta data) for enterprise grade data protection.
@@ -56,8 +58,11 @@ MayaData is a large user of Velero as well as a contributor. MayaData offers a D
 Okteto integrates Velero in [Okteto Cloud][94] and [Okteto Enterprise][95] to periodically backup and restore our clusters for disaster recovery. Velero is also a core software building block to provide namespace cloning capabilities, a feature that allows our users cloning staging environments into their personal development namespace for providing production-like development environments.
 
 **[Replicated][100]**<br>
-Replicated uses the Velero open source project to enable snapshots in [KOTS][101] to backup Kubernetes manifests & persistent volumes. In addition to the default functionality that Velero provides, [KOTS][101] provides a detailed interface in the [Admin Console][102] that can be used to manage the storage destination and schedule, and to perform and monitor the backup and restore process.
-​
+Replicated uses the Velero open source project to enable snapshots in [KOTS][101] to backup Kubernetes manifests & persistent volumes. In addition to the default functionality that Velero provides, [KOTS][101] provides a detailed interface in the [Admin Console][102] that can be used to manage the storage destination and schedule, and to perform and monitor the backup and restore process.<br>
+
+**[CloudCasa][103]**<br>
+[Catalogic Software][104] integrates Velero with [CloudCasa][103] - A Smart Home in the Cloud for Backups. CloudCasa is a simple, scalable, cloud-native solution providing data protection and disaster recovery as a service. This solution is built using Kubernetes for protecting Kubernetes clusters.<br>
+
 ## Adding your organization to the list of Velero Adopters
 
 If you are using Velero and would like to be included in the list of `Velero Adopters`, add an SVG version of your logo to the `site/static/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
@@ -86,6 +91,7 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 [50]: https://redhat.com
 [51]: https://github.com/fusor/mig-operator
 [52]: https://github.com/fusor/mig-operator/blob/master/docs/usage/2.md
+[53]: https://github.com/openshift/oadp-operator
 
 [60]: https://banzaicloud.com
 [61]: https://banzaicloud.com/products/pipeline/
@@ -110,3 +116,6 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 [100]: https://www.replicated.com
 [101]: https://kots.io
 [102]: https://kots.io/kotsadm/snapshots/overview/
+
+[103]: https://cloudcasa.io/
+[104]: https://www.catalogicsoftware.com/

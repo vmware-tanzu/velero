@@ -72,3 +72,8 @@ func (c *FakeDynamicClient) Delete(name string, opts metav1.DeleteOptions) error
 	args := c.Called(name, opts)
 	return args.Error(1)
 }
+
+func (c *FakeDynamicClient) UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+	args := c.Called(obj, opts)
+	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
+}

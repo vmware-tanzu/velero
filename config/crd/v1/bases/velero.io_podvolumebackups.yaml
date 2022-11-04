@@ -16,7 +16,44 @@ spec:
     singular: podvolumebackup
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Pod Volume Backup status such as New/InProgress
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: Time when this backup was started
+      jsonPath: .status.startTimestamp
+      name: Created
+      type: date
+    - description: Namespace of the pod containing the volume to be backed up
+      jsonPath: .spec.pod.namespace
+      name: Namespace
+      type: string
+    - description: Name of the pod containing the volume to be backed up
+      jsonPath: .spec.pod.name
+      name: Pod
+      type: string
+    - description: Name of the volume to be backed up
+      jsonPath: .spec.volume
+      name: Volume
+      type: string
+    - description: Backup repository identifier for this backup
+      jsonPath: .spec.repoIdentifier
+      name: Repository ID
+      type: string
+    - description: The type of the uploader to handle data transfer
+      jsonPath: .spec.uploaderType
+      name: Uploader Type
+      type: string
+    - description: Name of the Backup Storage Location where this backup should be
+        stored
+      jsonPath: .spec.backupStorageLocation
+      name: Storage Location
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
@@ -37,7 +74,7 @@ spec:
             properties:
               backupStorageLocation:
                 description: BackupStorageLocation is the name of the backup storage
-                  location where the restic repository is stored.
+                  location where the backup repository is stored.
                 type: string
               node:
                 description: Node is the name of the node that the Pod is running
@@ -81,7 +118,7 @@ spec:
                     type: string
                 type: object
               repoIdentifier:
-                description: RepoIdentifier is the restic repository identifier.
+                description: RepoIdentifier is the backup repository identifier.
                 type: string
               tags:
                 additionalProperties:
@@ -89,6 +126,14 @@ spec:
                 description: Tags are a map of key-value pairs that should be applied
                   to the volume backup as tags.
                 type: object
+              uploaderType:
+                description: UploaderType is the type of the uploader to handle the
+                  data transfer.
+                enum:
+                - kopia
+                - restic
+                - ""
+                type: string
               volume:
                 description: Volume is the name of the volume within the Pod to be
                   backed up.
@@ -153,6 +198,7 @@ spec:
         type: object
     served: true
     storage: true
+    subresources: {}
 status:
   acceptedNames:
     kind: ""

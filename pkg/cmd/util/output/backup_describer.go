@@ -26,7 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	"github.com/fatih/color"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,7 +45,7 @@ func DescribeBackup(
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
-	volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent,
+	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
 	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
@@ -110,7 +110,6 @@ func DescribeBackup(
 			d.Println()
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
-
 	})
 }
 
@@ -126,7 +125,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	}
 	d.Printf("\tIncluded:\t%s\n", s)
 	if len(spec.ExcludedNamespaces) == 0 {
-		s = "<none>"
+		s = emptyDisplay
 	} else {
 		s = strings.Join(spec.ExcludedNamespaces, ", ")
 	}
@@ -141,7 +140,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	}
 	d.Printf("\tIncluded:\t%s\n", s)
 	if len(spec.ExcludedResources) == 0 {
-		s = "<none>"
+		s = emptyDisplay
 	} else {
 		s = strings.Join(spec.ExcludedResources, ", ")
 	}
@@ -150,7 +149,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(spec.IncludeClusterResources, "excluded", "included", "auto"))
 
 	d.Println()
-	s = "<none>"
+	s = emptyDisplay
 	if spec.LabelSelector != nil {
 		s = metav1.FormatLabelSelector(spec.LabelSelector)
 	}
@@ -166,8 +165,11 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("TTL:\t%s\n", spec.TTL.Duration)
 
 	d.Println()
+	d.Printf("CSISnapshotTimeout:\t%s\n", spec.CSISnapshotTimeout.Duration)
+
+	d.Println()
 	if len(spec.Hooks.Resources) == 0 {
-		d.Printf("Hooks:\t<none>\n")
+		d.Printf("Hooks:\t" + emptyDisplay + "\n")
 	} else {
 		d.Printf("Hooks:\n")
 		d.Printf("\tResources:\n")
@@ -182,7 +184,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			}
 			d.Printf("\t\t\t\tIncluded:\t%s\n", s)
 			if len(spec.ExcludedNamespaces) == 0 {
-				s = "<none>"
+				s = emptyDisplay
 			} else {
 				s = strings.Join(spec.ExcludedNamespaces, ", ")
 			}
@@ -197,14 +199,14 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			}
 			d.Printf("\t\t\t\tIncluded:\t%s\n", s)
 			if len(spec.ExcludedResources) == 0 {
-				s = "<none>"
+				s = emptyDisplay
 			} else {
 				s = strings.Join(spec.ExcludedResources, ", ")
 			}
 			d.Printf("\t\t\t\tExcluded:\t%s\n", s)
 
 			d.Println()
-			s = "<none>"
+			s = emptyDisplay
 			if backupResourceHookSpec.LabelSelector != nil {
 				s = metav1.FormatLabelSelector(backupResourceHookSpec.LabelSelector)
 			}
@@ -241,7 +243,6 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			d.Printf("\t%s: %s\n", key, value)
 		}
 	}
-
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
@@ -402,10 +403,19 @@ func failedDeletionCount(requests []velerov1api.DeleteBackupRequest) int {
 
 // DescribePodVolumeBackups describes pod volume backups in human-readable format.
 func DescribePodVolumeBackups(d *Describer, backups []velerov1api.PodVolumeBackup, details bool) {
-	if details {
-		d.Printf("Restic Backups:\n")
+	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
+	// take the uploader type from the first element of the array.
+	var uploaderType string
+	if len(backups) > 0 {
+		uploaderType = backups[0].Spec.UploaderType
 	} else {
-		d.Printf("Restic Backups (specify --details for more information):\n")
+		return
+	}
+
+	if details {
+		d.Printf("%s Backups:\n", uploaderType)
+	} else {
+		d.Printf("%s Backups (specify --details for more information):\n", uploaderType)
 	}
 
 	// separate backups by phase (combining <none> and New into a single group)
@@ -486,7 +496,7 @@ func (v *volumesByPod) Add(namespace, name, volume, phase string, progress veler
 	key := fmt.Sprintf("%s/%s", namespace, name)
 
 	// append backup progress percentage if backup is in progress
-	if phase == "In Progress" && progress != (velerov1api.PodVolumeOperationProgress{}) {
+	if phase == "In Progress" && progress.TotalBytes != 0 {
 		volume = fmt.Sprintf("%s (%.2f%%)", volume, float64(progress.BytesDone)/float64(progress.TotalBytes)*100)
 	}
 
@@ -513,7 +523,7 @@ func (v *volumesByPod) Sorted() []*podVolumeGroup {
 	return v.volumesByPodSlice
 }
 
-func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent) {
+func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent) {
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		return
 	}
@@ -535,7 +545,7 @@ func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotConten
 	}
 }
 
-func DescribeVSC(d *Describer, details bool, vsc snapshotv1beta1api.VolumeSnapshotContent) {
+func DescribeVSC(d *Describer, details bool, vsc snapshotv1api.VolumeSnapshotContent) {
 	if vsc.Status == nil {
 		d.Printf("Volume Snapshot Content %s cannot be described because its status is nil\n", vsc.Name)
 		return

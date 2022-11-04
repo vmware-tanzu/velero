@@ -1,5 +1,5 @@
 /*
-Copyright the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,429 +18,293 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	corev1informers "k8s.io/client-go/informers/core/v1"
-	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type podVolumeBackupController struct {
-	*genericController
+// For unit test to mock function
+var NewUploaderProviderFunc = provider.NewUploaderProvider
 
-	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter
-	podVolumeBackupLister listers.PodVolumeBackupLister
-	podLister             corev1listers.PodLister
-	pvcLister             corev1listers.PersistentVolumeClaimLister
-	pvLister              corev1listers.PersistentVolumeLister
-	kbClient              client.Client
-	nodeName              string
-	metrics               *metrics.ServerMetrics
-	credentialsFileStore  credentials.FileStore
-
-	processBackupFunc func(*velerov1api.PodVolumeBackup) error
-	fileSystem        filesystem.Interface
-	clock             clock.Clock
+// PodVolumeBackupReconciler reconciles a PodVolumeBackup object
+type PodVolumeBackupReconciler struct {
+	Scheme           *runtime.Scheme
+	Client           client.Client
+	Clock            clock.Clock
+	Metrics          *metrics.ServerMetrics
+	CredentialGetter *credentials.CredentialGetter
+	NodeName         string
+	FileSystem       filesystem.Interface
+	Log              logrus.FieldLogger
 }
 
-// NewPodVolumeBackupController creates a new pod volume backup controller.
-func NewPodVolumeBackupController(
-	logger logrus.FieldLogger,
-	podVolumeBackupInformer informers.PodVolumeBackupInformer,
-	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
-	podInformer cache.SharedIndexInformer,
-	pvcInformer corev1informers.PersistentVolumeClaimInformer,
-	pvInformer corev1informers.PersistentVolumeInformer,
-	metrics *metrics.ServerMetrics,
-	kbClient client.Client,
-	nodeName string,
-	credentialsFileStore credentials.FileStore,
-) Interface {
-	c := &podVolumeBackupController{
-		genericController:     newGenericController(PodVolumeBackup, logger),
-		podVolumeBackupClient: podVolumeBackupClient,
-		podVolumeBackupLister: podVolumeBackupInformer.Lister(),
-		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
-		pvcLister:             pvcInformer.Lister(),
-		pvLister:              pvInformer.Lister(),
-		kbClient:              kbClient,
-		nodeName:              nodeName,
-		metrics:               metrics,
-		credentialsFileStore:  credentialsFileStore,
-
-		fileSystem: filesystem.NewFileSystem(),
-		clock:      &clock.RealClock{},
-	}
-
-	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(
-		c.cacheSyncWaiters,
-		podVolumeBackupInformer.Informer().HasSynced,
-		podInformer.HasSynced,
-		pvcInformer.Informer().HasSynced,
-	)
-	c.processBackupFunc = c.processBackup
-
-	podVolumeBackupInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.pvbHandler,
-			UpdateFunc: func(_, obj interface{}) { c.pvbHandler(obj) },
-		},
-	)
-
-	return c
+type BackupProgressUpdater struct {
+	PodVolumeBackup *velerov1api.PodVolumeBackup
+	Log             logrus.FieldLogger
+	Ctx             context.Context
+	Cli             client.Client
 }
 
-func (c *podVolumeBackupController) pvbHandler(obj interface{}) {
-	req := obj.(*velerov1api.PodVolumeBackup)
+// +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups/status,verbs=get;update;patch
+func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.Log.WithFields(logrus.Fields{
+		"controller":      "podvolumebackup",
+		"podvolumebackup": req.NamespacedName,
+	})
 
-	// only enqueue items for this node
-	if req.Spec.Node != c.nodeName {
-		return
+	var pvb velerov1api.PodVolumeBackup
+	if err := r.Client.Get(ctx, req.NamespacedName, &pvb); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Debug("Unable to find PodVolumeBackup")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, errors.Wrap(err, "getting PodVolumeBackup")
+	}
+	if len(pvb.OwnerReferences) == 1 {
+		log = log.WithField(
+			"backup",
+			fmt.Sprintf("%s/%s", req.Namespace, pvb.OwnerReferences[0].Name),
+		)
 	}
 
-	log := loggerForPodVolumeBackup(c.logger, req)
+	log.Info("PodVolumeBackup starting")
 
-	if req.Status.Phase != "" && req.Status.Phase != velerov1api.PodVolumeBackupPhaseNew {
-		log.Debug("Backup is not new, not enqueuing")
-		return
+	// Only process items for this node.
+	if pvb.Spec.Node != r.NodeName {
+		return ctrl.Result{}, nil
 	}
 
-	c.metrics.RegisterPodVolumeBackupEnqueue(c.nodeName)
-
-	log.Debug("Enqueueing")
-	c.enqueue(obj)
-}
-
-func (c *podVolumeBackupController) processQueueItem(key string) error {
-	log := c.logger.WithField("key", key)
-	log.Debug("Running processQueueItem")
-
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		log.WithError(err).Error("error splitting queue key")
-		return nil
-	}
-
-	req, err := c.podVolumeBackupLister.PodVolumeBackups(ns).Get(name)
-	if apierrors.IsNotFound(err) {
-		log.Debug("Unable to find PodVolumeBackup")
-		return nil
-	}
-	if err != nil {
-		return errors.Wrap(err, "error getting PodVolumeBackup")
-	}
-
-	// only process new items
-	switch req.Status.Phase {
+	switch pvb.Status.Phase {
 	case "", velerov1api.PodVolumeBackupPhaseNew:
+		// Only process new items.
 	default:
-		return nil
+		log.Debug("PodVolumeBackup is not new, not processing")
+		return ctrl.Result{}, nil
 	}
 
-	// Don't mutate the shared cache
-	reqCopy := req.DeepCopy()
-	return c.processBackupFunc(reqCopy)
-}
+	r.Metrics.RegisterPodVolumeBackupEnqueue(r.NodeName)
 
-func loggerForPodVolumeBackup(baseLogger logrus.FieldLogger, req *velerov1api.PodVolumeBackup) logrus.FieldLogger {
-	log := baseLogger.WithFields(logrus.Fields{
-		"namespace": req.Namespace,
-		"name":      req.Name,
-	})
-
-	if len(req.OwnerReferences) == 1 {
-		log = log.WithField("backup", fmt.Sprintf("%s/%s", req.Namespace, req.OwnerReferences[0].Name))
+	// Update status to InProgress.
+	original := pvb.DeepCopy()
+	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
+	pvb.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+	if err := r.Client.Patch(ctx, &pvb, client.MergeFrom(original)); err != nil {
+		log.WithError(err).Error("error updating PodVolumeBackup status")
+		return ctrl.Result{}, err
 	}
 
-	return log
-}
+	var pod corev1.Pod
+	podNamespacedName := client.ObjectKey{
+		Namespace: pvb.Spec.Pod.Namespace,
+		Name:      pvb.Spec.Pod.Name,
+	}
+	if err := r.Client.Get(ctx, podNamespacedName, &pod); err != nil {
+		return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("getting pod %s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name), log)
+	}
 
-func getOwningBackup(req *velerov1api.PodVolumeBackup) string {
-	return fmt.Sprintf("%s/%s", req.Namespace, req.OwnerReferences[0].Name)
-}
-
-func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBackup) error {
-	log := loggerForPodVolumeBackup(c.logger, req)
-
-	log.Info("Backup starting")
-
-	var err error
-
-	// update status to InProgress
-	req, err = c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
-		r.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
-		r.Status.StartTimestamp = &metav1.Time{Time: c.clock.Now()}
-	})
+	volDir, err := kube.GetVolumeDirectory(ctx, log, &pod, pvb.Spec.Volume, r.Client)
 	if err != nil {
-		log.WithError(err).Error("Error setting PodVolumeBackup StartTimestamp and phase to InProgress")
-		return errors.WithStack(err)
+		return r.updateStatusToFailed(ctx, &pvb, err, "getting volume directory name", log)
 	}
 
-	pod, err := c.podLister.Pods(req.Spec.Pod.Namespace).Get(req.Spec.Pod.Name)
-	if err != nil {
-		log.WithError(err).Errorf("Error getting pod %s/%s", req.Spec.Pod.Namespace, req.Spec.Pod.Name)
-		return c.fail(req, errors.Wrap(err, "error getting pod").Error(), log)
-	}
-
-	volumeDir, err := kube.GetVolumeDirectory(log, pod, req.Spec.Volume, c.pvcLister, c.pvLister, c.kbClient)
-	if err != nil {
-		log.WithError(err).Error("Error getting volume directory name")
-		return c.fail(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
-	}
-
-	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir)
+	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pvb.Spec.Pod.UID), volDir)
 	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
-	path, err := singlePathMatch(pathGlob)
+	path, err := kube.SinglePathMatch(pathGlob, r.FileSystem, log)
 	if err != nil {
-		log.WithError(err).Error("Error uniquely identifying volume path")
-		return c.fail(req, errors.Wrap(err, "error getting volume path on host").Error(), log)
+		return r.updateStatusToFailed(ctx, &pvb, err, "identifying unique volume path on host", log)
 	}
 	log.WithField("path", path).Debugf("Found path matching glob")
 
-	// temp creds
-	credentialsFile, err := c.credentialsFileStore.Path(restic.RepoKeySelector())
-	if err != nil {
-		log.WithError(err).Error("Error creating temp restic credentials file")
-		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
-	}
-	// ignore error since there's nothing we can do and it's a temp file.
-	defer os.Remove(credentialsFile)
-
-	resticCmd := restic.BackupCommand(
-		req.Spec.RepoIdentifier,
-		credentialsFile,
-		path,
-		req.Spec.Tags,
-	)
-
 	backupLocation := &velerov1api.BackupStorageLocation{}
-	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
+	if err := r.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvb.Namespace,
+		Name:      pvb.Spec.BackupStorageLocation,
 	}, backupLocation); err != nil {
-		return c.fail(req, errors.Wrap(err, "error getting backup storage location").Error(), log)
+		return ctrl.Result{}, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	var caCertFile string
-	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
-		caCertFile, err = restic.TempCACertFile(backupLocation.Spec.ObjectStorage.CACert, req.Spec.BackupStorageLocation, c.fileSystem)
-		if err != nil {
-			log.WithError(err).Error("Error creating temp cacert file")
-		}
-		// ignore error since there's nothing we can do and it's a temp file.
-		defer os.Remove(caCertFile)
-	}
-	resticCmd.CACertFile = caCertFile
-
-	env, err := restic.CmdEnv(backupLocation, c.credentialsFileStore)
-	if err != nil {
-		return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
-	}
-	resticCmd.Env = env
-
-	// If this is a PVC, look for the most recent completed pod volume backup for it and get
-	// its restic snapshot ID to use as the value of the `--parent` flag. Without this,
-	// if the pod using the PVC (and therefore the directory path under /host_pods/) has
-	// changed since the PVC's last backup, restic will not be able to identify a suitable
-	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
-	if pvcUID, ok := req.Labels[velerov1api.PVCUIDLabel]; ok {
-		parentSnapshotID := getParentSnapshot(log, pvcUID, req.Spec.BackupStorageLocation, c.podVolumeBackupLister.PodVolumeBackups(req.Namespace))
-		if parentSnapshotID == "" {
-			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
-		} else {
-			log.WithField("parentSnapshotID", parentSnapshotID).Info("Setting --parent flag for this backup")
-			resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshotID))
-		}
-	}
-
-	var stdout, stderr string
-
-	var emptySnapshot bool
-	if stdout, stderr, err = restic.RunBackup(resticCmd, log, c.updateBackupProgressFunc(req, log)); err != nil {
-		if strings.Contains(stderr, "snapshot is empty") {
-			emptySnapshot = true
-		} else {
-			log.WithError(errors.WithStack(err)).Errorf("Error running command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-			return c.fail(req, fmt.Sprintf("error running restic backup, stderr=%s: %s", stderr, err.Error()), log)
-		}
-	}
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-
-	var snapshotID string
-	if !emptySnapshot {
-		cmd := restic.GetSnapshotCommand(req.Spec.RepoIdentifier, credentialsFile, req.Spec.Tags)
-		cmd.Env = env
-		cmd.CACertFile = caCertFile
-
-		snapshotID, err = restic.GetSnapshotID(cmd)
-		if err != nil {
-			log.WithError(err).Error("Error getting SnapshotID")
-			return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)
-		}
-	}
-
-	// update status to Completed with path & snapshot id
-	req, err = c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
-		r.Status.Path = path
-		r.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
-		r.Status.SnapshotID = snapshotID
-		r.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-		if emptySnapshot {
-			r.Status.Message = "volume was empty so no snapshot was taken"
-		}
+	backupRepo, err := repository.GetBackupRepository(ctx, r.Client, pvb.Namespace, repository.BackupRepositoryKey{
+		VolumeNamespace: pvb.Spec.Pod.Namespace,
+		BackupLocation:  pvb.Spec.BackupStorageLocation,
+		RepositoryType:  podvolume.GetPvbRepositoryType(&pvb),
 	})
 	if err != nil {
-		log.WithError(err).Error("Error setting PodVolumeBackup phase to Completed")
-		return err
+		return ctrl.Result{}, errors.Wrap(err, "error getting backup repository")
 	}
-	latencyDuration := req.Status.CompletionTimestamp.Time.Sub(req.Status.StartTimestamp.Time)
-	latencySeconds := float64(latencyDuration / time.Second)
-	backupName := getOwningBackup(req)
-	c.metrics.ObserveResticOpLatency(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
-	c.metrics.RegisterResticOpLatencyGauge(c.nodeName, req.Name, resticCmd.Command, backupName, latencySeconds)
-	c.metrics.RegisterPodVolumeBackupDequeue(c.nodeName)
-	log.Info("Backup completed")
 
-	return nil
+	var uploaderProv provider.Provider
+	uploaderProv, err = NewUploaderProviderFunc(ctx, r.Client, pvb.Spec.UploaderType, pvb.Spec.RepoIdentifier,
+		backupLocation, backupRepo, r.CredentialGetter, repokey.RepoKeySelector(), log)
+	if err != nil {
+		return r.updateStatusToFailed(ctx, &pvb, err, "error creating uploader", log)
+	}
+
+	// If this is a PVC, look for the most recent completed pod volume backup for it and get
+	// its snapshot ID to do new backup based on it. Without this,
+	// if the pod using the PVC (and therefore the directory path under /host_pods/) has
+	// changed since the PVC's last backup, for backup, it will not be able to identify a suitable
+	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
+	var parentSnapshotID string
+	if pvcUID, ok := pvb.Labels[velerov1api.PVCUIDLabel]; ok {
+		parentSnapshotID = r.getParentSnapshot(ctx, log, pvcUID, &pvb)
+		if parentSnapshotID == "" {
+			log.Info("No parent snapshot found for PVC, not based on parent snapshot for this backup")
+		} else {
+			log.WithField("parentSnapshotID", parentSnapshotID).Info("Based on parent snapshot for this backup")
+		}
+	}
+
+	defer func() {
+		if err := uploaderProv.Close(ctx); err != nil {
+			log.Errorf("failed to close uploader provider with error %v", err)
+		}
+	}()
+
+	snapshotID, emptySnapshot, err := uploaderProv.RunBackup(ctx, path, pvb.Spec.Tags, parentSnapshotID, r.NewBackupProgressUpdater(&pvb, log, ctx))
+	if err != nil {
+		return r.updateStatusToFailed(ctx, &pvb, err, fmt.Sprintf("running backup, stderr=%v", err), log)
+	}
+
+	// Update status to Completed with path & snapshot ID.
+	original = pvb.DeepCopy()
+	pvb.Status.Path = path
+	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
+	pvb.Status.SnapshotID = snapshotID
+	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+	if emptySnapshot {
+		pvb.Status.Message = "volume was empty so no snapshot was taken"
+	}
+	if err = r.Client.Patch(ctx, &pvb, client.MergeFrom(original)); err != nil {
+		log.WithError(err).Error("error updating PodVolumeBackup status")
+		return ctrl.Result{}, err
+	}
+
+	latencyDuration := pvb.Status.CompletionTimestamp.Time.Sub(pvb.Status.StartTimestamp.Time)
+	latencySeconds := float64(latencyDuration / time.Second)
+	backupName := fmt.Sprintf("%s/%s", req.Namespace, pvb.OwnerReferences[0].Name)
+	generateOpName := fmt.Sprintf("%s-%s-%s-%s-%s-backup", pvb.Name, backupRepo.Name, pvb.Spec.BackupStorageLocation, pvb.Namespace, pvb.Spec.UploaderType)
+	r.Metrics.ObservePodVolumeOpLatency(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
+	r.Metrics.RegisterPodVolumeOpLatencyGauge(r.NodeName, req.Name, generateOpName, backupName, latencySeconds)
+	r.Metrics.RegisterPodVolumeBackupDequeue(r.NodeName)
+
+	log.Info("PodVolumeBackup completed")
+	return ctrl.Result{}, nil
 }
 
-// getParentSnapshot finds the most recent completed pod volume backup for the specified PVC and returns its
-// restic snapshot ID. Any errors encountered are logged but not returned since they do not prevent a backup
-// from proceeding.
-func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
+// SetupWithManager registers the PVB controller.
+func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&velerov1api.PodVolumeBackup{}).
+		Complete(r)
+}
+
+// getParentSnapshot finds the most recent completed PodVolumeBackup for the
+// specified PVC and returns its snapshot ID. Any errors encountered are
+// logged but not returned since they do not prevent a backup from proceeding.
+func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log logrus.FieldLogger, pvcUID string, podVolumeBackup *velerov1api.PodVolumeBackup) string {
 	log = log.WithField("pvcUID", pvcUID)
-	log.Infof("Looking for most recent completed pod volume backup for this PVC")
+	log.Infof("Looking for most recent completed PodVolumeBackup for this PVC")
 
-	pvcBackups, err := podVolumeBackupLister.List(labels.SelectorFromSet(map[string]string{velerov1api.PVCUIDLabel: pvcUID}))
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error listing pod volume backups for PVC")
-		return ""
+	listOpts := &client.ListOptions{
+		Namespace: podVolumeBackup.Namespace,
+	}
+	matchingLabels := client.MatchingLabels(map[string]string{velerov1api.PVCUIDLabel: pvcUID})
+	matchingLabels.ApplyToList(listOpts)
+
+	var pvbList velerov1api.PodVolumeBackupList
+	if err := r.Client.List(ctx, &pvbList, listOpts); err != nil {
+		log.WithError(errors.WithStack(err)).Error("getting list of podvolumebackups for this PVC")
 	}
 
-	// go through all the pod volume backups for the PVC and look for the most recent completed one
-	// to use as the parent.
-	var mostRecentBackup *velerov1api.PodVolumeBackup
-	for _, backup := range pvcBackups {
-		if backup.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
+	// Go through all the podvolumebackups for the PVC and look for the most
+	// recent completed one to use as the parent.
+	var mostRecentPVB velerov1api.PodVolumeBackup
+	for _, pvb := range pvbList.Items {
+		if pvb.Spec.UploaderType != podVolumeBackup.Spec.UploaderType {
+			continue
+		}
+		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
 			continue
 		}
 
-		if backupStorageLocation != backup.Spec.BackupStorageLocation {
-			// Check the backup storage location is the same as spec in order to support backup to multiple backup-locations.
-			// Otherwise, there exists a case that backup volume snapshot to the second location would failed, since the founded
-			// parent ID is only valid for the first backup location, not the second backup location.
-			// Also, the second backup should not use the first backup parent ID since its for the first backup location only.
+		if podVolumeBackup.Spec.BackupStorageLocation != pvb.Spec.BackupStorageLocation {
+			// Check the backup storage location is the same as spec in order to
+			// support backup to multiple backup-locations. Otherwise, there exists
+			// a case that backup volume snapshot to the second location would
+			// failed, since the founded parent ID is only valid for the first
+			// backup location, not the second backup location. Also, the second
+			// backup should not use the first backup parent ID since its for the
+			// first backup location only.
 			continue
 		}
 
-		if mostRecentBackup == nil || backup.Status.StartTimestamp.After(mostRecentBackup.Status.StartTimestamp.Time) {
-			mostRecentBackup = backup
+		if mostRecentPVB.Status == (velerov1api.PodVolumeBackupStatus{}) || pvb.Status.StartTimestamp.After(mostRecentPVB.Status.StartTimestamp.Time) {
+			mostRecentPVB = pvb
 		}
 	}
 
-	if mostRecentBackup == nil {
-		log.Info("No completed pod volume backup found for PVC")
+	if mostRecentPVB.Status == (velerov1api.PodVolumeBackupStatus{}) {
+		log.Info("No completed PodVolumeBackup found for PVC")
 		return ""
 	}
 
 	log.WithFields(map[string]interface{}{
-		"parentPodVolumeBackup": mostRecentBackup.Name,
-		"parentSnapshotID":      mostRecentBackup.Status.SnapshotID,
-	}).Info("Found most recent completed pod volume backup for PVC")
+		"parentPodVolumeBackup": mostRecentPVB.Name,
+		"parentSnapshotID":      mostRecentPVB.Status.SnapshotID,
+	}).Info("Found most recent completed PodVolumeBackup for PVC")
 
-	return mostRecentBackup.Status.SnapshotID
+	return mostRecentPVB.Status.SnapshotID
 }
 
-func (c *podVolumeBackupController) patchPodVolumeBackup(req *velerov1api.PodVolumeBackup, mutate func(*velerov1api.PodVolumeBackup)) (*velerov1api.PodVolumeBackup, error) {
-	// Record original json
-	oldData, err := json.Marshal(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling original PodVolumeBackup")
+func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
+	original := pvb.DeepCopy()
+	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
+	pvb.Status.Message = errors.WithMessage(err, msg).Error()
+	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+
+	if err = r.Client.Patch(ctx, pvb, client.MergeFrom(original)); err != nil {
+		log.WithError(err).Error("error updating PodVolumeBackup status")
+		return ctrl.Result{}, err
 	}
 
-	// Mutate
-	mutate(req)
-
-	// Record new json
-	newData, err := json.Marshal(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling updated PodVolumeBackup")
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating json merge patch for PodVolumeBackup")
-	}
-
-	req, err = c.podVolumeBackupClient.PodVolumeBackups(req.Namespace).Patch(context.TODO(), req.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return nil, errors.Wrap(err, "error patching PodVolumeBackup")
-	}
-
-	return req, nil
+	return ctrl.Result{}, nil
 }
 
-// updateBackupProgressFunc returns a func that takes progress info and patches
-// the PVB with the new progress
-func (c *podVolumeBackupController) updateBackupProgressFunc(req *velerov1api.PodVolumeBackup, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
-	return func(progress velerov1api.PodVolumeOperationProgress) {
-		if _, err := c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
-			r.Status.Progress = progress
-		}); err != nil {
-			log.WithError(err).Error("error updating PodVolumeBackup progress")
-		}
-	}
+func (r *PodVolumeBackupReconciler) NewBackupProgressUpdater(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger, ctx context.Context) *BackupProgressUpdater {
+	return &BackupProgressUpdater{pvb, log, ctx, r.Client}
 }
 
-func (c *podVolumeBackupController) fail(req *velerov1api.PodVolumeBackup, msg string, log logrus.FieldLogger) error {
-	if _, err := c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
-		r.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-		r.Status.Message = msg
-		r.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-	}); err != nil {
-		log.WithError(err).Error("Error setting PodVolumeBackup phase to Failed")
-		return err
+//UpdateProgress which implement ProgressUpdater interface to update pvb progress status
+func (b *BackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
+	original := b.PodVolumeBackup.DeepCopy()
+	b.PodVolumeBackup.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	if b.Cli == nil {
+		b.Log.Errorf("failed to update backup pod %s volume %s progress with uninitailize client", b.PodVolumeBackup.Spec.Pod.Name, b.PodVolumeBackup.Spec.Volume)
+		return
 	}
-	return nil
-}
-
-func singlePathMatch(path string) (string, error) {
-	matches, err := filepath.Glob(path)
-	if err != nil {
-		return "", errors.WithStack(err)
+	if err := b.Cli.Patch(b.Ctx, b.PodVolumeBackup, client.MergeFrom(original)); err != nil {
+		b.Log.Errorf("update backup pod %s volume %s progress with %v", b.PodVolumeBackup.Spec.Pod.Name, b.PodVolumeBackup.Spec.Volume, err)
 	}
-
-	if len(matches) != 1 {
-		return "", errors.Errorf("expected one matching path, got %d", len(matches))
-	}
-
-	return matches[0], nil
 }

@@ -41,8 +41,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
-const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
-
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
@@ -84,29 +82,29 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name                    string
-	TTL                     time.Duration
-	SnapshotVolumes         flag.OptionalBool
-	DefaultVolumesToRestic  flag.OptionalBool
-	IncludeNamespaces       flag.StringArray
-	ExcludeNamespaces       flag.StringArray
-	IncludeResources        flag.StringArray
-	ExcludeResources        flag.StringArray
-	Labels                  flag.Map
-	Selector                flag.LabelSelector
-	IncludeClusterResources flag.OptionalBool
-	Wait                    bool
-	StorageLocation         string
-	SnapshotLocations       []string
-	FromSchedule            string
-	OrderedResources        string
+	Name                     string
+	TTL                      time.Duration
+	SnapshotVolumes          flag.OptionalBool
+	DefaultVolumesToFsBackup flag.OptionalBool
+	IncludeNamespaces        flag.StringArray
+	ExcludeNamespaces        flag.StringArray
+	IncludeResources         flag.StringArray
+	ExcludeResources         flag.StringArray
+	Labels                   flag.Map
+	Selector                 flag.LabelSelector
+	IncludeClusterResources  flag.OptionalBool
+	Wait                     bool
+	StorageLocation          string
+	SnapshotLocations        []string
+	FromSchedule             string
+	OrderedResources         string
+	CSISnapshotTimeout       time.Duration
 
 	client veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		TTL:                     DefaultBackupTTL,
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
@@ -125,7 +123,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
-	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup.")
+	flags.DurationVar(&o.CSISnapshotTimeout, "csi-snapshot-timeout", o.CSISnapshotTimeout, "How long to wait for CSI snapshot creation before timeout.")
+	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup. If the parameter is not set, it is treated as setting to 'true'.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
@@ -133,7 +132,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup")
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.DefaultVolumesToRestic, "default-volumes-to-restic", "", "Use restic by default to backup all pod volumes")
+	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
 	f.NoOptDefVal = "true"
 }
 
@@ -291,11 +290,11 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	return nil
 }
 
-// parseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
+// ParseOrderedResources converts to map of Kinds to an ordered list of specific resources of that Kind.
 // Resource names in the list are in format 'namespace/resourcename' and separated by commas.
 // Key-value pairs in the mapping are separated by semi-colon.
 // Ex: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.
-func parseOrderedResources(orderMapStr string) (map[string]string, error) {
+func ParseOrderedResources(orderMapStr string) (map[string]string, error) {
 	entries := strings.Split(orderMapStr, ";")
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("Invalid OrderedResources '%s'.", orderMapStr)
@@ -335,9 +334,10 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			LabelSelector(o.Selector.LabelSelector).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
-			VolumeSnapshotLocations(o.SnapshotLocations...)
+			VolumeSnapshotLocations(o.SnapshotLocations...).
+			CSISnapshotTimeout(o.CSISnapshotTimeout)
 		if len(o.OrderedResources) > 0 {
-			orders, err := parseOrderedResources(o.OrderedResources)
+			orders, err := ParseOrderedResources(o.OrderedResources)
 			if err != nil {
 				return nil, err
 			}
@@ -350,8 +350,8 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		if o.IncludeClusterResources.Value != nil {
 			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
 		}
-		if o.DefaultVolumesToRestic.Value != nil {
-			backupBuilder.DefaultVolumesToRestic(*o.DefaultVolumesToRestic.Value)
+		if o.DefaultVolumesToFsBackup.Value != nil {
+			backupBuilder.DefaultVolumesToFsBackup(*o.DefaultVolumesToFsBackup.Value)
 		}
 	}
 

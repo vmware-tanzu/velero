@@ -48,7 +48,7 @@ type Context struct {
 func InvokeDeleteActions(ctx *Context) error {
 	var err error
 	resolver := framework.NewDeleteItemActionResolver(ctx.Actions)
-	ctx.resolvedActions, err = resolver.ResolveActions(ctx.DiscoveryHelper)
+	ctx.resolvedActions, err = resolver.ResolveActions(ctx.DiscoveryHelper, ctx.Log)
 	// No actions installed and no error means we don't have to continue;
 	// just do the backup deletion without worrying about plugins.
 	if len(ctx.resolvedActions) == 0 && err == nil {
@@ -62,16 +62,17 @@ func InvokeDeleteActions(ctx *Context) error {
 	dir, err := archive.NewExtractor(ctx.Log, ctx.Filesystem).UnzipAndExtractBackup(ctx.BackupReader)
 	if err != nil {
 		return errors.Wrapf(err, "error extracting backup")
-
 	}
 	defer ctx.Filesystem.RemoveAll(dir)
 	ctx.Log.Debugf("Downloaded and extracted the backup file to: %s", dir)
 
 	backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir)
-	if err != nil {
+	if existErr := errors.Is(err, archive.ErrNotExist); existErr {
+		ctx.Log.Debug("ignore invoking delete item actions: ", err)
+		return nil
+	} else if err != nil {
 		return errors.Wrapf(err, "error parsing backup %q", dir)
 	}
-
 	processdResources := sets.NewString()
 
 	for resource := range backupResources {

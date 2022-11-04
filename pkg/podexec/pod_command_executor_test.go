@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
@@ -101,12 +102,35 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 				Container: "foo",
 			},
 		},
+		{
+			name:         "hook's container is not overwritten by pod",
+			item:         velerotest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
+			podNamespace: "ns",
+			podName:      "pod",
+			hookName:     "hook",
+			hook: &v1.ExecHook{
+				Container: "",
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			pod := new(corev1api.Pod)
+			hookPodContainerNotSame := false
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(test.item, pod); err != nil {
+				assert.Error(t, err)
+			}
+			if (len(pod.Spec.Containers) > 0) && (pod.Spec.Containers[0].Name != test.hook.Container) {
+				hookPodContainerNotSame = true
+			}
+
 			e := &defaultPodCommandExecutor{}
 			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
+
+			if hookPodContainerNotSame && test.hook.Container == pod.Spec.Containers[0].Name {
+				assert.Error(t, fmt.Errorf("hook exec container is overwritten"))
+			}
 			assert.Error(t, err)
 		})
 	}

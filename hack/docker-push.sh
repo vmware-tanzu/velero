@@ -56,26 +56,24 @@ elif [[ "$triggeredBy" == "tags" ]]; then
     TAG=$(echo $GITHUB_REF | cut -d / -f 3)
 fi
 
-if [[ "$BRANCH" == "main" ]]; then
-    VERSION="$BRANCH"
-elif [[ ! -z "$TAG" ]]; then
+TAG_LATEST=false
+if [[ ! -z "$TAG" ]]; then
+    echo "We're building tag $TAG"
+    VERSION="$TAG"
     # Explicitly checkout tags when building from a git tag.
     # This is not needed when building from main
     git fetch --tags
     # Calculate the latest release if there's a tag.
     highest_release
-    VERSION="$TAG"
+    if [[ "$TAG" == "$HIGHEST" ]]; then
+      TAG_LATEST=true
+    fi
 else
-    echo "We're not on main and we're not building a tag, exit early."
-    exit 0
-fi
-
-# Assume we're not tagging `latest` by default, and never on main.
-TAG_LATEST=false
-if [[ "$BRANCH" == "main" ]]; then
-    echo "Building main, not tagging latest."
-elif [[ "$TAG" == "$HIGHEST" ]]; then
-    TAG_LATEST=true
+    echo "We're on branch $BRANCH"
+    VERSION="$BRANCH"
+    if [[ "$VERSION" == release-* ]]; then
+      VERSION=${VERSION}-dev
+    fi
 fi
 
 if [[ -z "$BUILDX_PLATFORMS" ]]; then
@@ -87,6 +85,7 @@ echo "Highest tag found: $HIGHEST"
 echo "BRANCH: $BRANCH"
 echo "TAG: $TAG"
 echo "TAG_LATEST: $TAG_LATEST"
+echo "VERSION: $VERSION"
 echo "BUILDX_PLATFORMS: $BUILDX_PLATFORMS"
 
 echo "Building and pushing container images."

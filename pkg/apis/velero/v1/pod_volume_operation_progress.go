@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 // PodVolumeOperationProgress represents the progress of a
-// PodVolumeBackup/Restore (restic) operation
+// PodVolumeBackup/Restore operation
 type PodVolumeOperationProgress struct {
 	// +optional
 	TotalBytes int64 `json:"totalBytes,omitempty"`

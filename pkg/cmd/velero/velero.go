@@ -23,7 +23,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/debug"
 
@@ -39,7 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/get"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/plugin"
-	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restic"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/repo"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restore"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/schedule"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/snapshotlocation"
@@ -49,6 +49,8 @@ import (
 	runplugin "github.com/vmware-tanzu/velero/pkg/cmd/server/plugin"
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/features"
+
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/nodeagent"
 )
 
 func NewCommand(name string) *cobra.Command {
@@ -89,7 +91,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		},
 	}
 
-	f := client.NewFactory(name, config)
+	f := client.NewFactory(name, "", config)
 	f.BindFlags(c.PersistentFlags())
 
 	// Bind features directly to the root command so it's available to all callers.
@@ -103,6 +105,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		schedule.NewCommand(f),
 		restore.NewCommand(f),
 		server.NewCommand(f),
+		nodeagent.NewCommand(f),
 		version.NewCommand(f),
 		get.NewCommand(f),
 		install.NewCommand(f),
@@ -114,7 +117,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		delete.NewCommand(f),
 		cliclient.NewCommand(),
 		completion.NewCommand(),
-		restic.NewCommand(f),
+		repo.NewCommand(f),
 		bug.NewCommand(),
 		backuplocation.NewCommand(f),
 		snapshotlocation.NewCommand(f),

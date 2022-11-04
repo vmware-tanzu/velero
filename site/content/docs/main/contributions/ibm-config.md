@@ -71,9 +71,9 @@ velero install \
 
 Velero does not have a volume snapshot plugin for IBM Cloud, so creating volume snapshots is disabled.
 
-Additionally, you can specify `--use-restic` to enable [restic support][16], and `--wait` to wait for the deployment to be ready.
+Additionally, you can specify `--use-node-agent` to enable [File System Backup][16], and `--wait` to wait for the deployment to be ready.
 
-(Optional) Specify [CPU and memory resource requests and limits][15] for the Velero/restic pods.
+(Optional) Specify [CPU and memory resource requests and limits][15] for the Velero/node-agent pods.
 
 Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's specific to AWS and won't work for IBM Cloud:
 
@@ -89,7 +89,7 @@ If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
 Uncomment `storageClassName: <YOUR_STORAGE_CLASS_NAME>` and replace with your `StorageClass` name.
 
-[0]: namespace.md
+[0]: ../namespace.md
 [1]: https://cloud.ibm.com/docs/cloud-object-storage/getting-started.html
 [2]: https://cloud.ibm.com/docs/cloud-object-storage/getting-started.html#create-buckets
 [3]: https://cloud.ibm.com/docs/cloud-object-storage/iam?topic=cloud-object-storage-service-credentials
@@ -97,5 +97,5 @@ Uncomment `storageClassName: <YOUR_STORAGE_CLASS_NAME>` and replace with your `S
 [4]: https://www.ibm.com/docs/en/cloud-private
 [5]: https://cloud.ibm.com/docs/containers/container_index.html#container_index
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
-[15]: customize-installation.md#customize-resource-requests-and-limits
-[16]: restic.md
+[15]: ../customize-installation.md#customize-resource-requests-and-limits
+[16]: ../file-system-backup.md

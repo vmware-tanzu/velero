@@ -9,14 +9,14 @@ reviewers:
 
   groups:
     maintainers:
-      - zubron
       - dsu-igeek
-      - jenting
       - sseago
       - reasonerjt
       - ywk253100
       - blackpiglet
       - qiuming-best
+      - shubham-pampattiwar
+      - Lyndon-Li
 
     tech-writer:
       - a-mccarthy

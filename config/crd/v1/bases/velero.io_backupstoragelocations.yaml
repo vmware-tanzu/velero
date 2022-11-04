@@ -158,6 +158,10 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              message:
+                description: Message is a message about the backup storage location's
+                  status.
+                type: string
               phase:
                 description: Phase is the current state of the BackupStorageLocation.
                 enum:
@@ -168,8 +172,7 @@ spec:
         type: object
     served: true
     storage: true
-    subresources:
-      status: {}
+    subresources: {}
 status:
   acceptedNames:
     kind: ""

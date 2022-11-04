@@ -17,7 +17,11 @@ limitations under the License.
 package e2e
 
 import (
+	"time"
+
 	"github.com/google/uuid"
+
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
 var UUIDgen uuid.UUID
@@ -42,10 +46,53 @@ type VerleroConfig struct {
 	AdditionalBSLConfig      string
 	AdditionalBSLCredentials string
 	RegistryCredentialFile   string
-	ResticHelperImage        string
+	RestoreHelperImage       string
 	UpgradeFromVeleroVersion string
 	UpgradeFromVeleroCLI     string
+	MigrateFromVeleroVersion string
+	MigrateFromVeleroCLI     string
 	Plugins                  string
 	AddBSLPlugins            string
 	InstallVelero            bool
+	KibishiiDirectory        string
+	Features                 string
+	Debug                    bool
+	GCFrequency              string
+	DefaultCluster           string
+	StandbyCluster           string
+	ClientToInstallVelero    *TestClient
+	DefaultClient            *TestClient
+	StandbyClient            *TestClient
+	UploaderType             string
+	UseNodeAgent             bool
+	UseRestic                bool
+}
+
+type SnapshotCheckPoint struct {
+	NamespaceBackedUp string
+	// SnapshotIDList is for Azure CSI Verification
+	//  we can get SnapshotID from VolumeSnapshotContent from a certain backup
+	SnapshotIDList []string
+	ExpectCount    int
+	PodName        []string
+	EnableCSI      bool
+}
+
+type BackupConfig struct {
+	BackupName              string
+	Namespace               string
+	BackupLocation          string
+	UseVolumeSnapshots      bool
+	Selector                string
+	TTL                     time.Duration
+	IncludeResources        string
+	ExcludeResources        string
+	IncludeClusterResources bool
+	OrderedResources        string
+	UseResticIfFSBackup     bool
+}
+
+type VeleroCLI2Version struct {
+	VeleroVersion string
+	VeleroCLI     string
 }

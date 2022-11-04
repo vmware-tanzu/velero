@@ -46,11 +46,19 @@ func TestDeployment(t *testing.T) {
 	assert.Equal(t, 7, len(deploy.Spec.Template.Spec.Containers[0].Env))
 	assert.Equal(t, 3, len(deploy.Spec.Template.Spec.Volumes))
 
-	deploy = Deployment("velero", WithDefaultResticMaintenanceFrequency(24*time.Hour))
+	deploy = Deployment("velero", WithDefaultRepoMaintenanceFrequency(24*time.Hour))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
-	assert.Equal(t, "--default-restic-prune-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
+	assert.Equal(t, "--default-repo-maintain-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
+	deploy = Deployment("velero", WithGarbageCollectionFrequency(24*time.Hour))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--garbage-collection-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
 
 	deploy = Deployment("velero", WithFeatures([]string{"EnableCSI", "foo", "bar", "baz"}))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--features=EnableCSI,foo,bar,baz", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
+	deploy = Deployment("velero", WithUploaderType("kopia"))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--uploader-type=kopia", deploy.Spec.Template.Spec.Containers[0].Args[1])
 }

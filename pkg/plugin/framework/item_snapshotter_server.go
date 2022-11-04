@@ -27,17 +27,18 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // ItemSnapshotterGRPCServer implements the proto-generated ItemSnapshotterServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type ItemSnapshotterGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
 func (recv *ItemSnapshotterGRPCServer) getImpl(name string) (isv1.ItemSnapshotter, error) {
-	impl, err := recv.mux.getHandler(name)
+	impl, err := recv.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
@@ -52,19 +53,19 @@ func (recv *ItemSnapshotterGRPCServer) getImpl(name string) (isv1.ItemSnapshotte
 
 func (recv *ItemSnapshotterGRPCServer) Init(c context.Context, req *proto.ItemSnapshotterInitRequest) (response *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	err = impl.Init(req.Config)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -72,23 +73,23 @@ func (recv *ItemSnapshotterGRPCServer) Init(c context.Context, req *proto.ItemSn
 
 func (recv *ItemSnapshotterGRPCServer) AppliesTo(ctx context.Context, req *proto.ItemSnapshotterAppliesToRequest) (response *proto.ItemSnapshotterAppliesToResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.ItemSnapshotterAppliesToResponse{
-		&proto.ResourceSelector{
+		ResourceSelector: &proto.ResourceSelector{
 			IncludedNamespaces: resourceSelector.IncludedNamespaces,
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
@@ -100,23 +101,23 @@ func (recv *ItemSnapshotterGRPCServer) AppliesTo(ctx context.Context, req *proto
 
 func (recv *ItemSnapshotterGRPCServer) AlsoHandles(ctx context.Context, req *proto.AlsoHandlesRequest) (res *proto.AlsoHandlesResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 	var item unstructured.Unstructured
 	var backup api.Backup
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	if err := json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	ahi := isv1.AlsoHandlesInput{
 		Item:   &item,
@@ -124,7 +125,7 @@ func (recv *ItemSnapshotterGRPCServer) AlsoHandles(ctx context.Context, req *pro
 	}
 	alsoHandles, err := impl.AlsoHandles(&ahi)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 	res = &proto.AlsoHandlesResponse{}
 
@@ -136,23 +137,23 @@ func (recv *ItemSnapshotterGRPCServer) AlsoHandles(ctx context.Context, req *pro
 
 func (recv *ItemSnapshotterGRPCServer) SnapshotItem(ctx context.Context, req *proto.SnapshotItemRequest) (res *proto.SnapshotItemResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 	var item unstructured.Unstructured
 	var backup api.Backup
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	if err := json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	sii := isv1.SnapshotItemInput{
 		Item:   &item,
@@ -169,7 +170,7 @@ func (recv *ItemSnapshotterGRPCServer) SnapshotItem(ctx context.Context, req *pr
 	} else {
 		updatedItemJSON, err = json.Marshal(sio.UpdatedItem.UnstructuredContent())
 		if err != nil {
-			return nil, newGRPCError(errors.WithStack(err))
+			return nil, common.NewGRPCError(errors.WithStack(err))
 		}
 	}
 	res = &proto.SnapshotItemResponse{
@@ -184,18 +185,18 @@ func (recv *ItemSnapshotterGRPCServer) SnapshotItem(ctx context.Context, req *pr
 
 func (recv *ItemSnapshotterGRPCServer) Progress(ctx context.Context, req *proto.ProgressRequest) (res *proto.ProgressResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 	var backup api.Backup
 
 	if err := json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 	sipi := &isv1.ProgressInput{
 		ItemID:     protoToResourceIdentifier(req.ItemID),
@@ -205,7 +206,7 @@ func (recv *ItemSnapshotterGRPCServer) Progress(ctx context.Context, req *proto.
 
 	sipo, err := impl.Progress(sipi)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	res = &proto.ProgressResponse{
@@ -223,18 +224,18 @@ func (recv *ItemSnapshotterGRPCServer) Progress(ctx context.Context, req *proto.
 
 func (recv *ItemSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteItemSnapshotRequest) (empty *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var itemFromBackup unstructured.Unstructured
 	if err := json.Unmarshal(req.ItemFromBackup, &itemFromBackup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	disi := isv1.DeleteSnapshotInput{
@@ -246,36 +247,36 @@ func (recv *ItemSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *
 
 	err = impl.DeleteSnapshot(ctx, &disi)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 	return
 }
 
 func (recv *ItemSnapshotterGRPCServer) CreateItemFromSnapshot(ctx context.Context, req *proto.CreateItemFromSnapshotRequest) (res *proto.CreateItemFromSnapshotResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 	impl, err := recv.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var snapshottedItem unstructured.Unstructured
 	if err := json.Unmarshal(req.Item, &snapshottedItem); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	var itemFromBackup unstructured.Unstructured
 	if err := json.Unmarshal(req.Item, &itemFromBackup); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	var restore api.Restore
 
 	if err := json.Unmarshal(req.Restore, &restore); err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
 	cii := isv1.CreateItemInput{
@@ -289,7 +290,7 @@ func (recv *ItemSnapshotterGRPCServer) CreateItemFromSnapshot(ctx context.Contex
 
 	cio, err := impl.CreateItemFromSnapshot(ctx, &cii)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	var updatedItemJSON []byte
@@ -298,7 +299,7 @@ func (recv *ItemSnapshotterGRPCServer) CreateItemFromSnapshot(ctx context.Contex
 	} else {
 		updatedItemJSON, err = json.Marshal(cio.UpdatedItem.UnstructuredContent())
 		if err != nil {
-			return nil, newGRPCError(errors.WithStack(err))
+			return nil, common.NewGRPCError(errors.WithStack(err))
 		}
 	}
 	res = &proto.CreateItemFromSnapshotResponse{

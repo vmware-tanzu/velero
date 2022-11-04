@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -39,6 +40,7 @@ depends on your test patterns.
 */
 type VeleroBackupRestoreTest interface {
 	Init() error
+	StartRun() error
 	CreateResources() error
 	Backup() error
 	Destroy() error
@@ -46,6 +48,7 @@ type VeleroBackupRestoreTest interface {
 	Verify() error
 	Clean() error
 	GetTestMsg() *TestMSG
+	GetTestCase() *TestCase
 }
 
 type TestMSG struct {
@@ -55,35 +58,38 @@ type TestMSG struct {
 }
 
 type TestCase struct {
-	BackupName      string
-	RestoreName     string
-	NSBaseName      string
-	BackupArgs      []string
-	RestoreArgs     []string
-	NamespacesTotal int
-	TestMsg         *TestMSG
-	Client          TestClient
-	Ctx             context.Context
-	NSIncluded      *[]string
+	BackupName         string
+	RestoreName        string
+	NSBaseName         string
+	BackupArgs         []string
+	RestoreArgs        []string
+	NamespacesTotal    int
+	TestMsg            *TestMSG
+	Client             TestClient
+	Ctx                context.Context
+	NSIncluded         *[]string
+	UseVolumeSnapshots bool
 }
 
 var TestClientInstance TestClient
 
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
-		var err error
-		TestClientInstance, err = NewTestClient()
-		Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+		By("Create test client instance", func() {
+			TestClientInstance = *VeleroCfg.ClientToInstallVelero
+		})
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
-				Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &VeleroCfg, test.GetTestCase().UseVolumeSnapshots)).To(Succeed())
 			}
 		})
 		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+			if !VeleroCfg.Debug {
+				if VeleroCfg.InstallVelero {
+					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+				}
 			}
 		})
 		It(test.GetTestMsg().Text, func() {
@@ -94,28 +100,32 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		var err error
 		var countIt int
-		TestClientInstance, err = NewTestClient()
-		Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
+		By("Create test client instance", func() {
+			TestClientInstance = *VeleroCfg.ClientToInstallVelero
+		})
+		var useVolumeSnapshots bool
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
+			useVolumeSnapshots = tests[k].GetTestCase().UseVolumeSnapshots
 		}
 
 		BeforeEach(func() {
 			flag.Parse()
 			if VeleroCfg.InstallVelero {
 				if countIt == 0 {
-					Expect(VeleroInstall(context.Background(), &VeleroCfg, "", false)).To(Succeed())
+					Expect(VeleroInstall(context.Background(), &VeleroCfg, useVolumeSnapshots)).To(Succeed())
 				}
 				countIt++
 			}
 		})
 
 		AfterEach(func() {
-			if VeleroCfg.InstallVelero {
-				if countIt == len(tests) {
-					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+			if !VeleroCfg.Debug {
+				if VeleroCfg.InstallVelero {
+					if countIt == len(tests) && !VeleroCfg.Debug {
+						Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To((Succeed()))
+					}
 				}
 			}
 		})
@@ -137,8 +147,12 @@ func (t *TestCase) CreateResources() error {
 	return nil
 }
 
+func (t *TestCase) StartRun() error {
+	return nil
+}
+
 func (t *TestCase) Backup() error {
-	if err := VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.BackupArgs); err != nil {
+	if err := VeleroBackupExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
 		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
 		return errors.Wrapf(err, "Failed to backup resources")
 	}
@@ -154,10 +168,20 @@ func (t *TestCase) Destroy() error {
 }
 
 func (t *TestCase) Restore() error {
-	if err := VeleroCmdExec(t.Ctx, VeleroCfg.VeleroCLI, t.RestoreArgs); err != nil {
-		RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName, "")
-		return errors.Wrapf(err, "Failed to restore resources")
+	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+	if t.UseVolumeSnapshots {
+		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
+		time.Sleep(5 * time.Minute)
 	}
+
+	By("Start to restore ......", func() {
+		Expect(VeleroRestoreExec(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", t.RestoreName)
+			return "Fail to restore workload"
+		})
+	})
 	return nil
 }
 
@@ -166,13 +190,24 @@ func (t *TestCase) Verify() error {
 }
 
 func (t *TestCase) Clean() error {
-	return CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+	if !VeleroCfg.Debug {
+		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.NSBaseName), func() {
+			CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+		})
+		By("Clean backups after test", func() {
+			DeleteBackups(t.Ctx, t.Client)
+		})
+	}
+	return nil
 }
 
 func (t *TestCase) GetTestMsg() *TestMSG {
 	return t.TestMsg
 }
 
+func (t *TestCase) GetTestCase() *TestCase {
+	return t
+}
 func RunTestCase(test VeleroBackupRestoreTest) error {
 	fmt.Printf("Running test case %s\n", test.GetTestMsg().Desc)
 	if test == nil {
@@ -180,8 +215,11 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 	}
 
 	defer test.Clean()
-
-	err := test.CreateResources()
+	err := test.StartRun()
+	if err != nil {
+		return err
+	}
+	err = test.CreateResources()
 	if err != nil {
 		return err
 	}

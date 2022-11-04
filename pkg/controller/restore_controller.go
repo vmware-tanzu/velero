@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
+	hook "github.com/vmware-tanzu/velero/internal/hook"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -71,10 +72,20 @@ var nonRestorableResources = []string{
 	// https://github.com/vmware-tanzu/velero/issues/622
 	"restores.velero.io",
 
+	// TODO: Remove this in v1.11 or v1.12
 	// Restic repositories are automatically managed by Velero and will be automatically
 	// created as needed if they don't exist.
 	// https://github.com/vmware-tanzu/velero/issues/1113
 	"resticrepositories.velero.io",
+
+	// CSINode delegates cluster node for CSI operation.
+	// VolumeAttachement records PV mounts to which node.
+	// https://github.com/vmware-tanzu/velero/issues/4823
+	"csinodes.storage.k8s.io",
+	"volumeattachments.storage.k8s.io",
+
+	// Backup repositories were renamed from Restic repositories
+	"backuprepositories.velero.io",
 }
 
 type restoreController struct {
@@ -313,10 +324,31 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
+	// validate that only one exists orLabelSelector or just labelSelector (singular)
+	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"))
+	}
+
 	// validate that exactly one of BackupName and ScheduleName have been specified
 	if !backupXorScheduleProvided(restore) {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Either a backup or schedule must be specified as a source for the restore, but not both")
 		return backupInfo{}
+	}
+
+	// validate Restore Init Hook's InitContainers
+	restoreHooks, err := hook.GetRestoreHooksFromSpec(&restore.Spec.Hooks)
+	if err != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+	}
+	for _, resource := range restoreHooks {
+		for _, h := range resource.RestoreHooks {
+			for _, container := range h.Init.InitContainers {
+				err = hook.ValidateContainer(container.Raw)
+				if err != nil {
+					restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+				}
+			}
+		}
 	}
 
 	// if ScheduleName is specified, fill in BackupName with the most recent successful backup from
@@ -431,7 +463,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 func (c *restoreController) runValidatedRestore(restore *api.Restore, info backupInfo) error {
 	// instantiate the per-restore logger that will output both to a temp file
 	// (for upload to object storage) and to stdout.
-	restoreLog, err := newRestoreLogger(restore, c.logger, c.restoreLogLevel, c.logFormat)
+	restoreLog, err := newRestoreLogger(restore, c.restoreLogLevel, c.logFormat)
 	if err != nil {
 		return err
 	}
@@ -486,6 +518,30 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
 		c.snapshotLocationLister, pluginManager)
+
+	// log errors and warnings to the restore log
+	for _, msg := range restoreErrors.Velero {
+		restoreLog.Errorf("Velero restore error: %v", msg)
+	}
+	for _, msg := range restoreErrors.Cluster {
+		restoreLog.Errorf("Cluster resource restore error: %v", msg)
+	}
+	for ns, errs := range restoreErrors.Namespaces {
+		for _, msg := range errs {
+			restoreLog.Errorf("Namespace %v, resource restore error: %v", ns, msg)
+		}
+	}
+	for _, msg := range restoreWarnings.Velero {
+		restoreLog.Warnf("Velero restore warning: %v", msg)
+	}
+	for _, msg := range restoreWarnings.Cluster {
+		restoreLog.Warnf("Cluster resource restore warning: %v", msg)
+	}
+	for ns, errs := range restoreWarnings.Namespaces {
+		for _, msg := range errs {
+			restoreLog.Warnf("Namespace %v, resource restore warning: %v", ns, msg)
+		}
+	}
 	restoreLog.Info("restore completed")
 
 	// re-instantiate the backup store because credentials could have changed since the original
@@ -521,14 +577,14 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		"errors":   restoreErrors,
 	}
 
-	if err := putResults(restore, m, info.backupStore, c.logger); err != nil {
+	if err := putResults(restore, m, info.backupStore); err != nil {
 		c.logger.WithError(err).Error("Error uploading restore results to backup storage")
 	}
 
 	return nil
 }
 
-func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore, log logrus.FieldLogger) error {
+func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore) error {
 	buf := new(bytes.Buffer)
 	gzw := gzip.NewWriter(buf)
 	defer gzw.Close()
@@ -613,7 +669,7 @@ type restoreLogger struct {
 	w    *gzip.Writer
 }
 
-func newRestoreLogger(restore *api.Restore, baseLogger logrus.FieldLogger, logLevel logrus.Level, logFormat logging.Format) (*restoreLogger, error) {
+func newRestoreLogger(restore *api.Restore, logLevel logrus.Level, logFormat logging.Format) (*restoreLogger, error) {
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp file")

@@ -1,0 +1,1 @@
+Fix typo in doc, in https://velero.io/docs/main/restore-reference/ "Restore order" section, "Mamespace" should be "Namespace".

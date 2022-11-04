@@ -53,7 +53,7 @@ func (f *FilteringCase) Init() error {
 	f.NamespacesTotal = 3
 	f.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", f.BackupName,
-		"--default-volumes-to-restic", "--wait",
+		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	f.RestoreArgs = []string{

@@ -89,6 +89,11 @@ type Deletor interface {
 	Delete(name string, opts metav1.DeleteOptions) error
 }
 
+// StatusUpdater updates status field of a object
+type StatusUpdater interface {
+	UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error)
+}
+
 // Dynamic contains client methods that Velero needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
@@ -97,6 +102,7 @@ type Dynamic interface {
 	Getter
 	Patcher
 	Deletor
+	StatusUpdater
 }
 
 // dynamicResourceClient implements Dynamic.
@@ -128,4 +134,8 @@ func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.U
 
 func (d *dynamicResourceClient) Delete(name string, opts metav1.DeleteOptions) error {
 	return d.resourceClient.Delete(context.TODO(), name, opts)
+}
+
+func (d *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+	return d.resourceClient.UpdateStatus(context.TODO(), obj, opts)
 }

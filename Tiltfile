@@ -7,7 +7,7 @@ k8s_yaml([
     'config/crd/v1/bases/velero.io_downloadrequests.yaml',
     'config/crd/v1/bases/velero.io_podvolumebackups.yaml',
     'config/crd/v1/bases/velero.io_podvolumerestores.yaml',
-    'config/crd/v1/bases/velero.io_resticrepositories.yaml',
+    'config/crd/v1/bases/velero.io_backuprepositories.yaml',
     'config/crd/v1/bases/velero.io_restores.yaml',
     'config/crd/v1/bases/velero.io_schedules.yaml',
     'config/crd/v1/bases/velero.io_serverstatusrequests.yaml',
@@ -17,7 +17,7 @@ k8s_yaml([
 # default values
 settings = {
     "default_registry": "docker.io/velero",
-    "enable_restic": False,
+    "use_node_agent": False,
     "enable_debug": False,
     "debug_continue_on_start": True,  # Continue the velero process by default when in debug mode
     "create_backup_locations": False,
@@ -34,9 +34,9 @@ k8s_yaml(kustomize('tilt-resources'))
 k8s_yaml('tilt-resources/deployment.yaml')
 if settings.get("enable_debug"):
     k8s_resource('velero', port_forwards = '2345')
-    # TODO: Need to figure out how to apply port forwards for all restic pods
-if settings.get("enable_restic"):
-    k8s_yaml('tilt-resources/restic.yaml')
+    # TODO: Need to figure out how to apply port forwards for all node-agent pods
+if settings.get("use_node_agent"):
+    k8s_yaml('tilt-resources/node-agent.yaml')
 if settings.get("create_backup_locations"):
     k8s_yaml('tilt-resources/velero_v1_backupstoragelocation.yaml')
 if settings.get("setup-minio"):
@@ -50,7 +50,7 @@ git_sha = str(local("git rev-parse HEAD", quiet = True, echo_off = True)).strip(
 
 tilt_helper_dockerfile_header = """
 # Tilt image
-FROM golang:1.17 as tilt-helper
+FROM golang:1.18 as tilt-helper
 
 # Support live reloading with Tilt
 RUN wget --output-document /restart.sh --quiet https://raw.githubusercontent.com/windmilleng/rerun-process-wrapper/master/restart.sh  && \
@@ -103,7 +103,7 @@ local_resource(
 
 local_resource(
     "restic_binary",
-    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/restic; BIN=velero GOOS=linux GOARCH=amd64 RESTIC_VERSION=0.12.0 OUTPUT_DIR=_tiltbuild/restic ./hack/download-restic.sh',
+    cmd = 'cd ' + '.' + ';mkdir -p _tiltbuild/restic; BIN=velero GOOS=linux GOARCH=amd64 RESTIC_VERSION=0.13.1 OUTPUT_DIR=_tiltbuild/restic ./hack/download-restic.sh',
 )
 
 # Note: we need a distro with a bash shell to exec into the Velero container

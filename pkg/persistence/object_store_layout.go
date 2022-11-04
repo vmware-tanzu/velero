@@ -40,6 +40,7 @@ func NewObjectStoreLayout(prefix string) *ObjectStoreLayout {
 		"restic":   path.Join(prefix, "restic") + "/",
 		"metadata": path.Join(prefix, "metadata") + "/",
 		"plugins":  path.Join(prefix, "plugins") + "/",
+		"kopia":    path.Join(prefix, "kopia") + "/",
 	}
 
 	return &ObjectStoreLayout{
@@ -110,4 +111,8 @@ func (l *ObjectStoreLayout) getCSIVolumeSnapshotKey(backup string) string {
 
 func (l *ObjectStoreLayout) getCSIVolumeSnapshotContentsKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotcontents.json.gz", backup))
+}
+
+func (l *ObjectStoreLayout) getCSIVolumeSnapshotClassesKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotclasses.json.gz", backup))
 }

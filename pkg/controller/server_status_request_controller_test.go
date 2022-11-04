@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -62,15 +63,15 @@ var _ = Describe("Server Status Request Reconciler", func() {
 		func(test request) {
 			// Setup reconciler
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-			r := ServerStatusRequestReconciler{
-				Client:         fake.NewFakeClientWithScheme(scheme.Scheme, test.req),
-				Ctx:            context.Background(),
-				PluginRegistry: test.reqPluginLister,
-				Clock:          clock.NewFakeClock(now),
-				Log:            velerotest.NewLogger(),
-			}
+			r := NewServerStatusRequestReconciler(
+				fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(test.req).Build(),
+				context.Background(),
+				test.reqPluginLister,
+				clock.NewFakeClock(now),
+				velerotest.NewLogger(),
+			)
 
-			actualResult, err := r.Reconcile(r.Ctx, ctrl.Request{
+			actualResult, err := r.Reconcile(r.ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      test.req.Name,
@@ -86,7 +87,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 			}
 
 			instance := &velerov1api.ServerStatusRequest{}
-			err = r.Client.Get(ctx, kbclient.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, instance)
+			err = r.client.Get(ctx, kbclient.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, instance)
 
 			// Assertions
 			if test.expected == nil {
@@ -247,7 +248,7 @@ type fakePluginLister struct {
 	plugins []framework.PluginIdentifier
 }
 
-func (l *fakePluginLister) List(kind framework.PluginKind) []framework.PluginIdentifier {
+func (l *fakePluginLister) List(kind common.PluginKind) []framework.PluginIdentifier {
 	var plugins []framework.PluginIdentifier
 	for _, plugin := range l.plugins {
 		if plugin.Kind == kind {

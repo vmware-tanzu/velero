@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -30,11 +31,11 @@ import (
 // ObjectStoreGRPCServer implements the proto-generated ObjectStoreServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type ObjectStoreGRPCServer struct {
-	mux *serverMux
+	mux *common.ServerMux
 }
 
 func (s *ObjectStoreGRPCServer) getImpl(name string) (velero.ObjectStore, error) {
-	impl, err := s.mux.getHandler(name)
+	impl, err := s.mux.GetHandler(name)
 	if err != nil {
 		return nil, err
 	}
@@ -52,18 +53,18 @@ func (s *ObjectStoreGRPCServer) getImpl(name string) (velero.ObjectStore, error)
 // cannot be initialized from the provided config.
 func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.ObjectStoreInitRequest) (response *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	if err := impl.Init(req.Config); err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -73,7 +74,7 @@ func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.ObjectStore
 // object storage bucket with the given key.
 func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServer) (err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
@@ -82,12 +83,12 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 	// in our receive method, we'll use `first` on the first call
 	firstChunk, err := stream.Recv()
 	if err != nil {
-		return newGRPCError(errors.WithStack(err))
+		return common.NewGRPCError(errors.WithStack(err))
 	}
 
 	impl, err := s.getImpl(firstChunk.Plugin)
 	if err != nil {
-		return newGRPCError(err)
+		return common.NewGRPCError(err)
 	}
 
 	bucket := firstChunk.Bucket
@@ -118,11 +119,11 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 	}
 
 	if err := impl.PutObject(bucket, key, &StreamReadCloser{receive: receive, close: close}); err != nil {
-		return newGRPCError(err)
+		return common.NewGRPCError(err)
 	}
 
 	if err := stream.SendAndClose(&proto.Empty{}); err != nil {
-		return newGRPCError(errors.WithStack(err))
+		return common.NewGRPCError(errors.WithStack(err))
 	}
 
 	return nil
@@ -131,19 +132,19 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 // ObjectExists checks if there is an object with the given key in the object storage bucket.
 func (s *ObjectStoreGRPCServer) ObjectExists(ctx context.Context, req *proto.ObjectExistsRequest) (response *proto.ObjectExistsResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	exists, err := impl.ObjectExists(req.Bucket, req.Key)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.ObjectExistsResponse{Exists: exists}, nil
@@ -153,19 +154,19 @@ func (s *ObjectStoreGRPCServer) ObjectExists(ctx context.Context, req *proto.Obj
 // bucket in object storage.
 func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream proto.ObjectStore_GetObjectServer) (err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return newGRPCError(err)
+		return common.NewGRPCError(err)
 	}
 
 	rdr, err := impl.GetObject(req.Bucket, req.Key)
 	if err != nil {
-		return newGRPCError(err)
+		return common.NewGRPCError(err)
 	}
 	defer rdr.Close()
 
@@ -173,14 +174,14 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 	for {
 		n, err := rdr.Read(chunk)
 		if err != nil && err != io.EOF {
-			return newGRPCError(errors.WithStack(err))
+			return common.NewGRPCError(errors.WithStack(err))
 		}
 		if n == 0 {
 			return nil
 		}
 
 		if err := stream.Send(&proto.Bytes{Data: chunk[0:n]}); err != nil {
-			return newGRPCError(errors.WithStack(err))
+			return common.NewGRPCError(errors.WithStack(err))
 		}
 	}
 }
@@ -190,19 +191,19 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 // (this is often used to simulate a directory hierarchy in object storage).
 func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *proto.ListCommonPrefixesRequest) (response *proto.ListCommonPrefixesResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	prefixes, err := impl.ListCommonPrefixes(req.Bucket, req.Prefix, req.Delimiter)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.ListCommonPrefixesResponse{Prefixes: prefixes}, nil
@@ -211,19 +212,19 @@ func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *pro
 // ListObjects gets a list of all objects in bucket that have the same prefix.
 func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.ListObjectsRequest) (response *proto.ListObjectsResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	keys, err := impl.ListObjects(req.Bucket, req.Prefix)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.ListObjectsResponse{Keys: keys}, nil
@@ -233,18 +234,18 @@ func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.List
 // bucket.
 func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.DeleteObjectRequest) (response *proto.Empty, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	if err := impl.DeleteObject(req.Bucket, req.Key); err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -253,19 +254,19 @@ func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.Del
 // CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
 func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.CreateSignedURLRequest) (response *proto.CreateSignedURLResponse, err error) {
 	defer func() {
-		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
 		}
 	}()
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	url, err := impl.CreateSignedURL(req.Bucket, req.Key, time.Duration(req.Ttl))
 	if err != nil {
-		return nil, newGRPCError(err)
+		return nil, common.NewGRPCError(err)
 	}
 
 	return &proto.CreateSignedURLResponse{Url: url}, nil

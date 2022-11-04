@@ -21,6 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -39,6 +40,7 @@ type pvRestorer struct {
 	volumeSnapshots         []*volume.Snapshot
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 	snapshotLocationLister  listers.VolumeSnapshotLocationLister
+	credentialFileStore     credentials.FileStore
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -59,7 +61,7 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 
 	log := r.logger.WithFields(logrus.Fields{"persistentVolume": pvName})
 
-	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.snapshotLocationLister)
+	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.snapshotLocationLister, r.credentialFileStore, r.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +105,7 @@ type snapshotInfo struct {
 	location           *api.VolumeSnapshotLocation
 }
 
-func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister) (*snapshotInfo, error) {
+func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister, credentialStore credentials.FileStore, logger logrus.FieldLogger) (*snapshotInfo, error) {
 	var pvSnapshot *volume.Snapshot
 	for _, snapshot := range volumeSnapshots {
 		if snapshot.Spec.PersistentVolumeName == pvName {
@@ -117,6 +119,11 @@ func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volum
 	}
 
 	loc, err := snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).Get(pvSnapshot.Spec.Location)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	// add credential to config
+	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(loc, credentialStore, logger)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

@@ -29,8 +29,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/volumesnapshotter/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -187,7 +187,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
 				volumeSnapshotter       = new(providermocks.VolumeSnapshotter)
-				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]velero.VolumeSnapshotter{
+				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]vsv1.VolumeSnapshotter{
 					tc.expectedProvider: volumeSnapshotter,
 				})
 				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
@@ -217,9 +217,9 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	}
 }
 
-type providerToVolumeSnapshotterMap map[string]velero.VolumeSnapshotter
+type providerToVolumeSnapshotterMap map[string]vsv1.VolumeSnapshotter
 
-func (g providerToVolumeSnapshotterMap) GetVolumeSnapshotter(provider string) (velero.VolumeSnapshotter, error) {
+func (g providerToVolumeSnapshotterMap) GetVolumeSnapshotter(provider string) (vsv1.VolumeSnapshotter, error) {
 	if bs, ok := g[provider]; !ok {
 		return nil, errors.New("volume snapshotter not found for provider")
 	} else {

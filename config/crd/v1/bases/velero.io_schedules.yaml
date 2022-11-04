@@ -16,7 +16,26 @@ spec:
     singular: schedule
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Status of the schedule
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: A Cron expression defining when to run the Backup
+      jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - description: The last time a Backup was run for this schedule
+      jsonPath: .status.lastBackup
+      name: LastBackup
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .spec.paused
+      name: Paused
+      type: boolean
+    name: v1
     schema:
       openAPIV3Schema:
         description: Schedule is a Velero resource that represents a pre-scheduled
@@ -37,6 +56,9 @@ spec:
           spec:
             description: ScheduleSpec defines the specification for a Velero schedule
             properties:
+              paused:
+                description: Paused specifies whether the schedule is paused or not
+                type: boolean
               schedule:
                 description: Schedule is a Cron expression defining when to run the
                   Backup.
@@ -45,9 +67,22 @@ spec:
                 description: Template is the definition of the Backup to be run on
                   the provided schedule
                 properties:
+                  csiSnapshotTimeout:
+                    description: CSISnapshotTimeout specifies the time used to wait
+                      for CSI VolumeSnapshot status turns to ReadyToUse during creation,
+                      before returning error as timeout. The default value is 10 minute.
+                    type: string
+                  defaultVolumesToFsBackup:
+                    description: DefaultVolumesToFsBackup specifies whether pod volume
+                      file system backup should be used for all volumes by default.
+                    nullable: true
+                    type: boolean
                   defaultVolumesToRestic:
-                    description: DefaultVolumesToRestic specifies whether restic should
-                      be used to take a backup of all pod volumes by default.
+                    description: "DefaultVolumesToRestic specifies whether restic
+                      should be used to take a backup of all pod volumes by default.
+                      \n Deprecated: this field is no longer used and will be removed
+                      entirely in future. Use DefaultVolumesToFsBackup instead."
+                    nullable: true
                     type: boolean
                   excludedNamespaces:
                     description: ExcludedNamespaces contains a list of namespaces
@@ -327,6 +362,61 @@ spec:
                           type: string
                         type: object
                     type: object
+                  orLabelSelectors:
+                    description: OrLabelSelectors is list of metav1.LabelSelector
+                      to filter with when adding individual objects to the backup.
+                      If multiple provided they will be joined by the OR operator.
+                      LabelSelector as well as OrLabelSelectors cannot co-exist in
+                      backup request, only one of them can be used.
+                    items:
+                      description: A label selector is a label query over a set of
+                        resources. The result of matchLabels and matchExpressions
+                        are ANDed. An empty label selector matches all objects. A
+                        null label selector matches no objects.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                    nullable: true
+                    type: array
                   orderedResources:
                     additionalProperties:
                       type: string
@@ -393,6 +483,7 @@ spec:
         type: object
     served: true
     storage: true
+    subresources: {}
 status:
   acceptedNames:
     kind: ""

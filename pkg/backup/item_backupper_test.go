@@ -131,6 +131,36 @@ func Test_zoneFromPVNodeAffinity(t *testing.T) {
 			wantKey:   "topology.disk.csi.azure.com/zone",
 			wantValue: "us-central",
 		},
+		{
+			/* an valid example of node affinity in a GKE's regional PV
+			nodeAffinity:
+			  required:
+			    nodeSelectorTerms:
+			    - matchExpressions:
+			      - key: topology.gke.io/zone
+			        operator: In
+			        values:
+			        - us-central1-a
+			    - matchExpressions:
+			      - key: topology.gke.io/zone
+			        operator: In
+			        values:
+			        - us-central1-c
+			*/
+			name: "Volume with multiple valid keys, and provider is gke, returns all valid entries's first zone value",
+			pv: builder.ForPersistentVolume("multi-matching-pv").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-central1-c").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-east-2c", "us-east-2b").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "europe-north1-a").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.gke.io/zone",
+			wantValue: "us-central1-c__us-east-2c__europe-north1-a",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

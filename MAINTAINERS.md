@@ -6,14 +6,14 @@
 
 | Maintainer | GitHub ID | Affiliation |
 | --------------- | --------- | ----------- |
-| Bridget McErlean | [zubron](https://github.com/zubron) | [VMware](https://www.github.com/vmware/) |
 | Dave Smith-Uchida | [dsu-igeek](https://github.com/dsu-igeek) | [Kasten](https://github.com/kastenhq/) |
-| JenTing Hsiao | [jenting](https://github.com/jenting) | [SUSE](https://github.com/SUSE/)
 | Scott Seago | [sseago](https://github.com/sseago) | [OpenShift](https://github.com/openshift)
 | Daniel Jiang | [reasonerjt](https://github.com/reasonerjt) | [VMware](https://www.github.com/vmware/)
 | Wenkai Yin | [ywk253100](https://github.com/ywk253100) | [VMware](https://www.github.com/vmware/) |
 | Xun Jiang | [blackpiglet](https://github.com/blackpiglet) | [VMware](https://www.github.com/vmware/) |
 | Ming Qiu | [qiuming-best](https://github.com/qiuming-best) | [VMware](https://www.github.com/vmware/) |
+| Shubham Pampattiwar | [shubham-pampattiwar](https://github.com/shubham-pampattiwar) | [OpenShift](https://github.com/openshift)
+| Yonghui Li | [Lyndon-Li](https://github.com/Lyndon-Li) | [VMware](https://www.github.com/vmware/) |
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
@@ -23,14 +23,17 @@
 * Nolan Brubaker ([nrb](https://github.com/nrb))
 * Ashish Amarnath ([ashish-amarnath](https://github.com/ashish-amarnath))
 * Carlisia Thompson ([carlisia](https://github.com/carlisia))
+* Bridget McErlean ([zubron](https://github.com/zubron))
+* JenTing Hsiao ([jenting](https://github.com/jenting))
 
 ## Velero Contributors & Stakeholders
 
 | Feature Area | Lead |
 | ----------------------------- | :---------------------: |
-| Architect | Dave Smith-Uchida (dsu-igeek) |
-| Technical Lead | Daniel Jiang (reasonerjt) |
+| Architect | Dave Smith-Uchida [dsu-igeek](https://github.com/dsu-igeek) |
+| Technical Lead | Daniel Jiang [reasonerjt](https://github.com/reasonerjt) |
 | Kubernetes CSI Liaison |  |
-| Deployment | JenTing Hsiao (jenting) |
-| Community Management | Jonas Rosland (jonasrosland) |
-| Product Management | Eleanor Millman (eleanor-millman) |
+| Deployment |  |
+| Community Management | Orlin Vasilev [OrlinVasilev](https://github.com/OrlinVasilev) |
+| Product Management | Pradeep Kumar Chaturvedi [pradeepkchaturvedi](https://github.com/pradeepkchaturvedi) |
+

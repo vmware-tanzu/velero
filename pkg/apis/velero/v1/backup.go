@@ -59,6 +59,15 @@ type BackupSpec struct {
 	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
+	// OrLabelSelectors is list of metav1.LabelSelector to filter with
+	// when adding individual objects to the backup. If multiple provided
+	// they will be joined by the OR operator. LabelSelector as well as
+	// OrLabelSelectors cannot co-exist in backup request, only one of them
+	// can be used.
+	// +optional
+	// +nullable
+	OrLabelSelectors []*metav1.LabelSelector `json:"orLabelSelectors,omitempty"`
+
 	// SnapshotVolumes specifies whether to take cloud snapshots
 	// of any PV's referenced in the set of objects included
 	// in the Backup.
@@ -91,9 +100,17 @@ type BackupSpec struct {
 
 	// DefaultVolumesToRestic specifies whether restic should be used to take a
 	// backup of all pod volumes by default.
+	//
+	// Deprecated: this field is no longer used and will be removed entirely in future. Use DefaultVolumesToFsBackup instead.
 	// +optional
-	// + nullable
+	// +nullable
 	DefaultVolumesToRestic *bool `json:"defaultVolumesToRestic,omitempty"`
+
+	// DefaultVolumesToFsBackup specifies whether pod volume file system backup should be used
+	// for all volumes by default.
+	// +optional
+	// +nullable
+	DefaultVolumesToFsBackup *bool `json:"defaultVolumesToFsBackup,omitempty"`
 
 	// OrderedResources specifies the backup order of resources of specific Kind.
 	// The map key is the Kind name and value is a list of resource names separated by commas.
@@ -101,6 +118,12 @@ type BackupSpec struct {
 	// +optional
 	// +nullable
 	OrderedResources map[string]string `json:"orderedResources,omitempty"`
+
+	// CSISnapshotTimeout specifies the time used to wait for CSI VolumeSnapshot status turns to
+	// ReadyToUse during creation, before returning error as timeout.
+	// The default value is 10 minute.
+	// +optional
+	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.
@@ -292,6 +315,10 @@ type BackupStatus struct {
 	// +optional
 	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted,omitempty"`
 
+	// FailureReason is an error that caused the entire backup to fail.
+	// +optional
+	FailureReason string `json:"failureReason,omitempty"`
+
 	// Warnings is a count of all warning messages that were generated during
 	// execution of the backup. The actual warnings are in the backup's log
 	// file in object storage.
@@ -310,6 +337,16 @@ type BackupStatus struct {
 	// +optional
 	// +nullable
 	Progress *BackupProgress `json:"progress,omitempty"`
+
+	// CSIVolumeSnapshotsAttempted is the total number of attempted
+	// CSI VolumeSnapshots for this backup.
+	// +optional
+	CSIVolumeSnapshotsAttempted int `json:"csiVolumeSnapshotsAttempted,omitempty"`
+
+	// CSIVolumeSnapshotsCompleted is the total number of successfully
+	// completed CSI VolumeSnapshots for this backup.
+	// +optional
+	CSIVolumeSnapshotsCompleted int `json:"csiVolumeSnapshotsCompleted,omitempty"`
 }
 
 // BackupProgress stores information about the progress of a Backup's execution.
