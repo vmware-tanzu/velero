@@ -21,6 +21,16 @@ jobs:
         go-version: 1.18
       id: go
 
+    - name: Set up GCloud  
+      uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+      with:
+        version: '285.0.0'
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_email: ${{ secrets.GCP_SA_EMAIL }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
+    - run: gcloud info
+
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
@@ -64,7 +74,7 @@ jobs:
         password: '${{ secrets.GCR_SA_KEY }}'
 
     # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
-    - name: Publish container image to GCR
-      if: github.repository == 'vmware-tanzu/velero'
+    - name: Publish container image to GCP
       run: |
-        REGISTRY=gcr.io/velero-gcp ./hack/docker-push.sh
+        echo 1 > 1.txt
+        uploader  1.txt velero-builds
