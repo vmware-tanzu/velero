@@ -46,32 +46,6 @@ jobs:
       with:
         version: latest
 
-    - name: Build
-      run: make local
-
-    - name: Test
-      run: make test
-
-    - name: Upload test coverage
-      uses: codecov/codecov-action@v2
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: coverage.out
-        verbose: true
-
-    # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
-    - name: Publish container image
-      if: github.repository == 'vmware-tanzu/velero'
-      run: |
-        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-        ./hack/docker-push.sh
-
-    # Use the JSON key in secret to login gcr.io
-    - uses: 'docker/login-action@v1'
-      with:
-        registry: 'gcr.io' # or REGION.docker.pkg.dev
-        username: '_json_key'
-        password: '${{ secrets.GCR_SA_KEY }}'
 
     # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
     - name: Publish container image to GCP
