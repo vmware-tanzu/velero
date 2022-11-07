@@ -5,9 +5,8 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-
-  # Dependencies listed in .github/workflows/*.yml
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    labels:
+      - "kind/changelog-not-required"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
