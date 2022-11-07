@@ -23,9 +23,9 @@ jobs:
 
     - uses: actions/checkout@v2
     - name: Set up GCloud  
-      uses: GoogleCloudPlatform/github-actions/setup-gcloud@main
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v0'
       with:
-        version: '285.0.0'
         project_id: ${{ secrets.GCP_PROJECT_ID }}
         service_account_email: ${{ secrets.GCP_SA_EMAIL }}
         service_account_key: ${{ secrets.GCP_SA_KEY }}
