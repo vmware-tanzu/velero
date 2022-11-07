@@ -21,6 +21,7 @@ jobs:
         go-version: 1.18
       id: go
 
+    - uses: actions/checkout@v2
     - name: Set up GCloud  
       uses: GoogleCloudPlatform/github-actions/setup-gcloud@main
       with:
