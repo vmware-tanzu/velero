@@ -18,12 +18,12 @@ package restic
 
 const (
 	// GCP specific environment variable
-	gcpCredentialsFileEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
+	gcpCredentialsFileEnvVar = "GOOGLE_APPLICATION_CREDENTIALS" //nolint:gosec
 )
 
 // getGCPResticEnvVars gets the environment variables that restic relies
 // on based on info in the provided object storage location config map.
-func getGCPResticEnvVars(config map[string]string) (map[string]string, error) {
+func getGCPResticEnvVars(config map[string]string) (map[string]string, error) { //nolint:unparam
 	result := make(map[string]string)
 
 	if credentialsFile, ok := config[credentialsFileKey]; ok {

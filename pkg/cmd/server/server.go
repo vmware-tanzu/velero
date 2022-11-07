@@ -594,7 +594,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
 		s.logger.Infof("Starting metric server at address [%s]", s.metricsAddress)
-		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil { //nolint:gosec
 			s.logger.Fatalf("Failed to start metric server at [%s]: %v", s.metricsAddress, err)
 		}
 	}()
@@ -611,7 +611,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	csiVSLister, csiVSCLister, csiVSClassLister := s.getCSISnapshotListers()
 
-	backupSyncControllerRunInfo := func() controllerRunInfo {
+	backupSyncControllerRunInfo := func() controllerRunInfo { //nolint:typecheck
 		backupSyncContoller := controller.NewBackupSyncController(
 			s.veleroClient.VeleroV1(),
 			s.mgr.GetClient(),
@@ -636,7 +636,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	backupTracker := controller.NewBackupTracker()
 
-	backupControllerRunInfo := func() controllerRunInfo {
+	backupControllerRunInfo := func() controllerRunInfo { //nolint:typecheck
 		backupper, err := backup.NewKubernetesBackupper(
 			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
@@ -680,7 +680,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	gcControllerRunInfo := func() controllerRunInfo {
+	gcControllerRunInfo := func() controllerRunInfo { //nolint:typecheck
 		gcController := controller.NewGCController(
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().Backups(),
@@ -696,7 +696,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	restoreControllerRunInfo := func() controllerRunInfo {
+	restoreControllerRunInfo := func() controllerRunInfo { //nolint:typecheck
 		restorer, err := restore.NewKubernetesRestorer(
 			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
@@ -906,7 +906,7 @@ func (s *server) runProfiler() {
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
+	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil { //nolint:gosec
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
 }
@@ -964,7 +964,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 		return
 	}
 
-	for _, backup := range backups.Items {
+	for i, backup := range backups.Items {
 		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
@@ -973,7 +973,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 		updated.Status.Phase = velerov1api.BackupPhaseFailed
 		updated.Status.FailureReason = fmt.Sprintf("get a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backup)); err != nil {
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backups.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
 			continue
 		}
@@ -987,7 +987,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		log.WithError(errors.WithStack(err)).Error("failed to list restores")
 		return
 	}
-	for _, restore := range restores.Items {
+	for i, restore := range restores.Items {
 		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
 			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
 			continue
@@ -996,7 +996,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		updated.Status.Phase = velerov1api.RestorePhaseFailed
 		updated.Status.FailureReason = fmt.Sprintf("get a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restore)); err != nil {
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restores.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
 			continue
 		}

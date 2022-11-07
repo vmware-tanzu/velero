@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:unparam
 package restic
 
 const (
 	// AWS specific environment variable
 	awsProfileEnvVar         = "AWS_PROFILE"
 	awsProfileKey            = "profile"
-	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE"
+	awsCredentialsFileEnvVar = "AWS_SHARED_CREDENTIALS_FILE" //nolint:gosec
 )
 
 // getS3ResticEnvVars gets the environment variables that restic

@@ -54,7 +54,7 @@ func newGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message
 
 // newGRPCError is a convenience function for creating a new gRPC error
 // with code = codes.Unknown
-func newGRPCError(err error, details ...goproto.Message) error {
+func newGRPCError(err error, details ...goproto.Message) error { //nolint:unparam
 	return newGRPCErrorWithCode(err, codes.Unknown, details...)
 }
 

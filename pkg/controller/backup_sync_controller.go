@@ -149,7 +149,7 @@ func (c *backupSyncController) run() {
 	pluginManager := c.newPluginManager(c.logger)
 	defer pluginManager.CleanupClients()
 
-	for _, location := range locations {
+	for i, location := range locations {
 		log := c.logger.WithField("backupLocation", location.Name)
 
 		syncPeriod := c.defaultBackupSyncPeriod
@@ -177,7 +177,7 @@ func (c *backupSyncController) run() {
 
 		log.Debug("Checking backup location for backups to sync into cluster")
 
-		backupStore, err := c.backupStoreGetter.Get(&location, pluginManager, log)
+		backupStore, err := c.backupStoreGetter.Get(&locations[i], pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting backup store for this location")
 			continue
@@ -337,7 +337,7 @@ func (c *backupSyncController) run() {
 		// update the location's last-synced time field
 		statusPatch := client.MergeFrom(location.DeepCopy())
 		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := c.kbClient.Patch(context.Background(), &location, statusPatch); err != nil {
+		if err := c.kbClient.Patch(context.Background(), &locations[i], statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}

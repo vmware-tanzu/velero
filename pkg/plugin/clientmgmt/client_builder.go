@@ -76,7 +76,7 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(framework.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(framework.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
-		Cmd:    exec.Command(b.commandName, b.commandArgs...),
+		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint
 	}
 }
 

@@ -81,7 +81,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	}
 
 	// we need config["resourceGroup"], config["storageAccount"]
-	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+	if err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return "", env, errors.Wrap(err, "unable to get all required config values")
 	}
 
@@ -140,7 +140,7 @@ func getAzureResticEnvVars(config map[string]string) (map[string]string, error) 
 		return nil, err
 	}
 
-	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
+	if err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
 		return nil, errors.Wrap(err, "unable to get all required config values")
 	}
 
@@ -190,7 +190,7 @@ func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
 	return &env, errors.WithStack(err)
 }
 
-func getRequiredValues(getValue func(string) string, keys ...string) (map[string]string, error) {
+func getRequiredValues(getValue func(string) string, keys ...string) error {
 	missing := []string{}
 	results := map[string]string{}
 
@@ -203,8 +203,8 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	}
 
 	if len(missing) > 0 {
-		return nil, errors.Errorf("the following keys do not have values: %s", strings.Join(missing, ", "))
+		return errors.Errorf("the following keys do not have values: %s", strings.Join(missing, ", "))
 	}
 
-	return results, nil
+	return nil
 }
