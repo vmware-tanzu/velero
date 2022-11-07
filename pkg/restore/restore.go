@@ -1029,7 +1029,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 			// Check to see if the claimRef.namespace field needs to be remapped,
 			// and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
+			err = remapClaimRefNS(ctx, obj)
 			if err != nil {
 				errs.Add(namespace, err)
 				return warnings, errs
@@ -1119,7 +1119,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
 			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
+			err = remapClaimRefNS(ctx, obj)
 			if err != nil {
 				errs.Add(namespace, err)
 				return warnings, errs
@@ -1529,37 +1529,37 @@ func shouldRenamePV(ctx *restoreContext, obj *unstructured.Unstructured, client 
 // remapClaimRefNS remaps a PersistentVolume's claimRef.Namespace based on a
 // restore's NamespaceMappings, if necessary. Returns true if the namespace was
 // remapped, false if it was not required.
-func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool, error) {
+func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) error {
 	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
 		ctx.log.Debug("Persistent volume does not need to have the claimRef.namespace remapped because restore is not remapping any namespaces")
-		return false, nil
+		return nil
 	}
 
 	// Conversion to the real type here is more readable than all the error checking
 	// involved with reading each field individually.
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pv); err != nil {
-		return false, errors.Wrapf(err, "error converting persistent volume to structured")
+		return errors.Wrapf(err, "error converting persistent volume to structured")
 	}
 
 	if pv.Spec.ClaimRef == nil {
 		ctx.log.Debugf("Persistent volume does not need to have the claimRef.namespace remapped because it's not claimed")
-		return false, nil
+		return nil
 	}
 
 	targetNS, ok := ctx.restore.Spec.NamespaceMapping[pv.Spec.ClaimRef.Namespace]
 
 	if !ok {
 		ctx.log.Debugf("Persistent volume does not need to have the claimRef.namespace remapped because it's not claimed by a PVC in a namespace that's being remapped")
-		return false, nil
+		return nil
 	}
 
 	err := unstructured.SetNestedField(obj.Object, targetNS, "spec", "claimRef", "namespace")
 	if err != nil {
-		return false, err
+		return err
 	}
 	ctx.log.Debug("Persistent volume's namespace was updated")
-	return true, nil
+	return nil
 }
 
 // restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod

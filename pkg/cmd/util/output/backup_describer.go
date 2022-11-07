@@ -126,7 +126,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	}
 	d.Printf("\tIncluded:\t%s\n", s)
 	if len(spec.ExcludedNamespaces) == 0 {
-		s = "<none>"
+		s = emptyDisplay
 	} else {
 		s = strings.Join(spec.ExcludedNamespaces, ", ")
 	}
@@ -141,7 +141,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	}
 	d.Printf("\tIncluded:\t%s\n", s)
 	if len(spec.ExcludedResources) == 0 {
-		s = "<none>"
+		s = emptyDisplay
 	} else {
 		s = strings.Join(spec.ExcludedResources, ", ")
 	}
@@ -150,7 +150,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(spec.IncludeClusterResources, "excluded", "included", "auto"))
 
 	d.Println()
-	s = "<none>"
+	s = emptyDisplay
 	if spec.LabelSelector != nil {
 		s = metav1.FormatLabelSelector(spec.LabelSelector)
 	}
@@ -167,7 +167,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 
 	d.Println()
 	if len(spec.Hooks.Resources) == 0 {
-		d.Printf("Hooks:\t<none>\n")
+		d.Printf("Hooks:\t" + emptyDisplay + "\n")
 	} else {
 		d.Printf("Hooks:\n")
 		d.Printf("\tResources:\n")
@@ -182,7 +182,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			}
 			d.Printf("\t\t\t\tIncluded:\t%s\n", s)
 			if len(spec.ExcludedNamespaces) == 0 {
-				s = "<none>"
+				s = emptyDisplay
 			} else {
 				s = strings.Join(spec.ExcludedNamespaces, ", ")
 			}
@@ -197,14 +197,14 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			}
 			d.Printf("\t\t\t\tIncluded:\t%s\n", s)
 			if len(spec.ExcludedResources) == 0 {
-				s = "<none>"
+				s = emptyDisplay
 			} else {
 				s = strings.Join(spec.ExcludedResources, ", ")
 			}
 			d.Printf("\t\t\t\tExcluded:\t%s\n", s)
 
 			d.Println()
-			s = "<none>"
+			s = emptyDisplay
 			if backupResourceHookSpec.LabelSelector != nil {
 				s = metav1.FormatLabelSelector(backupResourceHookSpec.LabelSelector)
 			}

@@ -14,7 +14,7 @@ https://velero.io/docs/v1.9/
 https://velero.io/docs/v1.9/upgrade-to-1.9/
 
 ### All changes
-
+  * Bump up golang version to 1.18.8 (#5558, @qiuming-best) 
   * Enhance the restore priorities list to support specifying the low prioritized resources that need to be restored in the last (#5529, @ywk253100)
   * Fix v1.9.3 CSI VolumeSnapshot status duplicate issue. (#5518, @blackpiglet)
   * Bump up the distroless image to the latest version (#5500, @ywk253100)

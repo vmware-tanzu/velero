@@ -151,7 +151,7 @@ func sortResourcesByOrder(log logrus.FieldLogger, items []*kubernetesResource, o
 }
 
 // getOrderedResourcesForType gets order of resourceType from orderResources.
-func getOrderedResourcesForType(log logrus.FieldLogger, orderedResources map[string]string, resourceType string) []string {
+func getOrderedResourcesForType(orderedResources map[string]string, resourceType string) []string {
 	if orderedResources == nil {
 		return nil
 	}
@@ -175,7 +175,7 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 		clusterScoped = !resource.Namespaced
 	)
 
-	orders := getOrderedResourcesForType(log, r.backupRequest.Backup.Spec.OrderedResources, resource.Name)
+	orders := getOrderedResourcesForType(r.backupRequest.Backup.Spec.OrderedResources, resource.Name)
 	// Getting the preferred group version of this resource
 	preferredGVR, _, err := r.discoveryHelper.ResourceFor(gr.WithVersion(""))
 	if err != nil {
