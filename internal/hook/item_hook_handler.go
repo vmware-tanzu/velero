@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/gofrs/uuid"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -377,7 +377,7 @@ func getInitContainerFromAnnotation(podName string, annotations map[string]strin
 		log.Infof("RestoreHook init container for pod %s is using container's default entrypoint", podName, containerImage)
 	}
 	if containerName == "" {
-		uid, err := uuid.NewV4()
+		uid, err := uuid.NewRandom()
 		uuidStr := "deadfeed"
 		if err != nil {
 			log.Errorf("Failed to generate UUID for container name")

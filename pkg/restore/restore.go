@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	uuid "github.com/gofrs/uuid"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -145,7 +145,7 @@ func NewKubernetesRestorer(
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
 		pvRenamer: func(string) (string, error) {
-			veleroCloneUuid, err := uuid.NewV4()
+			veleroCloneUuid, err := uuid.NewRandom()
 			if err != nil {
 				return "", errors.WithStack(err)
 			}
