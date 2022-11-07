@@ -22,8 +22,7 @@ jobs:
       id: go
 
     - uses: actions/checkout@v2
-    - name: Set up GCloud  
-    - name: 'Set up Cloud SDK'
+    - name: Set up GCloud
       uses: 'google-github-actions/setup-gcloud@v0'
       with:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
