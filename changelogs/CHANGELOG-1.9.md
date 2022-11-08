@@ -15,6 +15,7 @@ https://velero.io/docs/v1.9/upgrade-to-1.9/
 
 ### All changes
   * Fix controller problematic log output (#5570, @qiuming-best) 
+  * Add compile restic binary for CVE fix (#5564, @qiuming-best) 
   * Bump up golang version to 1.18.8 (#5558, @qiuming-best) 
   * Enhance the restore priorities list to support specifying the low prioritized resources that need to be restored in the last (#5529, @ywk253100)
   * Fix v1.9.3 CSI VolumeSnapshot status duplicate issue. (#5518, @blackpiglet)
