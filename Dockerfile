@@ -29,8 +29,6 @@ WORKDIR /go/src/github.com/vmware-tanzu/velero
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
-RUN apt-get update && apt-get install -y bzip2
-
 FROM --platform=$BUILDPLATFORM builder-env as builder
 
 ARG TARGETOS
@@ -45,7 +43,7 @@ ENV GOOS=${TARGETOS} \
     GOARM=${TARGETVARIANT}
 
 RUN mkdir -p /output/usr/bin && \
-    bash ./hack/download-restic.sh && \
+    bash ./hack/build-restic.sh && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
