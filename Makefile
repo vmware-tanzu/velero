@@ -64,7 +64,6 @@ VERSION ?= main
 
 TAG_LATEST ?= false
 
-SAVE_IMAGE ?= true
 ifeq ($(TAG_LATEST), true)
 	IMAGE_TAGS ?= $(IMAGE):$(VERSION) $(IMAGE):latest
 else
@@ -210,7 +209,7 @@ endif
 	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
 	-f $(VELERO_DOCKERFILE) .
 	@echo "container: $(IMAGE):$(VERSION)"
-ifeq ($(SAVE_IMAGE), true)
+ifeq ($(BUILDX_OUTPUT_TYPE), "registry")
 	@docker pull $(IMAGE):$(VERSION)
 	@docker save $(IMAGE):$(VERSION) -o $(BIN)-$(VERSION).tar
 	@gzip $(BIN)-$(VERSION).tar
