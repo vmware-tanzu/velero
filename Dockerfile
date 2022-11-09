@@ -43,8 +43,8 @@ ENV GOOS=${TARGETOS} \
     GOARM=${TARGETVARIANT}
 
 RUN mkdir -p /output/usr/bin && \
-    bash ./hack/build-restic.sh && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
+    bash ./hack/build-restic.sh && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
