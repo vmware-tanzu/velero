@@ -18,6 +18,7 @@ package kube
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -108,4 +109,11 @@ func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHand
 	}, p.period, ctx.Done())
 
 	return nil
+}
+
+func (p *PeriodicalEnqueueSource) String() string {
+	if p.objList != nil {
+		return fmt.Sprintf("kind source: %T", p.objList)
+	}
+	return "kind source: unknown type"
 }
