@@ -51,7 +51,7 @@ jobs:
       - name: Build Velero Image
         if: steps.image-cache.outputs.cache-hit != 'true'
         run: |
-          SAVE_IMAGE=false IMAGE=velero VERSION=pr-test make container
+          IMAGE=velero VERSION=pr-test make container
           docker save velero:pr-test -o ./velero.tar
   # Run E2E test against all kubernetes versions on kind
   run-e2e-test:
