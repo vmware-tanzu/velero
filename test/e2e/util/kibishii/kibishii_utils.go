@@ -51,7 +51,7 @@ var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
 var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
 
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(client TestClient, veleroCfg VerleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
+func RunKibishiiTests(client TestClient, veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots bool) error {
 	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 	veleroCLI := VeleroCfg.VeleroCLI
@@ -174,7 +174,8 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 }
 
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
-	kibishiiGenerateCmd := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
+	timeout, _ := context.WithTimeout(context.Background(), time.Minute*10)
+	kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 		"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 		strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
 		strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum), strconv.Itoa(kibishiiData.ExpectedNodes))
@@ -189,7 +190,7 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 }
 
 func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
-	timeout, _ := context.WithTimeout(context.Background(), time.Minute*5)
+	timeout, _ := context.WithTimeout(context.Background(), time.Minute*10)
 	kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 		"/usr/local/bin/verify.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 		strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),

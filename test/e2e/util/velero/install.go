@@ -49,7 +49,7 @@ type installOptions struct {
 	RestoreHelperImage     string
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnapshots bool) error {
+func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, useVolumeSnapshots bool) error {
 	if veleroCfg.CloudProvider != "kind" {
 		if veleroCfg.ObjectStoreProvider != "" {
 			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
@@ -103,6 +103,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VerleroConfig, useVolumeSnaps
 		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
 	})
 	if err != nil {
+		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
 

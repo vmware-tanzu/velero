@@ -29,6 +29,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
+
 	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
@@ -91,7 +92,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			UUIDgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
 			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
-
 			if veleroCLI2Version.VeleroCLI == "" {
 				//Assume tag of velero server image is identical to velero CLI version
 				//Download velero CLI if it's empty according to velero CLI version
@@ -200,7 +200,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfg.GCFrequency = ""
 				tmpCfg.UseNodeAgent = !useVolumeSnapshots
 				tmpCfg.UseRestic = false
-				Expect(VeleroInstall(context.Background(), &tmpCfg, useVolumeSnapshots)).To(Succeed())
+				tmpCfg.UploaderType = "restic"
+				Expect(VeleroUpgrade(context.Background(), tmpCfg)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
 					tmpCfg.VeleroVersion)).To(Succeed())
 			})

@@ -26,9 +26,9 @@ import (
 
 var UUIDgen uuid.UUID
 
-var VeleroCfg VerleroConfig
+var VeleroCfg VeleroConfig
 
-type VerleroConfig struct {
+type VeleroConfig struct {
 	VeleroCLI                string
 	VeleroImage              string
 	VeleroVersion            string

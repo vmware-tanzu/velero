@@ -96,6 +96,13 @@ var pluginsMatrix = map[string]map[string][]string{
 		"gcp":       {"velero/velero-plugin-for-gcp:v1.5.0"},
 		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.5.0", "velero/velero-plugin-for-csi:v0.3.0"},
 	},
+	"v1.10": {
+		"aws":       {"velero/velero-plugin-for-aws:v1.6.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.6.0"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.6.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.4.1"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.6.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.6.0", "velero/velero-plugin-for-csi:v0.4.0"},
+	},
 	"main": {
 		"aws":       {"velero/velero-plugin-for-aws:main"},
 		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
@@ -706,23 +713,30 @@ func CheckVeleroVersion(ctx context.Context, veleroCLI string, expectedVer strin
 }
 
 func InstallVeleroCLI(version string) (string, error) {
+	var tempVeleroCliDir string
 	name := "velero-" + version + "-" + runtime.GOOS + "-" + runtime.GOARCH
 	postfix := ".tar.gz"
 	tarball := name + postfix
-	tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
-	if err != nil {
-		return "", errors.WithMessagef(err, "failed to get Velero CLI tarball")
-	}
-	tempVeleroCliDir, err := ioutil.TempDir("", "velero-test")
-	if err != nil {
-		return "", errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
-	}
+	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+		tempFile, err := getVeleroCliTarball("https://github.com/vmware-tanzu/velero/releases/download/" + version + "/" + tarball)
+		if err != nil {
+			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
+		}
+		tempVeleroCliDir, err = ioutil.TempDir("", "velero-test")
+		if err != nil {
+			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
+		}
 
-	cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
-	defer os.Remove(tempFile.Name())
+		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
+		defer os.Remove(tempFile.Name())
 
-	if _, err := cmd.Output(); err != nil {
-		return "", errors.WithMessagef(err, "failed to extract file from velero CLI tarball")
+		if _, err := cmd.Output(); err != nil {
+			return false, errors.WithMessagef(err, "failed to extract file from velero CLI tarball")
+		}
+		return true, nil
+	})
+	if err != nil {
+		return "", errors.WithMessagef(err, "failed to install velero CLI")
 	}
 	return tempVeleroCliDir + "/" + name + "/velero", nil
 }
@@ -866,22 +880,27 @@ func GetBackupsFromBsl(ctx context.Context, veleroCLI, bslName string) ([]string
 	if strings.TrimSpace(bslName) != "" {
 		args1 = append(args1, "-l", "velero.io/storage-location="+bslName)
 	}
-	CmdLine1 := &common.OsCommandLine{
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
 		Cmd:  veleroCLI,
 		Args: args1,
 	}
+	cmds = append(cmds, cmd)
 
-	CmdLine2 := &common.OsCommandLine{
+	cmd = &common.OsCommandLine{
 		Cmd:  "awk",
 		Args: []string{"{print $1}"},
 	}
+	cmds = append(cmds, cmd)
 
-	CmdLine3 := &common.OsCommandLine{
+	cmd = &common.OsCommandLine{
 		Cmd:  "tail",
 		Args: []string{"-n", "+2"},
 	}
+	cmds = append(cmds, cmd)
 
-	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+	return common.GetListByCmdPipes(ctx, cmds)
 }
 
 func GetScheduledBackupsCreationTime(ctx context.Context, veleroCLI, bslName, scheduleName string) ([]string, error) {
@@ -903,22 +922,27 @@ func GetBackupsCreationTime(ctx context.Context, veleroCLI, bslName string) ([]s
 	if strings.TrimSpace(bslName) != "" {
 		args1 = append(args1, "-l", "velero.io/storage-location="+bslName)
 	}
-	CmdLine1 := &common.OsCommandLine{
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
 		Cmd:  veleroCLI,
 		Args: args1,
 	}
+	cmds = append(cmds, cmd)
 
-	CmdLine2 := &common.OsCommandLine{
+	cmd = &common.OsCommandLine{
 		Cmd:  "awk",
 		Args: []string{"{print " + createdTime + "}"},
 	}
+	cmds = append(cmds, cmd)
 
-	CmdLine3 := &common.OsCommandLine{
+	cmd = &common.OsCommandLine{
 		Cmd:  "tail",
 		Args: []string{"-n", "+2"},
 	}
+	cmds = append(cmds, cmd)
 
-	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+	return common.GetListByCmdPipes(ctx, cmds)
 }
 
 func GetAllBackups(ctx context.Context, veleroCLI string) ([]string, error) {
@@ -982,25 +1006,29 @@ func BackupRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targe
 }
 
 func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace string) ([]string, error) {
-	CmdLine1 := &common.OsCommandLine{
+	cmds := []*common.OsCommandLine{}
+	cmd := &common.OsCommandLine{
 		Cmd:  "kubectl",
 		Args: []string{"get", "-n", veleroNamespace, "BackupRepositories"},
 	}
+	cmds = append(cmds, cmd)
 
-	CmdLine2 := &common.OsCommandLine{
+	cmd = &common.OsCommandLine{
 		Cmd:  "grep",
 		Args: []string{targetNamespace},
 	}
+	cmds = append(cmds, cmd)
 
-	CmdLine3 := &common.OsCommandLine{
+	cmd = &common.OsCommandLine{
 		Cmd:  "awk",
 		Args: []string{"{print $1}"},
 	}
+	cmds = append(cmds, cmd)
 
-	return common.GetListBy2Pipes(ctx, *CmdLine1, *CmdLine2, *CmdLine3)
+	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetSnapshotCheckPoint(client TestClient, VeleroCfg VerleroConfig, expectCount int, namespaceBackedUp, backupName string, kibishiiPodNameList []string) (SnapshotCheckPoint, error) {
+func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, kibishiiPodNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
 
 	snapshotCheckPoint.ExpectCount = expectCount
@@ -1080,4 +1108,144 @@ func GetSchedule(ctx context.Context, veleroNamespace, scheduleName string) (str
 		return "", errors.Wrap(err, fmt.Sprintf("failed to run command %s", checkSnapshotCmd))
 	}
 	return stdout, err
+}
+
+func VeleroUpgrade(ctx context.Context, veleroCfg VeleroConfig) error {
+	crd, err := ApplyCRDs(ctx, veleroCfg.VeleroCLI)
+	if err != nil {
+		return errors.Wrap(err, "Fail to Apply CRDs")
+	}
+	fmt.Println(crd)
+	deploy, err := UpdateVeleroDeployment(ctx, veleroCfg)
+	if err != nil {
+		return errors.Wrap(err, "Fail to update Velero deployment")
+	}
+	fmt.Println(deploy)
+	if veleroCfg.UseNodeAgent {
+		dsjson, err := KubectlGetDsJson(veleroCfg.VeleroNamespace)
+		if err != nil {
+			return errors.Wrap(err, "Fail to update Velero deployment")
+		}
+
+		err = DeleteVeleroDs(ctx)
+		if err != nil {
+			return errors.Wrap(err, "Fail to delete Velero ds")
+		}
+		update, err := UpdateNodeAgent(ctx, veleroCfg, dsjson)
+		fmt.Println(update)
+		if err != nil {
+			return errors.Wrap(err, "Fail to update node agent")
+		}
+	}
+	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent)
+}
+func ApplyCRDs(ctx context.Context, veleroCLI string) ([]string, error) {
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  veleroCLI,
+		Args: []string{"install", "--crds-only", "--dry-run", "-o", "yaml"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"apply", "-f", "-"},
+	}
+	cmds = append(cmds, cmd)
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func UpdateVeleroDeployment(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "deploy", "-n", veleroCfg.VeleroNamespace, "-ojson"},
+	}
+	cmds = append(cmds, cmd)
+	var args string
+	if veleroCfg.CloudProvider == "vsphere" {
+		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"harbor-repo.vmware.com\\/velero_ci\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
+	} else {
+		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"velero\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
+	}
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{args},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{fmt.Sprintf("s#\\\"server\\\",#\\\"server\\\",\\\"--uploader-type=%s\\\",#g", veleroCfg.UploaderType)},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{"s#default-volumes-to-restic#default-volumes-to-fs-backup#g"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{"s#default-restic-prune-frequency#default-repo-maintain-frequency#g"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{"s#restic-timeout#fs-backup-timeout#g"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"apply", "-f", "-"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func UpdateNodeAgent(ctx context.Context, veleroCfg VeleroConfig, dsjson string) ([]string, error) {
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  "echo",
+		Args: []string{dsjson},
+	}
+	cmds = append(cmds, cmd)
+	var args string
+	if veleroCfg.CloudProvider == "vsphere" {
+		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"harbor-repo.vmware.com\\/velero_ci\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
+	} else {
+		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"velero\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
+	}
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{args},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{"s#\\\"name\\\"\\: \\\"restic\\\"#\\\"name\\\"\\: \\\"node-agent\\\"#g"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "sed",
+		Args: []string{"s#\\\"restic\\\",#\\\"node-agent\\\",#g"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"create", "-f", "-"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
 }
