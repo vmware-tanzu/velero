@@ -51,6 +51,8 @@ toc:
         url: /self-signed-certificates
       - page: Changing RBAC permissions
         url: /rbac
+      - page: Behind proxy
+        url: /proxy
   - title: Plugins
     subfolderitems:
       - page: Overview
