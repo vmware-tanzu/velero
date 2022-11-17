@@ -347,9 +347,9 @@ to be defined by its pod.
 - Even though the backup data could be incrementally preserved, for a single file data, FSB leverages on deduplication 
 to find the difference to be saved. This means that large files (such as ones storing a database) will take a long time 
 to scan for data deduplication, even if the actual difference is small.
-- You may need to [customize the resource limits](/docs/main/customize-installation/#customize-resource-requests-and-limits) 
+- You may need to [customize the resource limits](customize-installation/#customize-resource-requests-and-limits) 
 to make sure backups complete successfully for massive small files or large backup size cases, for more details refer to 
-[Velero File System Backup Performance Guide](https://empty-to-be-created).
+[Velero File System Backup Performance Guide](/docs/main/performance-guidance).
 - Velero's File System Backup reads/writes data from volumes by accessing the node's filesystem, on which the pod is running. 
 For this reason, FSB can only backup volumes that are mounted by a pod and not directly from the PVC. For orphan PVC/PV pairs 
 (without running pods), some Velero users overcame this limitation running a staging pod (i.e. a busybox or alpine container 
