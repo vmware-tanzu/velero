@@ -23,7 +23,7 @@ Because each Velero controller is configured to run with a single worker, only o
 
 Velero controllers will no longer directly execute backup/restore logic themselves (note: the rest of this document will refer only to backups, for brevity, but it applies equally to restores). Instead, when the controller is informed of a new backup custom resource, it will immediately create a new worker pod which is responsible for end-to-end processing of the backup, including validating the spec, scraping the Kubernetes API server for resources, triggering persistent volume snapshots, writing data to object storage, and updating the custom resource's status as appropriate.
 
-A worker pod will be given a deterministic name based on the name of the backup it's executing. This will prevent Velero from inadvertently creating multiple worker pods for the same backup, since any subsequent attempts to create a pod with the specified name will fail.
+A worker pod will be given a deterministic name based on the name of the backup it's executing. This will prevent Velero from inadvertently creating multiple worker pods for the same backup, since any subsequent attempts to create a pod with the specified name will fail. Additionally, velero can check Backup Storage Location if the backup exists in storage already, if so, worker pod would creation would not be attempted in the first place.
 
 This design trivially enables running multiple backups concurrently, as each one runs in its own isolated pod and the Velero server's backup controller does not need to wait for the backup to complete before spawning a worker pod for the next one. Additionally, Velero becomes much more scalable, as the resource requirements for the Velero server itself are largely unaffacted by the number of backups. Instead, Velero's scalability becomes limited only by the total amount of resources available in the cluster to process worker pods.
 
@@ -38,11 +38,11 @@ A new hidden command will be added to the velero binary, `velero backup run BACK
 ```bash
 --client-burst
 --client-qps
---default-backup-storage-location
---default-backup-ttl
---default-volume-snapshot-locations
+--backup-storage-location
+--backup-ttl
+--volume-snapshot-locations
 --log-level
---restic-timeout
+--unified-repo-timeout
 ```
 
 `velero restore run` will accept the following flags:
@@ -51,7 +51,7 @@ A new hidden command will be added to the velero binary, `velero backup run BACK
 --client-burst
 --client-qps
 --log-level
---restic-timeout
+--unified-repo-timeout
 --restore-resource-priorities
 --terminating-resource-timeout
 ```
@@ -142,9 +142,10 @@ The Velero server keeps a record of current in-progress backups and disallows th
 
 - Given that multiple backups/restores could be running concurrently, we need to consider possible areas of contention/conflict between jobs, including (but not limited to):
   - exec hooks (i.e. don't want to run `fsfreeze` twice on the same pod)
-  - restic backups and restores on the same volume
-- It probably makes sense to use Kubernetes Jobs to control worker pods, rather than directly creating "bare pods". The Job will ensure that a worker pod successfully runs to completion.
-- Currently, restic repository lock management is handled by an in-process lock manager in the Velero server. In order for backups/restores to safely run concurrently, the design for restic lock management needs to change. There is an [open issue](https://github.com/heptio/velero/issues/1540) for this which is currently not prioritized.
+  - unified-repo backups and restores on the same volume
+- It probably makes sense to use Kubernetes Jobs to control worker pods, rather than directly creating "bare pods". The Job will ensure that a worker pod successfully runs to completion if the job pods can handle parallel jobs. Otherwise using Kubernetes Jobs can become problematic. [from k8s](https://kubernetes.io/docs/concepts/workloads/controllers/job/#handling-pod-and-container-failures)
+> Note that even if you specify .spec.parallelism = 1 and .spec.completions = 1 and .spec.template.spec.restartPolicy = "Never", the same program may sometimes be started twice.
+- Currently, unified-repo repository lock management is handled by an in-process lock manager in the Velero server. In order for backups/restores to safely run concurrently, the design for unified-repo lock management needs to change. There is an [open issue](https://github.com/heptio/velero/issues/1540) for this which is currently not prioritized.
 - There are several prometheus metrics that are emitted as part of the backup process. Since backups will no longer be running in the Velero server, we need to find a way to expose those values. One option is to store any value that would feed a metric as a field on the backup's `status`, and to have the Velero server scrape values from there for completed backups. Another option is to use the [Prometheus push gateway](https://prometheus.io/docs/practices/pushing/).
 - Over time, many completed worker pods will exist in the `velero` namespace. We need to consider whether this poses any issue and whether we should garbage-collect them more aggressively.
 
