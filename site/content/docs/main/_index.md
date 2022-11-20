@@ -29,7 +29,7 @@ Please use the version selector at the top of the site to ensure you are using t
 
 ## Troubleshooting
 
-If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
+If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero-users channel][25] on the Kubernetes Slack server.
 
 ## Contributing
 
@@ -51,7 +51,7 @@ See [the list of releases][6] to find out about feature changes.
 [12]: https://github.com/kubernetes/kubernetes/blob/main/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
 [24]: https://groups.google.com/forum/#!forum/projectvelero
-[25]: https://kubernetes.slack.com/messages/velero
+[25]: https://kubernetes.slack.com/messages/velero-users
 
 [30]: troubleshooting.md
 
