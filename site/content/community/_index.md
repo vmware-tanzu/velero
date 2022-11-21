@@ -12,7 +12,7 @@ If you are ready to jump in and test, add code, or help with documentation, foll
 You can follow the work we do, see our milestones, and our backlog on our [GitHub project boards](https://github.com/vmware-tanzu/velero/projects).
 
 * Follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero)
-* Join our Kubernetes Slack channel and talk to over 800 other community members: [#velero](https://kubernetes.slack.com/messages/velero)
+* Join our Kubernetes Slack channel and talk to over 800 other community members: [#velero-users](https://kubernetes.slack.com/messages/velero-users)
 * Join our [Google Group](https://groups.google.com/forum/#!forum/projectvelero) to get updates on the project and invites to community meetings.
 * Join the Velero community meetings  - [Zoom link](https://VMware.zoom.us/j/94501971662?pwd=aUxVbWVEWHZSbDh4ZGdGU1cxYUFoZz09)  
 Bi-weekly  community meeting alternating every week between Beijing Friendly timezone and EST/Europe Friendly Timezone  
