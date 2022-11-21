@@ -1,4 +1,4 @@
-package orderedresources
+package schedule
 
 /*
 Copyright the Velero contributors.
