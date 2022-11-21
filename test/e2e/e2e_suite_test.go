@@ -33,15 +33,13 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
-	. "github.com/vmware-tanzu/velero/test/e2e/orderedresources"
+	. "github.com/vmware-tanzu/velero/test/e2e/migration"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
-
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
+	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
-
-	. "github.com/vmware-tanzu/velero/test/e2e/migration"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
@@ -114,7 +112,9 @@ var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup dele
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
 var _ = Describe("[Backups][TTL] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
 var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
-var _ = Describe("[Backups][Schedule] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
+
+var _ = Describe("[Schedule][BR][Pause] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
+var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
 var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
 
@@ -124,8 +124,6 @@ var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be
 var _ = Describe("[Migration][Restic]", MigrationWithRestic)
 
 var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
-
-var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
 var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
 var _ = Describe("[NamespaceMapping][Multiple][Restic]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
