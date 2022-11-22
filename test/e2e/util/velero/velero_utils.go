@@ -270,6 +270,24 @@ func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, schedul
 	})
 }
 
+func checkSchedulePause(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, pause bool) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	if err != nil {
+		return err
+	}
+	schedule := velerov1api.Schedule{}
+	err = json.Unmarshal(*jsonBuf, &schedule)
+	if err != nil {
+		return err
+	}
+
+	if schedule.Spec.Paused != pause {
+		fmt.Printf("Unexpected schedule phase got %s, expecting %s, still waiting...", schedule.Status.Phase, velerov1api.SchedulePhaseEnabled)
+		return nil
+	}
+	return nil
+}
 func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, order map[string]string) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
 	jsonBuf, err := CMDExecWithOutput(checkCMD)
@@ -440,6 +458,28 @@ func VeleroScheduleCreate(ctx context.Context, veleroCLI string, veleroNamespace
 		return err
 	}
 	return checkSchedulePhase(ctx, veleroCLI, veleroNamespace, scheduleName)
+}
+
+func VeleroSchedulePause(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string) error {
+	var args []string
+	args = append([]string{
+		"--namespace", veleroNamespace, "schedule", "pause", scheduleName,
+	})
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+	return checkSchedulePause(ctx, veleroCLI, veleroNamespace, scheduleName, true)
+}
+
+func VeleroScheduleUnpause(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string) error {
+	var args []string
+	args = append([]string{
+		"--namespace", veleroNamespace, "schedule", "unpause", scheduleName,
+	})
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+	return checkSchedulePause(ctx, veleroCLI, veleroNamespace, scheduleName, false)
 }
 
 func VeleroCmdExec(ctx context.Context, veleroCLI string, args []string) error {
