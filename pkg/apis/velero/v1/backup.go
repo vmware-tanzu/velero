@@ -113,8 +113,8 @@ type BackupSpec struct {
 	DefaultVolumesToFsBackup *bool `json:"defaultVolumesToFsBackup,omitempty"`
 
 	// OrderedResources specifies the backup order of resources of specific Kind.
-	// The map key is the Kind name and value is a list of resource names separated by commas.
-	// Each resource name has format "namespace/resourcename".  For cluster resources, simply use "resourcename".
+	// The map key is the resource name and value is a list of object names separated by commas.
+	// Each resource name has format "namespace/objectname".  For cluster resources, simply use "objectname".
 	// +optional
 	// +nullable
 	OrderedResources map[string]string `json:"orderedResources,omitempty"`
