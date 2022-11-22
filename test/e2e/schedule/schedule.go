@@ -1,4 +1,4 @@
-package backups
+package schedule
 
 import (
 	"context"
@@ -25,11 +25,11 @@ type ScheduleBackup struct {
 	verifyTimes    int
 }
 
-var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "schedule-test-ns", NSIncluded: &[]string{"ns1"}}})
+var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "schedule-test"}})
 
 func (n *ScheduleBackup) Init() error {
 	n.Client = TestClientInstance
-	n.Period = 3
+	n.Period = 3      // Unit is minute
 	n.verifyTimes = 5 // More verify times more confidence
 	n.TestMsg = &TestMSG{
 		Desc:      "Set up a scheduled backup defined by a Cron expression",
@@ -40,7 +40,7 @@ func (n *ScheduleBackup) Init() error {
 }
 
 func (n *ScheduleBackup) StartRun() error {
-
+	n.NSIncluded = &[]string{fmt.Sprintf("%s-%s", n.NSBaseName, "ns")}
 	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
 	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
 
@@ -48,7 +48,7 @@ func (n *ScheduleBackup) StartRun() error {
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
 		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
 	}
-
+	Expect(n.Period < 30).To(Equal(true))
 	return nil
 }
 func (n *ScheduleBackup) CreateResources() error {
@@ -152,6 +152,53 @@ func (n *ScheduleBackup) Destroy() error {
 		"--wait",
 	}
 
+	backupsInfo, err := GetScheduledBackupsCreationTime(context.Background(), VeleroCfg.VeleroCLI, "default", n.ScheduleName)
+	Expect(err).To(Succeed(), fmt.Sprintf("Fail to get backups from schedule %s", n.ScheduleName))
+	fmt.Println(backupsInfo)
+	backupCount := len(backupsInfo)
+
+	By(fmt.Sprintf("Pause schedule %s ......\n", n.ScheduleName), func() {
+		Expect(VeleroSchedulePause(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
+			return "Fail to restore workload"
+		})
+	})
+
+	periodCount := 3
+	sleepDuration := time.Duration(n.Period*periodCount) * time.Minute
+	By(fmt.Sprintf("Sleep for %s ......\n", sleepDuration), func() {
+		time.Sleep(sleepDuration)
+	})
+
+	backupsInfo, err = GetScheduledBackupsCreationTime(context.Background(), VeleroCfg.VeleroCLI, "default", n.ScheduleName)
+	Expect(err).To(Succeed(), fmt.Sprintf("Fail to get backups from schedule %s", n.ScheduleName))
+
+	backupCountPostPause := len(backupsInfo)
+	fmt.Printf("After pause, backkups count is %d\n", backupCountPostPause)
+
+	By(fmt.Sprintf("Verify no new backups from %s ......\n", n.ScheduleName), func() {
+		Expect(backupCountPostPause == backupCount).To(Equal(true))
+	})
+
+	By(fmt.Sprintf("Unpause schedule %s ......\n", n.ScheduleName), func() {
+		Expect(VeleroScheduleUnpause(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName)).To(Succeed(), func() string {
+			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
+			return "Fail to unpause schedule"
+		})
+	})
+
+	By(fmt.Sprintf("Sleep for %s ......\n", sleepDuration), func() {
+		time.Sleep(sleepDuration)
+	})
+
+	backupsInfo, err = GetScheduledBackupsCreationTime(context.Background(), VeleroCfg.VeleroCLI, "default", n.ScheduleName)
+	Expect(err).To(Succeed(), fmt.Sprintf("Fail to get backups from schedule %s", n.ScheduleName))
+	fmt.Println(backupsInfo)
+	backupCountPostUnpause := len(backupsInfo)
+	fmt.Printf("After unpause, backkups count is %d\n", backupCountPostUnpause)
+	By(fmt.Sprintf("Verify no new backups by schedule %s ......\n", n.ScheduleName), func() {
+		Expect(backupCountPostUnpause-backupCount >= periodCount-1).To(Equal(true))
+	})
 	return nil
 }
 
