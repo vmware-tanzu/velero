@@ -58,12 +58,12 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     | kubectl apply -f -
 
     # optional, if using the restic daemon set
-    dsjson=$(kubectl get ds -n velero -ojson)
-    kubectl delete ds -n velero --all --force --grace-period 0
-    echo $dsjson | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.10.0\"#g" \
+    echo $(kubectl get ds -n velero restic -ojson) \
+    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.10.0\"#g" \
     | sed "s#\"name\"\: \"restic\"#\"name\"\: \"node-agent\"#g" \
     | sed "s#\[ \"restic\",#\[ \"node-agent\",#g" \
     | kubectl apply -f -
+    kubectl delete ds -n velero restic --force --grace-period 0
     ```
 
 1. Confirm that the deployment is up and running with the correct version by running:
