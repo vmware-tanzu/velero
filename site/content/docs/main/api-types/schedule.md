@@ -32,6 +32,9 @@ metadata:
 spec:
   # Schedule is a Cron expression defining when to run the Backup
   schedule: 0 7 * * *
+  # Specifies whether to use OwnerReferences on backups created by this Schedule. 
+  # Notice: if set to true, when schedule is deleted, backups will be deleted too. Optional.
+  useOwnerReferencesInBackup: false
   # Template is the spec that should be used for each backup triggered by this schedule.
   template:
     # CSISnapshotTimeout specifies the time used to wait for
@@ -53,7 +56,10 @@ spec:
     # or fully-qualified. Optional.
     excludedResources:
     - storageclasses.storage.k8s.io
-    # Whether or not to include cluster-scoped resources. Valid values are true, false, and
+    orderedResources:
+      pods: mysql/mysql-cluster-replica-0,mysql/mysql-cluster-replica-1,mysql/mysql-cluster-source-0
+      persistentvolumes: pvc-87ae0832-18fd-4f40-a2a4-5ed4242680c4,pvc-63be1bb0-90f5-4629-a7db-b8ce61ee29b3
+    # Whether to include cluster-scoped resources. Valid values are true, false, and
     # null/unset. If true, all cluster-scoped resources are included (subject to included/excluded
     # resources and the label selector). If false, no cluster-scoped resources are included. If unset,
     # all cluster-scoped resources are included if and only if all namespaces are included and there are
@@ -68,7 +74,7 @@ spec:
       matchLabels:
         app: velero
         component: server
-    # Whether or not to snapshot volumes. This only applies to PersistentVolumes for Azure, GCE, and
+    # Whether to snapshot volumes. This only applies to PersistentVolumes for Azure, GCE, and
     # AWS. Valid values are true, false, and null/unset. If unset, Velero performs snapshots as long as
     # a persistent volume provider is configured for Velero.
     snapshotVolumes: null
@@ -136,9 +142,6 @@ spec:
           # processed. Only "exec" hooks are supported.
           post:
             # Same content as pre above.
-    # Specifies whether to use OwnerReferences on backups created by this Schedule. 
-    # Notice: if set to true, when schedule is deleted, backups will be deleted too. Optional.
-    useOwnerReferencesInBackup: false
 status:
   # The current phase of the latest scheduled backup. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
   phase: ""

@@ -48,7 +48,13 @@ spec:
   # or fully-qualified. Optional.
   excludedResources:
   - storageclasses.storage.k8s.io
-  # Whether or not to include cluster-scoped resources. Valid values are true, false, and
+  # Order of the resources to be collected during the backup process.  It's a map with key being the plural resource
+  # name, and the value being a list of object names separated by comma.  Each resource name has format "namespace/objectname".
+  # For cluster resources, simply use "objectname". Optional
+  orderedResources:
+    pods: mysql/mysql-cluster-replica-0,mysql/mysql-cluster-replica-1,mysql/mysql-cluster-source-0
+    persistentvolumes: pvc-87ae0832-18fd-4f40-a2a4-5ed4242680c4,pvc-63be1bb0-90f5-4629-a7db-b8ce61ee29b3
+  # Whether to include cluster-scoped resources. Valid values are true, false, and
   # null/unset. If true, all cluster-scoped resources are included (subject to included/excluded
   # resources and the label selector). If false, no cluster-scoped resources are included. If unset,
   # all cluster-scoped resources are included if and only if all namespaces are included and there are
@@ -157,5 +163,4 @@ status:
   errors: 0
   # An error that caused the entire backup to fail.
   failureReason: ""
-
 ```
