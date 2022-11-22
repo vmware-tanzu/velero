@@ -508,12 +508,13 @@ func (s *server) veleroResourcesExist() error {
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
 // - CAPI ClusterClasses go before Clusters.
+//
+// Low priorities:
+// - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
+//   ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
 // - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 //	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 //   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
-//
-// Low priorities:
-// - Tanzu ClusterBootstrap go last as it can reference any other kind of resources
 var defaultRestorePriorities = restore.Priorities{
 	HighPriorities: []string{
 		"customresourcedefinitions",
@@ -535,11 +536,11 @@ var defaultRestorePriorities = restore.Priorities{
 		// in the backup.
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
-		"clusters.cluster.x-k8s.io",
-		"clusterresourcesets.addons.cluster.x-k8s.io",
 	},
 	LowPriorities: []string{
 		"clusterbootstraps.run.tanzu.vmware.com",
+		"clusters.cluster.x-k8s.io",
+		"clusterresourcesets.addons.cluster.x-k8s.io",
 	},
 }
 
