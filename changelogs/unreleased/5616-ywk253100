@@ -1,1 +1,0 @@
-Restore ClusterBootstrap before Cluster otherwise a new default ClusterBootstrap object is create for the cluster

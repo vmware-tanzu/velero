@@ -1,1 +1,0 @@
-Refactor the repoEnsurer code to use controller runtime client and wrap some common BackupRepository operations to share with other modules

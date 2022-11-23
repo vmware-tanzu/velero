@@ -1,5 +1,5 @@
   ## v1.10.0
-### 2022-11-11
+### 2022-11-23
 
 ### Download
 https://github.com/vmware-tanzu/velero/releases/tag/v1.10.0
@@ -41,7 +41,7 @@ In this release we continued our code modernization work, rewriting some control
 #### Add credentials to volume snapshot locations
 In this release, we enabled dedicate credentials options to volume snapshot locations so that you can specify credentials per volume snapshot location as same as backup storage location.
 
-For more information, please visit the [locations document](https://github.com/vmware-tanzu/velero/blob/v1.10.0/site/content/docs/main/locations.md).
+For more information, please visit the [locations document](https://velero.io/docs/v1.10/locations/).
 
 #### CSI snapshot enhancements
 In this release we added several changes to enhance the robustness of CSI snapshot procedures, for example, some protection code for error handling, and a mechanism to skip exclusion checks so that CSI snapshot works with various backup resource filters.
@@ -81,6 +81,7 @@ Due to the code change in Velero, there will be some code change required in vSp
 
 ### All changes
   
+  * Restore ClusterBootstrap before Cluster otherwise a new default ClusterBootstrap object is create for the cluster  (#5616, @ywk253100)
   * Add compile restic binary for CVE fix  (#5574, @qiuming-best)
   * Fix controller problematic log output  (#5572, @qiuming-best)
   * Enhance the restore priorities list to support specifying the low prioritized resources that need to be restored in the last (#5535, @ywk253100)

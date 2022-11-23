@@ -60,17 +60,13 @@ jobs:
     strategy:
       matrix:
         k8s:
-          # doesn't cover 1.15 as 1.15 doesn't support "apiextensions.k8s.io/v1" that is needed for the case
-          #- 1.15.12
-          - 1.16.15
-          - 1.17.17
-          - 1.18.20
           - 1.19.16
           - 1.20.15
           - 1.21.12
           - 1.22.9
           - 1.23.6
           - 1.24.0
+          - 1.25.3
       fail-fast: false
     steps:
       - name: Set up Go
@@ -85,7 +81,7 @@ jobs:
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
       - uses: engineerd/setup-kind@v0.5.0
         with:
-          version: "v0.14.0"
+          version: "v0.17.0"
           image: "kindest/node:v${{ matrix.k8s }}"
       - name: Fetch built CLI
         id: cli-cache

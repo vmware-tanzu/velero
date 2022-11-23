@@ -1,1 +1,0 @@
-Added DownloadTargetKindCSIBackupVolumeSnapshots for retrieving the signed URL to download only the `<backup name>`-csi-volumesnapshots.json.gz  and DownloadTargetKindCSIBackupVolumeSnapshotContents to download only `<backup name>`-csi-volumesnapshotcontents.json.gz in the DownloadRequest CR structure. These files are already present in the backup layout. 
