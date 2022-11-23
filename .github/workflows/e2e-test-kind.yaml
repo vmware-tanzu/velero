@@ -9,7 +9,7 @@ on:
 jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04.5
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -56,7 +56,7 @@ jobs:
   # Run E2E test against all kubernetes versions on kind
   run-e2e-test:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04.5
     strategy:
       matrix:
         k8s:
