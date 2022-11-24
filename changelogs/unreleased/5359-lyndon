@@ -1,1 +1,0 @@
-Fix a repoEnsurer problem introduced by the refactor - The repoEnsurer didn't check "" state of BackupRepository, as a result, the function GetBackupRepository always returns without an error even though the ensreReady is specified.

@@ -1,1 +1,0 @@
-Upgrade velero docker image to use go 1.18 and upgrade golangci-lint to 1.45.0

@@ -1,1 +1,0 @@
-Fix issue 5505: the pod volume backups/restores except the first one fail under the kopia path if "AZURE_CLOUD_NAME" is specified
