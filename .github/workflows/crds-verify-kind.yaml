@@ -57,9 +57,6 @@ jobs:
       matrix:
         # Latest k8s versions. There's no series-based tag, nor is there a latest tag.
         k8s:
-          - 1.16.15
-          - 1.17.17
-          - 1.18.15
           - 1.19.7
           - 1.20.2
           - 1.21.1
