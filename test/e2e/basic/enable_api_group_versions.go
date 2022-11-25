@@ -115,6 +115,7 @@ func APIExtensionsVersionsTest() {
 			By(fmt.Sprintf("Install CRD of apiextenstions v1beta1 in cluster-A (%s)", VeleroCfg.DefaultCluster), func() {
 				Expect(installCRD(context.Background(), srcCrdYaml)).To(Succeed())
 				Expect(CRDShouldExist(context.Background(), crdName)).To(Succeed())
+				Expect(WaitForCRDEstablished(crdName)).To(Succeed())
 				Expect(AddLabelToCRD(context.Background(), crdName, label)).To(Succeed())
 			})
 
