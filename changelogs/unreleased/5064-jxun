@@ -1,1 +1,0 @@
-Exclude "csinodes.storage.k8s.io" and "volumeattachments.storage.k8s.io" from restore by default.

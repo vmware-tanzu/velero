@@ -1,1 +1,0 @@
-Skip registering "crd-remap-version" plugin when feature flag "EnableAPIGroupVersions" is set
