@@ -29,8 +29,12 @@ metadata:
   namespace: velero
 # Parameters about the restore. Required.
 spec:
-  # BackupName is the unique name of the Velero backup to restore from.
+  # The unique name of the Velero backup to restore from.
   backupName: a-very-special-backup
+  # The unique name of the Velero schedule
+  # to restore from. If specified, and BackupName is empty, Velero will
+  # restore from the most recent successful backup created from this schedule.
+  scheduleName: my-scheduled-backup-name
   # Array of namespaces to include in the restore. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
@@ -83,19 +87,18 @@ spec:
       app: velero
   - matchLabels:
       app: data-protection
-  # NamespaceMapping is a map of source namespace names to
+  # namespaceMapping is a map of source namespace names to
   # target namespace names to restore into. Any source namespaces not
   # included in the map will be restored into namespaces of the same name.
   namespaceMapping:
     namespace-backup-from: namespace-to-restore-to
-  # RestorePVs specifies whether to restore all included PVs
-  # from snapshot (via the cloudprovider).
+  # restorePVs specifies whether to restore all included PVs
+  # from snapshot (via the cloudprovider). Optional
   restorePVs: true
-  # ScheduleName is the unique name of the Velero schedule
-  # to restore from. If specified, and BackupName is empty, Velero will
-  # restore from the most recent successful backup created from this schedule.
-  scheduleName: my-scheduled-backup-name
-  # ExistingResourcePolicy specifies the restore behaviour
+  # preserveNodePorts specifies whether to restore old nodePorts from backup,
+  # so that the exposed port numbers on the node will remain the same after restore. Optional
+  preserveNodePorts: true
+  # existingResourcePolicy specifies the restore behaviour
   # for the kubernetes resource to be restored. Optional
   existingResourcePolicy: none
   # Actions to perform during or post restore. The only hooks currently supported are
