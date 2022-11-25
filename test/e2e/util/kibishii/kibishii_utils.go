@@ -174,7 +174,7 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 }
 
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
-	timeout, _ := context.WithTimeout(context.Background(), time.Minute*10)
+	timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
 	kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 		"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 		strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),

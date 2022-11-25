@@ -327,3 +327,17 @@ func DeleteVeleroDs(ctx context.Context) error {
 	fmt.Println(args)
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }
+
+func WaitForCRDEstablished(crdName string) error {
+	arg := []string{"wait", "--for", "condition=established", "--timeout=60s", "crd/" + crdName}
+	cmd := exec.CommandContext(context.Background(), "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Println(stdout)
+	if err != nil {
+		fmt.Println(stderr)
+		fmt.Println(err)
+		return err
+	}
+	return nil
+}
