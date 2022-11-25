@@ -1,1 +1,0 @@
-Fix issue 5386: Velero providers a full URL as the S3Url while the underlying minio client only accept the host part of the URL as the endpoint and the schema should be specified separately.

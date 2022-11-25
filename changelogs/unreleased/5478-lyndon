@@ -1,1 +1,0 @@
-Issue fix 5477: create the common way to support S3 compatible object storages that work for both Restic and Kopia; Keep the resticRepoPrefix parameter for compatibility
