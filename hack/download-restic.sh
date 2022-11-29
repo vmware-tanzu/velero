@@ -22,7 +22,6 @@ set -o pipefail
 # is the path expected by the Velero Dockerfile.
 output_dir=${OUTPUT_DIR:-/output/usr/bin}
 restic_bin=${output_dir}/restic
-build_path=$(dirname "$PWD")
 
 if [[ -z "${BIN}" ]]; then
     echo "BIN must be set"
@@ -47,9 +46,8 @@ if [[ -z "${RESTIC_VERSION}" ]]; then
     exit 1
 fi
 
-mkdir ${build_path}/restic
-git clone -b v${RESTIC_VERSION} https://github.com/restic/restic.git ${build_path}/restic
-pushd ${build_path}/restic
-go run build.go --goos "${GOOS}" --goarch "${GOARCH}" --goarm "${GOARM}" -o ${restic_bin}
+curl -s -L https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2 -O
+bunzip2 restic_${RESTIC_VERSION}_${GOOS}_${GOARCH}.bz2
+mv restic_${RESTIC_VERSION}_${GOOS}_${GOARCH} ${restic_bin}
+
 chmod +x ${restic_bin}
-popd
