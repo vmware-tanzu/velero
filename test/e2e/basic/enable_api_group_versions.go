@@ -117,6 +117,8 @@ func APIExtensionsVersionsTest() {
 				Expect(CRDShouldExist(context.Background(), crdName)).To(Succeed())
 				Expect(WaitForCRDEstablished(crdName)).To(Succeed())
 				Expect(AddLabelToCRD(context.Background(), crdName, label)).To(Succeed())
+				// Discovery helper is refreshed every 5 minutes
+				time.Sleep(6 * time.Minute)
 			})
 
 			By("Backup CRD", func() {
