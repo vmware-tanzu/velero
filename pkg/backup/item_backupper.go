@@ -164,11 +164,6 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 
 				pvbVolumes = append(pvbVolumes, volume)
 			}
-
-			// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
-			// via an item action in the next step, we don't snapshot PVs that will have their data backed up
-			// with pod volume backup.
-			ib.podVolumeSnapshotTracker.Track(pod, pvbVolumes)
 		}
 	}
 
@@ -211,6 +206,13 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 
 		ib.backupRequest.PodVolumeBackups = append(ib.backupRequest.PodVolumeBackups, podVolumeBackups...)
 		backupErrs = append(backupErrs, errs...)
+
+		// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
+		// via an item action in the next step, we don't snapshot PVs that will have their data backed up
+		// with pod volume backup.
+		for _, pvb := range podVolumeBackups {
+			ib.podVolumeSnapshotTracker.Track(pod, []string{pvb.Spec.Volume})
+		}
 	}
 
 	log.Debug("Executing post hooks")
