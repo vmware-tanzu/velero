@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test/e2e"
@@ -174,33 +175,56 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 }
 
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
-	timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
-	kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
-		"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
-		strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
-		strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum), strconv.Itoa(kibishiiData.ExpectedNodes))
-	fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
+	timeout := 5 * time.Minute
+	interval := 5 * time.Second
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
+		kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
+			"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
+			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
+			strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum), strconv.Itoa(kibishiiData.ExpectedNodes))
+		fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
 
-	_, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+		stdout, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
+		if strings.Contains(stderr, "Timeout occurred") {
+			return false, errors.Wrapf(err, "failed to generate, stderr=%s, stdout=%s", stderr, stdout)
+		}
+		if err != nil {
+			return true, errors.Wrapf(err, "failed to generate, stderr=%s, stdout=%s", stderr, stdout)
+		}
+		return true, nil
+	})
+
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate, stderr=%s", stderr)
+		return errors.Wrapf(err, fmt.Sprintf("Failed to wait generate data in namespace %s", namespace))
 	}
-
 	return nil
 }
 
 func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
-	timeout, _ := context.WithTimeout(context.Background(), time.Minute*10)
-	kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
-		"/usr/local/bin/verify.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
-		strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
-		strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum),
-		strconv.Itoa(kibishiiData.ExpectedNodes))
-	fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
+	timeout := 5 * time.Minute
+	interval := 5 * time.Second
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
+		kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
+			"/usr/local/bin/verify.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
+			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
+			strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum),
+			strconv.Itoa(kibishiiData.ExpectedNodes))
+		fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
 
-	stdout, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+		stdout, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+		if strings.Contains(stderr, "Timeout occurred") {
+			return false, errors.Wrapf(err, "failed to verify, stderr=%s, stdout=%s", stderr, stdout)
+		}
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to verify, stderr=%s, stdout=%s", stderr, stdout)
+		}
+		return true, nil
+	})
+
 	if err != nil {
-		return errors.Wrapf(err, "failed to verify, stderr=%s, stdout=%s", stderr, stdout)
+		return errors.Wrapf(err, fmt.Sprintf("Failed to wait generate data in namespace %s", namespace))
 	}
 	return nil
 }
