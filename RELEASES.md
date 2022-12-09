@@ -34,8 +34,9 @@ The Velero project maintains release branches for the three most recent minor re
 The activity for next release will be tracked in the [Velero Wiki roadmap](https://github.com/vmware-tanzu/velero/wiki). If your issue is not present in the corresponding release, please reach out to the maintainers to add the issue to the project board.
 
 ### New Features
-All features(Issues and PRs) that are aimed to be completed into the upcoming release must be labeled as `X.YY-cadidate`, where X.YY is the upcoming version.
-All features that were not completed it into the upcoming release needs to be revisited and re-labeled for the next release, if they are still considered valid for the project! The decision will be made by the major stakeholders(maintainers).
+- All features(Issues and PRs) that are aimed to be completed into the upcoming release must be labeled as `X.YY-cadidate`, where X.YY is the upcoming version.
+- Velero maintainers regularly triage the issues labelled with `X.YY-candidate`. The ones which will be planned for ‘X.YY’ release, maintainers will add milestone X.YY and remove `X.YY-candidate` label from them.
+- After the feature freeze date for the X.YY release, `X.YY-candidate` label will be removed from all the issues. Maintainers may re-label these issues for next Velero release candidate. The decision will be made by the major stakeholders(maintainers).
 
 Although Velero is supported by many companies, the Velero community is the core of new features and effort to make the project better and feature rich and more reliable with ever other release.
 
