@@ -1,8 +1,8 @@
 # Release cycle and process
-Velero team is aiming for 3 releases per year with few patch releases in between.
+Velero team is aiming for 3 releases per year, but will commit to two releases per year with few patch releases in between.
 Planing for new release starts with relabeling all candidates that were not completed in the current release - in example [1.11-candidates](https://github.com/vmware-tanzu/velero/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A1.11-candidate) and labeling all the new for the upcoming release.
 
-In parallel we start a [discussion](https://github.com/vmware-tanzu/velero/discussions?discussions_q=label%3ASurvey) to collect new ideas, proplsals, needs and new contributors.
+In parallel we start a [discussion](https://github.com/vmware-tanzu/velero/discussions?discussions_q=label%3ASurvey) to collect new ideas, proposals, needs and new contributors.
 
 # Versioning and Release
 This document describes the versioning and release process of Velero. This document is a living document, contents will be updated according to each releases.
@@ -32,6 +32,13 @@ The Velero project maintains release branches for the three most recent minor re
 
 ### Next Release
 The activity for next release will be tracked in the [Velero Wiki roadmap](https://github.com/vmware-tanzu/velero/wiki). If your issue is not present in the corresponding release, please reach out to the maintainers to add the issue to the project board.
+
+### New Features
+All features(Issues and PRs) that are aimed to be completed into the upcoming release must be labeled as `X.YY-cadidate`, where X.YY is the upcoming version.
+All features that were not completed it into the upcoming release needs to be revisited and re-labeled for the next release, if they are still considered valid for the project! The decision will be made by the major stakeholders(maintainers).
+
+Although Velero is supported by many companies, the Velero community is the core of new features and effort to make the project better and feature rich and more reliable with ever other release.
+
 
 # Release Instructions
 [Velero release steps](https://velero.io/docs/main/release-instructions/)
