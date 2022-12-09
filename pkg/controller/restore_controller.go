@@ -342,10 +342,12 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 	}
 	for _, resource := range restoreHooks {
 		for _, h := range resource.RestoreHooks {
-			for _, container := range h.Init.InitContainers {
-				err = hook.ValidateContainer(container.Raw)
-				if err != nil {
-					restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+			if h.Init != nil {
+				for _, container := range h.Init.InitContainers {
+					err = hook.ValidateContainer(container.Raw)
+					if err != nil {
+						restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+					}
 				}
 			}
 		}
