@@ -17,13 +17,16 @@ limitations under the License.
 package restore
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -39,7 +42,7 @@ type pvRestorer struct {
 	restorePVs              *bool
 	volumeSnapshots         []*volume.Snapshot
 	volumeSnapshotterGetter VolumeSnapshotterGetter
-	snapshotLocationLister  listers.VolumeSnapshotLocationLister
+	kbclient                client.Client
 	credentialFileStore     credentials.FileStore
 }
 
@@ -61,7 +64,7 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 
 	log := r.logger.WithFields(logrus.Fields{"persistentVolume": pvName})
 
-	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.snapshotLocationLister, r.credentialFileStore, r.logger)
+	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.kbclient, r.credentialFileStore, r.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +108,7 @@ type snapshotInfo struct {
 	location           *api.VolumeSnapshotLocation
 }
 
-func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister, credentialStore credentials.FileStore, logger logrus.FieldLogger) (*snapshotInfo, error) {
+func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, client client.Client, credentialStore credentials.FileStore, logger logrus.FieldLogger) (*snapshotInfo, error) {
 	var pvSnapshot *volume.Snapshot
 	for _, snapshot := range volumeSnapshots {
 		if snapshot.Spec.PersistentVolumeName == pvName {
@@ -118,12 +121,18 @@ func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volum
 		return nil, nil
 	}
 
-	loc, err := snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).Get(pvSnapshot.Spec.Location)
+	snapshotLocation := &api.VolumeSnapshotLocation{}
+	err := client.Get(
+		context.Background(),
+		types.NamespacedName{Namespace: backup.Namespace, Name: pvSnapshot.Spec.Location},
+		snapshotLocation,
+	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	// add credential to config
-	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(loc, credentialStore, logger)
+	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore, logger)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -133,6 +142,6 @@ func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volum
 		volumeType:         pvSnapshot.Spec.VolumeType,
 		volumeAZ:           pvSnapshot.Spec.VolumeAZ,
 		volumeIOPS:         pvSnapshot.Spec.VolumeIOPS,
-		location:           loc,
+		location:           snapshotLocation,
 	}, nil
 }

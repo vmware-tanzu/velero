@@ -39,12 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
@@ -53,8 +53,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
@@ -89,21 +87,18 @@ type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
 	Restore(req Request,
 		actions []riav1.RestoreItemAction,
-		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
 	RestoreWithResolvers(
 		req Request,
 		restoreItemActionResolver framework.RestoreItemActionResolver,
 		itemSnapshotterResolver framework.ItemSnapshotterResolver,
-		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
 }
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
 type kubernetesRestorer struct {
-	restoreClient              velerov1client.RestoresGetter
 	discoveryHelper            discovery.Helper
 	dynamicFactory             client.DynamicFactory
 	namespaceClient            corev1.NamespaceInterface
@@ -117,11 +112,11 @@ type kubernetesRestorer struct {
 	podCommandExecutor         podexec.PodCommandExecutor
 	podGetter                  cache.Getter
 	credentialFileStore        credentials.FileStore
+	kbClient                   crclient.Client
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
 func NewKubernetesRestorer(
-	restoreClient velerov1client.RestoresGetter,
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
 	resourcePriorities Priorities,
@@ -133,9 +128,9 @@ func NewKubernetesRestorer(
 	podCommandExecutor podexec.PodCommandExecutor,
 	podGetter cache.Getter,
 	credentialStore credentials.FileStore,
+	kbClient crclient.Client,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
-		restoreClient:              restoreClient,
 		discoveryHelper:            discoveryHelper,
 		dynamicFactory:             dynamicFactory,
 		namespaceClient:            namespaceClient,
@@ -156,6 +151,7 @@ func NewKubernetesRestorer(
 		podCommandExecutor:  podCommandExecutor,
 		podGetter:           podGetter,
 		credentialFileStore: credentialStore,
+		kbClient:            kbClient,
 	}, nil
 }
 
@@ -165,19 +161,17 @@ func NewKubernetesRestorer(
 func (kr *kubernetesRestorer) Restore(
 	req Request,
 	actions []riav1.RestoreItemAction,
-	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	resolver := framework.NewRestoreItemActionResolver(actions)
 	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
-	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, snapshotLocationLister, volumeSnapshotterGetter)
+	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, volumeSnapshotterGetter)
 }
 
 func (kr *kubernetesRestorer) RestoreWithResolvers(
 	req Request,
 	restoreItemActionResolver framework.RestoreItemActionResolver,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
-	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
@@ -281,7 +275,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		restorePVs:              req.Restore.Spec.RestorePVs,
 		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
-		snapshotLocationLister:  snapshotLocationLister,
+		kbclient:                kr.kbClient,
 		credentialFileStore:     kr.credentialFileStore,
 	}
 
@@ -320,7 +314,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		waitExecHookHandler:            waitExecHookHandler,
 		hooksContext:                   hooksCtx,
 		hooksCancelFunc:                hooksCancelFunc,
-		restoreClient:                  kr.restoreClient,
+		kbClient:                       kr.kbClient,
 	}
 
 	return restoreCtx.execute()
@@ -331,7 +325,6 @@ type restoreContext struct {
 	backupReader                   io.Reader
 	restore                        *velerov1api.Restore
 	restoreDir                     string
-	restoreClient                  velerov1client.RestoresGetter
 	resourceIncludesExcludes       *collections.IncludesExcludes
 	resourceStatusIncludesExcludes *collections.IncludesExcludes
 	namespaceIncludesExcludes      *collections.IncludesExcludes
@@ -365,6 +358,7 @@ type restoreContext struct {
 	waitExecHookHandler            hook.WaitExecHookHandler
 	hooksContext                   go_context.Context
 	hooksCancelFunc                go_context.CancelFunc
+	kbClient                       crclient.Client
 }
 
 type resourceClientKey struct {
@@ -459,18 +453,13 @@ func (ctx *restoreContext) execute() (Result, Result) {
 				lastUpdate = &val
 			case <-ticker.C:
 				if lastUpdate != nil {
-					patch := fmt.Sprintf(
-						`{"status":{"progress":{"totalItems":%d,"itemsRestored":%d}}}`,
-						lastUpdate.totalItems,
-						lastUpdate.itemsRestored,
-					)
-					_, err := ctx.restoreClient.Restores(ctx.restore.Namespace).Patch(
-						go_context.TODO(),
-						ctx.restore.Name,
-						types.MergePatchType,
-						[]byte(patch),
-						metav1.PatchOptions{},
-					)
+					updated := ctx.restore.DeepCopy()
+					if updated.Status.Progress == nil {
+						updated.Status.Progress = &velerov1api.RestoreProgress{}
+					}
+					updated.Status.Progress.TotalItems = lastUpdate.totalItems
+					updated.Status.Progress.ItemsRestored = lastUpdate.itemsRestored
+					err = kube.PatchResource(ctx.restore, updated, ctx.kbClient)
 					if err != nil {
 						ctx.log.WithError(errors.WithStack((err))).
 							Warn("Got error trying to update restore's status.progress")
@@ -552,19 +541,14 @@ func (ctx *restoreContext) execute() (Result, Result) {
 
 	// Do a final progress update as stopping the ticker might have left last few
 	// updates from taking place.
-	patch := fmt.Sprintf(
-		`{"status":{"progress":{"totalItems":%d,"itemsRestored":%d}}}`,
-		len(ctx.restoredItems),
-		len(ctx.restoredItems),
-	)
+	updated := ctx.restore.DeepCopy()
+	if updated.Status.Progress == nil {
+		updated.Status.Progress = &velerov1api.RestoreProgress{}
+	}
+	updated.Status.Progress.TotalItems = len(ctx.restoredItems)
+	updated.Status.Progress.ItemsRestored = len(ctx.restoredItems)
 
-	_, err = ctx.restoreClient.Restores(ctx.restore.Namespace).Patch(
-		go_context.TODO(),
-		ctx.restore.Name,
-		types.MergePatchType,
-		[]byte(patch),
-		metav1.PatchOptions{},
-	)
+	err = kube.PatchResource(ctx.restore, updated, ctx.kbClient)
 	if err != nil {
 		ctx.log.WithError(errors.WithStack((err))).Warn("Updating restore status.progress")
 	}
