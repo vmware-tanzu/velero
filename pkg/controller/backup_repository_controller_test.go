@@ -240,3 +240,129 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 		})
 	}
 }
+
+func TestNeedInvalidBackupRepo(t *testing.T) {
+	tests := []struct {
+		name   string
+		oldBSL *velerov1api.BackupStorageLocation
+		newBSL *velerov1api.BackupStorageLocation
+		expect bool
+	}{
+		{
+			name: "no change",
+			oldBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "old-provider",
+				},
+			},
+			newBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "new-provider",
+				},
+			},
+			expect: false,
+		},
+		{
+			name:   "other part change",
+			oldBSL: &velerov1api.BackupStorageLocation{},
+			newBSL: &velerov1api.BackupStorageLocation{},
+			expect: false,
+		},
+		{
+			name: "bucket change",
+			oldBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "old-bucket",
+						},
+					},
+				},
+			},
+			newBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "new-bucket",
+						},
+					},
+				},
+			},
+			expect: true,
+		},
+		{
+			name: "prefix change",
+			oldBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Prefix: "old-prefix",
+						},
+					},
+				},
+			},
+			newBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Prefix: "new-prefix",
+						},
+					},
+				},
+			},
+			expect: true,
+		},
+		{
+			name: "CACert change",
+			oldBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							CACert: []byte{0x11, 0x12, 0x13},
+						},
+					},
+				},
+			},
+			newBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							CACert: []byte{0x21, 0x22, 0x23},
+						},
+					},
+				},
+			},
+			expect: true,
+		},
+		{
+			name: "config change",
+			oldBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Config: map[string]string{
+						"key1": "value1",
+					},
+				},
+			},
+			newBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Config: map[string]string{
+						"key2": "value2",
+					},
+				},
+			},
+			expect: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reconciler := NewBackupRepoReconciler(
+				velerov1api.DefaultNamespace,
+				velerotest.NewLogger(),
+				velerotest.NewFakeControllerRuntimeClient(t),
+				time.Duration(0), nil)
+
+			need := reconciler.needInvalidBackupRepo(test.oldBSL, test.newBSL)
+			assert.Equal(t, test.expect, need)
+		})
+	}
+}

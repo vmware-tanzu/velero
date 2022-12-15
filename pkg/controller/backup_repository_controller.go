@@ -17,18 +17,27 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -64,10 +73,94 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 
 func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := kube.NewPeriodicalEnqueueSource(r.logger, mgr.GetClient(), &velerov1api.BackupRepositoryList{}, repoSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.BackupRepository{}).
 		Watches(s, nil).
+		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, handler.EnqueueRequestsFromMapFunc(r.invalidateBackupReposForBSL),
+			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo))).
 		Complete(r)
+}
+
+func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object) []reconcile.Request {
+	bsl := bslObj.(*velerov1api.BackupStorageLocation)
+
+	list := &velerov1api.BackupRepositoryList{}
+	options := &client.ListOptions{
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.StorageLocationLabel: label.GetValidName(bsl.Name),
+		}).AsSelector(),
+	}
+	if err := r.List(context.TODO(), list, options); err != nil {
+		r.logger.WithField("BSL", bsl.Name).WithError(err).Error("unable to list BackupRepositorys")
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(list.Items))
+	for i := range list.Items {
+		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
+		r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change"))
+
+		requests[i] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: list.Items[i].GetNamespace(),
+				Name:      list.Items[i].GetName(),
+			},
+		}
+	}
+
+	return requests
+}
+
+func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newObj client.Object) bool {
+	oldBSL := oldObj.(*velerov1api.BackupStorageLocation)
+	newBSL := newObj.(*velerov1api.BackupStorageLocation)
+
+	oldStorage := oldBSL.Spec.StorageType.ObjectStorage
+	newStorage := newBSL.Spec.StorageType.ObjectStorage
+	oldConfig := oldBSL.Spec.Config
+	newConfig := newBSL.Spec.Config
+
+	if oldStorage == nil {
+		oldStorage = &velerov1api.ObjectStorageLocation{}
+	}
+
+	if newStorage == nil {
+		newStorage = &velerov1api.ObjectStorageLocation{}
+	}
+
+	logger := r.logger.WithField("BSL", newBSL.Name)
+
+	if oldStorage.Bucket != newStorage.Bucket {
+		logger.WithFields(logrus.Fields{
+			"old bucket": oldStorage.Bucket,
+			"new bucket": newStorage.Bucket,
+		}).Info("BSL's bucket has changed, invalid backup repositories")
+
+		return true
+	}
+
+	if oldStorage.Prefix != newStorage.Prefix {
+		logger.WithFields(logrus.Fields{
+			"old prefix": oldStorage.Prefix,
+			"new prefix": newStorage.Prefix,
+		}).Info("BSL's prefix has changed, invalid backup repositories")
+
+		return true
+	}
+
+	if !bytes.Equal(oldStorage.CACert, newStorage.CACert) {
+		logger.Info("BSL's CACert has changed, invalid backup repositories")
+		return true
+	}
+
+	if !reflect.DeepEqual(oldConfig, newConfig) {
+		logger.Info("BSL's storage config has changed, invalid backup repositories")
+
+		return true
+	}
+
+	return false
 }
 
 func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -216,6 +309,28 @@ func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *veler
 	}
 
 	log.Info("Checking backup repository for readiness")
+
+	loc := &velerov1api.BackupStorageLocation{}
+
+	if err := r.Get(context.Background(), client.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, loc); err != nil {
+		return r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
+	}
+
+	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	if err != nil {
+		return r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
+	}
+
+	if repoIdentifier != req.Spec.ResticIdentifier {
+		if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+			rr.Spec.ResticIdentifier = repoIdentifier
+		}); err != nil {
+			return err
+		}
+	}
 
 	// we need to ensure it (first check, if check fails, attempt to init)
 	// because we don't know if it's been successfully initialized yet.
