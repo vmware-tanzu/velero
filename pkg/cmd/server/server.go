@@ -680,7 +680,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.restoreResourcePriorities,
 			s.kubeClient.CoreV1().Namespaces(),
 			podvolume.NewRestorerFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
-				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
+				s.kubeClient.CoreV1(), s.kubeClient, s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
 			s.logger,

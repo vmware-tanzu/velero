@@ -37,3 +37,21 @@ func IsPodRunning(pod *corev1api.Pod) error {
 
 	return nil
 }
+
+// IsPodRunning does a well-rounded check to make sure the specified pod has been scheduled into a node and in a stable status.
+// If not, return the error found
+func IsPodScheduled(pod *corev1api.Pod) error {
+	if pod.Spec.NodeName == "" {
+		return errors.Errorf("pod is not scheduled, name=%s, namespace=%s, phase=%s", pod.Name, pod.Namespace, pod.Status.Phase)
+	}
+
+	if pod.Status.Phase != corev1api.PodRunning && pod.Status.Phase != corev1api.PodPending {
+		return errors.Errorf("pod is not in a stable status, name=%s, namespace=%s, phase=%s", pod.Name, pod.Namespace, pod.Status.Phase)
+	}
+
+	if pod.DeletionTimestamp != nil {
+		return errors.Errorf("pod is being terminated, name=%s, namespace=%s, phase=%s", pod.Name, pod.Namespace, pod.Status.Phase)
+	}
+
+	return nil
+}
