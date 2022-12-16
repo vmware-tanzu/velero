@@ -272,8 +272,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}()
 
-	c.metrics.IncActiveBackup()
-	defer c.metrics.DecActiveBackup()
+	c.metrics.IncrementActiveBackupTotal()
+	defer c.metrics.DecrementActiveBackupTotal()
 
 	log.Debug("Running backup")
 

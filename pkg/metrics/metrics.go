@@ -714,15 +714,15 @@ func (m *ServerMetrics) SetBackupTotal(numberOfBackups int64) {
 	}
 }
 
-// IncActiveBackup increments the number of in-progress backups
-func (m *ServerMetrics) IncActiveBackup() {
+// IncrementActiveBackupTotal increments the number of in-progress backups
+func (m *ServerMetrics) IncrementActiveBackupTotal() {
 	if g, ok := m.metrics[backupActiveTotal].(prometheus.Gauge); ok {
 		g.Inc()
 	}
 }
 
-// DecActiveBackup decrements the number of in-progress backups
-func (m *ServerMetrics) DecActiveBackup() {
+// DecrementActiveBackupTotal decrements the number of in-progress backups
+func (m *ServerMetrics) DecrementActiveBackupTotal() {
 	if g, ok := m.metrics[backupActiveTotal].(prometheus.Gauge); ok {
 		g.Dec()
 	}
