@@ -1,3 +1,41 @@
+## v1.9.5
+### 2022-12-19
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.9.5
+
+### Container Image
+`velero/velero:v1.9.5`
+
+### Documentation
+https://velero.io/docs/v1.9/
+
+### Upgrading
+https://velero.io/docs/v1.9/upgrade-to-1.9/
+
+### All changes
+  * Add Restic builder in Dockerfile, and keep the used built Golang image version in accordance with upstream Restic. (#5685, @blackpiglet)
+
+## v1.9.4
+### 2022-11-30
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.9.4
+
+### Container Image
+`velero/velero:v1.9.4`
+
+### Documentation
+https://velero.io/docs/v1.9/
+
+### Upgrading
+https://velero.io/docs/v1.9/upgrade-to-1.9/
+
+### All changes
+  * Fix CVE for trivy scan (#5642, @qiuming-best)
+  * Remove old kubernetes versions from kind CI (#5627, @Lyndon-Li))
+  * Restore ClusterBootstrap before Cluster (#5617, @ywk253100)
+
 ## v1.9.3
 ### 2022-11-03
 
