@@ -54,6 +54,7 @@ ARG GOLANG_VERSION=1.19.4-bullseye
 FROM --platform=$BUILDPLATFORM builder-env as restic-builder
 
 RUN mkdir -p /output/usr/bin && \
+    export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     bash /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
 
 # Velero image packing section
