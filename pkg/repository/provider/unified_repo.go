@@ -200,6 +200,37 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	return nil
 }
 
+func (urp *unifiedRepoProvider) BoostRepoConnect(ctx context.Context, param RepoParam) error {
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name":  param.BackupLocation.Name,
+		"repo name": param.BackupRepo.Name,
+		"repo UID":  param.BackupRepo.UID,
+	})
+
+	log.Debug("Start to boost repo connect")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
+		udmrepo.WithDescription(repoConnectDesc),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "error to get repo options")
+	}
+
+	bkRepo, err := urp.repoService.Open(ctx, *repoOption)
+	if err == nil {
+		if c := bkRepo.Close(ctx); c != nil {
+			log.WithError(c).Error("Failed to close repo")
+		}
+
+		return nil
+	}
+
+	return urp.ConnectToRepo(ctx, param)
+}
+
 func (urp *unifiedRepoProvider) PruneRepo(ctx context.Context, param RepoParam) error {
 	log := urp.log.WithFields(logrus.Fields{
 		"BSL name":  param.BackupLocation.Name,
