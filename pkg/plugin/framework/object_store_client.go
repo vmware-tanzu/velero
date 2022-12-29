@@ -80,7 +80,7 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 	chunk := make([]byte, byteChunkSize)
 	for {
 		n, err := body.Read(chunk)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			if _, resErr := stream.CloseAndRecv(); resErr != nil {
 				return common.FromGRPCError(resErr)
 			}
@@ -129,7 +129,7 @@ func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, er
 
 	receive := func() ([]byte, error) {
 		data, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// we need to return io.EOF errors unwrapped so that
 			// calling code sees them as io.EOF and knows to stop
 			// reading.

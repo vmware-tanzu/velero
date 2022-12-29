@@ -19,6 +19,7 @@ package archive
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"io"
 	"path/filepath"
 
@@ -76,7 +77,7 @@ func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
 	for {
 		header, err := tarRdr.Next()
 
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
