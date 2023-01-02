@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -302,7 +301,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, RestoreHelperImage string) error {
 	// apply the image pull secret to avoid the image pull limit of Docker Hub
 	if len(registryCredentialFile) > 0 {
-		credential, err := ioutil.ReadFile(registryCredentialFile)
+		credential, err := os.ReadFile(registryCredentialFile)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read the registry credential file %s", registryCredentialFile)
 		}

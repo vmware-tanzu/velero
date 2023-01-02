@@ -17,7 +17,7 @@ limitations under the License.
 package clientmgmt
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -208,7 +208,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 			Function:                "GetObject",
 			Inputs:                  []interface{}{"bucket", "key"},
 			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{ioutil.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
+			ExpectedDelegateOutputs: []interface{}{io.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "ListCommonPrefixes",

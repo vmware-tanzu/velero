@@ -18,7 +18,6 @@ package kopia
 
 import (
 	"context"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -95,7 +94,7 @@ func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter rep
 	}
 
 	// to be consistent with restic when backup empty dir returns one error for upper logic handle
-	dirs, err := ioutil.ReadDir(dir)
+	dirs, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", dir)
 	} else if len(dirs) == 0 {

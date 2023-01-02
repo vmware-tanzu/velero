@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"time"
@@ -613,7 +612,7 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 	}
 	defer readCloser.Close()
 
-	file, err := ioutil.TempFile("", backupName)
+	file, err := os.CreateTemp("", backupName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Backup temp file")
 	}
@@ -672,7 +671,7 @@ type restoreLogger struct {
 }
 
 func newRestoreLogger(restore *api.Restore, logLevel logrus.Level, logFormat logging.Format) (*restoreLogger, error) {
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp file")
 	}

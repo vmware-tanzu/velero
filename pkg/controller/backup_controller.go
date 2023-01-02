@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -588,7 +587,7 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
-	logFile, err := ioutil.TempFile("", "")
+	logFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup log")
 	}
@@ -609,7 +608,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	backupLog := logger.WithField(Backup, kubeutil.NamespaceAndName(backup))
 
 	backupLog.Info("Setting up backup temp file")
-	backupFile, err := ioutil.TempFile("", "")
+	backupFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}

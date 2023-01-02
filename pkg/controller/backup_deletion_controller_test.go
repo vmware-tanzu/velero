@@ -19,11 +19,11 @@ package controller
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"time"
 
 	"context"
-	"io/ioutil"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -322,7 +322,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
 		td.backupStore.On("GetBackupVolumeSnapshots", input.Spec.BackupName).Return(snapshots, nil)
-		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
+		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
@@ -443,7 +443,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
 		td.backupStore.On("GetBackupVolumeSnapshots", dbr.Spec.BackupName).Return(snapshots, nil)
-		td.backupStore.On("GetBackupContents", dbr.Spec.BackupName).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
+		td.backupStore.On("GetBackupContents", dbr.Spec.BackupName).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", dbr.Spec.BackupName).Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
