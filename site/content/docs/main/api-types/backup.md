@@ -145,7 +145,9 @@ status:
   version: 1
   # The date and time when the Backup is eligible for garbage collection.
   expiration: null
-  # The current phase. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
+  # The current phase.
+  # Valid values are New, FailedValidation, InProgress, WaitingForPluginOperations,
+  # WaitingForPluginOperationsPartiallyFailed, Completed, PartiallyFailed, Failed.
   phase: ""
   # An array of any validation errors encountered.
   validationErrors: null

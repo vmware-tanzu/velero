@@ -179,7 +179,9 @@ spec:
           onError: Continue
 # RestoreStatus captures the current status of a Velero restore. Users should not set any data here.
 status:
-  # The current phase. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
+  # The current phase.
+  # Valid values are New, FailedValidation, InProgress, WaitingForPluginOperations,
+  # WaitingForPluginOperationsPartiallyFailed, Completed, PartiallyFailed, Failed.
   phase: ""
   # An array of any validation errors encountered.
   validationErrors: null
