@@ -124,6 +124,11 @@ type BackupSpec struct {
 	// The default value is 10 minute.
 	// +optional
 	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
+
+	// ResourceTimeout is the time used to wait for polling on certain resources,
+	// before returning error as timeout.
+	// +optional
+	ResourceTimeout metav1.Duration `json:"resourceTimeout,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.

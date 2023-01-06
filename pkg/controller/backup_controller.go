@@ -89,6 +89,7 @@ type backupController struct {
 	defaultVolumesToFsBackup  bool
 	defaultBackupTTL          time.Duration
 	defaultCSISnapshotTimeout time.Duration
+	resourceTimeout           time.Duration
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations  map[string]string
 	metrics                   *metrics.ServerMetrics
@@ -113,6 +114,7 @@ func NewBackupController(
 	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
 	defaultCSISnapshotTimeout time.Duration,
+	resourceTimeout time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -137,6 +139,7 @@ func NewBackupController(
 		defaultVolumesToFsBackup:  defaultVolumesToFsBackup,
 		defaultBackupTTL:          defaultBackupTTL,
 		defaultCSISnapshotTimeout: defaultCSISnapshotTimeout,
+		resourceTimeout:           resourceTimeout,
 		snapshotLocationLister:    volumeSnapshotLocationLister,
 		defaultSnapshotLocations:  defaultSnapshotLocations,
 		metrics:                   metrics,
@@ -362,6 +365,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup, logg
 	if request.Spec.CSISnapshotTimeout.Duration == 0 {
 		// set default CSI VolumeSnapshot timeout
 		request.Spec.CSISnapshotTimeout.Duration = c.defaultCSISnapshotTimeout
+	}
+
+	if request.Spec.ResourceTimeout.Duration == 0 {
+		// set default resource timeouts
+		request.Spec.ResourceTimeout.Duration = c.resourceTimeout
 	}
 
 	// calculate expiration
@@ -698,7 +706,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 		// Delete the VolumeSnapshots created in the backup, when CSI feature is enabled.
 		if len(volumeSnapshots) > 0 && len(volumeSnapshotContents) > 0 {
-			c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, backupLog)
+			c.deleteVolumeSnapshot(volumeSnapshots, volumeSnapshotContents, backupLog, backup.Spec.ResourceTimeout.Duration)
 		}
 	}
 
@@ -971,7 +979,7 @@ func (c *backupController) waitVolumeSnapshotReadyToUse(ctx context.Context,
 // change DeletionPolicy to Retain before deleting VS, then change DeletionPolicy back to Delete.
 func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.VolumeSnapshot,
 	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
-	logger logrus.FieldLogger) {
+	logger logrus.FieldLogger, timeout time.Duration) {
 	var wg sync.WaitGroup
 	vscMap := make(map[string]snapshotv1api.VolumeSnapshotContent)
 	for _, vsc := range volumeSnapshotContents {
@@ -1015,7 +1023,7 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 
 				defer func() {
 					logger.Debugf("Start to recreate VolumeSnapshotContent %s", vsc.Name)
-					err := c.recreateVolumeSnapshotContent(vsc)
+					err := c.recreateVolumeSnapshotContent(vsc, timeout)
 					if err != nil {
 						logger.Errorf("fail to recreate VolumeSnapshotContent %s: %s", vsc.Name, err.Error())
 					}
@@ -1039,8 +1047,8 @@ func (c *backupController) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 // and Source. Source is updated to let csi-controller thinks the VSC is statically provsisioned with VS.
 // Set VolumeSnapshotRef's UID to nil will let the csi-controller finds out the related VS is gone, then
 // VSC can be deleted.
-func (c *backupController) recreateVolumeSnapshotContent(vsc snapshotv1api.VolumeSnapshotContent) error {
-	timeout := 1 * time.Minute
+func (c *backupController) recreateVolumeSnapshotContent(vsc snapshotv1api.VolumeSnapshotContent, resourceTimeout time.Duration) error {
+	timeout := resourceTimeout
 	interval := 1 * time.Second
 
 	err := c.kbClient.Delete(context.TODO(), &vsc)

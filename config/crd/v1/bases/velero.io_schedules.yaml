@@ -427,6 +427,10 @@ spec:
                       simply use "objectname".
                     nullable: true
                     type: object
+                  resourceTimeout:
+                    description: ResourceTimeout is the time used to wait for polling
+                      on certain resources, before returning error as timeout.
+                    type: string
                   snapshotVolumes:
                     description: SnapshotVolumes specifies whether to take cloud snapshots
                       of any PV's referenced in the set of objects included in the

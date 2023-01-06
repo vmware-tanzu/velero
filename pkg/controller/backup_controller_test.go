@@ -1449,7 +1449,7 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClientBuilder(t).WithLists(
 				&snapshotv1api.VolumeSnapshotContentList{Items: tc.vscArray},
 			).Build()
-
+			timeout := 10
 			vsClient := snapshotfake.NewSimpleClientset(&tc.vsArray[0])
 			sharedInformers := snapshotinformers.NewSharedInformerFactory(vsClient, 0)
 
@@ -1464,7 +1464,7 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 				volumeSnapshotLister: sharedInformers.Snapshot().V1().VolumeSnapshots().Lister(),
 			}
 
-			c.deleteVolumeSnapshot(tc.vsArray, tc.vscArray, logger)
+			c.deleteVolumeSnapshot(tc.vsArray, tc.vscArray, logger, time.Duration(timeout))
 
 			vsList, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots("velero").List(context.TODO(), metav1.ListOptions{})
 			require.NoError(t, err)

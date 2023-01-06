@@ -111,6 +111,8 @@ const (
 
 	defaultCSISnapshotTimeout = 10 * time.Minute
 
+	resourceTimeout = 10 * time.Minute
+
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
@@ -118,22 +120,22 @@ const (
 
 type serverConfig struct {
 	// TODO(2.0) Deprecate defaultBackupLocation
-	pluginDir, metricsAddress, defaultBackupLocation                        string
-	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
-	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
-	restoreResourcePriorities                                               restore.Priorities
-	defaultVolumeSnapshotLocations                                          map[string]string
-	restoreOnly                                                             bool
-	disabledControllers                                                     []string
-	clientQPS                                                               float32
-	clientBurst                                                             int
-	clientPageSize                                                          int
-	profilerAddress                                                         string
-	formatFlag                                                              *logging.FormatFlag
-	repoMaintenanceFrequency                                                time.Duration
-	garbageCollectionFrequency                                              time.Duration
-	defaultVolumesToFsBackup                                                bool
-	uploaderType                                                            string
+	pluginDir, metricsAddress, defaultBackupLocation                                       string
+	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout                time.Duration
+	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout, resourceTimeout time.Duration
+	restoreResourcePriorities                                                              restore.Priorities
+	defaultVolumeSnapshotLocations                                                         map[string]string
+	restoreOnly                                                                            bool
+	disabledControllers                                                                    []string
+	clientQPS                                                                              float32
+	clientBurst                                                                            int
+	clientPageSize                                                                         int
+	profilerAddress                                                                        string
+	formatFlag                                                                             *logging.FormatFlag
+	repoMaintenanceFrequency                                                               time.Duration
+	garbageCollectionFrequency                                                             time.Duration
+	defaultVolumesToFsBackup                                                               bool
+	uploaderType                                                                           string
 }
 
 type controllerRunInfo struct {
@@ -153,6 +155,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			backupSyncPeriod:               defaultBackupSyncPeriod,
 			defaultBackupTTL:               defaultBackupTTL,
 			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
+			resourceTimeout:                resourceTimeout,
 			storeValidationFrequency:       defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
@@ -230,6 +233,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
 	command.Flags().BoolVar(&config.defaultVolumesToFsBackup, "default-volumes-to-fs-backup", config.defaultVolumesToFsBackup, "Backup all volumes with pod volume file system backup by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
+	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for snapshot deletion and repository ensurer before timeout.")
 
 	return command
 }
@@ -567,7 +571,7 @@ func (s *server) initRepoManager() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger)
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
 
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
@@ -656,6 +660,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultVolumesToFsBackup,
 			s.config.defaultBackupTTL,
 			s.config.defaultCSISnapshotTimeout,
+			s.config.resourceTimeout,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,

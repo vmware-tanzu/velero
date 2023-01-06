@@ -33,6 +33,10 @@ spec:
   # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
   # returning error as timeout. The default value is 10 minute.
   csiSnapshotTimeout: 10m
+  # ResourceTimeout can be used to replace default timeout occurrences such as 
+  # VolumeSnapshot recreation and checking the repository ready status. The 
+  # default value is 10 minutes.
+  resourceTimeout: 10m
   # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:

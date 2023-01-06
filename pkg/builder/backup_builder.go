@@ -245,3 +245,9 @@ func (b *BackupBuilder) CSISnapshotTimeout(timeout time.Duration) *BackupBuilder
 	b.object.Spec.CSISnapshotTimeout.Duration = timeout
 	return b
 }
+
+// ResourceTimeout sets the Backup's ResourceTimeout
+func (b *BackupBuilder) ResourceTimeout(timeout time.Duration) *BackupBuilder {
+	b.object.Spec.ResourceTimeout.Duration = timeout
+	return b
+}
