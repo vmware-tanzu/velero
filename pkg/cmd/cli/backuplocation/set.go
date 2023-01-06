@@ -19,13 +19,12 @@ package backuplocation
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -98,7 +97,7 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 		if err != nil {
 			return err
 		}
-		caCertData, err = ioutil.ReadFile(realPath)
+		caCertData, err = os.ReadFile(realPath)
 		if err != nil {
 			return err
 		}

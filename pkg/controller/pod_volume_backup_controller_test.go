@@ -115,7 +115,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 		func(test request) {
 			ctx := context.Background()
 
-			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 			err = fakeClient.Create(ctx, test.pvb)
 			Expect(err).To(BeNil())
 

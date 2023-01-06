@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
@@ -413,6 +412,7 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumesnapshots.json.gz", newStringReadSeeker("foo"))
 	res, err = harness.GetBackupVolumeSnapshots("test-backup")
 	assert.NotNil(t, err)
+	assert.Nil(t, res)
 
 	// volumesnapshots file containing gzipped json data should return correctly
 	snapshots := []*volume.Snapshot{
@@ -455,6 +455,7 @@ func TestGetItemSnapshots(t *testing.T) {
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemsnapshots.json.gz", newStringReadSeeker("foo"))
 	res, err = harness.GetItemSnapshots("test-backup")
 	assert.NotNil(t, err)
+	assert.Nil(t, res)
 
 	// volumesnapshots file containing gzipped json data should return correctly
 	snapshots := []*volume.ItemSnapshot{
@@ -493,7 +494,7 @@ func TestGetBackupContents(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rc)
 
-	data, err := ioutil.ReadAll(rc)
+	data, err := io.ReadAll(rc)
 	require.NoError(t, err)
 	assert.Equal(t, "foo", string(data))
 }

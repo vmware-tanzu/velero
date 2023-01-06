@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -302,7 +301,7 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	// Write a done file with name=<restore-uid> into the just-created .velero dir
 	// within the volume. The velero init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
-	if err := ioutil.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec
+	if err := os.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec
 		return errors.Wrap(err, "error writing done file")
 	}
 
@@ -313,7 +312,7 @@ func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.
 	return &RestoreProgressUpdater{pvr, log, ctx, r.Client}
 }
 
-//UpdateProgress which implement ProgressUpdater interface to update pvr progress status
+// UpdateProgress which implement ProgressUpdater interface to update pvr progress status
 func (r *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
 	original := r.PodVolumeRestore.DeepCopy()
 	r.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}

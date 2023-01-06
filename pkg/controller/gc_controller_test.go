@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	k8stesting "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,7 +35,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func mockGCReconciler(fakeClient kbclient.Client, fakeClock *clock.FakeClock, freq time.Duration) *gcReconciler {
+func mockGCReconciler(fakeClient kbclient.Client, fakeClock *k8stesting.FakeClock, freq time.Duration) *gcReconciler {
 	gcr := NewGCReconciler(
 		velerotest.NewLogger(),
 		fakeClient,

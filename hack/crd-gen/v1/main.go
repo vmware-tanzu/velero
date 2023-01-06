@@ -24,7 +24,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"text/template"
@@ -87,7 +86,7 @@ type templateData struct {
 }
 
 func main() {
-	headerBytes, err := ioutil.ReadFile(goHeaderFile)
+	headerBytes, err := os.ReadFile(goHeaderFile)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -97,7 +96,7 @@ func main() {
 	}
 
 	// This is relative to config/crd/crds
-	manifests, err := ioutil.ReadDir("../bases")
+	manifests, err := os.ReadDir("../bases")
 	if err != nil {
 		log.Fatalln(err)
 	}

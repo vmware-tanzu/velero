@@ -18,7 +18,7 @@ package k8s
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"time"
 
@@ -43,7 +43,7 @@ func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace str
 	data := make(map[string][]byte)
 
 	for key, filePath := range files {
-		contents, err := ioutil.ReadFile(filePath)
+		contents, err := os.ReadFile(filePath)
 		if err != nil {
 			return errors.WithMessagef(err, "Failed to read secret file %q", filePath)
 		}

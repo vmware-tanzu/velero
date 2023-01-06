@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -479,11 +478,12 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup, logg
 
 // validateAndGetSnapshotLocations gets a collection of VolumeSnapshotLocation objects that
 // this backup will use (returned as a map of provider name -> VSL), and ensures:
-// - each location name in .spec.volumeSnapshotLocations exists as a location
-// - exactly 1 location per provider
-// - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
-//   is not explicitly specified for the provider (if there's only one location for the provider,
-//   it will automatically be used)
+//   - each location name in .spec.volumeSnapshotLocations exists as a location
+//   - exactly 1 location per provider
+//   - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
+//     is not explicitly specified for the provider (if there's only one location for the provider,
+//     it will automatically be used)
+//
 // if backup has snapshotVolume disabled then it returns empty VSL
 func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.Backup) (map[string]*velerov1api.VolumeSnapshotLocation, []string) {
 	errors := []string{}
@@ -588,7 +588,7 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
-	logFile, err := ioutil.TempFile("", "")
+	logFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup log")
 	}
@@ -609,7 +609,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	backupLog := logger.WithField(Backup, kubeutil.NamespaceAndName(backup))
 
 	backupLog.Info("Setting up backup temp file")
-	backupFile, err := ioutil.TempFile("", "")
+	backupFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}

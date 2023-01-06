@@ -56,7 +56,7 @@ func (fs *osFileSystem) Glob(path string) ([]string, error) {
 }
 
 func (fs *osFileSystem) TempDir(dir, prefix string) (string, error) {
-	return ioutil.TempDir(dir, prefix)
+	return os.MkdirTemp(dir, prefix)
 }
 
 func (fs *osFileSystem) MkdirAll(path string, perm os.FileMode) error {
@@ -80,7 +80,7 @@ func (fs *osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
 }
 
 func (fs *osFileSystem) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 func (fs *osFileSystem) DirExists(path string) (bool, error) {
@@ -95,7 +95,7 @@ func (fs *osFileSystem) DirExists(path string) (bool, error) {
 }
 
 func (fs *osFileSystem) TempFile(dir, prefix string) (NameWriteCloser, error) {
-	return ioutil.TempFile(dir, prefix)
+	return os.CreateTemp(dir, prefix)
 }
 
 func (fs *osFileSystem) Stat(path string) (os.FileInfo, error) {

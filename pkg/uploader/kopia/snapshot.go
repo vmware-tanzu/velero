@@ -18,7 +18,6 @@ package kopia
 
 import (
 	"context"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -43,14 +42,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-//All function mainly used to make testing more convenient
+// All function mainly used to make testing more convenient
 var treeForSourceFunc = policy.TreeForSource
 var applyRetentionPolicyFunc = policy.ApplyRetentionPolicy
 var setPolicyFunc = policy.SetPolicy
 var saveSnapshotFunc = snapshot.SaveSnapshot
 var loadSnapshotFunc = snapshot.LoadSnapshot
 
-//SnapshotUploader which mainly used for UT test that could overwrite Upload interface
+// SnapshotUploader which mainly used for UT test that could overwrite Upload interface
 type SnapshotUploader interface {
 	Upload(
 		ctx context.Context,
@@ -65,7 +64,7 @@ func newOptionalInt(b policy.OptionalInt) *policy.OptionalInt {
 	return &b
 }
 
-//setupDefaultPolicy set default policy for kopia
+// setupDefaultPolicy set default policy for kopia
 func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo) error {
 	return setPolicyFunc(ctx, rep, sourceInfo, &policy.Policy{
 		RetentionPolicy: policy.RetentionPolicy{
@@ -83,7 +82,7 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 	})
 }
 
-//Backup backup specific sourcePath and update progress
+// Backup backup specific sourcePath and update progress
 func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath string,
 	parentSnapshot string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
@@ -95,7 +94,7 @@ func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter rep
 	}
 
 	// to be consistent with restic when backup empty dir returns one error for upper logic handle
-	dirs, err := ioutil.ReadDir(dir)
+	dirs, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", dir)
 	} else if len(dirs) == 0 {
@@ -140,7 +139,7 @@ func getLocalFSEntry(path0 string) (fs.Entry, error) {
 	return e, nil
 }
 
-//resolveSymlink returns the path name after the evaluation of any symbolic links
+// resolveSymlink returns the path name after the evaluation of any symbolic links
 func resolveSymlink(path string) (string, error) {
 	st, err := os.Lstat(path)
 	if err != nil {
@@ -154,7 +153,7 @@ func resolveSymlink(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 
-//SnapshotSource which setup policy for snapshot, upload snapshot, update progress
+// SnapshotSource which setup policy for snapshot, upload snapshot, update progress
 func SnapshotSource(
 	ctx context.Context,
 	rep repo.RepositoryWriter,
@@ -260,7 +259,7 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 	return result, nil
 }
 
-//Restore restore specific sourcePath with given snapshotID and update progress
+// Restore restore specific sourcePath with given snapshotID and update progress
 func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *KopiaProgress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 	log.Info("Start to restore...")
 
