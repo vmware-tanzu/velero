@@ -588,7 +588,7 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
-	logFile, err := ioutil.TempFile("", "")
+	logFile, err := ioutil.TempFile("", "log-"+backup.Name+"-*")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup log")
 	}
