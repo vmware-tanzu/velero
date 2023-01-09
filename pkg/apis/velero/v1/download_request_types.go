@@ -25,17 +25,18 @@ type DownloadRequestSpec struct {
 }
 
 // DownloadTargetKind represents what type of file to download.
-// +kubebuilder:validation:Enum=BackupLog;BackupContents;BackupVolumeSnapshots;BackupItemSnapshots;BackupResourceList;RestoreLog;RestoreResults;CSIBackupVolumeSnapshots;CSIBackupVolumeSnapshotContents
+// +kubebuilder:validation:Enum=BackupLog;BackupContents;BackupVolumeSnapshots;BackupItemOperations;BackupResourceList;RestoreLog;RestoreResults;RestoreItemOperations;CSIBackupVolumeSnapshots;CSIBackupVolumeSnapshotContents
 type DownloadTargetKind string
 
 const (
 	DownloadTargetKindBackupLog                       DownloadTargetKind = "BackupLog"
 	DownloadTargetKindBackupContents                  DownloadTargetKind = "BackupContents"
 	DownloadTargetKindBackupVolumeSnapshots           DownloadTargetKind = "BackupVolumeSnapshots"
-	DownloadTargetKindBackupItemSnapshots             DownloadTargetKind = "BackupItemSnapshots"
+	DownloadTargetKindBackupItemOperations            DownloadTargetKind = "BackupItemOperations"
 	DownloadTargetKindBackupResourceList              DownloadTargetKind = "BackupResourceList"
 	DownloadTargetKindRestoreLog                      DownloadTargetKind = "RestoreLog"
 	DownloadTargetKindRestoreResults                  DownloadTargetKind = "RestoreResults"
+	DownloadTargetKindRestoreItemOperations           DownloadTargetKind = "RestoreItemOperations"
 	DownloadTargetKindCSIBackupVolumeSnapshots        DownloadTargetKind = "CSIBackupVolumeSnapshots"
 	DownloadTargetKindCSIBackupVolumeSnapshotContents DownloadTargetKind = "CSIBackupVolumeSnapshotContents"
 )

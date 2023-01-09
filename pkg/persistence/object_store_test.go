@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -216,98 +217,98 @@ func TestListBackups(t *testing.T) {
 
 func TestPutBackup(t *testing.T) {
 	tests := []struct {
-		name            string
-		prefix          string
-		metadata        io.Reader
-		contents        io.Reader
-		log             io.Reader
-		podVolumeBackup io.Reader
-		snapshots       io.Reader
-		itemSnapshots   io.Reader
-		resourceList    io.Reader
-		expectedErr     string
-		expectedKeys    []string
+		name                 string
+		prefix               string
+		metadata             io.Reader
+		contents             io.Reader
+		log                  io.Reader
+		podVolumeBackup      io.Reader
+		snapshots            io.Reader
+		backupItemOperations io.Reader
+		resourceList         io.Reader
+		expectedErr          string
+		expectedKeys         []string
 	}{
 		{
-			name:            "normal case",
-			metadata:        newStringReadSeeker("metadata"),
-			contents:        newStringReadSeeker("contents"),
-			log:             newStringReadSeeker("log"),
-			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
-			snapshots:       newStringReadSeeker("snapshots"),
-			itemSnapshots:   newStringReadSeeker("itemSnapshots"),
-			resourceList:    newStringReadSeeker("resourceList"),
-			expectedErr:     "",
+			name:                 "normal case",
+			metadata:             newStringReadSeeker("metadata"),
+			contents:             newStringReadSeeker("contents"),
+			log:                  newStringReadSeeker("log"),
+			podVolumeBackup:      newStringReadSeeker("podVolumeBackup"),
+			snapshots:            newStringReadSeeker("snapshots"),
+			backupItemOperations: newStringReadSeeker("backupItemOperations"),
+			resourceList:         newStringReadSeeker("resourceList"),
+			expectedErr:          "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-logs.gz",
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
-				"backups/backup-1/backup-1-itemsnapshots.json.gz",
+				"backups/backup-1/backup-1-itemoperations.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
 			},
 		},
 		{
-			name:            "normal case with backup store prefix",
-			prefix:          "prefix-1/",
-			metadata:        newStringReadSeeker("metadata"),
-			contents:        newStringReadSeeker("contents"),
-			log:             newStringReadSeeker("log"),
-			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
-			snapshots:       newStringReadSeeker("snapshots"),
-			itemSnapshots:   newStringReadSeeker("itemSnapshots"),
-			resourceList:    newStringReadSeeker("resourceList"),
-			expectedErr:     "",
+			name:                 "normal case with backup store prefix",
+			prefix:               "prefix-1/",
+			metadata:             newStringReadSeeker("metadata"),
+			contents:             newStringReadSeeker("contents"),
+			log:                  newStringReadSeeker("log"),
+			podVolumeBackup:      newStringReadSeeker("podVolumeBackup"),
+			snapshots:            newStringReadSeeker("snapshots"),
+			backupItemOperations: newStringReadSeeker("backupItemOperations"),
+			resourceList:         newStringReadSeeker("resourceList"),
+			expectedErr:          "",
 			expectedKeys: []string{
 				"prefix-1/backups/backup-1/velero-backup.json",
 				"prefix-1/backups/backup-1/backup-1.tar.gz",
 				"prefix-1/backups/backup-1/backup-1-logs.gz",
 				"prefix-1/backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
-				"prefix-1/backups/backup-1/backup-1-itemsnapshots.json.gz",
+				"prefix-1/backups/backup-1/backup-1-itemoperations.json.gz",
 				"prefix-1/backups/backup-1/backup-1-resource-list.json.gz",
 			},
 		},
 		{
-			name:            "error on metadata upload does not upload data",
-			metadata:        new(errorReader),
-			contents:        newStringReadSeeker("contents"),
-			log:             newStringReadSeeker("log"),
-			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
-			snapshots:       newStringReadSeeker("snapshots"),
-			itemSnapshots:   newStringReadSeeker("itemSnapshots"),
-			resourceList:    newStringReadSeeker("resourceList"),
-			expectedErr:     "error readers return errors",
-			expectedKeys:    []string{"backups/backup-1/backup-1-logs.gz"},
+			name:                 "error on metadata upload does not upload data",
+			metadata:             new(errorReader),
+			contents:             newStringReadSeeker("contents"),
+			log:                  newStringReadSeeker("log"),
+			podVolumeBackup:      newStringReadSeeker("podVolumeBackup"),
+			snapshots:            newStringReadSeeker("snapshots"),
+			backupItemOperations: newStringReadSeeker("backupItemOperations"),
+			resourceList:         newStringReadSeeker("resourceList"),
+			expectedErr:          "error readers return errors",
+			expectedKeys:         []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
-			name:          "error on data upload deletes metadata",
-			metadata:      newStringReadSeeker("metadata"),
-			contents:      new(errorReader),
-			log:           newStringReadSeeker("log"),
-			snapshots:     newStringReadSeeker("snapshots"),
-			itemSnapshots: newStringReadSeeker("itemSnapshots"),
-			resourceList:  newStringReadSeeker("resourceList"),
-			expectedErr:   "error readers return errors",
-			expectedKeys:  []string{"backups/backup-1/backup-1-logs.gz"},
+			name:                 "error on data upload deletes metadata",
+			metadata:             newStringReadSeeker("metadata"),
+			contents:             new(errorReader),
+			log:                  newStringReadSeeker("log"),
+			snapshots:            newStringReadSeeker("snapshots"),
+			backupItemOperations: newStringReadSeeker("backupItemOperations"),
+			resourceList:         newStringReadSeeker("resourceList"),
+			expectedErr:          "error readers return errors",
+			expectedKeys:         []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
-			name:            "error on log upload is ok",
-			metadata:        newStringReadSeeker("foo"),
-			contents:        newStringReadSeeker("bar"),
-			log:             new(errorReader),
-			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
-			snapshots:       newStringReadSeeker("snapshots"),
-			itemSnapshots:   newStringReadSeeker("itemSnapshots"),
-			resourceList:    newStringReadSeeker("resourceList"),
-			expectedErr:     "",
+			name:                 "error on log upload is ok",
+			metadata:             newStringReadSeeker("foo"),
+			contents:             newStringReadSeeker("bar"),
+			log:                  new(errorReader),
+			podVolumeBackup:      newStringReadSeeker("podVolumeBackup"),
+			snapshots:            newStringReadSeeker("snapshots"),
+			backupItemOperations: newStringReadSeeker("backupItemOperations"),
+			resourceList:         newStringReadSeeker("resourceList"),
+			expectedErr:          "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
-				"backups/backup-1/backup-1-itemsnapshots.json.gz",
+				"backups/backup-1/backup-1-itemoperations.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
 			},
 		},
@@ -335,14 +336,14 @@ func TestPutBackup(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
 			backupInfo := BackupInfo{
-				Name:               "backup-1",
-				Metadata:           tc.metadata,
-				Contents:           tc.contents,
-				Log:                tc.log,
-				PodVolumeBackups:   tc.podVolumeBackup,
-				VolumeSnapshots:    tc.snapshots,
-				ItemSnapshots:      tc.itemSnapshots,
-				BackupResourceList: tc.resourceList,
+				Name:                 "backup-1",
+				Metadata:             tc.metadata,
+				Contents:             tc.contents,
+				Log:                  tc.log,
+				PodVolumeBackups:     tc.podVolumeBackup,
+				VolumeSnapshots:      tc.snapshots,
+				BackupItemOperations: tc.backupItemOperations,
+				BackupResourceList:   tc.resourceList,
 			}
 			err := harness.PutBackup(backupInfo)
 
@@ -442,30 +443,30 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 	assert.EqualValues(t, snapshots, res)
 }
 
-func TestGetItemSnapshots(t *testing.T) {
+func TestGetBackupItemOperations(t *testing.T) {
 	harness := newObjectBackupStoreTestHarness("test-bucket", "")
 
-	// volumesnapshots file not found should not error
+	// itemoperations file not found should not error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/velero-backup.json", newStringReadSeeker("foo"))
-	res, err := harness.GetItemSnapshots("test-backup")
+	res, err := harness.GetBackupItemOperations("test-backup")
 	assert.NoError(t, err)
 	assert.Nil(t, res)
 
-	// volumesnapshots file containing invalid data should error
-	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemsnapshots.json.gz", newStringReadSeeker("foo"))
-	res, err = harness.GetItemSnapshots("test-backup")
+	// itemoperations file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemoperations.json.gz", newStringReadSeeker("foo"))
+	res, err = harness.GetBackupItemOperations("test-backup")
 	assert.NotNil(t, err)
 
-	// volumesnapshots file containing gzipped json data should return correctly
-	snapshots := []*volume.ItemSnapshot{
+	// itemoperations file containing gzipped json data should return correctly
+	operations := []*itemoperation.BackupOperation{
 		{
-			Spec: volume.ItemSnapshotSpec{
+			Spec: itemoperation.BackupOperationSpec{
 				BackupName:         "test-backup",
 				ResourceIdentifier: "item-1",
 			},
 		},
 		{
-			Spec: volume.ItemSnapshotSpec{
+			Spec: itemoperation.BackupOperationSpec{
 				BackupName:         "test-backup",
 				ResourceIdentifier: "item-2",
 			},
@@ -475,13 +476,13 @@ func TestGetItemSnapshots(t *testing.T) {
 	obj := new(bytes.Buffer)
 	gzw := gzip.NewWriter(obj)
 
-	require.NoError(t, json.NewEncoder(gzw).Encode(snapshots))
+	require.NoError(t, json.NewEncoder(gzw).Encode(operations))
 	require.NoError(t, gzw.Close())
-	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemsnapshots.json.gz", obj))
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemoperations.json.gz", obj))
 
-	res, err = harness.GetItemSnapshots("test-backup")
+	res, err = harness.GetBackupItemOperations("test-backup")
 	assert.NoError(t, err)
-	assert.EqualValues(t, snapshots, res)
+	assert.EqualValues(t, operations, res)
 }
 
 func TestGetBackupContents(t *testing.T) {
@@ -564,7 +565,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupContents:        "backups/my-backup/my-backup.tar.gz",
 				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup/my-backup-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup/my-backup-volumesnapshots.json.gz",
-				velerov1api.DownloadTargetKindBackupItemSnapshots:   "backups/my-backup/my-backup-itemsnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "backups/my-backup/my-backup-itemoperations.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup/my-backup-resource-list.json.gz",
 			},
 		},
@@ -576,7 +577,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupContents:        "velero-backups/backups/my-backup/my-backup.tar.gz",
 				velerov1api.DownloadTargetKindBackupLog:             "velero-backups/backups/my-backup/my-backup-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "velero-backups/backups/my-backup/my-backup-volumesnapshots.json.gz",
-				velerov1api.DownloadTargetKindBackupItemSnapshots:   "velero-backups/backups/my-backup/my-backup-itemsnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "velero-backups/backups/my-backup/my-backup-itemoperations.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "velero-backups/backups/my-backup/my-backup-resource-list.json.gz",
 			},
 		},
@@ -587,7 +588,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupContents:        "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902.tar.gz",
 				velerov1api.DownloadTargetKindBackupLog:             "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-volumesnapshots.json.gz",
-				velerov1api.DownloadTargetKindBackupItemSnapshots:   "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-itemsnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-itemoperations.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-resource-list.json.gz",
 			},
 		},
@@ -598,7 +599,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupContents:        "backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
 				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup-20170913154901/my-backup-20170913154901-volumesnapshots.json.gz",
-				velerov1api.DownloadTargetKindBackupItemSnapshots:   "backups/my-backup-20170913154901/my-backup-20170913154901-itemsnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "backups/my-backup-20170913154901/my-backup-20170913154901-itemoperations.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup-20170913154901/my-backup-20170913154901-resource-list.json.gz",
 			},
 		},
@@ -610,7 +611,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupContents:        "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
 				velerov1api.DownloadTargetKindBackupLog:             "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-volumesnapshots.json.gz",
-				velerov1api.DownloadTargetKindBackupItemSnapshots:   "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-itemsnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-itemoperations.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-resource-list.json.gz",
 			},
 		},
@@ -618,8 +619,9 @@ func TestGetDownloadURL(t *testing.T) {
 			name:       "restore",
 			targetName: "my-backup",
 			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
-				velerov1api.DownloadTargetKindRestoreLog:     "restores/my-backup/restore-my-backup-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults: "restores/my-backup/restore-my-backup-results.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "restores/my-backup/restore-my-backup-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "restores/my-backup/restore-my-backup-results.gz",
+				velerov1api.DownloadTargetKindRestoreItemOperations: "restores/my-backup/restore-my-backup-itemoperations.json.gz",
 			},
 		},
 		{
@@ -627,16 +629,18 @@ func TestGetDownloadURL(t *testing.T) {
 			targetName: "my-backup",
 			prefix:     "velero-backups/",
 			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
-				velerov1api.DownloadTargetKindRestoreLog:     "velero-backups/restores/my-backup/restore-my-backup-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults: "velero-backups/restores/my-backup/restore-my-backup-results.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "velero-backups/restores/my-backup/restore-my-backup-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "velero-backups/restores/my-backup/restore-my-backup-results.gz",
+				velerov1api.DownloadTargetKindRestoreItemOperations: "velero-backups/restores/my-backup/restore-my-backup-itemoperations.json.gz",
 			},
 		},
 		{
 			name:       "restore with multiple dashes",
 			targetName: "b-cool-20170913154901-20170913154902",
 			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
-				velerov1api.DownloadTargetKindRestoreLog:     "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
+				velerov1api.DownloadTargetKindRestoreItemOperations: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-itemoperations.json.gz",
 			},
 		},
 	}
