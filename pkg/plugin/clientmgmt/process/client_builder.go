@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
@@ -68,13 +69,14 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 		HandshakeConfig:  framework.Handshake(),
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
-			string(common.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(common.ClientLogger(b.clientLogger)),
-			string(common.PluginKindVolumeSnapshotter): framework.NewVolumeSnapshotterPlugin(common.ClientLogger(b.clientLogger)),
-			string(common.PluginKindObjectStore):       framework.NewObjectStorePlugin(common.ClientLogger(b.clientLogger)),
-			string(common.PluginKindPluginLister):      &framework.PluginListerPlugin{},
-			string(common.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
-			string(common.PluginKindDeleteItemAction):  framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
-			string(common.PluginKindItemSnapshotter):   framework.NewItemSnapshotterPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindBackupItemAction):   framework.NewBackupItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindBackupItemActionV2): biav2.NewBackupItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindVolumeSnapshotter):  framework.NewVolumeSnapshotterPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindObjectStore):        framework.NewObjectStorePlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindPluginLister):       &framework.PluginListerPlugin{},
+			string(common.PluginKindRestoreItemAction):  framework.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindDeleteItemAction):   framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindItemSnapshotter):    framework.NewItemSnapshotterPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint

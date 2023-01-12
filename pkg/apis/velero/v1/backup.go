@@ -221,7 +221,7 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;Completed;PartiallyFailed;Failed;Deleting
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
 type BackupPhase string
 
 const (
@@ -236,16 +236,20 @@ const (
 	// BackupPhaseInProgress means the backup is currently executing.
 	BackupPhaseInProgress BackupPhase = "InProgress"
 
-	// BackupPhaseUploading means the backups of Kubernetes resources
-	// and creation of snapshots was successful and snapshot data
-	// is currently uploading.  The backup is not usable yet.
-	BackupPhaseUploading BackupPhase = "Uploading"
+	// BackupPhaseWaitingForPluginOperations means the backup of
+	// Kubernetes resources, creation of snapshots, and other
+	// async plugin operations was successful and snapshot data is
+	// currently uploading or other plugin operations are still
+	// ongoing.  The backup is not usable yet.
+	BackupPhaseWaitingForPluginOperations BackupPhase = "WaitingForPluginOperations"
 
-	// BackupPhaseUploadingPartialFailure means the backup of Kubernetes
-	// resources and creation of snapshots partially failed (final phase
-	// will be PartiallyFailed) and snapshot data is currently uploading.
-	// The backup is not usable yet.
-	BackupPhaseUploadingPartialFailure BackupPhase = "UploadingPartialFailure"
+	// BackupPhaseWaitingForPluginOperationsPartiallyFailed means
+	// the backup of Kubernetes resources, creation of snapshots,
+	// and other async plugin operations partially failed (final
+	// phase will be PartiallyFailed) and snapshot data is
+	// currently uploading or other plugin operations are still
+	// ongoing.  The backup is not usable yet.
+	BackupPhaseWaitingForPluginOperationsPartiallyFailed BackupPhase = "WaitingForPluginOperationsPartiallyFailed"
 
 	// BackupPhaseCompleted means the backup has run successfully without
 	// errors.

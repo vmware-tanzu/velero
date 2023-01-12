@@ -1,0 +1,4 @@
+new backup and restore phases to support async plugin operations:
+- WaitingForPluginOperations
+- WaitingForPluginOperationsPartiallyFailed
+
