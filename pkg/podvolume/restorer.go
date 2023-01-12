@@ -63,7 +63,7 @@ type restorer struct {
 
 	resultsLock    sync.Mutex
 	results        map[string]chan *velerov1api.PodVolumeRestore
-	nodeAgentCheck chan struct{}
+	nodeAgentCheck chan error
 	log            logrus.FieldLogger
 }
 
@@ -145,7 +145,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 	r.results[resultsKey(data.Pod.Namespace, data.Pod.Name)] = resultsChan
 	r.resultsLock.Unlock()
 
-	r.nodeAgentCheck = make(chan struct{})
+	r.nodeAgentCheck = make(chan error)
 
 	var (
 		errs        []error
@@ -179,11 +179,12 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 		numRestores++
 	}
 
+	checkCtx, checkCancel := context.WithCancel(context.Background())
 	go func() {
 		nodeName := ""
 
 		checkFunc := func(ctx context.Context) (bool, error) {
-			newObj, err := r.kubeClient.CoreV1().Pods(data.Pod.Namespace).Get(context.TODO(), data.Pod.Name, metav1.GetOptions{})
+			newObj, err := r.kubeClient.CoreV1().Pods(data.Pod.Namespace).Get(ctx, data.Pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -198,16 +199,16 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			}
 		}
 
-		err := wait.PollWithContext(r.ctx, time.Millisecond*500, time.Minute*10, checkFunc)
+		err := wait.PollWithContext(checkCtx, time.Millisecond*500, time.Minute*10, checkFunc)
 		if err == wait.ErrWaitTimeout {
-			r.log.WithError(err).Error("Restoring pod is not scheduled until timeout, disengage")
+			r.log.WithError(err).Error("Restoring pod is not scheduled until timeout or cancel, disengage")
 		} else if err != nil {
 			r.log.WithError(err).Error("Failed to check node-agent pod status, disengage")
 		} else {
-			err = nodeagent.IsRunningInNode(r.ctx, data.Restore.Namespace, nodeName, r.podClient)
+			err = nodeagent.IsRunningInNode(checkCtx, data.Restore.Namespace, nodeName, r.podClient)
 			if err != nil {
-				r.log.WithField("node", nodeName).WithError(err).Error("node-agent pod is not running on node, abort the restore")
-				r.nodeAgentCheck <- struct{}{}
+				r.log.WithField("node", nodeName).WithError(err).Error("node-agent pod is not running in node, abort the restore")
+				r.nodeAgentCheck <- errors.Wrapf(err, "node-agent pod is not running in node %s", nodeName)
 			}
 		}
 	}()
@@ -222,11 +223,16 @@ ForEachVolume:
 			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
 				errs = append(errs, errors.Errorf("pod volume restore failed: %s", res.Status.Message))
 			}
-		case <-r.nodeAgentCheck:
-			errs = append(errs, errors.New("node agent pod is not running in node"))
+		case err := <-r.nodeAgentCheck:
+			errs = append(errs, err)
 			break ForEachVolume
 		}
 	}
+
+	// This is to prevent the case that resultsChan is signaled before nodeAgentCheck though this is unlikely possible.
+	// One possible case is that the CR is edited and set to an ending state manually, either completed or failed.
+	// In this case, we must notify the check routine to stop.
+	checkCancel()
 
 	r.resultsLock.Lock()
 	delete(r.results, resultsKey(data.Pod.Namespace, data.Pod.Name))
