@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Setup build environment
-ARG GOLANG_VERSION=1.18.8
-FROM --platform=$BUILDPLATFORM golang:${GOLANG_VERSION} as builder-env
+# Velero binary build section
+FROM --platform=$BUILDPLATFORM golang:1.18.8 as velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -23,7 +22,6 @@ ARG VERSION
 ARG REGISTRY
 ARG GIT_SHA
 ARG GIT_TREE_STATE
-ARG RESTIC_VERSION
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -40,18 +38,28 @@ WORKDIR /go/src/github.com/vmware-tanzu/velero
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
-# Velero binary build section
-ARG GOLANG_VERSION=1.18.8
-FROM --platform=$BUILDPLATFORM builder-env as builder
-
 RUN mkdir -p /output/usr/bin && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
 # Restic binary build section
-ARG GOLANG_VERSION=1.19.4-bullseye
-FROM --platform=$BUILDPLATFORM builder-env as restic-builder
+FROM --platform=$BUILDPLATFORM golang:1.19.4-bullseye as restic-builder
+
+ARG BIN
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG RESTIC_VERSION
+
+env CGO_ENABLED=0 \
+    GO111MODULE=on \
+    GOPROXY=${GOPROXY} \
+    GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
+    GOARM=${TARGETVARIANT}
+
+COPY . /go/src/github.com/vmware-tanzu/velero
 
 RUN mkdir -p /output/usr/bin && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
@@ -62,7 +70,7 @@ FROM gcr.io/distroless/base-debian11@sha256:99133cb0878bb1f84d1753957c6fd4b84f00
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 
-COPY --from=builder /output /
+COPY --from=velero-builder /output /
 
 COPY --from=restic-builder /output /
 
