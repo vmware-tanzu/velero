@@ -9,7 +9,6 @@ reviewers:
 
   groups:
     maintainers:
-      - dsu-igeek
       - sseago
       - reasonerjt
       - ywk253100
@@ -19,7 +18,10 @@ reviewers:
       - Lyndon-Li
 
     tech-writer:
-      - a-mccarthy
+      - sseago
+      - reasonerjt
+      - ywk253100
+      - Lyndon-Li
 
 files:
   'site/**':
