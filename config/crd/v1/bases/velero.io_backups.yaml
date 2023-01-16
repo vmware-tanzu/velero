@@ -455,6 +455,8 @@ spec:
                 - New
                 - FailedValidation
                 - InProgress
+                - WaitingForPluginOperations
+                - WaitingForPluginOperationsPartiallyFailed
                 - Completed
                 - PartiallyFailed
                 - Failed

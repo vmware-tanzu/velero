@@ -145,7 +145,7 @@ allow for data movement to be handled in the "WaitingForPluginOperations" phase,
 
 The next phase is either "Completed", "WaitingForPluginOperations", "Failed" or "PartiallyFailed".
 Backups/restores which would have a final phase of "Completed" or "PartiallyFailed" may move to the
-"WaitingForPluginOperations" or "WaitingForPluginOperationsPartialFailure" state.  A backup/restore
+"WaitingForPluginOperations" or "WaitingForPluginOperationsPartiallyFailed" state.  A backup/restore
 which will be marked "Failed" will go directly to the "Failed" phase.  Uploads may continue in the
 background for snapshots that were taken by a "Failed" backup/restore, but no progress will not be
 monitored or updated. If there are any operations in progress when a backup is moved to the "Failed"
@@ -157,14 +157,14 @@ any uploads still in progress should be aborted.
 The "WaitingForPluginOperations" phase signifies that the main part of the backup/restore, including
 snapshotting has completed successfully and uploading and any other asynchronous BIA/RIA plugin
 operations are continuing.  In the event of an error during this phase, the phase will change to
-WaitingForPluginOperationsPartialFailure.  On success, the phase changes to Completed.  Backups
+WaitingForPluginOperationsPartiallyFailed.  On success, the phase changes to Completed.  Backups
 cannot be restored from when they are in the WaitingForPluginOperations state.
 
-### WaitingForPluginOperationsPartialFailure (new)
-The "WaitingForPluginOperationsPartialFailure" phase signifies that the main part of the
+### WaitingForPluginOperationsPartiallyFailed (new)
+The "WaitingForPluginOperationsPartiallyFailed" phase signifies that the main part of the
 backup/restore, including snapshotting has completed, but there were partial failures either during
 the main part or during any async operations, including snapshot uploads.  Backups cannot be
-restored from when they are in the WaitingForPluginOperationsPartialFailure state.
+restored from when they are in the WaitingForPluginOperationsPartiallyFailed state.
 
 ### Failed
 When a backup/restore has had fatal errors it is marked as "Failed" Backups in this state cannot be
@@ -203,20 +203,20 @@ Velero will poll the plugins for status on the operations when the backup/restor
 "InProgress" phase and has no fatal errors.
 
 If any operations are not complete, the backup/restore will move to either WaitingForPluginOperations
-or WaitingForPluginOperationsPartialFailure or Failed.
+or WaitingForPluginOperationsPartiallyFailed or Failed.
 
 Post-snapshot and other operations may take a long time and Velero and its plugins may be restarted
 during this time.  Once a backup/restore has moved into the WaitingForPluginOperations or
-WaitingForPluginOperationsPartialFailure phase, another backup/restore may be started.
+WaitingForPluginOperationsPartiallyFailed phase, another backup/restore may be started.
 
-While in the WaitingForPluginOperations or WaitingForPluginOperationsPartialFailure phase, the
+While in the WaitingForPluginOperations or WaitingForPluginOperationsPartiallyFailed phase, the
 snapshots and item actions will be periodically polled.  When all of the snapshots and item actions
 have reported success, the backup/restore will move to the Completed or PartiallyFailed phase,
 depending on whether the backup/restore was in the WaitingForPluginOperations or
-WaitingForPluginOperationsPartialFailure phase.
+WaitingForPluginOperationsPartiallyFailed phase.
 
 The Backup resources will not be written to object storage until the backup has entered a final phase: 
-Completed, Failed or PartialFailure
+Completed, Failed or PartiallyFailed
 
 ## Reconciliation of InProgress backups
 
@@ -231,7 +231,7 @@ ignored.
     type OperationProgress struct {
         Completed bool                          // True when the operation has completed, either successfully or with a failure
         Err string                              // Set when the operation has failed
-        Completed, Total int64                  // Quantity completed so far and the total quanity associated with the operaation in operationUnits
+        NCompleted, NTotal int64                // Quantity completed so far and the total quanity associated with the operaation in operationUnits
                                                 // For data mover and volume snapshotter use cases, this would be in bytes
                                                 // On successful completion, completed and total should be the same.
         OperationUnits string                   // Units represented by completed and total -- for data mover and item
@@ -267,14 +267,17 @@ process/controller so we will modify BackupItemAction and RestoreItemAction to o
 operationID in addition to the modified item.
 
 Velero can attempt to cancel an operation by calling the Cancel API call on the BIA/RIA. The plugin
-can then take any appropriate action as needed. Cancel will be called on backup deletion, and
-possibly upon reaching timeouts, if timeout support is included in this feature. Cancel is not
-intended to be used to delete/remove the results of completed actions.
+can then take any appropriate action as needed. Cancel will be called for unfinished operations on
+backup deletion, and possibly reaching timeout. Cancel is not intended to be used to delete/remove
+the results of completed actions and will have no effect on a completed action. Cancel has no return
+value apart from the standard Error return, but this should only be used for unexpected
+failures. Under normal operations, Cancel will simply return a nil error (and nothing else), whether
+or not the plugin is able to cancel the operation.
 
-_AsyncOperationsNotSupportedError_ should only be returned (by either Cancel or by Progress) if the
+_AsyncOperationsNotSupportedError_ should only be returned (by Progress) if the
 Backup/RestoreItemAction plugin should not be handling the item.  If the Backup/RestoreItemAction
 plugin should handle the item but, for example, the item/snapshot ID cannot be found to report
-progress, Progress or Cancel will return an InvalidOperationIDError error rather than a populated
+progress, Progress will return an InvalidOperationIDError error rather than a populated
 OperationProgress struct. If the item action does not start an asynchronous operation, then
 operationID will be empty.
 
@@ -368,9 +371,17 @@ of what a record for a datamover plugin might look like:
 ```
     {
         "itemOperation": {
-            "plugin":       "velero.io/datamover-backup",
-            "itemID":      "<VolumeSnapshotContent objectReference>",
-            "operationID":    "<DataMoverBackup objectReference>"
+            "plugin":         "velero.io/datamover-backup",
+            "itemID":         "<VolumeSnapshotContent objectReference>",
+            "operationID":    "<DataMoverBackup objectReference>",
+            "completed":      true,
+            "err":            "",
+            "NCompleted":     12345,
+            "NTotal":         12345,
+            "OperationUnits": "byte",
+            "Description":    "",
+            "Started":        "2022-12-14T12:01:00Z",
+            "Updated":        "2022-12-14T12:11:02Z"
         }
     }
 ```
@@ -424,8 +435,8 @@ will be completed and the backup will move to the appropriate terminal phase and
 
 If any of the snapshots or backup items are still being processed, the phase of the backup will be
 set to the appropriate phase (_WaitingForPluginOperations_ or
-_WaitingForPluginOperationsPartialFailure_).  In the event of any of the progress checks return an
-error, the phase will move to _WaitingForPluginOperationsPartialFailure_.  The backup will then be
+_WaitingForPluginOperationsPartiallyFailed_).  In the event of any of the progress checks return an
+error, the phase will move to _WaitingForPluginOperationsPartiallyFailed_.  The backup will then be
 requeued and will be rechecked again after some time has passed.
 
 ## Restore workflow changes
@@ -440,16 +451,16 @@ completed and the restore will move to the appropriate terminal phase and the re
 complete.
 
 If any of the restore items are still being processed, the phase of the restore will be set to the
-appropriate phase (_WaitingForPluginOperations_ or _WaitingForPluginOperationsPartialFailure_).  In
+appropriate phase (_WaitingForPluginOperations_ or _WaitingForPluginOperationsPartiallyFailed_).  In
 the event of any of the progress checks return an error, the phase will move to
-_WaitingForPluginOperationsPartialFailure_.  The restore will then be requeued and will be rechecked
+_WaitingForPluginOperationsPartiallyFailed_.  The restore will then be requeued and will be rechecked
 again after some time has passed.
 
 ## Restart workflow
 
 On restart, the Velero server will scan all Backup/Restore resources.  Any Backup/Restore resources
 which are in the _InProgress_ phase will be moved to the _Failed_ phase.  Any Backup/Restore
-resources in the _WaitingForPluginOperations_ or _WaitingForPluginOperationsPartialFailure_ phase
+resources in the _WaitingForPluginOperations_ or _WaitingForPluginOperationsPartiallyFailed_ phase
 will be treated as if they have been requeued and progress checked and the backup/restore will be
 requeued or moved to a terminal phase as appropriate.
 
@@ -459,9 +470,9 @@ Since this design is modifying a previously-approved design, there is some prepa
 the earlier upload progress monitoring design that may need modification as a result of these
 updates. Here is a list of some of these items:
 
-1. Consts for the "Uploading" and "UploadingPartialFailure" phases have already been defined. These
+1. Consts for the "Uploading" and "UploadingPartiallyFailed" phases have already been defined. These
    will need to be removed when the "WaitingForPluginOperations" and
-   "WaitingForPluginOperationsPartialFailure" phases are defined.
+   "WaitingForPluginOperationsPartiallyFailed" phases are defined.
    - https://github.com/vmware-tanzu/velero/pull/3805
 1. Remove the ItemSnapshotter plugin APIs (and related code) since the revised design will reuse
    VolumeSnapshotter and BackupItemAction plugins.
@@ -507,9 +518,9 @@ vSphere plug-in BackupItemAction Progress implementation (vSphere plug-in team)
      required custom cancellation actions, now would be a good time to perform them. For snapshot
      uploads that are already in proress, there's not really anything else to cancel.
 2. Should we actually write the backup *before* moving to the WaitingForPluginOperations or
-   WaitingForPluginOperationsPartialFailure phase rather than waiting until all operations
+   WaitingForPluginOperationsPartiallyFailed phase rather than waiting until all operations
    have completed? The operations in question won't affect what gets written to object storage
    for the backup, and since we've already written the list of operations we're waiting for to
    object storage, writing the backup now would make the process resilient to Velero restart if
-   it happens during WaitingForPluginOperations or WaitingForPluginOperationsPartialFailure
+   it happens during WaitingForPluginOperations or WaitingForPluginOperationsPartiallyFailed
 

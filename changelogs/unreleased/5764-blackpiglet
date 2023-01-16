@@ -1,0 +1,1 @@
+Add Restic builder in Dockerfile, and keep the used built Golang image version in accordance with upstream Restic.

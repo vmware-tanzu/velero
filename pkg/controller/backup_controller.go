@@ -620,7 +620,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	defer pluginManager.CleanupClients()
 
 	backupLog.Info("Getting backup item actions")
-	actions, err := pluginManager.GetBackupItemActions()
+	actions, err := pluginManager.GetBackupItemActionsV2()
 	if err != nil {
 		return err
 	}
@@ -645,7 +645,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return errors.Errorf("backup already exists in object storage")
 	}
 
-	backupItemActionsResolver := framework.NewBackupItemActionResolver(actions)
+	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
 	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	var fatalErrs []error

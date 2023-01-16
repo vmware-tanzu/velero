@@ -37,7 +37,7 @@ type SnapshotSpec struct {
 	Location string `json:"location"`
 
 	// PersistentVolumeName is the Kubernetes name for the volume.
-	PersistentVolumeName string `json:persistentVolumeName`
+	PersistentVolumeName string `json:"persistentVolumeName"`
 
 	// ProviderVolumeID is the provider's ID for the volume.
 	ProviderVolumeID string `json:"providerVolumeID"`

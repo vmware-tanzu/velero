@@ -43,6 +43,11 @@ type Provider interface {
 	// is already initialized, or do nothing if the repository is already connected
 	PrepareRepo(ctx context.Context, param RepoParam) error
 
+	// BoostRepoConnect is used to re-ensure the local connection to the repo,
+	// so that the followed operations could succeed in some environment reset
+	// scenarios, for example, pod restart
+	BoostRepoConnect(ctx context.Context, param RepoParam) error
+
 	// PruneRepo does a full prune/maintenance of the repository
 	PruneRepo(ctx context.Context, param RepoParam) error
 
