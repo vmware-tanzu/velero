@@ -56,6 +56,18 @@ elif [[ "$triggeredBy" == "tags" ]]; then
     TAG=$(echo $GITHUB_REF | cut -d / -f 3)
 fi
 
+# if both BRANCH and TAG are empty, then it's triggered by PR. Use target branch instead.
+# BRANCH is needed in docker buildx command to set as image tag.
+# When action is triggered by PR, just build container without pushing, so set type to local.
+# When action is triggered by PUSH, need to push container, so set type to registry.
+if [[ -z $BRANCH && -z $TAG ]]; then
+    echo "Test Velero container build without pushing, when Dockerfile is changed by PR."
+    BRANCH="${GITHUB_BASE_REF}-container"
+    OUTPUT_TYPE="local,dest=."
+else
+    OUTPUT_TYPE="registry"
+fi
+
 TAG_LATEST=false
 if [[ ! -z "$TAG" ]]; then
     echo "We're building tag $TAG"
@@ -90,11 +102,9 @@ echo "BUILDX_PLATFORMS: $BUILDX_PLATFORMS"
 
 echo "Building and pushing container images."
 
-# The use of "registry" as the buildx output type below instructs
-# Docker to push the image
 
 VERSION="$VERSION" \
 TAG_LATEST="$TAG_LATEST" \
 BUILDX_PLATFORMS="$BUILDX_PLATFORMS" \
-BUILDX_OUTPUT_TYPE="registry" \
+BUILDX_OUTPUT_TYPE=$OUTPUT_TYPE \
 make all-containers

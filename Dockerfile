@@ -62,7 +62,8 @@ env CGO_ENABLED=0 \
 COPY . /go/src/github.com/vmware-tanzu/velero
 
 RUN mkdir -p /output/usr/bin && \
-    bash /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
+    export GOARM=$(echo "${GOARM}" | cut -c2-) && \
+    /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
 
 # Velero image packing section
 FROM gcr.io/distroless/base-debian11@sha256:99133cb0878bb1f84d1753957c6fd4b84f006f2798535de22ebf7ba170bbf434
