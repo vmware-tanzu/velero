@@ -75,16 +75,28 @@ func TestPatchBackupRepository(t *testing.T) {
 
 func TestCheckNotReadyRepo(t *testing.T) {
 	rr := mockBackupRepositoryCR()
+	rr.Spec.BackupStorageLocation = "default"
+	rr.Spec.ResticIdentifier = "fake-identifier"
+	rr.Spec.VolumeNamespace = "volume-ns-1"
 	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
-	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
+	locations := &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
+			Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      rr.Spec.BackupStorageLocation,
+		},
+	}
+
+	err = reconciler.Client.Create(context.TODO(), locations)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhase(""))
-	rr.Spec.ResticIdentifier = "s3:test.amazonaws.com/bucket/restic"
 	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
 
 func TestRunMaintenanceIfDue(t *testing.T) {

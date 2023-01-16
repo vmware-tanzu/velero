@@ -1,0 +1,1 @@
+Fix issue 5226, invalidate the related backup repositories whenever the backup storage info change in BSL

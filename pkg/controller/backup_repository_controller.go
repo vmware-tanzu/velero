@@ -27,12 +27,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -77,7 +75,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.BackupRepository{}).
 		Watches(s, nil).
-		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, handler.EnqueueRequestsFromMapFunc(r.invalidateBackupReposForBSL),
+		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
 			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo))).
 		Complete(r)
 }
@@ -96,20 +94,12 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 		return []reconcile.Request{}
 	}
 
-	requests := make([]reconcile.Request, len(list.Items))
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
 		r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change"))
-
-		requests[i] = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: list.Items[i].GetNamespace(),
-				Name:      list.Items[i].GetName(),
-			},
-		}
 	}
 
-	return requests
+	return []reconcile.Request{}
 }
 
 func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newObj client.Object) bool {
@@ -202,20 +192,29 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
+func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *velerov1api.BackupRepository) (string, error) {
+	loc := &velerov1api.BackupStorageLocation{}
+
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, loc); err != nil {
+		return "", errors.Wrapf(err, "error to get BSL %s", req.Spec.BackupStorageLocation)
+	}
+
+	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	if err != nil {
+		return "", errors.Wrapf(err, "error to get identifier for repo %s", req.Name)
+	}
+
+	return repoIdentifier, nil
+}
+
 func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
 	log.Info("Initializing backup repository")
 
 	// confirm the repo's BackupStorageLocation is valid
-	loc := &velerov1api.BackupStorageLocation{}
-
-	if err := r.Get(context.Background(), client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
-	}, loc); err != nil {
-		return r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
-	}
-
-	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	repoIdentifier, err := r.getIdentiferByBSL(ctx, req)
 	if err != nil {
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 			rr.Status.Message = err.Error()
@@ -303,23 +302,9 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 }
 
 func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
-	// no identifier: can't possibly be ready, so just return
-	if req.Spec.ResticIdentifier == "" {
-		return nil
-	}
-
 	log.Info("Checking backup repository for readiness")
 
-	loc := &velerov1api.BackupStorageLocation{}
-
-	if err := r.Get(context.Background(), client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
-	}, loc); err != nil {
-		return r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
-	}
-
-	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	repoIdentifier, err := r.getIdentiferByBSL(ctx, req)
 	if err != nil {
 		return r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
 	}
