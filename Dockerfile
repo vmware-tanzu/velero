@@ -61,9 +61,12 @@ env CGO_ENABLED=0 \
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
+# Not sure why v1.10 and main branch works without adding executable permission.
+# Only v1.9 has the problem.
 RUN mkdir -p /output/usr/bin && \
-    export GOARM=$( echo "${GOARM}" | cut -c2-) && \
-    bash /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
+    export GOARM=$(echo "${GOARM}" | cut -c2-) && \
+    chmod +x /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh && \
+    /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
 
 # Velero image packing section
 FROM gcr.io/distroless/base-debian11@sha256:99133cb0878bb1f84d1753957c6fd4b84f006f2798535de22ebf7ba170bbf434
