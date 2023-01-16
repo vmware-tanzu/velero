@@ -2625,7 +2625,7 @@ type fakePodVolumeBackupper struct{}
 func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
 	var res []*velerov1.PodVolumeBackup
 	for _, vol := range volumes {
-		pvb := builder.ForPodVolumeBackup("velero", fmt.Sprintf("pvb-%s-%s-%s", pod.Namespace, pod.Name, vol)).Result()
+		pvb := builder.ForPodVolumeBackup("velero", fmt.Sprintf("pvb-%s-%s-%s", pod.Namespace, pod.Name, vol)).Volume(vol).Result()
 		res = append(res, pvb)
 	}
 
@@ -2654,7 +2654,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 				),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Volume("foo").Result(),
 			},
 		},
 		{
@@ -2675,7 +2675,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 				),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Volume("foo").Result(),
 			},
 		},
 		{
@@ -2710,8 +2710,8 @@ func TestBackupWithPodVolume(t *testing.T) {
 					WithVolume("pv-2", "vol-2", "", "type-1", 100, false),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-vol-1").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-vol-2").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-vol-1").Volume("vol-1").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-vol-2").Volume("vol-2").Result(),
 			},
 		},
 	}
