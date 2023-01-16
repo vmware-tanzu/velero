@@ -120,7 +120,7 @@ build-%:
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
-all-containers: container-builder-env
+all-containers:
 	@$(MAKE) --no-print-directory container
 	@$(MAKE) --no-print-directory container BIN=velero-restore-helper
 
@@ -178,20 +178,6 @@ shell: build-dirs build-env
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
-container-builder-env:
-ifneq ($(BUILDX_ENABLED), true)
-	$(error $(BUILDX_ERROR))
-endif
-	@docker buildx build \
-	--target=builder-env \
-	--build-arg=GOPROXY=$(GOPROXY) \
-	--build-arg=PKG=$(PKG) \
-	--build-arg=VERSION=$(VERSION) \
-	--build-arg=GIT_SHA=$(GIT_SHA) \
-	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
-	--build-arg=REGISTRY=$(REGISTRY) \
-	-f $(VELERO_DOCKERFILE) .
-
 container:
 ifneq ($(BUILDX_ENABLED), true)
 	$(error $(BUILDX_ERROR))
@@ -200,6 +186,7 @@ endif
 	--output=type=$(BUILDX_OUTPUT_TYPE) \
 	--platform $(BUILDX_PLATFORMS) \
 	$(addprefix -t , $(IMAGE_TAGS)) \
+	--build-arg=GOPROXY=$(GOPROXY) \
 	--build-arg=PKG=$(PKG) \
 	--build-arg=BIN=$(BIN) \
 	--build-arg=VERSION=$(VERSION) \
