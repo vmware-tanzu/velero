@@ -1,0 +1,13 @@
+diff --git a/internal/backend/s3/s3.go b/internal/backend/s3/s3.go
+index 0b3816c06..eec10f9c7 100644
+--- a/internal/backend/s3/s3.go
++++ b/internal/backend/s3/s3.go
+@@ -164,7 +164,7 @@ func isAccessDenied(err error) bool {
+ 	debug.Log("isAccessDenied(%T, %#v)", err, err)
+ 
+ 	var e minio.ErrorResponse
+-	return errors.As(err, &e) && e.Code == "Access Denied"
++	return errors.As(err, &e) && e.Code == "AccessDenied"
+ }
+ 
+ // IsNotExist returns true if the error is caused by a not existing file.
