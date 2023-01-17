@@ -18,7 +18,6 @@ package exec
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os/exec"
 
 	"github.com/pkg/errors"
@@ -38,13 +37,13 @@ func RunCommand(cmd *exec.Cmd) (string, string, error) {
 
 	var stdout, stderr string
 
-	if res, readErr := ioutil.ReadAll(stdoutBuf); readErr != nil {
+	if res, readErr := io.ReadAll(stdoutBuf); readErr != nil {
 		stdout = errors.Wrap(readErr, "error reading command's stdout").Error()
 	} else {
 		stdout = string(res)
 	}
 
-	if res, readErr := ioutil.ReadAll(stderrBuf); readErr != nil {
+	if res, readErr := io.ReadAll(stderrBuf); readErr != nil {
 		stderr = errors.Wrap(readErr, "error reading command's stderr").Error()
 	} else {
 		stderr = string(res)

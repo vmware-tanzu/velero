@@ -18,7 +18,6 @@ package install
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,7 +152,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		if err != nil {
 			return nil, err
 		}
-		secretData, err = ioutil.ReadFile(realPath)
+		secretData, err = os.ReadFile(realPath)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +163,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		if err != nil {
 			return nil, err
 		}
-		caCertData, err = ioutil.ReadFile(realPath)
+		caCertData, err = os.ReadFile(realPath)
 		if err != nil {
 			return nil, err
 		}

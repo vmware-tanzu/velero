@@ -19,7 +19,6 @@ package backuplocation
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"time"
@@ -141,7 +140,7 @@ func (o *CreateOptions) BuildBackupStorageLocation(namespace string, setBackupSy
 		if err != nil {
 			return nil, err
 		}
-		caCertData, err = ioutil.ReadFile(realPath)
+		caCertData, err = os.ReadFile(realPath)
 		if err != nil {
 			return nil, err
 		}

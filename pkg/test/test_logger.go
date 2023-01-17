@@ -17,13 +17,12 @@ limitations under the License.
 package test
 
 import (
-	"io/ioutil"
-
 	"github.com/sirupsen/logrus"
+	"io"
 )
 
 func NewLogger() logrus.FieldLogger {
 	logger := logrus.New()
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	return logrus.NewEntry(logger)
 }

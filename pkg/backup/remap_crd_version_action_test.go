@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -174,7 +173,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 		t.Run(tName, func(t *testing.T) {
 			// We don't need a Go struct of the v1 data, just an unstructured to pass into the plugin.
 			v1File := fmt.Sprintf("testdata/v1/%s.json", test.crd)
-			f, err := ioutil.ReadFile(v1File)
+			f, err := os.ReadFile(v1File)
 			require.NoError(t, err)
 
 			var obj unstructured.Unstructured
@@ -183,7 +182,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 
 			// Load a v1beta1 struct into the beta client to be returned
 			v1beta1File := fmt.Sprintf("testdata/v1beta1/%s.json", test.crd)
-			f, err = ioutil.ReadFile(v1beta1File)
+			f, err = os.ReadFile(v1beta1File)
 			require.NoError(t, err)
 
 			var crd apiextv1beta1.CustomResourceDefinition

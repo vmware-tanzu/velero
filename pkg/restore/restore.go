@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -715,7 +714,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	var nsBytes []byte
 	var err error
 
-	if nsBytes, err = ioutil.ReadFile(path); err != nil {
+	if nsBytes, err = os.ReadFile(path); err != nil {
 		return &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: remappedName,

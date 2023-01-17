@@ -24,7 +24,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"text/template"
@@ -41,7 +40,6 @@ package crds
 import (
 	"bytes"
 	"compress/gzip"
-	"io/ioutil"
 
 	apiextinstall "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -65,7 +63,7 @@ func crds() []*apiextv1.CustomResourceDefinition {
 		if err != nil {
 			panic(err)
 		}
-		bytes, err := ioutil.ReadAll(gzr)
+		bytes, err := io.ReadAll(gzr)
 		if err != nil {
 			panic(err)
 		}
@@ -87,7 +85,7 @@ type templateData struct {
 }
 
 func main() {
-	headerBytes, err := ioutil.ReadFile(goHeaderFile)
+	headerBytes, err := os.ReadFile(goHeaderFile)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -97,7 +95,7 @@ func main() {
 	}
 
 	// This is relative to config/crd/crds
-	manifests, err := ioutil.ReadDir("../bases")
+	manifests, err := os.ReadDir("../bases")
 	if err != nil {
 		log.Fatalln(err)
 	}

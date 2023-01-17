@@ -19,7 +19,6 @@ package backuplocation
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -98,7 +97,7 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 		if err != nil {
 			return err
 		}
-		caCertData, err = ioutil.ReadFile(realPath)
+		caCertData, err = os.ReadFile(realPath)
 		if err != nil {
 			return err
 		}

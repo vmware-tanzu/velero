@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -762,7 +761,7 @@ func InstallVeleroCLI(version string) (string, error) {
 		if err != nil {
 			return false, errors.WithMessagef(err, "failed to get Velero CLI tarball")
 		}
-		tempVeleroCliDir, err = ioutil.TempDir("", "velero-test")
+		tempVeleroCliDir, err = os.MkdirTemp("", "velero-test")
 		if err != nil {
 			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
 		}
@@ -791,11 +790,11 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 	}
 	defer resp.Body.Close()
 
-	tarballBuf, err := ioutil.ReadAll(resp.Body)
+	tarballBuf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to read buffer for tarball %s.", tarball)
 	}
-	tmpfile, err := ioutil.TempFile("", tarball)
+	tmpfile, err := os.CreateTemp("", tarball)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to create temp file for tarball %s locally.", tarball)
 	}
