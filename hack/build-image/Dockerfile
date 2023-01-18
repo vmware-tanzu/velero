@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=linux/amd64 golang:1.18.8-bullseye
+FROM --platform=linux/amd64 golang:1.18.10-bullseye
 
 ARG GOPROXY
 
