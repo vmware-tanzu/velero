@@ -45,6 +45,8 @@ const (
 	backupLastSuccessfulTimestamp = "backup_last_successful_timestamp"
 	backupItemsTotalGauge         = "backup_items_total"
 	backupItemsErrorsGauge        = "backup_items_errors"
+	backupWarningTotal            = "backup_warning_total"
+	backupLastStatus              = "backup_last_status"
 	restoreTotal                  = "restore_total"
 	restoreAttemptTotal           = "restore_attempt_total"
 	restoreValidationFailedTotal  = "restore_validation_failed_total"
@@ -70,6 +72,10 @@ const (
 	pvbNameLabel            = "pod_volume_backup"
 	scheduleLabel           = "schedule"
 	backupNameLabel         = "backupName"
+
+	// metrics values
+	BackupLastStatusSucc    int64 = 1
+	BackupLastStatusFailure int64 = 0
 )
 
 // NewServerMetrics returns new ServerMetrics
@@ -195,6 +201,22 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      backupItemsErrorsGauge,
 					Help:      "Total number of errors encountered during backup",
+				},
+				[]string{scheduleLabel},
+			),
+			backupWarningTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupWarningTotal,
+					Help:      "Total number of warned backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupLastStatus: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupLastStatus,
+					Help:      "Last status of the backup. A value of 1 is success, 0 is failure",
 				},
 				[]string{scheduleLabel},
 			),
@@ -386,6 +408,12 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
+	if c, ok := m.metrics[backupWarningTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
@@ -556,6 +584,20 @@ func (m *ServerMetrics) RegisterBackupItemsTotalGauge(backupSchedule string, ite
 func (m *ServerMetrics) RegisterBackupItemsErrorsGauge(backupSchedule string, items int) {
 	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
 		c.WithLabelValues(backupSchedule).Set(float64(items))
+	}
+}
+
+// RegisterBackupWarning records a warned backup.
+func (m *ServerMetrics) RegisterBackupWarning(backupSchedule string) {
+	if c, ok := m.metrics[backupWarningTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupLastStatus records the last status of the backup.
+func (m *ServerMetrics) RegisterBackupLastStatus(backupSchedule string, lastStatus int64) {
+	if g, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(backupSchedule).Set(float64(lastStatus))
 	}
 }
 
