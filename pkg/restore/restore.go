@@ -59,7 +59,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
@@ -88,13 +88,13 @@ type Request struct {
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
 	Restore(req Request,
-		actions []riav1.RestoreItemAction,
+		actions []riav2.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
 	RestoreWithResolvers(
 		req Request,
-		restoreItemActionResolver framework.RestoreItemActionResolver,
+		restoreItemActionResolver framework.RestoreItemActionResolverV2,
 		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -164,18 +164,18 @@ func NewKubernetesRestorer(
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(
 	req Request,
-	actions []riav1.RestoreItemAction,
+	actions []riav2.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
-	resolver := framework.NewRestoreItemActionResolver(actions)
+	resolver := framework.NewRestoreItemActionResolverV2(actions)
 	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
 	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, snapshotLocationLister, volumeSnapshotterGetter)
 }
 
 func (kr *kubernetesRestorer) RestoreWithResolvers(
 	req Request,
-	restoreItemActionResolver framework.RestoreItemActionResolver,
+	restoreItemActionResolver framework.RestoreItemActionResolverV2,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -342,7 +342,7 @@ type restoreContext struct {
 	dynamicFactory                 client.DynamicFactory
 	fileSystem                     filesystem.Interface
 	namespaceClient                corev1.NamespaceInterface
-	restoreItemActions             []framework.RestoreItemResolvedAction
+	restoreItemActions             []framework.RestoreItemResolvedActionV2
 	itemSnapshotterActions         []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter        VolumeSnapshotterGetter
 	podVolumeRestorer              podvolume.Restorer
@@ -743,8 +743,8 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 }
 
-func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.RestoreItemResolvedAction {
-	var actions []framework.RestoreItemResolvedAction
+func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResource, namespace string) []framework.RestoreItemResolvedActionV2 {
+	var actions []framework.RestoreItemResolvedActionV2
 	for _, action := range ctx.restoreItemActions {
 		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
 			actions = append(actions, action)
