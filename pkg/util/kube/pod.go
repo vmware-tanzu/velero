@@ -37,7 +37,7 @@ func IsPodRunning(pod *corev1api.Pod) error {
 func IsPodScheduled(pod *corev1api.Pod) error {
 	return isPodScheduledInStatus(pod, func(pod *corev1api.Pod) error {
 		if pod.Status.Phase != corev1api.PodRunning && pod.Status.Phase != corev1api.PodPending {
-			return errors.New("pod is running or pending")
+			return errors.New("pod is not running or pending")
 		}
 
 		return nil
