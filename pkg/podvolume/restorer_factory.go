@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -42,6 +43,8 @@ func NewRestorerFactory(repoLocker *repository.RepoLocker,
 	repoEnsurer *repository.RepositoryEnsurer,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
+	podClient corev1client.PodsGetter,
+	kubeClient kubernetes.Interface,
 	repoInformerSynced cache.InformerSynced,
 	log logrus.FieldLogger) RestorerFactory {
 	return &restorerFactory{
@@ -49,6 +52,8 @@ func NewRestorerFactory(repoLocker *repository.RepoLocker,
 		repoEnsurer:        repoEnsurer,
 		veleroClient:       veleroClient,
 		pvcClient:          pvcClient,
+		podClient:          podClient,
+		kubeClient:         kubeClient,
 		repoInformerSynced: repoInformerSynced,
 		log:                log,
 	}
@@ -59,6 +64,8 @@ type restorerFactory struct {
 	repoEnsurer        *repository.RepositoryEnsurer
 	veleroClient       clientset.Interface
 	pvcClient          corev1client.PersistentVolumeClaimsGetter
+	podClient          corev1client.PodsGetter
+	kubeClient         kubernetes.Interface
 	repoInformerSynced cache.InformerSynced
 	log                logrus.FieldLogger
 }
@@ -74,7 +81,7 @@ func (rf *restorerFactory) NewRestorer(ctx context.Context, restore *velerov1api
 		},
 	)
 
-	r := newRestorer(ctx, rf.repoLocker, rf.repoEnsurer, informer, rf.veleroClient, rf.pvcClient, rf.log)
+	r := newRestorer(ctx, rf.repoLocker, rf.repoEnsurer, informer, rf.veleroClient, rf.pvcClient, rf.podClient, rf.kubeClient, rf.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rf.repoInformerSynced) {
