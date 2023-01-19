@@ -119,7 +119,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 		)
 
 		if newPod.Status.Phase == v1.PodSucceeded || newPod.Status.Phase == v1.PodFailed {
-			err := fmt.Errorf("Pod entered phase %s before some post-restore exec hooks ran", newPod.Status.Phase)
+			err := fmt.Errorf("pod entered phase %s before some post-restore exec hooks ran", newPod.Status.Phase)
 			podLog.Warning(err)
 			cancel()
 			return
@@ -155,7 +155,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				)
 				// Check the individual hook's wait timeout is not expired
 				if hook.Hook.WaitTimeout.Duration != 0 && time.Since(waitStart) > hook.Hook.WaitTimeout.Duration {
-					err := fmt.Errorf("Hook %s in container %s expired before executing", hook.HookName, hook.Hook.Container)
+					err := fmt.Errorf("hook %s in container %s expired before executing", hook.HookName, hook.Hook.Container)
 					hookLog.Error(err)
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						errors = append(errors, err)
@@ -194,7 +194,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			handler(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			err := fmt.Errorf("Pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
+			err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
 			log.Error(err)
 			cancel()
 		},
@@ -212,7 +212,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			if hook.executed {
 				continue
 			}
-			err := fmt.Errorf("Hook %s in container %s in pod %s not executed: %v", hook.HookName, hook.Hook.Container, kube.NamespaceAndName(pod), ctx.Err())
+			err := fmt.Errorf("hook %s in container %s in pod %s not executed: %v", hook.HookName, hook.Hook.Container, kube.NamespaceAndName(pod), ctx.Err())
 			hookLog := log.WithFields(
 				logrus.Fields{
 					"hookSource": hook.HookSource,
