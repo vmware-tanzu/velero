@@ -18,6 +18,7 @@ package kopia
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
@@ -61,8 +62,14 @@ type SnapshotUploader interface {
 	) (*snapshot.Manifest, error)
 }
 
-func newOptionalInt(b policy.OptionalInt) *policy.OptionalInt {
-	return &b
+func newOptionalInt(b int) *policy.OptionalInt {
+	ob := policy.OptionalInt(b)
+	return &ob
+}
+
+func newOptionalBool(b bool) *policy.OptionalBool {
+	ob := policy.OptionalBool(b)
+	return &ob
 }
 
 //setupDefaultPolicy set default policy for kopia
@@ -75,10 +82,13 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 			CompressorName: "none",
 		},
 		UploadPolicy: policy.UploadPolicy{
-			MaxParallelFileReads: newOptionalInt(policy.OptionalInt(runtime.NumCPU())),
+			MaxParallelFileReads: newOptionalInt(runtime.NumCPU()),
 		},
 		SchedulingPolicy: policy.SchedulingPolicy{
 			Manual: true,
+		},
+		ErrorHandlingPolicy: policy.ErrorHandlingPolicy{
+			IgnoreUnknownTypes: newOptionalBool(true),
 		},
 	})
 }
@@ -212,19 +222,23 @@ func SnapshotSource(
 		return "", 0, errors.Wrapf(err, "Failed to flush kopia repository")
 	}
 	log.Infof("Created snapshot with root %v and ID %v in %v", manifest.RootObjectID(), manifest.ID, time.Since(snapshotStartTime).Truncate(time.Second))
-	return reportSnapshotStatus(manifest)
+	return reportSnapshotStatus(manifest, policyTree)
 }
 
-func reportSnapshotStatus(manifest *snapshot.Manifest) (string, int64, error) {
+func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) (string, int64, error) {
 	manifestID := manifest.ID
 	snapSize := manifest.Stats.TotalFileSize
 
 	var errs []string
 	if ds := manifest.RootEntry.DirSummary; ds != nil {
 		for _, ent := range ds.FailedEntries {
-			errs = append(errs, ent.Error)
+			policy := policyTree.DefinedPolicy()
+			if !(policy != nil && *policy.ErrorHandlingPolicy.IgnoreUnknownTypes == true && strings.Contains(ent.Error, fs.ErrUnknown.Error())) {
+				errs = append(errs, fmt.Sprintf("Error when processing %v: %v", ent.EntryPath, ent.Error))
+			}
 		}
 	}
+
 	if len(errs) != 0 {
 		return "", 0, errors.New(strings.Join(errs, "\n"))
 	}
