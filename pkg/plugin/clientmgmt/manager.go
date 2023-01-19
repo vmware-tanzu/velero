@@ -25,14 +25,18 @@ import (
 	"github.com/sirupsen/logrus"
 
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
+	biav2cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
+	riav2cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v2"
 	vsv1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 )
 
@@ -50,11 +54,23 @@ type Manager interface {
 	// GetBackupItemAction returns the backup item action plugin for name.
 	GetBackupItemAction(name string) (biav1.BackupItemAction, error)
 
+	// GetBackupItemActionsV2 returns all v2 backup item action plugins (including those adapted from v1).
+	GetBackupItemActionsV2() ([]biav2.BackupItemAction, error)
+
+	// GetBackupItemActionV2 returns the backup item action plugin for name.
+	GetBackupItemActionV2(name string) (biav2.BackupItemAction, error)
+
 	// GetRestoreItemActions returns all restore item action plugins.
 	GetRestoreItemActions() ([]riav1.RestoreItemAction, error)
 
 	// GetRestoreItemAction returns the restore item action plugin for name.
 	GetRestoreItemAction(name string) (riav1.RestoreItemAction, error)
+
+	// GetRestoreItemActionsV2 returns all v2 restore item action plugins.
+	GetRestoreItemActionsV2() ([]riav2.RestoreItemAction, error)
+
+	// GetRestoreItemActionV2 returns the restore item action plugin for name.
+	GetRestoreItemActionV2(name string) (riav2.RestoreItemAction, error)
 
 	// GetDeleteItemActions returns all delete item action plugins.
 	GetDeleteItemActions() ([]velero.DeleteItemAction, error)
@@ -218,6 +234,44 @@ func (m *manager) GetBackupItemAction(name string) (biav1.BackupItemAction, erro
 	return nil, fmt.Errorf("unable to get valid BackupItemAction for %q", name)
 }
 
+// GetBackupItemActionsV2 returns all v2 backup item actions as RestartableBackupItemActions.
+func (m *manager) GetBackupItemActionsV2() ([]biav2.BackupItemAction, error) {
+	list := m.registry.List(common.PluginKindBackupItemActionV2)
+
+	actions := make([]biav2.BackupItemAction, 0, len(list))
+
+	for i := range list {
+		id := list[i]
+
+		r, err := m.GetBackupItemActionV2(id.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		actions = append(actions, r)
+	}
+
+	return actions, nil
+}
+
+// GetBackupItemActionV2 returns a v2 restartableBackupItemAction for name.
+func (m *manager) GetBackupItemActionV2(name string) (biav2.BackupItemAction, error) {
+	name = sanitizeName(name)
+
+	for _, adaptedBackupItemAction := range biav2cli.AdaptedBackupItemActions() {
+		restartableProcess, err := m.getRestartableProcess(adaptedBackupItemAction.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedBackupItemAction.GetRestartable(name, restartableProcess), nil
+	}
+	return nil, fmt.Errorf("unable to get valid BackupItemActionV2 for %q", name)
+}
+
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
 func (m *manager) GetRestoreItemActions() ([]riav1.RestoreItemAction, error) {
 	list := m.registry.List(common.PluginKindRestoreItemAction)
@@ -254,6 +308,44 @@ func (m *manager) GetRestoreItemAction(name string) (riav1.RestoreItemAction, er
 		return adaptedRestoreItemAction.GetRestartable(name, restartableProcess), nil
 	}
 	return nil, fmt.Errorf("unable to get valid RestoreItemAction for %q", name)
+}
+
+// GetRestoreItemActionsV2 returns all v2 restore item actions as restartableRestoreItemActions.
+func (m *manager) GetRestoreItemActionsV2() ([]riav2.RestoreItemAction, error) {
+	list := m.registry.List(common.PluginKindRestoreItemActionV2)
+
+	actions := make([]riav2.RestoreItemAction, 0, len(list))
+
+	for i := range list {
+		id := list[i]
+
+		r, err := m.GetRestoreItemActionV2(id.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		actions = append(actions, r)
+	}
+
+	return actions, nil
+}
+
+// GetRestoreItemActionV2 returns a v2 restartableRestoreItemAction for name.
+func (m *manager) GetRestoreItemActionV2(name string) (riav2.RestoreItemAction, error) {
+	name = sanitizeName(name)
+
+	for _, adaptedRestoreItemAction := range riav2cli.AdaptedRestoreItemActions() {
+		restartableProcess, err := m.getRestartableProcess(adaptedRestoreItemAction.Kind, name)
+		// Check if plugin was not found
+		if errors.As(err, &pluginNotFoundErrType) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return adaptedRestoreItemAction.GetRestartable(name, restartableProcess), nil
+	}
+	return nil, fmt.Errorf("unable to get valid RestoreItemActionV2 for %q", name)
 }
 
 // GetDeleteItemActions returns all delete item actions as restartableDeleteItemActions.

@@ -43,7 +43,7 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
@@ -62,9 +62,9 @@ const BackupFormatVersion = "1.1.0"
 type Backupper interface {
 	// Backup takes a backup using the specification in the velerov1api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []biav1.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
+	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []biav2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
-		backupItemActionResolver framework.BackupItemActionResolver, itemSnapshotterResolver framework.ItemSnapshotterResolver,
+		backupItemActionResolver framework.BackupItemActionResolverV2, itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
@@ -173,8 +173,8 @@ type VolumeSnapshotterGetter interface {
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
 func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
-	actions []biav1.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
-	backupItemActions := framework.NewBackupItemActionResolver(actions)
+	actions []biav2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+	backupItemActions := framework.NewBackupItemActionResolverV2(actions)
 	itemSnapshotters := framework.NewItemSnapshotterResolver(nil)
 	return kb.BackupWithResolvers(log, backupRequest, backupFile, backupItemActions, itemSnapshotters,
 		volumeSnapshotterGetter)
@@ -183,7 +183,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	backupRequest *Request,
 	backupFile io.Writer,
-	backupItemActionResolver framework.BackupItemActionResolver,
+	backupItemActionResolver framework.BackupItemActionResolverV2,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
