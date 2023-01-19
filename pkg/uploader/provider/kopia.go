@@ -119,10 +119,11 @@ func (kp *kopiaProvider) RunBackup(
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
 	kpUploader := snapshotfs.NewUploader(repoWriter)
-	prorgess := new(kopia.KopiaProgress)
-	prorgess.InitThrottle(backupProgressCheckInterval)
-	prorgess.Updater = updater
-	kpUploader.Progress = prorgess
+	progress := new(kopia.KopiaProgress)
+	progress.InitThrottle(backupProgressCheckInterval)
+	progress.Updater = updater
+	progress.Log = log
+	kpUploader.Progress = progress
 	quit := make(chan struct{})
 	log.Info("Starting backup")
 	go kp.CheckContext(ctx, quit, nil, kpUploader)
