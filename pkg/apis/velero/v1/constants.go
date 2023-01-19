@@ -46,8 +46,4 @@ const (
 
 	// APIGroupVersionsFeatureFlag is the feature flag string that defines whether or not to handle multiple API Group Versions
 	APIGroupVersionsFeatureFlag = "EnableAPIGroupVersions"
-
-	// UploadProgressFeatureFlag is the feature flag string that defines whether or not upload progress monitoring is enabled
-	// and whether or not ItemSnapshotters should be invoked
-	UploadProgressFeatureFlag = "EnableUploadProgress"
 )
