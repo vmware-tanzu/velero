@@ -1,4 +1,28 @@
-  ## v1.10.0
+## v1.10.1
+### 2023-01-19
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.10.1
+
+### Container Image
+`velero/velero:v1.10.1`
+
+### Documentation
+https://velero.io/docs/v1.10/
+
+### Upgrading
+https://velero.io/docs/v1.10/upgrade-to-1.10/
+
+### All changes
+  * Bump up golang to 1.18.10 for Velero (#5780, @Lyndon-Li)
+  * Add PR container build action, which will not push image. Add GOARM parameter. Remove container-builder-env section. (#5770, @blackpiglet)
+  * Add Restic builder in Dockerfile, and keep the used built Golang image version in accordance with upstream Restic. (#5765, @blackpiglet)
+  * Fix issue 5696, check if the repo is still openable before running the prune and forget operation, if not, try to reconnect the repo (#5714, @Lyndon-Li)
+  * Fix error with Restic backup empty volumes (#5711, @qiuming-best)
+  * Prevent nil panic on exec restore hooks (#5708, @dymurray)
+  * Fix CVEs scanned by trivy (#5655, @qiuming-best)
+
+## v1.10.0
 ### 2022-11-23
 
 ### Download
