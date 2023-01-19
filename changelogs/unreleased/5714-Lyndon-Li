@@ -1,1 +1,0 @@
-Fix issue 5696, check if the repo is still openable before running the prune and forget operation, if not, try to reconnect the repo
