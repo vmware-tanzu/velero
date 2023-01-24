@@ -61,7 +61,9 @@ type BackupStore interface {
 	ListBackups() ([]string, error)
 
 	PutBackup(info BackupInfo) error
+	PutBackupMetadata(backup string, backupMetadata io.Reader) error
 	PutBackupItemOperations(backup string, backupItemOperations io.Reader) error
+	PutBackupContents(backup string, backupContents io.Reader) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupItemOperations(name string) ([]*itemoperation.BackupOperation, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
@@ -315,6 +317,10 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup,
 	return backupObj, nil
 }
 
+func (s *objectBackupStore) PutBackupMetadata(backup string, backupMetadata io.Reader) error {
+	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(backup), backupMetadata)
+}
+
 func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
 	// if the volumesnapshots file doesn't exist, we don't want to return an error, since
 	// a legacy backup or a backup with no snapshots would not have this file, so check for
@@ -548,6 +554,10 @@ func (s *objectBackupStore) PutRestoreItemOperations(backup string, restore stri
 
 func (s *objectBackupStore) PutBackupItemOperations(backup string, backupItemOperations io.Reader) error {
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupItemOperationsKey(backup), backupItemOperations)
+}
+
+func (s *objectBackupStore) PutBackupContents(backup string, backupContents io.Reader) error {
+	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(backup), backupContents)
 }
 
 func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (string, error) {

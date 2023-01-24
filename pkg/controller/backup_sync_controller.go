@@ -148,6 +148,26 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			continue
 		}
 
+		if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations ||
+			backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed {
+
+			if backup.Status.Expiration == nil || backup.Status.Expiration.After(time.Now()) {
+				log.Debugf("Skipping non-expired WaitingForPluginOperations backup %v", backup.Name)
+				continue
+			}
+			log.Debug("WaitingForPluginOperations Backup is past expiration, syncing for garbage collection")
+			backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+		}
+		if backup.Status.Phase == velerov1api.BackupPhaseFinalizingAfterPluginOperations ||
+			backup.Status.Phase == velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed {
+
+			if backup.Status.Expiration == nil || backup.Status.Expiration.After(time.Now()) {
+				log.Debugf("Skipping non-expired FinalizingAfterPluginOperations backup %v", backup.Name)
+				continue
+			}
+			log.Debug("FinalizingAfterPluginOperations Backup is past expiration, syncing for garbage collection")
+			backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+		}
 		backup.Namespace = b.namespace
 		backup.ResourceVersion = ""
 

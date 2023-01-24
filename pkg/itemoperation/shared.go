@@ -40,12 +40,19 @@ type OperationStatus struct {
 
 	// Units that NCompleted,NTotal are measured in
 	// i.e. "bytes"
-	OperationUnits int64 `json:"nTotal,omitempty"`
+	OperationUnits string `json:"operationUnits,omitempty"`
+
+	// Description of progress made
+	// i.e. "processing", "Current phase: Running", etc.
+	Description string `json:"description,omitempty"`
+
+	// Created records the time the item operation was created
+	Created *metav1.Time `json:"created,omitempty"`
 
 	// Started records the time the item operation was started, if known
 	// +optional
 	// +nullable
-	Started *metav1.Time `json:"start,omitempty"`
+	Started *metav1.Time `json:"started,omitempty"`
 
 	// Updated records the time the item operation was updated, if known.
 	// +optional
@@ -53,10 +60,35 @@ type OperationStatus struct {
 	Updated *metav1.Time `json:"updated,omitempty"`
 }
 
+func (in *OperationStatus) DeepCopy() *OperationStatus {
+	if in == nil {
+		return nil
+	}
+	out := new(OperationStatus)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *OperationStatus) DeepCopyInto(out *OperationStatus) {
+	*out = *in
+	if in.Created != nil {
+		in, out := &in.Created, &out.Created
+		*out = (*in).DeepCopy()
+	}
+	if in.Started != nil {
+		in, out := &in.Started, &out.Started
+		*out = (*in).DeepCopy()
+	}
+	if in.Updated != nil {
+		in, out := &in.Updated, &out.Updated
+		*out = (*in).DeepCopy()
+	}
+}
+
 const (
 	// OperationPhaseNew means the item operation has been created and started
 	// by the plugin
-	OperationPhaseInProgress OperationPhase = "New"
+	OperationPhaseInProgress OperationPhase = "InProgress"
 
 	// OperationPhaseCompleted means the item operation was successfully completed
 	// and can be used for restore.

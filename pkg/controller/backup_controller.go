@@ -74,27 +74,28 @@ import (
 
 type backupController struct {
 	*genericController
-	discoveryHelper           discovery.Helper
-	backupper                 pkgbackup.Backupper
-	lister                    velerov1listers.BackupLister
-	client                    velerov1client.BackupsGetter
-	kbClient                  kbclient.Client
-	clock                     clocks.WithTickerAndDelayedExecution
-	backupLogLevel            logrus.Level
-	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
-	backupTracker             BackupTracker
-	defaultBackupLocation     string
-	defaultVolumesToFsBackup  bool
-	defaultBackupTTL          time.Duration
-	defaultCSISnapshotTimeout time.Duration
-	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
-	defaultSnapshotLocations  map[string]string
-	metrics                   *metrics.ServerMetrics
-	backupStoreGetter         persistence.ObjectBackupStoreGetter
-	formatFlag                logging.Format
-	volumeSnapshotLister      snapshotv1listers.VolumeSnapshotLister
-	volumeSnapshotClient      snapshotterClientSet.Interface
-	credentialFileStore       credentials.FileStore
+	discoveryHelper             discovery.Helper
+	backupper                   pkgbackup.Backupper
+	lister                      velerov1listers.BackupLister
+	client                      velerov1client.BackupsGetter
+	kbClient                    kbclient.Client
+	clock                       clocks.WithTickerAndDelayedExecution
+	backupLogLevel              logrus.Level
+	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
+	backupTracker               BackupTracker
+	defaultBackupLocation       string
+	defaultVolumesToFsBackup    bool
+	defaultBackupTTL            time.Duration
+	defaultCSISnapshotTimeout   time.Duration
+	defaultItemOperationTimeout time.Duration
+	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
+	defaultSnapshotLocations    map[string]string
+	metrics                     *metrics.ServerMetrics
+	backupStoreGetter           persistence.ObjectBackupStoreGetter
+	formatFlag                  logging.Format
+	volumeSnapshotLister        snapshotv1listers.VolumeSnapshotLister
+	volumeSnapshotClient        snapshotterClientSet.Interface
+	credentialFileStore         credentials.FileStore
 }
 
 func NewBackupController(
@@ -111,6 +112,7 @@ func NewBackupController(
 	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
 	defaultCSISnapshotTimeout time.Duration,
+	defaultItemOperationTimeout time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -121,28 +123,29 @@ func NewBackupController(
 	credentialStore credentials.FileStore,
 ) Interface {
 	c := &backupController{
-		genericController:         newGenericController(Backup, logger),
-		discoveryHelper:           discoveryHelper,
-		backupper:                 backupper,
-		lister:                    backupInformer.Lister(),
-		client:                    client,
-		clock:                     &clocks.RealClock{},
-		backupLogLevel:            backupLogLevel,
-		newPluginManager:          newPluginManager,
-		backupTracker:             backupTracker,
-		kbClient:                  kbClient,
-		defaultBackupLocation:     defaultBackupLocation,
-		defaultVolumesToFsBackup:  defaultVolumesToFsBackup,
-		defaultBackupTTL:          defaultBackupTTL,
-		defaultCSISnapshotTimeout: defaultCSISnapshotTimeout,
-		snapshotLocationLister:    volumeSnapshotLocationLister,
-		defaultSnapshotLocations:  defaultSnapshotLocations,
-		metrics:                   metrics,
-		backupStoreGetter:         backupStoreGetter,
-		formatFlag:                formatFlag,
-		volumeSnapshotLister:      volumeSnapshotLister,
-		volumeSnapshotClient:      volumeSnapshotClient,
-		credentialFileStore:       credentialStore,
+		genericController:           newGenericController(Backup, logger),
+		discoveryHelper:             discoveryHelper,
+		backupper:                   backupper,
+		lister:                      backupInformer.Lister(),
+		client:                      client,
+		clock:                       &clocks.RealClock{},
+		backupLogLevel:              backupLogLevel,
+		newPluginManager:            newPluginManager,
+		backupTracker:               backupTracker,
+		kbClient:                    kbClient,
+		defaultBackupLocation:       defaultBackupLocation,
+		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
+		defaultBackupTTL:            defaultBackupTTL,
+		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
+		defaultItemOperationTimeout: defaultItemOperationTimeout,
+		snapshotLocationLister:      volumeSnapshotLocationLister,
+		defaultSnapshotLocations:    defaultSnapshotLocations,
+		metrics:                     metrics,
+		backupStoreGetter:           backupStoreGetter,
+		formatFlag:                  formatFlag,
+		volumeSnapshotLister:        volumeSnapshotLister,
+		volumeSnapshotClient:        volumeSnapshotClient,
+		credentialFileStore:         credentialStore,
 	}
 
 	c.syncHandler = c.processBackup
@@ -364,6 +367,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup, logg
 	if request.Spec.CSISnapshotTimeout.Duration == 0 {
 		// set default CSI VolumeSnapshot timeout
 		request.Spec.CSISnapshotTimeout.Duration = c.defaultCSISnapshotTimeout
+	}
+
+	if request.Spec.ItemOperationTimeout.Duration == 0 {
+		// set default item operation timeout
+		request.Spec.ItemOperationTimeout.Duration = c.defaultItemOperationTimeout
 	}
 
 	// calculate expiration
@@ -705,10 +713,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
-	// Mark completion timestamp before serializing and uploading.
-	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
-	backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
 	for _, snap := range backup.VolumeSnapshots {
 		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
@@ -723,10 +727,23 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
+	// Iterate over backup item operations and update progress.
+	// Any errors on operations at this point should be added to backup errors.
+	// If any operations are still not complete, then back will not be set to
+	// Completed yet.
+	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList())
+	if len(errs) > 0 {
+		for err := range errs {
+			backupLog.Error(err)
+		}
+	}
+
+	backup.Status.AsyncBackupItemOperationsAttempted = len(*backup.GetItemOperationsList())
+	backup.Status.AsyncBackupItemOperationsCompleted = opsCompleted
+	backup.Status.AsyncBackupItemOperationsFailed = opsFailed
+
 	backup.Status.Warnings = logCounter.GetCount(logrus.WarnLevel)
 	backup.Status.Errors = logCounter.GetCount(logrus.ErrorLevel)
-
-	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics)
 
 	backupWarnings := logCounter.GetEntries(logrus.WarnLevel)
 	backupErrors := logCounter.GetEntries(logrus.ErrorLevel)
@@ -747,10 +764,26 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	case len(fatalErrs) > 0:
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
 	case logCounter.GetCount(logrus.ErrorLevel) > 0:
-		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+		if inProgressOperations {
+			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed
+		} else {
+			backup.Status.Phase = velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed
+		}
 	default:
-		backup.Status.Phase = velerov1api.BackupPhaseCompleted
+		if inProgressOperations {
+			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperations
+		} else {
+			backup.Status.Phase = velerov1api.BackupPhaseFinalizingAfterPluginOperations
+		}
 	}
+	// Mark completion timestamp before serializing and uploading.
+	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
+	if backup.Status.Phase == velerov1api.BackupPhaseFailed ||
+		backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed ||
+		backup.Status.Phase == velerov1api.BackupPhaseCompleted {
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
+	}
+	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics, false)
 
 	// re-instantiate the backup store because credentials could have changed since the original
 	// instantiation, if this was a long-running backup
@@ -771,37 +804,43 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	return kerrors.NewAggregate(fatalErrs)
 }
 
-func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) {
+func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics, finalize bool) {
 	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 
-	var backupSizeBytes int64
-	if backupFileStat, err := backupFile.Stat(); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error getting backup file info")
-	} else {
-		backupSizeBytes = backupFileStat.Size()
-	}
-	serverMetrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
-
-	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
-	backupDurationSeconds := float64(backupDuration / time.Second)
-	serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
-	serverMetrics.RegisterVolumeSnapshotAttempts(backupScheduleName, backup.Status.VolumeSnapshotsAttempted)
-	serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
-	serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
-
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		serverMetrics.RegisterCSISnapshotAttempts(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted)
-		serverMetrics.RegisterCSISnapshotSuccesses(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsCompleted)
-		serverMetrics.RegisterCSISnapshotFailures(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted-backup.Status.CSIVolumeSnapshotsCompleted)
+	if backupFile != nil {
+		var backupSizeBytes int64
+		if backupFileStat, err := backupFile.Stat(); err != nil {
+			log.WithError(errors.WithStack(err)).Error("Error getting backup file info")
+		} else {
+			backupSizeBytes = backupFileStat.Size()
+		}
+		serverMetrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
 	}
 
-	if backup.Status.Progress != nil {
-		serverMetrics.RegisterBackupItemsTotalGauge(backupScheduleName, backup.Status.Progress.TotalItems)
+	if backup.Status.CompletionTimestamp != nil {
+		backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
+		backupDurationSeconds := float64(backupDuration / time.Second)
+		serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
 	}
-	serverMetrics.RegisterBackupItemsErrorsGauge(backupScheduleName, backup.Status.Errors)
+	if !finalize {
+		serverMetrics.RegisterVolumeSnapshotAttempts(backupScheduleName, backup.Status.VolumeSnapshotsAttempted)
+		serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
+		serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
 
-	if backup.Status.Warnings > 0 {
-		serverMetrics.RegisterBackupWarning(backupScheduleName)
+		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+			serverMetrics.RegisterCSISnapshotAttempts(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted)
+			serverMetrics.RegisterCSISnapshotSuccesses(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsCompleted)
+			serverMetrics.RegisterCSISnapshotFailures(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted-backup.Status.CSIVolumeSnapshotsCompleted)
+		}
+
+		if backup.Status.Progress != nil {
+			serverMetrics.RegisterBackupItemsTotalGauge(backupScheduleName, backup.Status.Progress.TotalItems)
+		}
+		serverMetrics.RegisterBackupItemsErrorsGauge(backupScheduleName, backup.Status.Errors)
+
+		if backup.Status.Warnings > 0 {
+			serverMetrics.RegisterBackupWarning(backupScheduleName)
+		}
 	}
 }
 
@@ -822,6 +861,12 @@ func persistBackup(backup *pkgbackup.Request,
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
 	nativeVolumeSnapshots, errs := encodeToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
+
+	var backupItemOperations *bytes.Buffer
+	backupItemOperations, errs = encodeToJSONGzip(backup.GetItemOperationsList(), "backup item operations list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
@@ -860,6 +905,7 @@ func persistBackup(backup *pkgbackup.Request,
 		backupJSON = nil
 		backupContents = nil
 		nativeVolumeSnapshots = nil
+		backupItemOperations = nil
 		backupResourceList = nil
 		csiSnapshotJSON = nil
 		csiSnapshotContentsJSON = nil
@@ -875,6 +921,7 @@ func persistBackup(backup *pkgbackup.Request,
 		BackupResults:             backupResult,
 		PodVolumeBackups:          podVolumeBackups,
 		VolumeSnapshots:           nativeVolumeSnapshots,
+		BackupItemOperations:      backupItemOperations,
 		BackupResourceList:        backupResourceList,
 		CSIVolumeSnapshots:        csiSnapshotJSON,
 		CSIVolumeSnapshotContents: csiSnapshotContentsJSON,
