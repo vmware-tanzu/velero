@@ -19,6 +19,11 @@ If you are running a build on Ubuntu you will need the following packages:
 * zlib1g-dev
 * nginx (or apache2)
 
+If you are running a build on Fedora/CentOS you will need the following packages:
+* sudo dnf groupinstall 'Development Tools'
+* sudo dnf install make automake gcc gcc-c++ 
+* sudo dnf install ruby ruby-devel rubygem-bundler rbenv zlibrary-devel nginx 
+
 
 # Local Development
 1. Install Jekyll and plug-ins in one fell swoop. `gem install github-pages`
@@ -27,6 +32,7 @@ This mirrors the plug-ins used by GitHub Pages on your local machine including J
 3. `cd velero/site`
 4. `rbenv local 2.6.3`
 5. `bundle install`
+6. `gem install racc  --user-install; gem install sassc  --user-install`
 6. Serve the site and watch for markup/sass changes `jekyll serve --livereload --incremental`. You may need to run `bundle exec jekyll serve --livereload --incremental`.
 7. View your website at http://127.0.0.1:4000/
 8. Commit any changes and push everything to your fork.
