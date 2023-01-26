@@ -46,6 +46,7 @@ site/.jekyll-metadata
 site/.jekyll-cache
 site/.bundle
 site/vendor
+site/Gemfile.lock
 .ruby-version
 
 .vs
