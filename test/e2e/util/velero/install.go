@@ -49,11 +49,9 @@ type installOptions struct {
 	RestoreHelperImage     string
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, useVolumeSnapshots bool) error {
+func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 	if veleroCfg.CloudProvider != "kind" {
-		if veleroCfg.ObjectStoreProvider != "" {
-			return errors.New("For cloud platforms, object store plugin cannot be overridden") // Can't set an object store provider that is different than your cloud
-		}
+		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
 		veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
 	} else {
 		if veleroCfg.ObjectStoreProvider == "" {
@@ -81,14 +79,13 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, useVolumeSnapsh
 		}
 	}
 
-	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
-		veleroCfg.BSLPrefix, veleroCfg.BSLConfig, veleroCfg.VSLConfig, providerPluginsTmp, veleroCfg.Features)
+	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg, providerPluginsTmp)
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
-	veleroInstallOptions.UseVolumeSnapshots = useVolumeSnapshots
+	veleroInstallOptions.UseVolumeSnapshots = veleroCfg.UseVolumeSnapshots
 	if !veleroCfg.UseRestic {
-		veleroInstallOptions.UseNodeAgent = !useVolumeSnapshots
+		veleroInstallOptions.UseNodeAgent = veleroCfg.UseNodeAgent
 	}
 	veleroInstallOptions.UseRestic = veleroCfg.UseRestic
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
@@ -178,6 +175,9 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	}
 	if options.UseNodeAgent {
 		args = append(args, "--use-node-agent")
+	}
+	if options.DefaultVolumesToFsBackup {
+		args = append(args, "--default-volumes-to-fs-backup")
 	}
 	if options.UseRestic {
 		args = append(args, "--use-restic")

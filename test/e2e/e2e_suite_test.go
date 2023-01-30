@@ -90,7 +90,7 @@ var _ = Describe("[Basic][Snapshot] Velero tests on cluster using the plugin pro
 
 var _ = Describe("[Basic][ClusterResource] Backup/restore of cluster resources", ResourcesCheckTest)
 
-var _ = Describe("[Scale] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
+var _ = Describe("[Scale][LongTime] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
 
 // Upgrade test by Kibishi using restic
 var _ = Describe("[Upgrade][Restic] Velero upgrade tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupUpgradeRestoreWithRestic)
@@ -110,10 +110,10 @@ var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup inclu
 
 var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
-var _ = Describe("[Backups][TTL] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
+var _ = Describe("[Backups][TTL][LongTime] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
 var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
 
-var _ = Describe("[Schedule][BR][Pause] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
+var _ = Describe("[Schedule][BR][Pause][LongTime] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
 
 var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
@@ -121,17 +121,18 @@ var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controlle
 var _ = Describe("[BSL][Deletion][Snapshot] Local backups will be deleted once the corresponding backup storage location is deleted", BslDeletionWithSnapshots)
 var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
 
-var _ = Describe("[Migration][Restic]", MigrationWithRestic)
-
-var _ = Describe("[Migration][Snapshot]", MigrationWithSnapshots)
+var _ = Describe("[Migration][Restic] Migrate resources between clusters by Restic", MigrationWithRestic)
+var _ = Describe("[Migration][Snapshot] Migrate resources between clusters by snapshot", MigrationWithSnapshots)
 
 var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
-var _ = Describe("[NamespaceMapping][Multiple][Restic]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
-var _ = Describe("[NamespaceMapping][Single][Snapshot]  Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
-var _ = Describe("[NamespaceMapping][Multiple][Snapshot]  Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Multiple][Restic] Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
+var _ = Describe("[NamespaceMapping][Single][Snapshot] Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Multiple][Snapshot] Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
 
 var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
 var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)
+
+var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
 
 func GetKubeconfigContext() error {
 	var err error

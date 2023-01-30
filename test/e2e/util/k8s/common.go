@@ -341,3 +341,17 @@ func WaitForCRDEstablished(crdName string) error {
 	}
 	return nil
 }
+
+func GetAllService(ctx context.Context) (string, error) {
+	args := []string{"get", "service", "-A"}
+	cmd := exec.CommandContext(context.Background(), "kubectl", args...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Println(stdout)
+	if err != nil {
+		fmt.Println(stderr)
+		fmt.Println(err)
+		return "", err
+	}
+	return stdout, nil
+}

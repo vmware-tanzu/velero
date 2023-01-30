@@ -129,12 +129,13 @@ func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, ba
 	return "", errors.New(fmt.Sprintf("Fail to get VolumeSnapshotContentName for pod %s under namespace %s", podName, namespace))
 }
 
-func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount int) error {
+func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount int) ([]string, error) {
 	var err error
 	var snapshotContentNameList []string
-	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil || len(snapshotContentNameList) != expectedCount {
-		return errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil ||
+		len(snapshotContentNameList) != expectedCount {
+		return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
 	}
 	fmt.Println(snapshotContentNameList)
-	return nil
+	return snapshotContentNameList, nil
 }
