@@ -68,7 +68,7 @@ type BackupSpec struct {
 	// +nullable
 	OrLabelSelectors []*metav1.LabelSelector `json:"orLabelSelectors,omitempty"`
 
-	// SnapshotVolumes specifies whether to take cloud snapshots
+	// SnapshotVolumes specifies whether to take snapshots
 	// of any PV's referenced in the set of objects included
 	// in the Backup.
 	// +optional

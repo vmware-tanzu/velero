@@ -76,8 +76,7 @@ spec:
       app: velero
   - matchLabels:
       app: data-protection
-  # Whether or not to snapshot volumes. This only applies to PersistentVolumes for Azure, GCE, and
-  # AWS. Valid values are true, false, and null/unset. If unset, Velero performs snapshots as long as
+  # Whether or not to snapshot volumes. Valid values are true, false, and null/unset. If unset, Velero performs snapshots as long as
   # a persistent volume provider is configured for Velero.
   snapshotVolumes: null
   # Where to store the tarball and logs.
