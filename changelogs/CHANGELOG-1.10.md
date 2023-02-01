@@ -14,6 +14,7 @@ https://velero.io/docs/v1.10/
 https://velero.io/docs/v1.10/upgrade-to-1.10/
 
 ### All changes
+  * Bump up golang net to fix CVE-2022-41721 (#5811, @Lyndon-Li)
   * Bump up golang to 1.18.10 for Velero (#5780, @Lyndon-Li)
   * Add PR container build action, which will not push image. Add GOARM parameter. Remove container-builder-env section. (#5770, @blackpiglet)
   * Add Restic builder in Dockerfile, and keep the used built Golang image version in accordance with upstream Restic. (#5765, @blackpiglet)
