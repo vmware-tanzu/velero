@@ -61,4 +61,7 @@ func TestDeployment(t *testing.T) {
 	deploy = Deployment("velero", WithUploaderType("kopia"))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--uploader-type=kopia", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
+	deploy = Deployment("velero", WithServiceAccountName("test-sa"))
+	assert.Equal(t, "test-sa", deploy.Spec.Template.Spec.ServiceAccountName)
 }

@@ -30,6 +30,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
+const defaultServiceAccountName = "velero"
+
 var (
 	DefaultVeleroPodCPURequest    = "500m"
 	DefaultVeleroPodMemRequest    = "128Mi"
@@ -96,7 +98,7 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 }
 
 func ServiceAccount(namespace string, annotations map[string]string) *corev1.ServiceAccount {
-	objMeta := objectMeta(namespace, "velero")
+	objMeta := objectMeta(namespace, defaultServiceAccountName)
 	objMeta.Annotations = annotations
 	return &corev1.ServiceAccount{
 		ObjectMeta: objMeta,
@@ -217,6 +219,7 @@ type VeleroOptions struct {
 	PodAnnotations                  map[string]string
 	PodLabels                       map[string]string
 	ServiceAccountAnnotations       map[string]string
+	ServiceAccountName              string
 	VeleroPodResources              corev1.ResourceRequirements
 	NodeAgentPodResources           corev1.ResourceRequirements
 	SecretData                      []byte
@@ -258,9 +261,13 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 
 	crb := ClusterRoleBinding(o.Namespace)
 	appendUnstructured(resources, crb)
-
-	sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
-	appendUnstructured(resources, sa)
+	serviceAccountName := defaultServiceAccountName
+	if o.ServiceAccountName == "" {
+		sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
+		appendUnstructured(resources, sa)
+	} else {
+		serviceAccountName = o.ServiceAccountName
+	}
 
 	if o.SecretData != nil {
 		sec := Secret(o.Namespace, o.SecretData)
@@ -287,6 +294,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithResources(o.VeleroPodResources),
 		WithSecret(secretPresent),
 		WithDefaultRepoMaintenanceFrequency(o.DefaultRepoMaintenanceFrequency),
+		WithServiceAccountName(serviceAccountName),
 		WithGarbageCollectionFrequency(o.GarbageCollectionFrequency),
 		WithUploaderType(o.UploaderType),
 	}
@@ -318,6 +326,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			WithImage(o.Image),
 			WithResources(o.NodeAgentPodResources),
 			WithSecret(secretPresent),
+			WithServiceAccountName(serviceAccountName),
 		}
 		if len(o.Features) > 0 {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))

@@ -44,6 +44,7 @@ type podTemplateConfig struct {
 	plugins                         []string
 	features                        []string
 	defaultVolumesToFsBackup        bool
+	serviceAccountName              string
 	uploaderType                    string
 }
 
@@ -135,6 +136,12 @@ func WithDefaultVolumesToFsBackup() podTemplateOption {
 	}
 }
 
+func WithServiceAccountName(sa string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.serviceAccountName = sa
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
@@ -180,7 +187,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,
-					ServiceAccountName: "velero",
+					ServiceAccountName: c.serviceAccountName,
 					Containers: []corev1.Container{
 						{
 							Name:            "velero",
