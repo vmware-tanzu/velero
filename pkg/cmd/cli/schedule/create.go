@@ -83,8 +83,6 @@ type CreateOptions struct {
 	Schedule                   string
 	UseOwnerReferencesInBackup bool
 	Paused                     bool
-
-	labelSelector *metav1.LabelSelector
 }
 
 func NewCreateOptions() *CreateOptions {

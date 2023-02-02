@@ -35,15 +35,12 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	. "github.com/vmware-tanzu/velero/test/e2e"
 )
 
 type AzureStorage string
-
-const fqdn = "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 
 const (
 	subscriptionIDConfigKey = "subscriptionId"
@@ -54,15 +51,6 @@ const (
 	storageAccount          = "storageAccount"
 	subscriptionID          = "subscriptionId"
 	resourceGroup           = "resourceGroup"
-
-	apiTimeoutConfigKey       = "apiTimeout"
-	snapsIncrementalConfigKey = "incremental"
-
-	snapshotsResource = "snapshots"
-	disksResource     = "disks"
-
-	resourceGroupConfigKey   = "resourceGroup"
-	credentialsFileConfigKey = "credentialsFile"
 )
 
 func getStorageCredential(cloudCredentialsFile, bslConfig string) (string, string, error) {
@@ -198,23 +186,6 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	return results, nil
 }
 
-func validateConfigKeys(config map[string]string, validKeys ...string) error {
-	validKeysSet := sets.NewString(validKeys...)
-
-	var invalidKeys []string
-	for k := range config {
-		if !validKeysSet.Has(k) {
-			invalidKeys = append(invalidKeys, k)
-		}
-	}
-
-	if len(invalidKeys) > 0 {
-		return errors.Errorf("config has invalid keys %v; valid keys are %v", invalidKeys, validKeys)
-	}
-
-	return nil
-}
-
 func deleteBlob(p pipeline.Pipeline, accountName, containerName, blobName string) error {
 	ctx := context.Background()
 
@@ -311,11 +282,6 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 	return nil
 }
 
-func mapLookup(data map[string]string) func(string) string {
-	return func(key string) string {
-		return data[key]
-	}
-}
 func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
 
 	ctx := context.Background()

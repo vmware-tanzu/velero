@@ -59,7 +59,6 @@ func AdaptedRestoreItemActions() []AdaptedRestoreItemAction {
 type RestartableRestoreItemAction struct {
 	Key                 process.KindAndName
 	SharedPluginProcess process.RestartableProcess
-	config              map[string]string
 }
 
 // NewRestartableRestoreItemAction returns a new RestartableRestoreItemAction.

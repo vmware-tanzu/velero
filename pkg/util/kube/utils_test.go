@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/test"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -139,21 +138,6 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 		})
 	}
 
-}
-
-type harness struct {
-	*test.APIServer
-
-	log logrus.FieldLogger
-}
-
-func newHarness(t *testing.T) *harness {
-	t.Helper()
-
-	return &harness{
-		APIServer: test.NewAPIServer(t),
-		log:       logrus.StandardLogger(),
-	}
 }
 
 // TestGetVolumeDirectorySuccess tests that the GetVolumeDirectory function
