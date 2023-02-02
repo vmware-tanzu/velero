@@ -112,9 +112,8 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 
 	var storageKey string
 	for _, key := range *res.Keys {
-		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
-		// the storagemgmt.Full constant in the SDK is defined as "Full".
-		if strings.ToUpper(string(key.Permissions)) == strings.ToUpper(string(storagemgmt.Full)) {
+		// The ListKeys call returns e.g. "FULL" but the storagemgmt.Full constant in the SDK is defined as "Full".
+		if strings.EqualFold(string(key.Permissions), string(storagemgmt.Full)) {
 			storageKey = *key.Value
 			break
 		}

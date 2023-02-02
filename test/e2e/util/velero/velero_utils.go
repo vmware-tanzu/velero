@@ -462,9 +462,9 @@ func VeleroScheduleCreate(ctx context.Context, veleroCLI string, veleroNamespace
 
 func VeleroSchedulePause(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string) error {
 	var args []string
-	args = append([]string{
+	args = []string{
 		"--namespace", veleroNamespace, "schedule", "pause", scheduleName,
-	})
+	}
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		return err
 	}
@@ -473,9 +473,9 @@ func VeleroSchedulePause(ctx context.Context, veleroCLI string, veleroNamespace 
 
 func VeleroScheduleUnpause(ctx context.Context, veleroCLI string, veleroNamespace string, scheduleName string) error {
 	var args []string
-	args = append([]string{
+	args = []string{
 		"--namespace", veleroNamespace, "schedule", "unpause", scheduleName,
-	})
+	}
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		return err
 	}
