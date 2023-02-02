@@ -44,7 +44,7 @@ type Request struct {
 	StorageLocation           *velerov1api.BackupStorageLocation
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
-	ResourceIncludesExcludes  *collections.IncludesExcludes
+	ResourceIncludesExcludes  collections.IncludesExcludesInterface
 	ResourceHooks             []hook.ResourceHook
 	ResolvedActions           []framework.BackupItemResolvedActionV2
 	ResolvedItemSnapshotters  []framework.ItemSnapshotterResolvedAction

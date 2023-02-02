@@ -163,6 +163,16 @@ func VSLs(items ...metav1.Object) *APIResource {
 	}
 }
 
+func Backups(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "velero.io",
+		Version:    "v1",
+		Name:       "backups",
+		Namespaced: true,
+		Items:      items,
+	}
+}
+
 func Services(items ...metav1.Object) *APIResource {
 	return &APIResource{
 		Group:      "",

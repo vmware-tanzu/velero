@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -135,21 +136,48 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("\tExcluded:\t%s\n", s)
 
 	d.Println()
-	d.Printf("Resources:\n")
-	if len(spec.IncludedResources) == 0 {
-		s = "*"
+	if collections.UseOldResourceFilters(spec) {
+		d.Printf("Resources:\n")
+		if len(spec.IncludedResources) == 0 {
+			s = "*"
+		} else {
+			s = strings.Join(spec.IncludedResources, ", ")
+		}
+		d.Printf("\tIncluded:\t%s\n", s)
+		if len(spec.ExcludedResources) == 0 {
+			s = emptyDisplay
+		} else {
+			s = strings.Join(spec.ExcludedResources, ", ")
+		}
+		d.Printf("\tExcluded:\t%s\n", s)
+		d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(spec.IncludeClusterResources, "excluded", "included", "auto"))
 	} else {
-		s = strings.Join(spec.IncludedResources, ", ")
-	}
-	d.Printf("\tIncluded:\t%s\n", s)
-	if len(spec.ExcludedResources) == 0 {
-		s = emptyDisplay
-	} else {
-		s = strings.Join(spec.ExcludedResources, ", ")
-	}
-	d.Printf("\tExcluded:\t%s\n", s)
+		if len(spec.IncludedClusterScopeResources) == 0 {
+			s = emptyDisplay
+		} else {
+			s = strings.Join(spec.IncludedClusterScopeResources, ", ")
+		}
+		d.Printf("\tIncluded cluster-scoped:\t%s\n", s)
+		if len(spec.ExcludedClusterScopeResources) == 0 {
+			s = emptyDisplay
+		} else {
+			s = strings.Join(spec.ExcludedClusterScopeResources, ", ")
+		}
+		d.Printf("\tExcluded cluster-scoped:\t%s\n", s)
 
-	d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(spec.IncludeClusterResources, "excluded", "included", "auto"))
+		if len(spec.IncludedNamespacedResources) == 0 {
+			s = "*"
+		} else {
+			s = strings.Join(spec.IncludedNamespacedResources, ", ")
+		}
+		d.Printf("\tIncluded namespaced:\t%s\n", s)
+		if len(spec.ExcludedNamespacedResources) == 0 {
+			s = emptyDisplay
+		} else {
+			s = strings.Join(spec.ExcludedNamespacedResources, ", ")
+		}
+		d.Printf("\tExcluded namespaced:\t%s\n", s)
+	}
 
 	d.Println()
 	s = emptyDisplay
