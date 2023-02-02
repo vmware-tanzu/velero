@@ -73,25 +73,15 @@ type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 }
 
-type Request struct {
-	*velerov1api.Restore
-
-	Log              logrus.FieldLogger
-	Backup           *velerov1api.Backup
-	PodVolumeBackups []*velerov1api.PodVolumeBackup
-	VolumeSnapshots  []*volume.Snapshot
-	BackupReader     io.Reader
-}
-
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(req Request,
+	Restore(req *Request,
 		actions []riav2.RestoreItemAction,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
 	RestoreWithResolvers(
-		req Request,
+		req *Request,
 		restoreItemActionResolver framework.RestoreItemActionResolverV2,
 		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -160,7 +150,7 @@ func NewKubernetesRestorer(
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(
-	req Request,
+	req *Request,
 	actions []riav2.RestoreItemAction,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
@@ -170,7 +160,7 @@ func (kr *kubernetesRestorer) Restore(
 }
 
 func (kr *kubernetesRestorer) RestoreWithResolvers(
-	req Request,
+	req *Request,
 	restoreItemActionResolver framework.RestoreItemActionResolverV2,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -280,6 +270,8 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		credentialFileStore:     kr.credentialFileStore,
 	}
 
+	req.RestoredItems = make(map[itemKey]string)
+
 	restoreCtx := &restoreContext{
 		backup:                         req.Backup,
 		backupReader:                   req.BackupReader,
@@ -305,7 +297,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		podVolumeBackups:               req.PodVolumeBackups,
 		resourceTerminatingTimeout:     kr.resourceTerminatingTimeout,
 		resourceClients:                make(map[resourceClientKey]client.Dynamic),
-		restoredItems:                  make(map[velero.ResourceIdentifier]struct{}),
+		restoredItems:                  req.RestoredItems,
 		renamedPVs:                     make(map[string]string),
 		pvRenamer:                      kr.pvRenamer,
 		discoveryHelper:                kr.discoveryHelper,
@@ -348,7 +340,7 @@ type restoreContext struct {
 	podVolumeBackups               []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout     time.Duration
 	resourceClients                map[resourceClientKey]client.Dynamic
-	restoredItems                  map[velero.ResourceIdentifier]struct{}
+	restoredItems                  map[itemKey]string
 	renamedPVs                     map[string]string
 	pvRenamer                      func(string) (string, error)
 	discoveryHelper                discovery.Helper
@@ -630,12 +622,12 @@ func (ctx *restoreContext) processSelectedResource(
 
 				// Add the newly created namespace to the list of restored items.
 				if nsCreated {
-					itemKey := velero.ResourceIdentifier{
-						GroupResource: kuberesource.Namespaces,
-						Namespace:     ns.Namespace,
-						Name:          ns.Name,
+					itemKey := itemKey{
+						resource:  resourceKey(ns),
+						namespace: ns.Namespace,
+						name:      ns.Name,
 					}
-					ctx.restoredItems[itemKey] = struct{}{}
+					ctx.restoredItems[itemKey] = itemRestoreResultCreated
 				}
 
 				// Keep track of namespaces that we know exist so we don't
@@ -702,6 +694,10 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 
 	if nsBytes, err = ioutil.ReadFile(path); err != nil {
 		return &v1.Namespace{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Namespace",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: remappedName,
 			},
@@ -712,6 +708,10 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	if err := json.Unmarshal(nsBytes, &backupNS); err != nil {
 		logger.Warnf("Error unmarshalling namespace from backup, creating new one.")
 		return &v1.Namespace{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Namespace",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: remappedName,
 			},
@@ -719,6 +719,10 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	}
 
 	return &v1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       backupNS.Kind,
+			APIVersion: backupNS.APIVersion,
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        remappedName,
 			Labels:      backupNS.Labels,
@@ -944,12 +948,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		} else {
 			// Add the newly created namespace to the list of restored items.
 			if nsCreated {
-				itemKey := velero.ResourceIdentifier{
-					GroupResource: kuberesource.Namespaces,
-					Namespace:     nsToEnsure.Namespace,
-					Name:          nsToEnsure.Name,
+				itemKey := itemKey{
+					resource:  resourceKey(nsToEnsure),
+					namespace: nsToEnsure.Namespace,
+					name:      nsToEnsure.Name,
 				}
-				ctx.restoredItems[itemKey] = struct{}{}
+				ctx.restoredItems[itemKey] = itemRestoreResultCreated
 			}
 		}
 	} else {
@@ -980,16 +984,29 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	name := obj.GetName()
 
 	// Check if we've already restored this itemKey.
-	itemKey := velero.ResourceIdentifier{
-		GroupResource: groupResource,
-		Namespace:     namespace,
-		Name:          name,
+	itemKey := itemKey{
+		resource:  resourceKey(obj),
+		namespace: namespace,
+		name:      name,
 	}
 	if _, exists := ctx.restoredItems[itemKey]; exists {
 		ctx.log.Infof("Skipping %s because it's already been restored.", resourceID)
 		return warnings, errs
 	}
-	ctx.restoredItems[itemKey] = struct{}{}
+	ctx.restoredItems[itemKey] = ""
+	defer func() {
+		// the action field is set explicitly
+		if action := ctx.restoredItems[itemKey]; len(action) > 0 {
+			return
+		}
+		// no action specified, and no warnings and errors
+		if errs.IsEmpty() && warnings.IsEmpty() {
+			ctx.restoredItems[itemKey] = itemRestoreResultSkipped
+			return
+		}
+		// others are all failed
+		ctx.restoredItems[itemKey] = itemRestoreResultFailed
+	}()
 
 	// TODO: move to restore item action if/when we add a ShouldRestore() method
 	// to the interface.
@@ -1243,6 +1260,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
+	if restoreErr == nil {
+		ctx.restoredItems[itemKey] = itemRestoreResultCreated
+	}
 	isAlreadyExistsError, err := isAlreadyExistsError(ctx, obj, restoreErr, resourceClient)
 	if err != nil {
 		errs.Add(namespace, err)
@@ -1317,6 +1337,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 						errs.Merge(&errsFromUpdate)
 					}
 				} else {
+					ctx.restoredItems[itemKey] = itemRestoreResultUpdated
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
@@ -1334,6 +1355,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					} else if resourcePolicy == velerov1api.PolicyTypeUpdate {
 						// processing update as existingResourcePolicy
 						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
+						if warningsFromUpdateRP.IsEmpty() && errsFromUpdateRP.IsEmpty() {
+							ctx.restoredItems[itemKey] = itemRestoreResultUpdated
+						}
 						warnings.Merge(&warningsFromUpdateRP)
 						errs.Merge(&errsFromUpdateRP)
 					}

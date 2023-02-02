@@ -158,6 +158,11 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
+		d.Println()
+		if details {
+			describeRestoreResourceList(ctx, kbClient, d, restore, insecureSkipTLSVerify, caCertFile)
+			d.Println()
+		}
 	})
 }
 
@@ -274,4 +279,35 @@ func groupRestoresByPhase(restores []velerov1api.PodVolumeRestore) map[string][]
 	}
 
 	return restoresByPhase
+}
+
+func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, d *Describer, restore *velerov1api.Restore, insecureSkipTLSVerify bool, caCertPath string) {
+	buf := new(bytes.Buffer)
+	if err := downloadrequest.Stream(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+		if err == downloadrequest.ErrNotFound {
+			d.Println("Resource List:\t<restore resource list not found>")
+		} else {
+			d.Printf("Resource List:\t<error getting restore resource list: %v>\n", err)
+		}
+		return
+	}
+
+	var resourceList map[string][]string
+	if err := json.NewDecoder(buf).Decode(&resourceList); err != nil {
+		d.Printf("Resource List:\t<error reading restore resource list: %v>\n", err)
+		return
+	}
+
+	d.Println("Resource List:")
+
+	// Sort GVKs in output
+	gvks := make([]string, 0, len(resourceList))
+	for gvk := range resourceList {
+		gvks = append(gvks, gvk)
+	}
+	sort.Strings(gvks)
+
+	for _, gvk := range gvks {
+		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(resourceList[gvk], "\n\t\t- "))
+	}
 }

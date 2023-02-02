@@ -105,6 +105,10 @@ func (l *ObjectStoreLayout) getRestoreResultsKey(restore string) string {
 	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-results.gz", restore))
 }
 
+func (l *ObjectStoreLayout) getRestoreResourceListKey(restore string) string {
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-resource-list.json.gz", restore))
+}
+
 func (l *ObjectStoreLayout) getRestoreItemOperationsKey(restore string) string {
 	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-itemoperations.json.gz", restore))
 }

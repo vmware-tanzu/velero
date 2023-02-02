@@ -50,6 +50,7 @@ spec:
                     - BackupResourceList
                     - RestoreLog
                     - RestoreResults
+                    - RestoreResourceList
                     - RestoreItemOperations
                     - CSIBackupVolumeSnapshots
                     - CSIBackupVolumeSnapshotContents

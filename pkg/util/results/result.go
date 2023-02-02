@@ -65,3 +65,8 @@ func (r *Result) Add(ns string, e error) {
 		r.Namespaces[ns] = append(r.Namespaces[ns], e.Error())
 	}
 }
+
+// IsEmpty returns true if all collections of messages are empty
+func (r *Result) IsEmpty() bool {
+	return len(r.Velero) == 0 && len(r.Cluster) == 0 && len(r.Namespaces) == 0
+}

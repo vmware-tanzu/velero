@@ -78,6 +78,7 @@ type BackupStore interface {
 
 	PutRestoreLog(backup, restore string, log io.Reader) error
 	PutRestoreResults(backup, restore string, results io.Reader) error
+	PutRestoredResourceList(restore string, results io.Reader) error
 	PutRestoreItemOperations(backup, restore string, restoreItemOperations io.Reader) error
 	GetRestoreItemOperations(name string) ([]*itemoperation.RestoreOperation, error)
 	DeleteRestore(name string) error
@@ -537,6 +538,10 @@ func (s *objectBackupStore) PutRestoreResults(backup string, restore string, res
 	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResultsKey(restore), results)
 }
 
+func (s *objectBackupStore) PutRestoredResourceList(restore string, list io.Reader) error {
+	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResourceListKey(restore), list)
+}
+
 func (s *objectBackupStore) PutRestoreItemOperations(backup string, restore string, restoreItemOperations io.Reader) error {
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getRestoreItemOperationsKey(restore), restoreItemOperations)
 }
@@ -563,6 +568,8 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreLogKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindRestoreResults:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreResultsKey(target.Name), DownloadURLTTL)
+	case velerov1api.DownloadTargetKindRestoreResourceList:
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreResourceListKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindCSIBackupVolumeSnapshots:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getCSIVolumeSnapshotKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindCSIBackupVolumeSnapshotContents:

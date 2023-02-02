@@ -327,3 +327,16 @@ func (_m *BackupStore) GetRestoreItemOperations(name string) ([]*itemoperation.R
 	panic("implement me")
 	return nil, nil
 }
+
+func (_m *BackupStore) PutRestoredResourceList(restore string, results io.Reader) error {
+	ret := _m.Called(restore, results)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
+		r0 = rf(restore, results)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
