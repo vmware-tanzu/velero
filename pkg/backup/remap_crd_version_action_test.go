@@ -178,7 +178,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			require.NoError(t, err)
 
 			var obj unstructured.Unstructured
-			err = json.Unmarshal([]byte(f), &obj)
+			err = json.Unmarshal(f, &obj)
 			require.NoError(t, err)
 
 			// Load a v1beta1 struct into the beta client to be returned
@@ -187,7 +187,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			require.NoError(t, err)
 
 			var crd apiextv1beta1.CustomResourceDefinition
-			err = json.Unmarshal([]byte(f), &crd)
+			err = json.Unmarshal(f, &crd)
 			require.NoError(t, err)
 
 			_, err = betaClient.Create(context.TODO(), &crd, metav1.CreateOptions{})

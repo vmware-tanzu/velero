@@ -203,8 +203,8 @@ func TestRestartableItemSnasphotterDelegatedFunctions(t *testing.T) {
 		restartabletest.RestartableDelegateTest{
 			Function:                "AlsoHandles",
 			Inputs:                  []interface{}{&isv1.AlsoHandlesInput{}},
-			ExpectedErrorOutputs:    []interface{}{[]velero.ResourceIdentifier([]velero.ResourceIdentifier(nil)), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{[]velero.ResourceIdentifier([]velero.ResourceIdentifier(nil)), errors.Errorf("delegate error")},
+			ExpectedErrorOutputs:    []interface{}{[]velero.ResourceIdentifier(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{[]velero.ResourceIdentifier(nil), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "SnapshotItem",

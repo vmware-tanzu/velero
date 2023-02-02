@@ -74,7 +74,7 @@ type kopiaObjectWriter struct {
 }
 
 const (
-	defaultLogInterval             = time.Duration(time.Second * 10)
+	defaultLogInterval             = time.Second * 10
 	defaultMaintainCheckPeriod     = time.Hour
 	overwriteFullMaintainInterval  = time.Duration(0)
 	overwriteQuickMaintainInterval = time.Duration(0)
@@ -505,9 +505,9 @@ func getManifestEntriesFromKopia(kMani []*manifest.EntryMetadata) []*udmrepo.Man
 }
 
 func (lt *logThrottle) shouldLog() bool {
-	nextOutputTime := atomic.LoadInt64((*int64)(&lt.lastTime))
+	nextOutputTime := atomic.LoadInt64(&lt.lastTime)
 	if nowNano := time.Now().UnixNano(); nowNano > nextOutputTime {
-		if atomic.CompareAndSwapInt64((*int64)(&lt.lastTime), nextOutputTime, nowNano+lt.interval.Nanoseconds()) {
+		if atomic.CompareAndSwapInt64(&lt.lastTime, nextOutputTime, nowNano+lt.interval.Nanoseconds()) {
 			return true
 		}
 	}

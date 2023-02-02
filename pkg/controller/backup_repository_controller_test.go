@@ -203,13 +203,13 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 	}{
 		{
 			name:            "user defined valid",
-			userDefinedFreq: time.Duration(time.Hour),
-			expectFreq:      time.Duration(time.Hour),
+			userDefinedFreq: time.Hour,
+			expectFreq:      time.Hour,
 		},
 		{
 			name:       "repo return valid",
-			freqReturn: time.Duration(time.Hour * 2),
-			expectFreq: time.Duration(time.Hour * 2),
+			freqReturn: time.Hour * 2,
+			expectFreq: time.Hour * 2,
 		},
 		{
 			name:            "fall to default",

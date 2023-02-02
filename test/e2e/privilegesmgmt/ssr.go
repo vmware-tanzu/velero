@@ -57,7 +57,7 @@ func SSRTest() {
 
 	It(fmt.Sprintf("Should create an ssr object in the %s namespace and later removed by controller", VeleroCfg.VeleroNamespace), func() {
 		defer DeleteNamespace(context.TODO(), *VeleroCfg.ClientToInstallVelero, testNS, false)
-		ctx, _ := context.WithTimeout(context.Background(), time.Duration(time.Minute*10))
+		ctx, _ := context.WithTimeout(context.Background(), time.Minute*10)
 		By(fmt.Sprintf("Create %s namespace", testNS))
 		Expect(CreateNamespace(ctx, *VeleroCfg.ClientToInstallVelero, testNS)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", testNS))

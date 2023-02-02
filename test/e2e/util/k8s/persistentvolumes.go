@@ -36,7 +36,7 @@ func CreatePersistentVolume(client TestClient, name string) (*corev1.PersistentV
 		Spec: corev1.PersistentVolumeSpec{
 			StorageClassName: "manual",
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Capacity:         corev1.ResourceList{corev1.ResourceName(corev1.ResourceStorage): resource.MustParse("2Gi")},
+			Capacity:         corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")},
 
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{

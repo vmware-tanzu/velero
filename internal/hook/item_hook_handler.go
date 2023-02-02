@@ -277,7 +277,7 @@ func phasedKey(phase hookPhase, key string) string {
 	if phase != "" {
 		return fmt.Sprintf("%v.%v", phase, key)
 	}
-	return string(key)
+	return key
 }
 
 func getHookAnnotation(annotations map[string]string, key string, phase hookPhase) string {
