@@ -40,4 +40,7 @@ func TestDaemonSet(t *testing.T) {
 	ds = DaemonSet("velero", WithFeatures([]string{"foo,bar,baz"}))
 	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
 	assert.Equal(t, "--features=foo,bar,baz", ds.Spec.Template.Spec.Containers[0].Args[2])
+
+	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
+	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
 }

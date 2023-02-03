@@ -137,7 +137,7 @@ func (rp *resticProvider) RunBackup(
 
 	summary, stderrBuf, err := restic.RunBackup(backupCmd, log, updater)
 	if err != nil {
-		if strings.Contains(err.Error(), "snapshot is empty") {
+		if strings.Contains(stderrBuf, "snapshot is empty") {
 			log.Debugf("Restic backup got empty dir with %s path", path)
 			return "", true, nil
 		}

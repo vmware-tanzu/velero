@@ -303,12 +303,16 @@ func (c *backupController) processBackup(key string) error {
 	switch request.Status.Phase {
 	case velerov1api.BackupPhaseCompleted:
 		c.metrics.RegisterBackupSuccess(backupScheduleName)
+		c.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusSucc)
 	case velerov1api.BackupPhasePartiallyFailed:
 		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
+		c.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	case velerov1api.BackupPhaseFailed:
 		c.metrics.RegisterBackupFailed(backupScheduleName)
+		c.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	case velerov1api.BackupPhaseFailedValidation:
 		c.metrics.RegisterBackupValidationFailure(backupScheduleName)
+		c.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
 
 	log.Debug("Updating backup's final status")
@@ -620,7 +624,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	defer pluginManager.CleanupClients()
 
 	backupLog.Info("Getting backup item actions")
-	actions, err := pluginManager.GetBackupItemActions()
+	actions, err := pluginManager.GetBackupItemActionsV2()
 	if err != nil {
 		return err
 	}
@@ -645,7 +649,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return errors.Errorf("backup already exists in object storage")
 	}
 
-	backupItemActionsResolver := framework.NewBackupItemActionResolver(actions)
+	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
 	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	var fatalErrs []error
@@ -789,6 +793,10 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 		serverMetrics.RegisterBackupItemsTotalGauge(backupScheduleName, backup.Status.Progress.TotalItems)
 	}
 	serverMetrics.RegisterBackupItemsErrorsGauge(backupScheduleName, backup.Status.Errors)
+
+	if backup.Status.Warnings > 0 {
+		serverMetrics.RegisterBackupWarning(backupScheduleName)
+	}
 }
 
 func persistBackup(backup *pkgbackup.Request,

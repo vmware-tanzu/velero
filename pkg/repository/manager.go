@@ -172,6 +172,11 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	if err := prd.BoostRepoConnect(context.Background(), param); err != nil {
+		return errors.WithStack(err)
+	}
+
 	return prd.PruneRepo(context.Background(), param)
 }
 
@@ -207,6 +212,11 @@ func (m *manager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	if err := prd.BoostRepoConnect(context.Background(), param); err != nil {
+		return errors.WithStack(err)
+	}
+
 	return prd.Forget(context.Background(), snapshot.SnapshotID, param)
 }
 

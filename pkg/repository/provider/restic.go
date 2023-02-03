@@ -62,6 +62,10 @@ func (r *resticRepositoryProvider) PrepareRepo(ctx context.Context, param RepoPa
 	return nil
 }
 
+func (r *resticRepositoryProvider) BoostRepoConnect(ctx context.Context, param RepoParam) error {
+	return nil
+}
+
 func (r *resticRepositoryProvider) PruneRepo(ctx context.Context, param RepoParam) error {
 	return r.svc.PruneRepo(param.BackupLocation, param.BackupRepo)
 }

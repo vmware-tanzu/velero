@@ -1,0 +1,3 @@
+Add File system backup related matrics to Grafana dashboard
+Add metrics backup_warning_total for record of total warnings
+Add metrics backup_last_status for record of last status of the backup 

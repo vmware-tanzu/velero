@@ -53,7 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -63,13 +63,13 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []biav1.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []biav2.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
 	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 
 func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
-	backupItemActionResolver framework.BackupItemActionResolver, itemSnapshotterResolver framework.ItemSnapshotterResolver,
+	backupItemActionResolver framework.BackupItemActionResolverV2, itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
 	args := b.Called(logger, backup, backupFile, backupItemActionResolver, itemSnapshotterResolver, volumeSnapshotterGetter)
 	return args.Error(0)
@@ -1070,11 +1070,11 @@ func TestProcessBackupCompletions(t *testing.T) {
 				formatFlag:               formatFlag,
 			}
 
-			pluginManager.On("GetBackupItemActions").Return(nil, nil)
+			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 			pluginManager.On("GetItemSnapshotters").Return(nil, nil)
-			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []biav1.BackupItemAction(nil), pluginManager).Return(nil)
-			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolver{}, framework.ItemSnapshotterResolver{}, pluginManager).Return(nil)
+			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []biav2.BackupItemAction(nil), pluginManager).Return(nil)
+			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, framework.ItemSnapshotterResolver{}, pluginManager).Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
 			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.

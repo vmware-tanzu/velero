@@ -330,10 +330,12 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 	}
 	for _, resource := range restoreHooks {
 		for _, h := range resource.RestoreHooks {
-			for _, container := range h.Init.InitContainers {
-				err = hook.ValidateContainer(container.Raw)
-				if err != nil {
-					restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+			if h.Init != nil {
+				for _, container := range h.Init.InitContainers {
+					err = hook.ValidateContainer(container.Raw)
+					if err != nil {
+						restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, err.Error())
+					}
 				}
 			}
 		}
@@ -464,11 +466,11 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	pluginManager := c.newPluginManager(restoreLog)
 	defer pluginManager.CleanupClients()
 
-	actions, err := pluginManager.GetRestoreItemActions()
+	actions, err := pluginManager.GetRestoreItemActionsV2()
 	if err != nil {
 		return errors.Wrap(err, "error getting restore item actions")
 	}
-	actionsResolver := framework.NewRestoreItemActionResolver(actions)
+	actionsResolver := framework.NewRestoreItemActionResolverV2(actions)
 
 	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
 	if err != nil {

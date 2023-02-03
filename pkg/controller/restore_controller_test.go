@@ -43,7 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -500,7 +500,7 @@ func TestProcessQueueItem(t *testing.T) {
 			}
 
 			if test.restore != nil {
-				pluginManager.On("GetRestoreItemActions").Return(nil, nil)
+				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
 				pluginManager.On("GetItemSnapshotters").Return([]isv1.ItemSnapshotter{}, nil)
 				pluginManager.On("CleanupClients")
 			}
@@ -792,7 +792,7 @@ type fakeRestorer struct {
 
 func (r *fakeRestorer) Restore(
 	info pkgrestore.Request,
-	actions []riav1.RestoreItemAction,
+	actions []riav2.RestoreItemAction,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (pkgrestore.Result, pkgrestore.Result) {
 	res := r.Called(info.Log, info.Restore, info.Backup, info.BackupReader, actions)
@@ -803,7 +803,7 @@ func (r *fakeRestorer) Restore(
 }
 
 func (r *fakeRestorer) RestoreWithResolvers(req pkgrestore.Request,
-	resolver framework.RestoreItemActionResolver,
+	resolver framework.RestoreItemActionResolverV2,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (pkgrestore.Result, pkgrestore.Result) {

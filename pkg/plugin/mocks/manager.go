@@ -8,7 +8,11 @@ import (
 
 	restoreitemactionv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 
+	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
+
 	v1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
+
+	v2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 
 	velero "github.com/vmware-tanzu/velero/pkg/plugin/velero"
 
@@ -48,6 +52,29 @@ func (_m *Manager) GetBackupItemAction(name string) (v1.BackupItemAction, error)
 	return r0, r1
 }
 
+// GetBackupItemActionV2 provides a mock function with given fields: name
+func (_m *Manager) GetBackupItemActionV2(name string) (v2.BackupItemAction, error) {
+	ret := _m.Called(name)
+
+	var r0 v2.BackupItemAction
+	if rf, ok := ret.Get(0).(func(string) v2.BackupItemAction); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(v2.BackupItemAction)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBackupItemActions provides a mock function with given fields:
 func (_m *Manager) GetBackupItemActions() ([]v1.BackupItemAction, error) {
 	ret := _m.Called()
@@ -58,6 +85,29 @@ func (_m *Manager) GetBackupItemActions() ([]v1.BackupItemAction, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]v1.BackupItemAction)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetBackupItemActionsV2 provides a mock function with given fields:
+func (_m *Manager) GetBackupItemActionsV2() ([]v2.BackupItemAction, error) {
+	ret := _m.Called()
+
+	var r0 []v2.BackupItemAction
+	if rf, ok := ret.Get(0).(func() []v2.BackupItemAction); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]v2.BackupItemAction)
 		}
 	}
 
@@ -209,6 +259,29 @@ func (_m *Manager) GetRestoreItemAction(name string) (restoreitemactionv1.Restor
 	return r0, r1
 }
 
+// GetRestoreItemActionV2 provides a mock function with given fields: name
+func (_m *Manager) GetRestoreItemActionV2(name string) (restoreitemactionv2.RestoreItemAction, error) {
+	ret := _m.Called(name)
+
+	var r0 restoreitemactionv2.RestoreItemAction
+	if rf, ok := ret.Get(0).(func(string) restoreitemactionv2.RestoreItemAction); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(restoreitemactionv2.RestoreItemAction)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRestoreItemActions provides a mock function with given fields:
 func (_m *Manager) GetRestoreItemActions() ([]restoreitemactionv1.RestoreItemAction, error) {
 	ret := _m.Called()
@@ -219,6 +292,29 @@ func (_m *Manager) GetRestoreItemActions() ([]restoreitemactionv1.RestoreItemAct
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]restoreitemactionv1.RestoreItemAction)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRestoreItemActionsV2 provides a mock function with given fields:
+func (_m *Manager) GetRestoreItemActionsV2() ([]restoreitemactionv2.RestoreItemAction, error) {
+	ret := _m.Called()
+
+	var r0 []restoreitemactionv2.RestoreItemAction
+	if rf, ok := ret.Get(0).(func() []restoreitemactionv2.RestoreItemAction); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]restoreitemactionv2.RestoreItemAction)
 		}
 	}
 

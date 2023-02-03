@@ -47,7 +47,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
@@ -1137,9 +1137,12 @@ func TestRestoreItems(t *testing.T) {
 // to run for specific resources/namespaces and simply records the items
 // that it is executed for.
 type recordResourcesAction struct {
-	selector        velero.ResourceSelector
-	ids             []string
-	additionalItems []velero.ResourceIdentifier
+	selector                    velero.ResourceSelector
+	ids                         []string
+	additionalItems             []velero.ResourceIdentifier
+	operationID                 string
+	waitForAdditionalItems      bool
+	additionalItemsReadyTimeout time.Duration
 }
 
 func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
@@ -1150,16 +1153,34 @@ func (a *recordResourcesAction) Execute(input *velero.RestoreItemActionExecuteIn
 	metadata, err := meta.Accessor(input.Item)
 	if err != nil {
 		return &velero.RestoreItemActionExecuteOutput{
-			UpdatedItem:     input.Item,
-			AdditionalItems: a.additionalItems,
+			UpdatedItem:                 input.Item,
+			AdditionalItems:             a.additionalItems,
+			OperationID:                 a.operationID,
+			WaitForAdditionalItems:      a.waitForAdditionalItems,
+			AdditionalItemsReadyTimeout: a.additionalItemsReadyTimeout,
 		}, err
 	}
 	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
 
 	return &velero.RestoreItemActionExecuteOutput{
-		UpdatedItem:     input.Item,
-		AdditionalItems: a.additionalItems,
+		UpdatedItem:                 input.Item,
+		AdditionalItems:             a.additionalItems,
+		OperationID:                 a.operationID,
+		WaitForAdditionalItems:      a.waitForAdditionalItems,
+		AdditionalItemsReadyTimeout: a.additionalItemsReadyTimeout,
 	}, nil
+}
+
+func (a *recordResourcesAction) Progress(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+	return velero.OperationProgress{}, nil
+}
+
+func (a *recordResourcesAction) Cancel(operationID string, restore *velerov1api.Restore) error {
+	return nil
+}
+
+func (a *recordResourcesAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *velerov1api.Restore) (bool, error) {
+	return true, nil
 }
 
 func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
@@ -1317,7 +1338,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				h.AddItems(t, r)
 			}
 
-			actions := []riav1.RestoreItemAction{}
+			actions := []riav2.RestoreItemAction{}
 			for action := range tc.actions {
 				actions = append(actions, action)
 			}
@@ -1368,9 +1389,21 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
+func (a *pluggableAction) Progress(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+	return velero.OperationProgress{}, nil
+}
+
+func (a *pluggableAction) Cancel(operationID string, restore *velerov1api.Restore) error {
+	return nil
+}
+
 func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggableAction {
 	a.selector = selector
 	return a
+}
+
+func (a *pluggableAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *velerov1api.Restore) (bool, error) {
+	return true, nil
 }
 
 // TestRestoreActionModifications runs restores with restore item actions that modify resources, and
@@ -1403,7 +1436,7 @@ func TestRestoreActionModifications(t *testing.T) {
 		backup       *velerov1api.Backup
 		apiResources []*test.APIResource
 		tarball      io.Reader
-		actions      []riav1.RestoreItemAction
+		actions      []riav2.RestoreItemAction
 		want         []*test.APIResource
 	}{
 		{
@@ -1412,7 +1445,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(map[string]string{"updated": "true"})
 				}),
@@ -1429,7 +1462,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(nil)
 				}),
@@ -1444,7 +1477,7 @@ func TestRestoreActionModifications(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
 					item.SetLabels(map[string]string{"updated": "true"})
 				}).addSelector(velero.ResourceSelector{
@@ -1515,7 +1548,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 		backup       *velerov1api.Backup
 		tarball      io.Reader
 		apiResources []*test.APIResource
-		actions      []riav1.RestoreItemAction
+		actions      []riav2.RestoreItemAction
 		want         map[*test.APIResource][]string
 	}{
 		{
@@ -1524,7 +1557,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				&pluggableAction{
 					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1547,7 +1580,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
 			apiResources: []*test.APIResource{test.Pods()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1572,7 +1605,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1598,7 +1631,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{
@@ -1624,7 +1657,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
 				Done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-			actions: []riav1.RestoreItemAction{
+			actions: []riav2.RestoreItemAction{
 				&pluggableAction{
 					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 						return &velero.RestoreItemActionExecuteOutput{

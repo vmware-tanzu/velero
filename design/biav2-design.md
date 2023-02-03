@@ -69,8 +69,8 @@ One new shared message type will be added, as this will also be needed for v2 Re
 message OperationProgress {
     bool completed = 1;
     string err = 2;
-    int64 completed = 3;
-    int64 total = 4;
+    int64 nCompleted = 3;
+    int64 nTotal = 4;
     string operationUnits = 5;
     string description = 6;
     google.protobuf.Timestamp started = 7;
