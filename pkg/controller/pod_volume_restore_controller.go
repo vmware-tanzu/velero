@@ -39,6 +39,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolumerestore"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -110,11 +111,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if err = c.processRestore(ctx, pvr, pod, log); err != nil {
-		original = pvr.DeepCopy()
-		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
-		pvr.Status.Message = err.Error()
-		pvr.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-		if e := c.Patch(ctx, pvr, client.MergeFrom(original)); e != nil {
+		if e := podvolumerestore.UpdateStatusToFailed(c, ctx, pvr, err.Error(), c.clock.Now()); e != nil {
 			log.WithError(err).Error("Unable to update status to failed")
 		}
 
