@@ -35,6 +35,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/podvolumebackup"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -279,16 +280,10 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 }
 
 func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
-	original := pvb.DeepCopy()
-	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-	pvb.Status.Message = errors.WithMessage(err, msg).Error()
-	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-
-	if err = r.Client.Patch(ctx, pvb, client.MergeFrom(original)); err != nil {
+	if err = podvolumebackup.UpdateStatusToFailed(r.Client, ctx, pvb, errors.WithMessage(err, msg).Error(), r.Clock.Now()); err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")
 		return ctrl.Result{}, err
 	}
-
 	return ctrl.Result{}, nil
 }
 
