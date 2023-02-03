@@ -45,7 +45,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
-	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
@@ -54,6 +53,7 @@ import (
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -579,7 +579,6 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // restoreItemActions
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -660,7 +659,6 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // restoreItemActions
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -745,7 +743,6 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		warnings, errs := h.restorer.Restore(
 			data,
 			nil, // restoreItemActions
-			nil, // snapshot location lister
 			nil, // volume snapshotter getter
 		)
 
@@ -823,7 +820,6 @@ func TestInvalidTarballContents(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // restoreItemActions
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 			assertWantErrsOrWarnings(t, tc.wantWarnings, warnings)
@@ -1128,7 +1124,6 @@ func TestRestoreItems(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // restoreItemActions
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -1359,7 +1354,6 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				actions,
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -1535,7 +1529,6 @@ func TestRestoreActionModifications(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				tc.actions,
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -1702,7 +1695,6 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				tc.actions,
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -2666,10 +2658,9 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				return renamed, nil
 			}
 
-			// set up the VolumeSnapshotLocation informer/lister and add test data to it
-			vslInformer := velerov1informers.NewSharedInformerFactory(h.VeleroClient, 0).Velero().V1().VolumeSnapshotLocations()
+			// set up the VolumeSnapshotLocation client and add test data to it
 			for _, vsl := range tc.volumeSnapshotLocations {
-				require.NoError(t, vslInformer.Informer().GetStore().Add(vsl))
+				require.NoError(t, h.restorer.kbClient.Create(context.Background(), vsl))
 			}
 
 			for _, r := range tc.apiResources {
@@ -2697,7 +2688,6 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // restoreItemActions
-				vslInformer.Lister(),
 				tc.volumeSnapshotterGetter,
 			)
 
@@ -2833,7 +2823,6 @@ func TestRestoreWithPodVolume(t *testing.T) {
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // restoreItemActions
-				nil, // snapshot location lister
 				nil, // volume snapshotter getter
 			)
 
@@ -3152,6 +3141,7 @@ func newHarness(t *testing.T) *harness {
 
 	apiServer := test.NewAPIServer(t)
 	log := logrus.StandardLogger()
+	kbClient := velerotest.NewFakeControllerRuntimeClient(t)
 
 	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
 	require.NoError(t, err)
@@ -3159,7 +3149,6 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		APIServer: apiServer,
 		restorer: &kubernetesRestorer{
-			restoreClient:              apiServer.VeleroClient.VeleroV1(),
 			discoveryHelper:            discoveryHelper,
 			dynamicFactory:             client.NewDynamicFactory(apiServer.DynamicClient),
 			namespaceClient:            apiServer.KubeClient.CoreV1().Namespaces(),
@@ -3170,6 +3159,7 @@ func newHarness(t *testing.T) *harness {
 			// unsupported
 			podVolumeRestorerFactory: nil,
 			podVolumeTimeout:         0,
+			kbClient:                 kbClient,
 		},
 		log: log,
 	}

@@ -28,7 +28,6 @@ import (
 	"sort"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,9 +40,7 @@ import (
 	hook "github.com/vmware-tanzu/velero/internal/hook"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -91,18 +88,13 @@ var nonRestorableResources = []string{
 type restoreController struct {
 	*genericController
 
-	namespace              string
-	restoreClient          velerov1client.RestoresGetter
-	podVolumeBackupClient  velerov1client.PodVolumeBackupsGetter
-	restorer               pkgrestore.Restorer
-	backupLister           velerov1listers.BackupLister
-	restoreLister          velerov1listers.RestoreLister
-	kbClient               client.Client
-	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister
-	restoreLogLevel        logrus.Level
-	metrics                *metrics.ServerMetrics
-	logFormat              logging.Format
-	clock                  clock.Clock
+	namespace       string
+	restorer        pkgrestore.Restorer
+	kbClient        client.Client
+	restoreLogLevel logrus.Level
+	metrics         *metrics.ServerMetrics
+	logFormat       logging.Format
+	clock           clock.Clock
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
@@ -111,12 +103,8 @@ type restoreController struct {
 func NewRestoreController(
 	namespace string,
 	restoreInformer velerov1informers.RestoreInformer,
-	restoreClient velerov1client.RestoresGetter,
-	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	restorer pkgrestore.Restorer,
-	backupLister velerov1listers.BackupLister,
 	kbClient client.Client,
-	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
@@ -125,19 +113,14 @@ func NewRestoreController(
 	logFormat logging.Format,
 ) Interface {
 	c := &restoreController{
-		genericController:      newGenericController(Restore, logger),
-		namespace:              namespace,
-		restoreClient:          restoreClient,
-		podVolumeBackupClient:  podVolumeBackupClient,
-		restorer:               restorer,
-		backupLister:           backupLister,
-		restoreLister:          restoreInformer.Lister(),
-		kbClient:               kbClient,
-		snapshotLocationLister: snapshotLocationLister,
-		restoreLogLevel:        restoreLogLevel,
-		metrics:                metrics,
-		logFormat:              logFormat,
-		clock:                  &clock.RealClock{},
+		genericController: newGenericController(Restore, logger),
+		namespace:         namespace,
+		restorer:          restorer,
+		kbClient:          kbClient,
+		restoreLogLevel:   restoreLogLevel,
+		metrics:           metrics,
+		logFormat:         logFormat,
+		clock:             &clock.RealClock{},
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -149,6 +132,7 @@ func NewRestoreController(
 	c.resyncFunc = c.resync
 	c.resyncPeriod = time.Minute
 
+	// restore informer cannot be removed, until restore controller adopt the controller-runtime framework.
 	restoreInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
@@ -179,11 +163,12 @@ func NewRestoreController(
 }
 
 func (c *restoreController) resync() {
-	restores, err := c.restoreLister.List(labels.Everything())
+	restoreList := &velerov1api.RestoreList{}
+	err := c.kbClient.List(context.Background(), restoreList, &client.ListOptions{})
 	if err != nil {
 		c.logger.Error(err, "Error computing restore_total metric")
 	} else {
-		c.metrics.SetRestoreTotal(int64(len(restores)))
+		c.metrics.SetRestoreTotal(int64(len(restoreList.Items)))
 	}
 }
 
@@ -199,7 +184,11 @@ func (c *restoreController) processQueueItem(key string) error {
 	}
 
 	log.Debug("Getting Restore")
-	restore, err := c.restoreLister.Restores(ns).Get(name)
+	restore := &velerov1api.Restore{}
+	err = c.kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: ns,
+		Name:      name,
+	}, restore)
 	if err != nil {
 		return errors.Wrap(err, "error getting Restore")
 	}
@@ -253,15 +242,14 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 	}
 
 	// patch to update status and persist to API
-	updatedRestore, err := patchRestore(original, restore, c.restoreClient)
+	err := kubeutil.PatchResource(original, restore, c.kbClient)
 	if err != nil {
 		// return the error so the restore can be re-processed; it's currently
 		// still in phase = New.
 		return errors.Wrapf(err, "error updating Restore phase to %s", restore.Status.Phase)
 	}
 	// store ref to just-updated item for creating patch
-	original = updatedRestore
-	restore = updatedRestore.DeepCopy()
+	original = restore.DeepCopy()
 
 	if restore.Status.Phase == api.RestorePhaseFailedValidation {
 		return nil
@@ -284,7 +272,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 
 	restore.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
 	c.logger.Debug("Updating restore's final status")
-	if _, err = patchRestore(original, restore, c.restoreClient); err != nil {
+	if err = kubeutil.PatchResource(original, restore, c.kbClient); err != nil {
 		c.logger.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
 	}
 
@@ -360,16 +348,19 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 			velerov1api.ScheduleNameLabel: restore.Spec.ScheduleName,
 		}))
 
-		backups, err := c.backupLister.Backups(c.namespace).List(selector)
+		backupList := &velerov1api.BackupList{}
+		c.kbClient.List(context.Background(), backupList, &client.ListOptions{
+			LabelSelector: selector,
+		})
 		if err != nil {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Unable to list backups for schedule")
 			return backupInfo{}
 		}
-		if len(backups) == 0 {
+		if len(backupList.Items) == 0 {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No backups found for schedule")
 		}
 
-		if backup := mostRecentCompletedBackup(backups); backup != nil {
+		if backup := mostRecentCompletedBackup(backupList.Items); backup.Name != "" {
 			restore.Spec.BackupName = backup.Name
 		} else {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No completed backups found for schedule")
@@ -407,7 +398,7 @@ func backupXorScheduleProvided(restore *api.Restore) bool {
 
 // mostRecentCompletedBackup returns the most recent backup that's
 // completed from a list of backups.
-func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
+func mostRecentCompletedBackup(backups []api.Backup) api.Backup {
 	sort.Slice(backups, func(i, j int) bool {
 		// Use .After() because we want descending sort.
 
@@ -427,13 +418,14 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 		}
 	}
 
-	return nil
+	return api.Backup{}
 }
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
 func (c *restoreController) fetchBackupInfo(backupName string, pluginManager clientmgmt.Manager) (backupInfo, error) {
-	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
+	backup := &velerov1api.Backup{}
+	err := c.kbClient.Get(context.Background(), types.NamespacedName{Namespace: c.namespace, Name: backupName}, backup)
 	if err != nil {
 		return backupInfo{}, err
 	}
@@ -492,10 +484,16 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	defer closeAndRemoveFile(backupFile, c.logger)
 
-	opts := label.NewListOptionsForBackup(restore.Spec.BackupName)
+	listOpts := &client.ListOptions{
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupNameLabel: label.GetValidName(restore.Spec.BackupName),
+		}).AsSelector(),
+	}
 
-	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(context.TODO(), opts)
+	podVolumeBackupList := &velerov1api.PodVolumeBackupList{}
+	err = c.kbClient.List(context.TODO(), podVolumeBackupList, listOpts)
 	if err != nil {
+		restoreLog.Errorf("Fail to list PodVolumeBackup :%s", err.Error())
 		return errors.WithStack(err)
 	}
 
@@ -519,7 +517,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		BackupReader:     backupFile,
 	}
 	restoreWarnings, restoreErrors := c.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
-		c.snapshotLocationLister, pluginManager)
+		pluginManager)
 
 	// log errors and warnings to the restore log
 	for _, msg := range restoreErrors.Velero {
@@ -639,30 +637,6 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 	}
 
 	return file, nil
-}
-
-func patchRestore(original, updated *api.Restore, client velerov1client.RestoresGetter) (*api.Restore, error) {
-	origBytes, err := json.Marshal(original)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling original restore")
-	}
-
-	updatedBytes, err := json.Marshal(updated)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling updated restore")
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating json merge patch for restore")
-	}
-
-	res, err := client.Restores(original.Namespace).Patch(context.TODO(), original.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return nil, errors.Wrap(err, "error patching restore")
-	}
-
-	return res, nil
 }
 
 type restoreLogger struct {

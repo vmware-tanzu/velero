@@ -674,7 +674,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	restoreControllerRunInfo := func() controllerRunInfo {
 		restorer, err := restore.NewKubernetesRestorer(
-			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			s.config.restoreResourcePriorities,
@@ -687,18 +686,15 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.kubeClient.CoreV1().RESTClient(),
 			s.credentialFileStore,
+			s.mgr.GetClient(),
 		)
 		cmd.CheckError(err)
 
 		restoreController := controller.NewRestoreController(
 			s.namespace,
 			s.sharedInformerFactory.Velero().V1().Restores(),
-			s.veleroClient.VeleroV1(),
-			s.veleroClient.VeleroV1(),
 			restorer,
-			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			s.mgr.GetClient(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			s.logger,
 			s.logLevel,
 			newPluginManager,

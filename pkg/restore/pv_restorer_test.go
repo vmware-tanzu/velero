@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -121,9 +122,9 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			)
 
 			r := &pvRestorer{
-				logger:                 velerotest.NewLogger(),
-				restorePVs:             tc.restore.Spec.RestorePVs,
-				snapshotLocationLister: snapshotLocationInformer.Lister(),
+				logger:     velerotest.NewLogger(),
+				restorePVs: tc.restore.Spec.RestorePVs,
+				kbclient:   velerotest.NewFakeControllerRuntimeClient(t),
 			}
 			if tc.backup != nil {
 				r.backup = tc.backup
@@ -190,18 +191,18 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]vsv1.VolumeSnapshotter{
 					tc.expectedProvider: volumeSnapshotter,
 				})
-				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
+				fakeClient = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
 			)
 
 			for _, loc := range tc.locations {
-				require.NoError(t, locationsInformer.Informer().GetStore().Add(loc))
+				require.NoError(t, fakeClient.Create(context.Background(), loc))
 			}
 
 			r := &pvRestorer{
 				logger:                  velerotest.NewLogger(),
 				backup:                  tc.backup,
 				volumeSnapshots:         tc.volumeSnapshots,
-				snapshotLocationLister:  locationsInformer.Lister(),
+				kbclient:                fakeClient,
 				volumeSnapshotterGetter: volumeSnapshotterGetter,
 			}
 
