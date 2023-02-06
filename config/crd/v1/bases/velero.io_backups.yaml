@@ -393,8 +393,8 @@ spec:
                 nullable: true
                 type: object
               snapshotVolumes:
-                description: SnapshotVolumes specifies whether to take cloud snapshots
-                  of any PV's referenced in the set of objects included in the Backup.
+                description: SnapshotVolumes specifies whether to take snapshots of
+                  any PV's referenced in the set of objects included in the Backup.
                 nullable: true
                 type: boolean
               storageLocation:

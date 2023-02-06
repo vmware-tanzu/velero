@@ -81,7 +81,7 @@ type RestoreSpec struct {
 	OrLabelSelectors []*metav1.LabelSelector `json:"orLabelSelectors,omitempty"`
 
 	// RestorePVs specifies whether to restore all included
-	// PVs from snapshot (via the cloudprovider).
+	// PVs from snapshot
 	// +optional
 	// +nullable
 	RestorePVs *bool `json:"restorePVs,omitempty"`

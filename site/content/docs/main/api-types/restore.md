@@ -93,7 +93,7 @@ spec:
   namespaceMapping:
     namespace-backup-from: namespace-to-restore-to
   # restorePVs specifies whether to restore all included PVs
-  # from snapshot (via the cloudprovider). Optional
+  # from snapshot. Optional
   restorePVs: true
   # preserveNodePorts specifies whether to restore old nodePorts from backup,
   # so that the exposed port numbers on the node will remain the same after restore. Optional
