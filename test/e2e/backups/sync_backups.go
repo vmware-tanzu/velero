@@ -47,7 +47,7 @@ func (b *SyncBackups) Init() {
 	UUIDgen, _ = uuid.NewRandom()
 	b.testNS = "sync-bsl-test-" + UUIDgen.String()
 	b.backupName = "sync-bsl-test-" + UUIDgen.String()
-	b.ctx, _ = context.WithTimeout(context.Background(), time.Duration(time.Minute*10))
+	b.ctx, _ = context.WithTimeout(context.Background(), time.Minute*10)
 }
 
 func BackupsSyncTest() {

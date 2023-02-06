@@ -79,7 +79,7 @@ third line
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			assert.Equal(t, []byte(tt.want), getLastLine([]byte(tt.output)))
+			assert.Equal(t, []byte(tt.want), getLastLine(tt.output))
 		})
 	}
 }

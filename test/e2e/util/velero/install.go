@@ -274,7 +274,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 
 	resources := &unstructured.UnstructuredList{}
 	if err := json.Unmarshal([]byte(stdout), resources); err != nil {
-		return errors.Wrapf(err, "failed to unmarshal the resources: %s", string(stdout))
+		return errors.Wrapf(err, "failed to unmarshal the resources: %s", stdout)
 	}
 
 	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.RestoreHelperImage); err != nil {

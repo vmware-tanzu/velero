@@ -171,7 +171,7 @@ func getKubectlVersion() (string, error) {
 		}
 	}
 	versionOut := outbuf.String()
-	kubectlVersion := strings.TrimSpace(string(versionOut))
+	kubectlVersion := strings.TrimSpace(versionOut)
 	return kubectlVersion, nil
 }
 
