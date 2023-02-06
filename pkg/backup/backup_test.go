@@ -3013,7 +3013,7 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		APIServer: apiServer,
 		backupper: &kubernetesBackupper{
-			backupClient:    apiServer.VeleroClient.VeleroV1(),
+			kbClient:        test.NewFakeControllerRuntimeClient(t),
 			dynamicFactory:  client.NewDynamicFactory(apiServer.DynamicClient),
 			discoveryHelper: discoveryHelper,
 

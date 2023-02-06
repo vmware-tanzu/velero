@@ -44,29 +44,26 @@ func NewBackupperFactory(repoLocker *repository.RepoLocker,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
 	podClient corev1client.PodsGetter,
-	repoInformerSynced cache.InformerSynced,
 	log logrus.FieldLogger) BackupperFactory {
 	return &backupperFactory{
-		repoLocker:         repoLocker,
-		repoEnsurer:        repoEnsurer,
-		veleroClient:       veleroClient,
-		pvcClient:          pvcClient,
-		pvClient:           pvClient,
-		podClient:          podClient,
-		repoInformerSynced: repoInformerSynced,
-		log:                log,
+		repoLocker:   repoLocker,
+		repoEnsurer:  repoEnsurer,
+		veleroClient: veleroClient,
+		pvcClient:    pvcClient,
+		pvClient:     pvClient,
+		podClient:    podClient,
+		log:          log,
 	}
 }
 
 type backupperFactory struct {
-	repoLocker         *repository.RepoLocker
-	repoEnsurer        *repository.RepositoryEnsurer
-	veleroClient       clientset.Interface
-	pvcClient          corev1client.PersistentVolumeClaimsGetter
-	pvClient           corev1client.PersistentVolumesGetter
-	podClient          corev1client.PodsGetter
-	repoInformerSynced cache.InformerSynced
-	log                logrus.FieldLogger
+	repoLocker   *repository.RepoLocker
+	repoEnsurer  *repository.RepositoryEnsurer
+	veleroClient clientset.Interface
+	pvcClient    corev1client.PersistentVolumeClaimsGetter
+	pvClient     corev1client.PersistentVolumesGetter
+	podClient    corev1client.PodsGetter
+	log          logrus.FieldLogger
 }
 
 func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1api.Backup, uploaderType string) (Backupper, error) {
@@ -83,7 +80,7 @@ func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1ap
 	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, informer, bf.veleroClient, bf.pvcClient, bf.pvClient, bf.podClient, uploaderType, bf.log)
 
 	go informer.Run(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, bf.repoInformerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, errors.New("timed out waiting for caches to sync")
 	}
 

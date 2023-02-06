@@ -27,8 +27,6 @@ import (
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotfake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
-	snapshotinformers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,17 +34,17 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
-	clocks "k8s.io/utils/clock"
+	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"
+	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -94,14 +92,6 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		backup *velerov1api.Backup
 	}{
 		{
-			name: "bad key does not return error",
-			key:  "bad/key/here",
-		},
-		{
-			name: "backup not found in lister does not return error",
-			key:  "nonexistent/backup",
-		},
-		{
 			name:   "FailedValidation backup is not processed",
 			key:    "velero/backup-1",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseFailedValidation).Result(),
@@ -127,21 +117,19 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
 			var (
-				sharedInformers = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				logger = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
-			c := &backupController{
-				genericController: newGenericController("backup-test", logger),
-				lister:            sharedInformers.Velero().V1().Backups().Lister(),
-				formatFlag:        formatFlag,
+			c := &backupReconciler{
+				kbClient:   velerotest.NewFakeControllerRuntimeClient(t),
+				formatFlag: formatFlag,
+				logger:     logger,
 			}
-
 			if test.backup != nil {
-				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
+				require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
 			}
-
-			err := c.processBackup(test.key)
+			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
+			assert.Equal(t, actualResult, ctrl.Result{})
 			assert.Nil(t, err)
 
 			// Any backup that would actually proceed to validation will cause a segfault because this
@@ -197,9 +185,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
 			var (
-				clientset       = fake.NewSimpleClientset(test.backup)
-				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				logger = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
 			apiServer := velerotest.NewAPIServer(t)
@@ -213,24 +199,23 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
-			c := &backupController{
-				genericController:      newGenericController("backup-test", logger),
-				discoveryHelper:        discoveryHelper,
-				client:                 clientset.VeleroV1(),
-				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				kbClient:               fakeClient,
-				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-				defaultBackupLocation:  defaultBackupLocation.Name,
-				clock:                  &clocks.RealClock{},
-				formatFlag:             formatFlag,
+			c := &backupReconciler{
+				logger:                logger,
+				discoveryHelper:       discoveryHelper,
+				kbClient:              fakeClient,
+				defaultBackupLocation: defaultBackupLocation.Name,
+				clock:                 &clock.RealClock{},
+				formatFlag:            formatFlag,
 			}
 
 			require.NotNil(t, test.backup)
-			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
+			require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
 
-			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
-
-			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(context.TODO(), test.backup.Name, metav1.GetOptions{})
+			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
+			assert.Equal(t, actualResult, ctrl.Result{})
+			assert.Nil(t, err)
+			res := &velerov1api.Backup{}
+			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
 
 			assert.Equal(t, velerov1api.BackupPhaseFailedValidation, res.Status.Phase)
@@ -270,26 +255,20 @@ func TestBackupLocationLabel(t *testing.T) {
 			formatFlag := logging.FormatText
 
 			var (
-				clientset       = fake.NewSimpleClientset(test.backup)
-				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
+				logger     = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			)
 
 			apiServer := velerotest.NewAPIServer(t)
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
 
-			c := &backupController{
-				genericController:      newGenericController("backup-test", logger),
-				discoveryHelper:        discoveryHelper,
-				client:                 clientset.VeleroV1(),
-				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				kbClient:               fakeClient,
-				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-				defaultBackupLocation:  test.backupLocation.Name,
-				clock:                  &clocks.RealClock{},
-				formatFlag:             formatFlag,
+			c := &backupReconciler{
+				discoveryHelper:       discoveryHelper,
+				kbClient:              fakeClient,
+				defaultBackupLocation: test.backupLocation.Name,
+				clock:                 &clock.RealClock{},
+				formatFlag:            formatFlag,
 			}
 
 			res := c.prepareBackupRequest(test.backup, logger)
@@ -360,10 +339,9 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			var (
-				formatFlag      = logging.FormatText
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				apiServer       = velerotest.NewAPIServer(t)
-				sharedInformers = informers.NewSharedInformerFactory(apiServer.VeleroClient, 0)
+				formatFlag = logging.FormatText
+				logger     = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				apiServer  = velerotest.NewAPIServer(t)
 			)
 
 			// objects that should init with client
@@ -379,15 +357,13 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
 
-			c := &backupController{
-				genericController:      newGenericController("backup-test", logger),
-				discoveryHelper:        discoveryHelper,
-				defaultBackupLocation:  defaultBackupLocation,
-				kbClient:               fakeClient,
-				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-				defaultBackupTTL:       defaultBackupTTL.Duration,
-				clock:                  testclocks.NewFakeClock(now),
-				formatFlag:             formatFlag,
+			c := &backupReconciler{
+				discoveryHelper:       discoveryHelper,
+				defaultBackupLocation: defaultBackupLocation,
+				kbClient:              fakeClient,
+				defaultBackupTTL:      defaultBackupTTL.Duration,
+				clock:                 testclocks.NewFakeClock(now),
+				formatFlag:            formatFlag,
 			}
 
 			test.backup.Spec.StorageLocation = test.backupLocationNameInBackup
@@ -443,10 +419,8 @@ func TestDefaultBackupTTL(t *testing.T) {
 	for _, test := range tests {
 		formatFlag := logging.FormatText
 		var (
-			clientset       = fake.NewSimpleClientset(test.backup)
-			fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
-			logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
+			fakeClient kbclient.Client
+			logger     = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 		)
 
 		t.Run(test.name, func(t *testing.T) {
@@ -454,15 +428,19 @@ func TestDefaultBackupTTL(t *testing.T) {
 			apiServer := velerotest.NewAPIServer(t)
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
-
-			c := &backupController{
-				genericController:      newGenericController("backup-test", logger),
-				discoveryHelper:        discoveryHelper,
-				kbClient:               fakeClient,
-				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-				defaultBackupTTL:       defaultBackupTTL.Duration,
-				clock:                  testclocks.NewFakeClock(now),
-				formatFlag:             formatFlag,
+			// add the test's backup storage location if it's different than the default
+			if test.backupLocation != nil {
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation)
+			} else {
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
+			}
+			c := &backupReconciler{
+				logger:           logger,
+				discoveryHelper:  discoveryHelper,
+				kbClient:         fakeClient,
+				defaultBackupTTL: defaultBackupTTL.Duration,
+				clock:            testclocks.NewFakeClock(now),
+				formatFlag:       formatFlag,
 			}
 
 			res := c.prepareBackupRequest(test.backup, logger)
@@ -548,24 +526,19 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 			formatFlag := logging.FormatText
 
 			var (
-				clientset       = fake.NewSimpleClientset(test.backup)
-				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
+				logger     = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			)
 
 			apiServer := velerotest.NewAPIServer(t)
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
 
-			c := &backupController{
-				genericController:        newGenericController("backup-test", logger),
+			c := &backupReconciler{
+				logger:                   logger,
 				discoveryHelper:          discoveryHelper,
-				client:                   clientset.VeleroV1(),
-				lister:                   sharedInformers.Velero().V1().Backups().Lister(),
 				kbClient:                 fakeClient,
-				snapshotLocationLister:   sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-				clock:                    &clocks.RealClock{},
+				clock:                    &clock.RealClock{},
 				formatFlag:               formatFlag,
 				defaultVolumesToFsBackup: test.globalVal,
 			}
@@ -1018,12 +991,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
 			var (
-				clientset       = fake.NewSimpleClientset(test.backup)
-				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				pluginManager   = new(pluginmocks.Manager)
-				backupStore     = new(persistencemocks.BackupStore)
-				backupper       = new(fakeBackupper)
+				logger        = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				pluginManager = new(pluginmocks.Manager)
+				backupStore   = new(persistencemocks.BackupStore)
+				backupper     = new(fakeBackupper)
 			)
 
 			var fakeClient kbclient.Client
@@ -1051,13 +1022,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
 
-			c := &backupController{
-				genericController:        newGenericController("backup-test", logger),
+			c := &backupReconciler{
+				logger:                   logger,
 				discoveryHelper:          discoveryHelper,
-				client:                   clientset.VeleroV1(),
-				lister:                   sharedInformers.Velero().V1().Backups().Lister(),
 				kbClient:                 fakeClient,
-				snapshotLocationLister:   sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:    defaultBackupLocation.Name,
 				defaultVolumesToFsBackup: test.defaultVolumesToFsBackup,
 				backupTracker:            NewBackupTracker(),
@@ -1091,18 +1059,21 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)
-			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
+
+			require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
 
 			// add the default backup storage location to the clientset and the informer/lister store
 			require.NoError(t, fakeClient.Create(context.Background(), defaultBackupLocation))
 
-			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
+			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
+			assert.Equal(t, actualResult, ctrl.Result{})
+			assert.Nil(t, err)
 
-			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(context.TODO(), test.backup.Name, metav1.GetOptions{})
+			res := &velerov1api.Backup{}
+			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
-
+			res.ResourceVersion = ""
 			assert.Equal(t, test.expectedResult, res)
-
 			// reset defaultBackupLocation resourceVersion
 			defaultBackupLocation.ObjectMeta.ResourceVersion = ""
 		})
@@ -1127,7 +1098,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
-			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocation.velero.io \"random-name\" not found", expectedSuccess: false,
+			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocations.velero.io \"random-name\" not found", expectedSuccess: false,
 		},
 		{
 			name:   "duplicate locationName per provider: should filter out dups",
@@ -1241,22 +1212,20 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
 			var (
-				client          = fake.NewSimpleClientset()
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				logger = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
-			c := &backupController{
-				genericController:        newGenericController("backup-test", logger),
-				snapshotLocationLister:   sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
+			c := &backupReconciler{
+				logger:                   logger,
 				defaultSnapshotLocations: test.defaultLocations,
+				kbClient:                 velerotest.NewFakeControllerRuntimeClient(t),
 			}
 
 			// set up a Backup object to represent what we expect to be passed to backupper.Backup()
 			backup := test.backup.DeepCopy()
 			backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
 			for _, location := range test.locations {
-				require.NoError(t, sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location))
+				require.NoError(t, c.kbClient.Create(context.Background(), location))
 			}
 
 			providerLocations, errs := c.validateAndGetSnapshotLocations(backup)
@@ -1287,7 +1256,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 // the completion timestamp of the most recent completed backup for each schedule, including an entry for ad-hoc
 // or non-scheduled backups.
 func Test_getLastSuccessBySchedule(t *testing.T) {
-	buildBackup := func(phase velerov1api.BackupPhase, completion time.Time, schedule string) *velerov1api.Backup {
+	buildBackup := func(phase velerov1api.BackupPhase, completion time.Time, schedule string) velerov1api.Backup {
 		b := builder.ForBackup("", "").
 			ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, schedule)).
 			Phase(phase)
@@ -1296,7 +1265,7 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 			b.CompletionTimestamp(completion)
 		}
 
-		return b.Result()
+		return *b.Result()
 	}
 
 	// create a static "base time" that can be used to easily construct completion timestamps
@@ -1306,7 +1275,7 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		backups []*velerov1api.Backup
+		backups []velerov1api.Backup
 		want    map[string]time.Time
 	}{
 		{
@@ -1316,12 +1285,12 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 		},
 		{
 			name:    "when backups is empty, an empty map is returned",
-			backups: []*velerov1api.Backup{},
+			backups: []velerov1api.Backup{},
 			want:    map[string]time.Time{},
 		},
 		{
 			name: "when multiple completed backups for a schedule exist, the latest one is returned",
-			backups: []*velerov1api.Backup{
+			backups: []velerov1api.Backup{
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(time.Second), "schedule-1"),
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
@@ -1332,7 +1301,7 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 		},
 		{
 			name: "when the most recent backup for a schedule is Failed, the timestamp of the most recent Completed one is returned",
-			backups: []*velerov1api.Backup{
+			backups: []velerov1api.Backup{
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
 				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
@@ -1343,7 +1312,7 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 		},
 		{
 			name: "when there are no Completed backups for a schedule, it's not returned",
-			backups: []*velerov1api.Backup{
+			backups: []velerov1api.Backup{
 				buildBackup(velerov1api.BackupPhaseInProgress, baseTime, "schedule-1"),
 				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
 				buildBackup(velerov1api.BackupPhasePartiallyFailed, baseTime.Add(-time.Second), "schedule-1"),
@@ -1352,7 +1321,7 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 		},
 		{
 			name: "when backups exist without a schedule, the most recent Completed one is returned",
-			backups: []*velerov1api.Backup{
+			backups: []velerov1api.Backup{
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, ""),
 				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), ""),
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), ""),
@@ -1363,7 +1332,7 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 		},
 		{
 			name: "when backups exist for multiple schedules, the most recent Completed timestamp for each schedule is returned",
-			backups: []*velerov1api.Backup{
+			backups: []velerov1api.Backup{
 				// ad-hoc backups (no schedule)
 				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(30*time.Minute), ""),
 				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Hour), ""),
@@ -1451,24 +1420,18 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClientBuilder(t).WithLists(
 				&snapshotv1api.VolumeSnapshotContentList{Items: tc.vscArray},
 			).Build()
-
-			vsClient := snapshotfake.NewSimpleClientset(&tc.vsArray[0])
-			sharedInformers := snapshotinformers.NewSharedInformerFactory(vsClient, 0)
+			c := &backupReconciler{
+				kbClient: fakeClient,
+			}
 
 			for _, vs := range tc.vsArray {
-				sharedInformers.Snapshot().V1().VolumeSnapshots().Informer().GetStore().Add(vs)
+				require.NoError(t, c.kbClient.Create(context.Background(), &vs))
 			}
-
 			logger := logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
-			c := &backupController{
-				kbClient:             fakeClient,
-				volumeSnapshotClient: vsClient,
-				volumeSnapshotLister: sharedInformers.Snapshot().V1().VolumeSnapshots().Lister(),
-			}
 
 			c.deleteVolumeSnapshot(tc.vsArray, tc.vscArray, logger)
-
-			vsList, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots("velero").List(context.TODO(), metav1.ListOptions{})
+			vsList := &snapshotv1api.VolumeSnapshotList{}
+			err := c.kbClient.List(context.Background(), vsList, &kbclient.ListOptions{Namespace: "velero"})
 			require.NoError(t, err)
 			assert.Equal(t, len(tc.expectedVSArray), len(vsList.Items))
 			for index := range tc.expectedVSArray {
