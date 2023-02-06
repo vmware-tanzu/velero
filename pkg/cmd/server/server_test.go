@@ -120,14 +120,11 @@ func TestRemoveControllers(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			enabledControllers := map[string]func() controllerRunInfo{
-				controller.BackupSync:        func() controllerRunInfo { return controllerRunInfo{} },
-				controller.Backup:            func() controllerRunInfo { return controllerRunInfo{} },
-				controller.GarbageCollection: func() controllerRunInfo { return controllerRunInfo{} },
-				controller.Restore:           func() controllerRunInfo { return controllerRunInfo{} },
-			}
-
 			enabledRuntimeControllers := map[string]struct{}{
+				controller.BackupSync:            {},
+				controller.Backup:                {},
+				controller.GarbageCollection:     {},
+				controller.Restore:               {},
 				controller.ServerStatusRequest:   {},
 				controller.Schedule:              {},
 				controller.BackupDeletion:        {},
@@ -136,20 +133,18 @@ func TestRemoveControllers(t *testing.T) {
 				controller.AsyncBackupOperations: {},
 			}
 
-			totalNumOriginalControllers := len(enabledControllers) + len(enabledRuntimeControllers)
+			totalNumOriginalControllers := len(enabledRuntimeControllers)
 
 			if tt.errorExpected {
-				assert.Error(t, removeControllers(tt.disabledControllers, enabledControllers, enabledRuntimeControllers, logger))
+				assert.Error(t, removeControllers(tt.disabledControllers, enabledRuntimeControllers, logger))
 			} else {
-				assert.NoError(t, removeControllers(tt.disabledControllers, enabledControllers, enabledRuntimeControllers, logger))
+				assert.NoError(t, removeControllers(tt.disabledControllers, enabledRuntimeControllers, logger))
 
-				totalNumEnabledControllers := len(enabledControllers) + len(enabledRuntimeControllers)
+				totalNumEnabledControllers := len(enabledRuntimeControllers)
 				assert.Equal(t, totalNumEnabledControllers, totalNumOriginalControllers-len(tt.disabledControllers))
 
 				for _, disabled := range tt.disabledControllers {
-					_, ok := enabledControllers[disabled]
-					assert.False(t, ok)
-					_, ok = enabledRuntimeControllers[disabled]
+					_, ok := enabledRuntimeControllers[disabled]
 					assert.False(t, ok)
 				}
 			}

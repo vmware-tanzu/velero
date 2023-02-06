@@ -174,6 +174,7 @@ func (c *asyncBackupOperationsReconciler) SetupWithManager(mgr ctrl.Manager) err
 // +kubebuilder:rbac:groups=velero.io,resources=backups,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=velero.io,resources=backups/status,verbs=get
 // +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations,verbs=get
+
 func (c *asyncBackupOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := c.logger.WithField("async backup operations for backup", req.String())
 	// FIXME: make this log.Debug

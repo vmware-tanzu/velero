@@ -547,7 +547,7 @@ func (r *restoreReconciler) updateTotalRestoreMetric() {
 		// Wait for 5 seconds to let controller-runtime to setup k8s clients.
 		time.Sleep(5 * time.Second)
 
-		wait.NonSlidingUntil(
+		wait.Until(
 			func() {
 				// recompute restore_total metric
 				restoreList := &api.RestoreList{}

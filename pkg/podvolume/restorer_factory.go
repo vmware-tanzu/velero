@@ -45,29 +45,26 @@ func NewRestorerFactory(repoLocker *repository.RepoLocker,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	podClient corev1client.PodsGetter,
 	kubeClient kubernetes.Interface,
-	repoInformerSynced cache.InformerSynced,
 	log logrus.FieldLogger) RestorerFactory {
 	return &restorerFactory{
-		repoLocker:         repoLocker,
-		repoEnsurer:        repoEnsurer,
-		veleroClient:       veleroClient,
-		pvcClient:          pvcClient,
-		podClient:          podClient,
-		kubeClient:         kubeClient,
-		repoInformerSynced: repoInformerSynced,
-		log:                log,
+		repoLocker:   repoLocker,
+		repoEnsurer:  repoEnsurer,
+		veleroClient: veleroClient,
+		pvcClient:    pvcClient,
+		podClient:    podClient,
+		kubeClient:   kubeClient,
+		log:          log,
 	}
 }
 
 type restorerFactory struct {
-	repoLocker         *repository.RepoLocker
-	repoEnsurer        *repository.RepositoryEnsurer
-	veleroClient       clientset.Interface
-	pvcClient          corev1client.PersistentVolumeClaimsGetter
-	podClient          corev1client.PodsGetter
-	kubeClient         kubernetes.Interface
-	repoInformerSynced cache.InformerSynced
-	log                logrus.FieldLogger
+	repoLocker   *repository.RepoLocker
+	repoEnsurer  *repository.RepositoryEnsurer
+	veleroClient clientset.Interface
+	pvcClient    corev1client.PersistentVolumeClaimsGetter
+	podClient    corev1client.PodsGetter
+	kubeClient   kubernetes.Interface
+	log          logrus.FieldLogger
 }
 
 func (rf *restorerFactory) NewRestorer(ctx context.Context, restore *velerov1api.Restore) (Restorer, error) {
@@ -84,7 +81,7 @@ func (rf *restorerFactory) NewRestorer(ctx context.Context, restore *velerov1api
 	r := newRestorer(ctx, rf.repoLocker, rf.repoEnsurer, informer, rf.veleroClient, rf.pvcClient, rf.podClient, rf.kubeClient, rf.log)
 
 	go informer.Run(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rf.repoInformerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, errors.New("timed out waiting for cache to sync")
 	}
 
