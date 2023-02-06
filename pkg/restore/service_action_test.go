@@ -368,6 +368,124 @@ func TestServiceActionExecute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "nodePort should be delete when not specified in managedFields",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`{"f:spec":{"f:ports":{"k:{\"port\":443,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:port":{}},"k:{\"port\":80,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:port":{}}},"f:selector":{},"f:type":{}}}`),
+							},
+						},
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: "TCP",
+						},
+						{
+							Name:     "https",
+							Port:     443,
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`{"f:spec":{"f:ports":{"k:{\"port\":443,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:port":{}},"k:{\"port\":80,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:port":{}}},"f:selector":{},"f:type":{}}}`),
+							},
+						},
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							NodePort: 0,
+							Protocol: "TCP",
+						},
+						{
+							Name:     "https",
+							Port:     443,
+							NodePort: 0,
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "nodePort should be preserved when specified in managedFields",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`{"f:spec":{"f:ports":{"k:{\"port\":443,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:nodePort":{},"f:port":{}},"k:{\"port\":80,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:nodePort":{},"f:port":{}}},"f:selector":{},"f:type":{}}}`),
+							},
+						},
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							NodePort: 30000,
+							Protocol: "TCP",
+						},
+						{
+							Name:     "https",
+							Port:     443,
+							NodePort: 30002,
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`{"f:spec":{"f:ports":{"k:{\"port\":443,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:nodePort":{},"f:port":{}},"k:{\"port\":80,\"protocol\":\"TCP\"}":{".":{},"f:name":{},"f:nodePort":{},"f:port":{}}},"f:selector":{},"f:type":{}}}`),
+							},
+						},
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							NodePort: 30000,
+							Protocol: "TCP",
+						},
+						{
+							Name:     "https",
+							Port:     443,
+							NodePort: 30002,
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
