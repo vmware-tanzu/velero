@@ -100,6 +100,15 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExe
 	}
 
 	if len(newNode) != 0 {
+		// Check whether the mapped node exists first.
+		exists, err := isNodeExist(p.nodeClient, newNode)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error checking %s's mapped node %s existence", node, newNode)
+		}
+		if !exists {
+			log.Warnf("Selected-node's mapped node doesn't exist: source: %s, dest: %s. Please check the ConfigMap with label velero.io/change-pvc-node-selector.", node, newNode)
+		}
+
 		// set node selector
 		// We assume that node exist for node-mapping
 		annotations["volume.kubernetes.io/selected-node"] = newNode
