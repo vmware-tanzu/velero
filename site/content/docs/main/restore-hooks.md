@@ -24,13 +24,13 @@ There are two ways to specify `InitContainer` restore hooks:
 
 Below are the annotations that can be added to a pod to specify restore hooks:
 * `init.hook.restore.velero.io/container-image`
-    * The container image for the init container to be added.
+    * The container image for the init container to be added. Optional.
 * `init.hook.restore.velero.io/container-name`
-    * The name for the init container that is being added.
+    * The name for the init container that is being added. Optional.
 * `init.hook.restore.velero.io/command`
-    * This is the `ENTRYPOINT` for the init container being added. This command is not executed within a shell and the container image's `ENTRYPOINT` is used if this is not provided.
+    * This is the `ENTRYPOINT` for the init container being added. This command is not executed within a shell and the container image's `ENTRYPOINT` is used if this is not provided. If a shell is needed to run your command, include a shell command, like `/bin/sh`, that is supported by the container at the beginning of your command. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`. See [InitContainer As Pod Annotation Example](#initcontainer-restore-hooks-as-pod-annotation-example). Optional.
 
-#### Example
+#### InitContainer Restore Hooks As Pod Annotation Example
 
 Use the below commands to add annotations to the pods before taking a backup.
 
@@ -61,6 +61,7 @@ With the annotation above, Velero will add the following init container to the p
 
 Init container restore hooks can also be specified using the `RestoreSpec`.
 Please refer to the documentation on the [Restore API Type][1] for how to specify hooks in the Restore spec.
+Init container restore hook command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like /bin/sh, that is supported by the container at the beginning of your command.
 
 #### Example
 
@@ -173,15 +174,15 @@ Below are the annotations that can be added to a pod to specify exec restore hoo
 * `post.hook.restore.velero.io/container`
     * The container name where the hook will be executed. Defaults to the first container. Optional.
 * `post.hook.restore.velero.io/command`
-    * The command that will be executed in the container. Required.
+    * The command that will be executed in the container. This command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like `/bin/sh`, that is supported by the container at the beginning of your command. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`. See [Exec Restore Hooks As Pod Annotation Example](#exec-restore-hooks-as-pod-annotation-example). Optional.
 * `post.hook.restore.velero.io/on-error`
     * How to handle execution failures. Valid values are `Fail` and `Continue`. Defaults to `Continue`. With `Continue` mode, execution failures are logged only. With `Fail` mode, no more restore hooks will be executed in any container in any pod and the status of the Restore will be `PartiallyFailed`. Optional.
 * `post.hook.restore.velero.io/exec-timeout`
-    * How long to wait once execution begins. Defaults to 30 seconds. Optional.
+    * How long to wait once execution begins. Defaults is 30 seconds. Optional.
 * `post.hook.restore.velero.io/wait-timeout`
     * How long to wait for a container to become ready. This should be long enough for the container to start plus any preceding hooks in the same container to complete. The wait timeout begins when the container is restored and may require time for the image to pull and volumes to mount. If not set the restore will wait indefinitely. Optional.
 
-#### Example
+#### Exec Restore Hooks As Pod Annotation Example
 
 Use the below commands to add annotations to the pods before taking a backup.
 
@@ -198,6 +199,7 @@ $ kubectl annotate pod -n <POD_NAMESPACE> <POD_NAME> \
 
 Exec restore hooks can also be specified using the `RestoreSpec`.
 Please refer to the documentation on the [Restore API Type][1] for how to specify hooks in the Restore spec.
+Exec restore hook command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like /bin/sh, that is supported by the container at the beginning of your command.
 
 #### Multiple Exec Restore Hooks Example
 
@@ -257,5 +259,23 @@ spec:
           - '-c'
           - 'date > /start'
 ```
+
+## Restore hook commands using scenarios
+### Using environment variables
+
+You are able to use environment variables from your pods in your pre and post hook commands by including a shell command before using the environment variable. For example, `MYSQL_ROOT_PASSWORD` is an environment variable defined in pod called `mysql`. To use `MYSQL_ROOT_PASSWORD` in your pre-hook, you'd include a shell, like `/bin/sh`, before calling your environment variable:
+
+```
+postHooks:
+- exec:
+    container: mysql
+    command:
+      - /bin/sh
+      - -c
+      - mysql --password=$MYSQL_ROOT_PASSWORD -e "FLUSH TABLES WITH READ LOCK"
+    onError: Fail
+```
+
+Note that the container must support the shell command you use. 
 
 [1]: api-types/restore.md
