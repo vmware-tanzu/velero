@@ -300,12 +300,11 @@ func (s *resticServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 			log.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
 			continue
 		}
-		original := pvb.DeepCopy()
-		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-		pvb.Status.Message = fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
-		pvb.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := client.Patch(s.ctx, &pvbs.Items[i], ctrlclient.MergeFrom(original)); err != nil {
-			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
+
+		if err := controller.UpdatePVBStatusToFailed(client, s.ctx, &pvbs.Items[i],
+			fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
+			time.Now()); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
 			continue
 		}
 		log.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
@@ -338,12 +337,10 @@ func (s *resticServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		original := pvr.DeepCopy()
-		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
-		pvr.Status.Message = fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, pvr.Status.Phase)
-		pvr.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-		if err := client.Patch(s.ctx, &pvrs.Items[i], ctrlclient.MergeFrom(original)); err != nil {
-			log.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
+		if err := controller.UpdatePVRStatusToFailed(client, s.ctx, &pvrs.Items[i],
+			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
+			time.Now()); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
 			continue
 		}
 		log.WithField("podvolumerestore", pvr.GetName()).Warn(pvr.Status.Message)
