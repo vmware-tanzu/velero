@@ -865,7 +865,7 @@ func TestRestoreItems(t *testing.T) {
 		want         []*test.APIResource
 	}{
 		{
-			name:    "metadata uid/resourceVersion/etc. gets removed",
+			name:    "metadata other than namespace/name/labels/annotations gets removed",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
@@ -875,7 +875,6 @@ func TestRestoreItems(t *testing.T) {
 							builder.WithLabels("key-1", "val-1"),
 							builder.WithAnnotations("key-1", "val-1"),
 							builder.WithFinalizers("finalizer-1"),
-							builder.WithUID("uid"),
 						).
 						Result(),
 				).
@@ -889,7 +888,6 @@ func TestRestoreItems(t *testing.T) {
 						ObjectMeta(
 							builder.WithLabels("key-1", "val-1", "velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 							builder.WithAnnotations("key-1", "val-1"),
-							builder.WithFinalizers("finalizer-1"),
 						).
 						Result(),
 				),
@@ -1105,53 +1103,6 @@ func TestRestoreItems(t *testing.T) {
 					Secrets:          []corev1api.ObjectReference{{Name: "secret-1"}},
 					ImagePullSecrets: []corev1api.LocalObjectReference{{Name: "pull-secret-1"}},
 				}),
-			},
-		},
-		{
-			name:    "metadata managedFields gets restored",
-			restore: defaultRestore().Result(),
-			backup:  defaultBackup().Result(),
-			tarball: test.NewTarWriter(t).
-				AddItems("pods",
-					builder.ForPod("ns-1", "pod-1").
-						ObjectMeta(
-							builder.WithManagedFields([]metav1.ManagedFieldsEntry{
-								{
-									Manager:    "kubectl",
-									Operation:  "Apply",
-									APIVersion: "v1",
-									FieldsType: "FieldsV1",
-									FieldsV1: &metav1.FieldsV1{
-										Raw: []byte(`{"f:data": {"f:key":{}}}`),
-									},
-								},
-							}),
-						).
-						Result(),
-				).
-				Done(),
-			apiResources: []*test.APIResource{
-				test.Pods(),
-			},
-			want: []*test.APIResource{
-				test.Pods(
-					builder.ForPod("ns-1", "pod-1").
-						ObjectMeta(
-							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-							builder.WithManagedFields([]metav1.ManagedFieldsEntry{
-								{
-									Manager:    "kubectl",
-									Operation:  "Apply",
-									APIVersion: "v1",
-									FieldsType: "FieldsV1",
-									FieldsV1: &metav1.FieldsV1{
-										Raw: []byte(`{"f:data": {"f:key":{}}}`),
-									},
-								},
-							}),
-						).
-						Result(),
-				),
 			},
 		},
 	}
@@ -2870,16 +2821,10 @@ func TestResetMetadata(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:        "keep name, namespace, labels, annotations, managedFields, finalizers",
-			obj:         NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
+			name:        "keep name, namespace, labels, annotations only",
+			obj:         NewTestUnstructured().WithMetadata("name", "blah", "namespace", "labels", "annotations", "foo").Unstructured,
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
-		},
-		{
-			name:        "remove uid, ownerReferences",
-			obj:         NewTestUnstructured().WithMetadata("name", "namespace", "uid", "ownerReferences").Unstructured,
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace").Unstructured,
+			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
 		},
 		{
 			name:        "keep status",
