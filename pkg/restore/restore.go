@@ -737,17 +737,6 @@ func (ctx *restoreContext) getApplicableActions(groupResource schema.GroupResour
 	return actions
 }
 
-func (ctx *restoreContext) getApplicableItemSnapshotters(groupResource schema.GroupResource, namespace string) []framework.ItemSnapshotterResolvedAction {
-	var actions []framework.ItemSnapshotterResolvedAction
-	for _, action := range ctx.itemSnapshotterActions {
-		if action.ShouldUse(groupResource, namespace, nil, ctx.log) {
-			actions = append(actions, action)
-		}
-	}
-
-	return actions
-}
-
 func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (bool, error) {
 	pvLogger := ctx.log.WithField("pvName", name)
 

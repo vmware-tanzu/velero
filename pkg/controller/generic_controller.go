@@ -144,18 +144,3 @@ func (c *genericController) processNextWorkItem() bool {
 
 	return true
 }
-
-func (c *genericController) enqueue(obj interface{}) {
-	key, err := cache.MetaNamespaceKeyFunc(obj)
-	if err != nil {
-		c.logger.WithError(errors.WithStack(err)).
-			Error("Error creating queue key, item not added to queue")
-		return
-	}
-
-	c.queue.Add(key)
-}
-
-func (c *genericController) enqueueSecond(_, obj interface{}) {
-	c.enqueue(obj)
-}

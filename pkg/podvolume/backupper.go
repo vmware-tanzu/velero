@@ -233,10 +233,6 @@ ForEachVolume:
 	return podVolumeBackups, errs
 }
 
-type pvcGetter interface {
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.PersistentVolumeClaim, error)
-}
-
 type pvGetter interface {
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error)
 }

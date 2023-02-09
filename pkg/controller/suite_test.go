@@ -87,7 +87,6 @@ type testEnvironment struct {
 	Config *rest.Config
 
 	doneMgr context.Context
-	cancel  context.CancelFunc
 }
 
 // newTestEnvironment creates a new environment spinning up a local api-server.

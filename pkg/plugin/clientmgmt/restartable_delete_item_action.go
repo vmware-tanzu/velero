@@ -31,7 +31,6 @@ import (
 type restartableDeleteItemAction struct {
 	key                 process.KindAndName
 	sharedPluginProcess process.RestartableProcess
-	config              map[string]string
 }
 
 // NewRestartableDeleteItemAction returns a new restartableDeleteItemAction.
