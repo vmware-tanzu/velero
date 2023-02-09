@@ -163,7 +163,7 @@ func TestListBackupStorageLocations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			client := fake.NewFakeClientWithScheme(scheme.Scheme, tt.backupLocations)
+			client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(tt.backupLocations).Build()
 			if tt.expectError {
 				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
 				g.Expect(err).NotTo(BeNil())

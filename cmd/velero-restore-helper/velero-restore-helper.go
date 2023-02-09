@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -34,18 +33,16 @@ func main() {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case <-ticker.C:
-			if done() {
-				fmt.Println("All restic restores are done")
-				err := removeFolder()
-				if err != nil {
-					fmt.Println(err)
-				} else {
-					fmt.Println("Done cleanup .velero folder")
-				}
-				return
+		<-ticker.C
+		if done() {
+			fmt.Println("All restic restores are done")
+			err := removeFolder()
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println("Done cleanup .velero folder")
 			}
+			return
 		}
 	}
 }
@@ -54,7 +51,7 @@ func main() {
 // within the .velero/ subdirectory whose name is equal to os.Args[1], or
 // false otherwise
 func done() bool {
-	children, err := ioutil.ReadDir("/restores")
+	children, err := os.ReadDir("/restores")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR reading /restores directory: %s\n", err)
 		return false
@@ -84,7 +81,7 @@ func done() bool {
 
 // remove .velero folder
 func removeFolder() error {
-	children, err := ioutil.ReadDir("/restores")
+	children, err := os.ReadDir("/restores")
 	if err != nil {
 		return err
 	}
