@@ -499,9 +499,9 @@ func (s *server) veleroResourcesExist() error {
 // - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
 // - PVs go before PVCs because PVCs depend on them.
 // - PVCs go before pods or controllers so they can be mounted as volumes.
+// - Service accounts go before secrets so service account token secrets can be filled automatically.
 // - Secrets and config maps go before pods or controllers so they can be mounted
 // 	 as volumes.
-// - Service accounts go before pods or controllers so pods can use them.
 // - Limit ranges go before pods or controllers so pods can use them.
 // - Pods go before controllers so they can be explicitly restored and potentially
 //	 have pod volume restores run before controllers adopt the pods.
@@ -525,9 +525,9 @@ var defaultRestorePriorities = restore.Priorities{
 		"volumesnapshots.snapshot.storage.k8s.io",
 		"persistentvolumes",
 		"persistentvolumeclaims",
+		"serviceaccounts",
 		"secrets",
 		"configmaps",
-		"serviceaccounts",
 		"limitranges",
 		"pods",
 		// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
