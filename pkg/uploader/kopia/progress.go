@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
@@ -63,6 +65,7 @@ type KopiaProgress struct {
 	processedBytes int64                    // which statistic all bytes has been processed currently
 	outputThrottle Throttle                 // which control the frequency of update progress
 	Updater        uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
+	Log            logrus.FieldLogger       // output info into log when backup
 }
 
 //UploadedBytes the total bytes has uploaded currently
@@ -77,8 +80,10 @@ func (p *KopiaProgress) UploadedBytes(numBytes int64) {
 func (p *KopiaProgress) Error(path string, err error, isIgnored bool) {
 	if isIgnored {
 		atomic.AddInt32(&p.ignoredErrorCount, 1)
+		p.Log.Warnf("Ignored error when processing %v: %v", path, err)
 	} else {
 		atomic.AddInt32(&p.fatalErrorCount, 1)
+		p.Log.Errorf("Error when processing %v: %v", path, err)
 	}
 }
 
