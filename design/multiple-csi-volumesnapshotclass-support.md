@@ -46,7 +46,7 @@ The Velero CSI plugin chooses the VolumeSnapshotClass in the cluster that has th
 
 ## Scenario 2
 - Bob is a cluster admin has PVCs storing different types of data. 
-- Most of the PVCs are used for storing non senstive application data. But certain PVCs store critical financial data.
+- Most of the PVCs are used for storing non-sensitive application data. But certain PVCs store critical financial data.
 - For such PVCs Bob wants to use a VolumeSnapshotClass with certain encryption related parameters set. 
 - In current velero, Bob can't achieve this as the CSI plugin will use the default VolumeSnapshotClass for the driver and all snapshots will be taken using the same VolumeSnapshotClass.
 - Proposed design will allow Bob to achieve this by overriding the VolumeSnapshotClass to use for a particular driver and backup/schedule using annotations on those specific PVCs.
