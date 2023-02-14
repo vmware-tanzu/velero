@@ -5,6 +5,9 @@
 	- [Background](#background)
 	- [Goals](#goals)
 	- [Non Goals](#non-goals)
+    - [User Stories](#user-stories)
+        - [Scenario 1](#scenario-1)
+        - [Scenario 2](#scenario-2)
     - [Detailed Design](#detailed-design)
         - [Plugin Inputs Contract Changes](#plugin-inputs-contract-changes)
         - [Using Plugin Inputs for CSI Plugin](#using-plugin-inputs-for-csi-plugin)
@@ -26,9 +29,27 @@ The Velero CSI plugin chooses the VolumeSnapshotClass in the cluster that has th
 
 ## Goals
 - Allow the user to specify the VolumeSnapshotClass to use for a particular driver and backup.
+- Add pluginInputs field in the velero CRs (Backup, Schedule, Restore) to allow the user to specify the parameters which are specific to a plugin.
 
 ## Non Goals
--
+- Deprecating existing VSC selection behaviour. (The current behaviour will remain the default behaviour if the user does not specify the VolumeSnapshotClass to use for a particular driver and backup.)
+
+
+## User Stories
+
+### Scenario 1
+- Consider Alice is a cluster admin and has a cluster with multiple VolumeSnapshotClasses for the same driver. Each VSC stores the snapshots taken in different ResourceGroup(Azure equivalent). 
+- Alice has configured multiple scheduled backups each covering a different set of namespaces, representing different apps owned by different teams. 
+- Alice wants to use a different VolumeSnapshotClass for each backup such that each snapshot goes in it's respective ResourceGroup to simply management of snapshots(COGS, RBAC etc).
+- In current velero, Alice can't achieve this as the CSI plugin will use the default VolumeSnapshotClass for the driver and all snapshots will go in the same ResourceGroup.
+- Proposed design will allow Alice to achieve this by specifying the VolumeSnapshotClass to use for a particular driver and backup/schedule.
+
+## Scenario 2
+- Bob is a cluster admin has PVCs storing different types of data. 
+- Most of the PVCs are used for storing non senstive application data. But certain PVCs store critical financial data.
+- For such PVCs Bob wants to use a VolumeSnapshotClass with certain encryption related parameters set. 
+- In current velero, Bob can't achieve this as the CSI plugin will use the default VolumeSnapshotClass for the driver and all snapshots will be taken using the same VolumeSnapshotClass.
+- Proposed design will allow Bob to achieve this by overriding the VolumeSnapshotClass to use for a particular driver and backup/schedule using annotations on those specific PVCs.
 
 
 ## Detailed Design
@@ -88,6 +109,8 @@ annotations:
 As of today various plugins such as StorageClass mapping plugin, use a global configmap which is discovered through labels/ annotations which is not ideal customer experience and prohibhit usage of specific settings for each backup/ schedule setup.
 
 The pluginInputs field can be used to pass in the reference the configmap/ secret to use for a particular plugin. This will allow the user to use different configmaps/ secrets for different backups/ schedules.
+
+*Note*: The rule of thumb for plugin owners which leverage the pluginInputs field is to use the value specified in the pluginInputs field if present, else fallback to the global configmap/ secret / annotation based discovery which was existing behaviour or the plugin.
 
 Example: 
 ```yaml
