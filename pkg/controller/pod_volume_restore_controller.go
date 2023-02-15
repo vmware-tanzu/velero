@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -57,7 +57,7 @@ func NewPodVolumeRestoreReconciler(logger logrus.FieldLogger, client client.Clie
 		logger:           logger.WithField("controller", "PodVolumeRestore"),
 		credentialGetter: credentialGetter,
 		fileSystem:       filesystem.NewFileSystem(),
-		clock:            &clock.RealClock{},
+		clock:            &clocks.RealClock{},
 	}
 }
 
@@ -66,7 +66,7 @@ type PodVolumeRestoreReconciler struct {
 	logger           logrus.FieldLogger
 	credentialGetter *credentials.CredentialGetter
 	fileSystem       filesystem.Interface
-	clock            clock.Clock
+	clock            clocks.WithTickerAndDelayedExecution
 }
 
 type RestoreProgressUpdater struct {
@@ -319,7 +319,7 @@ func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.
 	return &RestoreProgressUpdater{pvr, log, ctx, r.Client}
 }
 
-//UpdateProgress which implement ProgressUpdater interface to update pvr progress status
+// UpdateProgress which implement ProgressUpdater interface to update pvr progress status
 func (r *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
 	original := r.PodVolumeRestore.DeepCopy()
 	r.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}

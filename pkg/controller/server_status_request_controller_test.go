@@ -25,9 +25,8 @@ import (
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/kubernetes/scheme"
-
+	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -67,7 +66,7 @@ var _ = Describe("Server Status Request Reconciler", func() {
 				fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(test.req).Build(),
 				context.Background(),
 				test.reqPluginLister,
-				clock.NewFakeClock(now),
+				testclocks.NewFakeClock(now),
 				velerotest.NewLogger(),
 			)
 

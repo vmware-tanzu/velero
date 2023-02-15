@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -204,7 +204,7 @@ func (s *nodeAgentServer) run() {
 	pvbReconciler := controller.PodVolumeBackupReconciler{
 		Scheme:           s.mgr.GetScheme(),
 		Client:           s.mgr.GetClient(),
-		Clock:            clock.RealClock{},
+		Clock:            clocks.RealClock{},
 		Metrics:          s.metrics,
 		CredentialGetter: credentialGetter,
 		NodeName:         s.nodeName,

@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
+	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,7 +34,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func mockGCReconciler(fakeClient kbclient.Client, fakeClock *clock.FakeClock, freq time.Duration) *gcReconciler {
+func mockGCReconciler(fakeClient kbclient.Client, fakeClock *testclocks.FakeClock, freq time.Duration) *gcReconciler {
 	gcr := NewGCReconciler(
 		velerotest.NewLogger(),
 		fakeClient,
@@ -45,7 +45,7 @@ func mockGCReconciler(fakeClient kbclient.Client, fakeClock *clock.FakeClock, fr
 }
 
 func TestGCReconcile(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testclocks.NewFakeClock(time.Now())
 	defaultBackupLocation := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "default").Result()
 
 	tests := []struct {
