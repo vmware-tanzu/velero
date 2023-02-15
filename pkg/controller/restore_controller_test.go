@@ -29,14 +29,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/types"
 	clocktesting "k8s.io/utils/clock/testing"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -91,21 +90,19 @@ func TestFetchBackupInfo(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				client          = fake.NewSimpleClientset()
-				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
-				restorer        = &fakeRestorer{kbClient: fakeClient}
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger          = velerotest.NewLogger()
-				pluginManager   = &pluginmocks.Manager{}
-				backupStore     = &persistencemocks.BackupStore{}
+				fakeClient    = velerotest.NewFakeControllerRuntimeClient(t)
+				restorer      = &fakeRestorer{kbClient: fakeClient}
+				logger        = velerotest.NewLogger()
+				pluginManager = &pluginmocks.Manager{}
+				backupStore   = &persistencemocks.BackupStore{}
 			)
 
 			defer restorer.AssertExpectations(t)
 			defer backupStore.AssertExpectations(t)
 
-			c := NewRestoreController(
+			r := NewRestoreReconciler(
+				context.Background(),
 				velerov1api.DefaultNamespace,
-				sharedInformers.Velero().V1().Restores(),
 				restorer,
 				fakeClient,
 				logger,
@@ -114,15 +111,15 @@ func TestFetchBackupInfo(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
-			).(*restoreController)
+			)
 
 			if test.backupStoreError == nil {
 				for _, itm := range test.informerLocations {
-					require.NoError(t, c.kbClient.Create(context.Background(), itm))
+					require.NoError(t, r.kbClient.Create(context.Background(), itm))
 				}
 
 				for _, itm := range test.informerBackups {
-					assert.NoError(t, c.kbClient.Create(context.Background(), itm))
+					assert.NoError(t, r.kbClient.Create(context.Background(), itm))
 				}
 			}
 
@@ -139,7 +136,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				backupStore.On("GetBackupMetadata", test.backupName).Return(test.backupStoreBackup, nil).Maybe()
 			}
 
-			info, err := c.fetchBackupInfo(test.backupName, pluginManager)
+			info, err := r.fetchBackupInfo(test.backupName, pluginManager)
 
 			require.Equal(t, test.expectedErr, err != nil)
 			if test.expectedRes != nil {
@@ -152,33 +149,22 @@ func TestFetchBackupInfo(t *testing.T) {
 func TestProcessQueueItemSkips(t *testing.T) {
 	tests := []struct {
 		name        string
-		restoreKey  string
+		namespace   string
+		restoreName string
 		restore     *velerov1api.Restore
 		expectError bool
 	}{
 		{
-			name:       "invalid key returns error",
-			restoreKey: "invalid/key/value",
-		},
-		{
-			name:        "missing restore returns error",
-			restoreKey:  "foo/bar",
+			name:        "invalid key returns error",
+			namespace:   "invalid",
+			restoreName: "key/value",
 			expectError: true,
 		},
 		{
-			name:       "restore with phase InProgress does not get processed",
-			restoreKey: "foo/bar",
-			restore:    builder.ForRestore("foo", "bar").Phase(velerov1api.RestorePhaseInProgress).Result(),
-		},
-		{
-			name:       "restore with phase Completed does not get processed",
-			restoreKey: "foo/bar",
-			restore:    builder.ForRestore("foo", "bar").Phase(velerov1api.RestorePhaseCompleted).Result(),
-		},
-		{
-			name:       "restore with phase FailedValidation does not get processed",
-			restoreKey: "foo/bar",
-			restore:    builder.ForRestore("foo", "bar").Phase(velerov1api.RestorePhaseFailedValidation).Result(),
+			name:        "missing restore returns error",
+			namespace:   "foo",
+			restoreName: "bar",
+			expectError: true,
 		},
 	}
 
@@ -187,16 +173,18 @@ func TestProcessQueueItemSkips(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				client          = fake.NewSimpleClientset()
-				fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
-				restorer        = &fakeRestorer{kbClient: fakeClient}
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger          = velerotest.NewLogger()
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
+				restorer   = &fakeRestorer{kbClient: fakeClient}
+				logger     = velerotest.NewLogger()
 			)
 
-			c := NewRestoreController(
+			if test.restore != nil {
+				assert.Nil(t, fakeClient.Create(context.Background(), test.restore))
+			}
+
+			r := NewRestoreReconciler(
+				context.Background(),
 				velerov1api.DefaultNamespace,
-				sharedInformers.Velero().V1().Restores(),
 				restorer,
 				fakeClient,
 				logger,
@@ -205,20 +193,19 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				nil, // backupStoreGetter
 				metrics.NewServerMetrics(),
 				formatFlag,
-			).(*restoreController)
+			)
 
-			if test.restore != nil {
-				c.kbClient.Create(context.Background(), test.restore)
-			}
-
-			err := c.processQueueItem(test.restoreKey)
+			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: test.namespace,
+				Name:      test.restoreName,
+			}})
 
 			assert.Equal(t, test.expectError, err != nil)
 		})
 	}
 }
 
-func TestProcessQueueItem(t *testing.T) {
+func TestRestoreReconcile(t *testing.T) {
 
 	defaultStorageLocation := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
 
@@ -410,13 +397,11 @@ func TestProcessQueueItem(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				client          = fake.NewSimpleClientset()
-				fakeClient      = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
-				restorer        = &fakeRestorer{kbClient: fakeClient}
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger          = velerotest.NewLogger()
-				pluginManager   = &pluginmocks.Manager{}
-				backupStore     = &persistencemocks.BackupStore{}
+				fakeClient    = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
+				restorer      = &fakeRestorer{kbClient: fakeClient}
+				logger        = velerotest.NewLogger()
+				pluginManager = &pluginmocks.Manager{}
+				backupStore   = &persistencemocks.BackupStore{}
 			)
 
 			defer restorer.AssertExpectations(t)
@@ -426,9 +411,9 @@ func TestProcessQueueItem(t *testing.T) {
 				defaultStorageLocation.ObjectMeta.ResourceVersion = ""
 			}()
 
-			c := NewRestoreController(
+			r := NewRestoreReconciler(
+				context.Background(),
 				velerov1api.DefaultNamespace,
-				sharedInformers.Velero().V1().Restores(),
 				restorer,
 				fakeClient,
 				logger,
@@ -437,18 +422,18 @@ func TestProcessQueueItem(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
-			).(*restoreController)
+			)
 
-			c.clock = clocktesting.NewFakeClock(now)
+			r.clock = clocktesting.NewFakeClock(now)
 			if test.location != nil {
-				require.NoError(t, fakeClient.Create(context.Background(), test.location))
+				require.NoError(t, r.kbClient.Create(context.Background(), test.location))
 			}
 			if test.backup != nil {
-				assert.NoError(t, c.kbClient.Create(context.Background(), test.backup))
+				assert.NoError(t, r.kbClient.Create(context.Background(), test.backup))
 			}
 
 			if test.restore != nil {
-				require.NoError(t, c.kbClient.Create(context.Background(), test.restore))
+				require.NoError(t, r.kbClient.Create(context.Background(), test.restore))
 			}
 
 			var warnings, errors results.Result
@@ -479,17 +464,6 @@ func TestProcessQueueItem(t *testing.T) {
 				backupStore.On("GetBackupVolumeSnapshots", test.backup.Name).Return(volumeSnapshots, nil)
 			}
 
-			var (
-				key = test.restoreKey
-				err error
-			)
-			if key == "" && test.restore != nil {
-				key, err = cache.MetaNamespaceKeyFunc(test.restore)
-				if err != nil {
-					panic(err)
-				}
-			}
-
 			if test.backupStoreGetBackupMetadataErr != nil {
 				// TODO why do I need .Maybe() here?
 				backupStore.On("GetBackupMetadata", test.restore.Spec.BackupName).Return(nil, test.backupStoreGetBackupMetadataErr).Maybe()
@@ -506,7 +480,11 @@ func TestProcessQueueItem(t *testing.T) {
 				pluginManager.On("CleanupClients")
 			}
 
-			err = c.processQueueItem(key)
+			//err = r.processQueueItem(key)
+			_, err = r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
+				Namespace: test.restore.Namespace,
+				Name:      test.restore.Name,
+			}})
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 
@@ -590,26 +568,24 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	formatFlag := logging.FormatText
 
 	var (
-		client          = fake.NewSimpleClientset()
-		sharedInformers = informers.NewSharedInformerFactory(client, 0)
-		logger          = velerotest.NewLogger()
-		pluginManager   = &pluginmocks.Manager{}
-		fakeClient      = velerotest.NewFakeControllerRuntimeClient(t)
-		backupStore     = &persistencemocks.BackupStore{}
+		logger        = velerotest.NewLogger()
+		pluginManager = &pluginmocks.Manager{}
+		fakeClient    = velerotest.NewFakeControllerRuntimeClient(t)
+		backupStore   = &persistencemocks.BackupStore{}
 	)
 
-	c := NewRestoreController(
+	r := NewRestoreReconciler(
+		context.Background(),
 		velerov1api.DefaultNamespace,
-		sharedInformers.Velero().V1().Restores(),
 		nil,
 		fakeClient,
 		logger,
 		logrus.DebugLevel,
 		func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
-		nil,
+		metrics.NewServerMetrics(),
 		formatFlag,
-	).(*restoreController)
+	)
 
 	restore := &velerov1api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -622,19 +598,18 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	}
 
 	// no backups created from the schedule: fail validation
-	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(
-		defaultBackup().
-			ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "non-matching-schedule")).
-			Phase(velerov1api.BackupPhaseCompleted).
-			Result(),
-	))
+	require.NoError(t, r.kbClient.Create(context.Background(), defaultBackup().
+		ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "non-matching-schedule")).
+		Phase(velerov1api.BackupPhaseCompleted).
+		Result()))
 
-	c.validateAndComplete(restore, pluginManager)
+	r.validateAndComplete(restore, pluginManager)
 	assert.Contains(t, restore.Status.ValidationErrors, "No backups found for schedule")
 	assert.Empty(t, restore.Spec.BackupName)
 
 	// no completed backups created from the schedule: fail validation
-	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(
+	require.NoError(t, r.kbClient.Create(
+		context.Background(),
 		defaultBackup().
 			ObjectMeta(
 				builder.WithName("backup-2"),
@@ -644,14 +619,14 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 			Result(),
 	))
 
-	c.validateAndComplete(restore, pluginManager)
+	r.validateAndComplete(restore, pluginManager)
 	assert.Contains(t, restore.Status.ValidationErrors, "No completed backups found for schedule")
 	assert.Empty(t, restore.Spec.BackupName)
 
 	// multiple completed backups created from the schedule: use most recent
 	now := time.Now()
 
-	require.NoError(t, c.kbClient.Create(context.Background(),
+	require.NoError(t, r.kbClient.Create(context.Background(),
 		defaultBackup().
 			ObjectMeta(
 				builder.WithName("foo"),
@@ -664,7 +639,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	))
 
 	location := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
-	require.NoError(t, c.kbClient.Create(context.Background(), location))
+	require.NoError(t, r.kbClient.Create(context.Background(), location))
 
 	restore = &velerov1api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -675,7 +650,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 			ScheduleName: "schedule-1",
 		},
 	}
-	c.validateAndComplete(restore, pluginManager)
+	r.validateAndComplete(restore, pluginManager)
 	assert.Nil(t, restore.Status.ValidationErrors)
 	assert.Equal(t, "foo", restore.Spec.BackupName)
 }
