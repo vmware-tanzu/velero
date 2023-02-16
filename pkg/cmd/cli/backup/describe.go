@@ -41,6 +41,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		listOptions           metav1.ListOptions
 		details               bool
 		insecureSkipTLSVerify bool
+		outputFormat          string
 	)
 
 	config, err := client.LoadConfig()
@@ -58,6 +59,10 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
+
+			if outputFormat != "" && outputFormat != "json" {
+				cmd.CheckError(fmt.Errorf("Invalid argument '%s' for '--o'. Valid formats is 'json'", outputFormat))
+			}
 
 			var backups *velerov1api.BackupList
 			if len(args) > 0 {
@@ -102,13 +107,22 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					}
 				}
 
-				s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
-				if first {
-					first = false
+				// if there is only one backup in the BackupList and `output` flag is specified. we'll describe the backup in specified format
+				// The reason why the `output` flag only takes affect on a single backup is to avoid potential OOM.
+				// To describe the list of backups in specified format, Users could Iterate over the list and describe each backup one after another.
+				if len(backups.Items) == 1 && outputFormat != "" {
+					s := output.DescribeBackupInSF(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 					fmt.Print(s)
 				} else {
-					fmt.Printf("\n\n%s", s)
+					s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+					if first {
+						first = false
+						fmt.Print(s)
+					} else {
+						fmt.Printf("\n\n%s", s)
+					}
 				}
+
 			}
 			cmd.CheckError(err)
 		},
@@ -118,5 +132,6 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c.Flags().BoolVar(&details, "details", details, "Display additional detail in the command output.")
 	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
 	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
+	c.Flags().StringVar(&outputFormat, "o", outputFormat, "Output display format. Valid formats are 'json'. this flag only takes affect on a single backup")
 	return c
 }

@@ -18,6 +18,7 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,6 +45,15 @@ func Describe(fn func(d *Describer)) string {
 
 	d.out.Flush()
 	return d.buf.String()
+}
+
+func NewDescriber(minwidth, tabwidth, padding int, padchar byte, flags uint) *Describer {
+	d := &Describer{
+		out: new(tabwriter.Writer),
+		buf: new(bytes.Buffer),
+	}
+	d.out.Init(d.buf, minwidth, tabwidth, padding, padchar, flags)
+	return d
 }
 
 func (d *Describer) Printf(msg string, args ...interface{}) {
@@ -118,4 +128,43 @@ func BoolPointerString(b *bool, falseString, trueString, nilString string) strin
 		return trueString
 	}
 	return falseString
+}
+
+type StructuredDescriber struct {
+	output map[string]interface{}
+}
+
+// NewStructuredDescriber creates a StructuredDescriber.
+func NewStructuredDescriber() *StructuredDescriber {
+	return &StructuredDescriber{
+		output: make(map[string]interface{}),
+	}
+}
+
+// DescribeInSF returns the structured output based on the func
+// thats applys StructuredDescriber to collect outputs.
+func DescribeInSF(fn func(d *StructuredDescriber)) string {
+	d := NewStructuredDescriber()
+	fn(d)
+	byteBuffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(byteBuffer)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "    ")
+	_ = encoder.Encode(d.output)
+	return byteBuffer.String()
+}
+
+// Describe adds all types of argument to d.output.
+func (d *StructuredDescriber) Describe(name string, arg interface{}) {
+	d.output[name] = arg
+}
+
+// DescribeMetadata describes standard object metadata.
+func (d *StructuredDescriber) DescribeMetadata(metadata metav1.ObjectMeta) {
+	metadataInfo := make(map[string]interface{})
+	metadataInfo["name"] = metadata.Name
+	metadataInfo["namespace"] = metadata.Namespace
+	metadataInfo["labels"] = metadata.Labels
+	metadataInfo["annotations"] = metadata.Annotations
+	d.Describe("metadata", metadataInfo)
 }
