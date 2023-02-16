@@ -18,6 +18,7 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,6 +45,15 @@ func Describe(fn func(d *Describer)) string {
 
 	d.out.Flush()
 	return d.buf.String()
+}
+
+func NewDescriber(minwidth, tabwidth, padding int, padchar byte, flags uint) *Describer {
+	d := &Describer{
+		out: new(tabwriter.Writer),
+		buf: new(bytes.Buffer),
+	}
+	d.out.Init(d.buf, minwidth, tabwidth, padding, padchar, flags)
+	return d
 }
 
 func (d *Describer) Printf(msg string, args ...interface{}) {
@@ -118,4 +128,51 @@ func BoolPointerString(b *bool, falseString, trueString, nilString string) strin
 		return trueString
 	}
 	return falseString
+}
+
+type StructuredDescriber struct {
+	output map[string]interface{}
+	format string
+}
+
+// NewStructuredDescriber creates a StructuredDescriber.
+func NewStructuredDescriber(format string) *StructuredDescriber {
+	return &StructuredDescriber{
+		output: make(map[string]interface{}),
+		format: format,
+	}
+}
+
+// DescribeInSF returns the structured output based on the func
+// that applies StructuredDescriber to collect outputs.
+// This function takes arg 'format' for future format extension.
+func DescribeInSF(fn func(d *StructuredDescriber), format string) string {
+	d := NewStructuredDescriber(format)
+	fn(d)
+	return d.JsonEncode()
+}
+
+// Describe adds all types of argument to d.output.
+func (d *StructuredDescriber) Describe(name string, arg interface{}) {
+	d.output[name] = arg
+}
+
+// DescribeMetadata describes standard object metadata.
+func (d *StructuredDescriber) DescribeMetadata(metadata metav1.ObjectMeta) {
+	metadataInfo := make(map[string]interface{})
+	metadataInfo["name"] = metadata.Name
+	metadataInfo["namespace"] = metadata.Namespace
+	metadataInfo["labels"] = metadata.Labels
+	metadataInfo["annotations"] = metadata.Annotations
+	d.Describe("metadata", metadataInfo)
+}
+
+// JsonEncode encodes d.output to json
+func (d *StructuredDescriber) JsonEncode() string {
+	byteBuffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(byteBuffer)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "    ")
+	_ = encoder.Encode(d.output)
+	return byteBuffer.String()
 }
