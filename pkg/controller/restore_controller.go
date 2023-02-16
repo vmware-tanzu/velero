@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -572,7 +573,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		restore.Status.Errors += len(e)
 	}
 
-	m := map[string]pkgrestore.Result{
+	m := map[string]results.Result{
 		"warnings": restoreWarnings,
 		"errors":   restoreErrors,
 	}
@@ -584,7 +585,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	return nil
 }
 
-func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore) error {
+func putResults(restore *api.Restore, results map[string]results.Result, backupStore persistence.BackupStore) error {
 	buf := new(bytes.Buffer)
 	gzw := gzip.NewWriter(buf)
 	defer gzw.Close()
