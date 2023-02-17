@@ -40,6 +40,11 @@ func TestResources(t *testing.T) {
 	ns := Namespace("velero")
 
 	assert.Equal(t, "velero", ns.Name)
+	// For k8s version v1.25 and later, need to add the following labels to make
+	// velero installation namespace has privileged version to work with
+	// PSA(Pod Security Admission) and PSS(Pod Security Standards).
+	assert.Equal(t, ns.Labels["pod-security.kubernetes.io/enforce"], "privileged")
+	assert.Equal(t, ns.Labels["pod-security.kubernetes.io/enforce-version"], "latest")
 
 	crb := ClusterRoleBinding(DefaultVeleroNamespace)
 	// The CRB is a cluster-scoped resource
