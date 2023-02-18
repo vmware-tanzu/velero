@@ -43,6 +43,7 @@ type BackupInfo struct {
 	Metadata,
 	Contents,
 	Log,
+	BackupResults,
 	PodVolumeBackups,
 	VolumeSnapshots,
 	BackupItemOperations,
@@ -265,6 +266,7 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
 		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
 		s.layout.getCSIVolumeSnapshotClassesKey(info.Name):  info.CSIVolumeSnapshotClasses,
+		s.layout.getBackupResultsKey(info.Name):             info.BackupResults,
 	}
 
 	for key, reader := range backupObjs {

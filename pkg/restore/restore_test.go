@@ -56,6 +56,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	. "github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 

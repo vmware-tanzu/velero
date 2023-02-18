@@ -43,6 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/pkg/util/results"
+
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -607,7 +609,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	logger := logging.DefaultLogger(c.backupLogLevel, c.formatFlag)
 	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
 
-	logCounter := logging.NewLogCounterHook()
+	logCounter := logging.NewLogHook()
 	logger.Hooks.Add(logCounter)
 
 	backupLog := logger.WithField(Backup, kubeutil.NamespaceAndName(backup))
@@ -729,6 +731,13 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics)
 
+	backupWarnings := logCounter.GetEntries(logrus.WarnLevel)
+	backupErrors := logCounter.GetEntries(logrus.ErrorLevel)
+	results := map[string]results.Result{
+		"warnings": backupWarnings,
+		"errors":   backupErrors,
+	}
+
 	if err := gzippedLogFile.Close(); err != nil {
 		c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).WithError(err).Error("error closing gzippedLogFile")
 	}
@@ -754,7 +763,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses); len(errs) > 0 {
+	if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, results); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
 
@@ -805,6 +814,7 @@ func persistBackup(backup *pkgbackup.Request,
 	csiVolumeSnapshots []snapshotv1api.VolumeSnapshot,
 	csiVolumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	csiVolumesnapshotClasses []snapshotv1api.VolumeSnapshotClass,
+	results map[string]results.Result,
 ) []error {
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
@@ -843,6 +853,11 @@ func persistBackup(backup *pkgbackup.Request,
 		persistErrs = append(persistErrs, errs...)
 	}
 
+	backupResult, errs := encodeToJSONGzip(results, "backup results")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
+
 	if len(persistErrs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
 		backupJSON = nil
@@ -852,6 +867,7 @@ func persistBackup(backup *pkgbackup.Request,
 		csiSnapshotJSON = nil
 		csiSnapshotContentsJSON = nil
 		csiSnapshotClassesJSON = nil
+		backupResult = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
@@ -859,6 +875,7 @@ func persistBackup(backup *pkgbackup.Request,
 		Metadata:                  backupJSON,
 		Contents:                  backupContents,
 		Log:                       backupLog,
+		BackupResults:             backupResult,
 		PodVolumeBackups:          podVolumeBackups,
 		VolumeSnapshots:           nativeVolumeSnapshots,
 		BackupResourceList:        backupResourceList,
