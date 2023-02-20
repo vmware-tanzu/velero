@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.18.8
+FROM golang:1.18.10
 
 ARG GOPROXY
 
