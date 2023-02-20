@@ -146,3 +146,10 @@ func WithGenerateName(val string) func(obj metav1.Object) {
 		obj.SetGenerateName(val)
 	}
 }
+
+// WithManagedFields is a functional option that applies the specified managed fields to an object.
+func WithManagedFields(val []metav1.ManagedFieldsEntry) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetManagedFields(val)
+	}
+}
