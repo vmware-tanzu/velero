@@ -45,7 +45,8 @@ func (m *MultiNSBackup) Init() error {
 	m.BackupName = "backup-" + UUIDgen.String()
 	m.RestoreName = "restore-" + UUIDgen.String()
 	m.NSBaseName = "nstest-" + UUIDgen.String()
-	m.Client = TestClientInstance
+	m.VeleroCfg = VeleroCfg
+	m.Client = *m.VeleroCfg.ClientToInstallVelero
 	m.NSExcluded = &[]string{}
 
 	if m.IsScalTest {
@@ -79,13 +80,13 @@ func (m *MultiNSBackup) StartRun() error {
 	}
 
 	m.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", m.BackupName,
+		"create", "--namespace", m.VeleroCfg.VeleroNamespace, "backup", m.BackupName,
 		"--exclude-namespaces", strings.Join(*m.NSExcluded, ","),
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	m.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", m.RestoreName,
+		"create", "--namespace", m.VeleroCfg.VeleroNamespace, "restore", m.RestoreName,
 		"--from-backup", m.BackupName, "--wait",
 	}
 	return nil

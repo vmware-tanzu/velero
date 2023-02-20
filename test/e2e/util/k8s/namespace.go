@@ -100,7 +100,7 @@ func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseNam
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
 			}
-			fmt.Printf("Delete namespace %s\n", checkNamespace.Name)
+			fmt.Printf("Namespace %s was deleted\n", checkNamespace.Name)
 		}
 	}
 	return nil

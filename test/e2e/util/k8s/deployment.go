@@ -36,7 +36,16 @@ const (
 )
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string) *apps.Deployment {
+func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container) *apps.Deployment {
+	if containers == nil {
+		containers = []v1.Container{
+			{
+				Name:    fmt.Sprintf("container-%s", "busybox"),
+				Image:   "gcr.io/velero-gcp/busybox:latest",
+				Command: []string{"sleep", "1000000"},
+			},
+		}
+	}
 	return &apps.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -59,19 +68,17 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string) *a
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:    name,
-							Image:   "gcr.io/velero-gcp/busybox:latest",
-							Command: []string{"sleep", "1000000"},
-						},
-					},
+					Containers: containers,
 				},
 			},
 		},
 	}
 }
 
+func CreateDeploy(c clientset.Interface, ns string, deployment *apps.Deployment) error {
+	_, err := c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
+	return err
+}
 func CreateDeployment(c clientset.Interface, ns string, deployment *apps.Deployment) (*apps.Deployment, error) {
 	return c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
 }

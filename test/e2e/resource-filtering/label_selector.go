@@ -101,7 +101,7 @@ func (l *LabelSelector) CreateResources() error {
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 
-		deployment := NewDeployment(l.NSBaseName, namespace, l.replica, labels)
+		deployment := NewDeployment(l.NSBaseName, namespace, l.replica, labels, nil)
 		deployment, err := CreateDeployment(l.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

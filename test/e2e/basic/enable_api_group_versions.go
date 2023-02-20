@@ -40,22 +40,26 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
+var veleroCfg VeleroConfig
+
 func APIExtensionsVersionsTest() {
 	var (
 		backupName, restoreName string
 	)
+
 	resourceName := "apiextensions.k8s.io"
 	crdName := "rocknrollbands.music.example.io"
 	label := "for=backup"
 	srcCrdYaml := "testdata/enable_api_group_versions/case-a-source-v1beta1.yaml"
 	BeforeEach(func() {
-		if VeleroCfg.DefaultCluster == "" && VeleroCfg.StandbyCluster == "" {
+		if veleroCfg.DefaultCluster == "" && veleroCfg.StandbyCluster == "" {
 			Skip("CRD with apiextension versions migration test needs 2 clusters")
 		}
-		Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
-		srcVersions, err := GetAPIVersions(VeleroCfg.DefaultClient, resourceName)
+		veleroCfg = VeleroCfg
+		Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+		srcVersions, err := GetAPIVersions(veleroCfg.DefaultClient, resourceName)
 		Expect(err).ShouldNot(HaveOccurred())
-		dstVersions, err := GetAPIVersions(VeleroCfg.StandbyClient, resourceName)
+		dstVersions, err := GetAPIVersions(veleroCfg.StandbyClient, resourceName)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		Expect(srcVersions).Should(ContainElement("v1"), func() string {
@@ -76,26 +80,26 @@ func APIExtensionsVersionsTest() {
 		})
 	})
 	AfterEach(func() {
-		if !VeleroCfg.Debug {
+		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *VeleroCfg.DefaultClient)
+				DeleteBackups(context.Background(), *veleroCfg.DefaultClient)
 			})
-			if VeleroCfg.InstallVelero {
+			if veleroCfg.InstallVelero {
 				By("Uninstall Velero and delete CRD ", func() {
-					Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
-					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
+						veleroCfg.VeleroNamespace)).To(Succeed())
 					Expect(deleteCRDByName(context.Background(), crdName)).To(Succeed())
 
-					Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.StandbyCluster)).To(Succeed())
-					Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
+					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
+						veleroCfg.VeleroNamespace)).To(Succeed())
 					Expect(deleteCRDByName(context.Background(), crdName)).To(Succeed())
 				})
 			}
-			By(fmt.Sprintf("Switch to default kubeconfig context %s", VeleroCfg.DefaultCluster), func() {
-				Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
-				VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+			By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultCluster), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
 			})
 		}
 
@@ -105,19 +109,19 @@ func APIExtensionsVersionsTest() {
 			backupName = "backup-" + UUIDgen.String()
 			restoreName = "restore-" + UUIDgen.String()
 
-			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", VeleroCfg.DefaultCluster), func() {
-				Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)).To(Succeed())
-				VeleroCfg.ObjectStoreProvider = ""
-				VeleroCfg.Features = "EnableAPIGroupVersions"
-				Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
+			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", veleroCfg.DefaultCluster), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+				veleroCfg.Features = "EnableAPIGroupVersions"
+				veleroCfg.UseVolumeSnapshots = false
+				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
 			})
 
-			By(fmt.Sprintf("Install CRD of apiextenstions v1beta1 in cluster-A (%s)", VeleroCfg.DefaultCluster), func() {
+			By(fmt.Sprintf("Install CRD of apiextenstions v1beta1 in cluster-A (%s)", veleroCfg.DefaultCluster), func() {
 				Expect(installCRD(context.Background(), srcCrdYaml)).To(Succeed())
 				Expect(CRDShouldExist(context.Background(), crdName)).To(Succeed())
 				Expect(WaitForCRDEstablished(crdName)).To(Succeed())
 				Expect(AddLabelToCRD(context.Background(), crdName, label)).To(Succeed())
-				// Discovery helper is refreshed every 5 minutes
+				// Velero server refresh api version data by discovery helper every 5 minutes
 				time.Sleep(6 * time.Minute)
 			})
 
@@ -127,34 +131,33 @@ func APIExtensionsVersionsTest() {
 				BackupCfg.IncludeResources = "crd"
 				BackupCfg.IncludeClusterResources = true
 				BackupCfg.Selector = label
-				Expect(VeleroBackupNamespace(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
-					RunDebug(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace, backupName, "")
+				Expect(VeleroBackupNamespace(context.Background(), veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+					RunDebug(context.Background(), veleroCfg.VeleroCLI,
+						veleroCfg.VeleroNamespace, backupName, "")
 					return "Fail to backup workload"
 				})
 			})
 
-			By(fmt.Sprintf("Install Velero in cluster-B (%s) to restore workload", VeleroCfg.StandbyCluster), func() {
-				Expect(KubectlConfigUseContext(context.Background(), VeleroCfg.StandbyCluster)).To(Succeed())
-				VeleroCfg.ObjectStoreProvider = ""
-				VeleroCfg.ClientToInstallVelero = VeleroCfg.StandbyClient
-				Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
+			By(fmt.Sprintf("Install Velero in cluster-B (%s) to restore workload", veleroCfg.StandbyCluster), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
+				veleroCfg.ClientToInstallVelero = veleroCfg.StandbyClient
+				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
 			})
 
-			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", VeleroCfg.StandbyCluster), func() {
-				Expect(WaitForBackupToBeCreated(context.Background(), VeleroCfg.VeleroCLI, backupName, 5*time.Minute)).To(Succeed())
+			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", veleroCfg.StandbyCluster), func() {
+				Expect(WaitForBackupToBeCreated(context.Background(), veleroCfg.VeleroCLI, backupName, 5*time.Minute)).To(Succeed())
 			})
 
-			By(fmt.Sprintf("CRD %s should not exist in cluster-B (%s)", crdName, VeleroCfg.StandbyCluster), func() {
+			By(fmt.Sprintf("CRD %s should not exist in cluster-B (%s)", crdName, veleroCfg.StandbyCluster), func() {
 				Expect(CRDShouldNotExist(context.Background(), crdName)).To(Succeed(), "Error: CRD already exists in cluster B, clean it and re-run test")
 			})
 
 			By("Restore CRD", func() {
-				Expect(VeleroRestore(context.Background(), VeleroCfg.VeleroCLI,
-					VeleroCfg.VeleroNamespace, restoreName, backupName, "")).To(Succeed(), func() string {
-					RunDebug(context.Background(), VeleroCfg.VeleroCLI,
-						VeleroCfg.VeleroNamespace, "", restoreName)
+				Expect(VeleroRestore(context.Background(), veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace, restoreName, backupName, "")).To(Succeed(), func() string {
+					RunDebug(context.Background(), veleroCfg.VeleroCLI,
+						veleroCfg.VeleroNamespace, "", restoreName)
 					return "Fail to restore workload"
 				})
 			})
@@ -173,6 +176,7 @@ func APIGropuVersionsTest() {
 	)
 
 	BeforeEach(func() {
+		veleroCfg = VeleroCfg
 		resource = "rockbands"
 		group = "music.example.io"
 		UUIDgen, err = uuid.NewRandom()
@@ -180,15 +184,16 @@ func APIGropuVersionsTest() {
 		flag.Parse()
 		// TODO: install Velero once for the test suite once feature flag is
 		// removed and velero installation becomes the same as other e2e tests.
-		if VeleroCfg.InstallVelero {
-			VeleroCfg.Features = "EnableAPIGroupVersions"
-			err = VeleroInstall(context.Background(), &VeleroCfg, false)
+		if veleroCfg.InstallVelero {
+			veleroCfg.Features = "EnableAPIGroupVersions"
+			veleroCfg.UseVolumeSnapshots = false
+			err = VeleroInstall(context.Background(), &veleroCfg)
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})
 
 	AfterEach(func() {
-		if !VeleroCfg.Debug {
+		if !veleroCfg.Debug {
 			fmt.Printf("Clean up resource: kubectl delete crd %s.%s\n", resource, group)
 			cmd := exec.CommandContext(ctx, "kubectl", "delete", "crd", resource+"."+group)
 			_, stderr, err := veleroexec.RunCommand(cmd)
@@ -198,12 +203,12 @@ func APIGropuVersionsTest() {
 			}
 			Expect(err).NotTo(HaveOccurred())
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
+				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
-			if VeleroCfg.InstallVelero {
+			if veleroCfg.InstallVelero {
 
 				By("Uninstall Velero", func() {
-					Expect(VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
+					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
 				})
 			}
 		}
@@ -213,7 +218,7 @@ func APIGropuVersionsTest() {
 		It("Should back up API group version and restore by version priority", func() {
 			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
-				*VeleroCfg.ClientToInstallVelero,
+				*veleroCfg.ClientToInstallVelero,
 				resource,
 				group,
 			)).To(Succeed(), "Failed to successfully backup and restore multiple API Groups")
@@ -294,7 +299,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 			},
 			tgtCrdYaml: "testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
 			tgtVer:     "v2beta1",
-			cm: builder.ForConfigMap(VeleroCfg.VeleroNamespace, "enableapigroupversions").Data(
+			cm: builder.ForConfigMap(veleroCfg.VeleroNamespace, "enableapigroupversions").Data(
 				"restoreResourcesVersionPriority",
 				`rockbands.music.example.io=v2beta1,v2beta2,v2`,
 			).Result(),
@@ -354,12 +359,8 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 			tc.namespaces = append(tc.namespaces, ns)
 		}
 
-		// Restart Velero pods in order to recognize music-system CRD right away
-		// instead of waiting for discovery helper to refresh. See
-		// https://github.com/vmware-tanzu/velero/issues/3471.
-		if err := restartPods(ctx, VeleroCfg.VeleroNamespace); err != nil {
-			return errors.Wrapf(err, "restart Velero pods")
-		}
+		// Velero server refresh api version data by discovery helper every 5 minutes
+		time.Sleep(6 * time.Minute)
 
 		backup := "backup-rockbands-" + UUIDgen.String() + "-" + strconv.Itoa(i)
 		namespacesStr := strings.Join(tc.namespaces, ",")
@@ -371,10 +372,10 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 		BackupCfg.UseVolumeSnapshots = false
 		BackupCfg.Selector = ""
 
-		Expect(VeleroBackupNamespace(ctx, VeleroCfg.VeleroCLI,
-			VeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
-			RunDebug(context.Background(), VeleroCfg.VeleroCLI,
-				VeleroCfg.VeleroNamespace, backup, "")
+		Expect(VeleroBackupNamespace(ctx, veleroCfg.VeleroCLI,
+			veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			RunDebug(context.Background(), veleroCfg.VeleroCLI,
+				veleroCfg.VeleroNamespace, backup, "")
 			return "Fail to backup workload"
 		})
 
@@ -397,23 +398,21 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 
 		// Apply config map if there is one.
 		if tc.cm != nil {
-			_, err := client.ClientGo.CoreV1().ConfigMaps(VeleroCfg.VeleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
+			_, err := client.ClientGo.CoreV1().ConfigMaps(veleroCfg.VeleroNamespace).Create(ctx, tc.cm, metav1.CreateOptions{})
 			if err != nil {
 				return errors.Wrap(err, "create config map with user version priorities")
 			}
 		}
 
-		// Reset Velero to recognize music-system CRD.
-		if err := restartPods(ctx, VeleroCfg.VeleroNamespace); err != nil {
-			return errors.Wrapf(err, "restart Velero pods")
-		}
+		// Velero server refresh api version data by discovery helper every 5 minutes
+		time.Sleep(6 * time.Minute)
 
 		// Restore rockbands namespaces.
 		restore := "restore-rockbands-" + UUIDgen.String() + "-" + strconv.Itoa(i)
 
 		if tc.want != nil {
-			if err := VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup, ""); err != nil {
-				RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", restore)
+			if err := VeleroRestore(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, restore, backup, ""); err != nil {
+				RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", restore)
 				return errors.Wrapf(err, "restore %s namespaces on target cluster", namespacesStr)
 			}
 
@@ -451,7 +450,7 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, reso
 		} else {
 			// No custom resource should have been restored. Expect "no resource found"
 			// error during restore.
-			err := VeleroRestore(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore, backup, "")
+			err := VeleroRestore(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, restore, backup, "")
 			if !strings.Contains(err.Error(), "Unexpected restore phase got PartiallyFailed, expecting Completed") {
 				return errors.New("expected error but not none")
 			}
@@ -499,20 +498,6 @@ func deleteCRDByName(ctx context.Context, name string) error {
 		return errors.Wrap(err, stderr)
 	}
 
-	return nil
-}
-
-func restartPods(ctx context.Context, ns string) error {
-	fmt.Printf("Restart pods in %s namespace.\n", ns)
-	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "--all", "-n", ns, "--wait=true")
-
-	_, stderr, err := veleroexec.RunCommand(cmd)
-	if strings.Contains(stderr, "not found") {
-		return nil
-	}
-	if err != nil {
-		return errors.Wrap(err, stderr)
-	}
 	return nil
 }
 

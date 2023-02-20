@@ -29,7 +29,11 @@ var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase
 var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1", NamespaceBaseName + "2"}, UseVolumeSnapshots: true}})
 
 func (n *NamespaceMapping) Init() error {
-	n.Client = TestClientInstance
+	//n.Client = TestClientInstance
+	n.VeleroCfg = VeleroCfg
+	n.Client = *n.VeleroCfg.ClientToInstallVelero
+	n.VeleroCfg.UseVolumeSnapshots = n.UseVolumeSnapshots
+	n.VeleroCfg.UseNodeAgent = !n.UseVolumeSnapshots
 	n.kibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
 	backupType := "restic"
 	if n.UseVolumeSnapshots {

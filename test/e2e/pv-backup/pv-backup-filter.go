@@ -32,7 +32,10 @@ var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_
 
 func (p *PVBackupFiltering) Init() error {
 	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-	p.Client = TestClientInstance
+	p.VeleroCfg = VeleroCfg
+	p.Client = *p.VeleroCfg.ClientToInstallVelero
+	p.VeleroCfg.UseVolumeSnapshots = false
+	p.VeleroCfg.UseNodeAgent = true
 	p.NSBaseName = "ns"
 	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 2)}
 

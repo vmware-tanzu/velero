@@ -43,7 +43,8 @@ func (n *NSAnnotationCase) Init() error {
 	n.NSBaseName = "namespace-annotations-" + UUIDgen.String()
 	n.NamespacesTotal = 1
 	n.NSIncluded = &[]string{}
-	n.Client = TestClientInstance
+	n.VeleroCfg = VeleroCfg
+	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", n.NSBaseName, nsNum)
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)

@@ -28,7 +28,9 @@ type ScheduleBackup struct {
 var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "schedule-test"}})
 
 func (n *ScheduleBackup) Init() error {
-	n.Client = TestClientInstance
+	//n.Client = TestClientInstance
+	n.VeleroCfg = VeleroCfg
+	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
 	n.verifyTimes = 5 // More verify times more confidence
 	n.TestMsg = &TestMSG{

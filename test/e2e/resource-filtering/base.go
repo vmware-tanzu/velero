@@ -48,8 +48,9 @@ func (f *FilteringCase) Init() error {
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}
 	f.labelSelector = "resourcefiltering"
-	f.Client = TestClientInstance
-
+	//f.Client = TestClientInstance
+	f.VeleroCfg = VeleroCfg
+	f.Client = *f.VeleroCfg.ClientToInstallVelero
 	f.NamespacesTotal = 3
 	f.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", f.BackupName,
@@ -84,7 +85,7 @@ func (f *FilteringCase) CreateResources() error {
 		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels)
+		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels, nil)
 		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

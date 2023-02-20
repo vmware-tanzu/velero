@@ -78,7 +78,8 @@ func (r *RBACCase) Init() error {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
 		"--from-backup", r.BackupName, "--wait",
 	}
-	r.Client = TestClientInstance
+	r.VeleroCfg = VeleroCfg
+	r.Client = *r.VeleroCfg.ClientToInstallVelero
 	return nil
 }
 
