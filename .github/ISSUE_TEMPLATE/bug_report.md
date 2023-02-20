@@ -5,7 +5,7 @@ about: Tell us about a problem you are experiencing
 ---
 
 **What steps did you take and what happened:**
-[A clear and concise description of what the bug is, and what commands you ran.)
+<!--A clear and concise description of what the bug is, and what commands you ran.-->
 
 
 **What did you expect to happen:**
@@ -25,7 +25,7 @@ Please provide the output of the following commands (Pasting long output into a 
 
 
 **Anything else you would like to add:**
-[Miscellaneous information that will assist in solving the issue.]
+<!--Miscellaneous information that will assist in solving the issue.-->
 
 
 **Environment:**
