@@ -2624,6 +2624,12 @@ type fakePodVolumeBackupper struct{}
 // and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
 func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
 	var res []*velerov1.PodVolumeBackup
+
+	anno := pod.GetAnnotations()
+	if anno != nil && anno["backup.velero.io/bakupper-skip"] != "" {
+		return res, nil
+	}
+
 	for _, vol := range volumes {
 		pvb := builder.ForPodVolumeBackup("velero", fmt.Sprintf("pvb-%s-%s-%s", pod.Namespace, pod.Name, vol)).Volume(vol).Result()
 		res = append(res, pvb)
@@ -2676,6 +2682,27 @@ func TestBackupWithPodVolume(t *testing.T) {
 			},
 			want: []*velerov1.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Volume("foo").Result(),
+			},
+		},
+		{
+			name:   "when a PVC is used by two pods and annotated for pod volume backup on both, the backup for pod1 gives up the PVC, the backup for pod2 should include it",
+			backup: defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo", "backup.velero.io/bakupper-skip", "foo")).
+						Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("pvc-1").Result()).
+						Result(),
+				),
+				test.Pods(
+					builder.ForPod("ns-1", "pod-2").
+						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "bar")).
+						Volumes(builder.ForVolume("bar").PersistentVolumeClaimSource("pvc-1").Result()).
+						Result(),
+				),
+			},
+			want: []*velerov1.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-2-bar").Volume("bar").Result(),
 			},
 		},
 		{
