@@ -1,3 +1,25 @@
+## v1.9.6
+### 2023-02-21
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.9.6
+
+### Container Image
+`velero/velero:v1.9.6`
+
+### Documentation
+https://velero.io/docs/v1.9/
+
+### Upgrading
+https://velero.io/docs/v1.9/upgrade-to-1.9/
+
+### All changes
+  * Bump up Golang version and fix CVEs. (#5884, @blackpiglet)
+  * Add labels for velero installed namespace to support PSA. (#5887, @blackpiglet)
+  * Fix Dockerfile issue. (#5761, @blackpiglet)
+  * Add PR container build action, which will not push image. Add GOARM parameter. (#5777, @blackpiglet)
+  * Correct PVB/PVR Failed Phase patching during startup (#5829, @kaovilai)
+
 ## v1.9.5
 ### 2022-12-19
 
