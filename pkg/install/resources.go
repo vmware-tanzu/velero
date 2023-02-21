@@ -259,10 +259,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)
 
-	crb := ClusterRoleBinding(o.Namespace)
-	appendUnstructured(resources, crb)
 	serviceAccountName := defaultServiceAccountName
 	if o.ServiceAccountName == "" {
+		crb := ClusterRoleBinding(o.Namespace)
+		appendUnstructured(resources, crb)
 		sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
 		appendUnstructured(resources, sa)
 	} else {
