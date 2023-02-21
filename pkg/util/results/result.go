@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restore
+package results
 
 // Result is a collection of messages that were generated during
-// execution of a restore. This will typically store either
+// execution of a backup or restore. This will typically store either
 // warning or error messages.
 type Result struct {
 	// Velero is a slice of messages related to the operation of Velero
@@ -25,12 +25,12 @@ type Result struct {
 	// cloud, reading a backup file, etc.)
 	Velero []string `json:"velero,omitempty"`
 
-	// Cluster is a slice of messages related to restoring cluster-
-	// scoped resources.
+	// Cluster is a slice of messages related to backup or restore of
+	// cluster-scoped resources.
 	Cluster []string `json:"cluster,omitempty"`
 
 	// Namespaces is a map of namespace name to slice of messages
-	// related to restoring namespace-scoped resources.
+	// related to backup or restore namespace-scoped resources.
 	Namespaces map[string][]string `json:"namespaces,omitempty"`
 }
 
