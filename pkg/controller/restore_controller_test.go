@@ -51,6 +51,7 @@ import (
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -506,7 +507,7 @@ func TestProcessQueueItem(t *testing.T) {
 				sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup)
 			}
 
-			var warnings, errors pkgrestore.Result
+			var warnings, errors results.Result
 			if test.restorerError != nil {
 				errors.Namespaces = map[string][]string{"ns-1": {test.restorerError.Error()}}
 			}
@@ -864,12 +865,12 @@ func (r *fakeRestorer) Restore(
 	actions []riav1.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
-) (pkgrestore.Result, pkgrestore.Result) {
+) (results.Result, results.Result) {
 	res := r.Called(info.Log, info.Restore, info.Backup, info.BackupReader, actions)
 
 	r.calledWithArg = *info.Restore
 
-	return res.Get(0).(pkgrestore.Result), res.Get(1).(pkgrestore.Result)
+	return res.Get(0).(results.Result), res.Get(1).(results.Result)
 }
 
 func (r *fakeRestorer) RestoreWithResolvers(req pkgrestore.Request,
@@ -877,11 +878,11 @@ func (r *fakeRestorer) RestoreWithResolvers(req pkgrestore.Request,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
-) (pkgrestore.Result, pkgrestore.Result) {
+) (results.Result, results.Result) {
 	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver, itemSnapshotterResolver,
 		snapshotLocationLister, volumeSnapshotterGetter)
 
 	r.calledWithArg = *req.Restore
 
-	return res.Get(0).(pkgrestore.Result), res.Get(1).(pkgrestore.Result)
+	return res.Get(0).(results.Result), res.Get(1).(results.Result)
 }

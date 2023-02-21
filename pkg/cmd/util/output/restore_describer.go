@@ -32,7 +32,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
 func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *velerov1api.Restore, podVolumeRestores []velerov1api.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertFile string) string {
@@ -167,7 +167,7 @@ func describeRestoreResults(ctx context.Context, kbClient kbclient.Client, d *De
 	}
 
 	var buf bytes.Buffer
-	var resultMap map[string]pkgrestore.Result
+	var resultMap map[string]results.Result
 
 	if err := downloadrequest.Stream(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
@@ -189,7 +189,7 @@ func describeRestoreResults(ctx context.Context, kbClient kbclient.Client, d *De
 	}
 }
 
-func describeRestoreResult(d *Describer, name string, result pkgrestore.Result) {
+func describeRestoreResult(d *Describer, name string, result results.Result) {
 	d.Printf("%s:\n", name)
 	d.DescribeSlice(1, "Velero", result.Velero)
 	d.DescribeSlice(1, "Cluster", result.Cluster)
