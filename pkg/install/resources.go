@@ -136,13 +136,18 @@ func ClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
 }
 
 func Namespace(namespace string) *corev1.Namespace {
-	return &corev1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: objectMeta("", namespace),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 	}
+
+	ns.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
+	ns.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+
+	return ns
 }
 
 func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *velerov1api.BackupStorageLocation {
