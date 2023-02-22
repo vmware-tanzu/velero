@@ -1,3 +1,27 @@
+## v1.10.2
+### 2023-02-22
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.10.2
+
+### Container Image
+`velero/velero:v1.10.2`
+
+### Documentation
+https://velero.io/docs/v1.10/
+
+### Upgrading
+https://velero.io/docs/v1.10/upgrade-to-1.10/
+
+### All changes
+  * Update distroless image and fix CVE-2022-41717 for release-1.10 (#5891, @blackpiglet)
+  * Set Kopia IgnoreUnknownTypes in ErrorHandlingPolicy to True for ignoring backup unknown file type (#5890, @qiuiming-best)
+  * Add labels for velero installed namespace to support PSA. (#5888, @blackpiglet)
+  * Publish backupresults json to enhance error info during backups. (#5879, @anshulahuja98)
+  * Restore finalizer and managedFields of metadata during the restoration (#5877, @ywk253100)
+  * Add secret restore item action to handle service account token secret (#5869, @ywk253100)
+  * Correct PVB/PVR Failed Phase patching during startup (#5830, @kaovilai)
+
 ## v1.10.1
 ### 2023-01-19
 
