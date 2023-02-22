@@ -1,1 +1,0 @@
-Prevent nil panic on exec restore hooks

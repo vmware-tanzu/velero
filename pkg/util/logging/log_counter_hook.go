@@ -17,45 +17,88 @@ limitations under the License.
 package logging
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-// LogCounterHook is a logrus hook that counts the number of log
-// statements that have been written at each logrus level.
-type LogCounterHook struct {
-	mu     sync.RWMutex
-	counts map[logrus.Level]int
+// LogHook is a logrus hook that counts the number of log
+// statements that have been written at each logrus level. It also
+// maintains log entries at each logrus level in result structure.
+type LogHook struct {
+	mu      sync.RWMutex
+	counts  map[logrus.Level]int
+	entries map[logrus.Level]*results.Result
 }
 
-// NewLogCounterHook returns a pointer to an initialized LogCounterHook.
-func NewLogCounterHook() *LogCounterHook {
-	return &LogCounterHook{
-		counts: make(map[logrus.Level]int),
+// NewLogHook returns a pointer to an initialized LogHook.
+func NewLogHook() *LogHook {
+	return &LogHook{
+		counts:  make(map[logrus.Level]int),
+		entries: make(map[logrus.Level]*results.Result),
 	}
 }
 
 // Levels returns the logrus levels that the hook should be fired for.
-func (h *LogCounterHook) Levels() []logrus.Level {
+func (h *LogHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
 // Fire executes the hook's logic.
-func (h *LogCounterHook) Fire(entry *logrus.Entry) error {
+func (h *LogHook) Fire(entry *logrus.Entry) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	h.counts[entry.Level]++
+	if h.entries[entry.Level] == nil {
+		h.entries[entry.Level] = &results.Result{}
+	}
 
+	namespace, isNamespacePresent := entry.Data["namespace"]
+	errorField, isErrorFieldPresent := entry.Data["error"]
+	resourceField, isResourceFieldPresent := entry.Data["resource"]
+	nameField, isNameFieldPresent := entry.Data["name"]
+
+	entryMessage := ""
+	if isResourceFieldPresent {
+		entryMessage = fmt.Sprintf("%s resource: /%s", entryMessage, resourceField.(string))
+	}
+	if isNameFieldPresent {
+		entryMessage = fmt.Sprintf("%s name: /%s", entryMessage, nameField.(string))
+	}
+	if isErrorFieldPresent {
+		entryMessage = fmt.Sprintf("%s error: /%s", entryMessage, errorField.(error).Error())
+	}
+
+	if isNamespacePresent {
+		h.entries[entry.Level].Add(namespace.(string), errors.New(entryMessage))
+	} else {
+		h.entries[entry.Level].AddVeleroError(errors.New(entryMessage))
+	}
 	return nil
 }
 
 // GetCount returns the number of log statements that have been
 // written at the specific level provided.
-func (h *LogCounterHook) GetCount(level logrus.Level) int {
+func (h *LogHook) GetCount(level logrus.Level) int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	return h.counts[level]
+}
+
+// GetEntries returns the log statements that have been
+// written at the specific level provided.
+func (h *LogHook) GetEntries(level logrus.Level) results.Result {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	response, isPresent := h.entries[level]
+	if isPresent {
+		return *response
+	}
+	return results.Result{}
 }

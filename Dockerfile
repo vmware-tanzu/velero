@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.18.8 as velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.18.10 as velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -62,10 +62,11 @@ env CGO_ENABLED=0 \
 COPY . /go/src/github.com/vmware-tanzu/velero
 
 RUN mkdir -p /output/usr/bin && \
-    bash /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
+    export GOARM=$(echo "${GOARM}" | cut -c2-) && \
+    /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
 
 # Velero image packing section
-FROM gcr.io/distroless/base-debian11@sha256:99133cb0878bb1f84d1753957c6fd4b84f006f2798535de22ebf7ba170bbf434
+FROM gcr.io/distroless/base-debian11@sha256:db7ea5913b13bb5fc4a5f5ee5a1fab693d262846d3e7b28efd3f8f62f835c161
 
 LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
 

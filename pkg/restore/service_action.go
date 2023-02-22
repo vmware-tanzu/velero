@@ -18,6 +18,7 @@ package restore
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -83,10 +84,10 @@ func deleteNodePorts(service *corev1api.Service) error {
 	// find any NodePorts whose values were explicitly specified according
 	// to the last-applied-config annotation. We'll retain these values, and
 	// clear out any other (presumably auto-assigned) NodePort values.
-	explicitNodePorts := sets.NewString()
-	unnamedPortInts := sets.NewInt()
 	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
 	if ok {
+		explicitNodePorts := sets.NewString()
+		unnamedPortInts := sets.NewInt()
 		appliedServiceUnstructured := new(map[string]interface{})
 		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedServiceUnstructured); err != nil {
 			return errors.WithStack(err)
@@ -134,19 +135,58 @@ func deleteNodePorts(service *corev1api.Service) error {
 				}
 			}
 		}
+
+		for i, port := range service.Spec.Ports {
+			if port.Name != "" {
+				if !explicitNodePorts.Has(port.Name) {
+					service.Spec.Ports[i].NodePort = 0
+				}
+			} else {
+				if !unnamedPortInts.Has(int(port.NodePort)) {
+					service.Spec.Ports[i].NodePort = 0
+				}
+			}
+		}
+
+		return nil
 	}
 
-	for i, port := range service.Spec.Ports {
-		if port.Name != "" {
-			if !explicitNodePorts.Has(port.Name) {
-				service.Spec.Ports[i].NodePort = 0
+	explicitNodePorts := sets.NewString()
+	for _, entry := range service.GetManagedFields() {
+		if entry.FieldsV1 == nil {
+			continue
+		}
+		fields := new(map[string]interface{})
+		if err := json.Unmarshal(entry.FieldsV1.Raw, fields); err != nil {
+			return errors.WithStack(err)
+		}
+
+		ports, exist, err := unstructured.NestedMap(*fields, "f:spec", "f:ports")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if !exist {
+			continue
+		}
+		for key, port := range ports {
+			p, ok := port.(map[string]interface{})
+			if !ok {
+				continue
 			}
-		} else {
-			if !unnamedPortInts.Has(int(port.NodePort)) {
-				service.Spec.Ports[i].NodePort = 0
+			if _, exist := p["f:nodePort"]; exist {
+				explicitNodePorts.Insert(key)
 			}
 		}
 	}
-
+	for i, port := range service.Spec.Ports {
+		k := portKey(port)
+		if !explicitNodePorts.Has(k) {
+			service.Spec.Ports[i].NodePort = 0
+		}
+	}
 	return nil
+}
+
+func portKey(port corev1api.ServicePort) string {
+	return fmt.Sprintf(`k:{"port":%d,"protocol":"%s"}`, port.Port, port.Protocol)
 }

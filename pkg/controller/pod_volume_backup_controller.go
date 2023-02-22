@@ -279,17 +279,20 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 }
 
 func (r *PodVolumeBackupReconciler) updateStatusToFailed(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
-	original := pvb.DeepCopy()
-	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-	pvb.Status.Message = errors.WithMessage(err, msg).Error()
-	pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-
-	if err = r.Client.Patch(ctx, pvb, client.MergeFrom(original)); err != nil {
+	if err = UpdatePVBStatusToFailed(r.Client, ctx, pvb, errors.WithMessage(err, msg).Error(), r.Clock.Now()); err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")
 		return ctrl.Result{}, err
 	}
-
 	return ctrl.Result{}, nil
+}
+
+func UpdatePVBStatusToFailed(c client.Client, ctx context.Context, pvb *velerov1api.PodVolumeBackup, errString string, time time.Time) error {
+	original := pvb.DeepCopy()
+	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
+	pvb.Status.Message = errString
+	pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
+
+	return c.Patch(ctx, pvb, client.MergeFrom(original))
 }
 
 func (r *PodVolumeBackupReconciler) NewBackupProgressUpdater(pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger, ctx context.Context) *BackupProgressUpdater {
