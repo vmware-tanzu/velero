@@ -109,6 +109,8 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
+
+	defaultMaxConcurrentK8SConnections = 30
 )
 
 type serverConfig struct {
@@ -131,6 +133,7 @@ type serverConfig struct {
 	itemOperationSyncFrequency                                              time.Duration
 	defaultVolumesToFsBackup                                                bool
 	uploaderType                                                            string
+	maxConcurrentK8SConnections                                             int
 }
 
 type controllerRunInfo struct {
@@ -163,6 +166,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			formatFlag:                     logging.NewFormatFlag(),
 			defaultVolumesToFsBackup:       podvolume.DefaultVolumesToFsBackup,
 			uploaderType:                   uploader.ResticType,
+			maxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
 		}
 	)
 
@@ -232,6 +236,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
 	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out.")
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
+	command.Flags().IntVar(&config.maxConcurrentK8SConnections, "max-concurrent-k8s-connections", config.maxConcurrentK8SConnections, "Max concurrent connections number that Velero can create with kube-apiserver. Default is 30.")
 
 	return command
 }
@@ -734,6 +739,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.csiSnapshotLister,
 			s.csiSnapshotClient,
 			s.credentialFileStore,
+			s.config.maxConcurrentK8SConnections,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.Backup)
 		}
