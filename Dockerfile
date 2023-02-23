@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.18.8 as velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.18-bullseye as velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -44,7 +44,7 @@ RUN mkdir -p /output/usr/bin && \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
 # Restic binary build section
-FROM --platform=$BUILDPLATFORM golang:1.19.4-bullseye as restic-builder
+FROM --platform=$BUILDPLATFORM golang:1.19-bullseye as restic-builder
 
 ARG BIN
 ARG TARGETOS
