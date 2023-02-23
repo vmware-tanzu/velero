@@ -25,13 +25,12 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/kubernetes/scheme"
+	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -144,7 +143,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 			r := PodVolumeBackupReconciler{
 				Client:           fakeClient,
-				Clock:            clock.NewFakeClock(now),
+				Clock:            testclocks.NewFakeClock(now),
 				Metrics:          metrics.NewPodVolumeMetrics(),
 				CredentialGetter: &credentials.CredentialGetter{FromFile: credentialFileStore},
 				NodeName:         "test_node",

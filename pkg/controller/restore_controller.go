@@ -33,11 +33,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
+	clocks "k8s.io/utils/clock"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	hook "github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/hook"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -51,8 +52,6 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // nonRestorableResources is an exclusion list  for the restoration process. Any resources
@@ -95,7 +94,7 @@ type restoreController struct {
 	restoreLogLevel logrus.Level
 	metrics         *metrics.ServerMetrics
 	logFormat       logging.Format
-	clock           clock.Clock
+	clock           clocks.WithTickerAndDelayedExecution
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
@@ -121,7 +120,7 @@ func NewRestoreController(
 		restoreLogLevel:   restoreLogLevel,
 		metrics:           metrics,
 		logFormat:         logFormat,
-		clock:             &clock.RealClock{},
+		clock:             &clocks.RealClock{},
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -619,8 +618,8 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 
 	n, err := io.Copy(file, readCloser)
 	if err != nil {
-		//Temporary file has been created if we go here. And some problems occurs such as network interruption and
-		//so on. So we close and remove temporary file first to prevent residual file.
+		// Temporary file has been created if we go here. And some problems occurs such as network interruption and
+		// so on. So we close and remove temporary file first to prevent residual file.
 		closeAndRemoveFile(file, logger)
 		return nil, errors.Wrap(err, "error copying Backup to temp file")
 	}

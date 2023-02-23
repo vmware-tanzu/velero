@@ -29,27 +29,24 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	corev1api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-
-	"github.com/vmware-tanzu/velero/pkg/util/results"
-
-	"github.com/vmware-tanzu/velero/pkg/util/csi"
-
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
-	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
+	clocks "k8s.io/utils/clock"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
@@ -67,13 +64,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
-
-	corev1api "k8s.io/api/core/v1"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupController struct {
@@ -83,7 +79,7 @@ type backupController struct {
 	lister                    velerov1listers.BackupLister
 	client                    velerov1client.BackupsGetter
 	kbClient                  kbclient.Client
-	clock                     clock.Clock
+	clock                     clocks.WithTickerAndDelayedExecution
 	backupLogLevel            logrus.Level
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker             BackupTracker
@@ -130,7 +126,7 @@ func NewBackupController(
 		backupper:                 backupper,
 		lister:                    backupInformer.Lister(),
 		client:                    client,
-		clock:                     &clock.RealClock{},
+		clock:                     &clocks.RealClock{},
 		backupLogLevel:            backupLogLevel,
 		newPluginManager:          newPluginManager,
 		backupTracker:             backupTracker,
@@ -485,11 +481,12 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup, logg
 
 // validateAndGetSnapshotLocations gets a collection of VolumeSnapshotLocation objects that
 // this backup will use (returned as a map of provider name -> VSL), and ensures:
-// - each location name in .spec.volumeSnapshotLocations exists as a location
-// - exactly 1 location per provider
-// - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
-//   is not explicitly specified for the provider (if there's only one location for the provider,
-//   it will automatically be used)
+//   - each location name in .spec.volumeSnapshotLocations exists as a location
+//   - exactly 1 location per provider
+//   - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
+//     is not explicitly specified for the provider (if there's only one location for the provider,
+//     it will automatically be used)
+//
 // if backup has snapshotVolume disabled then it returns empty VSL
 func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.Backup) (map[string]*velerov1api.VolumeSnapshotLocation, []string) {
 	errors := []string{}

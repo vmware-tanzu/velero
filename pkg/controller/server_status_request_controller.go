@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -51,7 +51,7 @@ type serverStatusRequestReconciler struct {
 	client         client.Client
 	ctx            context.Context
 	pluginRegistry PluginLister
-	clock          clock.Clock
+	clock          clocks.WithTickerAndDelayedExecution
 
 	log logrus.FieldLogger
 }
@@ -61,7 +61,7 @@ func NewServerStatusRequestReconciler(
 	client client.Client,
 	ctx context.Context,
 	pluginRegistry PluginLister,
-	clock clock.Clock,
+	clock clocks.WithTickerAndDelayedExecution,
 	log logrus.FieldLogger) *serverStatusRequestReconciler {
 	return &serverStatusRequestReconciler{
 		client:         client,

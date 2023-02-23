@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,7 +35,7 @@ import (
 // downloadRequestReconciler reconciles a DownloadRequest object
 type downloadRequestReconciler struct {
 	client kbclient.Client
-	clock  clock.Clock
+	clock  clocks.Clock
 	// use variables to refer to these functions so they can be
 	// replaced with fakes for testing.
 	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
@@ -47,7 +47,7 @@ type downloadRequestReconciler struct {
 // NewDownloadRequestReconciler initializes and returns downloadRequestReconciler struct.
 func NewDownloadRequestReconciler(
 	client kbclient.Client,
-	clock clock.Clock,
+	clock clocks.Clock,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,

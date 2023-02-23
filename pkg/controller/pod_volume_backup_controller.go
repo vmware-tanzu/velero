@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -50,7 +50,7 @@ var NewUploaderProviderFunc = provider.NewUploaderProvider
 type PodVolumeBackupReconciler struct {
 	Scheme           *runtime.Scheme
 	Client           client.Client
-	Clock            clock.Clock
+	Clock            clocks.WithTickerAndDelayedExecution
 	Metrics          *metrics.ServerMetrics
 	CredentialGetter *credentials.CredentialGetter
 	NodeName         string
@@ -299,7 +299,7 @@ func (r *PodVolumeBackupReconciler) NewBackupProgressUpdater(pvb *velerov1api.Po
 	return &BackupProgressUpdater{pvb, log, ctx, r.Client}
 }
 
-//UpdateProgress which implement ProgressUpdater interface to update pvb progress status
+// UpdateProgress which implement ProgressUpdater interface to update pvb progress status
 func (b *BackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
 	original := b.PodVolumeBackup.DeepCopy()
 	b.PodVolumeBackup.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
