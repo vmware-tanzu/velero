@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/test/e2e/pkg/client"
 )
 
 // TestClient contains different API clients that are in use throughout
