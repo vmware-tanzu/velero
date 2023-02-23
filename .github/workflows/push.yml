@@ -99,7 +99,7 @@ jobs:
     - name: Publish container image to GCR
       if: github.repository == 'vmware-tanzu/velero'
       run: |
-        sudo swapoff /swapfile
-        sudo rm -rf /swapfile
+        sudo swapoff -a
+        sudo rm -f /mnt/swapfile
         docker image prune -a --force
         REGISTRY=gcr.io/velero-gcp ./hack/docker-push.sh
