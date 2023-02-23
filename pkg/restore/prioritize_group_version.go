@@ -214,7 +214,7 @@ func userPriorityConfigMap() (*corev1.ConfigMap, error) {
 		return nil, errors.Wrap(err, "reading client config file")
 	}
 
-	fc := client.NewFactory("APIGroupVersionsRestore", "", cfg)
+	fc := client.NewFactory("APIGroupVersionsRestore", cfg)
 
 	kc, err := fc.KubeClient()
 	if err != nil {
