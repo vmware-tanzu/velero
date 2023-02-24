@@ -128,7 +128,7 @@ func configvSpherePlugin(cli TestClient) error {
 		"cluster_flavor":           "VANILLA",
 		"vsphere_secret_name":      vsphereSecret,
 		"vsphere_secret_namespace": VeleroCfg.VeleroNamespace,
-	})
+	}, nil)
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to create velero-vsphere-plugin-config configmap in %s namespace", VeleroCfg.VeleroNamespace)
 	}

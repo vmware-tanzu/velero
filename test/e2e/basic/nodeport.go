@@ -44,7 +44,7 @@ func (n *NodePort) Init() error {
 		FailedMSG: "Failed to restore with nodeport preservation",
 		Text:      fmt.Sprintf("Nodeport can be preserved or omit during restore"),
 	}
-	n.BackupName = "backup-label-selector-" + UUIDgen.String()
+	n.BackupName = "backup-nodeport-" + UUIDgen.String()
 	n.RestoreName = "restore-" + UUIDgen.String()
 	n.serviceName = "nginx-service-" + UUIDgen.String()
 	n.labels = map[string]string{"app": "nginx"}

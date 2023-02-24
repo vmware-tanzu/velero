@@ -61,7 +61,7 @@ func (n *ScheduleBackup) CreateResources() error {
 		})
 		configmaptName := n.NSBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, ns)
-		_, err := CreateConfigMap(n.Client.ClientGo, ns, configmaptName, nil)
+		_, err := CreateConfigMap(n.Client.ClientGo, ns, configmaptName, nil, nil)
 		Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", ns))
 		Expect(WaitForConfigMapComplete(n.Client.ClientGo, ns, configmaptName)).To(Succeed(),
 			fmt.Sprintf("ailed to ensure secret completion in namespace: %q", ns))

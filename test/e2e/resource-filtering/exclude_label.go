@@ -127,7 +127,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 	//Create Configmap: to be included
 	configmaptName := e.NSBaseName
 	fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
-	_, err = CreateConfigMap(e.Client.ClientGo, namespace, configmaptName, label1)
+	_, err = CreateConfigMap(e.Client.ClientGo, namespace, configmaptName, label1, nil)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create configmap in the namespace %q", namespace))
 	}
