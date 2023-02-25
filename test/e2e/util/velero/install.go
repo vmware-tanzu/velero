@@ -50,8 +50,9 @@ type installOptions struct {
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
+	KubectlGetInfo("date", []string{"-u"})
 	if veleroCfg.CloudProvider != "kind" {
-		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
+		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider\n")
 		veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
 	} else {
 		if veleroCfg.ObjectStoreProvider == "" {
@@ -104,7 +105,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
-
+	KubectlGetInfo("date", []string{"-u"})
 	return nil
 }
 
@@ -167,6 +168,7 @@ func clearupvSpherePluginConfig(c clientset.Interface, ns, secretName, configMap
 func installVeleroServer(ctx context.Context, cli string, options *installOptions) error {
 	args := []string{"install"}
 	namespace := "velero"
+	args = append(args, "--v", "4")
 	if len(options.Namespace) > 0 {
 		args = append(args, "--namespace", options.Namespace)
 		namespace = options.Namespace

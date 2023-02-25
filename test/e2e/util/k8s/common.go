@@ -355,3 +355,40 @@ func GetAllService(ctx context.Context) (string, error) {
 	}
 	return stdout, nil
 }
+
+func GetVeleroPodName(ctx context.Context) ([]string, error) {
+	// Example:
+	//    NAME                                  STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS             AGE
+	//    kibishii-data-kibishii-deployment-0   Bound    pvc-94b9fdf2-c30f-4a7b-87bf-06eadca0d5b6   1Gi        RWO            kibishii-storage-class   115s
+	cmds := []*common.OsCommandLine{}
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "pod", "-n", "velero"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{"velero"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func KubectlGetPodLog(ctx context.Context, podName, surfix string) error {
+	cmd := exec.CommandContext(ctx, "kubectl",
+		"logs", "-n", "velero", podName)
+	fmt.Printf("Kubectl logs = %v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Print(stderr)
+	err = common.WriteToFile(stdout, fmt.Sprintf("pod-%s-%s", podName, surfix))
+	fmt.Println(err)
+	return err
+}
