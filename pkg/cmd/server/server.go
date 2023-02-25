@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bombsimon/logrusr/v3"
+	logrusr "github.com/bombsimon/logrusr/v3"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	snapshotv1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
@@ -47,7 +47,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	clocks "k8s.io/utils/clock"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -665,50 +665,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	restoreControllerRunInfo := func() controllerRunInfo {
-		restorer, err := restore.NewKubernetesRestorer(
-			s.discoveryHelper,
-			client.NewDynamicFactory(s.dynamicClient),
-			s.config.restoreResourcePriorities,
-			s.kubeClient.CoreV1().Namespaces(),
-			podvolume.NewRestorerFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(), s.kubeClient, s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
-			s.config.podVolumeOperationTimeout,
-			s.config.resourceTerminatingTimeout,
-			s.logger,
-			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.kubeClient.CoreV1().RESTClient(),
-			s.credentialFileStore,
-			s.mgr.GetClient(),
-		)
-		cmd.CheckError(err)
-
-		restoreController := controller.NewRestoreController(
-			s.namespace,
-			s.sharedInformerFactory.Velero().V1().Restores(),
-			restorer,
-			s.mgr.GetClient(),
-			s.logger,
-			s.logLevel,
-			newPluginManager,
-			backupStoreGetter,
-			s.metrics,
-			s.config.formatFlag.Parse(),
-		)
-
-		return controllerRunInfo{
-			controller: restoreController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	// By far, PodVolumeBackup, PodVolumeRestore, BackupStorageLocation controllers
 	// are not included in --disable-controllers list.
 	// This is because of PVB and PVR are used by node agent DaemonSet,
 	// and BSL controller is mandatory for Velero to work.
 	enabledControllers := map[string]func() controllerRunInfo{
-		controller.Backup:  backupControllerRunInfo,
-		controller.Restore: restoreControllerRunInfo,
+		controller.Backup: backupControllerRunInfo,
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
@@ -719,6 +681,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.BackupDeletion:      {},
 		controller.GarbageCollection:   {},
 		controller.BackupSync:          {},
+		controller.Restore:             {},
 	}
 
 	if s.config.restoreOnly {
@@ -815,7 +778,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.mgr.GetClient(),
 			s.ctx,
 			s.pluginRegistry,
-			clocks.RealClock{},
+			clock.RealClock{},
 			s.logger,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
@@ -825,7 +788,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
 		r := controller.NewDownloadRequestReconciler(
 			s.mgr.GetClient(),
-			clocks.RealClock{},
+			clock.RealClock{},
 			newPluginManager,
 			backupStoreGetter,
 			s.logger,
@@ -858,6 +821,43 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient(), s.config.garbageCollectionFrequency)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.GarbageCollection)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.Restore]; ok {
+		restorer, err := restore.NewKubernetesRestorer(
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			s.config.restoreResourcePriorities,
+			s.kubeClient.CoreV1().Namespaces(),
+			podvolume.NewRestorerFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(), s.kubeClient, s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
+			s.config.podVolumeOperationTimeout,
+			s.config.resourceTerminatingTimeout,
+			s.logger,
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			s.kubeClient.CoreV1().RESTClient(),
+			s.credentialFileStore,
+			s.mgr.GetClient(),
+		)
+
+		cmd.CheckError(err)
+
+		r := controller.NewRestoreReconciler(
+			s.ctx,
+			s.namespace,
+			restorer,
+			s.mgr.GetClient(),
+			s.logger,
+			s.logLevel,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			s.config.formatFlag.Parse(),
+		)
+
+		if err = r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "fail to create controller", "controller", controller.Restore)
 		}
 	}
 
