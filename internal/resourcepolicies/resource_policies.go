@@ -30,6 +30,10 @@ type ResourcePolicies struct {
 	// OtherResourcePolicies: []OtherResourcePolicy
 }
 
+type ResourcePolicyMatcher interface {
+	Match(res interface{}, actionType string) bool
+}
+
 type VolumePolicyMatcherImpl struct {
 	policy      *VolumePolicy
 	matcherFunc func(volume interface{}, actionType string) bool
