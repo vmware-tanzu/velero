@@ -84,6 +84,7 @@ type backupReconciler struct {
 	defaultVolumesToFsBackup    bool
 	defaultBackupTTL            time.Duration
 	defaultCSISnapshotTimeout   time.Duration
+	resourceTimeout             time.Duration
 	defaultItemOperationTimeout time.Duration
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
@@ -107,6 +108,7 @@ func NewBackupReconciler(
 	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
 	defaultCSISnapshotTimeout time.Duration,
+	resourceTimeout time.Duration,
 	defaultItemOperationTimeout time.Duration,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -131,6 +133,7 @@ func NewBackupReconciler(
 		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
 		defaultBackupTTL:            defaultBackupTTL,
 		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
+		resourceTimeout:             resourceTimeout,
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
 		metrics:                     metrics,
@@ -1057,7 +1060,7 @@ func (b *backupReconciler) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 // Set VolumeSnapshotRef's UID to nil will let the csi-controller finds out the related VS is gone, then
 // VSC can be deleted.
 func (b *backupReconciler) recreateVolumeSnapshotContent(vsc snapshotv1api.VolumeSnapshotContent) error {
-	timeout := 1 * time.Minute
+	timeout := b.resourceTimeout
 	interval := 1 * time.Second
 
 	err := b.kbClient.Delete(context.TODO(), &vsc)

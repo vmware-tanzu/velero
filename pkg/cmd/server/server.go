@@ -103,6 +103,8 @@ const (
 	defaultCSISnapshotTimeout   = 10 * time.Minute
 	defaultItemOperationTimeout = 60 * time.Minute
 
+	resourceTimeout = 10 * time.Minute
+
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
@@ -113,7 +115,7 @@ type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
 	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
-	defaultItemOperationTimeout                                             time.Duration
+	defaultItemOperationTimeout, resourceTimeout                            time.Duration
 	restoreResourcePriorities                                               restore.Priorities
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -148,6 +150,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultBackupTTL:               defaultBackupTTL,
 			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
 			defaultItemOperationTimeout:    defaultItemOperationTimeout,
+			resourceTimeout:                resourceTimeout,
 			storeValidationFrequency:       defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
@@ -227,6 +230,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().BoolVar(&config.defaultVolumesToFsBackup, "default-volumes-to-fs-backup", config.defaultVolumesToFsBackup, "Backup all volumes with pod volume file system backup by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
 	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out.")
+	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 
 	return command
 }
@@ -568,7 +572,7 @@ func (s *server) initRepoManager() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger)
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
 
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
@@ -736,6 +740,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultVolumesToFsBackup,
 			s.config.defaultBackupTTL,
 			s.config.defaultCSISnapshotTimeout,
+			s.config.resourceTimeout,
 			s.config.defaultItemOperationTimeout,
 			defaultVolumeSnapshotLocations,
 			s.metrics,
@@ -863,6 +868,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			),
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
+			s.config.resourceTimeout,
 			s.logger,
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.kubeClient.CoreV1().RESTClient(),
