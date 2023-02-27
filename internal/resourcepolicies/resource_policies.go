@@ -30,16 +30,16 @@ type ResourcePolicies struct {
 	// OtherResourcePolicies: []OtherResourcePolicy
 }
 
-type ResourcePolicyMatcher interface {
+type resourcePolicyMatcher interface {
 	Match(res interface{}, actionType string) bool
 }
 
-type VolumePolicyMatcherImpl struct {
+type volumePolicyMatcherImpl struct {
 	policy      *VolumePolicy
 	matcherFunc func(volume interface{}, actionType string) bool
 }
 
-func (v *VolumePolicyMatcherImpl) Match(volume interface{}, actionType string) bool {
+func (v *volumePolicyMatcherImpl) Match(volume interface{}, actionType string) bool {
 	return v.matcherFunc(volume, actionType)
 }
 
@@ -49,41 +49,41 @@ func (policy *VolumePolicy) Match(volume interface{}, actionType string) bool {
 	if !ok {
 		return false
 	}
-	matcher := PolicyConditionsMatcher{}
+	matcher := policyConditionsMatcher{}
 	matcher.addPolicy(policy)
 	return matcher.Match(val) == policy.Action.Type
 }
 
-func NewVolumePolicyMatcher(policy *VolumePolicy) ResourcePolicyMatcher {
-	return &VolumePolicyMatcherImpl{
+func newVolumePolicyMatcher(policy *VolumePolicy) resourcePolicyMatcher {
+	return &volumePolicyMatcherImpl{
 		policy:      policy,
 		matcherFunc: policy.Match,
 	}
 }
 
-type ResourcePoliciesMatcherFactory struct {
-	volumeMatchers []ResourcePolicyMatcher
+type resourcePoliciesMatcherFactory struct {
+	volumeMatchers []resourcePolicyMatcher
 	// could extended by add other policy matcher
-	// otherResourceMatchers   []ResourcePolicyMatcher
+	// otherResourceMatchers   []resourcePolicyMatcher
 }
 
-func (r *ResourcePoliciesMatcherFactory) AddVolumePolicyMatcher(volumePolicy []VolumePolicy) {
+func (r *resourcePoliciesMatcherFactory) addVolumePolicyMatcher(volumePolicy []VolumePolicy) {
 	for k := range volumePolicy {
-		matcher := NewVolumePolicyMatcher(&volumePolicy[k])
+		matcher := newVolumePolicyMatcher(&volumePolicy[k])
 		r.volumeMatchers = append(r.volumeMatchers, matcher)
 	}
 }
 
-func NewResourcePoliciesMatcherFactory(policies *ResourcePolicies) *ResourcePoliciesMatcherFactory {
-	factory := &ResourcePoliciesMatcherFactory{}
-	factory.AddVolumePolicyMatcher(policies.VolumePolicies)
+func newResourcePoliciesMatcherFactory(policies *ResourcePolicies) *resourcePoliciesMatcherFactory {
+	factory := &resourcePoliciesMatcherFactory{}
+	factory.addVolumePolicyMatcher(policies.VolumePolicies)
 	// TODO we can add other policy matcher into the factory
 	// factory.AddOtherResourcePolicyMatcher(policies.OtherResourcePolicies)
 	return factory
 }
 
-// GetMatchers return related resource policy matcher
-func (r *ResourcePoliciesMatcherFactory) GetMatchers(resourceType string) []ResourcePolicyMatcher {
+// getMatchers return related resource policy matcher
+func (r *resourcePoliciesMatcherFactory) getMatchers(resourceType string) []resourcePolicyMatcher {
 	switch resourceType {
 	case "volume":
 		return r.volumeMatchers
@@ -104,8 +104,8 @@ func LoadResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 // GetVolumeMatchedAction checks the current volume is match resource policies
 // It will return once matched ignoring the latter policies
 func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume, actionType string) string {
-	factory := NewResourcePoliciesMatcherFactory(policies)
-	matchers := factory.GetMatchers("volume")
+	factory := newResourcePoliciesMatcherFactory(policies)
+	matchers := factory.getMatchers("volume")
 
 	for _, matcher := range matchers {
 		if matcher.Match(volume, actionType) {

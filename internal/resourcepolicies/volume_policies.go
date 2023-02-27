@@ -10,24 +10,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type VolumePolicier struct {
+type volumePolicier struct {
 	action        Action
-	volConditions []VolumeCondition
+	volConditions []volumeCondition
 }
 
-type VolumeCondition interface {
+type volumeCondition interface {
 	Validate() (bool, error)
 	Match(v *StructuredVolume) bool
 }
 
-type ConditionsMatcher interface {
-	Validate() (bool, error)
-	// return matched action type
-	Match(v *StructuredVolume) string
-}
-
-type PolicyConditionsMatcher struct {
-	policies []*VolumePolicier
+type policyConditionsMatcher struct {
+	policies []*volumePolicier
 }
 
 // Capacity consist of the lower and upper boundary
@@ -36,53 +30,26 @@ type Capacity struct {
 	upper resource.Quantity
 }
 
-func SetCapacity(lower resource.Quantity, upper resource.Quantity) *Capacity {
-	return &Capacity{lower: lower, upper: upper}
-}
-
-func (c *Capacity) GetLowerCapacity() *resource.Quantity {
-	return &c.lower
-}
-
-func (c *Capacity) GetUpperCapacity() *resource.Quantity {
-	return &c.upper
-}
-
 type StructuredVolume struct {
 	capacity     resource.Quantity
 	storageClass string
 	nfs          *struct{}
-	csi          *CSIVolumeSource
+	csi          *csiVolumeSource
 }
 
-func SetStructuredVolume(capacity resource.Quantity, sc string, nfs *struct{}, csi *CSIVolumeSource) *StructuredVolume {
-	return &StructuredVolume{
-		capacity:     capacity,
-		storageClass: sc,
-		nfs:          nfs,
-		csi:          csi,
-	}
-}
-
-type CapacityCondition struct {
+type capacityCondition struct {
 	capacity Capacity
 }
 
-func (c *CapacityCondition) Match(v *StructuredVolume) bool {
-	return c.capacity.IsInRange(v.capacity)
+func (c *capacityCondition) Match(v *StructuredVolume) bool {
+	return c.capacity.isInRange(v.capacity)
 }
 
-type StorageClassCondition struct {
+type storageClassCondition struct {
 	storageClass []string
 }
 
-func SetStorageClassCondition(sc []string) *StorageClassCondition {
-	return &StorageClassCondition{
-		storageClass: sc,
-	}
-}
-
-func (s *StorageClassCondition) Match(v *StructuredVolume) bool {
+func (s *storageClassCondition) Match(v *StructuredVolume) bool {
 	if len(s.storageClass) == 0 {
 		return true
 	} else if v.storageClass == "" {
@@ -99,15 +66,11 @@ func (s *StorageClassCondition) Match(v *StructuredVolume) bool {
 	return false
 }
 
-type NFSCondition struct {
+type nfsCondition struct {
 	nfs *struct{}
 }
 
-func SetNFSCondition(nfs *struct{}) *NFSCondition {
-	return &NFSCondition{nfs: nfs}
-}
-
-func (c *NFSCondition) Match(v *StructuredVolume) bool {
+func (c *nfsCondition) Match(v *StructuredVolume) bool {
 	if c.nfs == nil {
 		return true
 	} else if v.nfs != nil {
@@ -116,15 +79,11 @@ func (c *NFSCondition) Match(v *StructuredVolume) bool {
 	return false
 }
 
-type CSICondition struct {
-	csi *CSIVolumeSource
+type csiCondition struct {
+	csi *csiVolumeSource
 }
 
-func SetCSICondition(csi *CSIVolumeSource) *CSICondition {
-	return &CSICondition{csi: csi}
-}
-
-func (c *CSICondition) Match(v *StructuredVolume) bool {
+func (c *csiCondition) Match(v *StructuredVolume) bool {
 	if c.csi == nil {
 		return true
 	} else if v.csi != nil {
@@ -133,7 +92,7 @@ func (c *CSICondition) Match(v *StructuredVolume) bool {
 	return false
 }
 
-func (p *PolicyConditionsMatcher) Match(v *StructuredVolume) string {
+func (p *policyConditionsMatcher) Match(v *StructuredVolume) string {
 	for _, policy := range p.policies {
 		for _, con := range policy.volConditions {
 			isMatch := con.Match(v)
@@ -145,28 +104,28 @@ func (p *PolicyConditionsMatcher) Match(v *StructuredVolume) string {
 	return ""
 }
 
-func (p *PolicyConditionsMatcher) addPolicy(vp *VolumePolicy) error {
-	con, err := UnmarshalVolConditions(vp.Conditions)
+func (p *policyConditionsMatcher) addPolicy(vp *VolumePolicy) error {
+	con, err := unmarshalVolConditions(vp.Conditions)
 	if err != nil {
 		return errors.Wrap(err, "failed to unmarshl volume conditions")
 	}
 
-	volCap, err := ParseCapacity(con.Capacity)
+	volCap, err := parseCapacity(con.Capacity)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse condition capacity %s", con.Capacity)
 	}
-	newPolicy := &VolumePolicier{}
+	newPolicy := &volumePolicier{}
 	newPolicy.action = vp.Action
-	newPolicy.volConditions = append(newPolicy.volConditions, &CapacityCondition{capacity: *volCap})
-	newPolicy.volConditions = append(newPolicy.volConditions, &StorageClassCondition{storageClass: con.StorageClass})
-	newPolicy.volConditions = append(newPolicy.volConditions, &NFSCondition{nfs: con.NFS})
-	newPolicy.volConditions = append(newPolicy.volConditions, &CSICondition{csi: con.CSI})
+	newPolicy.volConditions = append(newPolicy.volConditions, &capacityCondition{capacity: *volCap})
+	newPolicy.volConditions = append(newPolicy.volConditions, &storageClassCondition{storageClass: con.StorageClass})
+	newPolicy.volConditions = append(newPolicy.volConditions, &nfsCondition{nfs: con.NFS})
+	newPolicy.volConditions = append(newPolicy.volConditions, &csiCondition{csi: con.CSI})
 	p.policies = append(p.policies, newPolicy)
 	return nil
 }
 
-// ParseCapacity parse string into capacity format
-func ParseCapacity(capacity string) (*Capacity, error) {
+// parseCapacity parse string into capacity format
+func parseCapacity(capacity string) (*Capacity, error) {
 	capacities := strings.Split(capacity, ",")
 	var quantities []resource.Quantity
 	if len(capacities) != 2 {
@@ -189,8 +148,8 @@ func ParseCapacity(capacity string) (*Capacity, error) {
 	return &Capacity{lower: quantities[0], upper: quantities[1]}, nil
 }
 
-// IsInRange returns true if the quantity y is in range of capacity, or it returns false
-func (c *Capacity) IsInRange(y resource.Quantity) bool {
+// isInRange returns true if the quantity y is in range of capacity, or it returns false
+func (c *Capacity) isInRange(y resource.Quantity) bool {
 	if c.lower.IsZero() && c.upper.Cmp(y) >= 0 {
 		// [0, a] y
 		return true
@@ -204,10 +163,10 @@ func (c *Capacity) IsInRange(y resource.Quantity) bool {
 	return false
 }
 
-// UnmarshalVolConditions parse map[string]interface{} into VolumeConditions format
+// unmarshalVolConditions parse map[string]interface{} into volumeConditions format
 // and validate key fields of the map.
-func UnmarshalVolConditions(con map[string]interface{}) (*VolumeConditions, error) {
-	volConditons := &VolumeConditions{}
+func unmarshalVolConditions(con map[string]interface{}) (*volumeConditions, error) {
+	volConditons := &volumeConditions{}
 	buffer := new(bytes.Buffer)
 	err := yaml.NewEncoder(buffer).Encode(con)
 	if err != nil {

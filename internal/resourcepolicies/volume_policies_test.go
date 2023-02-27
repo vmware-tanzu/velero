@@ -1,56 +1,67 @@
-package resourcepolicies_test
+package resourcepolicies
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	"github.com/zeebo/assert"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+func setStructuredVolume(capacity resource.Quantity, sc string, nfs *struct{}, csi *csiVolumeSource) *StructuredVolume {
+	return &StructuredVolume{
+		capacity:     capacity,
+		storageClass: sc,
+		nfs:          nfs,
+		csi:          csi,
+	}
+}
+
 func TestParseCapacity(t *testing.T) {
+	var emptyCapacity Capacity
 	tests := []struct {
 		input       string
-		expected    *resourcepolicies.Capacity
+		expected    Capacity
 		expectedErr error
 	}{
-		{"10Gi,20Gi", resourcepolicies.SetCapacity(*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)), nil},
-		{"10Gi,", resourcepolicies.SetCapacity(*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)), nil},
-		{"10Gi", nil, fmt.Errorf("wrong format of Capacity 10Gi")},
-		{"", nil, fmt.Errorf("wrong format of Capacity ")},
+		{"10Gi,20Gi", Capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(20<<30, resource.BinarySI)}, nil},
+		{"10Gi,", Capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(0, resource.DecimalSI)}, nil},
+		{"10Gi", emptyCapacity, fmt.Errorf("wrong format of Capacity 10Gi")},
+		{"", emptyCapacity, fmt.Errorf("wrong format of Capacity")},
 	}
 
 	for _, test := range tests {
 		test := test // capture range variable
 		t.Run(test.input, func(t *testing.T) {
-			actual, actualErr := resourcepolicies.ParseCapacity(test.input)
-			if test.expected != nil {
-				assert.Equal(t, test.expected.GetLowerCapacity().Cmp(*actual.GetLowerCapacity()), 0)
-				assert.Equal(t, test.expected.GetUpperCapacity().Cmp(*actual.GetUpperCapacity()), 0)
+			actual, actualErr := parseCapacity(test.input)
+			if test.expected != emptyCapacity {
+				assert.Equal(t, test.expected.lower.Cmp(actual.lower), 0)
+				assert.Equal(t, test.expected.upper.Cmp(actual.upper), 0)
 			}
-			assert.Equal(t, test.expectedErr, actualErr)
+			if test.expectedErr == nil {
+				assert.Equal(t, nil, actualErr)
+			}
 		})
 	}
 }
 
-func TestCapacity_IsInRange(t *testing.T) {
+func TestCapacityIsInRange(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		capacity  *resourcepolicies.Capacity
+		capacity  *Capacity
 		quantity  resource.Quantity
 		isInRange bool
 	}{
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)), *resource.NewQuantity(5<<30, resource.BinarySI), true},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)), *resource.NewQuantity(15<<30, resource.BinarySI), false},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)), *resource.NewQuantity(25<<30, resource.BinarySI), true},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)), *resource.NewQuantity(15<<30, resource.BinarySI), false},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)), *resource.NewQuantity(15<<30, resource.BinarySI), true},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)), *resource.NewQuantity(5<<30, resource.BinarySI), false},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)), *resource.NewQuantity(25<<30, resource.BinarySI), false},
-		{resourcepolicies.SetCapacity(*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(0, resource.BinarySI)), *resource.NewQuantity(5<<30, resource.BinarySI), true},
+		{&Capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), true},
+		{&Capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)}, *resource.NewQuantity(15<<30, resource.BinarySI), false},
+		{&Capacity{*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)}, *resource.NewQuantity(25<<30, resource.BinarySI), true},
+		{&Capacity{*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)}, *resource.NewQuantity(15<<30, resource.BinarySI), false},
+		{&Capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(15<<30, resource.BinarySI), true},
+		{&Capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), false},
+		{&Capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(25<<30, resource.BinarySI), false},
+		{&Capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(0, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), true},
 	}
 
 	for _, test := range tests {
@@ -58,7 +69,7 @@ func TestCapacity_IsInRange(t *testing.T) {
 		t.Run(fmt.Sprintf("%v with %v", test.capacity, test.quantity), func(t *testing.T) {
 			t.Parallel()
 
-			actual := test.capacity.IsInRange(test.quantity)
+			actual := test.capacity.isInRange(test.quantity)
 
 			assert.Equal(t, test.isInRange, actual)
 
@@ -69,38 +80,38 @@ func TestCapacity_IsInRange(t *testing.T) {
 func TestStorageClassConditionMatch(t *testing.T) {
 	tests := []struct {
 		name          string
-		condition     *resourcepolicies.StorageClassCondition
-		volume        *resourcepolicies.StructuredVolume
+		condition     *storageClassCondition
+		volume        *StructuredVolume
 		expectedMatch bool
 	}{
 		{
 			name:          "match single storage class",
-			condition:     resourcepolicies.SetStorageClassCondition([]string{"gp2"}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil),
+			condition:     &storageClassCondition{[]string{"gp2"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "match multiple storage classes",
-			condition:     resourcepolicies.SetStorageClassCondition([]string{"gp2", "ebs-sc"}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil),
+			condition:     &storageClassCondition{[]string{"gp2", "ebs-sc"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "mismatch storage class",
-			condition:     resourcepolicies.SetStorageClassCondition([]string{"gp2"}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil),
+			condition:     &storageClassCondition{[]string{"gp2"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil),
 			expectedMatch: false,
 		},
 		{
 			name:          "empty storage class",
-			condition:     resourcepolicies.SetStorageClassCondition([]string{}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil),
+			condition:     &storageClassCondition{[]string{}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty volume storage class",
-			condition:     resourcepolicies.SetStorageClassCondition([]string{"gp2"}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
+			condition:     &storageClassCondition{[]string{"gp2"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
 			expectedMatch: false,
 		},
 	}
@@ -115,30 +126,30 @@ func TestStorageClassConditionMatch(t *testing.T) {
 	}
 }
 
-func TestNFSCondition_Match(t *testing.T) {
+func TestNFSConditionMatch(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		condition     *resourcepolicies.NFSCondition
-		volume        *resourcepolicies.StructuredVolume
+		condition     *nfsCondition
+		volume        *StructuredVolume
 		expectedMatch bool
 	}{
 		{
-			name:          "match nfs conditon",
-			condition:     resourcepolicies.SetNFSCondition(&struct{}{}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &struct{}{}, nil),
+			name:          "match nfs condition",
+			condition:     &nfsCondition{&struct{}{}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &struct{}{}, nil),
 			expectedMatch: true,
 		},
 		{
-			name:          "emtpy nfs condition",
-			condition:     resourcepolicies.SetNFSCondition(nil),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &struct{}{}, nil),
+			name:          "empty nfs condition",
+			condition:     &nfsCondition{nil},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &struct{}{}, nil),
 			expectedMatch: true,
 		},
 		{
-			name:          "emtpy nfs volume",
-			condition:     resourcepolicies.SetNFSCondition(&struct{}{}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
+			name:          "empty nfs volume",
+			condition:     &nfsCondition{&struct{}{}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
 			expectedMatch: false,
 		},
 	}
@@ -152,30 +163,30 @@ func TestNFSCondition_Match(t *testing.T) {
 	}
 }
 
-func TestCSICondition_Match(t *testing.T) {
+func TestCSIConditionMatch(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		condition     *resourcepolicies.CSICondition
-		volume        *resourcepolicies.StructuredVolume
+		condition     *csiCondition
+		volume        *StructuredVolume
 		expectedMatch bool
 	}{
 		{
-			name:          "match csi conditon",
-			condition:     resourcepolicies.SetCSICondition(&resourcepolicies.CSIVolumeSource{Driver: "test"}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &resourcepolicies.CSIVolumeSource{Driver: "test"}),
+			name:          "match csi condition",
+			condition:     &csiCondition{&csiVolumeSource{driver: "test"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{driver: "test"}),
 			expectedMatch: true,
 		},
 		{
-			name:          "empty csi conditon",
-			condition:     resourcepolicies.SetCSICondition(nil),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &resourcepolicies.CSIVolumeSource{Driver: "test"}),
+			name:          "empty csi condition",
+			condition:     &csiCondition{nil},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{driver: "test"}),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi volume",
-			condition:     resourcepolicies.SetCSICondition(&resourcepolicies.CSIVolumeSource{Driver: "test"}),
-			volume:        resourcepolicies.SetStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &resourcepolicies.CSIVolumeSource{}),
+			condition:     &csiCondition{&csiVolumeSource{driver: "test"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{}),
 			expectedMatch: false,
 		},
 	}
@@ -203,8 +214,8 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 					"gp2",
 					"ebs-sc",
 				},
-				"csi": &resourcepolicies.CSIVolumeSource{
-					Driver: "aws.efs.csi.driver",
+				"csi": &csiVolumeSource{
+					driver: "aws.efs.csi.driver",
 				},
 			},
 			expectedError: "",
@@ -228,7 +239,7 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 			input: map[string]interface{}{
 				"csi": "csi.driver",
 			},
-			expectedError: "str `csi.driver` into resourcepolicies.CSIVolumeSource",
+			expectedError: "str `csi.driver` into resourcepolicies.csiVolumeSource",
 		},
 		{
 			name: "Invalid input: unknown field",
@@ -241,7 +252,7 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := resourcepolicies.UnmarshalVolConditions(tc.input)
+			_, err := unmarshalVolConditions(tc.input)
 			if tc.expectedError != "" {
 				if err == nil {
 					t.Errorf("Expected error '%s', but got nil", tc.expectedError)

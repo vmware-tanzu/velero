@@ -10,19 +10,19 @@ import (
 
 const currentSupportDataVersion = "v1"
 
-type CSIVolumeSource struct {
+type csiVolumeSource struct {
 	driver string `yaml:"driver"`
 }
 
-// VolumeConditions defined the current format of conditions we parsed
-type VolumeConditions struct {
+// volumeConditions defined the current format of conditions we parsed
+type volumeConditions struct {
 	Capacity     string           `yaml:"capacity,omitempty"`
 	StorageClass []string         `yaml:"storageClass,omitempty"`
 	NFS          *struct{}        `yaml:"nfs,omitempty"`
-	CSI          *CSIVolumeSource `yaml:"csi,omitempty"`
+	CSI          *csiVolumeSource `yaml:"csi,omitempty"`
 }
 
-func (p *PolicyConditionsMatcher) Validate() (bool, error) {
+func (p *policyConditionsMatcher) Validate() (bool, error) {
 	for _, policy := range p.policies {
 		for _, con := range policy.volConditions {
 			valid, err := con.Validate()
@@ -38,7 +38,7 @@ func (p *PolicyConditionsMatcher) Validate() (bool, error) {
 	return true, nil
 }
 
-func (c *CapacityCondition) Validate() (bool, error) {
+func (c *capacityCondition) Validate() (bool, error) {
 	// [0, a]
 	// [a, b]
 	// [b, 0]
@@ -51,18 +51,18 @@ func (c *CapacityCondition) Validate() (bool, error) {
 	}
 }
 
-func (s *StorageClassCondition) Validate() (bool, error) {
-	// validate by yaml.v3
+func (s *storageClassCondition) Validate() (bool, error) {
+	// validate by yamlv3
 	return true, nil
 }
 
-func (c *NFSCondition) Validate() (bool, error) {
-	// validate by yaml.v3
+func (c *nfsCondition) Validate() (bool, error) {
+	// validate by yamlv3
 	return true, nil
 }
 
-func (c *CSICondition) Validate() (bool, error) {
-	// validate by yaml.v3
+func (c *csiCondition) Validate() (bool, error) {
+	// validate by yamlv3
 	return true, nil
 }
 
@@ -94,12 +94,12 @@ func Validate(yamlData *string) (bool, error) {
 		return false, fmt.Errorf("incompatible version number %s with supported version %s", resPolicies.Version, currentSupportDataVersion)
 	}
 
-	matcher := PolicyConditionsMatcher{}
+	matcher := policyConditionsMatcher{}
 	for k := range resPolicies.VolumePolicies {
 		if ok, err := resPolicies.VolumePolicies[k].Action.Validate(); !ok {
 			return false, errors.Wrap(err, "failed to validate config")
 		}
-		_, err := UnmarshalVolConditions(resPolicies.VolumePolicies[k].Conditions) // validate keys by yamlv3
+		_, err := unmarshalVolConditions(resPolicies.VolumePolicies[k].Conditions) // validate keys by yamlv3
 		if err != nil {
 			return false, err
 		}
