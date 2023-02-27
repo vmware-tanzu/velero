@@ -20,45 +20,60 @@ import (
 	"fmt"
 
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // pvcSnapshotTracker keeps track of persistent volume claims that have been snapshotted
 // with pod volume backup.
 type pvcSnapshotTracker struct {
-	pvcs sets.String
+	pvcs map[string]pvcSnapshotStatus
+}
+
+type pvcSnapshotStatus struct {
+	taken bool
 }
 
 func newPVCSnapshotTracker() *pvcSnapshotTracker {
 	return &pvcSnapshotTracker{
-		pvcs: sets.NewString(),
+		pvcs: make(map[string]pvcSnapshotStatus),
 	}
 }
 
-// Track takes a pod and a list of volumes from that pod that were snapshotted, and
-// tracks each snapshotted volume that's a PVC.
-func (t *pvcSnapshotTracker) Track(pod *corev1api.Pod, snapshottedVolumes []string) {
-	for _, volumeName := range snapshottedVolumes {
-		// if the volume is a PVC, track it
-		for _, volume := range pod.Spec.Volumes {
-			if volume.Name == volumeName {
-				if volume.PersistentVolumeClaim != nil {
-					t.pvcs.Insert(key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName))
+// Track indicates a volume from a pod should be snapshotted by pod volume backup.
+func (t *pvcSnapshotTracker) Track(pod *corev1api.Pod, volumeName string) {
+	// if the volume is a PVC, track it
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == volumeName {
+			if volume.PersistentVolumeClaim != nil {
+				if _, ok := t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)]; !ok {
+					t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = pvcSnapshotStatus{false}
 				}
-				break
 			}
+			break
+		}
+	}
+}
+
+// Take indicates a volume from a pod has been taken by pod volume backup.
+func (t *pvcSnapshotTracker) Take(pod *corev1api.Pod, volumeName string) {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == volumeName {
+			if volume.PersistentVolumeClaim != nil {
+				t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = pvcSnapshotStatus{true}
+			}
+			break
 		}
 	}
 }
 
 // Has returns true if the PVC with the specified namespace and name has been tracked.
 func (t *pvcSnapshotTracker) Has(namespace, name string) bool {
-	return t.pvcs.Has(key(namespace, name))
+	_, found := t.pvcs[key(namespace, name)]
+	return found
 }
 
-// HasPVCForPodVolume returns true and the PVC's name if the pod volume with the specified name uses a
-// PVC and that PVC has been tracked.
-func (t *pvcSnapshotTracker) HasPVCForPodVolume(pod *corev1api.Pod, volume string) (bool, string) {
+// TakenForPodVolume returns true and the PVC's name if the pod volume with the specified name uses a
+// PVC and that PVC has been taken by pod volume backup.
+func (t *pvcSnapshotTracker) TakenForPodVolume(pod *corev1api.Pod, volume string) (bool, string) {
 	for _, podVolume := range pod.Spec.Volumes {
 		if podVolume.Name != volume {
 			continue
@@ -68,7 +83,12 @@ func (t *pvcSnapshotTracker) HasPVCForPodVolume(pod *corev1api.Pod, volume strin
 			return false, ""
 		}
 
-		if !t.pvcs.Has(key(pod.Namespace, podVolume.PersistentVolumeClaim.ClaimName)) {
+		status, found := t.pvcs[key(pod.Namespace, podVolume.PersistentVolumeClaim.ClaimName)]
+		if !found {
+			return false, ""
+		}
+
+		if !status.taken {
 			return false, ""
 		}
 
