@@ -30,14 +30,22 @@ type PolicyConditionsMatcher struct {
 	policies []*VolumePolicier
 }
 
-type ResourcePolicyMatcher interface {
-	Match(res interface{}, actionType string) bool
-}
-
 // Capacity consist of the lower and upper boundary
 type Capacity struct {
 	lower resource.Quantity
 	upper resource.Quantity
+}
+
+func SetCapacity(lower resource.Quantity, upper resource.Quantity) *Capacity {
+	return &Capacity{lower: lower, upper: upper}
+}
+
+func (c *Capacity) GetLowerCapacity() *resource.Quantity {
+	return &c.lower
+}
+
+func (c *Capacity) GetUpperCapacity() *resource.Quantity {
+	return &c.upper
 }
 
 type StructuredVolume struct {
@@ -57,6 +65,12 @@ func (c *CapacityCondition) Match(v *StructuredVolume) bool {
 
 type StorageClassCondition struct {
 	storageClass []string
+}
+
+func SetStorageClassCondition(sc []string) *StorageClassCondition {
+	return &StorageClassCondition{
+		storageClass: sc,
+	}
 }
 
 func (s *StorageClassCondition) Match(v *StructuredVolume) bool {
@@ -80,6 +94,10 @@ type NFSCondition struct {
 	nfs *struct{}
 }
 
+func SetNFSCondition(nfs *struct{}) *NFSCondition {
+	return &NFSCondition{nfs: nfs}
+}
+
 func (c *NFSCondition) Match(v *StructuredVolume) bool {
 	if c.nfs == nil {
 		return true
@@ -91,6 +109,10 @@ func (c *NFSCondition) Match(v *StructuredVolume) bool {
 
 type CSICondition struct {
 	csi *CSIVolumeSource
+}
+
+func SetCSICondition(csi *CSIVolumeSource) *CSICondition {
+	return &CSICondition{csi: csi}
 }
 
 func (c *CSICondition) Match(v *StructuredVolume) bool {
@@ -168,7 +190,7 @@ func (c *Capacity) IsInRange(y resource.Quantity) bool {
 		return true
 	} else if !c.lower.IsZero() && !c.upper.IsZero() {
 		// [a, b] y
-		return c.lower.Cmp(y) >= 0 && c.upper.Cmp(y) <= 0
+		return c.lower.Cmp(y) <= 0 && c.upper.Cmp(y) >= 0
 	}
 	return false
 }
@@ -176,15 +198,15 @@ func (c *Capacity) IsInRange(y resource.Quantity) bool {
 // UnmarshalVolConditions parse map[string]interface{} into VolumeConditions format
 // and validate key fields of the map.
 func UnmarshalVolConditions(con map[string]interface{}) (*VolumeConditions, error) {
-	var volConditons *VolumeConditions
+	volConditons := &VolumeConditions{}
 	buffer := new(bytes.Buffer)
 	err := yaml.NewEncoder(buffer).Encode(con)
 	if err != nil {
-		return volConditons, fmt.Errorf("failed to encode volume conditions with err %v", err)
+		return nil, errors.Wrap(err, "failed to encode volume conditions")
 	}
 
 	if err := decodeStruct(buffer, volConditons); err != nil {
-		return nil, fmt.Errorf("failed to decode volume conditions with err %v", err)
+		return nil, errors.Wrap(err, "failed to decode volume conditions")
 	}
 	return volConditons, nil
 }
