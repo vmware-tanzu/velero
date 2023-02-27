@@ -138,6 +138,8 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			// 	return errors.Wrapf(err, "Error get vSphere snapshot uploads")
 			// }
 		} else {
+			// wait for a period to confirm no snapshots exist for the backup
+			time.Sleep(5 * time.Minute)
 			if strings.EqualFold(veleroFeatures, "EnableCSI") {
 				_, err = GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 0,
 					kibishiiNamespace, backupName, KibishiiPodNameList)

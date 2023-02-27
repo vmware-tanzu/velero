@@ -1,0 +1,1 @@
+Fix Dependabot alerts. Use 1.18 and 1.19 golang instead of patch image in dockerfile. Add release-1.10 and release-1.9 in Trivy daily scan.

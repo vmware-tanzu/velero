@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	bld "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,7 +47,7 @@ type scheduleReconciler struct {
 	client.Client
 	namespace string
 	logger    logrus.FieldLogger
-	clock     clock.Clock
+	clock     clocks.WithTickerAndDelayedExecution
 	metrics   *metrics.ServerMetrics
 }
 
@@ -61,7 +61,7 @@ func NewScheduleReconciler(
 		Client:    client,
 		namespace: namespace,
 		logger:    logger,
-		clock:     clock.RealClock{},
+		clock:     clocks.RealClock{},
 		metrics:   metrics,
 	}
 }

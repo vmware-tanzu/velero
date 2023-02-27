@@ -94,7 +94,8 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.PodLabels, "pod-labels", "Labels to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "Annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
-	flags.StringVar(&o.ServiceAccountName, "service-account-name", o.ServiceAccountName, "ServiceAccountName to be set to the Velero and node agent pods, it should be created before the installation.  Optional, if this attribute is set, the default service account 'velero' will not be created, and the flag --sa-annotations will be disregarded.")
+	flags.StringVar(&o.ServiceAccountName, "service-account-name", o.ServiceAccountName, "ServiceAccountName to be set to the Velero and node agent pods, it should be created before the installation, and the user also needs to create the rolebinding for it."+
+		"  Optional, if this attribute is set, the default service account 'velero' will not be created, and the flag --sa-annotations will be disregarded.")
 	flags.StringVar(&o.VeleroPodCPURequest, "velero-pod-cpu-request", o.VeleroPodCPURequest, `CPU request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, `Memory request for Velero pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.VeleroPodCPULimit, "velero-pod-cpu-limit", o.VeleroPodCPULimit, `CPU limit for Velero pod. A value of "0" is treated as unbounded. Optional.`)

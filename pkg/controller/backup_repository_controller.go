@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,7 +50,7 @@ type BackupRepoReconciler struct {
 	client.Client
 	namespace            string
 	logger               logrus.FieldLogger
-	clock                clock.Clock
+	clock                clocks.WithTickerAndDelayedExecution
 	maintenanceFrequency time.Duration
 	repositoryManager    repository.Manager
 }
@@ -61,7 +61,7 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 		client,
 		namespace,
 		logger,
-		clock.RealClock{},
+		clocks.RealClock{},
 		maintenanceFrequency,
 		repositoryManager,
 	}

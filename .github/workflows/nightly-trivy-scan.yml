@@ -11,9 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         # maintain the versions of Velero those need security scan
-        versions: [main]
+        versions: [main, release-1.10-dev, release-1.9-dev]
         # list of images that need scan
-        images: [velero, velero-restore-helper]
+        images: [velero, velero-restore-helper, velero-restic-restore-helper]
     permissions:
       security-events: write  # for github/codeql-action/upload-sarif to upload SARIF results
 

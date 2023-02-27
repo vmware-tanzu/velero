@@ -115,3 +115,20 @@ func (f FalsePredicate) Update(event.UpdateEvent) bool {
 func (f FalsePredicate) Generic(event.GenericEvent) bool {
 	return false
 }
+
+func NewCreateEventPredicate(f func(client.Object) bool) predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(event event.CreateEvent) bool {
+			return f(event.Object)
+		},
+		DeleteFunc: func(event event.DeleteEvent) bool {
+			return false
+		},
+		GenericFunc: func(event event.GenericEvent) bool {
+			return false
+		},
+		UpdateFunc: func(event event.UpdateEvent) bool {
+			return false
+		},
+	}
+}
