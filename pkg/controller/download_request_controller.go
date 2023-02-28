@@ -121,7 +121,8 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		downloadRequest.Status.Expiration = &metav1.Time{Time: r.clock.Now().Add(persistence.DownloadURLTTL)}
 
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreLog ||
-			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResults {
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResults ||
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResourceList {
 			restore := &velerov1api.Restore{}
 			if err := r.client.Get(ctx, kbclient.ObjectKey{
 				Namespace: downloadRequest.Namespace,
