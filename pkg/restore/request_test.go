@@ -44,17 +44,17 @@ func TestResourceKey(t *testing.T) {
 
 func TestRestoredResourceList(t *testing.T) {
 	request := &Request{
-		RestoredItems: map[itemKey]string{
+		RestoredItems: map[itemKey]restoredItemStatus{
 			{
 				resource:  "v1/Namespace",
 				namespace: "",
 				name:      "default",
-			}: "created",
+			}: {action: "created"},
 			{
 				resource:  "v1/ConfigMap",
 				namespace: "default",
 				name:      "cm",
-			}: "skipped",
+			}: {action: "skipped"},
 		},
 	}
 
