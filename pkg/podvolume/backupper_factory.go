@@ -38,13 +38,15 @@ type BackupperFactory interface {
 	NewBackupper(context.Context, *velerov1api.Backup, string) (Backupper, error)
 }
 
-func NewBackupperFactory(repoLocker *repository.RepoLocker,
+func NewBackupperFactory(
+	repoLocker *repository.RepoLocker,
 	repoEnsurer *repository.RepositoryEnsurer,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
 	podClient corev1client.PodsGetter,
-	log logrus.FieldLogger) BackupperFactory {
+	log logrus.FieldLogger,
+) BackupperFactory {
 	return &backupperFactory{
 		repoLocker:   repoLocker,
 		repoEnsurer:  repoEnsurer,

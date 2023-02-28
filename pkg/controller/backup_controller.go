@@ -29,6 +29,8 @@ import (
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -59,7 +61,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
@@ -76,7 +77,7 @@ type backupReconciler struct {
 	discoveryHelper             discovery.Helper
 	backupper                   pkgbackup.Backupper
 	kbClient                    kbclient.Client
-	clock                       clock.Clock
+	clock                       clock.WithTickerAndDelayedExecution
 	backupLogLevel              logrus.Level
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker               BackupTracker
@@ -89,6 +90,8 @@ type backupReconciler struct {
 	metrics                     *metrics.ServerMetrics
 	backupStoreGetter           persistence.ObjectBackupStoreGetter
 	formatFlag                  logging.Format
+	volumeSnapshotLister        snapshotv1listers.VolumeSnapshotLister
+	volumeSnapshotClient        snapshotterClientSet.Interface
 	credentialFileStore         credentials.FileStore
 }
 
@@ -110,6 +113,8 @@ func NewBackupReconciler(
 	metrics *metrics.ServerMetrics,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	formatFlag logging.Format,
+	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
+	volumeSnapshotClient snapshotterClientSet.Interface,
 	credentialStore credentials.FileStore,
 ) *backupReconciler {
 
@@ -132,6 +137,8 @@ func NewBackupReconciler(
 		metrics:                     metrics,
 		backupStoreGetter:           backupStoreGetter,
 		formatFlag:                  formatFlag,
+		volumeSnapshotLister:        volumeSnapshotLister,
+		volumeSnapshotClient:        volumeSnapshotClient,
 		credentialFileStore:         credentialStore,
 	}
 	b.updateTotalBackupMetric()
@@ -145,24 +152,31 @@ func (b *backupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (b *backupReconciler) updateTotalBackupMetric() {
-	go wait.Until(b.resync, backupResyncPeriod, b.ctx.Done())
-}
+	go func() {
+		// Wait for 5 seconds to let controller-runtime to setup k8s clients.
+		time.Sleep(5 * time.Second)
 
-func (b *backupReconciler) resync() {
-	// recompute backup_total metric
-	backups := &velerov1api.BackupList{}
-	err := b.kbClient.List(context.Background(), backups, &kbclient.ListOptions{LabelSelector: labels.Everything()})
-	if err != nil {
-		b.logger.Error(err, "Error computing backup_total metric")
-	} else {
-		b.metrics.SetBackupTotal(int64(len(backups.Items)))
-	}
+		wait.Until(
+			func() {
+				// recompute backup_total metric
+				backups := &velerov1api.BackupList{}
+				err := b.kbClient.List(context.Background(), backups, &kbclient.ListOptions{LabelSelector: labels.Everything()})
+				if err != nil {
+					b.logger.Error(err, "Error computing backup_total metric")
+				} else {
+					b.metrics.SetBackupTotal(int64(len(backups.Items)))
+				}
 
-	// recompute backup_last_successful_timestamp metric for each
-	// schedule (including the empty schedule, i.e. ad-hoc backups)
-	for schedule, timestamp := range getLastSuccessBySchedule(backups.Items) {
-		b.metrics.SetBackupLastSuccessfulTimestamp(schedule, timestamp)
-	}
+				// recompute backup_last_successful_timestamp metric for each
+				// schedule (including the empty schedule, i.e. ad-hoc backups)
+				for schedule, timestamp := range getLastSuccessBySchedule(backups.Items) {
+					b.metrics.SetBackupLastSuccessfulTimestamp(schedule, timestamp)
+				}
+			},
+			backupResyncPeriod,
+			b.ctx.Done(),
+		)
+	}()
 }
 
 // getLastSuccessBySchedule finds the most recent completed backup for each schedule
@@ -241,7 +255,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// update status
-	if err := kube.PatchResource(original, request.Backup, b.kbClient); err != nil {
+	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
 	}
 	// store ref to just-updated item for creating patch
@@ -288,7 +302,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
 	log.Info("Updating backup's final status")
-	if err := kube.PatchResource(original, request.Backup, b.kbClient); err != nil {
+	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		log.WithError(err).Error("error updating backup's final status")
 	}
 	return ctrl.Result{}, nil
@@ -929,15 +943,15 @@ func (b *backupReconciler) waitVolumeSnapshotReadyToUse(ctx context.Context,
 	interval := 5 * time.Second
 	volumeSnapshots := make([]snapshotv1api.VolumeSnapshot, 0)
 
-	tmpVSs := &snapshotv1api.VolumeSnapshotList{}
-	err := b.kbClient.List(ctx, tmpVSs, &kbclient.ListOptions{LabelSelector: label.NewSelectorForBackup(backupName)})
-	if err != nil {
-		b.logger.Error(err)
-		return volumeSnapshots, err
-	}
-
-	for _, vs := range tmpVSs.Items {
-		volumeSnapshots = append(volumeSnapshots, vs)
+	if b.volumeSnapshotLister != nil {
+		tmpVSs, err := b.volumeSnapshotLister.List(label.NewSelectorForBackup(backupName))
+		if err != nil {
+			b.logger.Error(err)
+			return volumeSnapshots, err
+		}
+		for _, vs := range tmpVSs {
+			volumeSnapshots = append(volumeSnapshots, *vs)
+		}
 	}
 
 	vsChannel := make(chan snapshotv1api.VolumeSnapshot, len(volumeSnapshots))
@@ -969,7 +983,7 @@ func (b *backupReconciler) waitVolumeSnapshotReadyToUse(ctx context.Context,
 		})
 	}
 
-	err = eg.Wait()
+	err := eg.Wait()
 
 	result := make([]snapshotv1api.VolumeSnapshot, 0)
 	length := len(vsChannel)
@@ -1024,7 +1038,7 @@ func (b *backupReconciler) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 				logger.Debugf("Patching VolumeSnapshotContent %s", vsc.Name)
 				original := vsc.DeepCopy()
 				vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
-				err := kube.PatchResource(original, &vsc, b.kbClient)
+				err := kubeutil.PatchResource(original, &vsc, b.kbClient)
 				if err != nil {
 					logger.Errorf("fail to modify VolumeSnapshotContent %s DeletionPolicy to Retain: %s", vsc.Name, err.Error())
 					return

@@ -31,11 +31,13 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	snapshotv1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -63,7 +65,6 @@ import (
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -239,7 +240,6 @@ type server struct {
 	discoveryClient                     discovery.DiscoveryInterface
 	discoveryHelper                     velerodiscovery.Helper
 	dynamicClient                       dynamic.Interface
-	sharedInformerFactory               informers.SharedInformerFactory
 	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
 	csiSnapshotClient                   *snapshotv1client.Clientset
 	ctx                                 context.Context
@@ -354,7 +354,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		veleroClient:                        veleroClient,
 		discoveryClient:                     veleroClient.Discovery(),
 		dynamicClient:                       dynamicClient,
-		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
 		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
 		csiSnapshotClient:                   csiSnapClient,
 		ctx:                                 ctx,
@@ -570,6 +569,32 @@ func (s *server) initRepoManager() error {
 	return nil
 }
 
+func (s *server) getCSIVolumeSnapshotListers() snapshotv1listers.VolumeSnapshotLister {
+	// Make empty listers that will only be populated if CSI is properly enabled.
+	var vsLister snapshotv1listers.VolumeSnapshotLister
+	var err error
+
+	// If CSI is enabled, check for the CSI groups and generate the listers
+	// If CSI isn't enabled, return empty listers.
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
+		switch {
+		case apierrors.IsNotFound(err):
+			// CSI is enabled, but the required CRDs aren't installed, so halt.
+			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
+		case err == nil:
+			// CSI is enabled, and the resources were found.
+			// Instantiate the listers fully
+			s.logger.Debug("Creating CSI listers")
+			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
+			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshots().Lister()
+		case err != nil:
+			cmd.CheckError(err)
+		}
+	}
+	return vsLister
+}
+
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
 	s.logger.Info("Starting controllers")
 
@@ -637,7 +662,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	csiCacheSyncResults := s.csiSnapshotterSharedInformerFactory.WaitForCacheSync(ctx.Done())
 	s.logger.Info("Done waiting for informer caches to sync")
 
-	// Append our CSI informer types into the larger list of caches, so we can check them all at once
 	for informer, synced := range csiCacheSyncResults {
 		if !synced {
 			return errors.Errorf("cache was not synced for informer %v", informer)
@@ -684,6 +708,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			backupStoreGetter,
 			s.config.formatFlag.Parse(),
+			s.getCSIVolumeSnapshotListers(),
+			s.csiSnapshotClient,
 			s.credentialFileStore,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.Backup)
