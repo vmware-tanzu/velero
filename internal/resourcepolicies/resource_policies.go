@@ -10,8 +10,6 @@ type Action struct {
 	// Type defined specific type of action, currently only support 'skip'
 	Type string `yaml:"type"`
 	// Parameters defined map of parameters when executing a specific action
-	// +optional
-	// +nullable
 	Parameters map[string]interface{} `yaml:"parameters,omitempty"`
 }
 
@@ -31,27 +29,27 @@ type ResourcePolicies struct {
 }
 
 type resourcePolicyMatcher interface {
-	Match(res interface{}, actionType string) bool
+	Match(res interface{}) *Action
 }
 
 type volumePolicyMatcherImpl struct {
 	policy      *VolumePolicy
-	matcherFunc func(volume interface{}, actionType string) bool
+	matcherFunc func(volume interface{}) *Action
 }
 
-func (v *volumePolicyMatcherImpl) Match(volume interface{}, actionType string) bool {
-	return v.matcherFunc(volume, actionType)
+func (v *volumePolicyMatcherImpl) Match(volume interface{}) *Action {
+	return v.matcherFunc(volume)
 }
 
 // Match interface is implemented by VolumePolicy
-func (policy *VolumePolicy) Match(volume interface{}, actionType string) bool {
+func (policy *VolumePolicy) Match(volume interface{}) *Action {
 	val, ok := volume.(*StructuredVolume)
 	if !ok {
-		return false
+		return nil
 	}
 	matcher := policyConditionsMatcher{}
 	matcher.addPolicy(policy)
-	return matcher.Match(val) == policy.Action.Type
+	return matcher.Match(val)
 }
 
 func newVolumePolicyMatcher(policy *VolumePolicy) resourcePolicyMatcher {
@@ -103,14 +101,15 @@ func LoadResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 
 // GetVolumeMatchedAction checks the current volume is match resource policies
 // It will return once matched ignoring the latter policies
-func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume, actionType string) string {
+func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume) *Action {
 	factory := newResourcePoliciesMatcherFactory(policies)
 	matchers := factory.getMatchers("volume")
 
 	for _, matcher := range matchers {
-		if matcher.Match(volume, actionType) {
-			return actionType
+		action := matcher.Match(volume)
+		if action != nil {
+			return action
 		}
 	}
-	return ""
+	return nil
 }

@@ -92,16 +92,16 @@ func (c *csiCondition) Match(v *StructuredVolume) bool {
 	return false
 }
 
-func (p *policyConditionsMatcher) Match(v *StructuredVolume) string {
+func (p *policyConditionsMatcher) Match(v *StructuredVolume) *Action {
 	for _, policy := range p.policies {
 		for _, con := range policy.volConditions {
 			isMatch := con.Match(v)
 			if isMatch {
-				return policy.action.Type
+				return &policy.action
 			}
 		}
 	}
-	return ""
+	return nil
 }
 
 func (p *policyConditionsMatcher) addPolicy(vp *VolumePolicy) error {

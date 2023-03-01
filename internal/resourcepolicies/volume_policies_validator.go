@@ -28,10 +28,8 @@ func (p *policyConditionsMatcher) Validate() (bool, error) {
 			valid, err := con.Validate()
 			if err != nil {
 				return false, errors.Wrap(err, "failed to validate conditions config")
-			} else {
-				if !valid {
-					return false, nil
-				}
+			} else if !valid {
+				return false, nil
 			}
 		}
 	}
