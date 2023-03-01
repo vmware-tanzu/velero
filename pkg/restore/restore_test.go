@@ -569,7 +569,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -649,7 +649,7 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -733,7 +733,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		}
 		require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-		data := Request{
+		data := &Request{
 			Log:              h.log,
 			Restore:          tc.restore,
 			Backup:           tc.backup,
@@ -810,7 +810,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -856,12 +856,13 @@ func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
 // with the expected metadata/spec/status in the API.
 func TestRestoreItems(t *testing.T) {
 	tests := []struct {
-		name         string
-		restore      *velerov1api.Restore
-		backup       *velerov1api.Backup
-		apiResources []*test.APIResource
-		tarball      io.Reader
-		want         []*test.APIResource
+		name                 string
+		restore              *velerov1api.Restore
+		backup               *velerov1api.Backup
+		apiResources         []*test.APIResource
+		tarball              io.Reader
+		want                 []*test.APIResource
+		expectedRestoreItems map[itemKey]string
 	}{
 		{
 			name:    "metadata uid/resourceVersion/etc. gets removed",
@@ -892,6 +893,10 @@ func TestRestoreItems(t *testing.T) {
 						).
 						Result(),
 				),
+			},
+			expectedRestoreItems: map[itemKey]string{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: "created",
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  "created",
 			},
 		},
 		{
@@ -999,6 +1004,10 @@ func TestRestoreItems(t *testing.T) {
 			want: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
+			expectedRestoreItems: map[itemKey]string{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          "created",
+				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: "skipped",
+			},
 		},
 		{
 			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update",
@@ -1012,6 +1021,10 @@ func TestRestoreItems(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+			expectedRestoreItems: map[itemKey]string{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  "created",
+				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: "updated",
 			},
 		},
 		{
@@ -1163,13 +1176,14 @@ func TestRestoreItems(t *testing.T) {
 				h.AddItems(t, r)
 			}
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
 				PodVolumeBackups: nil,
 				VolumeSnapshots:  nil,
 				BackupReader:     tc.tarball,
+				RestoredItems:    map[itemKey]string{},
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -1179,6 +1193,9 @@ func TestRestoreItems(t *testing.T) {
 
 			assertEmptyResults(t, warnings, errs)
 			assertRestoredItems(t, h, tc.want)
+			if len(tc.expectedRestoreItems) > 0 {
+				assert.EqualValues(t, tc.expectedRestoreItems, data.RestoredItems)
+			}
 		})
 	}
 }
@@ -1393,7 +1410,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				actions = append(actions, action)
 			}
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -1568,7 +1585,7 @@ func TestRestoreActionModifications(t *testing.T) {
 				}
 			}
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -1734,7 +1751,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				h.AddItems(t, r)
 			}
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -2728,7 +2745,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				}
 			}
 
-			data := Request{
+			data := &Request{
 				Log:             h.log,
 				Restore:         tc.restore,
 				Backup:          tc.backup,
@@ -2862,7 +2879,7 @@ func TestRestoreWithPodVolume(t *testing.T) {
 					Return(nil)
 			}
 
-			data := Request{
+			data := &Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,

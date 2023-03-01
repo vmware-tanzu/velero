@@ -194,3 +194,19 @@ func TestAdd(t *testing.T) {
 		})
 	}
 }
+
+func TestIsEmpty(t *testing.T) {
+	result := &Result{
+		Velero:     nil,
+		Cluster:    nil,
+		Namespaces: nil,
+	}
+	assert.True(t, result.IsEmpty())
+
+	result = &Result{
+		Velero:     []string{"error"},
+		Cluster:    nil,
+		Namespaces: nil,
+	}
+	assert.False(t, result.IsEmpty())
+}

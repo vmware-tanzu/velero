@@ -452,6 +452,7 @@ func TestRestoreReconcile(t *testing.T) {
 				backupStore.On("PutRestoreLog", test.backup.Name, test.restore.Name, mock.Anything).Return(test.putRestoreLogErr)
 
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
+				backupStore.On("PutRestoredResourceList", test.restore.Name, mock.Anything).Return(nil)
 
 				volumeSnapshots := []*volume.Snapshot{
 					{
@@ -767,7 +768,7 @@ type fakeRestorer struct {
 }
 
 func (r *fakeRestorer) Restore(
-	info pkgrestore.Request,
+	info *pkgrestore.Request,
 	actions []riav2.RestoreItemAction,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (results.Result, results.Result) {
@@ -778,7 +779,7 @@ func (r *fakeRestorer) Restore(
 	return res.Get(0).(results.Result), res.Get(1).(results.Result)
 }
 
-func (r *fakeRestorer) RestoreWithResolvers(req pkgrestore.Request,
+func (r *fakeRestorer) RestoreWithResolvers(req *pkgrestore.Request,
 	resolver framework.RestoreItemActionResolverV2,
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,

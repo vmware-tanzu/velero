@@ -622,6 +622,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindRestoreLog:            "restores/my-backup/restore-my-backup-logs.gz",
 				velerov1api.DownloadTargetKindRestoreResults:        "restores/my-backup/restore-my-backup-results.gz",
 				velerov1api.DownloadTargetKindRestoreItemOperations: "restores/my-backup/restore-my-backup-itemoperations.json.gz",
+				velerov1api.DownloadTargetKindRestoreResourceList:   "restores/my-backup/restore-my-backup-resource-list.json.gz",
 			},
 		},
 		{
@@ -632,6 +633,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindRestoreLog:            "velero-backups/restores/my-backup/restore-my-backup-logs.gz",
 				velerov1api.DownloadTargetKindRestoreResults:        "velero-backups/restores/my-backup/restore-my-backup-results.gz",
 				velerov1api.DownloadTargetKindRestoreItemOperations: "velero-backups/restores/my-backup/restore-my-backup-itemoperations.json.gz",
+				velerov1api.DownloadTargetKindRestoreResourceList:   "velero-backups/restores/my-backup/restore-my-backup-resource-list.json.gz",
 			},
 		},
 		{
@@ -641,6 +643,7 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindRestoreLog:            "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-logs.gz",
 				velerov1api.DownloadTargetKindRestoreResults:        "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
 				velerov1api.DownloadTargetKindRestoreItemOperations: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-itemoperations.json.gz",
+				velerov1api.DownloadTargetKindRestoreResourceList:   "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-resource-list.json.gz",
 			},
 		},
 	}

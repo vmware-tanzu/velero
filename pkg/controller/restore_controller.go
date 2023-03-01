@@ -466,7 +466,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	for i := range podVolumeBackupList.Items {
 		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
-	restoreReq := pkgrestore.Request{
+	restoreReq := &pkgrestore.Request{
 		Log:              restoreLog,
 		Restore:          restore,
 		Backup:           info.backup,
@@ -539,6 +539,10 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		r.logger.WithError(err).Error("Error uploading restore results to backup storage")
 	}
 
+	if err := putRestoredResourceList(restore, restoreReq.RestoredResourceList(), info.backupStore); err != nil {
+		r.logger.WithError(err).Error("Error uploading restored resource list to backup storage")
+	}
+
 	return nil
 }
 
@@ -579,6 +583,26 @@ func putResults(restore *api.Restore, results map[string]results.Result, backupS
 	}
 
 	if err := backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, buf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func putRestoredResourceList(restore *api.Restore, list map[string][]string, backupStore persistence.BackupStore) error {
+	buf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(buf)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(list); err != nil {
+		return errors.Wrap(err, "error encoding restored resource list to JSON")
+	}
+
+	if err := gzw.Close(); err != nil {
+		return errors.Wrap(err, "error closing gzip writer")
+	}
+
+	if err := backupStore.PutRestoredResourceList(restore.Name, buf); err != nil {
 		return err
 	}
 
