@@ -11,14 +11,21 @@ import (
 const currentSupportDataVersion = "v1"
 
 type csiVolumeSource struct {
-	driver string `yaml:"driver"`
+	Driver string `yaml:"driver,omitempty"`
+}
+
+type nFSVolumeSource struct {
+	// Server is the hostname or IP address of the NFS server
+	Server string `yaml:"server,omitempty"`
+	// Path is the exported NFS share
+	Path string `yaml:"path,omitempty"`
 }
 
 // volumeConditions defined the current format of conditions we parsed
 type volumeConditions struct {
 	Capacity     string           `yaml:"capacity,omitempty"`
 	StorageClass []string         `yaml:"storageClass,omitempty"`
-	NFS          *struct{}        `yaml:"nfs,omitempty"`
+	NFS          *nFSVolumeSource `yaml:"nfs,omitempty"`
 	CSI          *csiVolumeSource `yaml:"csi,omitempty"`
 }
 
@@ -28,7 +35,8 @@ func (p *policyConditionsMatcher) Validate() (bool, error) {
 			valid, err := con.Validate()
 			if err != nil {
 				return false, errors.Wrap(err, "failed to validate conditions config")
-			} else if !valid {
+			}
+			if !valid {
 				return false, nil
 			}
 		}
@@ -44,9 +52,9 @@ func (c *capacityCondition) Validate() (bool, error) {
 	if (c.capacity.upper.Cmp(c.capacity.lower) >= 0) ||
 		(!c.capacity.lower.IsZero() && c.capacity.upper.IsZero()) {
 		return true, nil
-	} else {
-		return false, errors.Errorf("illegal values for capacity %v", c.capacity)
 	}
+	return false, errors.Errorf("illegal values for capacity %v", c.capacity)
+
 }
 
 func (s *storageClassCondition) Validate() (bool, error) {
@@ -74,7 +82,7 @@ func decodeStruct(r io.Reader, s interface{}) error {
 // Validate check action format
 func (a *Action) Validate() (bool, error) {
 	// Validate Type
-	if a.Type != "skip" {
+	if a.Type != Skip {
 		return false, fmt.Errorf("invalid action type %s", a.Type)
 	}
 

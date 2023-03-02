@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func setStructuredVolume(capacity resource.Quantity, sc string, nfs *struct{}, csi *csiVolumeSource) *StructuredVolume {
+func setStructuredVolume(capacity resource.Quantity, sc string, nfs *nFSVolumeSource, csi *csiVolumeSource) *StructuredVolume {
 	return &StructuredVolume{
 		capacity:     capacity,
 		storageClass: sc,
@@ -136,19 +136,37 @@ func TestNFSConditionMatch(t *testing.T) {
 	}{
 		{
 			name:          "match nfs condition",
-			condition:     &nfsCondition{&struct{}{}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &struct{}{}, nil),
+			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty nfs condition",
 			condition:     &nfsCondition{nil},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &struct{}{}, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil),
+			expectedMatch: true,
+		},
+		{
+			name:          "empty nfs server and path condition",
+			condition:     &nfsCondition{&nFSVolumeSource{Server: "", Path: ""}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil),
+			expectedMatch: true,
+		},
+		{
+			name:          "server dismatch",
+			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20", Path: ""}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: ""}, nil),
+			expectedMatch: false,
+		},
+		{
+			name:          "empty nfs server condition",
+			condition:     &nfsCondition{&nFSVolumeSource{Path: "/mnt/data"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20", Path: "/mnt/data"}, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty nfs volume",
-			condition:     &nfsCondition{&struct{}{}},
+			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20"}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
 			expectedMatch: false,
 		},
@@ -173,19 +191,19 @@ func TestCSIConditionMatch(t *testing.T) {
 	}{
 		{
 			name:          "match csi condition",
-			condition:     &csiCondition{&csiVolumeSource{driver: "test"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{driver: "test"}),
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi condition",
 			condition:     &csiCondition{nil},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{driver: "test"}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi volume",
-			condition:     &csiCondition{&csiVolumeSource{driver: "test"}},
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{}),
 			expectedMatch: false,
 		},
@@ -215,7 +233,7 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 					"ebs-sc",
 				},
 				"csi": &csiVolumeSource{
-					driver: "aws.efs.csi.driver",
+					Driver: "aws.efs.csi.driver",
 				},
 			},
 			expectedError: "",

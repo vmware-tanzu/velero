@@ -33,7 +33,7 @@ type Capacity struct {
 type StructuredVolume struct {
 	capacity     resource.Quantity
 	storageClass string
-	nfs          *struct{}
+	nfs          *nFSVolumeSource
 	csi          *csiVolumeSource
 }
 
@@ -52,31 +52,53 @@ type storageClassCondition struct {
 func (s *storageClassCondition) Match(v *StructuredVolume) bool {
 	if len(s.storageClass) == 0 {
 		return true
-	} else if v.storageClass == "" {
+	}
+
+	if v.storageClass == "" {
 		return false
-	} else {
-		target := strings.TrimSpace(v.storageClass)
-		for _, v := range s.storageClass {
-			sc := strings.TrimSpace(v)
-			if target == sc {
-				return true
-			}
+	}
+
+	for _, sc := range s.storageClass {
+		if v.storageClass == sc {
+			return true
 		}
 	}
+
 	return false
 }
 
 type nfsCondition struct {
-	nfs *struct{}
+	nfs *nFSVolumeSource
 }
 
 func (c *nfsCondition) Match(v *StructuredVolume) bool {
 	if c.nfs == nil {
 		return true
-	} else if v.nfs != nil {
+	}
+	if v.nfs == nil {
+		return false
+	}
+
+	if c.nfs.Path == "" {
+		if c.nfs.Server == "" {
+			return true
+		}
+		if c.nfs.Server != v.nfs.Server {
+			return false
+		}
 		return true
 	}
-	return false
+	if c.nfs.Path != v.nfs.Path {
+		return false
+	}
+	if c.nfs.Server == "" {
+		return true
+	}
+	if c.nfs.Server != v.nfs.Server {
+		return false
+	}
+	return true
+
 }
 
 type csiCondition struct {
@@ -86,19 +108,27 @@ type csiCondition struct {
 func (c *csiCondition) Match(v *StructuredVolume) bool {
 	if c.csi == nil {
 		return true
-	} else if v.csi != nil {
-		return c.csi.driver == v.csi.driver
 	}
-	return false
+
+	if v.csi == nil {
+		return false
+	}
+
+	return c.csi.Driver == v.csi.Driver
 }
 
 func (p *policyConditionsMatcher) Match(v *StructuredVolume) *Action {
 	for _, policy := range p.policies {
+		isAllMatch := false
 		for _, con := range policy.volConditions {
-			isMatch := con.Match(v)
-			if isMatch {
-				return &policy.action
+			if !con.Match(v) {
+				isAllMatch = false
+				break
 			}
+			isAllMatch = true
+		}
+		if isAllMatch {
+			return &policy.action
 		}
 	}
 	return nil
@@ -153,10 +183,12 @@ func (c *Capacity) isInRange(y resource.Quantity) bool {
 	if c.lower.IsZero() && c.upper.Cmp(y) >= 0 {
 		// [0, a] y
 		return true
-	} else if c.upper.IsZero() && c.lower.Cmp(y) <= 0 {
+	}
+	if c.upper.IsZero() && c.lower.Cmp(y) <= 0 {
 		// [b, 0] y
 		return true
-	} else if !c.lower.IsZero() && !c.upper.IsZero() {
+	}
+	if !c.lower.IsZero() && !c.upper.IsZero() {
 		// [a, b] y
 		return c.lower.Cmp(y) <= 0 && c.upper.Cmp(y) >= 0
 	}

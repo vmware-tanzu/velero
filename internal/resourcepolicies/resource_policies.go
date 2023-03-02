@@ -5,10 +5,14 @@ import (
 	"strings"
 )
 
+type VolumeActionType string
+
+const Skip VolumeActionType = "skip"
+
 // Action defined as one action for a specific way of backup
 type Action struct {
 	// Type defined specific type of action, currently only support 'skip'
-	Type string `yaml:"type"`
+	Type VolumeActionType `yaml:"type"`
 	// Parameters defined map of parameters when executing a specific action
 	Parameters map[string]interface{} `yaml:"parameters,omitempty"`
 }
@@ -34,22 +38,22 @@ type resourcePolicyMatcher interface {
 
 type volumePolicyMatcherImpl struct {
 	policy      *VolumePolicy
-	matcherFunc func(volume interface{}) *Action
+	matcherFunc func(volume *StructuredVolume) *Action
 }
 
 func (v *volumePolicyMatcherImpl) Match(volume interface{}) *Action {
-	return v.matcherFunc(volume)
-}
-
-// Match interface is implemented by VolumePolicy
-func (policy *VolumePolicy) Match(volume interface{}) *Action {
 	val, ok := volume.(*StructuredVolume)
 	if !ok {
 		return nil
 	}
+	return v.matcherFunc(val)
+}
+
+// Match interface is implemented by VolumePolicy
+func (policy *VolumePolicy) Match(volume *StructuredVolume) *Action {
 	matcher := policyConditionsMatcher{}
 	matcher.addPolicy(policy)
-	return matcher.Match(val)
+	return matcher.Match(volume)
 }
 
 func newVolumePolicyMatcher(policy *VolumePolicy) resourcePolicyMatcher {
