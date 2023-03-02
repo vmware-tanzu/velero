@@ -50,6 +50,10 @@ fi
 mkdir ${build_path}/restic
 git clone -b v${RESTIC_VERSION} https://github.com/restic/restic.git ${build_path}/restic
 pushd ${build_path}/restic
-go run build.go --goos "${GOOS}" --goarch "${GOARCH}" --goarm "${GOARM}" -o ${restic_bin}
+if [ -z "${GOARM}" ]; then
+    go run build.go --goos "${GOOS}" --goarch "${GOARCH}" -o ${restic_bin}
+else
+    go run build.go --goos "${GOOS}" --goarch "${GOARCH}" --goarm "${GOARM}" -o ${restic_bin}
+fi
 chmod +x ${restic_bin}
 popd
