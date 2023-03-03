@@ -99,9 +99,15 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log = log.WithField("restore", fmt.Sprintf("%s/%s", pvr.Namespace, pvr.OwnerReferences[0].Name))
 	}
 
-	shouldProcess, pod, err := c.shouldProcess(ctx, log, pvr)
+	shouldProcess, markFailed, pod, err := c.shouldProcess(ctx, log, pvr)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+	if markFailed {
+		if e := UpdatePVRStatusToFailed(c, ctx, pvr, fmt.Sprintf("Pod  %s/%s is being Terminating", pvr.Spec.Pod.Namespace, pvr.Spec.Pod.Name), c.clock.Now()); e != nil {
+			log.WithError(err).Error("Unable to update status to failed")
+		}
+		return ctrl.Result{}, nil
 	}
 	if !shouldProcess {
 		return ctrl.Result{}, nil
@@ -151,30 +157,36 @@ func UpdatePVRStatusToFailed(c client.Client, ctx context.Context, pvr *velerov1
 	return c.Patch(ctx, pvr, client.MergeFrom(original))
 }
 
-func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, *corev1api.Pod, error) {
-	if !isPVRNew(pvr) {
-		log.Debug("PodVolumeRestore is not new, skip")
-		return false, nil, nil
-	}
-
+func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, bool, *corev1api.Pod, error) {
+	// We need to check pods status
 	// we filter the pods during the initialization of cache, if we can get a pod here, the pod must be in the same node with the controller
 	// so we don't need to compare the node anymore
 	pod := &corev1api.Pod{}
 	if err := c.Get(ctx, types.NamespacedName{Namespace: pvr.Spec.Pod.Namespace, Name: pvr.Spec.Pod.Name}, pod); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.WithError(err).Debug("Pod not found on this node, skip")
-			return false, nil, nil
+			return false, false, nil, nil
 		}
 		log.WithError(err).Error("Unable to get pod")
-		return false, nil, err
+		return false, false, nil, err
+	}
+	if pod.GetDeletionTimestamp() != nil {
+		log.Error("Pod is being Terminating")
+		return false, true, nil, nil
+	}
+
+	// Pods exist, we need to check PVR is NEW.
+	if !isPVRNew(pvr) {
+		log.Debug("PodVolumeRestore is not new, skip")
+		return false, false, nil, nil
 	}
 
 	if !isInitContainerRunning(pod) {
 		log.Debug("Pod is not running restore-wait init container, skip")
-		return false, nil, nil
+		return false, false, nil, nil
 	}
 
-	return true, pod, nil
+	return true, false, pod, nil
 }
 
 func (c *PodVolumeRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
