@@ -3,6 +3,8 @@ package resourcepolicies
 import (
 	"fmt"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 type VolumeActionType string
@@ -94,7 +96,7 @@ func (r *resourcePoliciesMatcherFactory) getMatchers(resourceType string) []reso
 	}
 }
 
-func LoadResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
+func unmarshalResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 	resPolicies := &ResourcePolicies{}
 	if err := decodeStruct(strings.NewReader(*YamlData), resPolicies); err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
@@ -103,9 +105,9 @@ func LoadResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 	}
 }
 
-// GetVolumeMatchedAction checks the current volume is match resource policies
+// getVolumeMatchedAction checks the current volume is match resource policies
 // It will return once matched ignoring the latter policies
-func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume) *Action {
+func getVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume) *Action {
 	factory := newResourcePoliciesMatcherFactory(policies)
 	matchers := factory.getMatchers("volume")
 
@@ -116,4 +118,18 @@ func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume
 		}
 	}
 	return nil
+}
+
+func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*ResourcePolicies, error) {
+	if cm == nil {
+		return nil, fmt.Errorf("could not parse config from nil configmap")
+	}
+	if len(cm.Data) != 1 {
+		return nil, fmt.Errorf("illegal resource policies %s/%s configmap", cm.Name, cm.Namespace)
+	}
+	var yamlData string
+	for _, v := range cm.Data {
+		yamlData = v
+	}
+	return unmarshalResourcePolicies(&yamlData)
 }

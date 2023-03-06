@@ -3,7 +3,10 @@ package resourcepolicies
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestLoadResourcePolicies(t *testing.T) {
@@ -93,7 +96,7 @@ func TestLoadResourcePolicies(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := LoadResourcePolicies(&tc.yamlData)
+			_, err := unmarshalResourcePolicies(&tc.yamlData)
 
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Expected error %v, but got error %v", tc.wantErr, err)
@@ -176,7 +179,7 @@ func TestGetVolumeMatchedAction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			action := GetVolumeMatchedAction(resPolicies, tc.volume)
+			action := getVolumeMatchedAction(resPolicies, tc.volume)
 			if action == nil {
 				if tc.expectedAction != nil {
 					t.Errorf("Expected action %v, but got result nil", tc.expectedAction.Type)
@@ -192,4 +195,36 @@ func TestGetVolumeMatchedAction(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetResourcePoliciesFromConfig(t *testing.T) {
+	// Create a test ConfigMap
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"test-data": "version: v1\nvolumePolicies:\n- conditions:\n    capacity: '0,10Gi'\n  action:\n    type: skip",
+		},
+	}
+
+	// Call the function and check for errors
+	resPolicies, err := GetResourcePoliciesFromConfig(cm)
+	assert.Nil(t, err)
+
+	// Check that the returned ResourcePolicies object contains the expected data
+	assert.Equal(t, "v1", resPolicies.Version)
+	assert.Len(t, resPolicies.VolumePolicies, 1)
+
+	expectedPolicy := VolumePolicy{
+		Conditions: map[string]interface{}{
+			"capacity": "0,10Gi",
+		},
+		Action: Action{
+			Type: Skip,
+		},
+	}
+
+	assert.Equal(t, expectedPolicy, resPolicies.VolumePolicies[0])
 }

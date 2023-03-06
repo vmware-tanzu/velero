@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -28,7 +29,7 @@ func TestParseCapacity(t *testing.T) {
 		{"10Gi,20Gi", Capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(20<<30, resource.BinarySI)}, nil},
 		{"10Gi,", Capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(0, resource.DecimalSI)}, nil},
 		{"10Gi", emptyCapacity, fmt.Errorf("wrong format of Capacity 10Gi")},
-		{"", emptyCapacity, fmt.Errorf("wrong format of Capacity")},
+		{"", emptyCapacity, nil},
 	}
 
 	for _, test := range tests {
@@ -39,9 +40,7 @@ func TestParseCapacity(t *testing.T) {
 				assert.Equal(t, test.expected.lower.Cmp(actual.lower), 0)
 				assert.Equal(t, test.expected.upper.Cmp(actual.upper), 0)
 			}
-			if test.expectedErr == nil {
-				assert.Equal(t, nil, actualErr)
-			}
+			assert.Equal(t, test.expectedErr, actualErr)
 		})
 	}
 }
@@ -276,6 +275,136 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 					t.Errorf("Expected error '%s', but got nil", tc.expectedError)
 				} else if !strings.Contains(err.Error(), tc.expectedError) {
 					t.Errorf("Expected error '%s', but got '%v'", tc.expectedError, err)
+				}
+			}
+		})
+	}
+}
+
+func TestParsePodVolume(t *testing.T) {
+	// Mock data
+	nfsVolume := corev1api.Volume{}
+	nfsVolume.NFS = &corev1api.NFSVolumeSource{
+		Server: "nfs.example.com",
+		Path:   "/exports/data",
+	}
+	csiVolume := corev1api.Volume{}
+	csiVolume.CSI = &corev1api.CSIVolumeSource{
+		Driver: "csi.example.com",
+	}
+	emptyVolume := corev1api.Volume{}
+
+	// Test cases
+	testCases := []struct {
+		name        string
+		inputVolume *corev1api.Volume
+		expectedNFS *nFSVolumeSource
+		expectedCSI *csiVolumeSource
+	}{
+		{
+			name:        "NFS volume",
+			inputVolume: &nfsVolume,
+			expectedNFS: &nFSVolumeSource{Server: "nfs.example.com", Path: "/exports/data"},
+		},
+		{
+			name:        "CSI volume",
+			inputVolume: &csiVolume,
+			expectedCSI: &csiVolumeSource{Driver: "csi.example.com"},
+		},
+		{
+			name:        "Empty volume",
+			inputVolume: &emptyVolume,
+			expectedNFS: nil,
+			expectedCSI: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Call the function
+			structuredVolume := &StructuredVolume{}
+			structuredVolume.ParsePodVolume(tc.inputVolume)
+
+			// Check the results
+			if tc.expectedNFS != nil {
+				if structuredVolume.nfs == nil {
+					t.Errorf("Expected a non-nil NFS volume source")
+				} else if *tc.expectedNFS != *structuredVolume.nfs {
+					t.Errorf("NFS volume source does not match expected value")
+				}
+			}
+			if tc.expectedCSI != nil {
+				if structuredVolume.csi == nil {
+					t.Errorf("Expected a non-nil CSI volume source")
+				} else if *tc.expectedCSI != *structuredVolume.csi {
+					t.Errorf("CSI volume source does not match expected value")
+				}
+			}
+		})
+	}
+}
+
+func TestParsePV(t *testing.T) {
+	// Mock data
+	nfsVolume := corev1api.PersistentVolume{}
+	nfsVolume.Spec.Capacity = corev1api.ResourceList{corev1api.ResourceStorage: resource.MustParse("1Gi")}
+	nfsVolume.Spec.NFS = &corev1api.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/data"}
+	csiVolume := corev1api.PersistentVolume{}
+	csiVolume.Spec.Capacity = corev1api.ResourceList{corev1api.ResourceStorage: resource.MustParse("2Gi")}
+	csiVolume.Spec.CSI = &corev1api.CSIPersistentVolumeSource{Driver: "csi.example.com"}
+	emptyVolume := corev1api.PersistentVolume{}
+
+	// Test cases
+	testCases := []struct {
+		name        string
+		inputVolume *corev1api.PersistentVolume
+		expectedNFS *nFSVolumeSource
+		expectedCSI *csiVolumeSource
+	}{
+		{
+			name:        "NFS volume",
+			inputVolume: &nfsVolume,
+			expectedNFS: &nFSVolumeSource{Server: "nfs.example.com", Path: "/exports/data"},
+			expectedCSI: nil,
+		},
+		{
+			name:        "CSI volume",
+			inputVolume: &csiVolume,
+			expectedNFS: nil,
+			expectedCSI: &csiVolumeSource{Driver: "csi.example.com"},
+		},
+		{
+			name:        "Empty volume",
+			inputVolume: &emptyVolume,
+			expectedNFS: nil,
+			expectedCSI: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Call the function
+			structuredVolume := &StructuredVolume{}
+			structuredVolume.ParsePV(tc.inputVolume)
+			// Check the results
+			if structuredVolume.capacity != *tc.inputVolume.Spec.Capacity.Storage() {
+				t.Errorf("Capacity does not match expected value")
+			}
+			if structuredVolume.storageClass != tc.inputVolume.Spec.StorageClassName {
+				t.Errorf("Storage class does not match expected value")
+			}
+			if tc.expectedNFS != nil {
+				if structuredVolume.nfs == nil {
+					t.Errorf("Expected a non-nil NFS volume source")
+				} else if *tc.expectedNFS != *structuredVolume.nfs {
+					t.Errorf("NFS volume source does not match expected value")
+				}
+			}
+			if tc.expectedCSI != nil {
+				if structuredVolume.csi == nil {
+					t.Errorf("Expected a non-nil CSI volume source")
+				} else if *tc.expectedCSI != *structuredVolume.csi {
+					t.Errorf("CSI volume source does not match expected value")
 				}
 			}
 		})

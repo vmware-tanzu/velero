@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -35,6 +36,32 @@ type StructuredVolume struct {
 	storageClass string
 	nfs          *nFSVolumeSource
 	csi          *csiVolumeSource
+}
+
+func (s *StructuredVolume) ParsePV(pv *corev1api.PersistentVolume) {
+	s.capacity = *pv.Spec.Capacity.Storage()
+	s.storageClass = pv.Spec.StorageClassName
+	nfs := pv.Spec.NFS
+	if nfs != nil {
+		s.nfs = &nFSVolumeSource{Server: nfs.Server, Path: nfs.Path}
+	}
+
+	csi := pv.Spec.CSI
+	if csi != nil {
+		s.csi = &csiVolumeSource{Driver: csi.Driver}
+	}
+}
+
+func (s *StructuredVolume) ParsePodVolume(vol *corev1api.Volume) {
+	nfs := vol.NFS
+	if nfs != nil {
+		s.nfs = &nFSVolumeSource{Server: nfs.Server, Path: nfs.Path}
+	}
+
+	csi := vol.CSI
+	if csi != nil {
+		s.csi = &csiVolumeSource{Driver: csi.Driver}
+	}
 }
 
 type capacityCondition struct {
@@ -156,6 +183,9 @@ func (p *policyConditionsMatcher) addPolicy(vp *VolumePolicy) error {
 
 // parseCapacity parse string into capacity format
 func parseCapacity(capacity string) (*Capacity, error) {
+	if capacity == "" {
+		capacity = ","
+	}
 	capacities := strings.Split(capacity, ",")
 	var quantities []resource.Quantity
 	if len(capacities) != 2 {

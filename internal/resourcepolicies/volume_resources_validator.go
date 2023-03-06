@@ -91,11 +91,7 @@ func (a *Action) Validate() (bool, error) {
 }
 
 // Validate func validate the key and value format of the user generated resource policies configuration
-func Validate(yamlData *string) (bool, error) {
-	resPolicies, err := LoadResourcePolicies(yamlData)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to validate config")
-	}
+func Validate(resPolicies *ResourcePolicies) (bool, error) {
 	if resPolicies.Version != currentSupportDataVersion {
 		return false, fmt.Errorf("incompatible version number %s with supported version %s", resPolicies.Version, currentSupportDataVersion)
 	}

@@ -81,115 +81,181 @@ func TestCapacityConditionValidate(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	testCases := []struct {
-		name     string
-		yamlData string
-		want     bool
-		wantErr  bool
+		name    string
+		res     *ResourcePolicies
+		want    bool
+		wantErr bool
 	}{
 		{
 			name: "unknown key in yaml",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "0,100Gi"
-    unknown: {}
-    storageClass:
-    - gp2
-    - ebs-sc
-  action:
-    type: skip`,
-			want:    false,
-			wantErr: true,
-		},
-		{
-			name: "reduplicated key in yaml",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "0,100Gi"
-    capacity: "0,100Gi"
-    storageClass:
-    - gp2
-    - ebs-sc
-  action:
-    type: skip`,
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"unknown":      "",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
 			want:    false,
 			wantErr: true,
 		},
 		{
 			name: "error format of capacity",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "100Gi"
-    storageClass:
-    - gp2
-    - ebs-sc
-  action:
-    type: skip`,
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "10Gi",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
 			want:    false,
 			wantErr: true,
 		},
 		{
 			name: "error format of storageClass",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "0,100Gi"
-    storageClass: gp2
-  action:
-    type: skip`,
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"storageClass": "ebs-sc",
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
 			want:    false,
 			wantErr: true,
 		},
 		{
 			name: "error format of csi",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "0,100Gi"
-    csi: gp2
-  action:
-    type: skip`,
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"csi":          "aws.efs.csi.driver",
+						},
+					},
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "unsupported version",
+			res: &ResourcePolicies{
+				Version: "v2",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity": "0,10Gi",
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "unsupported action",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "unsupported"},
+						Conditions: map[string]interface{}{
+							"capacity": "0,10Gi",
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
 			want:    false,
 			wantErr: true,
 		},
 		{
 			name: "error format of nfs",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "0,100Gi"
-    csi: {}
-    nfs: abc
-  action:
-    type: skip`,
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"nfs":          "aws.efs.csi.driver",
+						},
+					},
+				},
+			},
 			want:    false,
 			wantErr: true,
 		},
 		{
 			name: "supported formart volume policies",
-			yamlData: `version: v1
-volumePolicies:
-- conditions:
-    capacity: "0,100Gi"
-    csi:
-      driver: aws.efs.csi.driver
-    nfs:
-	  server: 192.168.20.90
-	  path: /mnt/data/
-    storageClass:
-    - gp2
-    - ebs-sc
-  action:
-    type: skip`,
-			want:    false,
-			wantErr: true,
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+							"nfs": interface{}(
+								map[string]interface{}{
+									"server": "192.168.20.90",
+									"path":   "/mnt/data/",
+								}),
+						},
+					},
+				},
+			},
+			want:    true,
+			wantErr: false,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := Validate(&tc.yamlData)
+			got, err := Validate(tc.res)
 
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Expected error %v, but got error %v", tc.wantErr, err)
