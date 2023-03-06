@@ -23,9 +23,9 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -91,7 +91,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 
 	var caPool *x509.CertPool
 	if len(caCertFile) > 0 {
-		caCert, err := ioutil.ReadFile(caCertFile)
+		caCert, err := os.ReadFile(caCertFile)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't open cacert")
 		}
@@ -140,7 +140,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return errors.Wrapf(err, "request failed: unable to decode response body")
 		}

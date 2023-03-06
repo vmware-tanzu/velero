@@ -19,7 +19,7 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -47,7 +47,7 @@ func WaitUntilServiceAccountCreated(ctx context.Context, client TestClient, name
 }
 
 func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClient, namespace, serviceAccount, dockerCredentialFile string) error {
-	credential, err := ioutil.ReadFile(dockerCredentialFile)
+	credential, err := os.ReadFile(dockerCredentialFile)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read the docker credential file %q", dockerCredentialFile)
 	}

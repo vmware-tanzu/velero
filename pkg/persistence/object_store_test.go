@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
@@ -503,7 +502,7 @@ func TestGetBackupContents(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rc)
 
-	data, err := ioutil.ReadAll(rc)
+	data, err := io.ReadAll(rc)
 	require.NoError(t, err)
 	assert.Equal(t, "foo", string(data))
 }

@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 
@@ -415,7 +415,7 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 }
 
 func (r *itemCollector) writeToFile(item *unstructured.Unstructured) (string, error) {
-	f, err := ioutil.TempFile(r.dir, "")
+	f, err := os.CreateTemp(r.dir, "")
 	if err != nil {
 		return "", errors.Wrap(err, "error creating temp file")
 	}
