@@ -266,7 +266,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	if config.clientQPS < 0.0 {
+	if config.clientQPS <= 0.0 {
 		return nil, errors.New("client-qps must be positive")
 	}
 	f.SetClientQPS(config.clientQPS)
@@ -516,7 +516,6 @@ func (s *server) veleroResourcesExist() error {
 //   - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
 //     for the same clusters
 
-//
 // Low priorities:
 //   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
 //     ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
