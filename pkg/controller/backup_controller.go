@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -591,25 +590,14 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
-	logFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		return errors.Wrap(err, "error creating temp file for backup log")
-	}
-	gzippedLogFile := gzip.NewWriter(logFile)
-	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
-	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
-	defer gzippedLogFile.Close()
-	defer closeAndRemoveFile(logFile, c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
-
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
-	logger := logging.DefaultLogger(c.backupLogLevel, c.formatFlag)
-	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
-
 	logCounter := logging.NewLogHook()
-	logger.Hooks.Add(logCounter)
-
-	backupLog := logger.WithField(Backup, kubeutil.NamespaceAndName(backup))
+	backupLog, err := logging.NewTempFileLogger(c.backupLogLevel, c.formatFlag, logCounter, logrus.Fields{Backup: kubeutil.NamespaceAndName(backup)})
+	if err != nil {
+		return errors.Wrap(err, "error creating dual mode logger for backup")
+	}
+	defer backupLog.Dispose(c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	backupLog.Info("Setting up backup temp file")
 	backupFile, err := ioutil.TempFile("", "")
@@ -735,9 +723,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		"errors":   backupErrors,
 	}
 
-	if err := gzippedLogFile.Close(); err != nil {
-		c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).WithError(err).Error("error closing gzippedLogFile")
-	}
+	backupLog.DoneForPersist(c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	// Assign finalize phase as close to end as possible so that any errors
 	// logged to backupLog are captured. This is done before uploading the
@@ -760,8 +746,12 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, results); len(errs) > 0 {
-		fatalErrs = append(fatalErrs, errs...)
+	if logFile, err := backupLog.GetPersistFile(); err != nil {
+		fatalErrs = append(fatalErrs, errors.Wrap(err, "error getting backup log file"))
+	} else {
+		if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, results); len(errs) > 0 {
+			fatalErrs = append(fatalErrs, errs...)
+		}
 	}
 
 	c.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup completed")

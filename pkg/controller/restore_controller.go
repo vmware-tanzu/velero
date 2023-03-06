@@ -100,9 +100,8 @@ type restoreReconciler struct {
 }
 
 type backupInfo struct {
-	backup      *api.Backup
-	location    *api.BackupStorageLocation
-	backupStore persistence.BackupStore
+	backup   *api.Backup
+	location *api.BackupStorageLocation
 }
 
 func NewRestoreReconciler(
@@ -160,13 +159,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// store a copy of the original restore for creating patch
 	original := restore.DeepCopy()
 
-	// Validate the restore and fetch the backup. Note that the plugin
-	// manager used here is not the same one used by c.runValidatedRestore,
-	// since within that function we want the plugin manager to log to
-	// our per-restore log (which is instantiated within c.runValidatedRestore).
-	pluginManager := r.newPluginManager(r.logger)
-	defer pluginManager.CleanupClients()
-	info := r.validateAndComplete(restore, pluginManager)
+	// Validate the restore and fetch the backup
+	info := r.validateAndComplete(restore)
 
 	// Register attempts after validation so we don't have to fetch the backup multiple times
 	backupScheduleName := restore.Spec.ScheduleName
@@ -243,7 +237,7 @@ func (r *restoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *restoreReconciler) validateAndComplete(restore *api.Restore, pluginManager clientmgmt.Manager) backupInfo {
+func (r *restoreReconciler) validateAndComplete(restore *api.Restore) backupInfo {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -326,7 +320,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore, pluginMana
 		}
 	}
 
-	info, err := r.fetchBackupInfo(restore.Spec.BackupName, pluginManager)
+	info, err := r.fetchBackupInfo(restore.Spec.BackupName)
 	if err != nil {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
 		return backupInfo{}
@@ -381,7 +375,7 @@ func mostRecentCompletedBackup(backups []api.Backup) api.Backup {
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
-func (r *restoreReconciler) fetchBackupInfo(backupName string, pluginManager clientmgmt.Manager) (backupInfo, error) {
+func (r *restoreReconciler) fetchBackupInfo(backupName string) (backupInfo, error) {
 	backup := &api.Backup{}
 	err := r.kbClient.Get(context.Background(), types.NamespacedName{Namespace: r.namespace, Name: backupName}, backup)
 	if err != nil {
@@ -396,15 +390,9 @@ func (r *restoreReconciler) fetchBackupInfo(backupName string, pluginManager cli
 		return backupInfo{}, errors.WithStack(err)
 	}
 
-	backupStore, err := r.backupStoreGetter.Get(location, pluginManager, r.logger)
-	if err != nil {
-		return backupInfo{}, err
-	}
-
 	return backupInfo{
-		backup:      backup,
-		location:    location,
-		backupStore: backupStore,
+		backup:   backup,
+		location: location,
 	}, nil
 }
 
@@ -415,14 +403,19 @@ func (r *restoreReconciler) fetchBackupInfo(backupName string, pluginManager cli
 func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backupInfo) error {
 	// instantiate the per-restore logger that will output both to a temp file
 	// (for upload to object storage) and to stdout.
-	restoreLog, err := newRestoreLogger(restore, r.restoreLogLevel, r.logFormat)
+	restoreLog, err := logging.NewTempFileLogger(r.restoreLogLevel, r.logFormat, nil, logrus.Fields{"restore": kubeutil.NamespaceAndName(restore)})
 	if err != nil {
 		return err
 	}
-	defer restoreLog.closeAndRemove(r.logger)
+	defer restoreLog.Dispose(r.logger)
 
 	pluginManager := r.newPluginManager(restoreLog)
 	defer pluginManager.CleanupClients()
+
+	backupStore, err := r.backupStoreGetter.Get(info.location, pluginManager, r.logger)
+	if err != nil {
+		return err
+	}
 
 	actions, err := pluginManager.GetRestoreItemActionsV2()
 	if err != nil {
@@ -436,7 +429,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 	snapshotItemResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
-	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, restoreLog)
+	backupFile, err := downloadToTempFile(restore.Spec.BackupName, backupStore, restoreLog)
 	if err != nil {
 		return errors.Wrap(err, "error downloading backup")
 	}
@@ -455,7 +448,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.WithStack(err)
 	}
 
-	volumeSnapshots, err := info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
+	volumeSnapshots, err := backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
 	if err != nil {
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
@@ -502,17 +495,19 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 	restoreLog.Info("restore completed")
 
+	restoreLog.DoneForPersist(r.logger)
+
 	// re-instantiate the backup store because credentials could have changed since the original
 	// instantiation, if this was a long-running restore
-	info.backupStore, err = r.backupStoreGetter.Get(info.location, pluginManager, r.logger)
+	backupStore, err = r.backupStoreGetter.Get(info.location, pluginManager, r.logger)
 	if err != nil {
 		return errors.Wrap(err, "error setting up backup store to persist log and results files")
 	}
 
-	if logReader, err := restoreLog.done(r.logger); err != nil {
+	if logReader, err := restoreLog.GetPersistFile(); err != nil {
 		restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error getting restore log reader: %v", err))
 	} else {
-		if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logReader); err != nil {
+		if err := backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logReader); err != nil {
 			restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error uploading log file to backup storage: %v", err))
 		}
 	}
@@ -535,11 +530,11 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		"errors":   restoreErrors,
 	}
 
-	if err := putResults(restore, m, info.backupStore); err != nil {
+	if err := putResults(restore, m, backupStore); err != nil {
 		r.logger.WithError(err).Error("Error uploading restore results to backup storage")
 	}
 
-	if err := putRestoredResourceList(restore, restoreReq.RestoredResourceList(), info.backupStore); err != nil {
+	if err := putRestoredResourceList(restore, restoreReq.RestoredResourceList(), backupStore); err != nil {
 		r.logger.WithError(err).Error("Error uploading restored resource list to backup storage")
 	}
 
@@ -642,51 +637,4 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 	}
 
 	return file, nil
-}
-
-type restoreLogger struct {
-	logrus.FieldLogger
-	file *os.File
-	w    *gzip.Writer
-}
-
-func newRestoreLogger(restore *api.Restore, logLevel logrus.Level, logFormat logging.Format) (*restoreLogger, error) {
-	file, err := ioutil.TempFile("", "")
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating temp file")
-	}
-	w := gzip.NewWriter(file)
-
-	logger := logging.DefaultLogger(logLevel, logFormat)
-	logger.Out = io.MultiWriter(os.Stdout, w)
-
-	return &restoreLogger{
-		FieldLogger: logger.WithField("restore", kubeutil.NamespaceAndName(restore)),
-		file:        file,
-		w:           w,
-	}, nil
-}
-
-// done stops the restoreLogger from being able to be written to, and returns
-// an io.Reader for getting the content of the logger. Any attempts to use
-// restoreLogger to log after calling done will panic.
-func (l *restoreLogger) done(log logrus.FieldLogger) (io.Reader, error) {
-	l.FieldLogger = nil
-
-	if err := l.w.Close(); err != nil {
-		log.WithError(errors.WithStack(err)).Error("error closing gzip writer")
-	}
-
-	if _, err := l.file.Seek(0, 0); err != nil {
-		return nil, errors.Wrap(err, "error resetting log file offset to 0")
-	}
-
-	return l.file, nil
-}
-
-// closeAndRemove removes the logger's underlying temporary storage. This
-// method should be called when all logging and reading from the logger is
-// complete.
-func (l *restoreLogger) closeAndRemove(log logrus.FieldLogger) {
-	closeAndRemoveFile(l.file, log)
 }

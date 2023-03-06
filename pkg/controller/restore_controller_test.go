@@ -136,7 +136,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				backupStore.On("GetBackupMetadata", test.backupName).Return(test.backupStoreBackup, nil).Maybe()
 			}
 
-			info, err := r.fetchBackupInfo(test.backupName, pluginManager)
+			info, err := r.fetchBackupInfo(test.backupName)
 
 			require.Equal(t, test.expectedErr, err != nil)
 			if test.expectedRes != nil {
@@ -604,7 +604,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		Phase(velerov1api.BackupPhaseCompleted).
 		Result()))
 
-	r.validateAndComplete(restore, pluginManager)
+	r.validateAndComplete(restore)
 	assert.Contains(t, restore.Status.ValidationErrors, "No backups found for schedule")
 	assert.Empty(t, restore.Spec.BackupName)
 
@@ -620,7 +620,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 			Result(),
 	))
 
-	r.validateAndComplete(restore, pluginManager)
+	r.validateAndComplete(restore)
 	assert.Contains(t, restore.Status.ValidationErrors, "No completed backups found for schedule")
 	assert.Empty(t, restore.Spec.BackupName)
 
@@ -651,7 +651,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 			ScheduleName: "schedule-1",
 		},
 	}
-	r.validateAndComplete(restore, pluginManager)
+	r.validateAndComplete(restore)
 	assert.Nil(t, restore.Status.ValidationErrors)
 	assert.Equal(t, "foo", restore.Spec.BackupName)
 }

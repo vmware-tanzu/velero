@@ -103,7 +103,7 @@ Also added DownloadTargetKindBackupItemSnapshots for retrieving the signed URL t
 * Fix CVE-2020-29652 and CVE-2020-26160 (#4274, @ywk253100)
 * Refine tag-release.sh to align with change in release process (#4185, @reasonerjt)
 * Fix plugins incompatible issue in upgrade test (#4141, @danfengliu)
-* Verify group before treating resource as cohabitating (#4126, @sseago)
+* Verify group before treating resource as cohabiting (#4126, @sseago)
 * Added ItemSnapshotter plugin definition and plugin framework - addresses #3533.
   Part of the Upload Progress enhancement (#3533) (#4077, @dsmithuchida)
 * Add upgrade test in E2E test (#4058, @danfengliu)
