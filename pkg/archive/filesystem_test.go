@@ -28,4 +28,22 @@ func TestGetItemFilePath(t *testing.T) {
 
 	res = GetItemFilePath("root", "resource", "namespace", "item")
 	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
+
+	res = GetItemFilePath("", "resource", "", "item")
+	assert.Equal(t, "resources/resource/cluster/item.json", res)
+
+	res = GetVersionedItemFilePath("root", "resource", "", "item", "")
+	assert.Equal(t, "root/resources/resource/cluster/item.json", res)
+
+	res = GetVersionedItemFilePath("root", "resource", "namespace", "item", "")
+	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
+
+	res = GetVersionedItemFilePath("root", "resource", "namespace", "item", "v1")
+	assert.Equal(t, "root/resources/resource/v1/namespaces/namespace/item.json", res)
+
+	res = GetVersionedItemFilePath("root", "resource", "", "item", "v1")
+	assert.Equal(t, "root/resources/resource/v1/cluster/item.json", res)
+
+	res = GetVersionedItemFilePath("", "resource", "", "item", "")
+	assert.Equal(t, "resources/resource/cluster/item.json", res)
 }

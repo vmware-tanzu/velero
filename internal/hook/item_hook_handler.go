@@ -273,6 +273,20 @@ func (h *DefaultItemHookHandler) HandleHooks(
 	return nil
 }
 
+// NoOpItemHookHandler is the an itemHookHandler for the Finalize controller where hooks don't run
+type NoOpItemHookHandler struct{}
+
+func (h *NoOpItemHookHandler) HandleHooks(
+	log logrus.FieldLogger,
+	groupResource schema.GroupResource,
+	obj runtime.Unstructured,
+	resourceHooks []ResourceHook,
+	phase hookPhase,
+) error {
+
+	return nil
+}
+
 func phasedKey(phase hookPhase, key string) string {
 	if phase != "" {
 		return fmt.Sprintf("%v.%v", phase, key)

@@ -245,3 +245,9 @@ func (b *BackupBuilder) CSISnapshotTimeout(timeout time.Duration) *BackupBuilder
 	b.object.Spec.CSISnapshotTimeout.Duration = timeout
 	return b
 }
+
+// ItemOperationTimeout sets the Backup's ItemOperationTimeout
+func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuilder {
+	b.object.Spec.ItemOperationTimeout.Duration = timeout
+	return b
+}
