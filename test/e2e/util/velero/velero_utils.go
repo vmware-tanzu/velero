@@ -207,17 +207,24 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace str
 
 	fmt.Printf("get backup cmd =%v\n", checkCMD)
 	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	fmt.Println("========0=======")
 	if err != nil {
 		return err
 	}
 	backup := velerov1api.Backup{}
 	err = json.Unmarshal(*jsonBuf, &backup)
+	fmt.Println("========1=======")
 	if err != nil {
 		return err
 	}
+	fmt.Println("111111111111")
+	fmt.Println(backup.Status.Phase)
+	fmt.Println(expectedPhase)
 	if backup.Status.Phase != expectedPhase {
+
 		return errors.Errorf("Unexpected backup phase got %s, expecting %s", backup.Status.Phase, expectedPhase)
 	}
+	fmt.Println("22222222222")
 	return nil
 }
 
@@ -238,6 +245,7 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 		return err
 	}
 	if restore.Status.Phase != expectedPhase {
+		time.Sleep(100000000 * time.Minute)
 		return errors.Errorf("Unexpected restore phase got %s, expecting %s", restore.Status.Phase, expectedPhase)
 	}
 	return nil

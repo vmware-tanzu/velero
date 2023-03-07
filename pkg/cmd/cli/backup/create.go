@@ -277,8 +277,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if backup.Status.Phase == velerov1api.BackupPhaseFailedValidation || backup.Status.Phase == velerov1api.BackupPhaseCompleted ||
-					backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed || backup.Status.Phase == velerov1api.BackupPhaseFailed {
+				if backup.Status.Phase != velerov1api.BackupPhaseNew && backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
 					return nil
 				}

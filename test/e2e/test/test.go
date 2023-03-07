@@ -148,7 +148,9 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		for k := range tests {
 			curTest := tests[k]
 			It(curTest.GetTestMsg().Text, func() {
+				fmt.Println("====RunTestCase===1==")
 				Expect(RunTestCase(curTest)).To(Succeed(), curTest.GetTestMsg().FailedMSG)
+				fmt.Println("====RunTestCase===2==")
 			})
 		}
 	}
@@ -170,8 +172,10 @@ func (t *TestCase) Backup() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
 	if err := VeleroBackupExec(t.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, "")
+		fmt.Println("RunDebug")
 		return errors.Wrapf(err, "Failed to backup resources")
 	}
+	fmt.Println("return nil")
 	return nil
 }
 
@@ -244,6 +248,8 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 		return err
 	}
 	err = test.Backup()
+	fmt.Println("=======err=========")
+	fmt.Println(err)
 	if err != nil {
 		return err
 	}
