@@ -120,6 +120,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfgForOldVeleroInstall.UploaderType = ""
 				tmpCfgForOldVeleroInstall.UseNodeAgent = false
 				tmpCfgForOldVeleroInstall.UseRestic = !useVolumeSnapshots
+				tmpCfgForOldVeleroInstall.DoNotRemoveItemsInBslConfigForAzure = true
 
 				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,

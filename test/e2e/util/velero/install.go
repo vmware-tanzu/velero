@@ -189,7 +189,12 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 		args = append(args, "--provider", options.ProviderName)
 	}
 	if len(options.BackupStorageConfig.Data()) > 0 {
-		args = append(args, "--backup-location-config", options.BackupStorageConfig.String())
+		bsConfig := options.BackupStorageConfig
+		if options.ProviderName == "azure" {
+			delete(bsConfig.Data(), "resourceGroup")
+			delete(bsConfig.Data(), "subscriptionId")
+		}
+		args = append(args, "--backup-location-config", bsConfig.String())
 	}
 	if len(options.BucketName) > 0 {
 		args = append(args, "--bucket", options.BucketName)
