@@ -172,6 +172,18 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, fmt.Sprintf("--uploader-type=%s", c.uploaderType))
 	}
 
+	if c.restoreOnly {
+		args = append(args, "--restore-only")
+	}
+
+	if c.defaultRepoMaintenanceFrequency > 0 {
+		args = append(args, fmt.Sprintf("--default-repo-maintain-frequency=%v", c.defaultRepoMaintenanceFrequency))
+	}
+
+	if c.garbageCollectionFrequency > 0 {
+		args = append(args, fmt.Sprintf("--garbage-collection-frequency=%v", c.garbageCollectionFrequency))
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
 		TypeMeta: metav1.TypeMeta{
@@ -290,18 +302,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 	}
 
 	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, c.envVars...)
-
-	if c.restoreOnly {
-		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--restore-only")
-	}
-
-	if c.defaultRepoMaintenanceFrequency > 0 {
-		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--default-repo-maintain-frequency=%v", c.defaultRepoMaintenanceFrequency))
-	}
-
-	if c.garbageCollectionFrequency > 0 {
-		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--garbage-collection-frequency=%v", c.garbageCollectionFrequency))
-	}
 
 	if len(c.plugins) > 0 {
 		for _, image := range c.plugins {
