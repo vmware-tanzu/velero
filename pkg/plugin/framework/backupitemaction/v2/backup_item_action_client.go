@@ -118,9 +118,9 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 		additionalItems = append(additionalItems, newItem)
 	}
 
-	var itemsToUpdate []velero.ResourceIdentifier
+	var postOperationItems []velero.ResourceIdentifier
 
-	for _, itm := range res.ItemsToUpdate {
+	for _, itm := range res.PostOperationItems {
 		newItem := velero.ResourceIdentifier{
 			GroupResource: schema.GroupResource{
 				Group:    itm.Group,
@@ -130,10 +130,10 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 			Name:      itm.Name,
 		}
 
-		itemsToUpdate = append(itemsToUpdate, newItem)
+		postOperationItems = append(postOperationItems, newItem)
 	}
 
-	return &updatedItem, additionalItems, res.OperationID, itemsToUpdate, nil
+	return &updatedItem, additionalItems, res.OperationID, postOperationItems, nil
 }
 
 func (c *BackupItemActionGRPCClient) Progress(operationID string, backup *api.Backup) (velero.OperationProgress, error) {

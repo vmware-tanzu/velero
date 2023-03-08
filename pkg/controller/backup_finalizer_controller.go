@@ -94,7 +94,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	switch backup.Status.Phase {
-	case velerov1api.BackupPhaseFinalizingAfterPluginOperations, velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed:
+	case velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		// only process backups finalizing after  plugin operations are complete
 	default:
 		log.Debug("Backup is not awaiting finalizing, skipping")
@@ -168,11 +168,11 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	backupScheduleName := backupRequest.GetLabels()[velerov1api.ScheduleNameLabel]
 	switch backup.Status.Phase {
-	case velerov1api.BackupPhaseFinalizingAfterPluginOperations:
+	case velerov1api.BackupPhaseFinalizing:
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
 		r.metrics.RegisterBackupSuccess(backupScheduleName)
 		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusSucc)
-	case velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed:
+	case velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
 		r.metrics.RegisterBackupPartialFailure(backupScheduleName)
 		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)

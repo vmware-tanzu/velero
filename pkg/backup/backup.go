@@ -422,7 +422,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 }
 
 func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource) bool {
-	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, false)
+	backedUpItem, _, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, false, false)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
@@ -441,7 +441,7 @@ func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.Grou
 }
 
 func (kb *kubernetesBackupper) finalizeItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource) (bool, []FileForArchive) {
-	backedUpItem, updateFiles, err := itemBackupper.finalizeItem(log, unstructured, gr, preferredGVR)
+	backedUpItem, updateFiles, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, true, true)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
@@ -563,15 +563,15 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 		pageSize:              kb.clientPageSize,
 	}
 
-	// Get item list from itemoperation.BackupOperation.Spec.ItemsToUpdate
+	// Get item list from itemoperation.BackupOperation.Spec.PostOperationItems
 	var resourceIDs []velero.ResourceIdentifier
 	for _, operation := range asyncBIAOperations {
-		if len(operation.Spec.ItemsToUpdate) != 0 {
-			resourceIDs = append(resourceIDs, operation.Spec.ItemsToUpdate...)
+		if len(operation.Spec.PostOperationItems) != 0 {
+			resourceIDs = append(resourceIDs, operation.Spec.PostOperationItems...)
 		}
 	}
 	items := collector.getItemsFromResourceIdentifiers(resourceIDs)
-	log.WithField("progress", "").Infof("Collected %d items from the async BIA operations ItemsToUpdate list", len(items))
+	log.WithField("progress", "").Infof("Collected %d items from the async BIA operations PostOperationItems list", len(items))
 
 	itemBackupper := &itemBackupper{
 		backupRequest:   backupRequest,

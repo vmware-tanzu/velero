@@ -44,11 +44,17 @@ type BackupItemAction interface {
 	// including mutating the item itself prior to backup. The item (unmodified or modified)
 	// should be returned, along with an optional slice of ResourceIdentifiers specifying
 	// additional related items that should be backed up now, an optional operationID for actions which
-	// initiate asynchronous actions, and a second slice of ResourceIdentifiers specifying related items
-	// which should be backed up after all asynchronous operations have completed. This last field will be
+	// initiate (asynchronous) operations, and a second slice of ResourceIdentifiers specifying related items
+	// which should be backed up after all operations have completed. This last field will be
 	// ignored if operationID is empty, and should not be filled in unless the resource must be updated in the
-	// backup after async operations complete (i.e. some of the item's kubernetes metadata will be updated
-	// during the asynch operation which will be required during restore)
+	// backup after operations complete (i.e. some of the item's kubernetes metadata will be updated
+	// during the operation which will be required during restore)
+	// Note that (async) operations are not supported for items being backed up during Finalize phases,
+	// so a plugin should not return an OperationID if the backup phase is "Finalizing"
+	// or "FinalizingPartiallyFailed". The plugin should check the incoming
+	// backup.Status.Phase before initiating operations, since the backup has already passed the waiting
+	// for plugin operations phase. Plugins being called during Finalize will only be called for resources
+	// that were returned as postOperationItems.
 	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error)
 
 	// Progress allows the BackupItemAction to report on progress of an asynchronous action.

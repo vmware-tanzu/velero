@@ -72,12 +72,12 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 		expectPhase      velerov1api.BackupPhase
 	}{
 		{
-			name: "FinalizingAfterPluginOperations backup is completed",
+			name: "Finalizing backup is completed",
 			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
 				StorageLocation("default").
 				ObjectMeta(builder.WithUID("foo")).
 				StartTimestamp(fakeClock.Now()).
-				Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperations).Result(),
+				Phase(velerov1api.BackupPhaseFinalizing).Result(),
 			backupLocation: defaultBackupLocation,
 			expectPhase:    velerov1api.BackupPhaseCompleted,
 			backupOperations: []*itemoperation.BackupOperation{
@@ -91,7 +91,7 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						ItemsToUpdate: []velero.ResourceIdentifier{
+						PostOperationItems: []velero.ResourceIdentifier{
 							{
 								GroupResource: kuberesource.Secrets,
 								Namespace:     "ns-1",
@@ -108,12 +108,12 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "FinalizingAfterPluginOperationsPartiallyFailed backup is partially failed",
+			name: "FinalizingPartiallyFailed backup is partially failed",
 			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-2").
 				StorageLocation("default").
 				ObjectMeta(builder.WithUID("foo")).
 				StartTimestamp(fakeClock.Now()).
-				Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed).Result(),
+				Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).Result(),
 			backupLocation: defaultBackupLocation,
 			expectPhase:    velerov1api.BackupPhasePartiallyFailed,
 			backupOperations: []*itemoperation.BackupOperation{
@@ -127,7 +127,7 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 							Namespace:     "ns-2",
 							Name:          "pod-2",
 						},
-						ItemsToUpdate: []velero.ResourceIdentifier{
+						PostOperationItems: []velero.ResourceIdentifier{
 							{
 								GroupResource: kuberesource.Secrets,
 								Namespace:     "ns-2",
