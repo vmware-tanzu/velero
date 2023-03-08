@@ -77,3 +77,11 @@ func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podNa
 
 	return client.ClientGo.CoreV1().Pods(namespace).Update(ctx, newPod, metav1.UpdateOptions{})
 }
+
+func GetPodNodeName(ctx context.Context, client TestClient, namespace, podName string) (string, error) {
+	pod, err := GetPod(ctx, client, namespace, podName)
+	if err != nil {
+		return "", errors.Wrap(err, fmt.Sprintf("Fail to ge pod %s in namespace %s", podName, namespace))
+	}
+	return pod.Spec.NodeName, nil
+}
