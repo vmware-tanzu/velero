@@ -135,6 +135,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					OriginVeleroCfg.UseNodeAgent = false
 					OriginVeleroCfg.UseRestic = !useVolumeSnapshots
 				}
+				OriginVeleroCfg.DoNotRemoveItemsInBslConfigForAzure = false
 
 				Expect(VeleroInstall(context.Background(), &OriginVeleroCfg)).To(Succeed())
 				if veleroCLI2Version.VeleroVersion != "self" {
