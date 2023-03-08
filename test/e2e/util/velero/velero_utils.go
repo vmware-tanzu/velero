@@ -168,36 +168,6 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	return io, nil
 }
 
-func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {
-	stdoutPipe, err := checkCMD.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	jsonBuf := make([]byte, 16*1024) // If the YAML is bigger than 16K, there's probably something bad happening
-
-	err = checkCMD.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
-
-	if err != nil && err != io.ErrUnexpectedEOF {
-		return nil, err
-	}
-	if bytesRead == len(jsonBuf) {
-		return nil, errors.New("yaml returned bigger than max allowed")
-	}
-
-	jsonBuf = jsonBuf[0:bytesRead]
-	err = checkCMD.Wait()
-	if err != nil {
-		return nil, err
-	}
-	return &jsonBuf, err
-}
-
 // checkBackupPhase uses VeleroCLI to inspect the phase of a Velero backup.
 func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string,
 	expectedPhase velerov1api.BackupPhase) error {
@@ -205,7 +175,7 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace str
 		backupName)
 
 	fmt.Printf("get backup cmd =%v\n", checkCMD)
-	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}
@@ -227,7 +197,7 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 		restoreName)
 
 	fmt.Printf("get restore cmd =%v\n", checkCMD)
-	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}
@@ -245,7 +215,7 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string) error {
 	return wait.PollImmediate(time.Second*5, time.Minute*2, func() (bool, error) {
 		checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
-		jsonBuf, err := CMDExecWithOutput(checkCMD)
+		jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 		if err != nil {
 			return false, err
 		}
@@ -265,7 +235,7 @@ func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, schedul
 
 func checkSchedulePause(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, pause bool) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
-	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}
@@ -283,7 +253,7 @@ func checkSchedulePause(ctx context.Context, veleroCLI, veleroNamespace, schedul
 }
 func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, order map[string]string) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
-	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}
@@ -305,7 +275,7 @@ func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamesp
 
 func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, backupName string, order map[string]string) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "get", "backup", backupName, "-ojson")
-	jsonBuf, err := CMDExecWithOutput(checkCMD)
+	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
 	}

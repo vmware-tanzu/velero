@@ -75,15 +75,10 @@ type TestCase struct {
 	RestorePhaseExpect velerov1api.RestorePhase
 }
 
-var TestClientInstance TestClient
-
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		veleroCfg := test.GetTestCase().VeleroCfg
-		By("Create test client instance", func() {
-			TestClientInstance = *veleroCfg.ClientToInstallVelero
-		})
 		BeforeEach(func() {
 			flag.Parse()
 			veleroCfg := test.GetTestCase().VeleroCfg
@@ -117,9 +112,6 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
 			veleroCfg = tests[k].GetTestCase().VeleroCfg
-			By("Create test client instance", func() {
-				TestClientInstance = *veleroCfg.ClientToInstallVelero
-			})
 			useVolumeSnapshots = tests[k].GetTestCase().UseVolumeSnapshots
 		}
 
