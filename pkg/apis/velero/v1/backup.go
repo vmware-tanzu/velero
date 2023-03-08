@@ -124,6 +124,22 @@ type BackupSpec struct {
 	// The default value is 10 minute.
 	// +optional
 	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
+
+	// ItemOperationTimeout specifies the time used to wait for asynchronous BackupItemAction operations
+	// The default value is 1 hour.
+	// +optional
+	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
+	// ResourcePolices specifies the referenced resource policies that backup should follow
+	// +optional
+	ResourcePolices *ResourcePolices `json:"resourcePolices,omitempty"`
+}
+
+// ResourcePolices stored the backup referenced config type and config object name
+type ResourcePolices struct {
+	// RefType is the type of the config object
+	RefType string `json:"refType,omitempty"`
+	// RefName is the name of the config object
+	RefName string `json:"refName,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.

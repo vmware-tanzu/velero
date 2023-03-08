@@ -622,6 +622,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	backupControllerRunInfo := func() controllerRunInfo {
 		backupper, err := backup.NewKubernetesBackupper(
 			s.veleroClient.VeleroV1(),
+			s.mgr.GetClient(),
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
@@ -782,6 +783,52 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
+		}
+	}
+
+	var backupOpsMap *controller.BackupItemOperationsMap
+	if _, ok := enabledRuntimeControllers[controller.AsyncBackupOperations]; ok {
+		r, m := controller.NewAsyncBackupOperationsReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			s.config.itemOperationSyncFrequency,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.AsyncBackupOperations)
+		}
+		backupOpsMap = m
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.BackupFinalizer]; ok {
+		backupper, err := backup.NewKubernetesBackupper(
+			s.veleroClient.VeleroV1(),
+			s.mgr.GetClient(),
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			podvolume.NewBackupperFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(), s.kubeClient.CoreV1(),
+				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
+			s.config.podVolumeOperationTimeout,
+			s.config.defaultVolumesToFsBackup,
+			s.config.clientPageSize,
+			s.config.uploaderType,
+		)
+		cmd.CheckError(err)
+		r := controller.NewBackupFinalizerReconciler(
+			s.mgr.GetClient(),
+			clock.RealClock{},
+			backupper,
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+			s.metrics,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupFinalizer)
 		}
 	}
 

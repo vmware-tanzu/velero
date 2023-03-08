@@ -24,12 +24,15 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -99,8 +102,9 @@ type CreateOptions struct {
 	FromSchedule             string
 	OrderedResources         string
 	CSISnapshotTimeout       time.Duration
-
-	client veleroclient.Interface
+	ItemOperationTimeout     time.Duration
+	ResPoliciesConfigmap     string
+	client                   veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -124,6 +128,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
 	flags.DurationVar(&o.CSISnapshotTimeout, "csi-snapshot-timeout", o.CSISnapshotTimeout, "How long to wait for CSI snapshot creation before timeout.")
+	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup. If the parameter is not set, it is treated as setting to 'true'.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
@@ -134,6 +139,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
 	f.NoOptDefVal = "true"
+
+	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup using")
 }
 
 // BindWait binds the wait flag separately so it is not called by other create
@@ -181,6 +188,27 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	for _, loc := range o.SnapshotLocations {
 		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(context.TODO(), loc, metav1.GetOptions{}); err != nil {
 			return err
+		}
+	}
+
+	if o.ResPoliciesConfigmap != "" {
+		cm := &corev1.ConfigMap{}
+		if err := client.Get(context.Background(), kbclient.ObjectKey{
+			Namespace: f.Namespace(),
+			Name:      o.ResPoliciesConfigmap,
+		}, cm); err != nil {
+			return errors.Wrapf(err, "failed to get resource policies %s/%s", o.ResPoliciesConfigmap, f.Namespace())
+		}
+
+		resPolicies, err := resourcepolicies.GetResourcePoliciesFromConfig(cm)
+		if err == nil {
+			if isValid, err := resourcepolicies.Validate(resPolicies); err != nil {
+				return errors.Wrap(err, "failed to validate the user resource policies config")
+			} else if !isValid {
+				return fmt.Errorf("user resource policies config is unvalid")
+			}
+		} else {
+			return errors.Wrap(err, "failed to get the user resource policies config")
 		}
 	}
 
@@ -275,7 +303,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if backup.Status.Phase != velerov1api.BackupPhaseNew && backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+				if backup.Status.Phase == velerov1api.BackupPhaseFailedValidation || backup.Status.Phase == velerov1api.BackupPhaseCompleted ||
+					backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed || backup.Status.Phase == velerov1api.BackupPhaseFailed {
 					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
 					return nil
 				}
@@ -335,7 +364,8 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...).
-			CSISnapshotTimeout(o.CSISnapshotTimeout)
+			CSISnapshotTimeout(o.CSISnapshotTimeout).
+			ItemOperationTimeout(o.ItemOperationTimeout)
 		if len(o.OrderedResources) > 0 {
 			orders, err := ParseOrderedResources(o.OrderedResources)
 			if err != nil {
@@ -352,6 +382,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 		if o.DefaultVolumesToFsBackup.Value != nil {
 			backupBuilder.DefaultVolumesToFsBackup(*o.DefaultVolumesToFsBackup.Value)
+		}
+		if o.ResPoliciesConfigmap != "" {
+			backupBuilder.ResourcePolices(o.ResPoliciesConfigmap)
 		}
 	}
 

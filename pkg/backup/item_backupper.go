@@ -18,6 +18,7 @@ package backup
 
 import (
 	"archive/tar"
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -47,6 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
+	kbClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -59,6 +62,7 @@ type itemBackupper struct {
 	backupRequest            *Request
 	tarWriter                tarWriter
 	dynamicFactory           client.DynamicFactory
+	kbClient                 kbClient.Client
 	discoveryHelper          discovery.Helper
 	podVolumeBackupper       podvolume.Backupper
 	podVolumeSnapshotTracker *pvcSnapshotTracker
@@ -309,7 +313,7 @@ func (ib *itemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api
 		return nil, nil
 	}
 
-	return ib.podVolumeBackupper.BackupPodVolumes(ib.backupRequest.Backup, pod, volumes, log)
+	return ib.podVolumeBackupper.BackupPodVolumes(ib.backupRequest.Backup, pod, volumes, ib.backupRequest.ResPolicies, log)
 }
 
 func (ib *itemBackupper) executeActions(
@@ -324,10 +328,31 @@ func (ib *itemBackupper) executeActions(
 			continue
 		}
 		log.Info("Executing custom action")
+		if ib.backupRequest.Spec.ResourcePolices != nil && groupResource.String() == "persistentvolumeclaims" && action.Name() == "velero.io/csi-pvc-backupper" {
+			pvc := corev1api.PersistentVolumeClaim{}
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+				return nil, errors.WithStack(err)
+			}
 
-		// Note: we're ignoring the operationID returned from Execute for now, it will be used
-		// with the async plugin action implementation
-		updatedItem, additionalItemIdentifiers, _, err := action.Execute(obj, ib.backupRequest.Backup)
+			pvName := pvc.Spec.VolumeName
+			if pvName == "" {
+				return nil, errors.Errorf("PVC has no volume backing this claim")
+			}
+
+			pv := &corev1api.PersistentVolume{}
+			if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
+				return nil, errors.WithStack(err)
+			}
+
+			volume := resourcepolicies.StructuredVolume{}
+			volume.ParsePV(pv)
+			act := resourcepolicies.GetVolumeMatchedAction(ib.backupRequest.ResPolicies, &volume)
+			if act != nil && act.Type == resourcepolicies.Skip {
+				log.Infof("skip snapshot of pv %s for the matched resource policies", pvName)
+			}
+			return nil, nil
+		}
+		updatedItem, additionalItemIdentifiers, operationID, itemsToUpdate, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
@@ -443,6 +468,16 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) && pv.Spec.CSI != nil {
 		log.Infof("Skipping snapshot of persistent volume %s, because it's handled by CSI plugin.", pv.Name)
 		return nil
+	}
+
+	if ib.backupRequest.Spec.ResourcePolices != nil {
+		structuredVolume := &resourcepolicies.StructuredVolume{}
+		structuredVolume.ParsePV(pv)
+		action := resourcepolicies.GetVolumeMatchedAction(ib.backupRequest.ResPolicies, structuredVolume)
+		if action != nil && action.Type == resourcepolicies.Skip {
+			log.Infof("skip snapshot of pv %s for the matched resource policies", pv.Name)
+			return nil
+		}
 	}
 
 	// TODO: -- once failure-domain.beta.kubernetes.io/zone is no longer

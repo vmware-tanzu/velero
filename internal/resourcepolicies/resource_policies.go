@@ -26,6 +26,9 @@ type VolumePolicy struct {
 	Action     Action                 `yaml:"action"`
 }
 
+// currently only support configmap type of resource config
+const ConfigmapRefType string = "configmap"
+
 // ResourcePolicies currently defined slice of volume policies to handle backup
 type ResourcePolicies struct {
 	Version        string         `yaml:"version"`
@@ -105,9 +108,9 @@ func unmarshalResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 	}
 }
 
-// getVolumeMatchedAction checks the current volume is match resource policies
+// GetVolumeMatchedAction checks the current volume is match resource policies
 // It will return once matched ignoring the latter policies
-func getVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume) *Action {
+func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume) *Action {
 	factory := newResourcePoliciesMatcherFactory(policies)
 	matchers := factory.getMatchers("volume")
 
