@@ -69,6 +69,7 @@ type VeleroConfig struct {
 	ProvideSnapshotsVolumeParam bool
 	DefaultVolumesToFsBackup    bool
 	UseVolumeSnapshots          bool
+	VeleroServerDebugMode       bool
 }
 
 type SnapshotCheckPoint struct {
