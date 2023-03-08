@@ -1,0 +1,1 @@
+Fix client wait problem after async operation change, velero backup/restore --wait should check a full list of the terminal status
