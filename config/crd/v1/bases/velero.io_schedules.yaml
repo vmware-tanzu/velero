@@ -432,6 +432,17 @@ spec:
                       simply use "objectname".
                     nullable: true
                     type: object
+                  resourcePolices:
+                    description: ResourcePolices specifies the referenced resource
+                      policies that backup should follow
+                    properties:
+                      refName:
+                        description: RefName is the name of the config object
+                        type: string
+                      refType:
+                        description: RefType is the type of the config object
+                        type: string
+                    type: object
                   snapshotVolumes:
                     description: SnapshotVolumes specifies whether to take snapshots
                       of any PV's referenced in the set of objects included in the

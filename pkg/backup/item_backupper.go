@@ -37,6 +37,8 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbClient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -51,7 +53,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
-	kbClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -340,8 +341,8 @@ func (ib *itemBackupper) executeActions(
 			act := resourcepolicies.GetVolumeMatchedAction(ib.backupRequest.ResPolicies, &volume)
 			if act != nil && act.Type == resourcepolicies.Skip {
 				log.Infof("skip snapshot of pv %s for the matched resource policies", pvName)
+				return nil, nil
 			}
-			return nil, nil
 		}
 		updatedItem, additionalItemIdentifiers, operationID, itemsToUpdate, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
