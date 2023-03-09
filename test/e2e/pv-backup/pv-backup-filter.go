@@ -118,7 +118,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 			})
 		}
 	})
-	By(fmt.Sprintf("Polulate all pods %s with file %s", p.podsList, FILE_NAME), func() {
+	By(fmt.Sprintf("Populate all pods %s with file %s", p.podsList, FILE_NAME), func() {
 		for index, ns := range *p.NSIncluded {
 			By(fmt.Sprintf("Creating file in all pods to start %d in namespace %s", index, ns), func() {
 				WaitForPods(p.Ctx, p.Client, ns, p.podsList[index])

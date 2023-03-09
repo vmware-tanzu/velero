@@ -272,7 +272,7 @@ ignored.
     type OperationProgress struct {
         Completed bool                          // True when the operation has completed, either successfully or with a failure
         Err string                              // Set when the operation has failed
-        NCompleted, NTotal int64                // Quantity completed so far and the total quanity associated with the operaation in operationUnits
+        NCompleted, NTotal int64                // Quantity completed so far and the total quantity associated with the operaation in operationUnits
                                                 // For data mover and volume snapshotter use cases, this would be in bytes
                                                 // On successful completion, completed and total should be the same.
         OperationUnits string                   // Units represented by completed and total -- for data mover and item
