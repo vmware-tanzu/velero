@@ -96,6 +96,11 @@ func (r *RestartableBackupItemAction) getDelegate() (biav2.BackupItemAction, err
 	return r.getBackupItemAction()
 }
 
+// Name returns the plugin's name.
+func (r *RestartableBackupItemAction) Name() string {
+	return r.Key.Name
+}
+
 // AppliesTo restarts the plugin's process if needed, then delegates the call.
 func (r *RestartableBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	delegate, err := r.getDelegate()
@@ -107,10 +112,10 @@ func (r *RestartableBackupItemAction) AppliesTo() (velero.ResourceSelector, erro
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *RestartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+func (r *RestartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", nil, err
 	}
 
 	return delegate.Execute(item, backup)
@@ -148,15 +153,20 @@ func NewAdaptedV1RestartableBackupItemAction(v1Restartable *biav1cli.Restartable
 	return r
 }
 
+// Name restarts the plugin's name.
+func (r *AdaptedV1RestartableBackupItemAction) Name() string {
+	return r.V1Restartable.Key.Name
+}
+
 // AppliesTo delegates to the v1 AppliesTo call.
 func (r *AdaptedV1RestartableBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return r.V1Restartable.AppliesTo()
 }
 
 // Execute delegates to the v1 Execute call, returning an empty operationID.
-func (r *AdaptedV1RestartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+func (r *AdaptedV1RestartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	updatedItem, additionalItems, err := r.V1Restartable.Execute(item, backup)
-	return updatedItem, additionalItems, "", err
+	return updatedItem, additionalItems, "", nil, err
 }
 
 // Progress returns with an error since v1 plugins will never return an operationID, which means that

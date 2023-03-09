@@ -17,8 +17,10 @@ limitations under the License.
 package controller
 
 const (
+	AsyncBackupOperations = "async-backup-operations"
 	Backup                = "backup"
 	BackupDeletion        = "backup-deletion"
+	BackupFinalizer       = "backup-finalizer"
 	BackupStorageLocation = "backup-storage-location"
 	BackupSync            = "backup-sync"
 	DownloadRequest       = "download-request"
@@ -33,8 +35,10 @@ const (
 
 // DisableableControllers is a list of controllers that can be disabled
 var DisableableControllers = []string{
+	AsyncBackupOperations,
 	Backup,
 	BackupDeletion,
+	BackupFinalizer,
 	BackupSync,
 	DownloadRequest,
 	GarbageCollection,

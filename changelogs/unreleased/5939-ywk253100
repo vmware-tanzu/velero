@@ -1,0 +1,1 @@
+Switch the base image to distroless/base-nossl-debian11 to reduce the CVE triage efforts

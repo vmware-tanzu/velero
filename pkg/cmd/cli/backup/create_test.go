@@ -37,6 +37,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
 	orders, err := ParseOrderedResources(o.OrderedResources)
 	o.CSISnapshotTimeout = 20 * time.Minute
+	o.ItemOperationTimeout = 20 * time.Minute
 	assert.NoError(t, err)
 
 	backup, err := o.BuildBackup(testNamespace)
@@ -49,6 +50,7 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 		IncludeClusterResources: o.IncludeClusterResources.Value,
 		OrderedResources:        orders,
 		CSISnapshotTimeout:      metav1.Duration{Duration: o.CSISnapshotTimeout},
+		ItemOperationTimeout:    metav1.Duration{Duration: o.ItemOperationTimeout},
 	}, backup.Spec)
 
 	assert.Equal(t, map[string]string{

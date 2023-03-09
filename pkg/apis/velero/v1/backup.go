@@ -237,7 +237,7 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;FinalizingAfterPluginOperations;FinalizingAfterPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
 type BackupPhase string
 
 const (
@@ -266,6 +266,23 @@ const (
 	// currently uploading or other plugin operations are still
 	// ongoing.  The backup is not usable yet.
 	BackupPhaseWaitingForPluginOperationsPartiallyFailed BackupPhase = "WaitingForPluginOperationsPartiallyFailed"
+
+	// BackupPhaseFinalizingAfterPluginOperations means the backup of
+	// Kubernetes resources, creation of snapshots, and other
+	// async plugin operations were successful and snapshot upload and
+	// other plugin operations are now complete, but the Backup is awaiting
+	// final update of resources modified during async operations.
+	// The backup is not usable yet.
+	BackupPhaseFinalizingAfterPluginOperations BackupPhase = "FinalizingAfterPluginOperations"
+
+	// BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed means the backup of
+	// Kubernetes resources, creation of snapshots, and other
+	// async plugin operations were successful and snapshot upload and
+	// other plugin operations are now complete, but one or more errors
+	// occurred during backup or async operation processing, and the
+	// Backup is awaiting final update of resources modified during async
+	// operations. The backup is not usable yet.
+	BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed BackupPhase = "FinalizingAfterPluginOperationsPartiallyFailed"
 
 	// BackupPhaseCompleted means the backup has run successfully without
 	// errors.
@@ -367,6 +384,21 @@ type BackupStatus struct {
 	// completed CSI VolumeSnapshots for this backup.
 	// +optional
 	CSIVolumeSnapshotsCompleted int `json:"csiVolumeSnapshotsCompleted,omitempty"`
+
+	// AsyncBackupItemOperationsAttempted is the total number of attempted
+	// async BackupItemAction operations for this backup.
+	// +optional
+	AsyncBackupItemOperationsAttempted int `json:"asyncBackupItemOperationsAttempted,omitempty"`
+
+	// AsyncBackupItemOperationsCompleted is the total number of successfully completed
+	// async BackupItemAction operations for this backup.
+	// +optional
+	AsyncBackupItemOperationsCompleted int `json:"asyncBackupItemOperationsCompleted,omitempty"`
+
+	// AsyncBackupItemOperationsFailed is the total number of async
+	// BackupItemAction operations for this backup which ended with an error.
+	// +optional
+	AsyncBackupItemOperationsFailed int `json:"asyncBackupItemOperationsFailed,omitempty"`
 }
 
 // BackupProgress stores information about the progress of a Backup's execution.

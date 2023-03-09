@@ -205,7 +205,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 			if isValid, err := resourcepolicies.Validate(resPolicies); err != nil {
 				return errors.Wrap(err, "failed to validate the user resource policies config")
 			} else if !isValid {
-				return fmt.Errorf("user resource policies config is unvalid")
+				return fmt.Errorf("user resource policies config is invalid")
 			}
 		} else {
 			return errors.Wrap(err, "failed to get the user resource policies config")

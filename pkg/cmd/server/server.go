@@ -102,7 +102,8 @@ const (
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
 
-	defaultCSISnapshotTimeout = 10 * time.Minute
+	defaultCSISnapshotTimeout   = 10 * time.Minute
+	defaultItemOperationTimeout = 60 * time.Minute
 
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
@@ -114,6 +115,7 @@ type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
 	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
+	defaultItemOperationTimeout                                             time.Duration
 	restoreResourcePriorities                                               restore.Priorities
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -125,6 +127,7 @@ type serverConfig struct {
 	formatFlag                                                              *logging.FormatFlag
 	repoMaintenanceFrequency                                                time.Duration
 	garbageCollectionFrequency                                              time.Duration
+	itemOperationSyncFrequency                                              time.Duration
 	defaultVolumesToFsBackup                                                bool
 	uploaderType                                                            string
 }
@@ -146,6 +149,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			backupSyncPeriod:               defaultBackupSyncPeriod,
 			defaultBackupTTL:               defaultBackupTTL,
 			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
+			defaultItemOperationTimeout:    defaultItemOperationTimeout,
 			storeValidationFrequency:       defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
@@ -221,8 +225,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.repoMaintenanceFrequency, "default-repo-maintain-frequency", config.repoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
+	command.Flags().DurationVar(&config.itemOperationSyncFrequency, "item-operation-sync-frequency", config.itemOperationSyncFrequency, "How often to check status on async backup/restore operations after backup processing.")
 	command.Flags().BoolVar(&config.defaultVolumesToFsBackup, "default-volumes-to-fs-backup", config.defaultVolumesToFsBackup, "Backup all volumes with pod volume file system backup by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
+	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out.")
 
 	return command
 }
@@ -650,6 +656,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultVolumesToFsBackup,
 			s.config.defaultBackupTTL,
 			s.config.defaultCSISnapshotTimeout,
+			s.config.defaultItemOperationTimeout,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
@@ -675,14 +682,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
-		controller.ServerStatusRequest: {},
-		controller.DownloadRequest:     {},
-		controller.Schedule:            {},
-		controller.BackupRepo:          {},
-		controller.BackupDeletion:      {},
-		controller.GarbageCollection:   {},
-		controller.BackupSync:          {},
-		controller.Restore:             {},
+		controller.ServerStatusRequest:   {},
+		controller.DownloadRequest:       {},
+		controller.Schedule:              {},
+		controller.BackupRepo:            {},
+		controller.BackupDeletion:        {},
+		controller.BackupFinalizer:       {},
+		controller.GarbageCollection:     {},
+		controller.BackupSync:            {},
+		controller.AsyncBackupOperations: {},
+		controller.Restore:               {},
 	}
 
 	if s.config.restoreOnly {
@@ -692,6 +701,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			controller.Schedule,
 			controller.GarbageCollection,
 			controller.BackupDeletion,
+			controller.BackupFinalizer,
+			controller.AsyncBackupOperations,
 		)
 	}
 
@@ -839,6 +850,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			newPluginManager,
 			backupStoreGetter,
 			s.logger,
+			backupOpsMap,
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)

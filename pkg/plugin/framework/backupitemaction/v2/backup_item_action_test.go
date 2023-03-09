@@ -97,6 +97,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 		implUpdatedItem     runtime.Unstructured
 		implAdditionalItems []velero.ResourceIdentifier
 		implOperationID     string
+		implItemsToUpdate   []velero.ResourceIdentifier
 		implError           error
 		expectError         bool
 		skipMock            bool
@@ -153,7 +154,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 			defer itemAction.AssertExpectations(t)
 
 			if !test.skipMock {
-				itemAction.On("Execute", &validItemObject, &validBackupObject).Return(test.implUpdatedItem, test.implAdditionalItems, test.implOperationID, test.implError)
+				itemAction.On("Execute", &validItemObject, &validBackupObject).Return(test.implUpdatedItem, test.implAdditionalItems, test.implOperationID, test.implItemsToUpdate, test.implError)
 			}
 
 			s := &BackupItemActionGRPCServer{mux: &common.ServerMux{

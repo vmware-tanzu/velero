@@ -179,7 +179,7 @@ func TestGetVolumeMatchedAction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			action := getVolumeMatchedAction(resPolicies, tc.volume)
+			action := GetVolumeMatchedAction(resPolicies, tc.volume)
 			if action == nil {
 				if tc.expectedAction != nil {
 					t.Errorf("Expected action %v, but got result nil", tc.expectedAction.Type)

@@ -28,11 +28,20 @@ import (
 
 // GetItemFilePath returns an item's file path once extracted from a Velero backup archive.
 func GetItemFilePath(rootDir, groupResource, namespace, name string) string {
-	switch namespace {
-	case "":
-		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.ClusterScopedDir, name+".json")
-	default:
-		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.NamespaceScopedDir, namespace, name+".json")
+	return GetVersionedItemFilePath(rootDir, groupResource, namespace, name, "")
+}
+
+// GetVersionedItemFilePath returns an item's file path once extracted from a Velero backup archive, with version included.
+func GetVersionedItemFilePath(rootDir, groupResource, namespace, name, versionPath string) string {
+	return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, versionPath, GetScopeDir(namespace), namespace, name+".json")
+}
+
+// GetScopeDir returns NamespaceScopedDir if namespace is present, or ClusterScopedDir if empty
+func GetScopeDir(namespace string) string {
+	if namespace == "" {
+		return velerov1api.ClusterScopedDir
+	} else {
+		return velerov1api.NamespaceScopedDir
 	}
 }
 

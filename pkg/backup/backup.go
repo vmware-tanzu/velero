@@ -70,6 +70,9 @@ type Backupper interface {
 	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
 		backupItemActionResolver framework.BackupItemActionResolverV2, itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		volumeSnapshotterGetter VolumeSnapshotterGetter) error
+	FinalizeBackup(log logrus.FieldLogger, backupRequest *Request, inBackupFile io.Reader, outBackupFile io.Writer,
+		backupItemActionResolver framework.BackupItemActionResolverV2,
+		asyncBIAOperations []*itemoperation.BackupOperation) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -439,6 +442,25 @@ func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.Grou
 		return false
 	}
 	return backedUpItem
+}
+
+func (kb *kubernetesBackupper) finalizeItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource) (bool, []FileForArchive) {
+	backedUpItem, updateFiles, err := itemBackupper.finalizeItem(log, unstructured, gr, preferredGVR)
+	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
+		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
+		// log each error separately so we get error location info in the log, and an
+		// accurate count of errors
+		for _, err = range aggregate.Errors() {
+			log.WithError(err).WithField("name", unstructured.GetName()).Error("Error backing up item")
+		}
+
+		return false, updateFiles
+	}
+	if err != nil {
+		log.WithError(err).WithField("name", unstructured.GetName()).Error("Error backing up item")
+		return false, updateFiles
+	}
+	return backedUpItem, updateFiles
 }
 
 // backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
