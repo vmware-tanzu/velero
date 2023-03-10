@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 )
 
@@ -54,4 +56,34 @@ func GetListByCmdPipes(ctx context.Context, cmdlines []*OsCommandLine) ([]string
 	}
 
 	return ret, nil
+}
+
+func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {
+	stdoutPipe, err := checkCMD.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	jsonBuf := make([]byte, 128*1024) // If the YAML is bigger than 64K, there's probably something bad happening
+
+	err = checkCMD.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
+
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	if bytesRead == len(jsonBuf) {
+		return nil, errors.New("yaml returned bigger than max allowed")
+	}
+
+	jsonBuf = jsonBuf[0:bytesRead]
+	err = checkCMD.Wait()
+	if err != nil {
+		return nil, err
+	}
+	return &jsonBuf, err
 }

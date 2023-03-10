@@ -38,7 +38,6 @@ func (n *NodePort) Init() error {
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.NSBaseName = NodeportBaseName
-	n.NamespacesTotal = 1
 	n.TestMsg = &TestMSG{
 		Desc:      fmt.Sprintf("Nodeport preservation"),
 		FailedMSG: "Failed to restore with nodeport preservation",

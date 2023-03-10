@@ -28,6 +28,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -35,9 +36,19 @@ import (
 
 func CreateNamespace(ctx context.Context, client TestClient, namespace string) error {
 	ns := builder.ForNamespace(namespace).Result()
-	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		return nil
+
+	if err := wait.PollImmediate(PollInterval, PollTimeout, func() (bool, error) {
+		if _, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{}); err != nil {
+			fmt.Println("=======")
+			fmt.Println(err)
+			if apierrors.IsAlreadyExists(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("failed to create namespace: %v", err)
 	}
 	return err
 }

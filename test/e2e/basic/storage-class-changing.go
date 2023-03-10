@@ -40,7 +40,6 @@ func (s *StorageClasssChanging) Init() error {
 	s.NSBaseName = SCCBaseName
 	s.namespace = s.NSBaseName + UUIDgen.String()
 	s.mappedNS = s.namespace + "-mapped"
-	s.NamespacesTotal = 1
 	s.TestMsg = &TestMSG{
 		Desc:      "Changing PV/PVC Storage Classes",
 		FailedMSG: "Failed to changing PV/PVC Storage Classes",
@@ -86,7 +85,7 @@ func (s *StorageClasssChanging) CreateResources() error {
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
-		_, err := CreatePodWithPVC(s.Client, s.namespace, s.podName, s.srcStorageClass, []string{s.volume})
+		_, err := CreatePodWithPVC(s.Client, s.namespace, s.podName, s.srcStorageClass, "", []string{s.volume}, nil)
 		Expect(err).To(Succeed())
 	})
 	By(fmt.Sprintf("Create ConfigMap %s in namespace %s", s.configmaptName, s.VeleroCfg.VeleroNamespace), func() {
@@ -130,6 +129,7 @@ func (s *StorageClasssChanging) Restore() error {
 }
 func (s *StorageClasssChanging) Verify() error {
 	By(fmt.Sprintf("Expect storage class of PV %s to be %s ", s.volume, s.desStorageClass), func() {
+		time.Sleep(1 * time.Minute)
 		pvName, err := GetPVByPodName(s.Client, s.mappedNS, s.volume)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV name by pod name %s", s.podName))
 		pv, err := GetPersistentVolume(s.Ctx, s.Client, s.mappedNS, pvName)

@@ -255,10 +255,16 @@ func GetPVByPodName(client TestClient, namespace, podName string) (string, error
 	}
 	return pv_value.Name, nil
 }
-func CreatePodWithPVC(client TestClient, ns, podName, sc string, volumeNameList []string) (*corev1.Pod, error) {
+func CreatePodWithPVC(client TestClient, ns, podName, sc, pvcName string, volumeNameList []string, pvcAnn map[string]string) (*corev1.Pod, error) {
 	volumes := []corev1.Volume{}
 	for _, volume := range volumeNameList {
-		pvc, err := CreatePVC(client, ns, fmt.Sprintf("pvc-%s", volume), sc)
+		var _pvcName string
+		if pvcName == "" {
+			_pvcName = fmt.Sprintf("pvc-%s", volume)
+		} else {
+			_pvcName = pvcName
+		}
+		pvc, err := CreatePVC(client, ns, _pvcName, sc, pvcAnn)
 		if err != nil {
 			return nil, err
 		}
@@ -354,4 +360,18 @@ func GetAllService(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return stdout, nil
+}
+
+func CreateNS(ns string) error {
+	arg := []string{"create", "namespace", ns}
+	cmd := exec.CommandContext(context.Background(), "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	fmt.Println(stdout)
+	if err != nil {
+		fmt.Println(stderr)
+		fmt.Println(err)
+		return err
+	}
+	return nil
 }
