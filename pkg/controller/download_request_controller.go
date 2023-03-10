@@ -68,6 +68,7 @@ func NewDownloadRequestReconciler(
 
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests/status,verbs=get;update;patch
+
 func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithFields(logrus.Fields{
 		"controller":      "download-request",

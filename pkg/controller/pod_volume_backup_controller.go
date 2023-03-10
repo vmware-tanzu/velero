@@ -67,6 +67,7 @@ type BackupProgressUpdater struct {
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups/status,verbs=get;update;patch
+
 func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithFields(logrus.Fields{
 		"controller":      "podvolumebackup",
