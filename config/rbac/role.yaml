@@ -187,6 +187,12 @@ rules:
 - apiGroups:
   - velero.io
   resources:
+  - restorestoragelocations
+  verbs:
+  - get
+- apiGroups:
+  - velero.io
+  resources:
   - schedules
   verbs:
   - create

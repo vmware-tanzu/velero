@@ -112,6 +112,11 @@ type RestoreSpec struct {
 	// +optional
 	// +nullable
 	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`
+
+	// ItemOperationTimeout specifies the time used to wait for RestoreItemAction operations
+	// The default value is 1 hour.
+	// +optional
+	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
@@ -314,6 +319,21 @@ type RestoreStatus struct {
 	// +optional
 	// +nullable
 	Progress *RestoreProgress `json:"progress,omitempty"`
+
+	// RestoreItemOperationsAttempted is the total number of attempted
+	// async RestoreItemAction operations for this restore.
+	// +optional
+	RestoreItemOperationsAttempted int `json:"restoreItemOperationsAttempted,omitempty"`
+
+	// RestoreItemOperationsCompleted is the total number of successfully completed
+	// async RestoreItemAction operations for this restore.
+	// +optional
+	RestoreItemOperationsCompleted int `json:"restoreItemOperationsCompleted,omitempty"`
+
+	// RestoreItemOperationsFailed is the total number of async
+	// RestoreItemAction operations for this restore which ended with an error.
+	// +optional
+	RestoreItemOperationsFailed int `json:"restoreItemOperationsFailed,omitempty"`
 }
 
 // RestoreProgress stores information about the restore's execution progress

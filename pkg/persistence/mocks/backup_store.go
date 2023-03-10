@@ -407,13 +407,13 @@ func (_m *BackupStore) PutBackupMetadata(backup string, backupMetadata io.Reader
 	return r0
 }
 
-// PutRestoreItemOperations provides a mock function with given fields: backup, restore, restoreItemOperations
-func (_m *BackupStore) PutRestoreItemOperations(backup string, restore string, restoreItemOperations io.Reader) error {
-	ret := _m.Called(backup, restore, restoreItemOperations)
+// PutRestoreItemOperations provides a mock function with given fields: restore, restoreItemOperations
+func (_m *BackupStore) PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error {
+	ret := _m.Called(restore, restoreItemOperations)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, io.Reader) error); ok {
-		r0 = rf(backup, restore, restoreItemOperations)
+	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
+		r0 = rf(restore, restoreItemOperations)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -449,6 +449,20 @@ func (_m *BackupStore) PutRestoreResults(backup string, restore string, results 
 	return r0
 }
 
+// PutRestoredResourceList provides a mock function with given fields: restore, results
+func (_m *BackupStore) PutRestoredResourceList(restore string, results io.Reader) error {
+	ret := _m.Called(restore, results)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
+		r0 = rf(restore, results)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewBackupStore interface {
 	mock.TestingT
 	Cleanup(func())
@@ -462,17 +476,4 @@ func NewBackupStore(t mockConstructorTestingTNewBackupStore) *BackupStore {
 	t.Cleanup(func() { mock.AssertExpectations(t) })
 
 	return mock
-}
-
-func (_m *BackupStore) PutRestoredResourceList(restore string, results io.Reader) error {
-	ret := _m.Called(restore, results)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
-		r0 = rf(restore, results)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }

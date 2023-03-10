@@ -111,6 +111,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
+				60*time.Minute,
 			)
 
 			if test.backupStoreError == nil {
@@ -193,6 +194,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				nil, // backupStoreGetter
 				metrics.NewServerMetrics(),
 				formatFlag,
+				60*time.Minute,
 			)
 
 			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
@@ -422,6 +424,7 @@ func TestRestoreReconcile(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
+				60*time.Minute,
 			)
 
 			r.clock = clocktesting.NewFakeClock(now)
@@ -453,6 +456,7 @@ func TestRestoreReconcile(t *testing.T) {
 
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 				backupStore.On("PutRestoredResourceList", test.restore.Name, mock.Anything).Return(nil)
+				backupStore.On("PutRestoreItemOperations", mock.Anything, mock.Anything).Return(nil)
 
 				volumeSnapshots := []*volume.Snapshot{
 					{
@@ -586,6 +590,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		metrics.NewServerMetrics(),
 		formatFlag,
+		60*time.Minute,
 	)
 
 	restore := &velerov1api.Restore{
@@ -746,7 +751,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 }
 
 func NewRestore(ns, name, backup, includeNS, includeResource string, phase velerov1api.RestorePhase) *builder.RestoreBuilder {
-	restore := builder.ForRestore(ns, name).Phase(phase).Backup(backup)
+	restore := builder.ForRestore(ns, name).Phase(phase).Backup(backup).ItemOperationTimeout(60 * time.Minute)
 
 	if includeNS != "" {
 		restore = restore.IncludedNamespaces(includeNS)

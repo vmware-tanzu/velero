@@ -44,6 +44,8 @@ type downloadRequestReconciler struct {
 
 	// used to force update of async backup item operations before processing download request
 	backupItemOperationsMap *itemoperationmap.BackupItemOperationsMap
+	// used to force update of async restore item operations before processing download request
+	restoreItemOperationsMap *itemoperationmap.RestoreItemOperationsMap
 
 	log logrus.FieldLogger
 }
@@ -56,14 +58,16 @@ func NewDownloadRequestReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,
 	backupItemOperationsMap *itemoperationmap.BackupItemOperationsMap,
+	restoreItemOperationsMap *itemoperationmap.RestoreItemOperationsMap,
 ) *downloadRequestReconciler {
 	return &downloadRequestReconciler{
-		client:                  client,
-		clock:                   clock,
-		newPluginManager:        newPluginManager,
-		backupStoreGetter:       backupStoreGetter,
-		backupItemOperationsMap: backupItemOperationsMap,
-		log:                     log,
+		client:                   client,
+		clock:                    clock,
+		newPluginManager:         newPluginManager,
+		backupStoreGetter:        backupStoreGetter,
+		backupItemOperationsMap:  backupItemOperationsMap,
+		restoreItemOperationsMap: restoreItemOperationsMap,
+		log:                      log,
 	}
 }
 
@@ -129,7 +133,8 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreLog ||
 			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResults ||
-			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResourceList {
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResourceList ||
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreItemOperations {
 			restore := &velerov1api.Restore{}
 			if err := r.client.Get(ctx, kbclient.ObjectKey{
 				Namespace: downloadRequest.Namespace,
@@ -171,6 +176,13 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			r.backupItemOperationsMap != nil {
 			// ignore errors here. If we can't upload anything here, process the download as usual
 			_ = r.backupItemOperationsMap.UpdateForBackup(backupStore, backupName)
+		}
+		// If this is a request for restore item operations, force upload of in-memory operations that
+		// are not yet uploaded (if there are any)
+		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreItemOperations &&
+			r.restoreItemOperationsMap != nil {
+			// ignore errors here. If we can't upload anything here, process the download as usual
+			_ = r.restoreItemOperationsMap.UpdateForRestore(backupStore, downloadRequest.Spec.Target.Name)
 		}
 		if downloadRequest.Status.DownloadURL, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
 			return ctrl.Result{Requeue: true}, errors.WithStack(err)

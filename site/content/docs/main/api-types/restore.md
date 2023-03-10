@@ -35,6 +35,10 @@ spec:
   # to restore from. If specified, and BackupName is empty, Velero will
   # restore from the most recent successful backup created from this schedule.
   scheduleName: my-scheduled-backup-name
+  # ItemOperationTimeout specifies the time used to wait for
+  # asynchronous BackupItemAction operations
+  # The default value is 1 hour.
+  itemOperationTimeout: 1h
   # Array of namespaces to include in the restore. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
@@ -185,6 +189,12 @@ status:
   phase: ""
   # An array of any validation errors encountered.
   validationErrors: null
+  # Number of attempted RestoreItemAction operations for this restore.
+  restoreItemOperationsAttempted: 2
+  # Number of RestoreItemAction operations that Velero successfully completed for this restore.
+  restoreItemOperationsCompleted: 1
+  # Number of RestoreItemAction operations that ended in failure for this restore.
+  restoreItemOperationsFailed: 0
   # Number of warnings that were logged by the restore.
   warnings: 2
   # Errors is a count of all error messages that were generated
