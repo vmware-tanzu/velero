@@ -101,10 +101,6 @@ func Validate(resPolicies *ResourcePolicies) (bool, error) {
 		if ok, err := resPolicies.VolumePolicies[k].Action.Validate(); !ok {
 			return false, errors.Wrap(err, "failed to validate config")
 		}
-		_, err := unmarshalVolConditions(resPolicies.VolumePolicies[k].Conditions) // validate keys by yamlv3
-		if err != nil {
-			return false, err
-		}
 		if err := matcher.addPolicy(&resPolicies.VolumePolicies[k]); err != nil {
 			return false, errors.Wrap(err, "failed to validate config")
 		}

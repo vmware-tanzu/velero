@@ -81,7 +81,7 @@ Server:
 
 Below we've done 6 groups of tests, for each single group of test, we used limited resources (1 core CPU 2 GB memory or 4 cores CPU 4 GB memory) to do Velero file system backup under Restic path and Kopia path, and then compare the results.
 
-Recorded the metrics of time consumption, maximum CPU usage, maximum memory usage, and minio strorage usage for node-agent daemonset, and the metrics of Velero deployment are not included since the differences are not obvious by whether using Restic uploader or Kopia uploader.
+Recorded the metrics of time consumption, maximum CPU usage, maximum memory usage, and minio storage usage for node-agent daemonset, and the metrics of Velero deployment are not included since the differences are not obvious by whether using Restic uploader or Kopia uploader.
 
 Compression is either disabled or not unavailable for both uploader.
 

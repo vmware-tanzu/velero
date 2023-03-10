@@ -330,6 +330,11 @@ type RestoreProgress struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:object:generate=true
+// +kubebuilder:storageversion
+// +kubebuilder:rbac:groups=velero.io,resources=restores,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups=velero.io,resources=restores/status,verbs=get;update;patch
 
 // Restore is a Velero resource that represents the application of
 // resources from a Velero backup to a target Kubernetes cluster.

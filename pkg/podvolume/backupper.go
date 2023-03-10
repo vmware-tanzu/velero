@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-	respolicies "github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -184,27 +183,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
-		if backup.Spec.ResourcePolices != nil {
-			structuredVolume := &respolicies.StructuredVolume{}
-			var volumeName string
-			if pvc != nil {
-				pv, err := b.pvClient.PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
-				if err != nil {
-					errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
-				}
-				structuredVolume.ParsePV(pv)
-				volumeName = pv.Name
-			} else {
-				structuredVolume.ParsePodVolume(&volume)
-				volumeName = volume.Name
-			}
-			action := respolicies.GetVolumeMatchedAction(resPolicies, structuredVolume)
-			if action != nil && action.Type == respolicies.Skip {
-				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
-				continue
-			}
-		}
-
 		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
 		// daemonset pod has no way to access their data.
 		isHostPath, err := isHostPathVolume(&volume, pvc, b.pvClient.PersistentVolumes())
@@ -222,6 +200,27 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		if !mountedPodVolumes.Has(volumeName) {
 			log.Warnf("Volume %s is declared in pod %s/%s but not mounted by any container, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
+		}
+
+		if backup.Spec.ResourcePolices != nil {
+			structuredVolume := &resourcepolicies.StructuredVolume{}
+			var volumeName string
+			if pvc != nil {
+				pv, err := b.pvClient.PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+				if err != nil {
+					errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
+				}
+				structuredVolume.ParsePV(pv)
+				volumeName = pv.Name
+			} else {
+				structuredVolume.ParsePodVolume(&volume)
+				volumeName = volume.Name
+			}
+			action := resourcepolicies.GetVolumeMatchedAction(resPolicies, structuredVolume)
+			if action != nil && action.Type == resourcepolicies.Skip {
+				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
+				continue
+			}
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, b.uploaderType, pvc)

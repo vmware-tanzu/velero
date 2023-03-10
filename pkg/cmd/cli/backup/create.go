@@ -197,7 +197,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 			Namespace: f.Namespace(),
 			Name:      o.ResPoliciesConfigmap,
 		}, cm); err != nil {
-			return errors.Wrapf(err, "failed to get resource policies %s/%s", o.ResPoliciesConfigmap, f.Namespace())
+			return errors.Wrapf(err, "failed to get resource policies %s/%s", f.Namespace(), o.ResPoliciesConfigmap)
 		}
 
 		resPolicies, err := resourcepolicies.GetResourcePoliciesFromConfig(cm)

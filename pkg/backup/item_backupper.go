@@ -226,6 +226,8 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			backupErrs = append(backupErrs, err)
 		}
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
+	} else if updatedObj == nil { // which would be skip handle obj by resource policies
+		return true, itemFiles, nil
 	}
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
