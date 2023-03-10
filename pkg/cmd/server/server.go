@@ -173,6 +173,20 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long:   "Run the velero server",
 		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
+			// load time zone information from the system so logs are timestamped with local time
+			// rather than UTC
+			tzEnv := os.Getenv("TZ")
+			// if TZ is not set, respect system default
+			if tzEnv == "" {
+				// do nothing
+			} else {
+				loc, err := time.LoadLocation(tzEnv)
+				if err != nil {
+					logrus.WithError(err).WithField("TZ", tzEnv).Fatal("Error loading time zone")
+				}
+				time.Local = loc
+			}
+
 			// go-plugin uses log.Println to log when it's waiting for all plugin processes to complete so we need to
 			// set its output to stdout.
 			log.SetOutput(os.Stdout)
