@@ -33,6 +33,10 @@ spec:
   # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
   # returning error as timeout. The default value is 10 minute.
   csiSnapshotTimeout: 10m
+  # ItemOperationTimeout specifies the time used to wait for
+  # asynchronous BackupItemAction operations
+  # The default value is 1 hour.
+  csiSnapshotTimeout: 1h
   # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
@@ -146,7 +150,8 @@ status:
   expiration: null
   # The current phase.
   # Valid values are New, FailedValidation, InProgress, WaitingForPluginOperations,
-  # WaitingForPluginOperationsPartiallyFailed, Completed, PartiallyFailed, Failed.
+  # WaitingForPluginOperationsPartiallyFailed, FinalizingafterPluginOperations,
+  # FinalizingAfterPluginOperationsPartiallyFailed, Completed, PartiallyFailed, Failed.
   phase: ""
   # An array of any validation errors encountered.
   validationErrors: null
@@ -158,6 +163,12 @@ status:
   volumeSnapshotsAttempted: 2
   # Number of volume snapshots that Velero successfully created for this backup.
   volumeSnapshotsCompleted: 1
+  # Number of attempted async BackupItemAction operations for this backup.
+  asyncBackupItemOperationsAttempted: 2
+  # Number of async BackupItemAction operations that Velero successfully completed for this backup.
+  asyncBackupItemOperationsCompleted: 1
+  # Number of async BackupItemAction operations that ended in failure for this backup.
+  asyncBackupItemOperationsFailed: 0
   # Number of warnings that were logged by the backup.
   warnings: 2
   # Number of errors that were logged by the backup.

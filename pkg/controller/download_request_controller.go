@@ -41,6 +41,9 @@ type downloadRequestReconciler struct {
 	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 
+	// used to force update of async backup item operations before processing download request
+	backupItemOperationsMap *BackupItemOperationsMap
+
 	log logrus.FieldLogger
 }
 
@@ -51,18 +54,21 @@ func NewDownloadRequestReconciler(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,
+	backupItemOperationsMap *BackupItemOperationsMap,
 ) *downloadRequestReconciler {
 	return &downloadRequestReconciler{
-		client:            client,
-		clock:             clock,
-		newPluginManager:  newPluginManager,
-		backupStoreGetter: backupStoreGetter,
-		log:               log,
+		client:                  client,
+		clock:                   clock,
+		newPluginManager:        newPluginManager,
+		backupStoreGetter:       backupStoreGetter,
+		backupItemOperationsMap: backupItemOperationsMap,
+		log:                     log,
 	}
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests/status,verbs=get;update;patch
+
 func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithFields(logrus.Fields{
 		"controller":      "download-request",
@@ -158,6 +164,13 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 
+		// If this is a request for backup item operations, force update of in-memory operations that
+		// are not yet uploaded
+		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindBackupItemOperations &&
+			r.backupItemOperationsMap != nil {
+			// ignore errors here. If we can't upload anything here, process the download as usual
+			_ = r.backupItemOperationsMap.UpdateForBackup(backupStore, backupName)
+		}
 		if downloadRequest.Status.DownloadURL, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
 			return ctrl.Result{Requeue: true}, errors.WithStack(err)
 		}

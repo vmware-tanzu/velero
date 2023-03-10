@@ -273,6 +273,11 @@ spec:
                   type: string
                 nullable: true
                 type: array
+              itemOperationTimeout:
+                description: ItemOperationTimeout specifies the time used to wait
+                  for asynchronous BackupItemAction operations The default value is
+                  1 hour.
+                type: string
               labelSelector:
                 description: LabelSelector is a metav1.LabelSelector to filter with
                   when adding individual objects to the backup. If empty or nil, all
@@ -415,6 +420,20 @@ spec:
           status:
             description: BackupStatus captures the current status of a Velero backup.
             properties:
+              asyncBackupItemOperationsAttempted:
+                description: AsyncBackupItemOperationsAttempted is the total number
+                  of attempted async BackupItemAction operations for this backup.
+                type: integer
+              asyncBackupItemOperationsCompleted:
+                description: AsyncBackupItemOperationsCompleted is the total number
+                  of successfully completed async BackupItemAction operations for
+                  this backup.
+                type: integer
+              asyncBackupItemOperationsFailed:
+                description: AsyncBackupItemOperationsFailed is the total number of
+                  async BackupItemAction operations for this backup which ended with
+                  an error.
+                type: integer
               completionTimestamp:
                 description: CompletionTimestamp records the time a backup was completed.
                   Completion time is recorded even on failed backups. Completion time
@@ -457,6 +476,8 @@ spec:
                 - InProgress
                 - WaitingForPluginOperations
                 - WaitingForPluginOperationsPartiallyFailed
+                - FinalizingAfterPluginOperations
+                - FinalizingAfterPluginOperationsPartiallyFailed
                 - Completed
                 - PartiallyFailed
                 - Failed

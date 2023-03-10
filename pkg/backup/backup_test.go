@@ -45,6 +45,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
@@ -1002,7 +1003,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			},
 		},
 		{
-			name:   "when deployments exist that are not in the cohabitating groups those are backed up along with apps/deployments",
+			name:   "when deployments exist that are not in the cohabiting groups those are backed up along with apps/deployments",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.VeleroDeployments(
@@ -1047,7 +1048,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 }
 
 // TestBackupUsesNewCohabitatingResourcesForEachBackup ensures that when two backups are
-// run that each include cohabitating resources, one copy of the relevant resources is
+// run that each include cohabiting resources, one copy of the relevant resources is
 // backed up in each backup. Verification is done by looking at the contents of the backup
 // tarball. This covers a specific issue that was fixed by https://github.com/vmware-tanzu/velero/pull/485.
 func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
@@ -1140,17 +1141,18 @@ type recordResourcesAction struct {
 	backups         []velerov1.Backup
 	additionalItems []velero.ResourceIdentifier
 	operationID     string
+	itemsToUpdate   []velero.ResourceIdentifier
 }
 
-func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	metadata, err := meta.Accessor(item)
 	if err != nil {
-		return item, a.additionalItems, a.operationID, err
+		return item, a.additionalItems, a.operationID, a.itemsToUpdate, err
 	}
 	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
 	a.backups = append(a.backups, *backup)
 
-	return item, a.additionalItems, a.operationID, nil
+	return item, a.additionalItems, a.operationID, a.itemsToUpdate, nil
 }
 
 func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
@@ -1163,6 +1165,10 @@ func (a *recordResourcesAction) Progress(operationID string, backup *velerov1.Ba
 
 func (a *recordResourcesAction) Cancel(operationID string, backup *velerov1.Backup) error {
 	return nil
+}
+
+func (a *recordResourcesAction) Name() string {
+	return ""
 }
 
 func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
@@ -1462,7 +1468,7 @@ func (a *appliesToErrorAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{}, errors.New("error calling AppliesTo")
 }
 
-func (a *appliesToErrorAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+func (a *appliesToErrorAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	panic("not implemented")
 }
 
@@ -1474,6 +1480,10 @@ func (a *appliesToErrorAction) Cancel(operationID string, backup *velerov1.Backu
 	panic("not implemented")
 }
 
+func (a *appliesToErrorAction) Name() string {
+	return ""
+}
+
 // TestBackupActionModifications runs backups with backup item actions that make modifications
 // to items in their Execute(...) methods and verifies that these modifications are
 // persisted to the backup tarball. Verification is done by inspecting the file contents
@@ -1483,16 +1493,16 @@ func TestBackupActionModifications(t *testing.T) {
 	// method modifies the item being passed in by calling the 'modify' function on it.
 	modifyingActionGetter := func(modify func(*unstructured.Unstructured)) *pluggableAction {
 		return &pluggableAction{
-			executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+			executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 				obj, ok := item.(*unstructured.Unstructured)
 				if !ok {
-					return nil, nil, "", errors.Errorf("unexpected type %T", item)
+					return nil, nil, "", nil, errors.Errorf("unexpected type %T", item)
 				}
 
 				res := obj.DeepCopy()
 				modify(res)
 
-				return res, nil, "", nil
+				return res, nil, "", nil, nil
 			},
 		}
 	}
@@ -1621,13 +1631,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
 					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
 							{GroupResource: kuberesource.Pods, Namespace: "ns-3", Name: "pod-3"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -1652,13 +1662,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
 							{GroupResource: kuberesource.Pods, Namespace: "ns-3", Name: "pod-3"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -1682,13 +1692,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -1715,13 +1725,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -1745,13 +1755,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -1776,13 +1786,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
 							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -1807,13 +1817,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			actions: []biav2.BackupItemAction{
 				&pluggableAction{
 					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
-					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 						additionalItems := []velero.ResourceIdentifier{
 							{GroupResource: kuberesource.Pods, Namespace: "ns-4", Name: "pod-4"},
 							{GroupResource: kuberesource.Pods, Namespace: "ns-5", Name: "pod-5"},
 						}
 
-						return item, additionalItems, "", nil
+						return item, additionalItems, "", nil, nil
 					},
 				},
 			},
@@ -2288,6 +2298,167 @@ func TestBackupWithSnapshots(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
+		})
+	}
+}
+
+// TestBackupWithAsyncOperations runs backups which return operationIDs and
+// verifies that the itemoperations are tracked as appropriate. Verification is done by
+// looking at the backup request's itemOperationsList field.
+func TestBackupWithAsyncOperations(t *testing.T) {
+	// completedOperationAction is a *pluggableAction, whose Execute(...)
+	// method returns an operationID which will always be done when calling Progress.
+	completedOperationAction := &pluggableAction{
+		executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+			obj, ok := item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, nil, "", nil, errors.Errorf("unexpected type %T", item)
+			}
+
+			return obj, nil, obj.GetName() + "-1", nil, nil
+		},
+		progressFunc: func(operationID string, backup *velerov1.Backup) (velero.OperationProgress, error) {
+			return velero.OperationProgress{
+				Completed:   true,
+				Description: "Done!",
+			}, nil
+		},
+	}
+
+	// incompleteOperationAction is a *pluggableAction, whose Execute(...)
+	// method returns an operationID which will never be done when calling Progress.
+	incompleteOperationAction := &pluggableAction{
+		executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+			obj, ok := item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, nil, "", nil, errors.Errorf("unexpected type %T", item)
+			}
+
+			return obj, nil, obj.GetName() + "-1", nil, nil
+		},
+		progressFunc: func(operationID string, backup *velerov1.Backup) (velero.OperationProgress, error) {
+			return velero.OperationProgress{
+				Completed:   false,
+				Description: "Working...",
+			}, nil
+		},
+	}
+
+	// noOperationAction is a *pluggableAction, whose Execute(...)
+	// method does not return an operationID.
+	noOperationAction := &pluggableAction{
+		executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+			obj, ok := item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, nil, "", nil, errors.Errorf("unexpected type %T", item)
+			}
+
+			return obj, nil, "", nil, nil
+		},
+	}
+
+	tests := []struct {
+		name         string
+		req          *Request
+		apiResources []*test.APIResource
+		actions      []biav2.BackupItemAction
+		want         []*itemoperation.BackupOperation
+	}{
+		{
+			name: "action that starts a short-running process records operation",
+			req: &Request{
+				Backup: defaultBackup().Result(),
+			},
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").Result(),
+				),
+			},
+			actions: []biav2.BackupItemAction{
+				completedOperationAction,
+			},
+			want: []*itemoperation.BackupOperation{
+				{
+					Spec: itemoperation.BackupOperationSpec{
+						BackupName: "backup-1",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-1"},
+						OperationID: "pod-1-1",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase: "InProgress",
+					},
+				},
+			},
+		},
+		{
+			name: "action that starts a long-running process records operation",
+			req: &Request{
+				Backup: defaultBackup().Result(),
+			},
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-2").Result(),
+				),
+			},
+			actions: []biav2.BackupItemAction{
+				incompleteOperationAction,
+			},
+			want: []*itemoperation.BackupOperation{
+				{
+					Spec: itemoperation.BackupOperationSpec{
+						BackupName: "backup-1",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-2"},
+						OperationID: "pod-2-1",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase: "InProgress",
+					},
+				},
+			},
+		},
+		{
+			name: "action that has no operation doesn't record one",
+			req: &Request{
+				Backup: defaultBackup().Result(),
+			},
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-3").Result(),
+				),
+			},
+			actions: []biav2.BackupItemAction{
+				noOperationAction,
+			},
+			want: []*itemoperation.BackupOperation{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource)
+			}
+
+			err := h.backupper.Backup(h.log, tc.req, backupFile, tc.actions, nil)
+			assert.NoError(t, err)
+
+			resultOper := *tc.req.GetItemOperationsList()
+			// set want Created times so it won't fail the assert.Equal test
+			for i, wantOper := range tc.want {
+				wantOper.Status.Created = resultOper[i].Status.Created
+			}
+			assert.Equal(t, tc.want, *tc.req.GetItemOperationsList())
 		})
 	}
 }
@@ -2767,16 +2938,17 @@ func TestBackupWithPodVolume(t *testing.T) {
 	}
 }
 
-// pluggableAction is a backup item action that can be plugged with an Execute
-// function body at runtime.
+// pluggableAction is a backup item action that can be plugged with Execute
+// and Progress function bodies at runtime.
 type pluggableAction struct {
-	selector    velero.ResourceSelector
-	executeFunc func(runtime.Unstructured, *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error)
+	selector     velero.ResourceSelector
+	executeFunc  func(runtime.Unstructured, *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error)
+	progressFunc func(string, *velerov1.Backup) (velero.OperationProgress, error)
 }
 
-func (a *pluggableAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, error) {
+func (a *pluggableAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	if a.executeFunc == nil {
-		return item, nil, "", nil
+		return item, nil, "", nil, nil
 	}
 
 	return a.executeFunc(item, backup)
@@ -2787,11 +2959,19 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 func (a *pluggableAction) Progress(operationID string, backup *velerov1.Backup) (velero.OperationProgress, error) {
-	return velero.OperationProgress{}, nil
+	if a.progressFunc == nil {
+		return velero.OperationProgress{}, nil
+	}
+
+	return a.progressFunc(operationID, backup)
 }
 
 func (a *pluggableAction) Cancel(operationID string, backup *velerov1.Backup) error {
 	return nil
+}
+
+func (a *pluggableAction) Name() string {
+	return ""
 }
 
 type harness struct {
@@ -2833,7 +3013,7 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		APIServer: apiServer,
 		backupper: &kubernetesBackupper{
-			backupClient:    apiServer.VeleroClient.VeleroV1(),
+			kbClient:        test.NewFakeControllerRuntimeClient(t),
 			dynamicFactory:  client.NewDynamicFactory(apiServer.DynamicClient),
 			discoveryHelper: discoveryHelper,
 

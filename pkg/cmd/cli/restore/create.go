@@ -355,7 +355,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if restore.Status.Phase != api.RestorePhaseNew && restore.Status.Phase != api.RestorePhaseInProgress {
+				if restore.Status.Phase == api.RestorePhaseFailedValidation || restore.Status.Phase == api.RestorePhaseCompleted ||
+					restore.Status.Phase == api.RestorePhasePartiallyFailed || restore.Status.Phase == api.RestorePhaseFailed {
 					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `velero restore describe %s` and `velero restore logs %s`.\n", restore.Status.Phase, restore.Name, restore.Name)
 					return nil
 				}

@@ -96,6 +96,7 @@ func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=velero.io,resources=deletebackuprequests,verbs=get;list;watch;create;
 // +kubebuilder:rbac:groups=velero.io,resources=deletebackuprequests/status,verbs=get
 // +kubebuilder:rbac:groups=velero.io,resources=backupstoragelocations,verbs=get
+
 func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := c.logger.WithField("gc backup", req.String())
 	log.Debug("gcController getting backup")

@@ -68,6 +68,20 @@ type ResourceIdentifier struct {
 	Name      string
 }
 
+func (in *ResourceIdentifier) DeepCopy() *ResourceIdentifier {
+	if in == nil {
+		return nil
+	}
+	out := new(ResourceIdentifier)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *ResourceIdentifier) DeepCopyInto(out *ResourceIdentifier) {
+	*out = *in
+	out.GroupResource = in.GroupResource
+}
+
 // OperationProgress describes progress of an asynchronous plugin operation.
 type OperationProgress struct {
 	// True when the operation has completed, either successfully or with a failure

@@ -24,6 +24,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -51,6 +52,16 @@ type Request struct {
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             map[itemKey]struct{}
 	CSISnapshots              []snapshotv1api.VolumeSnapshot
+	itemOperationsList        *[]*itemoperation.BackupOperation
+}
+
+// GetItemOperationsList returns ItemOperationsList, initializing it if necessary
+func (r *Request) GetItemOperationsList() *[]*itemoperation.BackupOperation {
+	if r.itemOperationsList == nil {
+		list := []*itemoperation.BackupOperation{}
+		r.itemOperationsList = &list
+	}
+	return r.itemOperationsList
 }
 
 // BackupResourceList returns the list of backed up resources grouped by the API

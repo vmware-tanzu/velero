@@ -145,8 +145,8 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 		restartabletest.RestartableDelegateTest{
 			Function:                "Execute",
 			Inputs:                  []interface{}{pv, b},
-			ExpectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), "", errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, "", errors.Errorf("delegate error")},
+			ExpectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), "", ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, "", ([]velero.ResourceIdentifier)(nil), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "Progress",
