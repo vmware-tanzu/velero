@@ -1,0 +1,1 @@
+Read timezone information from TZ Environment variable so logs and schedule generated backup names are in local time expected.
