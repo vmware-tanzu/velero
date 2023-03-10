@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -37,66 +38,10 @@ type ResourcePolicies struct {
 	// OtherResourcePolicies: []OtherResourcePolicy
 }
 
-type resourcePolicyMatcher interface {
-	Match(res interface{}) *Action
-}
-
-type volumePolicyMatcherImpl struct {
-	policy      *VolumePolicy
-	matcherFunc func(volume *StructuredVolume) *Action
-}
-
-func (v *volumePolicyMatcherImpl) Match(volume interface{}) *Action {
-	val, ok := volume.(*StructuredVolume)
-	if !ok {
-		return nil
-	}
-	return v.matcherFunc(val)
-}
-
-// Match interface is implemented by VolumePolicy
-func (policy *VolumePolicy) Match(volume *StructuredVolume) *Action {
-	matcher := policyConditionsMatcher{}
-	matcher.addPolicy(policy)
-	return matcher.Match(volume)
-}
-
-func newVolumePolicyMatcher(policy *VolumePolicy) resourcePolicyMatcher {
-	return &volumePolicyMatcherImpl{
-		policy:      policy,
-		matcherFunc: policy.Match,
-	}
-}
-
-type resourcePoliciesMatcherFactory struct {
-	volumeMatchers []resourcePolicyMatcher
-	// could extended by add other policy matcher
-	// otherResourceMatchers   []resourcePolicyMatcher
-}
-
-func (r *resourcePoliciesMatcherFactory) addVolumePolicyMatcher(volumePolicy []VolumePolicy) {
-	for k := range volumePolicy {
-		matcher := newVolumePolicyMatcher(&volumePolicy[k])
-		r.volumeMatchers = append(r.volumeMatchers, matcher)
-	}
-}
-
-func newResourcePoliciesMatcherFactory(policies *ResourcePolicies) *resourcePoliciesMatcherFactory {
-	factory := &resourcePoliciesMatcherFactory{}
-	factory.addVolumePolicyMatcher(policies.VolumePolicies)
-	// TODO we can add other policy matcher into the factory
-	// factory.AddOtherResourcePolicyMatcher(policies.OtherResourcePolicies)
-	return factory
-}
-
-// getMatchers return related resource policy matcher
-func (r *resourcePoliciesMatcherFactory) getMatchers(resourceType string) []resourcePolicyMatcher {
-	switch resourceType {
-	case "volume":
-		return r.volumeMatchers
-	default:
-		return nil
-	}
+type Policies struct {
+	Version        string
+	VolumePolicies []volumePolicy
+	// OtherPolicies
 }
 
 func unmarshalResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
@@ -108,31 +53,91 @@ func unmarshalResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 	}
 }
 
-// GetVolumeMatchedAction checks the current volume is match resource policies
-// It will return once matched ignoring the latter policies
-func GetVolumeMatchedAction(policies *ResourcePolicies, volume *StructuredVolume) *Action {
-	factory := newResourcePoliciesMatcherFactory(policies)
-	matchers := factory.getMatchers("volume")
+func (policies *Policies) buildPolicy(resPolicies *ResourcePolicies) error {
+	for _, vp := range resPolicies.VolumePolicies {
+		con, err := unmarshalVolConditions(vp.Conditions)
+		if err != nil {
+			return errors.Wrap(err, "failed to unmarshl volume conditions")
+		}
+		volCap, err := parseCapacity(con.Capacity)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse condition capacity %s", con.Capacity)
+		}
+		var p volumePolicy
+		p.action = vp.Action
+		p.conditions = append(p.conditions, &capacityCondition{capacity: *volCap})
+		p.conditions = append(p.conditions, &storageClassCondition{storageClass: con.StorageClass})
+		p.conditions = append(p.conditions, &nfsCondition{nfs: con.NFS})
+		p.conditions = append(p.conditions, &csiCondition{csi: con.CSI})
+		policies.VolumePolicies = append(policies.VolumePolicies, p)
+	}
 
-	for _, matcher := range matchers {
-		action := matcher.Match(volume)
-		if action != nil {
-			return action
+	// Other resource policies
+
+	policies.Version = resPolicies.Version
+	return nil
+}
+
+func (p *Policies) Match(res interface{}) *Action {
+	vol, ok := res.(*StructuredVolume)
+	if ok {
+		for _, policy := range p.VolumePolicies {
+			isAllMatch := false
+			for _, con := range policy.conditions {
+				if !con.Match(vol) {
+					isAllMatch = false
+					break
+				}
+				isAllMatch = true
+			}
+			if isAllMatch {
+				return &policy.action
+			}
 		}
 	}
 	return nil
 }
 
-func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*ResourcePolicies, error) {
+func (p *Policies) Validate() error {
+	if p.Version != currentSupportDataVersion {
+		return fmt.Errorf("incompatible version number %s with supported version %s", p.Version, currentSupportDataVersion)
+	}
+
+	for _, policy := range p.VolumePolicies {
+		if err := policy.action.Validate(); err != nil {
+			return errors.Wrap(err, "failed to validate config")
+		}
+		for _, con := range policy.conditions {
+			if err := con.Validate(); err != nil {
+				return errors.Wrap(err, "failed to validate conditions config")
+			}
+		}
+	}
+	return nil
+}
+
+func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
 	if cm == nil {
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}
 	if len(cm.Data) != 1 {
 		return nil, fmt.Errorf("illegal resource policies %s/%s configmap", cm.Name, cm.Namespace)
 	}
+
 	var yamlData string
 	for _, v := range cm.Data {
 		yamlData = v
 	}
-	return unmarshalResourcePolicies(&yamlData)
+
+	resPolicies, err := unmarshalResourcePolicies(&yamlData)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	policies := &Policies{}
+	if err := policies.buildPolicy(resPolicies); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return policies, nil
 }

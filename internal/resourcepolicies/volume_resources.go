@@ -11,18 +11,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type volumePolicier struct {
-	action        Action
-	volConditions []volumeCondition
+type volumePolicy struct {
+	action     Action
+	conditions []VolumeCondition
 }
 
-type volumeCondition interface {
-	Validate() (bool, error)
+type VolumeCondition interface {
 	Match(v *StructuredVolume) bool
-}
-
-type policyConditionsMatcher struct {
-	policies []*volumePolicier
+	Validate() error
 }
 
 // Capacity consist of the lower and upper boundary
@@ -142,43 +138,6 @@ func (c *csiCondition) Match(v *StructuredVolume) bool {
 	}
 
 	return c.csi.Driver == v.csi.Driver
-}
-
-func (p *policyConditionsMatcher) Match(v *StructuredVolume) *Action {
-	for _, policy := range p.policies {
-		isAllMatch := false
-		for _, con := range policy.volConditions {
-			if !con.Match(v) {
-				isAllMatch = false
-				break
-			}
-			isAllMatch = true
-		}
-		if isAllMatch {
-			return &policy.action
-		}
-	}
-	return nil
-}
-
-func (p *policyConditionsMatcher) addPolicy(vp *VolumePolicy) error {
-	con, err := unmarshalVolConditions(vp.Conditions)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshl volume conditions")
-	}
-
-	volCap, err := parseCapacity(con.Capacity)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse condition capacity %s", con.Capacity)
-	}
-	newPolicy := &volumePolicier{}
-	newPolicy.action = vp.Action
-	newPolicy.volConditions = append(newPolicy.volConditions, &capacityCondition{capacity: *volCap})
-	newPolicy.volConditions = append(newPolicy.volConditions, &storageClassCondition{storageClass: con.StorageClass})
-	newPolicy.volConditions = append(newPolicy.volConditions, &nfsCondition{nfs: con.NFS})
-	newPolicy.volConditions = append(newPolicy.volConditions, &csiCondition{csi: con.CSI})
-	p.policies = append(p.policies, newPolicy)
-	return nil
 }
 
 // parseCapacity parse string into capacity format

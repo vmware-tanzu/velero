@@ -322,7 +322,7 @@ func (ib *itemBackupper) executeActions(
 			continue
 		}
 		log.Info("Executing custom action")
-		if ib.backupRequest.Spec.ResourcePolices != nil && groupResource.String() == "persistentvolumeclaims" && action.Name() == "velero.io/csi-pvc-backupper" {
+		if ib.backupRequest.ResPolicies != nil && groupResource.String() == "persistentvolumeclaims" && action.Name() == "velero.io/csi-pvc-backupper" {
 			pvc := corev1api.PersistentVolumeClaim{}
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
 				return nil, errors.WithStack(err)
@@ -340,7 +340,7 @@ func (ib *itemBackupper) executeActions(
 
 			volume := resourcepolicies.StructuredVolume{}
 			volume.ParsePV(pv)
-			act := resourcepolicies.GetVolumeMatchedAction(ib.backupRequest.ResPolicies, &volume)
+			act := ib.backupRequest.ResPolicies.Match(&volume)
 			if act != nil && act.Type == resourcepolicies.Skip {
 				log.Infof("skip snapshot of pv %s for the matched resource policies", pvName)
 				return nil, nil
@@ -495,10 +495,10 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		return nil
 	}
 
-	if ib.backupRequest.Spec.ResourcePolices != nil {
+	if ib.backupRequest.ResPolicies != nil {
 		structuredVolume := &resourcepolicies.StructuredVolume{}
 		structuredVolume.ParsePV(pv)
-		action := resourcepolicies.GetVolumeMatchedAction(ib.backupRequest.ResPolicies, structuredVolume)
+		action := ib.backupRequest.ResPolicies.Match(structuredVolume)
 		if action != nil && action.Type == resourcepolicies.Skip {
 			log.Infof("skip snapshot of pv %s for the matched resource policies", pv.Name)
 			return nil

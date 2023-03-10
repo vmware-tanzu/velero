@@ -401,12 +401,21 @@ spec:
                 description: ResourcePolices specifies the referenced resource policies
                   that backup should follow
                 properties:
-                  refName:
-                    description: RefName is the name of the config object
+                  apiGroup:
+                    description: APIGroup is the group for the resource being referenced.
+                      If APIGroup is not specified, the specified Kind must be in
+                      the core API group. For any other third-party types, APIGroup
+                      is required.
                     type: string
-                  refType:
-                    description: RefType is the type of the config object
+                  kind:
+                    description: Kind is the type of resource being referenced
                     type: string
+                  name:
+                    description: Name is the name of resource being referenced
+                    type: string
+                required:
+                - kind
+                - name
                 type: object
               snapshotVolumes:
                 description: SnapshotVolumes specifies whether to take snapshots of

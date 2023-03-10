@@ -42,7 +42,7 @@ import (
 // Backupper can execute pod volume backups of volumes in a pod.
 type Backupper interface {
 	// BackupPodVolumes backs up all specified volumes in a pod.
-	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.ResourcePolicies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
+	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
 }
 
 type backupper struct {
@@ -111,7 +111,7 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
-func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.ResourcePolicies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
+func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumesToBackup) == 0 {
 		return nil, nil
 	}
@@ -202,7 +202,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		if backup.Spec.ResourcePolices != nil {
+		if resPolicies != nil {
 			structuredVolume := &resourcepolicies.StructuredVolume{}
 			var volumeName string
 			if pvc != nil {
@@ -216,7 +216,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 				structuredVolume.ParsePodVolume(&volume)
 				volumeName = volume.Name
 			}
-			action := resourcepolicies.GetVolumeMatchedAction(resPolicies, structuredVolume)
+			action := resPolicies.Match(structuredVolume)
 			if action != nil && action.Type == resourcepolicies.Skip {
 				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
 				continue

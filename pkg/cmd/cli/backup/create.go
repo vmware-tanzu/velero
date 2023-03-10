@@ -24,15 +24,12 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -188,27 +185,6 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	for _, loc := range o.SnapshotLocations {
 		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(context.TODO(), loc, metav1.GetOptions{}); err != nil {
 			return err
-		}
-	}
-
-	if o.ResPoliciesConfigmap != "" {
-		cm := &corev1.ConfigMap{}
-		if err := client.Get(context.Background(), kbclient.ObjectKey{
-			Namespace: f.Namespace(),
-			Name:      o.ResPoliciesConfigmap,
-		}, cm); err != nil {
-			return errors.Wrapf(err, "failed to get resource policies %s/%s", f.Namespace(), o.ResPoliciesConfigmap)
-		}
-
-		resPolicies, err := resourcepolicies.GetResourcePoliciesFromConfig(cm)
-		if err == nil {
-			if isValid, err := resourcepolicies.Validate(resPolicies); err != nil {
-				return errors.Wrap(err, "failed to validate the user resource policies config")
-			} else if !isValid {
-				return fmt.Errorf("user resource policies config is invalid")
-			}
-		} else {
-			return errors.Wrap(err, "failed to get the user resource policies config")
 		}
 	}
 

@@ -54,7 +54,7 @@ type Request struct {
 	BackedUpItems             map[itemKey]struct{}
 	CSISnapshots              []snapshotv1api.VolumeSnapshot
 	itemOperationsList        *[]*itemoperation.BackupOperation
-	ResPolicies               *resourcepolicies.ResourcePolicies
+	ResPolicies               *resourcepolicies.Policies
 }
 
 // GetItemOperationsList returns ItemOperationsList, initializing it if necessary

@@ -441,15 +441,18 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
 	}
 
-	if request.Spec.ResourcePolices != nil && request.Spec.ResourcePolices.RefType == resourcepolicies.ConfigmapRefType {
+	if request.Spec.ResourcePolices != nil && request.Spec.ResourcePolices.Kind == resourcepolicies.ConfigmapRefType {
 		policiesConfigmap := &v1.ConfigMap{}
-		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolices.RefName}, policiesConfigmap)
+		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolices.Name}, policiesConfigmap)
 		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolices.RefName, err))
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolices.Name, err))
 		}
 		res, err := resourcepolicies.GetResourcePoliciesFromConfig(policiesConfigmap)
 		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get the user resource policies %s/%s config with err %v", request.Namespace, request.Spec.ResourcePolices.RefName, err))
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolices.Name)).Error())
+		}
+		if err := res.Validate(); err != nil {
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolices.Name)).Error())
 		}
 		request.ResPolicies = res
 	}

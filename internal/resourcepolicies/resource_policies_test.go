@@ -105,7 +105,7 @@ func TestLoadResourcePolicies(t *testing.T) {
 	}
 }
 
-func TestGetVolumeMatchedAction(t *testing.T) {
+func TestGetResourceMatchedAction(t *testing.T) {
 	resPolicies := &ResourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
@@ -179,7 +179,13 @@ func TestGetVolumeMatchedAction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			action := GetVolumeMatchedAction(resPolicies, tc.volume)
+			policies := &Policies{}
+			err := policies.buildPolicy(resPolicies)
+			if err != nil {
+				t.Errorf("Failed to build policy with error %v", err)
+			}
+
+			action := policies.Match(tc.volume)
 			if action == nil {
 				if tc.expectedAction != nil {
 					t.Errorf("Expected action %v, but got result nil", tc.expectedAction.Type)
@@ -216,15 +222,28 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	// Check that the returned ResourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.Version)
 	assert.Len(t, resPolicies.VolumePolicies, 1)
-
-	expectedPolicy := VolumePolicy{
-		Conditions: map[string]interface{}{
-			"capacity": "0,10Gi",
-		},
-		Action: Action{
-			Type: Skip,
+	policies := ResourcePolicies{
+		Version: "v1",
+		VolumePolicies: []VolumePolicy{
+			{
+				Conditions: map[string]interface{}{
+					"capacity": "0,10Gi",
+				},
+				Action: Action{
+					Type: Skip,
+				},
+			},
 		},
 	}
+	p := &Policies{}
+	err = p.buildPolicy(&policies)
+	if err != nil {
+		t.Fatalf("failed to build policy with error %v", err)
+	}
 
-	assert.Equal(t, expectedPolicy, resPolicies.VolumePolicies[0])
+	for k := range resPolicies.VolumePolicies[0].conditions {
+		t.Logf("vae %v", resPolicies.VolumePolicies[0].conditions[k])
+	}
+
+	assert.Equal(t, p, resPolicies)
 }

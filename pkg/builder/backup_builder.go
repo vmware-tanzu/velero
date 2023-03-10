@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
 	"github.com/sirupsen/logrus"
@@ -254,6 +256,6 @@ func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuild
 
 // ResourcePolices sets the Backup's resource polices.
 func (b *BackupBuilder) ResourcePolices(name string) *BackupBuilder {
-	b.object.Spec.ResourcePolices = &velerov1api.ResourcePolices{RefType: "configmap", RefName: name}
+	b.object.Spec.ResourcePolices = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
 	return b
 }

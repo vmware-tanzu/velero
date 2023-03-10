@@ -258,10 +258,11 @@ func getNextRunTime(schedule *velerov1.Schedule, cronSchedule cron.Schedule, asO
 
 func getBackup(item *velerov1.Schedule, timestamp time.Time) *velerov1.Backup {
 	name := item.TimestampedName(timestamp)
-	backup := builder.
+	backupBuilder := builder.
 		ForBackup(item.Namespace, name).
-		FromSchedule(item).
-		Result()
-
-	return backup
+		FromSchedule(item)
+	if item.Spec.Template.ResourcePolices != nil {
+		backupBuilder.ResourcePolices(item.Spec.Template.ResourcePolices.Name)
+	}
+	return backupBuilder.Result()
 }

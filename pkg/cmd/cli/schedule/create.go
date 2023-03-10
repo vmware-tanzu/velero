@@ -23,8 +23,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -152,6 +154,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,
 			Paused:                     o.Paused,
 		},
+	}
+
+	if o.BackupOptions.ResPoliciesConfigmap != "" {
+		schedule.Spec.Template.ResourcePolices = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: o.BackupOptions.ResPoliciesConfigmap}
 	}
 
 	if printed, err := output.PrintWithFormat(c, schedule); printed || err != nil {

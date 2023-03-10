@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -131,15 +132,7 @@ type BackupSpec struct {
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
 	// ResourcePolices specifies the referenced resource policies that backup should follow
 	// +optional
-	ResourcePolices *ResourcePolices `json:"resourcePolices,omitempty"`
-}
-
-// ResourcePolices stored the backup referenced config type and config object name
-type ResourcePolices struct {
-	// RefType is the type of the config object
-	RefType string `json:"refType,omitempty"`
-	// RefName is the name of the config object
-	RefName string `json:"refName,omitempty"`
+	ResourcePolices *v1.TypedLocalObjectReference `json:"resourcePolices,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.
