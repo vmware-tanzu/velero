@@ -176,7 +176,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		},
 		{
 			name: "labelSelector as well as orLabelSelectors both are specified in backup request fails validation",
-			backup: defaultBackup().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
+			backup: defaultBackup().LabelSelector("a=b").OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
 				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"},

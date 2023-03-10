@@ -269,7 +269,7 @@ func TestRestoreReconcile(t *testing.T) {
 		{
 			name:                     "new restore with labelSelector as well as orLabelSelector fails validation",
 			location:                 defaultStorageLocation,
-			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}}, {MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).LabelSelector("a=b").OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}}, {MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
 			backup:                   defaultBackup().StorageLocation("default").Result(),
 			expectedErr:              false,
 			expectedValidationErrors: []string{"encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"},

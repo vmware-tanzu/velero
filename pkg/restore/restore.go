@@ -168,15 +168,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
-	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
-	// Nothing Selector, i.e. a selector that matches nothing. We want
-	// a selector that matches everything. This can be accomplished by
-	// passing a non-nil empty LabelSelector.
-	ls := req.Restore.Spec.LabelSelector
-	if ls == nil {
-		ls = &metav1.LabelSelector{}
-	}
-
 	var OrSelectors []labels.Selector
 	if req.Restore.Spec.OrLabelSelectors != nil {
 		for _, s := range req.Restore.Spec.OrLabelSelectors {
@@ -188,7 +179,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		}
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(ls)
+	selector, err := labels.Parse(req.Restore.Spec.LabelSelector)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}

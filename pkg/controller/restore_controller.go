@@ -264,8 +264,13 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) backupInfo
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
+	// validate selector
+	if _, err := labels.Parse(restore.Spec.LabelSelector); err != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid selector: %s", err.Error()))
+	}
+
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
-	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != nil {
+	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != "" {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"))
 	}
 

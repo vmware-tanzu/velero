@@ -52,12 +52,12 @@ type BackupSpec struct {
 	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
-	// LabelSelector is a metav1.LabelSelector to filter with
+	// LabelSelector is a string that can be parsed into
+	// labels.Selector, then use to filter with
 	// when adding individual objects to the backup. If empty
 	// or nil, all objects are included. Optional.
 	// +optional
-	// +nullable
-	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
+	LabelSelector string `json:"labelSelector,omitempty"`
 
 	// OrLabelSelectors is list of metav1.LabelSelector to filter with
 	// when adding individual objects to the backup. If multiple provided

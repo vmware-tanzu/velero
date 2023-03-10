@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -88,7 +89,7 @@ type CreateOptions struct {
 	StatusIncludeResources  flag.StringArray
 	StatusExcludeResources  flag.StringArray
 	NamespaceMappings       flag.Map
-	Selector                flag.LabelSelector
+	Selector                string
 	IncludeClusterResources flag.OptionalBool
 	Wait                    bool
 	AllowPartiallyFailed    flag.OptionalBool
@@ -119,7 +120,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.ExistingResourcePolicy, "existing-resource-policy", "", "Restore Policy to be used during the restore workflow, can be - none or update")
 	flags.Var(&o.StatusIncludeResources, "status-include-resources", "Resources to include in the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.Var(&o.StatusExcludeResources, "status-exclude-resources", "Resources to exclude from the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
-	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
+	flags.StringVarP(&o.Selector, "selector", "l", "", "Only restore resources matching this label selector.")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
 	// like a normal bool flag
@@ -170,6 +171,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	}
 
 	if err := output.ValidateFlags(c); err != nil {
+		return err
+	}
+
+	if _, err := labels.Parse(o.Selector); err != nil {
 		return err
 	}
 
@@ -276,7 +281,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			ExcludedResources:       o.ExcludeResources,
 			ExistingResourcePolicy:  api.PolicyType(o.ExistingResourcePolicy),
 			NamespaceMapping:        o.NamespaceMappings.Data(),
-			LabelSelector:           o.Selector.LabelSelector,
+			LabelSelector:           o.Selector,
 			RestorePVs:              o.RestoreVolumes.Value,
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,

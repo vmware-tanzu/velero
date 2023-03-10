@@ -67,7 +67,7 @@ func printRestore(restore *v1.Restore) []metav1.TableRow {
 		restore.Status.Errors,
 		restore.Status.Warnings,
 		restore.CreationTimestamp.Time,
-		metav1.FormatLabelSelector(restore.Spec.LabelSelector),
+		restore.Spec.LabelSelector,
 	)
 
 	return []metav1.TableRow{row}

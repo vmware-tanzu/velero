@@ -108,7 +108,7 @@ func printBackup(backup *velerov1api.Backup) []metav1.TableRow {
 		backup.Status.StartTimestamp,
 		humanReadableTimeFromNow(expiration),
 		backup.Spec.StorageLocation,
-		metav1.FormatLabelSelector(backup.Spec.LabelSelector),
+		backup.Spec.LabelSelector,
 	)
 
 	return []metav1.TableRow{row}

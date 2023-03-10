@@ -121,11 +121,7 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 	backupSpecInfo["resources"] = resourcesInfo
 
 	// describe label selector
-	s = emptyDisplay
-	if spec.LabelSelector != nil {
-		s = metav1.FormatLabelSelector(spec.LabelSelector)
-	}
-	backupSpecInfo["labelSelector"] = s
+	backupSpecInfo["labelSelector"] = spec.LabelSelector
 
 	// describe storage location
 	backupSpecInfo["storageLocation"] = spec.StorageLocation

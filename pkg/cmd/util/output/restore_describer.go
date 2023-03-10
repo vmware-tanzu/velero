@@ -24,7 +24,6 @@ import (
 	"sort"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/fatih/color"
@@ -134,11 +133,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.DescribeMap("Namespace mappings", restore.Spec.NamespaceMapping)
 
 		d.Println()
-		s = emptyDisplay
-		if restore.Spec.LabelSelector != nil {
-			s = metav1.FormatLabelSelector(restore.Spec.LabelSelector)
-		}
-		d.Printf("Label selector:\t%s\n", s)
+		d.Printf("Label selector:\t%s\n", restore.Spec.LabelSelector)
 
 		d.Println()
 		d.Printf("Restore PVs:\t%s\n", BoolPointerString(restore.Spec.RestorePVs, "false", "true", "auto"))

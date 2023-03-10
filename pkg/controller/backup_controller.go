@@ -436,8 +436,13 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
+	// validate the selector
+	if _, err := labels.Parse(request.Spec.LabelSelector); err != nil {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid selector: %s", err.Error()))
+	}
+
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
-	if request.Spec.OrLabelSelectors != nil && request.Spec.LabelSelector != nil {
+	if request.Spec.OrLabelSelectors != nil && request.Spec.LabelSelector != "" {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
 	}
 

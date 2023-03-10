@@ -71,7 +71,7 @@ func printSchedule(schedule *v1.Schedule) []metav1.TableRow {
 		schedule.Spec.Schedule,
 		schedule.Spec.Template.TTL.Duration,
 		humanReadableTimeFromNow(lastBackupTime),
-		metav1.FormatLabelSelector(schedule.Spec.Template.LabelSelector),
+		schedule.Spec.Template.LabelSelector,
 		schedule.Spec.Paused,
 	)
 

@@ -339,7 +339,7 @@ func TestGetBackup(t *testing.T) {
 					ExcludedNamespaces("ns-3").
 					IncludedResources("foo", "bar").
 					ExcludedResources("baz").
-					LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}}).
+					LabelSelector("label=value").
 					TTL(time.Duration(300)).
 					Result().
 					Spec).
@@ -351,7 +351,7 @@ func TestGetBackup(t *testing.T) {
 				ExcludedNamespaces("ns-3").
 				IncludedResources("foo", "bar").
 				ExcludedResources("baz").
-				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}}).
+				LabelSelector("label=value").
 				TTL(time.Duration(300)).
 				Result(),
 		},

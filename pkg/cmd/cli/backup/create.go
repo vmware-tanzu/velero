@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
@@ -91,7 +92,7 @@ type CreateOptions struct {
 	IncludeResources         flag.StringArray
 	ExcludeResources         flag.StringArray
 	Labels                   flag.Map
-	Selector                 flag.LabelSelector
+	Selector                 string
 	IncludeClusterResources  flag.OptionalBool
 	Wait                     bool
 	StorageLocation          string
@@ -122,7 +123,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
-	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
+	flags.StringVarP(&o.Selector, "selector", "l", "", "Only back up resources matching this label selector.")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
 	flags.DurationVar(&o.CSISnapshotTimeout, "csi-snapshot-timeout", o.CSISnapshotTimeout, "How long to wait for CSI snapshot creation before timeout.")
 	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
@@ -152,6 +153,11 @@ func (o *CreateOptions) BindFromSchedule(flags *pflag.FlagSet) {
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
+		return err
+	}
+
+	// Verify whether selector string is valid.
+	if _, err := labels.Parse(o.Selector); err != nil {
 		return err
 	}
 
@@ -334,7 +340,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			ExcludedNamespaces(o.ExcludeNamespaces...).
 			IncludedResources(o.IncludeResources...).
 			ExcludedResources(o.ExcludeResources...).
-			LabelSelector(o.Selector.LabelSelector).
+			LabelSelector(o.Selector).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...).

@@ -108,7 +108,7 @@ func (b *RestoreBuilder) IncludeClusterResources(val bool) *RestoreBuilder {
 }
 
 // LabelSelector sets the Restore's label selector.
-func (b *RestoreBuilder) LabelSelector(selector *metav1.LabelSelector) *RestoreBuilder {
+func (b *RestoreBuilder) LabelSelector(selector string) *RestoreBuilder {
 	b.object.Spec.LabelSelector = selector
 	return b
 }

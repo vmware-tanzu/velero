@@ -309,7 +309,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name: "label selector only backs up matching resources",
 			backup: defaultBackup().
-				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
+				LabelSelector("a=b").
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -324,10 +324,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("a", "c")).Result(),
 				),
+				test.Namespaces(
+					builder.ForNamespace("foo").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForNamespace("zoo").Result(),
+				),
 			},
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
 				"resources/persistentvolumes/cluster/bar.json",
 				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
 				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
@@ -393,7 +399,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name: "resources with velero.io/exclude-from-backup=true label are not included even if matching label selector",
 			backup: defaultBackup().
-				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
+				LabelSelector("a=b").
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(

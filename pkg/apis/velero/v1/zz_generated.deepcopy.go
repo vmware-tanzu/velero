@@ -299,11 +299,6 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.LabelSelector != nil {
-		in, out := &in.LabelSelector, &out.LabelSelector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.OrLabelSelectors != nil {
 		in, out := &in.OrLabelSelectors, &out.OrLabelSelectors
 		*out = make([]*metav1.LabelSelector, len(*in))
@@ -1263,11 +1258,6 @@ func (in *RestoreSpec) DeepCopyInto(out *RestoreSpec) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
-	}
-	if in.LabelSelector != nil {
-		in, out := &in.LabelSelector, &out.LabelSelector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
 	}
 	if in.OrLabelSelectors != nil {
 		in, out := &in.OrLabelSelectors, &out.OrLabelSelectors

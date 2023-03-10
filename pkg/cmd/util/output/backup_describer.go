@@ -152,11 +152,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(spec.IncludeClusterResources, "excluded", "included", "auto"))
 
 	d.Println()
-	s = emptyDisplay
-	if spec.LabelSelector != nil {
-		s = metav1.FormatLabelSelector(spec.LabelSelector)
-	}
-	d.Printf("Label selector:\t%s\n", s)
+	d.Printf("Label selector:\t%s\n", spec.LabelSelector)
 
 	d.Println()
 	d.Printf("Storage Location:\t%s\n", spec.StorageLocation)

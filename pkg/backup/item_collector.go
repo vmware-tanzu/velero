@@ -302,12 +302,9 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			log.WithError(err).Error("Error getting dynamic client")
 		} else {
 			var labelSelector labels.Selector
-			if r.backupRequest.Spec.LabelSelector != nil {
-				labelSelector, err = metav1.LabelSelectorAsSelector(r.backupRequest.Spec.LabelSelector)
-				if err != nil {
-					// This should never happen...
-					return nil, errors.Wrap(err, "invalid label selector")
-				}
+			labelSelector, err := labels.Parse(r.backupRequest.Spec.LabelSelector)
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid label selector")
 			}
 
 			var items []*kubernetesResource
@@ -387,14 +384,9 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			continue
 		}
 
-		var labelSelector string
-		if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
-			labelSelector = metav1.FormatLabelSelector(selector)
-		}
-
 		// Listing items for labelSelector (singular)
 		if len(orLabelSelectors) == 0 {
-			unstructuredItems, err = r.listItemsForLabel(unstructuredItems, gr, labelSelector, resourceClient)
+			unstructuredItems, err = r.listItemsForLabel(unstructuredItems, gr, r.backupRequest.Spec.LabelSelector, resourceClient)
 			if err != nil {
 				log.WithError(err).Error("Error listing items")
 				continue

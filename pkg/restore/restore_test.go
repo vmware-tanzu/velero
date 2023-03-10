@@ -228,7 +228,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 		},
 		{
 			name:    "label selector only restores matching resources",
-			restore: defaultRestore().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).Result(),
+			restore: defaultRestore().LabelSelector("a=b").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
 				AddItems("pods",
