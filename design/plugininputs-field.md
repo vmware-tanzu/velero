@@ -103,7 +103,7 @@ type PluginInput struct {
 No security impact.
 
 ## Compatibility
-Since this is a generic property bag, it is the responsibility of plugin owners and the end users to ensure compatiblity of the settings.
+Since this is a generic property bag, it is the responsibility of plugin owners and the end users to ensure compatibility of the settings.
 
 *Note*: The rule of thumb for plugin owners which leverage the pluginInputs field is to use the value specified in the pluginInputs field if present, else fallback to the global configmap/ secret / annotation based discovery which was existing behaviour or the plugin.
 
