@@ -96,6 +96,7 @@ type kubernetesRestorer struct {
 	podVolumeRestorerFactory   podvolume.RestorerFactory
 	podVolumeTimeout           time.Duration
 	resourceTerminatingTimeout time.Duration
+	resourceTimeout            time.Duration
 	resourcePriorities         Priorities
 	fileSystem                 filesystem.Interface
 	pvRenamer                  func(string) (string, error)
@@ -115,6 +116,7 @@ func NewKubernetesRestorer(
 	podVolumeRestorerFactory podvolume.RestorerFactory,
 	podVolumeTimeout time.Duration,
 	resourceTerminatingTimeout time.Duration,
+	resourceTimeout time.Duration,
 	logger logrus.FieldLogger,
 	podCommandExecutor podexec.PodCommandExecutor,
 	podGetter cache.Getter,
@@ -128,6 +130,7 @@ func NewKubernetesRestorer(
 		podVolumeRestorerFactory:   podVolumeRestorerFactory,
 		podVolumeTimeout:           podVolumeTimeout,
 		resourceTerminatingTimeout: resourceTerminatingTimeout,
+		resourceTimeout:            resourceTimeout,
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
 		pvRenamer: func(string) (string, error) {
@@ -296,6 +299,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		volumeSnapshots:                req.VolumeSnapshots,
 		podVolumeBackups:               req.PodVolumeBackups,
 		resourceTerminatingTimeout:     kr.resourceTerminatingTimeout,
+		resourceTimeout:                kr.resourceTimeout,
 		resourceClients:                make(map[resourceClientKey]client.Dynamic),
 		restoredItems:                  req.RestoredItems,
 		renamedPVs:                     make(map[string]string),
@@ -339,6 +343,7 @@ type restoreContext struct {
 	volumeSnapshots                []*volume.Snapshot
 	podVolumeBackups               []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout     time.Duration
+	resourceTimeout                time.Duration
 	resourceClients                map[resourceClientKey]client.Dynamic
 	restoredItems                  map[itemKey]string
 	renamedPVs                     map[string]string
@@ -842,9 +847,8 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 	crdLogger := ctx.log.WithField("crdName", name)
 
 	var available bool
-	// Wait 1 minute rather than the standard resource timeout, since each CRD
-	// will transition fairly quickly.
-	err := wait.PollImmediate(time.Second, time.Minute*1, func() (bool, error) {
+
+	err := wait.PollImmediate(time.Second, ctx.resourceTimeout, func() (bool, error) {
 		unstructuredCRD, err := crdClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
