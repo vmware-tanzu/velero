@@ -29,7 +29,6 @@ The Velero CSI plugin chooses the VolumeSnapshotClass in the cluster that has th
 
 ## Goals
 - Allow the user to specify the VolumeSnapshotClass to use for a particular driver and backup.
-- Add pluginInputs field in the velero CRs (Backup, Schedule, Restore) to allow the user to specify the parameters which are specific to a plugin.
 
 ## Non Goals
 - Deprecating existing VSC selection behaviour. (The current behaviour will remain the default behaviour if the user does not specify the VolumeSnapshotClass to use for a particular driver and backup.)
@@ -54,94 +53,11 @@ The Velero CSI plugin chooses the VolumeSnapshotClass in the cluster that has th
 
 ## Detailed Design
 
-### Plugin Inputs Contract Changes
-Approach is to introduce a new field `pluginInputs` in the velero CRs (Backup, Schedule, Restore). This field can be leveraged by all plugins for sending plugin specific settings rather than relying on annotations or global settings which hold across backups.
+### Staged Approach: 
 
-```go
-type PluginInput struct {
-    Name string `json:"name"`
-    Properties map[string][string] `json:"properties"`
-}
-```
-
-### Using Plugin Inputs for CSI Plugin
-The user can specify the VolumeSnapshotClass to use for a particular driver and backup using the plugin inputs. The CSI plugin will use the VolumeSnapshotClass specified in the plugin inputs. If the VolumeSnapshotClass is not specified for a driver, the CSI plugin will use the default VolumeSnapshotClass for the driver fetched using labels through older route.
-
-Example: 
-```yaml
-apiVersion: velero.io/v1
-kind: Backup
-metadata:
-  name: backup-1
-spec:
-    pluginInputs:
-    - name: velero.io/csi
-    - properties:
-        - key: csi.cloud.disk.driver
-        - value: csi-diskdriver-snapclass
-        - key: csi.cloud.file.driver
-        - value: csi-filedriver-snapclass
-```
-
-CLI Example
-
-```bash
-velero backup create my-backup --plugin-inputs velero.io/csi:csi.cloud.disk.driver=csi-diskdriver-snapclass,csi.cloud.file.driver=csi-filedriver-snapclass
-```
-
-### Annotations overrides on PVC for CSI Plugin
-The user can annotate the PVCs with VolumeSnapshotClass name. This will override whatever the user has passed in pluginInputs for that driver.
-
-- If annotation is not present or VolumeSnapshotClass referred is not present in cluster OR if the specified VSC does not have the same CSI driver as the PVC
-    -  the CSI plugin will try to fallback to the pluginInputs value for that driver. If pluginInputs does not have the VSC for that driver, the CSI plugin will use the default VolumeSnapshotClass for the driver using the older label route.
-
-Example: 
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-name: pvc-1
-annotations:
-    velero.io/csi-volumesnapshot-class/disk.fg: csi-diskdriver-snapclass
-```
-
-### Using Plugin Inputs for Other Plugins
-As of today various plugins such as StorageClass mapping plugin, use a global configmap which is discovered through labels/ annotations which is not ideal customer experience and prohibhit usage of specific settings for each backup/ schedule setup.
-
-The pluginInputs field can be used to pass in the reference the configmap/ secret to use for a particular plugin. This will allow the user to use different configmaps/ secrets for different backups/ schedules.
-
-*Note*: The rule of thumb for plugin owners which leverage the pluginInputs field is to use the value specified in the pluginInputs field if present, else fallback to the global configmap/ secret / annotation based discovery which was existing behaviour or the plugin.
-
-Example: 
-```yaml
-spec:
-    pluginInputs:
-    - name: velero.io/storageclass
-    - properties:
-        - key: storageclass-mapping-configmap
-        - value: configMapNamespace/configMapName
-```
-
-
-
-## Alternatives Considered
-
-1. **Through Annotations**
-    1. **Support VolumeSnapshotClass selection at PVC level**
-    The user can annotate the PVCs with driver and VolumeSnapshotClass name. The CSI plugin will use the VolumeSnapshotClass specified in the annotation. If the annotation is not present, the CSI plugin will use the default VolumeSnapshotClass for the driver. If the VolumeSNapshotClass provided is of a different driver, the CSI plugin will use the default VolumeSnapshotClass for the driver.
-
-        *example annotation on PVC:*
-        ```yaml
-        apiVersion: v1
-        kind: PersistentVolumeClaim
-        metadata:
-        name: pvc-1
-        annotations:
-            velero.io/csi-volumesnapshot-class: csi-diskdriver-snapclass
-            
-        ```
-
-    2. **Support VolumeSnapshotClass selection at backup/schedule level**
+### Stage 1 Approach
+#### Through Annotations
+    1. **Support VolumeSnapshotClass selection at backup/schedule level**
     The user can  annotate the backup/ schedule with driver and VolumeSnapshotClass name. The CSI plugin will use the VolumeSnapshotClass specified in the annotation. If the annotation is not present, the CSI plugin will use the default VolumeSnapshotClass for the driver.
 
         *example annotation on backup/schedule:*
@@ -158,11 +74,31 @@ spec:
 
          To query the annotations on a backup: "velero.io/csi-volumesnapshot-class/'driver name'" - where driver names comes from the PVC's driver.
 
-    **Limitations of Annotations approach**:
+    2. **Support VolumeSnapshotClass selection at PVC level**
+    The user can annotate the PVCs with driver and VolumeSnapshotClass name. The CSI plugin will use the VolumeSnapshotClass specified in the annotation. If the annotation is not present, the CSI plugin will use the default VolumeSnapshotClass for the driver. If the VolumeSnapshotClass provided is of a different driver, the CSI plugin will use the default VolumeSnapshotClass for the driver.
+
+        *example annotation on PVC:*
+        ```yaml
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+        name: pvc-1
+        annotations:
+            velero.io/csi-volumesnapshot-class: csi-diskdriver-snapclass
+            
+        ```
+
     - The user has to annotate the PVCs or backups with the VolumeSnapshotClass to use for each driver. This is not ideal for the user experience.
-        - Mitigation: We can extend Velero CLI to also annotate backups/schedules with the VolumeSnapshotClass to use for each driver. This will make it easier for the user to annotate the backups/schedules. This mitigation is not for the PVCs though, since PVCs is anyways a specific use case.
+        - Mitigation: We can extend Velero CLI to also annotate backups/schedules with the VolumeSnapshotClass to use for each driver. This will make it easier for the user to annotate the backups/schedules. This mitigation is not for the PVCs though, since PVCs is anyways a specific use case. Similar to : " kubectl run --image myimage --annotations="foo=bar" --annotations="another=one" mypod"
+        We can add support for  - velero backup create my-backup --annotations "velero.io/csi:csi.cloud.disk.driver=csi-diskdriver-snapclass"
+
+### Stage 2 Approach
+The above annotations route is to get started and for initial design closure/ implementation, north star is to either introduce CSI specific fields (considering that CSI might be a very core part of velero going forward) in the backup/restore CR OR leverage the pluginInputs field as being tracked in: https://github.com/vmware-tanzu/velero/pull/5981
+
+Refer section Alternatives 2. **Through generic property bag in the velero contracts**: in the design doc for more details on the pluginInputs field.
 
 
+## Alternatives Considered
 1. **Through CSI Specific Fields in Velero contracts**
 
     **Considerations**
