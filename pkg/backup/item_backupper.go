@@ -81,34 +81,27 @@ type FileForArchive struct {
 	FileBytes []byte
 }
 
-// finalizeItem backs up an individual item and returns its content to replace previous content
-// in the backup tarball
-// In addition to the error return, backupItem also returns a bool indicating whether the item
-// was actually backed up and a slice of filepaths and filecontent to replace the data in the original tarball.
-func (ib *itemBackupper) finalizeItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, []FileForArchive, error) {
-	return ib.backupItemInternal(logger, obj, groupResource, preferredGVR, true, true)
-}
-
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
+// If finalize is true, then it returns the bytes instead of writing them to the tarWriter
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude bool) (bool, error) {
-	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, false)
-	// return if not selected, an error occurred, or there are no files to add
-	if selectedForBackup == false || err != nil || len(files) == 0 {
-		return selectedForBackup, err
+func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
+	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize)
+	// return if not selected, an error occurred, there are no files to add, or for finalize
+	if selectedForBackup == false || err != nil || len(files) == 0 || finalize {
+		return selectedForBackup, files, err
 	}
 	for _, file := range files {
 		if err := ib.tarWriter.WriteHeader(file.Header); err != nil {
-			return false, errors.WithStack(err)
+			return false, []FileForArchive{}, errors.WithStack(err)
 		}
 
 		if _, err := ib.tarWriter.Write(file.FileBytes); err != nil {
-			return false, errors.WithStack(err)
+			return false, []FileForArchive{}, errors.WithStack(err)
 		}
 	}
-	return true, nil
+	return true, []FileForArchive{}, nil
 }
 
 func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
@@ -183,7 +176,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		return false, itemFiles, err
 	}
 
-	if !finalize && groupResource == kuberesource.Pods {
+	if groupResource == kuberesource.Pods {
 		// pod needs to be initialized for the unstructured converter
 		pod = new(corev1api.Pod)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
@@ -216,7 +209,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	// the group version of the object.
 	versionPath := resourceVersion(obj)
 
-	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize)
+	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
 
@@ -229,6 +222,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	} else if updatedObj == nil { // which would be skip handle obj by resource policies
 		return true, itemFiles, nil
 	}
+	itemFiles = append(itemFiles, additionalItemFiles...)
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
 		return false, itemFiles, errors.WithStack(err)
@@ -237,13 +231,13 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	name = metadata.GetName()
 	namespace = metadata.GetNamespace()
 
-	if !finalize && groupResource == kuberesource.PersistentVolumes {
+	if groupResource == kuberesource.PersistentVolumes {
 		if err := ib.takePVSnapshot(obj, log); err != nil {
 			backupErrs = append(backupErrs, err)
 		}
 	}
 
-	if !finalize && groupResource == kuberesource.Pods && pod != nil {
+	if groupResource == kuberesource.Pods && pod != nil {
 		// this function will return partial results, so process podVolumeBackups
 		// even if there are errors.
 		podVolumeBackups, errs := ib.backupPodVolumes(log, pod, pvbVolumes)
@@ -316,7 +310,8 @@ func (ib *itemBackupper) executeActions(
 	name, namespace string,
 	metadata metav1.Object,
 	finalize bool,
-) (runtime.Unstructured, error) {
+) (runtime.Unstructured, []FileForArchive, error) {
+	var itemFiles []FileForArchive
 	for _, action := range ib.backupRequest.ResolvedActions {
 		if !action.ShouldUse(groupResource, namespace, metadata, log) {
 			continue
@@ -325,17 +320,17 @@ func (ib *itemBackupper) executeActions(
 		if ib.backupRequest.ResPolicies != nil && groupResource.String() == "persistentvolumeclaims" && action.Name() == "velero.io/csi-pvc-backupper" {
 			pvc := corev1api.PersistentVolumeClaim{}
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
-				return nil, errors.WithStack(err)
+				return nil, itemFiles, errors.WithStack(err)
 			}
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
-				return nil, errors.Errorf("PVC has no volume backing this claim")
+				return nil, itemFiles, errors.Errorf("PVC has no volume backing this claim")
 			}
 
 			pv := &corev1api.PersistentVolume{}
 			if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
-				return nil, errors.WithStack(err)
+				return nil, itemFiles, errors.WithStack(err)
 			}
 
 			volume := resourcepolicies.StructuredVolume{}
@@ -343,29 +338,30 @@ func (ib *itemBackupper) executeActions(
 			act := ib.backupRequest.ResPolicies.Match(&volume)
 			if act != nil && act.Type == resourcepolicies.Skip {
 				log.Infof("skip snapshot of pv %s for the matched resource policies", pvName)
-				return nil, nil
+				return nil, itemFiles, nil
 			}
 		}
-		updatedItem, additionalItemIdentifiers, operationID, itemsToUpdate, err := action.Execute(obj, ib.backupRequest.Backup)
+		updatedItem, additionalItemIdentifiers, operationID, postOperationItems, err := action.Execute(obj, ib.backupRequest.Backup)
+
 		if err != nil {
-			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
+			return nil, itemFiles, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
 
 		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
-		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true"
+		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true" || finalize
 		// remove the annotation as it's for communication between BIA and velero server,
 		// we don't want the resource be restored with this annotation.
 		if _, ok := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation]; ok {
 			delete(u.GetAnnotations(), mustIncludeAdditionalItemAnnotation)
 		}
 		obj = u
-		if finalize {
-			continue
-		}
 
 		// If async plugin started async operation, add it to the ItemOperations list
 		// ignore during finalize phase
 		if operationID != "" {
+			if finalize {
+				return nil, itemFiles, errors.New(fmt.Sprintf("Backup Item Action created operation during finalize (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name))
+			}
 			resourceIdentifier := velero.ResourceIdentifier{
 				GroupResource: groupResource,
 				Namespace:     namespace,
@@ -385,7 +381,7 @@ func (ib *itemBackupper) executeActions(
 					Created: &now,
 				},
 			}
-			newOperation.Spec.ItemsToUpdate = itemsToUpdate
+			newOperation.Spec.PostOperationItems = postOperationItems
 			itemOperList := ib.backupRequest.GetItemOperationsList()
 			*itemOperList = append(*itemOperList, &newOperation)
 		}
@@ -393,12 +389,12 @@ func (ib *itemBackupper) executeActions(
 		for _, additionalItem := range additionalItemIdentifiers {
 			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
 			if err != nil {
-				return nil, err
+				return nil, itemFiles, err
 			}
 
 			client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
 			if err != nil {
-				return nil, err
+				return nil, itemFiles, err
 			}
 
 			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
@@ -412,15 +408,17 @@ func (ib *itemBackupper) executeActions(
 				continue
 			}
 			if err != nil {
-				return nil, errors.WithStack(err)
+				return nil, itemFiles, errors.WithStack(err)
 			}
 
-			if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude); err != nil {
-				return nil, err
+			_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
+			if err != nil {
+				return nil, itemFiles, err
 			}
+			itemFiles = append(itemFiles, additionalItemFiles...)
 		}
 	}
-	return obj, nil
+	return obj, itemFiles, nil
 }
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,

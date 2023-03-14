@@ -216,17 +216,17 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-4").
-							Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperations).Result(),
+							Phase(velerov1api.BackupPhaseFinalizing).Result(),
 						backupShouldSkipSync: true,
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-5").
-							Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed).Result(),
+							Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).Result(),
 						backupShouldSkipSync: true,
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-6").
-							Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperations).Result(),
+							Phase(velerov1api.BackupPhaseFinalizing).Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
 							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
 						},
@@ -262,19 +262,19 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-4").
-							Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperations).
+							Phase(velerov1api.BackupPhaseFinalizing).
 							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
 						backupShouldSkipSync: true,
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-5").
-							Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed).
+							Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).
 							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
 						backupShouldSkipSync: true,
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-6").
-							Phase(velerov1api.BackupPhaseFinalizingAfterPluginOperations).
+							Phase(velerov1api.BackupPhaseFinalizing).
 							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
 							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),

@@ -65,6 +65,7 @@ import (
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -103,6 +104,8 @@ const (
 	defaultCSISnapshotTimeout   = 10 * time.Minute
 	defaultItemOperationTimeout = 60 * time.Minute
 
+	resourceTimeout = 10 * time.Minute
+
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
@@ -113,7 +116,7 @@ type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
 	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
-	defaultItemOperationTimeout                                             time.Duration
+	defaultItemOperationTimeout, resourceTimeout                            time.Duration
 	restoreResourcePriorities                                               restore.Priorities
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -148,6 +151,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultBackupTTL:               defaultBackupTTL,
 			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
 			defaultItemOperationTimeout:    defaultItemOperationTimeout,
+			resourceTimeout:                resourceTimeout,
 			storeValidationFrequency:       defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
@@ -223,10 +227,11 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.repoMaintenanceFrequency, "default-repo-maintain-frequency", config.repoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
-	command.Flags().DurationVar(&config.itemOperationSyncFrequency, "item-operation-sync-frequency", config.itemOperationSyncFrequency, "How often to check status on async backup/restore operations after backup processing.")
+	command.Flags().DurationVar(&config.itemOperationSyncFrequency, "item-operation-sync-frequency", config.itemOperationSyncFrequency, "How often to check status on backup/restore operations after backup/restore processing.")
 	command.Flags().BoolVar(&config.defaultVolumesToFsBackup, "default-volumes-to-fs-backup", config.defaultVolumesToFsBackup, "Backup all volumes with pod volume file system backup by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
 	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out.")
+	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 
 	return command
 }
@@ -568,7 +573,7 @@ func (s *server) initRepoManager() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger)
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
 
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
@@ -638,26 +643,26 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	// and BSL controller is mandatory for Velero to work.
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
-		controller.AsyncBackupOperations: {},
-		controller.Backup:                {},
-		controller.BackupDeletion:        {},
-		controller.BackupFinalizer:       {},
-		controller.BackupRepo:            {},
-		controller.BackupSync:            {},
-		controller.DownloadRequest:       {},
-		controller.GarbageCollection:     {},
-		controller.Restore:               {},
-		controller.Schedule:              {},
-		controller.ServerStatusRequest:   {},
+		controller.Backup:              {},
+		controller.BackupDeletion:      {},
+		controller.BackupFinalizer:     {},
+		controller.BackupOperations:    {},
+		controller.BackupRepo:          {},
+		controller.BackupSync:          {},
+		controller.DownloadRequest:     {},
+		controller.GarbageCollection:   {},
+		controller.Restore:             {},
+		controller.Schedule:            {},
+		controller.ServerStatusRequest: {},
 	}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 		s.config.disabledControllers = append(s.config.disabledControllers,
-			controller.AsyncBackupOperations,
 			controller.Backup,
 			controller.BackupDeletion,
 			controller.BackupFinalizer,
+			controller.BackupOperations,
 			controller.GarbageCollection,
 			controller.Schedule,
 		)
@@ -684,22 +689,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	)
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
-	}
-
-	var backupOpsMap *controller.BackupItemOperationsMap
-	if _, ok := enabledRuntimeControllers[controller.AsyncBackupOperations]; ok {
-		r, m := controller.NewAsyncBackupOperationsReconciler(
-			s.logger,
-			s.mgr.GetClient(),
-			s.config.itemOperationSyncFrequency,
-			newPluginManager,
-			backupStoreGetter,
-			s.metrics,
-		)
-		if err := r.SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.AsyncBackupOperations)
-		}
-		backupOpsMap = m
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.Backup]; ok {
@@ -736,6 +725,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultVolumesToFsBackup,
 			s.config.defaultBackupTTL,
 			s.config.defaultCSISnapshotTimeout,
+			s.config.resourceTimeout,
 			s.config.defaultItemOperationTimeout,
 			defaultVolumeSnapshotLocations,
 			s.metrics,
@@ -762,6 +752,22 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.credentialFileStore,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupDeletion)
+		}
+	}
+
+	backupOpsMap := itemoperationmap.NewBackupItemOperationsMap()
+	if _, ok := enabledRuntimeControllers[controller.BackupOperations]; ok {
+		r := controller.NewBackupOperationsReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			s.config.itemOperationSyncFrequency,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			backupOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupOperations)
 		}
 	}
 
@@ -863,6 +869,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			),
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
+			s.config.resourceTimeout,
 			s.logger,
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.kubeClient.CoreV1().RESTClient(),

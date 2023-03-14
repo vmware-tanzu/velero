@@ -360,7 +360,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			backupBuilder.DefaultVolumesToFsBackup(*o.DefaultVolumesToFsBackup.Value)
 		}
 		if o.ResPoliciesConfigmap != "" {
-			backupBuilder.ResourcePolices(o.ResPoliciesConfigmap)
+			backupBuilder.ResourcePolicies(o.ResPoliciesConfigmap)
 		}
 	}
 

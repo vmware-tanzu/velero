@@ -61,8 +61,8 @@ type BackupOperationSpec struct {
 	// OperationID returned by the BIA plugin
 	OperationID string "json:operationID"
 
-	// Items needing update after all async operations have completed
-	ItemsToUpdate []velero.ResourceIdentifier "json:itemsToUpdate"
+	// Items needing to be added to the backup after all async operations have completed
+	PostOperationItems []velero.ResourceIdentifier "json:postOperationItems"
 }
 
 func (in *BackupOperationSpec) DeepCopy() *BackupOperationSpec {
@@ -77,8 +77,8 @@ func (in *BackupOperationSpec) DeepCopy() *BackupOperationSpec {
 func (in *BackupOperationSpec) DeepCopyInto(out *BackupOperationSpec) {
 	*out = *in
 	in.ResourceIdentifier.DeepCopyInto(&out.ResourceIdentifier)
-	if in.ItemsToUpdate != nil {
-		in, out := &in.ItemsToUpdate, &out.ItemsToUpdate
+	if in.PostOperationItems != nil {
+		in, out := &in.PostOperationItems, &out.PostOperationItems
 		*out = make([]velero.ResourceIdentifier, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

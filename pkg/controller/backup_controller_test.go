@@ -580,7 +580,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		backupExists             bool
 		existenceCheckError      error
 	}{
-		// FinalizingAfterPluginOperations
+		// Finalizing
 		{
 			name:                     "backup with no backup location gets the default",
 			backup:                   defaultBackup().Result(),
@@ -608,7 +608,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.True(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -643,7 +643,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.False(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -681,7 +681,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.True(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -717,7 +717,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.False(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					Expiration:     &metav1.Time{now.Add(10 * time.Minute)},
@@ -753,7 +753,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.True(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -790,7 +790,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.False(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -827,7 +827,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.True(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -864,7 +864,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.True(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,
@@ -901,7 +901,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					DefaultVolumesToFsBackup: boolptr.False(),
 				},
 				Status: velerov1api.BackupStatus{
-					Phase:          velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
 					StartTimestamp: &timestamp,

@@ -68,7 +68,7 @@ func DescribeBackup(
 			phaseString = color.GreenString(phaseString)
 		case velerov1api.BackupPhaseDeleting:
 		case velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
-		case velerov1api.BackupPhaseFinalizingAfterPluginOperations, velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed:
+		case velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		case velerov1api.BackupPhaseInProgress:
 		case velerov1api.BackupPhaseNew:
 		}
@@ -288,7 +288,7 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 		d.Println()
 	}
 
-	describeAsyncBackupItemOperations(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertPath)
+	describeBackupItemOperations(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertPath)
 
 	if details {
 		describeBackupResourceList(ctx, kbClient, d, backup, insecureSkipTLSVerify, caCertPath)
@@ -323,29 +323,29 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 	d.Printf("Velero-Native Snapshots: <none included>\n")
 }
 
-func describeAsyncBackupItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {
+func describeBackupItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {
 	status := backup.Status
-	if status.AsyncBackupItemOperationsAttempted > 0 {
+	if status.BackupItemOperationsAttempted > 0 {
 		if !details {
-			d.Printf("Async Backup Item Operations:\t%d of %d completed successfully, %d failed (specify --details for more information)\n", status.AsyncBackupItemOperationsCompleted, status.AsyncBackupItemOperationsAttempted, status.AsyncBackupItemOperationsFailed)
+			d.Printf("Backup Item Operations:\t%d of %d completed successfully, %d failed (specify --details for more information)\n", status.BackupItemOperationsCompleted, status.BackupItemOperationsAttempted, status.BackupItemOperationsFailed)
 			return
 		}
 
 		buf := new(bytes.Buffer)
 		if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupItemOperations, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-			d.Printf("Async Backup Item Operations:\t<error getting operation info: %v>\n", err)
+			d.Printf("Backup Item Operations:\t<error getting operation info: %v>\n", err)
 			return
 		}
 
 		var operations []*itemoperation.BackupOperation
 		if err := json.NewDecoder(buf).Decode(&operations); err != nil {
-			d.Printf("Async Backup Item Operations:\t<error reading operation info: %v>\n", err)
+			d.Printf("Backup Item Operations:\t<error reading operation info: %v>\n", err)
 			return
 		}
 
-		d.Printf("Async Backup Item Operations:\n")
+		d.Printf("Backup Item Operations:\n")
 		for _, operation := range operations {
-			describeAsyncBackupItemOperation(d, operation)
+			describeBackupItemOperation(d, operation)
 		}
 	}
 }
@@ -398,14 +398,14 @@ func describeSnapshot(d *Describer, pvName, snapshotID, volumeType, volumeAZ str
 	d.Printf("\t\tIOPS:\t%s\n", iopsString)
 }
 
-func describeAsyncBackupItemOperation(d *Describer, operation *itemoperation.BackupOperation) {
+func describeBackupItemOperation(d *Describer, operation *itemoperation.BackupOperation) {
 	d.Printf("\tOperation for %s %s/%s:\n", operation.Spec.ResourceIdentifier, operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
 	d.Printf("\t\tBackup Item Action Plugin:\t%s\n", operation.Spec.BackupItemAction)
 	d.Printf("\t\tOperation ID:\t%s\n", operation.Spec.OperationID)
-	if len(operation.Spec.ItemsToUpdate) > 0 {
+	if len(operation.Spec.PostOperationItems) > 0 {
 		d.Printf("\t\tItems to Update:\n")
 	}
-	for _, item := range operation.Spec.ItemsToUpdate {
+	for _, item := range operation.Spec.PostOperationItems {
 		d.Printf("\t\t\t%s %s/%s\n", item, item.Namespace, item.Name)
 	}
 	d.Printf("\t\tPhase:\t%s\n", operation.Status.Phase)

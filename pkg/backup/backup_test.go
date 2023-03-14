@@ -1137,23 +1137,23 @@ func TestBackupResourceOrdering(t *testing.T) {
 // to run for specific resources/namespaces and simply records the items
 // that it is executed for.
 type recordResourcesAction struct {
-	selector        velero.ResourceSelector
-	ids             []string
-	backups         []velerov1.Backup
-	additionalItems []velero.ResourceIdentifier
-	operationID     string
-	itemsToUpdate   []velero.ResourceIdentifier
+	selector           velero.ResourceSelector
+	ids                []string
+	backups            []velerov1.Backup
+	additionalItems    []velero.ResourceIdentifier
+	operationID        string
+	postOperationItems []velero.ResourceIdentifier
 }
 
 func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	metadata, err := meta.Accessor(item)
 	if err != nil {
-		return item, a.additionalItems, a.operationID, a.itemsToUpdate, err
+		return item, a.additionalItems, a.operationID, a.postOperationItems, err
 	}
 	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
 	a.backups = append(a.backups, *backup)
 
-	return item, a.additionalItems, a.operationID, a.itemsToUpdate, nil
+	return item, a.additionalItems, a.operationID, a.postOperationItems, nil
 }
 
 func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {

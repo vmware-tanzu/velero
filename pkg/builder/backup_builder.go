@@ -254,8 +254,8 @@ func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuild
 	return b
 }
 
-// ResourcePolices sets the Backup's resource polices.
-func (b *BackupBuilder) ResourcePolices(name string) *BackupBuilder {
-	b.object.Spec.ResourcePolices = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
+// ResourcePolicies sets the Backup's resource polices.
+func (b *BackupBuilder) ResourcePolicies(name string) *BackupBuilder {
+	b.object.Spec.ResourcePolicies = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
 	return b
 }

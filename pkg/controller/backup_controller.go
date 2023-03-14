@@ -18,9 +18,7 @@ package controller
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -85,6 +83,7 @@ type backupReconciler struct {
 	defaultVolumesToFsBackup    bool
 	defaultBackupTTL            time.Duration
 	defaultCSISnapshotTimeout   time.Duration
+	resourceTimeout             time.Duration
 	defaultItemOperationTimeout time.Duration
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
@@ -108,6 +107,7 @@ func NewBackupReconciler(
 	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
 	defaultCSISnapshotTimeout time.Duration,
+	resourceTimeout time.Duration,
 	defaultItemOperationTimeout time.Duration,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -132,6 +132,7 @@ func NewBackupReconciler(
 		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
 		defaultBackupTTL:            defaultBackupTTL,
 		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
+		resourceTimeout:             resourceTimeout,
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
 		metrics:                     metrics,
@@ -441,18 +442,18 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
 	}
 
-	if request.Spec.ResourcePolices != nil && request.Spec.ResourcePolices.Kind == resourcepolicies.ConfigmapRefType {
+	if request.Spec.ResourcePolicies != nil && request.Spec.ResourcePolicies.Kind == resourcepolicies.ConfigmapRefType {
 		policiesConfigmap := &v1.ConfigMap{}
-		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolices.Name}, policiesConfigmap)
+		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolicies.Name}, policiesConfigmap)
 		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolices.Name, err))
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolicies.Name, err))
 		}
 		res, err := resourcepolicies.GetResourcePoliciesFromConfig(policiesConfigmap)
 		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolices.Name)).Error())
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicies.Name)).Error())
 		}
 		if err := res.Validate(); err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolices.Name)).Error())
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicies.Name)).Error())
 		}
 		request.ResPolicies = res
 	}
@@ -701,9 +702,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
-	backup.Status.AsyncBackupItemOperationsAttempted = len(*backup.GetItemOperationsList())
-	backup.Status.AsyncBackupItemOperationsCompleted = opsCompleted
-	backup.Status.AsyncBackupItemOperationsFailed = opsFailed
+	backup.Status.BackupItemOperationsAttempted = len(*backup.GetItemOperationsList())
+	backup.Status.BackupItemOperationsCompleted = opsCompleted
+	backup.Status.BackupItemOperationsFailed = opsFailed
 
 	backup.Status.Warnings = logCounter.GetCount(logrus.WarnLevel)
 	backup.Status.Errors = logCounter.GetCount(logrus.ErrorLevel)
@@ -728,13 +729,13 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		if inProgressOperations {
 			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed
 		} else {
-			backup.Status.Phase = velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed
+			backup.Status.Phase = velerov1api.BackupPhaseFinalizingPartiallyFailed
 		}
 	default:
 		if inProgressOperations {
 			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperations
 		} else {
-			backup.Status.Phase = velerov1api.BackupPhaseFinalizingAfterPluginOperations
+			backup.Status.Phase = velerov1api.BackupPhaseFinalizing
 		}
 	}
 	// Mark completion timestamp before serializing and uploading.
@@ -825,42 +826,42 @@ func persistBackup(backup *pkgbackup.Request,
 	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
-	nativeVolumeSnapshots, errs := encodeToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
+	nativeVolumeSnapshots, errs := encode.EncodeToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
 	var backupItemOperations *bytes.Buffer
-	backupItemOperations, errs = encodeToJSONGzip(backup.GetItemOperationsList(), "backup item operations list")
+	backupItemOperations, errs = encode.EncodeToJSONGzip(backup.GetItemOperationsList(), "backup item operations list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	podVolumeBackups, errs := encodeToJSONGzip(backup.PodVolumeBackups, "pod volume backups list")
+	podVolumeBackups, errs := encode.EncodeToJSONGzip(backup.PodVolumeBackups, "pod volume backups list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	csiSnapshotJSON, errs := encodeToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
+	csiSnapshotJSON, errs := encode.EncodeToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	csiSnapshotContentsJSON, errs := encodeToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
+	csiSnapshotContentsJSON, errs := encode.EncodeToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
-	csiSnapshotClassesJSON, errs := encodeToJSONGzip(csiVolumesnapshotClasses, "csi volume snapshot classes list")
-	if errs != nil {
-		persistErrs = append(persistErrs, errs...)
-	}
-
-	backupResourceList, errs := encodeToJSONGzip(backup.BackupResourceList(), "backup resources list")
+	csiSnapshotClassesJSON, errs := encode.EncodeToJSONGzip(csiVolumesnapshotClasses, "csi volume snapshot classes list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	backupResult, errs := encodeToJSONGzip(results, "backup results")
+	backupResourceList, errs := encode.EncodeToJSONGzip(backup.BackupResourceList(), "backup resources list")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
+
+	backupResult, errs := encode.EncodeToJSONGzip(results, "backup results")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
@@ -910,29 +911,6 @@ func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
 	if err := os.Remove(file.Name()); err != nil {
 		log.WithError(err).WithField("file", file.Name()).Error("error removing file")
 	}
-}
-
-// encodeToJSONGzip takes arbitrary Go data and encodes it to GZip compressed JSON in a buffer, as well as a description of the data to put into an error should encoding fail.
-func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
-	buf := new(bytes.Buffer)
-	gzw := gzip.NewWriter(buf)
-
-	// Since both encoding and closing the gzip writer could fail separately and both errors are useful,
-	// collect both errors to report back.
-	errs := []error{}
-
-	if err := json.NewEncoder(gzw).Encode(data); err != nil {
-		errs = append(errs, errors.Wrapf(err, "error encoding %s", desc))
-	}
-	if err := gzw.Close(); err != nil {
-		errs = append(errs, errors.Wrapf(err, "error closing gzip writer for %s", desc))
-	}
-
-	if len(errs) > 0 {
-		return nil, errs
-	}
-
-	return buf, nil
 }
 
 // waitVolumeSnapshotReadyToUse is used to wait VolumeSnapshot turned to ReadyToUse.
@@ -1074,7 +1052,7 @@ func (b *backupReconciler) deleteVolumeSnapshot(volumeSnapshots []snapshotv1api.
 // Set VolumeSnapshotRef's UID to nil will let the csi-controller finds out the related VS is gone, then
 // VSC can be deleted.
 func (b *backupReconciler) recreateVolumeSnapshotContent(vsc snapshotv1api.VolumeSnapshotContent) error {
-	timeout := 1 * time.Minute
+	timeout := b.resourceTimeout
 	interval := 1 * time.Second
 
 	err := b.kbClient.Delete(context.TODO(), &vsc)

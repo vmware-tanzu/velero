@@ -433,7 +433,7 @@ spec:
                     nullable: true
                     type: object
                   resourcePolices:
-                    description: ResourcePolices specifies the referenced resource
+                    description: ResourcePolicies specifies the referenced resource
                       policies that backup should follow
                     properties:
                       apiGroup:

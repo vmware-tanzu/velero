@@ -261,8 +261,8 @@ func getBackup(item *velerov1.Schedule, timestamp time.Time) *velerov1.Backup {
 	backupBuilder := builder.
 		ForBackup(item.Namespace, name).
 		FromSchedule(item)
-	if item.Spec.Template.ResourcePolices != nil {
-		backupBuilder.ResourcePolices(item.Spec.Template.ResourcePolices.Name)
+	if item.Spec.Template.ResourcePolicies != nil {
+		backupBuilder.ResourcePolicies(item.Spec.Template.ResourcePolicies.Name)
 	}
 	return backupBuilder.Result()
 }

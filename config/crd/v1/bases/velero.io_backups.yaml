@@ -398,7 +398,7 @@ spec:
                 nullable: true
                 type: object
               resourcePolices:
-                description: ResourcePolices specifies the referenced resource policies
+                description: ResourcePolicies specifies the referenced resource policies
                   that backup should follow
                 properties:
                   apiGroup:
@@ -440,19 +440,19 @@ spec:
           status:
             description: BackupStatus captures the current status of a Velero backup.
             properties:
-              asyncBackupItemOperationsAttempted:
-                description: AsyncBackupItemOperationsAttempted is the total number
-                  of attempted async BackupItemAction operations for this backup.
+              backupItemOperationsAttempted:
+                description: BackupItemOperationsAttempted is the total number of
+                  attempted async BackupItemAction operations for this backup.
                 type: integer
-              asyncBackupItemOperationsCompleted:
-                description: AsyncBackupItemOperationsCompleted is the total number
-                  of successfully completed async BackupItemAction operations for
-                  this backup.
+              backupItemOperationsCompleted:
+                description: BackupItemOperationsCompleted is the total number of
+                  successfully completed async BackupItemAction operations for this
+                  backup.
                 type: integer
-              asyncBackupItemOperationsFailed:
-                description: AsyncBackupItemOperationsFailed is the total number of
-                  async BackupItemAction operations for this backup which ended with
-                  an error.
+              backupItemOperationsFailed:
+                description: BackupItemOperationsFailed is the total number of async
+                  BackupItemAction operations for this backup which ended with an
+                  error.
                 type: integer
               completionTimestamp:
                 description: CompletionTimestamp records the time a backup was completed.
@@ -496,8 +496,8 @@ spec:
                 - InProgress
                 - WaitingForPluginOperations
                 - WaitingForPluginOperationsPartiallyFailed
-                - FinalizingAfterPluginOperations
-                - FinalizingAfterPluginOperationsPartiallyFailed
+                - Finalizing
+                - FinalizingPartiallyFailed
                 - Completed
                 - PartiallyFailed
                 - Failed

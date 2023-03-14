@@ -149,23 +149,15 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations ||
-			backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed {
+			backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed ||
+			backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
+			backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
 
 			if backup.Status.Expiration == nil || backup.Status.Expiration.After(time.Now()) {
-				log.Debugf("Skipping non-expired WaitingForPluginOperations backup %v", backup.Name)
+				log.Debugf("Skipping non-expired incomplete backup %v", backup.Name)
 				continue
 			}
-			log.Debug("WaitingForPluginOperations Backup is past expiration, syncing for garbage collection")
-			backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
-		}
-		if backup.Status.Phase == velerov1api.BackupPhaseFinalizingAfterPluginOperations ||
-			backup.Status.Phase == velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed {
-
-			if backup.Status.Expiration == nil || backup.Status.Expiration.After(time.Now()) {
-				log.Debugf("Skipping non-expired FinalizingAfterPluginOperations backup %v", backup.Name)
-				continue
-			}
-			log.Debug("FinalizingAfterPluginOperations Backup is past expiration, syncing for garbage collection")
+			log.Debugf("%v Backup is past expiration, syncing for garbage collection", backup.Status.Phase)
 			backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
 		}
 		backup.Namespace = b.namespace

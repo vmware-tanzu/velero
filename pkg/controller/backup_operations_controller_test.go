@@ -35,6 +35,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
@@ -51,20 +52,21 @@ var (
 	bia           = &biav2mocks.BackupItemAction{}
 )
 
-func mockAsyncBackupOperationsReconciler(fakeClient kbclient.Client, fakeClock *testclocks.FakeClock, freq time.Duration) (*asyncBackupOperationsReconciler, *BackupItemOperationsMap) {
-	abor, biaMap := NewAsyncBackupOperationsReconciler(
+func mockBackupOperationsReconciler(fakeClient kbclient.Client, fakeClock *testclocks.FakeClock, freq time.Duration) *backupOperationsReconciler {
+	abor := NewBackupOperationsReconciler(
 		logrus.StandardLogger(),
 		fakeClient,
 		freq,
 		func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		metrics.NewServerMetrics(),
+		itemoperationmap.NewBackupItemOperationsMap(),
 	)
 	abor.clock = fakeClock
-	return abor, biaMap
+	return abor
 }
 
-func TestAsyncBackupOperationsReconcile(t *testing.T) {
+func TestBackupOperationsReconcile(t *testing.T) {
 	fakeClock := testclocks.NewFakeClock(time.Now())
 	metav1Now := metav1.NewTime(fakeClock.Now())
 
@@ -81,27 +83,27 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 		expectPhase       velerov1api.BackupPhase
 	}{
 		{
-			name: "WaitingForPluginOperations backup with completed operations is FinalizingAfterPluginOperations",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+			name: "WaitingForPluginOperations backup with completed operations is Finalizing",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").
 				StorageLocation("default").
 				ItemOperationTimeout(60 * time.Minute).
-				ObjectMeta(builder.WithUID("foo")).
+				ObjectMeta(builder.WithUID("foo-11")).
 				Phase(velerov1api.BackupPhaseWaitingForPluginOperations).Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
-			expectPhase:       velerov1api.BackupPhaseFinalizingAfterPluginOperations,
+			expectPhase:       velerov1api.BackupPhaseFinalizing,
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
-						BackupName:       "backup-1",
-						BackupUID:        "foo",
-						BackupItemAction: "foo",
+						BackupName:       "backup-11",
+						BackupUID:        "foo-11",
+						BackupItemAction: "foo-11",
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						OperationID: "operation-1",
+						OperationID: "operation-11",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseInProgress,
@@ -112,10 +114,10 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 		},
 		{
 			name: "WaitingForPluginOperations backup with incomplete operations is still incomplete",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-2").
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-12").
 				StorageLocation("default").
 				ItemOperationTimeout(60 * time.Minute).
-				ObjectMeta(builder.WithUID("foo")).
+				ObjectMeta(builder.WithUID("foo-12")).
 				Phase(velerov1api.BackupPhaseWaitingForPluginOperations).Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: false,
@@ -123,15 +125,15 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
-						BackupName:       "backup-2",
-						BackupUID:        "foo-2",
-						BackupItemAction: "foo-2",
+						BackupName:       "backup-12",
+						BackupUID:        "foo-12",
+						BackupItemAction: "foo-12",
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						OperationID: "operation-2",
+						OperationID: "operation-12",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseInProgress,
@@ -141,28 +143,28 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "WaitingForPluginOperations backup with completed failed operations is FinalizingAfterPluginOperationsPartiallyFailed",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-3").
+			name: "WaitingForPluginOperations backup with completed failed operations is FinalizingPartiallyFailed",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-13").
 				StorageLocation("default").
 				ItemOperationTimeout(60 * time.Minute).
-				ObjectMeta(builder.WithUID("foo")).
+				ObjectMeta(builder.WithUID("foo-13")).
 				Phase(velerov1api.BackupPhaseWaitingForPluginOperations).Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
 			operationErr:      "failed",
-			expectPhase:       velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed,
+			expectPhase:       velerov1api.BackupPhaseFinalizingPartiallyFailed,
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
-						BackupName:       "backup-3",
-						BackupUID:        "foo-3",
-						BackupItemAction: "foo-3",
+						BackupName:       "backup-13",
+						BackupUID:        "foo-13",
+						BackupItemAction: "foo-13",
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						OperationID: "operation-3",
+						OperationID: "operation-13",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseInProgress,
@@ -172,27 +174,27 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "WaitingForPluginOperationsPartiallyFailed backup with completed operations is FinalizingAfterPluginOperationsPartiallyFailed",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+			name: "WaitingForPluginOperationsPartiallyFailed backup with completed operations is FinalizingPartiallyFailed",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-14").
 				StorageLocation("default").
 				ItemOperationTimeout(60 * time.Minute).
-				ObjectMeta(builder.WithUID("foo")).
+				ObjectMeta(builder.WithUID("foo-14")).
 				Phase(velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed).Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
-			expectPhase:       velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed,
+			expectPhase:       velerov1api.BackupPhaseFinalizingPartiallyFailed,
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
-						BackupName:       "backup-4",
-						BackupUID:        "foo-4",
-						BackupItemAction: "foo-4",
+						BackupName:       "backup-14",
+						BackupUID:        "foo-14",
+						BackupItemAction: "foo-14",
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						OperationID: "operation-4",
+						OperationID: "operation-14",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseInProgress,
@@ -203,10 +205,10 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 		},
 		{
 			name: "WaitingForPluginOperationsPartiallyFailed backup with incomplete operations is still incomplete",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-2").
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-15").
 				StorageLocation("default").
 				ItemOperationTimeout(60 * time.Minute).
-				ObjectMeta(builder.WithUID("foo")).
+				ObjectMeta(builder.WithUID("foo-15")).
 				Phase(velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed).Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: false,
@@ -214,15 +216,15 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
-						BackupName:       "backup-5",
-						BackupUID:        "foo-5",
-						BackupItemAction: "foo-5",
+						BackupName:       "backup-15",
+						BackupUID:        "foo-15",
+						BackupItemAction: "foo-15",
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						OperationID: "operation-5",
+						OperationID: "operation-15",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseInProgress,
@@ -232,28 +234,28 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "WaitingForPluginOperationsPartiallyFailed backup with completed failed operations is FinalizingAfterPluginOperationsPartiallyFailed",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-3").
+			name: "WaitingForPluginOperationsPartiallyFailed backup with completed failed operations is FinalizingPartiallyFailed",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-16").
 				StorageLocation("default").
 				ItemOperationTimeout(60 * time.Minute).
-				ObjectMeta(builder.WithUID("foo")).
+				ObjectMeta(builder.WithUID("foo-16")).
 				Phase(velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed).Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
 			operationErr:      "failed",
-			expectPhase:       velerov1api.BackupPhaseFinalizingAfterPluginOperationsPartiallyFailed,
+			expectPhase:       velerov1api.BackupPhaseFinalizingPartiallyFailed,
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{
-						BackupName:       "backup-6",
-						BackupUID:        "foo-6",
-						BackupItemAction: "foo-6",
+						BackupName:       "backup-16",
+						BackupUID:        "foo-16",
+						BackupItemAction: "foo-16",
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
 							Name:          "pod-1",
 						},
-						OperationID: "operation-6",
+						OperationID: "operation-16",
 					},
 					Status: itemoperation.OperationStatus{
 						Phase:   itemoperation.OperationPhaseInProgress,
@@ -278,7 +280,7 @@ func TestAsyncBackupOperationsReconcile(t *testing.T) {
 			}
 
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
-			reconciler, _ := mockAsyncBackupOperationsReconciler(fakeClient, fakeClock, defaultAsyncBackupOperationsFrequency)
+			reconciler := mockBackupOperationsReconciler(fakeClient, fakeClock, defaultBackupOperationsFrequency)
 			pluginManager.On("CleanupClients").Return(nil)
 			backupStore.On("GetBackupItemOperations", test.backup.Name).Return(test.backupOperations, nil)
 			backupStore.On("PutBackupItemOperations", mock.Anything, mock.Anything).Return(nil)

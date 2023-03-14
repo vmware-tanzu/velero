@@ -91,16 +91,16 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name                string
-		backup              []byte
-		item                []byte
-		implUpdatedItem     runtime.Unstructured
-		implAdditionalItems []velero.ResourceIdentifier
-		implOperationID     string
-		implItemsToUpdate   []velero.ResourceIdentifier
-		implError           error
-		expectError         bool
-		skipMock            bool
+		name                   string
+		backup                 []byte
+		item                   []byte
+		implUpdatedItem        runtime.Unstructured
+		implAdditionalItems    []velero.ResourceIdentifier
+		implOperationID        string
+		implPostOperationItems []velero.ResourceIdentifier
+		implError              error
+		expectError            bool
+		skipMock               bool
 	}{
 		{
 			name:        "error unmarshaling item",
@@ -154,7 +154,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 			defer itemAction.AssertExpectations(t)
 
 			if !test.skipMock {
-				itemAction.On("Execute", &validItemObject, &validBackupObject).Return(test.implUpdatedItem, test.implAdditionalItems, test.implOperationID, test.implItemsToUpdate, test.implError)
+				itemAction.On("Execute", &validItemObject, &validBackupObject).Return(test.implUpdatedItem, test.implAdditionalItems, test.implOperationID, test.implPostOperationItems, test.implError)
 			}
 
 			s := &BackupItemActionGRPCServer{mux: &common.ServerMux{
