@@ -75,7 +75,14 @@ func (r *itemCollector) getAllItems() []*kubernetesResource {
 	return r.getItems(nil)
 }
 
-// getAllItems gets all relevant items from all API groups.
+// getItems gets all relevant items from all API groups.
+// If resourceIDsMap is nil, then all items from the cluster are
+// pulled for each API group, subject to include/exclude rules.
+// If resourceIDsMap is supplied, then only those resources are
+// returned, with the appropriate APIGroup information filled in. In
+// this case, include/exclude rules are not invoked, since we already
+// have the list of items, we just need the item collector/discovery
+// helper to fill in the missing GVR, etc. context.
 func (r *itemCollector) getItems(resourceIDsMap map[schema.GroupResource][]velero.ResourceIdentifier) []*kubernetesResource {
 	var resources []*kubernetesResource
 	for _, group := range r.discoveryHelper.Resources() {
@@ -92,6 +99,8 @@ func (r *itemCollector) getItems(resourceIDsMap map[schema.GroupResource][]veler
 }
 
 // getGroupItems collects all relevant items from a single API group.
+// If resourceIDsMap is supplied, then only those items are returned,
+// with GVR/APIResource metadata supplied.
 func (r *itemCollector) getGroupItems(log logrus.FieldLogger, group *metav1.APIResourceList, resourceIDsMap map[schema.GroupResource][]velero.ResourceIdentifier) ([]*kubernetesResource, error) {
 	log = log.WithField("group", group.GroupVersion)
 
@@ -181,6 +190,8 @@ func getOrderedResourcesForType(orderedResources map[string]string, resourceType
 }
 
 // getResourceItems collects all relevant items for a given group-version-resource.
+// If resourceIDsMap is supplied, the items will be pulled from here
+// rather than from the cluster and applying include/exclude rules.
 func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.GroupVersion, resource metav1.APIResource, resourceIDsMap map[schema.GroupResource][]velero.ResourceIdentifier) ([]*kubernetesResource, error) {
 	log = log.WithField("resource", resource.Name)
 

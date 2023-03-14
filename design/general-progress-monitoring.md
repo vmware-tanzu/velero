@@ -123,11 +123,11 @@ from a plugin could cause a backup or restore to move to "PartiallyFailed".  If 
 deleted (cancelled), the plug-ins will attempt to delete the snapshots and stop the data movement -
 this may not be possible with all storage systems.
 
-In addition, for backups (but not restores), there will also be two additional phases,
-"FinalizingAfterPluginOperations" and "FinalizingAfterPluginOperationsPartiallyFailed", which will
-handle any steps required after plugin operations have all completed. Initially, this will just
-include adding any required resources to the backup that might have changed during asynchronous
-operation execution, although eventually other cleanup actions could be added to this phase.
+In addition, for backups (but not restores), there will also be two additional phases, "Finalizing"
+and "FinalizingPartiallyFailed", which will handle any steps required after plugin operations have
+all completed. Initially, this will just include adding any required resources to the backup that
+might have changed during asynchronous operation execution, although eventually other cleanup
+actions could be added to this phase.
 
 ### State progression
 
@@ -156,24 +156,24 @@ asynchronous plugin operations and no errors so far, "WaitingForPluginOperations
 backups or restores which have unfinished asynchronous plugin operations at least one error,
 "Completed" for restores with no unfinished asynchronous plugin operations and no errors,
 "PartiallyFailed" for restores with no unfinished asynchronous plugin operations and at least one
-error, "FinalizingAfterPluginOperations" for backups with no unfinished asynchronous plugin
-operations and no errors, "FinalizingAfterPluginOperationsPartiallyFailed" for backups with no
-unfinished asynchronous plugin operations and at least one error, or "PartiallyFailed".
-Backups/restores which would have a final phase of "Completed" or "PartiallyFailed" may move to the
-"WaitingForPluginOperations" or "WaitingForPluginOperationsPartiallyFailed" state.  A backup/restore
-which will be marked "Failed" will go directly to the "Failed" phase.  Uploads may continue in the
-background for snapshots that were taken by a "Failed" backup/restore, but no progress will not be
-monitored or updated. If there are any operations in progress when a backup is moved to the "Failed"
-phase (although with the current workflow, that shouldn't happen), Cancel() should be called on
-these operations. When a "Failed" backup is deleted, all snapshots will be deleted and at that point
-any uploads still in progress should be aborted.
+error, "Finalizing" for backups with no unfinished asynchronous plugin operations and no errors,
+"FinalizingPartiallyFailed" for backups with no unfinished asynchronous plugin operations and at
+least one error, or "PartiallyFailed".  Backups/restores which would have a final phase of
+"Completed" or "PartiallyFailed" may move to the "WaitingForPluginOperations" or
+"WaitingForPluginOperationsPartiallyFailed" state.  A backup/restore which will be marked "Failed"
+will go directly to the "Failed" phase.  Uploads may continue in the background for snapshots that
+were taken by a "Failed" backup/restore, but no progress will not be monitored or updated. If there
+are any operations in progress when a backup is moved to the "Failed" phase (although with the
+current workflow, that shouldn't happen), Cancel() should be called on these operations. When a
+"Failed" backup is deleted, all snapshots will be deleted and at that point any uploads still in
+progress should be aborted.
 
 ### WaitingForPluginOperations (new)
 The "WaitingForPluginOperations" phase signifies that the main part of the backup/restore, including
 snapshotting has completed successfully and uploading and any other asynchronous BIA/RIA plugin
 operations are continuing.  In the event of an error during this phase, the phase will change to
 WaitingForPluginOperationsPartiallyFailed.  On success, the phase changes to
-"FinalizingAfterPluginOperations" for backups and "Completed" for restores.  Backups cannot be
+"Finalizing" for backups and "Completed" for restores.  Backups cannot be
 restored from when they are in the WaitingForPluginOperations state.
 
 ### WaitingForPluginOperationsPartiallyFailed (new)
@@ -182,21 +182,19 @@ backup/restore, including snapshotting has completed, but there were partial fai
 the main part or during any async operations, including snapshot uploads.  Backups cannot be
 restored from when they are in the WaitingForPluginOperationsPartiallyFailed state.
 
-### FinalizingAfterPluginOperations (new)
-The "FinalizingAfterPluginOperations" phase signifies that asynchronous backup operations have all
-completed successfully and Velero is currently backing up any resources indicated by asynchronous
-plugins as items to back up after operations complete. Once this is done, the phase changes to
-Completed.  Backups cannot be restored from when they are in the FinalizingAfterPluginOperations
-state.
+### Finalizing (new)
+The "Finalizing" phase signifies that asynchronous backup operations have all completed successfully
+and Velero is currently backing up any resources indicated by asynchronous plugins as items to back
+up after operations complete. Once this is done, the phase changes to Completed.  Backups cannot be
+restored from when they are in the Finalizing state.
 
-### FinalizingAfterPluginOperationsPartiallyFailed (new)
+### FinalizingPartiallyFailed (new)
 
-The "FinalizingAfterPluginOperationsPartiallyFailed" phase signifies that, for a backup which had
-errors during initial processing or asynchronous plugin operation, asynchronous backup operations
-have all completed and Velero is currently backing up any resources indicated by asynchronous
-plugins as items to back up after operations complete. Once this is done, the phase changes to
-PartiallyFailed.  Backups cannot be restored from when they are in the
-FinalizingAfterPluginOperationsPartiallyFailed state.
+The "FinalizingPartiallyFailed" phase signifies that, for a backup which had errors during initial
+processing or asynchronous plugin operation, asynchronous backup operations have all completed and
+Velero is currently backing up any resources indicated by asynchronous plugins as items to back up
+after operations complete. Once this is done, the phase changes to PartiallyFailed.  Backups cannot
+be restored from when they are in the FinalizingPartiallyFailed state.
 
 ### Failed
 When a backup/restore has had fatal errors it is marked as "Failed" Backups in this state cannot be
@@ -244,14 +242,14 @@ WaitingForPluginOperationsPartiallyFailed phase, another backup/restore may be s
 While in the WaitingForPluginOperations or WaitingForPluginOperationsPartiallyFailed phase, the
 snapshots and item actions will be periodically polled.  When all of the snapshots and item actions
 have reported success, restores will move directly to the Completed or PartiallyFailed phase, and
-backups will move to the FinalizingAfterPluginOperations or
-FinalizingAfterPluginOperationsPartiallyFailed phase, depending on whether the backup/restore was in
-the WaitingForPluginOperations or WaitingForPluginOperationsPartiallyFailed phase.
+backups will move to the Finalizing or FinalizingPartiallyFailed phase, depending on whether the
+backup/restore was in the WaitingForPluginOperations or WaitingForPluginOperationsPartiallyFailed
+phase.
 
-While in the FinalizingAfterPluginOperations or FinalizingAfterPluginOperationsPartiallyFailed
-phase, Velero will update the backup with any resources indicated by plugins that they must be added
-to the backup after operations are completed, and then the backup will move to the Completed or
-PartiallyFailed phase, depending on whether there are any backup errors.
+While in the Finalizing or FinalizingPartiallyFailed phase, Velero will update the backup with any
+resources indicated by plugins that they must be added to the backup after operations are completed,
+and then the backup will move to the Completed or PartiallyFailed phase, depending on whether there
+are any backup errors.
 
 The Backup resources will be written to object storage at the time the backup leaves the InProgress
 phase, but it will not be synced to other clusters (or usable for restores in the current cluster)
@@ -272,7 +270,7 @@ ignored.
     type OperationProgress struct {
         Completed bool                          // True when the operation has completed, either successfully or with a failure
         Err string                              // Set when the operation has failed
-        NCompleted, NTotal int64                // Quantity completed so far and the total quantity associated with the operaation in operationUnits
+        NCompleted, NTotal int64                // Quantity completed so far and the total quantity associated with the operation in operationUnits
                                                 // For data mover and volume snapshotter use cases, this would be in bytes
                                                 // On successful completion, completed and total should be the same.
         OperationUnits string                   // Units represented by completed and total -- for data mover and item

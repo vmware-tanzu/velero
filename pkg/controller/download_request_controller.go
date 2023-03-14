@@ -28,6 +28,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
@@ -42,7 +43,7 @@ type downloadRequestReconciler struct {
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 
 	// used to force update of async backup item operations before processing download request
-	backupItemOperationsMap *BackupItemOperationsMap
+	backupItemOperationsMap *itemoperationmap.BackupItemOperationsMap
 
 	log logrus.FieldLogger
 }
@@ -54,7 +55,7 @@ func NewDownloadRequestReconciler(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,
-	backupItemOperationsMap *BackupItemOperationsMap,
+	backupItemOperationsMap *itemoperationmap.BackupItemOperationsMap,
 ) *downloadRequestReconciler {
 	return &downloadRequestReconciler{
 		client:                  client,
@@ -164,8 +165,8 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 
-		// If this is a request for backup item operations, force update of in-memory operations that
-		// are not yet uploaded
+		// If this is a request for backup item operations, force upload of in-memory operations that
+		// are not yet uploaded (if there are any)
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindBackupItemOperations &&
 			r.backupItemOperationsMap != nil {
 			// ignore errors here. If we can't upload anything here, process the download as usual

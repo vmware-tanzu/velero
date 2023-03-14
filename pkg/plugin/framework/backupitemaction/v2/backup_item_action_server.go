@@ -107,7 +107,7 @@ func (s *BackupItemActionGRPCServer) Execute(
 		return nil, common.NewGRPCError(errors.WithStack(err))
 	}
 
-	updatedItem, additionalItems, operationID, itemsToUpdate, err := impl.Execute(&item, &backup)
+	updatedItem, additionalItems, operationID, postOperationItems, err := impl.Execute(&item, &backup)
 	if err != nil {
 		return nil, common.NewGRPCError(err)
 	}
@@ -132,8 +132,8 @@ func (s *BackupItemActionGRPCServer) Execute(
 	for _, item := range additionalItems {
 		res.AdditionalItems = append(res.AdditionalItems, backupResourceIdentifierToProto(item))
 	}
-	for _, item := range itemsToUpdate {
-		res.ItemsToUpdate = append(res.ItemsToUpdate, backupResourceIdentifierToProto(item))
+	for _, item := range postOperationItems {
+		res.PostOperationItems = append(res.PostOperationItems, backupResourceIdentifierToProto(item))
 	}
 
 	return res, nil
