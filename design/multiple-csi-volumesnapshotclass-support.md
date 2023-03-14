@@ -87,10 +87,12 @@ The Velero CSI plugin chooses the VolumeSnapshotClass in the cluster that has th
             velero.io/csi-volumesnapshot-class: csi-diskdriver-snapclass
             
         ```
+    
+    Consider this as a override option in conjunction to part 1.
 
-    - The user has to annotate the PVCs or backups with the VolumeSnapshotClass to use for each driver. This is not ideal for the user experience.
-        - Mitigation: We can extend Velero CLI to also annotate backups/schedules with the VolumeSnapshotClass to use for each driver. This will make it easier for the user to annotate the backups/schedules. This mitigation is not for the PVCs though, since PVCs is anyways a specific use case. Similar to : " kubectl run --image myimage --annotations="foo=bar" --annotations="another=one" mypod"
-        We can add support for  - velero backup create my-backup --annotations "velero.io/csi:csi.cloud.disk.driver=csi-diskdriver-snapclass"
+**Note**: The user has to annotate the PVCs or backups with the VolumeSnapshotClass to use for each driver. This is not ideal for the user experience.
+    - **Mitigation**: We can extend Velero CLI to also annotate backups/schedules with the VolumeSnapshotClass to use for each driver. This will make it easier for the user to annotate the backups/schedules. This mitigation is not for the PVCs though, since PVCs is anyways a specific use case. Similar to : " kubectl run --image myimage --annotations="foo=bar" --annotations="another=one" mypod"
+    We can add support for  - velero backup create my-backup --annotations "velero.io/csi:csi.cloud.disk.driver=csi-diskdriver-snapclass"
 
 ### Stage 2 Approach
 The above annotations route is to get started and for initial design closure/ implementation, north star is to either introduce CSI specific fields (considering that CSI might be a very core part of velero going forward) in the backup/restore CR OR leverage the pluginInputs field as being tracked in: https://github.com/vmware-tanzu/velero/pull/5981
