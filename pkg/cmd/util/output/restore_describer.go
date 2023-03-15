@@ -186,15 +186,15 @@ func describeRestoreResults(ctx context.Context, kbClient kbclient.Client, d *De
 
 	if restore.Status.Warnings > 0 {
 		d.Println()
-		describeRestoreResult(d, "Warnings", resultMap["warnings"])
+		describeResult(d, "Warnings", resultMap["warnings"])
 	}
 	if restore.Status.Errors > 0 {
 		d.Println()
-		describeRestoreResult(d, "Errors", resultMap["errors"])
+		describeResult(d, "Errors", resultMap["errors"])
 	}
 }
 
-func describeRestoreResult(d *Describer, name string, result results.Result) {
+func describeResult(d *Describer, name string, result results.Result) {
 	d.Printf("%s:\n", name)
 	d.DescribeSlice(1, "Velero", result.Velero)
 	d.DescribeSlice(1, "Cluster", result.Cluster)
