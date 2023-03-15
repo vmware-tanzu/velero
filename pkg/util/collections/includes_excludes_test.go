@@ -20,8 +20,15 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestShouldInclude(t *testing.T) {
@@ -294,4 +301,627 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateScopedIncludesExcludes(t *testing.T) {
+	tests := []struct {
+		name     string
+		includes []string
+		excludes []string
+		wantErr  []error
+	}{
+		// includes testing
+		{
+			name:     "empty includes is valid",
+			includes: []string{},
+			wantErr:  []error{},
+		},
+		{
+			name:     "asterisk includes is valid",
+			includes: []string{"*"},
+			wantErr:  []error{},
+		},
+		{
+			name:     "include everything not allowed with other includes",
+			includes: []string{"*", "foo"},
+			wantErr:  []error{errors.New("includes list must either contain '*' only, or a non-empty list of items")},
+		},
+		// excludes testing
+		{
+			name:     "empty excludes is valid",
+			excludes: []string{},
+			wantErr:  []error{},
+		},
+		{
+			name:     "asterisk excludes is valid",
+			excludes: []string{"*"},
+			wantErr:  []error{},
+		},
+		{
+			name:     "exclude everything not allowed with other excludes",
+			excludes: []string{"*", "foo"},
+			wantErr:  []error{errors.New("excludes list must either contain '*' only, or a non-empty list of items")},
+		},
+		// includes and excludes combination testing
+		{
+			name:     "asterisk excludes doesn't work with non-empty includes",
+			includes: []string{"foo"},
+			excludes: []string{"*"},
+			wantErr:  []error{errors.New("when exclude is '*', include cannot have value")},
+		},
+		{
+			name:     "excludes cannot contain items in includes",
+			includes: []string{"foo", "bar"},
+			excludes: []string{"bar"},
+			wantErr:  []error{errors.New("excludes list cannot contain an item in the includes list: bar")},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateScopedIncludesExcludes(tc.includes, tc.excludes)
+
+			require.Equal(t, len(tc.wantErr), len(errs))
+
+			for i := 0; i < len(tc.wantErr); i++ {
+				assert.Equal(t, tc.wantErr[i].Error(), errs[i].Error())
+			}
+		})
+	}
+}
+
+func TestNamespaceScopeShouldInclude(t *testing.T) {
+	tests := []struct {
+		name              string
+		namespaceIncludes []string
+		namespaceExcludes []string
+		item              string
+		want              bool
+		apiResources      []*test.APIResource
+	}{
+		{
+			name: "empty string should include every item",
+			item: "pods",
+			want: true,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "include * should include every item",
+			namespaceIncludes: []string{"*"},
+			item:              "pods",
+			want:              true,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "item in includes list should include item",
+			namespaceIncludes: []string{"foo", "bar", "pods"},
+			item:              "pods",
+			want:              true,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "item not in includes list should not include item",
+			namespaceIncludes: []string{"foo", "baz"},
+			item:              "pods",
+			want:              false,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "include *, excluded item should not include item",
+			namespaceIncludes: []string{"*"},
+			namespaceExcludes: []string{"pods"},
+			item:              "pods",
+			want:              false,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "include *, exclude foo, bar should be included",
+			namespaceIncludes: []string{"*"},
+			namespaceExcludes: []string{"foo"},
+			item:              "pods",
+			want:              true,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "an item both included and excluded should not be included",
+			namespaceIncludes: []string{"pods"},
+			namespaceExcludes: []string{"pods"},
+			item:              "pods",
+			want:              false,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "wildcard should include item",
+			namespaceIncludes: []string{"*s"},
+			item:              "pods",
+			want:              true,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "wildcard mismatch should not include item",
+			namespaceIncludes: []string{"*.bar"},
+			item:              "pods",
+			want:              false,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "exclude * should include nothing",
+			namespaceExcludes: []string{"*"},
+			item:              "pods",
+			want:              false,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "wildcard exclude should not include item",
+			namespaceIncludes: []string{"*"},
+			namespaceExcludes: []string{"*s"},
+			item:              "pods",
+			want:              false,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name:              "wildcard exclude mismatch should include item",
+			namespaceExcludes: []string{"*.bar"},
+			item:              "pods",
+			want:              true,
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+		},
+		{
+			name: "resource cannot be found by discovery client should not be include",
+			item: "pods",
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryHelper := setupDiscoveryClientWithResources(tc.apiResources)
+			logger := logrus.StandardLogger()
+			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceIncludes, tc.namespaceExcludes, []string{}, []string{}, *NewIncludesExcludes())
+
+			if got := scopeIncludesExcludes.ShouldInclude((tc.item)); got != tc.want {
+				t.Errorf("want %t, got %t", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestClusterScopedShouldInclude(t *testing.T) {
+	tests := []struct {
+		name            string
+		clusterIncludes []string
+		clusterExcludes []string
+		nsIncludes      []string
+		item            string
+		want            bool
+		apiResources    []*test.APIResource
+	}{
+		{
+			name:       "empty string should include nothing",
+			nsIncludes: []string{"default"},
+			item:       "persistentvolumes",
+			want:       false,
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+		},
+		{
+			name:            "include * should include every item",
+			clusterIncludes: []string{"*"},
+			item:            "persistentvolumes",
+			want:            true,
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+		},
+		{
+			name:            "item in includes list should include item",
+			clusterIncludes: []string{"namespaces", "bar", "baz"},
+			item:            "namespaces",
+			want:            true,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "item not in includes list should not include item",
+			clusterIncludes: []string{"foo", "baz"},
+			nsIncludes:      []string{"default"},
+			item:            "persistentvolumes",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+		},
+		{
+			name:            "include *, excluded item should not include item",
+			clusterIncludes: []string{"*"},
+			clusterExcludes: []string{"namespaces"},
+			item:            "namespaces",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "include *, exclude foo, bar should be included",
+			clusterIncludes: []string{"*"},
+			clusterExcludes: []string{"foo"},
+			item:            "namespaces",
+			want:            true,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "an item both included and excluded should not be included",
+			clusterIncludes: []string{"namespaces"},
+			clusterExcludes: []string{"namespaces"},
+			item:            "namespaces",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "wildcard should include item",
+			clusterIncludes: []string{"*spaces"},
+			item:            "namespaces",
+			want:            true,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "wildcard mismatch should not include item",
+			clusterIncludes: []string{"*.bar"},
+			nsIncludes:      []string{"default"},
+			item:            "persistentvolumes",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+		},
+		{
+			name:            "exclude * should include nothing",
+			clusterExcludes: []string{"*"},
+			item:            "namespaces",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "wildcard exclude should not include item",
+			clusterIncludes: []string{"*"},
+			clusterExcludes: []string{"*spaces"},
+			item:            "namespaces",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "wildcard exclude mismatch should not include item",
+			clusterExcludes: []string{"*spaces"},
+			item:            "namespaces",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name: "resource cannot be found by discovery client should not be include",
+			item: "namespaces",
+			want: false,
+		},
+		{
+			name:            "even namespaces is not in the include list, it should also be involved.",
+			clusterIncludes: []string{"foo", "baz"},
+			item:            "namespaces",
+			want:            true,
+			apiResources: []*test.APIResource{
+				test.Namespaces(),
+			},
+		},
+		{
+			name:            "When all namespaces and namespace scope resources are included, cluster resource should be included.",
+			clusterIncludes: []string{},
+			nsIncludes:      []string{"*"},
+			item:            "persistentvolumes",
+			want:            true,
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+		},
+		{
+			name:            "When all namespaces and namespace scope resources are included, but cluster resource is excluded.",
+			clusterIncludes: []string{},
+			clusterExcludes: []string{"persistentvolumes"},
+			nsIncludes:      []string{"*"},
+			item:            "persistentvolumes",
+			want:            false,
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryHelper := setupDiscoveryClientWithResources(tc.apiResources)
+			logger := logrus.StandardLogger()
+			nsIncludeExclude := NewIncludesExcludes().Includes(tc.nsIncludes...)
+			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, []string{}, []string{}, tc.clusterIncludes, tc.clusterExcludes, *nsIncludeExclude)
+
+			if got := scopeIncludesExcludes.ShouldInclude((tc.item)); got != tc.want {
+				t.Errorf("want %t, got %t", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestGetScopedResourceIncludesExcludes(t *testing.T) {
+	tests := []struct {
+		name                      string
+		namespaceIncludes         []string
+		namespaceExcludes         []string
+		clusterIncludes           []string
+		clusterExcludes           []string
+		expectedNamespaceIncludes []string
+		expectedNamespaceExcludes []string
+		expectedClusterIncludes   []string
+		expectedClusterExcludes   []string
+		apiResources              []*test.APIResource
+	}{
+		{
+			name:                      "only include namespace resources in IncludesExcludes, when namespaced is set to true",
+			namespaceIncludes:         []string{"deployments.apps", "persistentvolumes"},
+			namespaceExcludes:         []string{"pods", "persistentvolumes"},
+			expectedNamespaceIncludes: []string{"deployments.apps"},
+			expectedNamespaceExcludes: []string{"pods"},
+			expectedClusterIncludes:   []string{},
+			expectedClusterExcludes:   []string{},
+			apiResources: []*test.APIResource{
+				test.Deployments(),
+				test.PVs(),
+				test.Pods(),
+			},
+		},
+		{
+			name:                      "only include cluster-scoped resources in IncludesExcludes, when namespaced is set to false",
+			clusterIncludes:           []string{"deployments.apps", "persistentvolumes"},
+			clusterExcludes:           []string{"pods", "persistentvolumes"},
+			expectedNamespaceIncludes: []string{},
+			expectedNamespaceExcludes: []string{},
+			expectedClusterIncludes:   []string{"persistentvolumes"},
+			expectedClusterExcludes:   []string{"persistentvolumes"},
+			apiResources: []*test.APIResource{
+				test.Deployments(),
+				test.PVs(),
+				test.Pods(),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+
+			logger := logrus.StandardLogger()
+			nsIncludeExclude := NewIncludesExcludes()
+			resources := GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.namespaceIncludes, tc.namespaceExcludes, tc.clusterIncludes, tc.clusterExcludes, *nsIncludeExclude)
+
+			assert.Equal(t, tc.expectedNamespaceIncludes, resources.namespaceResourceFilter.includes.List())
+			assert.Equal(t, tc.expectedNamespaceExcludes, resources.namespaceResourceFilter.excludes.List())
+			assert.Equal(t, tc.expectedClusterIncludes, resources.clusterResourceFilter.includes.List())
+			assert.Equal(t, tc.expectedClusterExcludes, resources.clusterResourceFilter.excludes.List())
+		})
+	}
+}
+
+func TestUseOldResourceFilters(t *testing.T) {
+	tests := []struct {
+		name                  string
+		backup                velerov1api.Backup
+		useOldResourceFilters bool
+	}{
+		{
+			name:                  "backup with no filters should use old filters",
+			backup:                *defaultBackup().Result(),
+			useOldResourceFilters: true,
+		},
+		{
+			name:                  "backup with only old filters should use old filters",
+			backup:                *defaultBackup().IncludeClusterResources(true).Result(),
+			useOldResourceFilters: true,
+		},
+		{
+			name:                  "backup with only new filters should use new filters",
+			backup:                *defaultBackup().IncludedClusterScopeResources("StorageClass").Result(),
+			useOldResourceFilters: false,
+		},
+		{
+			// This case should not happen in Velero workflow, because filter validation not old and new
+			// filters used together. So this is only used for UT checking, and I assume old filters
+			// have higher priority, because old parameter should be the default one.
+			name:                  "backup with both old and new filters should use old filters",
+			backup:                *defaultBackup().IncludeClusterResources(true).IncludedClusterScopeResources("StorageClass").Result(),
+			useOldResourceFilters: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.useOldResourceFilters, UseOldResourceFilters(test.backup.Spec))
+		})
+	}
+}
+
+func defaultBackup() *builder.BackupBuilder {
+	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").DefaultVolumesToFsBackup(false)
+}
+
+func TestShouldExcluded(t *testing.T) {
+	falseBoolean := false
+	trueBoolean := true
+	tests := []struct {
+		name                    string
+		clusterIncludes         []string
+		clusterExcludes         []string
+		includeClusterResources *bool
+		filterType              string
+		resourceName            string
+		apiResources            []*test.APIResource
+		resourceIsExcluded      bool
+	}{
+		{
+			name:                    "GlobalResourceIncludesExcludes: filters are all default",
+			clusterIncludes:         []string{},
+			clusterExcludes:         []string{},
+			includeClusterResources: nil,
+			filterType:              "global",
+			resourceName:            "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: false,
+		},
+		{
+			name:                    "GlobalResourceIncludesExcludes: IncludeClusterResources is set to true",
+			clusterIncludes:         []string{},
+			clusterExcludes:         []string{},
+			includeClusterResources: &trueBoolean,
+			filterType:              "global",
+			resourceName:            "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: false,
+		},
+		{
+			name:                    "GlobalResourceIncludesExcludes: IncludeClusterResources is set to false",
+			clusterIncludes:         []string{"persistentvolumes"},
+			clusterExcludes:         []string{},
+			includeClusterResources: &falseBoolean,
+			filterType:              "global",
+			resourceName:            "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: true,
+		},
+		{
+			name:                    "GlobalResourceIncludesExcludes: resource is in the include list",
+			clusterIncludes:         []string{"persistentvolumes"},
+			clusterExcludes:         []string{},
+			includeClusterResources: nil,
+			filterType:              "global",
+			resourceName:            "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: false,
+		},
+		{
+			name:            "ScopeResourceIncludesExcludes: resource is in the include list",
+			clusterIncludes: []string{"persistentvolumes"},
+			clusterExcludes: []string{},
+			filterType:      "scope",
+			resourceName:    "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: false,
+		},
+		{
+			name:            "ScopeResourceIncludesExcludes: filters are all default",
+			clusterIncludes: []string{},
+			clusterExcludes: []string{},
+			filterType:      "scope",
+			resourceName:    "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: false,
+		},
+		{
+			name:            "ScopeResourceIncludesExcludes: resource is not in the exclude list",
+			clusterIncludes: []string{},
+			clusterExcludes: []string{"namespaces"},
+			filterType:      "scope",
+			resourceName:    "persistentvolumes",
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			resourceIsExcluded: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := logrus.StandardLogger()
+
+			var ie IncludesExcludesInterface
+			if tc.filterType == "global" {
+				ie = GetGlobalResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.clusterIncludes, tc.clusterExcludes, tc.includeClusterResources, *NewIncludesExcludes())
+			} else if tc.filterType == "scope" {
+				ie = GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, []string{}, []string{}, tc.clusterIncludes, tc.clusterExcludes, *NewIncludesExcludes())
+			}
+			assert.Equal(t, tc.resourceIsExcluded, ie.ShouldExclude(tc.resourceName))
+		})
+	}
+}
+
+func setupDiscoveryClientWithResources(APIResources []*test.APIResource) *test.FakeDiscoveryHelper {
+	resourcesMap := make(map[schema.GroupVersionResource]schema.GroupVersionResource)
+	resourceList := make([]*metav1.APIResourceList, 0)
+
+	for _, resource := range APIResources {
+		gvr := schema.GroupVersionResource{
+			Group:    resource.Group,
+			Version:  resource.Version,
+			Resource: resource.Name,
+		}
+		resourcesMap[gvr] = gvr
+
+		resourceList = append(resourceList,
+			&metav1.APIResourceList{
+				GroupVersion: gvr.GroupVersion().String(),
+				APIResources: []metav1.APIResource{
+					{
+						Name:       resource.Name,
+						Kind:       resource.Name,
+						Namespaced: resource.Namespaced,
+					},
+				},
+			},
+		)
+	}
+
+	discoveryHelper := test.NewFakeDiscoveryHelper(false, resourcesMap)
+	discoveryHelper.ResourceList = resourceList
+	return discoveryHelper
 }

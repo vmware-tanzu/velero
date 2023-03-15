@@ -133,17 +133,24 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			log.Info("Excluding item because namespace is excluded")
 			return false, itemFiles, nil
 		}
-		// NOTE: we specifically allow namespaces to be backed up even if IncludeClusterResources is
-		// false.
-		if namespace == "" && groupResource != kuberesource.Namespaces && ib.backupRequest.Spec.IncludeClusterResources != nil && !*ib.backupRequest.Spec.IncludeClusterResources {
-			log.Info("Excluding item because resource is cluster-scoped and backup.spec.includeClusterResources is false")
+
+		// NOTE: we specifically allow namespaces to be backed up even if it's excluded.
+		// This check is more permissive for cluster resources to let those passed in by
+		// plugins' additional items to get involved.
+		// Only expel cluster resource when it's specifically listed in the excluded list here.
+		if namespace == "" && groupResource != kuberesource.Namespaces &&
+			ib.backupRequest.ResourceIncludesExcludes.ShouldExclude(groupResource.String()) {
+			log.Info("Excluding item because resource is cluster-scoped and is excluded by cluster filter.")
 			return false, itemFiles, nil
 		}
 
-		if !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+		// Only check namespace-scoped resource to avoid expelling cluster resources
+		// are not specified in included list.
+		if namespace != "" && !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 			log.Info("Excluding item because resource is excluded")
 			return false, itemFiles, nil
 		}
+
 	}
 
 	if metadata.GetDeletionTimestamp() != nil {

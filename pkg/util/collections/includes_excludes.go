@@ -21,11 +21,15 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 type globStringSet struct {
@@ -101,6 +105,160 @@ func (ie *IncludesExcludes) ShouldInclude(s string) bool {
 	return ie.includes.Len() == 0 || ie.includes.Has("*") || ie.includes.match(s)
 }
 
+// IncludesExcludesInterface is used as polymorphic IncludesExcludes for Global and scope
+// resources Include/Exclude.
+type IncludesExcludesInterface interface {
+	// Check whether the type name passed in by parameter should be included.
+	// typeName should be k8s.io/apimachinery/pkg/runtime/schema GroupResource's String() result.
+	ShouldInclude(typeName string) bool
+
+	// Check whether the type name passed in by parameter should be excluded.
+	// typeName should be k8s.io/apimachinery/pkg/runtime/schema GroupResource's String() result.
+	ShouldExclude(typeName string) bool
+}
+
+type GlobalIncludesExcludes struct {
+	resourceFilter          IncludesExcludes
+	includeClusterResources *bool
+	namespaceFilter         IncludesExcludes
+
+	helper discovery.Helper
+	logger logrus.FieldLogger
+}
+
+// ShouldInclude returns whether the specified item should be
+// included or not. Everything in the includes list except those
+// items in the excludes list should be included.
+// It has some exceptional cases. When IncludeClusterResources is set to false,
+// no need to check the filter, all cluster resources are excluded.
+func (ie *GlobalIncludesExcludes) ShouldInclude(typeName string) bool {
+	_, resource, err := ie.helper.ResourceFor(schema.ParseGroupResource(typeName).WithVersion(""))
+	if err != nil {
+		ie.logger.Errorf("fail to get resource %s. %s", typeName, err.Error())
+		return false
+	}
+
+	if resource.Namespaced == false && boolptr.IsSetToFalse(ie.includeClusterResources) {
+		ie.logger.Info("Skipping resource %s, because it's cluster-scoped, and IncludeClusterResources is set to false.", typeName)
+		return false
+	}
+
+	// when IncludeClusterResources == nil (auto), only directly
+	// back up cluster-scoped resources if we're doing a full-cluster
+	// (all namespaces and all namespace scope types) backup. Note that in the case of a subset of
+	// namespaces being backed up, some related cluster-scoped resources
+	// may still be backed up if triggered by a custom action (e.g. PVC->PV).
+	// If we're processing namespaces themselves, we will not skip here, they may be
+	// filtered out later.
+	if typeName != kuberesource.Namespaces.String() && resource.Namespaced == false &&
+		ie.includeClusterResources == nil && !ie.namespaceFilter.IncludeEverything() {
+		ie.logger.Infof("Skipping resource %s, because it's cluster-scoped and only specific namespaces or namespace scope types are included in the backup.", typeName)
+		return false
+	}
+
+	return ie.resourceFilter.ShouldInclude(typeName)
+}
+
+// ShouldExclude returns whether the resource type should be excluded or not.
+func (ie *GlobalIncludesExcludes) ShouldExclude(typeName string) bool {
+	// if the type name is specified in excluded list, it's excluded.
+	if ie.resourceFilter.excludes.match(typeName) {
+		return true
+	}
+
+	_, resource, err := ie.helper.ResourceFor(schema.ParseGroupResource(typeName).WithVersion(""))
+	if err != nil {
+		ie.logger.Errorf("fail to get resource %s. %s", typeName, err.Error())
+		return true
+	}
+
+	// the resource type is cluster scope
+	if !resource.Namespaced {
+		// if includeClusterResources is set to false, cluster resource should be excluded.
+		if boolptr.IsSetToFalse(ie.includeClusterResources) {
+			return true
+		}
+		// if includeClusterResources is set to nil, check whether it's included by resource
+		// filter.
+		if ie.includeClusterResources == nil && !ie.resourceFilter.ShouldInclude(typeName) {
+			return true
+		}
+	}
+
+	return false
+}
+
+type ScopeIncludesExcludes struct {
+	namespaceResourceFilter IncludesExcludes // namespace scope resource filter
+	clusterResourceFilter   IncludesExcludes // cluster scope resource filter
+	namespaceFilter         IncludesExcludes // namespace filter
+
+	helper discovery.Helper
+	logger logrus.FieldLogger
+}
+
+// ShouldInclude returns whether the specified resource should be included or not.
+// The function will check whether the resource is namespaced resource first.
+// For namespaced resource, except resources listed in excludes, other things should be included.
+// For cluster resource, except resources listed in excludes, only include the resource specified by the included.
+// It also has some exceptional checks. For namespace, as long as it's not excluded, it is involved.
+// If all namespace resources are included, all cluster resource are returned to get a full backup.
+func (ie *ScopeIncludesExcludes) ShouldInclude(typeName string) bool {
+	_, resource, err := ie.helper.ResourceFor(schema.ParseGroupResource(typeName).WithVersion(""))
+	if err != nil {
+		ie.logger.Errorf("fail to get resource %s. %s", typeName, err.Error())
+		return false
+	}
+
+	if resource.Namespaced {
+		if ie.namespaceResourceFilter.excludes.Has("*") || ie.namespaceResourceFilter.excludes.match(typeName) {
+			return false
+		}
+
+		// len=0 means include everything
+		return ie.namespaceResourceFilter.includes.Len() == 0 || ie.namespaceResourceFilter.includes.Has("*") || ie.namespaceResourceFilter.includes.match(typeName)
+	}
+
+	if ie.clusterResourceFilter.excludes.Has("*") || ie.clusterResourceFilter.excludes.match(typeName) {
+		return false
+	}
+
+	// when IncludedClusterScopeResources and ExcludedClusterScopeResources are not specified,
+	// only directly back up cluster-scoped resources if we're doing a full-cluster
+	// (all namespaces and all namespace scope types) backup.
+	if len(ie.clusterResourceFilter.includes.List()) == 0 &&
+		len(ie.clusterResourceFilter.excludes.List()) == 0 &&
+		ie.namespaceFilter.IncludeEverything() &&
+		ie.namespaceResourceFilter.IncludeEverything() {
+		return true
+	}
+
+	// Also include namespace resource by default.
+	return ie.clusterResourceFilter.includes.Has("*") || ie.clusterResourceFilter.includes.match(typeName) || typeName == kuberesource.Namespaces.String()
+}
+
+// ShouldExclude returns whether the resource type should be excluded or not.
+// For ScopeIncludesExcludes, if the resource type is specified in the exclude
+// list, it should be excluded.
+func (ie *ScopeIncludesExcludes) ShouldExclude(typeName string) bool {
+	_, resource, err := ie.helper.ResourceFor(schema.ParseGroupResource(typeName).WithVersion(""))
+	if err != nil {
+		ie.logger.Errorf("fail to get resource %s. %s", typeName, err.Error())
+		return true
+	}
+
+	if resource.Namespaced {
+		if ie.namespaceResourceFilter.excludes.match(typeName) {
+			return true
+		}
+	} else {
+		if ie.clusterResourceFilter.excludes.match(typeName) {
+			return true
+		}
+	}
+	return false
+}
+
 // IncludesString returns a string containing all of the includes, separated by commas, or * if the
 // list is empty.
 func (ie *IncludesExcludes) IncludesString() string {
@@ -124,6 +282,24 @@ func asString(in []string, empty string) string {
 // and the excludes list is empty, or false otherwise.
 func (ie *IncludesExcludes) IncludeEverything() bool {
 	return ie.excludes.Len() == 0 && (ie.includes.Len() == 0 || (ie.includes.Len() == 1 && ie.includes.Has("*")))
+}
+
+func newScopeIncludesExcludes(nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
+	ret := &ScopeIncludesExcludes{
+		namespaceResourceFilter: IncludesExcludes{
+			includes: newGlobStringSet(),
+			excludes: newGlobStringSet(),
+		},
+		clusterResourceFilter: IncludesExcludes{
+			includes: newGlobStringSet(),
+			excludes: newGlobStringSet(),
+		},
+		namespaceFilter: nsIncludesExcludes,
+		helper:          helper,
+		logger:          logger,
+	}
+
+	return ret
 }
 
 // ValidateIncludesExcludes checks provided lists of included and excluded
@@ -177,6 +353,35 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 	return errs
 }
 
+// ValidateScopedIncludesExcludes checks provided lists of namespaced or cluster-scoped
+// included and excluded items to ensure they are a valid set of IncludesExcludes data.
+func ValidateScopedIncludesExcludes(includesList, excludesList []string) []error {
+	var errs []error
+
+	includes := sets.NewString(includesList...)
+	excludes := sets.NewString(excludesList...)
+
+	if includes.Len() > 1 && includes.Has("*") {
+		errs = append(errs, errors.New("includes list must either contain '*' only, or a non-empty list of items"))
+	}
+
+	if excludes.Len() > 1 && excludes.Has("*") {
+		errs = append(errs, errors.New("excludes list must either contain '*' only, or a non-empty list of items"))
+	}
+
+	if includes.Len() > 0 && excludes.Has("*") {
+		errs = append(errs, errors.New("when exclude is '*', include cannot have value"))
+	}
+
+	for _, itm := range excludes.List() {
+		if includes.Has(itm) {
+			errs = append(errs, errors.Errorf("excludes list cannot contain an item in the includes list: %v", itm))
+		}
+	}
+
+	return errs
+}
+
 func validateNamespaceName(ns string) []error {
 	var errs []error
 
@@ -200,11 +405,11 @@ func validateNamespaceName(ns string) []error {
 	return errs
 }
 
-// GenerateIncludesExcludes constructs an IncludesExcludes struct by taking the provided
+// generateIncludesExcludes constructs an IncludesExcludes struct by taking the provided
 // include/exclude slices, applying the specified mapping function to each item in them,
 // and adding the output of the function to the new struct. If the mapping function returns
 // an empty string for an item, it is omitted from the result.
-func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) string) *IncludesExcludes {
+func generateIncludesExcludes(includes, excludes []string, mapFunc func(string) string) *IncludesExcludes {
 	res := NewIncludesExcludes()
 
 	for _, item := range includes {
@@ -237,11 +442,39 @@ func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 	return res
 }
 
+// generateScopedIncludesExcludes's function is similar with generateIncludesExcludes,
+// but it's used for scoped Includes/Excludes.
+func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
+	res := newScopeIncludesExcludes(nsIncludesExcludes, helper, logger)
+
+	generateFilter(res.namespaceResourceFilter.includes, namespacedIncludes, mapFunc, true)
+	generateFilter(res.namespaceResourceFilter.excludes, namespacedExcludes, mapFunc, true)
+	generateFilter(res.clusterResourceFilter.includes, clusterIncludes, mapFunc, false)
+	generateFilter(res.clusterResourceFilter.excludes, clusterExcludes, mapFunc, false)
+
+	return res
+}
+
+func generateFilter(filter globStringSet, resources []string, mapFunc func(string, bool) string, namespaced bool) {
+	for _, item := range resources {
+		if item == "*" {
+			filter.Insert(item)
+			continue
+		}
+
+		key := mapFunc(item, namespaced)
+		if key == "" {
+			continue
+		}
+		filter.Insert(key)
+	}
+}
+
 // GetResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
 // discovery helper to resolve them to fully-qualified group-resource names, and returns an
 // IncludesExcludes list.
 func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *IncludesExcludes {
-	resources := GenerateIncludesExcludes(
+	resources := generateIncludesExcludes(
 		includes,
 		excludes,
 		func(item string) string {
@@ -259,4 +492,75 @@ func GetResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 	)
 
 	return resources
+}
+
+func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, includes, excludes []string, includeClusterResources *bool, nsIncludesExcludes IncludesExcludes) *GlobalIncludesExcludes {
+	ret := &GlobalIncludesExcludes{
+		resourceFilter:          *GetResourceIncludesExcludes(helper, includes, excludes),
+		includeClusterResources: includeClusterResources,
+		namespaceFilter:         nsIncludesExcludes,
+		helper:                  helper,
+		logger:                  logger,
+	}
+
+	logger.Infof("Including resources: %s", ret.resourceFilter.IncludesString())
+	logger.Infof("Excluding resources: %s", ret.resourceFilter.ExcludesString())
+	return ret
+}
+
+// GetScopeResourceIncludesExcludes's function is similar with GetResourceIncludesExcludes,
+// but it's used for scoped Includes/Excludes, and can handle both cluster and namespace resources.
+func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes IncludesExcludes) *ScopeIncludesExcludes {
+	ret := generateScopedIncludesExcludes(
+		namespaceIncludes,
+		namespaceExcludes,
+		clusterIncludes,
+		clusterExcludes,
+		func(item string, namespaced bool) string {
+			gvr, resource, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
+			if err != nil {
+				return item
+			}
+			if resource.Namespaced != namespaced {
+				return ""
+			}
+
+			gr := gvr.GroupResource()
+			return gr.String()
+		},
+		nsIncludesExcludes,
+		helper,
+		logger,
+	)
+	logger.Infof("Including namespace scope resources: %s", ret.namespaceResourceFilter.IncludesString())
+	logger.Infof("Excluding namespace scope resources: %s", ret.namespaceResourceFilter.ExcludesString())
+	logger.Infof("Including cluster scope resources: %s", ret.clusterResourceFilter.GetIncludes())
+	logger.Infof("Excluding cluster scope resources: %s", ret.clusterResourceFilter.ExcludesString())
+
+	return ret
+}
+
+// UseOldResourceFilters checks whether to use old resource filters (IncludeClusterResources,
+// IncludedResources and ExcludedResources), depending the backup's filters setting.
+// New filters are IncludeClusterScopedResources, ExcludeClusterScopedResources,
+// IncludeNamespacedResources and ExcludeNamespacedResources.
+func UseOldResourceFilters(backupSpec velerov1api.BackupSpec) bool {
+	// If all resource filters are none, it is treated as using old parameter filters.
+	if backupSpec.IncludeClusterResources == nil &&
+		len(backupSpec.IncludedResources) == 0 &&
+		len(backupSpec.ExcludedResources) == 0 &&
+		len(backupSpec.IncludedClusterScopeResources) == 0 &&
+		len(backupSpec.ExcludedClusterScopeResources) == 0 &&
+		len(backupSpec.IncludedNamespacedResources) == 0 &&
+		len(backupSpec.ExcludedNamespacedResources) == 0 {
+		return true
+	}
+
+	if backupSpec.IncludeClusterResources != nil ||
+		len(backupSpec.IncludedResources) > 0 ||
+		len(backupSpec.ExcludedResources) > 0 {
+		return true
+	}
+
+	return false
 }

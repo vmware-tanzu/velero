@@ -862,7 +862,7 @@ func TestRestoreItems(t *testing.T) {
 		apiResources         []*test.APIResource
 		tarball              io.Reader
 		want                 []*test.APIResource
-		expectedRestoreItems map[itemKey]string
+		expectedRestoreItems map[itemKey]restoredItemStatus
 	}{
 		{
 			name:    "metadata uid/resourceVersion/etc. gets removed",
@@ -894,9 +894,9 @@ func TestRestoreItems(t *testing.T) {
 						Result(),
 				),
 			},
-			expectedRestoreItems: map[itemKey]string{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: "created",
-				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  "created",
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
 			},
 		},
 		{
@@ -1004,9 +1004,9 @@ func TestRestoreItems(t *testing.T) {
 			want: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
-			expectedRestoreItems: map[itemKey]string{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          "created",
-				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: "skipped",
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          {action: "created", itemExists: true},
+				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: {action: "skipped", itemExists: true},
 			},
 		},
 		{
@@ -1022,9 +1022,9 @@ func TestRestoreItems(t *testing.T) {
 			want: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
-			expectedRestoreItems: map[itemKey]string{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  "created",
-				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: "updated",
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
 			},
 		},
 		{
@@ -1183,7 +1183,7 @@ func TestRestoreItems(t *testing.T) {
 				PodVolumeBackups: nil,
 				VolumeSnapshots:  nil,
 				BackupReader:     tc.tarball,
-				RestoredItems:    map[itemKey]string{},
+				RestoredItems:    map[itemKey]restoredItemStatus{},
 			}
 			warnings, errs := h.restorer.Restore(
 				data,

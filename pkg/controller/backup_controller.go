@@ -427,9 +427,28 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting namespace list: %v", err))
 	}
 
+	// validate whether Included/Excluded resources and IncludedClusterResource are mixed with
+	// Included/Excluded cluster-scoped/namespaced resources.
+	if oldAndNewFilterParametersUsedTogether(request.Spec) {
+		validatedError := fmt.Sprintf("include-resources, exclude-resources and include-cluster-resources are old filter parameters.\n" +
+			"include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources are new filter parameters.\n" +
+			"They cannot be used together")
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, validatedError)
+	}
+
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
+	}
+
+	// validate the cluster-scoped included/excluded resources
+	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedClusterScopeResources, request.Spec.ExcludedClusterScopeResources) {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid cluster-scoped included/excluded resource lists: %s", err))
+	}
+
+	// validate the namespaced included/excluded resources
+	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedNamespacedResources, request.Spec.ExcludedNamespacedResources) {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid namespaced included/excluded resource lists: %s", err))
 	}
 
 	// validate the included/excluded namespaces
@@ -1098,4 +1117,16 @@ func (b *backupReconciler) recreateVolumeSnapshotContent(vsc snapshotv1api.Volum
 	}
 
 	return nil
+}
+
+func oldAndNewFilterParametersUsedTogether(backupSpec velerov1api.BackupSpec) bool {
+	haveOldResourceFilterParameters := len(backupSpec.IncludedResources) > 0 ||
+		(len(backupSpec.ExcludedResources) > 0) ||
+		(backupSpec.IncludeClusterResources != nil)
+	haveNewResourceFilterParameters := len(backupSpec.IncludedClusterScopeResources) > 0 ||
+		(len(backupSpec.ExcludedClusterScopeResources) > 0) ||
+		(len(backupSpec.IncludedNamespacedResources) > 0) ||
+		(len(backupSpec.ExcludedNamespacedResources) > 0)
+
+	return haveOldResourceFilterParameters && haveNewResourceFilterParameters
 }

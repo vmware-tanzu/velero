@@ -158,12 +158,13 @@ func TestBackupProgressIsUpdated(t *testing.T) {
 // verifies that the set of items written to the backup tarball are
 // correct. Validation is done by looking at the names of the files in
 // the backup tarball; the contents of the files are not checked.
-func TestBackupResourceFiltering(t *testing.T) {
+func TestBackupOldResourceFiltering(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
 		apiResources []*test.APIResource
 		want         []string
+		actions      []biav2.BackupItemAction
 	}{
 		{
 			name:   "no filters backs up everything",
@@ -761,6 +762,95 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
 			},
 		},
+		{
+			name:   "new filters' default value should not impact the old filters' function",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludeClusterResources(true).Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("test-1").Result()).Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "Resource's CRD should be included",
+			backup: defaultBackup().IncludedNamespaces("foo").Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "bar").Result(),
+				),
+				test.Backups(
+					builder.ForBackup("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/bar.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+		{
+			name:   "Resource's CRD is not included, when CRD is excluded.",
+			backup: defaultBackup().IncludedNamespaces("foo").ExcludedResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "bar").Result(),
+				),
+				test.Backups(
+					builder.ForBackup("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/bar.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -775,7 +865,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 				h.addItems(t, resource)
 			}
 
-			h.backupper.Backup(h.log, req, backupFile, nil, nil)
+			h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
 
 			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
 		})
@@ -888,7 +978,7 @@ func TestCRDInclusion(t *testing.T) {
 			},
 		},
 		{
-			name: "include cluster resources=false excludes all CRDs when backing up selected namespaces",
+			name: "include-cluster-resources=false excludes all CRDs when backing up selected namespaces",
 			backup: defaultBackup().
 				IncludeClusterResources(false).
 				IncludedNamespaces("foo").
@@ -900,12 +990,12 @@ func TestCRDInclusion(t *testing.T) {
 					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
 				),
 				test.VSLs(
-					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+					builder.ForVolumeSnapshotLocation("foo", "bar").Result(),
 				),
 			},
 			want: []string{
-				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
-				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/bar.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/bar.json",
 			},
 		},
 		{
@@ -3178,5 +3268,839 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 		// the last resource we saw for the backed-up order to be correct.
 		assert.True(t, current >= lastSeen, "%s was backed up out of order", resourceName)
 		lastSeen = current
+	}
+}
+
+func TestBackupNewResourceFiltering(t *testing.T) {
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*test.APIResource
+		want         []string
+		actions      []biav2.BackupItemAction
+	}{
+		{
+			name:   "no namespaced resources + some cluster resources",
+			backup: defaultBackup().IncludedClusterScopeResources("persistentvolumes").ExcludedNamespacedResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("testing").Result(),
+				),
+			},
+			want: []string{
+				"resources/persistentvolumes/cluster/testing.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/testing.json",
+			},
+		},
+		{
+			name:   "no namespaced resources + all cluster resources",
+			backup: defaultBackup().IncludedClusterScopeResources("*").ExcludedNamespacedResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + no cluster resources 1",
+			backup: defaultBackup().ExcludedClusterScopeResources("*").IncludedNamespaces("foo", "zoo").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + no cluster resources 2",
+			backup: defaultBackup().ExcludedClusterScopeResources("*").IncludedNamespacedResources("pods", "deployments").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + no cluster resources 3",
+			backup: defaultBackup().ExcludedClusterScopeResources("*").IncludedNamespaces("foo").IncludedNamespacedResources("pods", "deployments").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + no cluster resources 4",
+			backup: defaultBackup().ExcludedClusterScopeResources("*").ExcludedNamespacedResources("pods").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + only related cluster resources 2",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods", "persistentvolumeclaims").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("test-1").Result()).Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+			},
+			want: []string{
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "some namespaced resources + only related cluster resources 3",
+			backup: defaultBackup().IncludedNamespaces("foo").ExcludedNamespacedResources("deployments").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("test-1").Result()).Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+			},
+			want: []string{
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "some namespaced resources + some additional cluster resources 1",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopeResources("customresourcedefinitions").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "some namespaced resources + some additional cluster resources 2",
+			backup: defaultBackup().IncludedNamespacedResources("persistentvolumeclaims").IncludedClusterScopeResources("customresourcedefinitions").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "some namespaced resources + some additional cluster resources 3",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods", "persistentvolumeclaims").IncludedClusterScopeResources("customresourcedefinitions").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "some namespaced resources + some additional cluster resources 4",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods", "persistentvolumeclaims").IncludedClusterScopeResources("*").ExcludedClusterScopeResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+			actions: []biav2.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedResources: []string{"persistentvolumeclaims"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "test1"},
+						}
+
+						return item, additionalItems, "", nil, nil
+					},
+				},
+			},
+		},
+		{
+			name:   "some namespaced resources + all cluster resources 1",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopeResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("foo", "test-1").VolumeName("test1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/persistentvolumeclaims/namespaces/foo/test-1.json",
+				"resources/persistentvolumeclaims/v1-preferredversion/namespaces/foo/test-1.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + all cluster resources 2",
+			backup: defaultBackup().IncludedNamespacedResources("pods").IncludedClusterScopeResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "some namespaced resources + all cluster resources 3",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods").IncludedClusterScopeResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+		{
+			name:   "all namespaced resources + no cluster resources",
+			backup: defaultBackup().ExcludedClusterScopeResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "all namespaced resources + all cluster resources",
+			backup: defaultBackup().IncludedClusterScopeResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("test1").Result(),
+					builder.ForPersistentVolume("test2").Result(),
+				),
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/cluster/test1.json",
+				"resources/persistentvolumes/cluster/test2.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/test2.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "namespace resource should be included even it's not specified in the include list, when IncludedNamespaces has specified value 1",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("Secrets").Result(),
+			apiResources: []*test.APIResource{
+				test.Secrets(
+					builder.ForSecret("foo", "bar").Result(),
+					builder.ForSecret("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("foo").Result(),
+				),
+				test.Namespaces(
+					builder.ForNamespace("foo").Result(),
+				),
+			},
+			want: []string{
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
+				"resources/secrets/namespaces/foo/bar.json",
+				"resources/secrets/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+		{
+			name:   "namespace resource should be included even it's not specified in the include list, when IncludedNamespaces has specified value 2",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopeResources("persistentvolumes").Result(),
+			apiResources: []*test.APIResource{
+				test.Secrets(
+					builder.ForSecret("foo", "bar").Result(),
+					builder.ForSecret("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("foo").Result(),
+				),
+				test.Namespaces(
+					builder.ForNamespace("foo").Result(),
+				),
+			},
+			want: []string{
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
+				"resources/secrets/namespaces/foo/bar.json",
+				"resources/secrets/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/persistentvolumes/cluster/foo.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/foo.json",
+			},
+		},
+		{
+			name:   "namespace resource should be included even it's not specified in the include list, when IncludedNamespaces is asterisk.",
+			backup: defaultBackup().IncludedNamespaces("*").IncludedClusterScopeResources("persistentvolumes").Result(),
+			apiResources: []*test.APIResource{
+				test.Secrets(
+					builder.ForSecret("foo", "bar").Result(),
+					builder.ForSecret("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("foo").Result(),
+				),
+				test.Namespaces(
+					builder.ForNamespace("foo").Result(),
+					builder.ForNamespace("zoo").Result(),
+				),
+			},
+			want: []string{
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
+				"resources/namespaces/cluster/zoo.json",
+				"resources/namespaces/v1-preferredversion/cluster/zoo.json",
+				"resources/secrets/namespaces/foo/bar.json",
+				"resources/secrets/namespaces/zoo/raz.json",
+				"resources/secrets/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/secrets/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/cluster/foo.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/foo.json",
+			},
+		},
+		{
+			name:   "when all namespace resources are involved, cluster resources should be included too",
+			backup: defaultBackup().IncludedNamespaces("*").IncludedNamespacedResources("*").Result(),
+			apiResources: []*test.APIResource{
+				test.Secrets(
+					builder.ForSecret("foo", "bar").Result(),
+					builder.ForSecret("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("foo").Result(),
+					builder.ForPersistentVolume("bar").Result(),
+				),
+				test.Namespaces(
+					builder.ForNamespace("foo").Result(),
+					builder.ForNamespace("zoo").Result(),
+				),
+			},
+			want: []string{
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
+				"resources/namespaces/cluster/zoo.json",
+				"resources/namespaces/v1-preferredversion/cluster/zoo.json",
+				"resources/secrets/namespaces/foo/bar.json",
+				"resources/secrets/namespaces/zoo/raz.json",
+				"resources/secrets/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/secrets/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/cluster/foo.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/foo.json",
+				"resources/persistentvolumes/cluster/bar.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/bar.json",
+			},
+		},
+		{
+			name:   "IncludedNamespaces is asterisk, but not all namespaced types are include, additional cluster resource should not be included.",
+			backup: defaultBackup().IncludedNamespaces("*").IncludedNamespacedResources("secrets").Result(),
+			apiResources: []*test.APIResource{
+				test.Secrets(
+					builder.ForSecret("foo", "bar").Result(),
+					builder.ForSecret("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("foo").Result(),
+					builder.ForPersistentVolume("bar").Result(),
+				),
+				test.Namespaces(
+					builder.ForNamespace("foo").Result(),
+					builder.ForNamespace("zoo").Result(),
+				),
+			},
+			want: []string{
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
+				"resources/namespaces/cluster/zoo.json",
+				"resources/namespaces/v1-preferredversion/cluster/zoo.json",
+				"resources/secrets/namespaces/foo/bar.json",
+				"resources/secrets/namespaces/zoo/raz.json",
+				"resources/secrets/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/secrets/v1-preferredversion/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "Resource's CRD should be included",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("volumesnapshotlocations.velero.io", "backups.velero.io").Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "bar").Result(),
+				),
+				test.Backups(
+					builder.ForBackup("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/bar.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+		{
+			name:   "Resource's CRD is not included, when CRD is excluded.",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("volumesnapshotlocations.velero.io", "backups.velero.io").ExcludedClusterScopeResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinitionV1Beta1("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "bar").Result(),
+				),
+				test.Backups(
+					builder.ForBackup("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/bar.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/bar.json",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource)
+			}
+
+			h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
+
+			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
+		})
 	}
 }

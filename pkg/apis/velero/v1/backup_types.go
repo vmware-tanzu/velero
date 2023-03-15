@@ -53,6 +53,36 @@ type BackupSpec struct {
 	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
+	// IncludedClusterScopeResources is a slice of cluster scope
+	// resource type names to include in the backup.
+	// If set to "*", all cluster scope resource types are included.
+	// The default value is empty, which means only related cluster
+	// scope resources are included.
+	// +optional
+	// +nullable
+	IncludedClusterScopeResources []string `json:"includedClusterScopeResources,omitempty"`
+
+	// ExcludedClusterScopeResources is a slice of cluster scope
+	// resource type names to exclude from the backup.
+	// If set to "*", all cluster scope resource types are excluded.
+	// +optional
+	// +nullable
+	ExcludedClusterScopeResources []string `json:"excludedClusterScopeResources,omitempty"`
+
+	// IncludedNamespacedResources is a slice of namespace scope
+	// resource type names to include in the backup.
+	// The default value is "*".
+	// +optional
+	// +nullable
+	IncludedNamespacedResources []string `json:"includedNamespacedResources,omitempty"`
+
+	// ExcludedNamespacedResources is a slice of namespace scope
+	// resource type names to exclude from the backup.
+	// If set to "*", all namespace scope resource types are excluded.
+	// +optional
+	// +nullable
+	ExcludedNamespacedResources []string `json:"excludedNamespacedResources,omitempty"`
+
 	// LabelSelector is a metav1.LabelSelector to filter with
 	// when adding individual objects to the backup. If empty
 	// or nil, all objects are included. Optional.

@@ -8,13 +8,26 @@
 	- [High-Level Design](#high-level-design)
 		- [Parameters Rules](#parameters-rules)
 		- [Using scenarios:](#using-scenarios)
-			- [no namespaced resources + no cluster resources](#no-namespaced-resources--no-cluster-resources)
 			- [no namespaced resources + some cluster resources](#no-namespaced-resources--some-cluster-resources)
 			- [no namespaced resources + all cluster resources](#no-namespaced-resources--all-cluster-resources)
 			- [some namespaced resources + no cluster resources](#some-namespaced-resources--no-cluster-resources)
+				- [scenario 1](#scenario-1)
+				- [scenario 2](#scenario-2)
+				- [scenario 3](#scenario-3)
+				- [scenario 4](#scenario-4)
 			- [some namespaced resources + only related cluster resources](#some-namespaced-resources--only-related-cluster-resources)
+				- [scenario 1](#scenario-1-1)
+				- [scenario 2](#scenario-2-1)
+				- [scenario 3](#scenario-3-1)
 			- [some namespaced resources + some additional cluster resources](#some-namespaced-resources--some-additional-cluster-resources)
+				- [scenario 1](#scenario-1-2)
+				- [scenario 2](#scenario-2-2)
+				- [scenario 3](#scenario-3-2)
+				- [scenario 4](#scenario-4-1)
 			- [some namespaced resources + all cluster resources](#some-namespaced-resources--all-cluster-resources)
+				- [scenario 1](#scenario-1-3)
+				- [scenario 2](#scenario-2-3)
+				- [scenario 3](#scenario-3-3)
 			- [all namespaced resources + no cluster resources](#all-namespaced-resources--no-cluster-resources)
 			- [all namespaced resources + some additional cluster resources](#all-namespaced-resources--some-additional-cluster-resources)
 			- [all namespaced resources + all cluster resources](#all-namespaced-resources--all-cluster-resources)
@@ -67,13 +80,8 @@ Restore and other code pieces also use resource filtering will be handled in fut
 
 * If both `--include-cluster-scope-resources` and `--exclude-cluster-scope-resources` are not present, it means no additional cluster resource is included per resource type, just as the existing `--include-cluster-resources` parameter not setting value. Cluster resources are related to the namespace scope resources, which means those are returned in the namespace resources' BackupItemAction's result AdditionalItems array, are still included in backup by default. Taking backing up PVC scenario as an example, PVC is namespaced, PV is in cluster scope. PVC's BIA will include PVC related PV into backup too.
 
-* If the backup contains no resource, validation failure should be returned.
-
 ### Using scenarios:
 Please notice, if the scenario give the example of using old filtering parameters (`--include-cluster-resources`, `--include-resources` and `--exclude-resources`), that means the old parameters also work for this case. If old parameters example is not given, that means they don't work for this scenario, only new parameters (`--include-cluster-scope-resources`, `--include-namespaced-resources`, `--exclude-cluster-scope-resources` and `--exclude-namespaced-resources`) work.
-
-#### no namespaced resources + no cluster resources
-This is not allowed. Backup or restore cannot contain no resource.
 
 #### no namespaced resources + some cluster resources
 The following command means backup no namespaced resources and some cluster resources.
@@ -94,6 +102,7 @@ velero backup create <backup-name>
 ```
 
 #### some namespaced resources + no cluster resources
+##### scenario 1
 The following commands mean backup all resources in namespaces default and kube-system, and no cluster resources.
 
 Example of new parameters:
@@ -109,7 +118,7 @@ velero backup create <backup-name>
 	--include-namespaces=default,kube-system
 	--include-cluster-resources=false
 ```
-
+##### scenario 2
 The following commands mean backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in all namespaces, and no cluster resources. Although PVC's related PV should be included, due to no cluster resources are included, so they are ruled out too.
 
 Example of new parameters:
@@ -125,7 +134,7 @@ velero backup create <backup-name>
 	--include-resources=persistentvolumeclaim,deployment,service,endpoint,pod,replicaset
 	--include-cluster-resources=false
 ```
-
+##### scenario 3
 The following commands mean backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in namespace default and kube-system, and no cluster resources. Although PVC's related PV should be included, due to no cluster resources are included, so they are ruled out too.
 
 Example of new parameters:
@@ -143,7 +152,7 @@ velero backup create <backup-name>
 	--include-resources=persistentvolumeclaim,deployment,service,endpoint,pod,replicaset
 	--include-cluster-resources=false
 ```
-
+##### scenario 4
 The following commands mean backup all resources except Ingress type resources in all namespaces, and no cluster resources.
 
 Example of new parameters:
@@ -161,42 +170,22 @@ velero backup create <backup-name>
 ```
 
 #### some namespaced resources + only related cluster resources
+##### scenario 1
 This means backup all resources in namespaces default and kube-system, and related cluster resources.
 ``` bash
 velero backup create <backup-name>
 	--include-namespaces=default,kube-system
 ```
 
-The following commands mean backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in all namespaces, and related cluster resources (PVC's related PV).
-
-Example of new parameters:
-``` bash
-velero backup create <backup-name>
-	--include-namespaced-resources=persistentvolumeclaim,deployment,service,endpoint,pod,replicaset
-```
-
-Example of old parameters:
-``` bash
-velero backup create <backup-name>
-	--include-resources=persistentvolumeclaim,deployment,service,endpoint,pod,replicaset
-```
-
-The following commands mean backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in namespaces default and kube-system, and related cluster resources. PVC related PV is included too.
-
-Example of new parameters:
+##### scenario 2
+This means backup pods and configmaps in namespaces default and kube-system, and related cluster resources.
 ``` bash
 velero backup create <backup-name>
 	--include-namespaces=default,kube-system
-	--include-namespaced-resources=persistentvolumeclaim,deployment,service,endpoint,pod,replicaset
+	--include-namespaced-resources=pods,configmaps
 ```
 
-Example of old parameters:
-``` bash
-velero backup create <backup-name>
-	--include-namespaces=default,kube-system
-	--include-resources=persistentvolumeclaim,deployment,service,endpoint,pod,replicaset
-```
-
+##### scenario 3
 This means backup all resources except Ingress type resources in all namespaces, and related cluster resources.
 
 Example of new parameters:
@@ -212,6 +201,7 @@ velero backup create <backup-name>
 ```
 
 #### some namespaced resources + some additional cluster resources
+##### scenario 1
 This means backup all resources in namespace in default, kube-system, and related cluster resources, plus all StorageClass cluster resources.
 ``` bash
 velero backup create <backup-name>
@@ -219,6 +209,7 @@ velero backup create <backup-name>
 	--include-cluster-scope-resources=storageclass
 ```
 
+##### scenario 2
 This means backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in all namespaces, and related cluster resources, plus all StorageClass cluster resources, and PVC related PV.
 ``` bash
 velero backup create <backup-name>
@@ -226,6 +217,7 @@ velero backup create <backup-name>
 	--include-cluster-scope-resources=storageclass
 ```
 
+##### scenario 3
 This means backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in default and kube-system namespaces, and related cluster resources, plus all StorageClass cluster resources, and PVC related PV.
 ``` bash
 velero backup create <backup-name>
@@ -234,6 +226,7 @@ velero backup create <backup-name>
 	--include-cluster-scope-resources=storageclass
 ```
 
+##### scenario 4
 This means backup PVC, Deployment, Service, Endpoint, Pod and ReplicaSet resources in default and kube-system namespaces, and related cluster resources, plus all cluster scope resources except StorageClass type resources.
 ``` bash
 velero backup create <backup-name>
@@ -243,6 +236,7 @@ velero backup create <backup-name>
 ```
 
 #### some namespaced resources + all cluster resources
+##### scenario 1
 The following commands mean backup all resources in namespace in default, kube-system, and all cluster resources.
 
 Example of new parameters:
@@ -259,6 +253,7 @@ velero backup create <backup-name>
 	--include-cluster-resources=true
 ```
 
+##### scenario 2
 This means backup Deployment, Service, Endpoint, Pod and ReplicaSet resources in all namespaces, and all cluster resources.
 ``` bash
 velero backup create <backup-name>
@@ -266,6 +261,7 @@ velero backup create <backup-name>
 	--include-cluster-scope-resources=*
 ```
 
+##### scenario 3
 This means backup Deployment, Service, Endpoint, Pod and ReplicaSet resources in default and kube-system namespaces, and all cluster resources.
 ``` bash
 velero backup create <backup-name>
