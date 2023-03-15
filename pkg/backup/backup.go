@@ -209,9 +209,22 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
 	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
 
-	backupRequest.ResourceIncludesExcludes = collections.GetResourceIncludesExcludes(kb.discoveryHelper, backupRequest.Spec.IncludedResources, backupRequest.Spec.ExcludedResources)
-	log.Infof("Including resources: %s", backupRequest.ResourceIncludesExcludes.IncludesString())
-	log.Infof("Excluding resources: %s", backupRequest.ResourceIncludesExcludes.ExcludesString())
+	if collections.UseOldResourceFilters(backupRequest.Spec) {
+		backupRequest.ResourceIncludesExcludes = collections.GetGlobalResourceIncludesExcludes(kb.discoveryHelper, log,
+			backupRequest.Spec.IncludedResources,
+			backupRequest.Spec.ExcludedResources,
+			backupRequest.Spec.IncludeClusterResources,
+			*backupRequest.NamespaceIncludesExcludes)
+	} else {
+		backupRequest.ResourceIncludesExcludes = collections.GetScopeResourceIncludesExcludes(kb.discoveryHelper, log,
+			backupRequest.Spec.IncludedNamespacedResources,
+			backupRequest.Spec.ExcludedNamespacedResources,
+			backupRequest.Spec.IncludedClusterScopeResources,
+			backupRequest.Spec.ExcludedClusterScopeResources,
+			*backupRequest.NamespaceIncludesExcludes,
+		)
+	}
+
 	log.Infof("Backing up all volumes using pod volume backup: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToFsBackup))
 
 	var err error
@@ -398,10 +411,12 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	// no more progress updates will be sent on the 'update' channel
 	quit <- struct{}{}
 
-	// back up CRD for resource if found. We should only need to do this if we've backed up at least
-	// one item for the resource and IncludeClusterResources is nil. If IncludeClusterResources is false
-	// we don't want to back it up, and if it's true it will already be included.
-	if backupRequest.Spec.IncludeClusterResources == nil {
+	// back up CRD(this is a CRD definition of the resource, it's a CRD instance) for resource if found.
+	// We should only need to do this if we've backed up at least one item for the resource
+	// and the CRD type(this is the CRD type itself) is neither included or excluded.
+	// When it's included, the resource's CRD is already handled. When it's excluded, no need to check.
+	if !backupRequest.ResourceIncludesExcludes.ShouldExclude(kuberesource.CustomResourceDefinitions.String()) &&
+		!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.CustomResourceDefinitions.String()) {
 		for gr := range backedUpGroupResources {
 			kb.backupCRD(log, gr, itemBackupper)
 		}
@@ -492,6 +507,7 @@ func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.Group
 		log.WithError(errors.WithStack(err)).Errorf("Error getting CRD %s", gr.String())
 		return
 	}
+
 	log.Infof("Found associated CRD %s to add to backup", gr.String())
 
 	kb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr)

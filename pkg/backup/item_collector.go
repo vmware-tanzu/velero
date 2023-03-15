@@ -249,26 +249,6 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 
 		return items, nil
 	}
-	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
-	// we should include it based on the IncludeClusterResources setting.
-	if gr != kuberesource.Namespaces && clusterScoped {
-		if r.backupRequest.Spec.IncludeClusterResources == nil {
-			if !r.backupRequest.NamespaceIncludesExcludes.IncludeEverything() {
-				// when IncludeClusterResources == nil (auto), only directly
-				// back up cluster-scoped resources if we're doing a full-cluster
-				// (all namespaces) backup. Note that in the case of a subset of
-				// namespaces being backed up, some related cluster-scoped resources
-				// may still be backed up if triggered by a custom action (e.g. PVC->PV).
-				// If we're processing namespaces themselves, we will not skip here, they may be
-				// filtered out later.
-				log.Info("Skipping resource because it's cluster-scoped and only specific namespaces are included in the backup")
-				return nil, nil
-			}
-		} else if !*r.backupRequest.Spec.IncludeClusterResources {
-			log.Info("Skipping resource because it's cluster-scoped")
-			return nil, nil
-		}
-	}
 
 	if !r.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
 		log.Infof("Skipping resource because it's excluded")
@@ -293,7 +273,7 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
 
 	// Check if we're backing up namespaces for a less-than-full backup.
-	// We enter this block if resource is Namespaces and the namespae list is either empty or contains
+	// We enter this block if resource is Namespaces and the namespace list is either empty or contains
 	// an explicit namespace list. (We skip this block if the list contains "" since that indicates
 	// a full-cluster backup
 	if gr == kuberesource.Namespaces && (len(namespacesToList) == 0 || namespacesToList[0] != "") {

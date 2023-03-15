@@ -299,6 +299,26 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IncludedClusterScopeResources != nil {
+		in, out := &in.IncludedClusterScopeResources, &out.IncludedClusterScopeResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExcludedClusterScopeResources != nil {
+		in, out := &in.ExcludedClusterScopeResources, &out.ExcludedClusterScopeResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.IncludedNamespacedResources != nil {
+		in, out := &in.IncludedNamespacedResources, &out.IncludedNamespacedResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExcludedNamespacedResources != nil {
+		in, out := &in.ExcludedNamespacedResources, &out.ExcludedNamespacedResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.LabelSelector != nil {
 		in, out := &in.LabelSelector, &out.LabelSelector
 		*out = new(metav1.LabelSelector)

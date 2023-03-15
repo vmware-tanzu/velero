@@ -181,6 +181,12 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"},
 		},
+		{
+			name:           "use old filter parameters and new filter parameters together",
+			backup:         defaultBackup().IncludeClusterResources(true).IncludedNamespacedResources("Deployment").IncludedNamespaces("default").Result(),
+			backupLocation: defaultBackupLocation,
+			expectedErrs:   []string{"include-resources, exclude-resources and include-cluster-resources are old filter parameters.\ninclude-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources are new filter parameters.\nThey cannot be used together"},
+		},
 	}
 
 	for _, test := range tests {

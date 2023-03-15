@@ -1332,8 +1332,8 @@ func TestGetRestoreHooksFromSpec(t *testing.T) {
 				{
 					Name: "h1",
 					Selector: ResourceHookSelector{
-						Namespaces: collections.NewIncludesExcludes().Includes([]string{"ns1", "ns2", "ns3"}...).Excludes([]string{"ns4", "ns5", "ns6"}...),
-						Resources:  collections.NewIncludesExcludes().Includes([]string{kuberesource.Pods.Resource}...),
+						Namespaces: collections.NewIncludesExcludes().Includes("ns1", "ns2", "ns3").Excludes("ns4", "ns5", "ns6"),
+						Resources:  collections.NewIncludesExcludes().Includes(kuberesource.Pods.Resource),
 					},
 					RestoreHooks: []velerov1api.RestoreResourceHook{
 						{
