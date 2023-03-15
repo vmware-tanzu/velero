@@ -54,19 +54,24 @@ type Request struct {
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
 	VolumeSnapshots  []*volume.Snapshot
 	BackupReader     io.Reader
-	RestoredItems    map[itemKey]string
+	RestoredItems    map[itemKey]restoredItemStatus
+}
+
+type restoredItemStatus struct {
+	action     string
+	itemExists bool
 }
 
 // RestoredResourceList returns the list of restored resources grouped by the API
 // Version and Kind
 func (r *Request) RestoredResourceList() map[string][]string {
 	resources := map[string][]string{}
-	for i, action := range r.RestoredItems {
+	for i, item := range r.RestoredItems {
 		entry := i.name
 		if i.namespace != "" {
 			entry = fmt.Sprintf("%s/%s", i.namespace, i.name)
 		}
-		entry = fmt.Sprintf("%s(%s)", entry, action)
+		entry = fmt.Sprintf("%s(%s)", entry, item.action)
 		resources[i.resource] = append(resources[i.resource], entry)
 	}
 
