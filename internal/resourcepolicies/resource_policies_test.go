@@ -106,7 +106,7 @@ func TestLoadResourcePolicies(t *testing.T) {
 }
 
 func TestGetResourceMatchedAction(t *testing.T) {
-	resPolicies := &ResourcePolicies{
+	resPolicies := &resourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
 			{
@@ -219,10 +219,10 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	resPolicies, err := GetResourcePoliciesFromConfig(cm)
 	assert.Nil(t, err)
 
-	// Check that the returned ResourcePolicies object contains the expected data
+	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.Version)
 	assert.Len(t, resPolicies.VolumePolicies, 1)
-	policies := ResourcePolicies{
+	policies := resourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
 			{

@@ -30,8 +30,8 @@ type VolumePolicy struct {
 // currently only support configmap type of resource config
 const ConfigmapRefType string = "configmap"
 
-// ResourcePolicies currently defined slice of volume policies to handle backup
-type ResourcePolicies struct {
+// resourcePolicies currently defined slice of volume policies to handle backup
+type resourcePolicies struct {
 	Version        string         `yaml:"version"`
 	VolumePolicies []VolumePolicy `yaml:"volumePolicies"`
 	// we may support other resource policies in the future, and they could be added separately
@@ -44,8 +44,8 @@ type Policies struct {
 	// OtherPolicies
 }
 
-func unmarshalResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
-	resPolicies := &ResourcePolicies{}
+func unmarshalResourcePolicies(YamlData *string) (*resourcePolicies, error) {
+	resPolicies := &resourcePolicies{}
 	if err := decodeStruct(strings.NewReader(*YamlData), resPolicies); err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
 	} else {
@@ -53,7 +53,7 @@ func unmarshalResourcePolicies(YamlData *string) (*ResourcePolicies, error) {
 	}
 }
 
-func (policies *Policies) buildPolicy(resPolicies *ResourcePolicies) error {
+func (policies *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 	for _, vp := range resPolicies.VolumePolicies {
 		con, err := unmarshalVolConditions(vp.Conditions)
 		if err != nil {

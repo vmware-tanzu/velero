@@ -69,12 +69,12 @@ func TestCapacityConditionValidate(t *testing.T) {
 func TestValidate(t *testing.T) {
 	testCases := []struct {
 		name    string
-		res     *ResourcePolicies
+		res     *resourcePolicies
 		wantErr bool
 	}{
 		{
 			name: "unknown key in yaml",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -95,7 +95,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "error format of capacity",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -115,7 +115,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "error format of storageClass",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -135,7 +135,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "error format of csi",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -152,7 +152,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "unsupported version",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v2",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -171,7 +171,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "unsupported action",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -190,7 +190,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "error format of nfs",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{
@@ -207,7 +207,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "supported formart volume policies",
-			res: &ResourcePolicies{
+			res: &resourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{
 					{

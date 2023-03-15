@@ -219,9 +219,8 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			backupErrs = append(backupErrs, err)
 		}
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
-	} else if updatedObj == nil { // which would be skip handle obj by resource policies
-		return true, itemFiles, nil
 	}
+
 	itemFiles = append(itemFiles, additionalItemFiles...)
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
@@ -338,7 +337,7 @@ func (ib *itemBackupper) executeActions(
 			act := ib.backupRequest.ResPolicies.Match(&volume)
 			if act != nil && act.Type == resourcepolicies.Skip {
 				log.Infof("skip snapshot of pv %s for the matched resource policies", pvName)
-				return nil, itemFiles, nil
+				continue
 			}
 		}
 		updatedItem, additionalItemIdentifiers, operationID, postOperationItems, err := action.Execute(obj, ib.backupRequest.Backup)
