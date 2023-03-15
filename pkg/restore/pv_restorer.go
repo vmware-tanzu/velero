@@ -64,7 +64,7 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 
 	log := r.logger.WithFields(logrus.Fields{"persistentVolume": pvName})
 
-	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.kbclient, r.credentialFileStore, r.logger)
+	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.kbclient, r.credentialFileStore)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ type snapshotInfo struct {
 	location           *api.VolumeSnapshotLocation
 }
 
-func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, client client.Client, credentialStore credentials.FileStore, logger logrus.FieldLogger) (*snapshotInfo, error) {
+func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, client client.Client, credentialStore credentials.FileStore) (*snapshotInfo, error) {
 	var pvSnapshot *volume.Snapshot
 	for _, snapshot := range volumeSnapshots {
 		if snapshot.Spec.PersistentVolumeName == pvName {
@@ -132,7 +132,7 @@ func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volum
 	}
 
 	// add credential to config
-	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore, logger)
+	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

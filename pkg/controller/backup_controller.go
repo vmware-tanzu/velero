@@ -560,7 +560,7 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 
 	// add credential to config for each location
 	for _, location := range providerLocations {
-		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, b.credentialFileStore, b.logger)
+		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, b.credentialFileStore)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("error adding credentials to volume snapshot location named %s: %v", location.Name, err))
 			continue
