@@ -111,6 +111,22 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
+func (b *backupper) checkResourcePolicies(resPolicies *resourcepolicies.Policies, pvc *corev1api.PersistentVolumeClaim, volume *corev1api.Volume) (*resourcepolicies.Action, error) {
+	structuredVolume := &resourcepolicies.StructuredVolume{}
+	if pvc != nil {
+		pv, err := b.pvClient.PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+		if err != nil {
+			return nil, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName)
+		}
+		structuredVolume.ParsePV(pv)
+	} else if volume != nil {
+		structuredVolume.ParsePodVolume(volume)
+	} else {
+		return nil, errors.Errorf("failed to check resource policies for empty volume")
+	}
+	return resPolicies.Match(structuredVolume), nil
+}
+
 func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumesToBackup) == 0 {
 		return nil, nil
@@ -203,21 +219,10 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		if resPolicies != nil {
-			structuredVolume := &resourcepolicies.StructuredVolume{}
-			var volumeName string
-			if pvc != nil {
-				pv, err := b.pvClient.PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
-				if err != nil {
-					errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
-				}
-				structuredVolume.ParsePV(pv)
-				volumeName = pv.Name
-			} else {
-				structuredVolume.ParsePodVolume(&volume)
-				volumeName = volume.Name
-			}
-			action := resPolicies.Match(structuredVolume)
-			if action != nil && action.Type == resourcepolicies.Skip {
+			if action, err := b.checkResourcePolicies(resPolicies, pvc, &volume); err != nil {
+				errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
+				continue
+			} else if action != nil && action.Type == resourcepolicies.Skip {
 				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
 				continue
 			}

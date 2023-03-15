@@ -323,30 +323,14 @@ func (ib *itemBackupper) executeActions(
 			continue
 		}
 		log.Info("Executing custom action")
-		if ib.backupRequest.ResPolicies != nil && groupResource.String() == "persistentvolumeclaims" && action.Name() == "velero.io/csi-pvc-backupper" {
-			pvc := corev1api.PersistentVolumeClaim{}
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
-				return nil, itemFiles, errors.WithStack(err)
-			}
 
-			pvName := pvc.Spec.VolumeName
-			if pvName == "" {
-				return nil, itemFiles, errors.Errorf("PVC has no volume backing this claim")
-			}
-
-			pv := &corev1api.PersistentVolume{}
-			if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
-				return nil, itemFiles, errors.WithStack(err)
-			}
-
-			volume := resourcepolicies.StructuredVolume{}
-			volume.ParsePV(pv)
-			act := ib.backupRequest.ResPolicies.Match(&volume)
-			if act != nil && act.Type == resourcepolicies.Skip {
-				log.Infof("skip snapshot of pv %s for the matched resource policies", pvName)
-				continue
-			}
+		if act, err := ib.checkResourcePolicies(obj, &groupResource, action.Name()); err != nil {
+			return nil, itemFiles, errors.WithStack(err)
+		} else if act != nil && act.Type == resourcepolicies.Skip {
+			log.Infof("skip snapshot of pvc %s/%s bound pv for the matched resource policies", namespace, name)
+			continue
 		}
+
 		updatedItem, additionalItemIdentifiers, operationID, postOperationItems, err := action.Execute(obj, ib.backupRequest.Backup)
 
 		if err != nil {
@@ -593,6 +577,30 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 	// nil errors are automatically removed
 	return kubeerrs.NewAggregate(errs)
+}
+
+func (ib *itemBackupper) checkResourcePolicies(obj runtime.Unstructured, groupResource *schema.GroupResource, actionName string) (*resourcepolicies.Action, error) {
+	if ib.backupRequest.ResPolicies != nil && groupResource.String() == "persistentvolumeclaims" && actionName == "velero.io/csi-pvc-backupper" {
+		pvc := corev1api.PersistentVolumeClaim{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		pvName := pvc.Spec.VolumeName
+		if pvName == "" {
+			return nil, errors.Errorf("PVC has no volume backing this claim")
+		}
+
+		pv := &corev1api.PersistentVolume{}
+		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		volume := resourcepolicies.StructuredVolume{}
+		volume.ParsePV(pv)
+		return ib.backupRequest.ResPolicies.Match(&volume), nil
+	}
+	return nil, nil
 }
 
 func volumeSnapshot(backup *velerov1api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {

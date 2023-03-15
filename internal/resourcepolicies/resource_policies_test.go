@@ -240,10 +240,5 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to build policy with error %v", err)
 	}
-
-	for k := range resPolicies.VolumePolicies[0].conditions {
-		t.Logf("vae %v", resPolicies.VolumePolicies[0].conditions[k])
-	}
-
 	assert.Equal(t, p, resPolicies)
 }
