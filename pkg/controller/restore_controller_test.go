@@ -19,7 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -444,7 +444,7 @@ func TestRestoreReconcile(t *testing.T) {
 				errors.Velero = append(errors.Velero, "error uploading log file to object storage: "+test.putRestoreLogErr.Error())
 			}
 			if test.expectedRestorerCall != nil {
-				backupStore.On("GetBackupContents", test.backup.Name).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
+				backupStore.On("GetBackupContents", test.backup.Name).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 
 				restorer.On("RestoreWithResolvers", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)

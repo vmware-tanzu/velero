@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"time"
@@ -611,7 +610,7 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 	}
 	defer readCloser.Close()
 
-	file, err := ioutil.TempFile("", backupName)
+	file, err := os.CreateTemp("", backupName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Backup temp file")
 	}

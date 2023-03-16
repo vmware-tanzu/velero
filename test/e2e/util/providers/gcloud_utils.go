@@ -19,7 +19,7 @@ package providers
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -103,7 +103,7 @@ func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 
 func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
 	ctx := context.Background()
-	data, err := ioutil.ReadFile(cloudCredentialsFile)
+	data, err := os.ReadFile(cloudCredentialsFile)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Failed reading gcloud credential file %s", cloudCredentialsFile))
 	}

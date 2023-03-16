@@ -18,6 +18,7 @@ package test
 
 import (
 	"io"
+	"io/fs"
 	"os"
 
 	"github.com/spf13/afero"
@@ -61,7 +62,7 @@ func (fs *FakeFileSystem) RemoveAll(path string) error {
 	return fs.fs.RemoveAll(path)
 }
 
-func (fs *FakeFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (fs *FakeFileSystem) ReadDir(dirname string) ([]fs.FileInfo, error) {
 	fs.ReadDirCalls = append(fs.ReadDirCalls, dirname)
 	return afero.ReadDir(fs.fs, dirname)
 }

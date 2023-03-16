@@ -18,9 +18,9 @@ package controller
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -573,8 +573,18 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 // runBackup runs and uploads a validated backup. Any error returned from this function
 // causes the backup to be Failed; if no error is returned, the backup's status's Errors
 // field is checked to see if the backup was a partial failure.
+
 func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
+	logFile, err := os.CreateTemp("", "")
+	if err != nil {
+		return errors.Wrap(err, "error creating temp file for backup log")
+	}
+	gzippedLogFile := gzip.NewWriter(logFile)
+	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
+	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
+	defer gzippedLogFile.Close()
+	defer closeAndRemoveFile(logFile, b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
@@ -586,7 +596,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	defer backupLog.Dispose(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	backupLog.Info("Setting up backup temp file")
-	backupFile, err := ioutil.TempFile("", "")
+	backupFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}

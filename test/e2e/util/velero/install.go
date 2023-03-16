@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -109,7 +108,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 	return nil
 }
 
-//configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
+// configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
 func configvSpherePlugin(cli TestClient) error {
 	var err error
 	vsphereSecret := "velero-vsphere-config-secret"
@@ -311,11 +310,10 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 		// apply the image pull secret to avoid the image pull limit of Docker Hub
 		if len(options.RegistryCredentialFile) > 0 && resource.GetKind() == "ServiceAccount" &&
 			resource.GetName() == "velero" {
-			credential, err := ioutil.ReadFile(options.RegistryCredentialFile)
+			credential, err := os.ReadFile(options.RegistryCredentialFile)
 			if err != nil {
 				return errors.Wrapf(err, "failed to read the registry credential file %s", options.RegistryCredentialFile)
 			}
-
 			imagePullSecret = corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Secret",
