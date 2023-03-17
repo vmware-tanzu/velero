@@ -218,7 +218,7 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 }
 
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
-	timeout := 30 * time.Minute
+	timeout := 120 * time.Minute
 	interval := 1 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
