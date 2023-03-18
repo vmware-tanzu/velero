@@ -422,12 +422,6 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 	actionsResolver := framework.NewRestoreItemActionResolverV2(actions)
 
-	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
-	if err != nil {
-		return errors.Wrap(err, "error getting item snapshotters")
-	}
-	snapshotItemResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
-
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, backupStore, restoreLog)
 	if err != nil {
 		return errors.Wrap(err, "error downloading backup")
@@ -466,8 +460,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
-	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
-		pluginManager)
+	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
 	// log errors and warnings to the restore log
 	for _, msg := range restoreErrors.Velero {

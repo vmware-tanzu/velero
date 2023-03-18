@@ -83,7 +83,6 @@ type Restorer interface {
 	RestoreWithResolvers(
 		req *Request,
 		restoreItemActionResolver framework.RestoreItemActionResolverV2,
-		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
 }
@@ -158,14 +157,12 @@ func (kr *kubernetesRestorer) Restore(
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	resolver := framework.NewRestoreItemActionResolverV2(actions)
-	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
-	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, volumeSnapshotterGetter)
+	return kr.RestoreWithResolvers(req, resolver, volumeSnapshotterGetter)
 }
 
 func (kr *kubernetesRestorer) RestoreWithResolvers(
 	req *Request,
 	restoreItemActionResolver framework.RestoreItemActionResolverV2,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
@@ -217,11 +214,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
 	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
-	if err != nil {
-		return Result{}, Result{Velero: []string{err.Error()}}
-	}
-
-	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -290,7 +282,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		fileSystem:                     kr.fileSystem,
 		namespaceClient:                kr.namespaceClient,
 		restoreItemActions:             resolvedActions,
-		itemSnapshotterActions:         resolvedItemSnapshotterActions,
 		volumeSnapshotterGetter:        volumeSnapshotterGetter,
 		podVolumeRestorer:              podVolumeRestorer,
 		podVolumeErrs:                  make(chan error),
@@ -333,7 +324,6 @@ type restoreContext struct {
 	fileSystem                     filesystem.Interface
 	namespaceClient                corev1.NamespaceInterface
 	restoreItemActions             []framework.RestoreItemResolvedActionV2
-	itemSnapshotterActions         []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter        VolumeSnapshotterGetter
 	podVolumeRestorer              podvolume.Restorer
 	podVolumeWaitGroup             sync.WaitGroup

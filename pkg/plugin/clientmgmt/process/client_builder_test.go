@@ -71,7 +71,6 @@ func TestClientConfig(t *testing.T) {
 			string(common.PluginKindRestoreItemAction):   framework.NewRestoreItemActionPlugin(common.ClientLogger(logger)),
 			string(common.PluginKindRestoreItemActionV2): riav2.NewRestoreItemActionPlugin(common.ClientLogger(logger)),
 			string(common.PluginKindDeleteItemAction):    framework.NewDeleteItemActionPlugin(common.ClientLogger(logger)),
-			string(common.PluginKindItemSnapshotter):     framework.NewItemSnapshotterPlugin(common.ClientLogger(logger)),
 		},
 		Logger: cb.pluginLogger,
 		Cmd:    exec.Command(cb.commandName, cb.commandArgs...),

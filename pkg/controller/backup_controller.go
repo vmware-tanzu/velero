@@ -611,11 +611,6 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	if err != nil {
 		return err
 	}
-	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
-	if err != nil {
-		return err
-	}
-
 	backupLog.Info("Setting up backup store to check for backup existence")
 	backupStore, err := b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
 	if err != nil {
@@ -633,11 +628,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
-	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	var fatalErrs []error
-	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver,
-		itemSnapshottersResolver, pluginManager); err != nil {
+	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 
