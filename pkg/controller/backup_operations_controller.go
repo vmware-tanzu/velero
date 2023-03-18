@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	defaultBackupOperationsFrequency = 2 * time.Minute
+	defaultBackupOperationsFrequency = 10 * time.Second
 )
 
 type backupOperationsReconciler struct {
@@ -82,9 +82,14 @@ func NewBackupOperationsReconciler(
 
 func (c *backupOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1api.BackupList{}, c.frequency, kube.PeriodicalEnqueueSourceOption{})
+	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
+		backup := object.(*velerov1api.Backup)
+		return (backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations ||
+			backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed)
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}, builder.WithPredicates(kube.FalsePredicate{})).
-		Watches(s, nil).
+		Watches(s, nil, builder.WithPredicates(gp)).
 		Complete(c)
 }
 
@@ -94,8 +99,7 @@ func (c *backupOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (c *backupOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := c.logger.WithField("backup operations for backup", req.String())
-	// FIXME: make this log.Debug
-	log.Info("backupOperationsReconciler getting backup")
+	log.Debug("backupOperationsReconciler getting backup")
 
 	original := &velerov1api.Backup{}
 	if err := c.Get(ctx, req.NamespacedName, original); err != nil {
