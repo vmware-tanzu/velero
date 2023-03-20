@@ -98,6 +98,27 @@ message OperationProgress {
 }
 ```
 
+In addition to the three new rpc methods added to the RestoreItemAction interface, there is also a new `Name()` method. This one is only actually used internally by Velero to get the name that the plugin was registered with, but it still must be defined in a plugin which implements RestoreItemActionV2 in order to implement the interface. It doesn't really matter what it returns, though, as this particular method is not delegated to the plugin via RPC calls. The new (and modified) interface methods for `RestoreItemAction` are as follows:
+```
+type BackupItemAction interface {
+...
+	Name() string
+...
+	Progress(operationID string, restore *api.Restore) (velero.OperationProgress, error)
+	Cancel(operationID string, backup *api.Restore) error
+	AreAdditionalItemsReady(AdditionalItems []velero.ResourceIdentifier, restore *api.Restore) (bool, error)
+...
+}
+type RestoreItemActionExecuteOutput struct {
+	UpdatedItem            runtime.Unstructured
+	AdditionalItems        []ResourceIdentifier
+	SkipRestore            bool
+	OperationID            string
+	WaitForAdditionalItems bool
+}
+
+```
+
 A new PluginKind, `RestoreItemActionV2`, will be created, and the restore process will be modified to use this plugin kind.
 See [Plugin Versioning](plugin-versioning.md) for more details on implementation plans, including v1 adapters, etc.
 

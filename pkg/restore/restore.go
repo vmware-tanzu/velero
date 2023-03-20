@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
@@ -312,6 +313,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		hooksContext:                   hooksCtx,
 		hooksCancelFunc:                hooksCancelFunc,
 		kbClient:                       kr.kbClient,
+		itemOperationsList:             req.GetItemOperationsList(),
 	}
 
 	return restoreCtx.execute()
@@ -357,6 +359,7 @@ type restoreContext struct {
 	hooksContext                   go_context.Context
 	hooksCancelFunc                go_context.CancelFunc
 	kbClient                       crclient.Client
+	itemOperationsList             *[]*itemoperation.RestoreOperation
 }
 
 type resourceClientKey struct {
@@ -1211,6 +1214,30 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 		}
 
+		// If async plugin started async operation, add it to the ItemOperations list
+		if executeOutput.OperationID != "" {
+			resourceIdentifier := velero.ResourceIdentifier{
+				GroupResource: groupResource,
+				Namespace:     namespace,
+				Name:          name,
+			}
+			now := metav1.Now()
+			newOperation := itemoperation.RestoreOperation{
+				Spec: itemoperation.RestoreOperationSpec{
+					RestoreName:        ctx.restore.Name,
+					RestoreUID:         string(ctx.restore.UID),
+					RestoreItemAction:  action.RestoreItemAction.Name(),
+					ResourceIdentifier: resourceIdentifier,
+					OperationID:        executeOutput.OperationID,
+				},
+				Status: itemoperation.OperationStatus{
+					Phase:   itemoperation.OperationPhaseInProgress,
+					Created: &now,
+				},
+			}
+			itemOperList := ctx.itemOperationsList
+			*itemOperList = append(*itemOperList, &newOperation)
+		}
 		if executeOutput.SkipRestore {
 			ctx.log.Infof("Skipping restore of %s: %v because a registered plugin discarded it", obj.GroupVersionKind().Kind, name)
 			return warnings, errs, itemExists

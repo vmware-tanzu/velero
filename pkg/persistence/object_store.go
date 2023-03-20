@@ -80,7 +80,7 @@ type BackupStore interface {
 	PutRestoreLog(backup, restore string, log io.Reader) error
 	PutRestoreResults(backup, restore string, results io.Reader) error
 	PutRestoredResourceList(restore string, results io.Reader) error
-	PutRestoreItemOperations(backup, restore string, restoreItemOperations io.Reader) error
+	PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error
 	GetRestoreItemOperations(name string) ([]*itemoperation.RestoreOperation, error)
 	DeleteRestore(name string) error
 
@@ -547,7 +547,7 @@ func (s *objectBackupStore) PutRestoredResourceList(restore string, list io.Read
 	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResourceListKey(restore), list)
 }
 
-func (s *objectBackupStore) PutRestoreItemOperations(backup string, restore string, restoreItemOperations io.Reader) error {
+func (s *objectBackupStore) PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error {
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getRestoreItemOperationsKey(restore), restoreItemOperations)
 }
 

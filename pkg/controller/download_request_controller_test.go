@@ -113,6 +113,7 @@ var _ = Describe("Download Request Reconciler", func() {
 				NewFakeObjectBackupStoreGetter(backupStores),
 				velerotest.NewLogger(),
 				nil,
+				nil,
 			)
 
 			if test.backupLocation != nil && test.expectGetsURL {
