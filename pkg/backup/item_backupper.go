@@ -506,7 +506,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 			continue
 		}
 		if volumeID == "" {
-			log.Infof("No volume ID returned by volume snapshotter for persistent volume")
+			log.Warn("No volume ID returned by volume snapshotter for persistent volume")
 			continue
 		}
 
