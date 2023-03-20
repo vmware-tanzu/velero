@@ -1,7 +1,7 @@
 ![100]
 
 [![Build Status][1]][2] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3811/badge)](https://bestpractices.coreinfrastructure.org/projects/3811)
-
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/vmware-tanzu/velero)
 
 ## Overview
 
