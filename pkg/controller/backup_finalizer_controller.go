@@ -19,7 +19,6 @@ package controller
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -146,7 +145,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.Wrap(err, "error downloading backup")
 		}
 		defer closeAndRemoveFile(inBackupFile, log)
-		outBackupFile, err = ioutil.TempFile("", "")
+		outBackupFile, err = os.CreateTemp("", "")
 		if err != nil {
 			log.WithError(err).Error("error creating temp file for backup")
 			return ctrl.Result{}, errors.WithStack(err)
