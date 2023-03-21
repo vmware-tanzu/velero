@@ -18,7 +18,6 @@ package volume
 
 import (
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -26,7 +25,7 @@ import (
 
 // UpdateVolumeSnapshotLocationWithCredentialConfig adds the credentials file path to the config
 // if the VSL specifies a credential
-func UpdateVolumeSnapshotLocationWithCredentialConfig(location *velerov1api.VolumeSnapshotLocation, credentialStore credentials.FileStore, logger logrus.FieldLogger) error {
+func UpdateVolumeSnapshotLocationWithCredentialConfig(location *velerov1api.VolumeSnapshotLocation, credentialStore credentials.FileStore) error {
 	if location.Spec.Config == nil {
 		location.Spec.Config = make(map[string]string)
 	}

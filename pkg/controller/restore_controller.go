@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"time"
@@ -41,6 +40,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -85,15 +85,16 @@ var nonRestorableResources = []string{
 }
 
 type restoreReconciler struct {
-	ctx             context.Context
-	namespace       string
-	restorer        pkgrestore.Restorer
-	kbClient        client.Client
-	restoreLogLevel logrus.Level
-	logger          logrus.FieldLogger
-	metrics         *metrics.ServerMetrics
-	logFormat       logging.Format
-	clock           clock.WithTickerAndDelayedExecution
+	ctx                         context.Context
+	namespace                   string
+	restorer                    pkgrestore.Restorer
+	kbClient                    client.Client
+	restoreLogLevel             logrus.Level
+	logger                      logrus.FieldLogger
+	metrics                     *metrics.ServerMetrics
+	logFormat                   logging.Format
+	clock                       clock.WithTickerAndDelayedExecution
+	defaultItemOperationTimeout time.Duration
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
@@ -115,17 +116,19 @@ func NewRestoreReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
 	logFormat logging.Format,
+	defaultItemOperationTimeout time.Duration,
 ) *restoreReconciler {
 	r := &restoreReconciler{
-		ctx:             ctx,
-		namespace:       namespace,
-		restorer:        restorer,
-		kbClient:        kbClient,
-		logger:          logger,
-		restoreLogLevel: restoreLogLevel,
-		metrics:         metrics,
-		logFormat:       logFormat,
-		clock:           &clock.RealClock{},
+		ctx:                         ctx,
+		namespace:                   namespace,
+		restorer:                    restorer,
+		kbClient:                    kbClient,
+		logger:                      logger,
+		restoreLogLevel:             restoreLogLevel,
+		metrics:                     metrics,
+		logFormat:                   logFormat,
+		clock:                       &clock.RealClock{},
+		defaultItemOperationTimeout: defaultItemOperationTimeout,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -173,6 +176,10 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		restore.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
 		restore.Status.Phase = api.RestorePhaseInProgress
 	}
+	if restore.Spec.ItemOperationTimeout.Duration == 0 {
+		// set default item operation timeout
+		restore.Spec.ItemOperationTimeout.Duration = r.defaultItemOperationTimeout
+	}
 
 	// patch to update status and persist to API
 	err = kubeutil.PatchResource(original, restore, r.kbClient)
@@ -195,17 +202,14 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		restore.Status.Phase = api.RestorePhaseFailed
 		restore.Status.FailureReason = err.Error()
 		r.metrics.RegisterRestoreFailed(backupScheduleName)
-	} else if restore.Status.Errors > 0 {
-		log.Debug("Restore partially failed")
-		restore.Status.Phase = api.RestorePhasePartiallyFailed
-		r.metrics.RegisterRestorePartialFailure(backupScheduleName)
-	} else {
-		log.Debug("Restore completed")
-		restore.Status.Phase = api.RestorePhaseCompleted
-		r.metrics.RegisterRestoreSuccess(backupScheduleName)
 	}
 
-	restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	// mark completion if in terminal phase
+	if restore.Status.Phase == api.RestorePhaseFailed ||
+		restore.Status.Phase == api.RestorePhasePartiallyFailed ||
+		restore.Status.Phase == api.RestorePhaseCompleted {
+		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	}
 	log.Debug("Updating restore's final status")
 	if err = kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
 		log.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
@@ -376,15 +380,19 @@ func mostRecentCompletedBackup(backups []api.Backup) api.Backup {
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
 func (r *restoreReconciler) fetchBackupInfo(backupName string) (backupInfo, error) {
+	return fetchBackupInfoInternal(r.kbClient, r.namespace, backupName)
+}
+
+func fetchBackupInfoInternal(kbClient client.Client, namespace, backupName string) (backupInfo, error) {
 	backup := &api.Backup{}
-	err := r.kbClient.Get(context.Background(), types.NamespacedName{Namespace: r.namespace, Name: backupName}, backup)
+	err := kbClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: backupName}, backup)
 	if err != nil {
-		return backupInfo{}, err
+		return backupInfo{}, errors.Wrap(err, fmt.Sprintf("can't find backup %s/%s", namespace, backupName))
 	}
 
 	location := &api.BackupStorageLocation{}
-	if err := r.kbClient.Get(context.Background(), client.ObjectKey{
-		Namespace: r.namespace,
+	if err := kbClient.Get(context.Background(), client.ObjectKey{
+		Namespace: namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, location); err != nil {
 		return backupInfo{}, errors.WithStack(err)
@@ -422,12 +430,6 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "error getting restore item actions")
 	}
 	actionsResolver := framework.NewRestoreItemActionResolverV2(actions)
-
-	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
-	if err != nil {
-		return errors.Wrap(err, "error getting item snapshotters")
-	}
-	snapshotItemResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, backupStore, restoreLog)
 	if err != nil {
@@ -467,8 +469,22 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
-	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, snapshotItemResolver,
-		pluginManager)
+	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
+
+	// Iterate over restore item operations and update progress.
+	// Any errors on operations at this point should be added to restore errors.
+	// If any operations are still not complete, then restore will not be set to
+	// Completed yet.
+	inProgressOperations, _, opsCompleted, opsFailed, errs := getRestoreItemOperationProgress(restoreReq.Restore, pluginManager, *restoreReq.GetItemOperationsList())
+	if len(errs) > 0 {
+		for err := range errs {
+			restoreLog.Error(err)
+		}
+	}
+
+	restore.Status.RestoreItemOperationsAttempted = len(*restoreReq.GetItemOperationsList())
+	restore.Status.RestoreItemOperationsCompleted = opsCompleted
+	restore.Status.RestoreItemOperationsFailed = opsFailed
 
 	// log errors and warnings to the restore log
 	for _, msg := range restoreErrors.Velero {
@@ -538,6 +554,29 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		r.logger.WithError(err).Error("Error uploading restored resource list to backup storage")
 	}
 
+	if err := putOperationsForRestore(restore, *restoreReq.GetItemOperationsList(), backupStore); err != nil {
+		r.logger.WithError(err).Error("Error uploading restore item action operation resource list to backup storage")
+	}
+
+	if restore.Status.Errors > 0 {
+		if inProgressOperations {
+			r.logger.Debug("Restore WaitingForPluginOperationsPartiallyFailed")
+			restore.Status.Phase = api.RestorePhaseWaitingForPluginOperationsPartiallyFailed
+		} else {
+			r.logger.Debug("Restore partially failed")
+			restore.Status.Phase = api.RestorePhasePartiallyFailed
+			r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
+		}
+	} else {
+		if inProgressOperations {
+			r.logger.Debug("Restore WaitingForPluginOperations")
+			restore.Status.Phase = api.RestorePhaseWaitingForPluginOperations
+		} else {
+			r.logger.Debug("Restore completed")
+			restore.Status.Phase = api.RestorePhaseCompleted
+			r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
+		}
+	}
 	return nil
 }
 
@@ -604,6 +643,26 @@ func putRestoredResourceList(restore *api.Restore, list map[string][]string, bac
 	return nil
 }
 
+func putOperationsForRestore(restore *api.Restore, operations []*itemoperation.RestoreOperation, backupStore persistence.BackupStore) error {
+	buf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(buf)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(operations); err != nil {
+		return errors.Wrap(err, "error encoding restore item operations list to JSON")
+	}
+
+	if err := gzw.Close(); err != nil {
+		return errors.Wrap(err, "error closing gzip writer")
+	}
+
+	if err := backupStore.PutRestoreItemOperations(restore.Name, buf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func downloadToTempFile(backupName string, backupStore persistence.BackupStore, logger logrus.FieldLogger) (*os.File, error) {
 	readCloser, err := backupStore.GetBackupContents(backupName)
 	if err != nil {
@@ -611,7 +670,7 @@ func downloadToTempFile(backupName string, backupStore persistence.BackupStore, 
 	}
 	defer readCloser.Close()
 
-	file, err := ioutil.TempFile("", backupName)
+	file, err := os.CreateTemp("", backupName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating Backup temp file")
 	}

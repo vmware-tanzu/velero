@@ -28,6 +28,21 @@ type RestoreOperation struct {
 	Status OperationStatus `json:"status"`
 }
 
+func (in *RestoreOperation) DeepCopy() *RestoreOperation {
+	if in == nil {
+		return nil
+	}
+	out := new(RestoreOperation)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *RestoreOperation) DeepCopyInto(out *RestoreOperation) {
+	*out = *in
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+}
+
 type RestoreOperationSpec struct {
 	// RestoreName is the name of the Velero restore this item operation
 	// is associated with.
@@ -45,4 +60,18 @@ type RestoreOperationSpec struct {
 
 	// OperationID returned by the RIA plugin
 	OperationID string "json:operationID"
+}
+
+func (in *RestoreOperationSpec) DeepCopy() *RestoreOperationSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(RestoreOperationSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *RestoreOperationSpec) DeepCopyInto(out *RestoreOperationSpec) {
+	*out = *in
+	in.ResourceIdentifier.DeepCopyInto(&out.ResourceIdentifier)
 }

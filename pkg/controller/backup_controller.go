@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -576,7 +575,7 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 
 	// add credential to config for each location
 	for _, location := range providerLocations {
-		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, b.credentialFileStore, b.logger)
+		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, b.credentialFileStore)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("error adding credentials to volume snapshot location named %s: %v", location.Name, err))
 			continue
@@ -589,6 +588,7 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 // runBackup runs and uploads a validated backup. Any error returned from this function
 // causes the backup to be Failed; if no error is returned, the backup's status's Errors
 // field is checked to see if the backup was a partial failure.
+
 func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
@@ -602,7 +602,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	defer backupLog.Dispose(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	backupLog.Info("Setting up backup temp file")
-	backupFile, err := ioutil.TempFile("", "")
+	backupFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}
@@ -617,11 +617,6 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	if err != nil {
 		return err
 	}
-	itemSnapshotters, err := pluginManager.GetItemSnapshotters()
-	if err != nil {
-		return err
-	}
-
 	backupLog.Info("Setting up backup store to check for backup existence")
 	backupStore, err := b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
 	if err != nil {
@@ -639,11 +634,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
-	itemSnapshottersResolver := framework.NewItemSnapshotterResolver(itemSnapshotters)
 
 	var fatalErrs []error
-	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver,
-		itemSnapshottersResolver, pluginManager); err != nil {
+	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 

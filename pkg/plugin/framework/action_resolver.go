@@ -27,7 +27,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
@@ -137,12 +136,6 @@ func NewRestoreItemActionResolverV2(actions []riav2.RestoreItemAction) RestoreIt
 
 func NewDeleteItemActionResolver(actions []velero.DeleteItemAction) DeleteItemActionResolver {
 	return DeleteItemActionResolver{
-		actions: actions,
-	}
-}
-
-func NewItemSnapshotterResolver(actions []isv1.ItemSnapshotter) ItemSnapshotterResolver {
-	return ItemSnapshotterResolver{
 		actions: actions,
 	}
 }
@@ -277,35 +270,6 @@ func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper, log
 		}
 		res := DeleteItemResolvedAction{
 			DeleteItemAction: action,
-			resolvedAction: resolvedAction{
-				ResourceIncludesExcludes:  resources,
-				NamespaceIncludesExcludes: namespaces,
-				Selector:                  selector,
-			},
-		}
-		resolved = append(resolved, res)
-	}
-	return resolved, nil
-}
-
-type ItemSnapshotterResolvedAction struct {
-	isv1.ItemSnapshotter
-	resolvedAction
-}
-
-type ItemSnapshotterResolver struct {
-	actions []isv1.ItemSnapshotter
-}
-
-func (recv ItemSnapshotterResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]ItemSnapshotterResolvedAction, error) {
-	var resolved []ItemSnapshotterResolvedAction
-	for _, action := range recv.actions {
-		resources, namespaces, selector, err := resolveAction(helper, action)
-		if err != nil {
-			return nil, err
-		}
-		res := ItemSnapshotterResolvedAction{
-			ItemSnapshotter: action,
 			resolvedAction: resolvedAction{
 				ResourceIncludesExcludes:  resources,
 				NamespaceIncludesExcludes: namespaces,

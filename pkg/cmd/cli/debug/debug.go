@@ -21,7 +21,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -91,7 +90,7 @@ func (o *option) complete(f client.Factory, fs *pflag.FlagSet) error {
 		return fmt.Errorf("invalid output path: %v", err)
 	}
 	o.outputPath = absOutputPath
-	tmpDir, err := ioutil.TempDir("", "crashd")
+	tmpDir, err := os.MkdirTemp("", "crashd")
 	if err != nil {
 		return err
 	}

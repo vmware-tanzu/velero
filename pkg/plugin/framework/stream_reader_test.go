@@ -18,7 +18,7 @@ package framework
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,7 +59,7 @@ func TestStreamReader(t *testing.T) {
 		close:   rdr.CloseSend,
 	}
 
-	res, err := ioutil.ReadAll(sr)
+	res, err := io.ReadAll(sr)
 
 	require.Nil(t, err)
 	assert.Equal(t, s, string(res))

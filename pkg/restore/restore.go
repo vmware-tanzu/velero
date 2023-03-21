@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
@@ -83,7 +84,6 @@ type Restorer interface {
 	RestoreWithResolvers(
 		req *Request,
 		restoreItemActionResolver framework.RestoreItemActionResolverV2,
-		itemSnapshotterResolver framework.ItemSnapshotterResolver,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (Result, Result)
 }
@@ -158,14 +158,12 @@ func (kr *kubernetesRestorer) Restore(
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	resolver := framework.NewRestoreItemActionResolverV2(actions)
-	snapshotItemResolver := framework.NewItemSnapshotterResolver(nil)
-	return kr.RestoreWithResolvers(req, resolver, snapshotItemResolver, volumeSnapshotterGetter)
+	return kr.RestoreWithResolvers(req, resolver, volumeSnapshotterGetter)
 }
 
 func (kr *kubernetesRestorer) RestoreWithResolvers(
 	req *Request,
 	restoreItemActionResolver framework.RestoreItemActionResolverV2,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (Result, Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
@@ -217,11 +215,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
 	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
-	if err != nil {
-		return Result{}, Result{Velero: []string{err.Error()}}
-	}
-
-	resolvedItemSnapshotterActions, err := itemSnapshotterResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
@@ -290,7 +283,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		fileSystem:                     kr.fileSystem,
 		namespaceClient:                kr.namespaceClient,
 		restoreItemActions:             resolvedActions,
-		itemSnapshotterActions:         resolvedItemSnapshotterActions,
 		volumeSnapshotterGetter:        volumeSnapshotterGetter,
 		podVolumeRestorer:              podVolumeRestorer,
 		podVolumeErrs:                  make(chan error),
@@ -312,6 +304,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		hooksContext:                   hooksCtx,
 		hooksCancelFunc:                hooksCancelFunc,
 		kbClient:                       kr.kbClient,
+		itemOperationsList:             req.GetItemOperationsList(),
 	}
 
 	return restoreCtx.execute()
@@ -333,7 +326,6 @@ type restoreContext struct {
 	fileSystem                     filesystem.Interface
 	namespaceClient                corev1.NamespaceInterface
 	restoreItemActions             []framework.RestoreItemResolvedActionV2
-	itemSnapshotterActions         []framework.ItemSnapshotterResolvedAction
 	volumeSnapshotterGetter        VolumeSnapshotterGetter
 	podVolumeRestorer              podvolume.Restorer
 	podVolumeWaitGroup             sync.WaitGroup
@@ -357,6 +349,7 @@ type restoreContext struct {
 	hooksContext                   go_context.Context
 	hooksCancelFunc                go_context.CancelFunc
 	kbClient                       crclient.Client
+	itemOperationsList             *[]*itemoperation.RestoreOperation
 }
 
 type resourceClientKey struct {
@@ -697,7 +690,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 	var nsBytes []byte
 	var err error
 
-	if nsBytes, err = ioutil.ReadFile(path); err != nil {
+	if nsBytes, err = os.ReadFile(path); err != nil {
 		return &v1.Namespace{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Namespace",
@@ -1211,6 +1204,30 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 		}
 
+		// If async plugin started async operation, add it to the ItemOperations list
+		if executeOutput.OperationID != "" {
+			resourceIdentifier := velero.ResourceIdentifier{
+				GroupResource: groupResource,
+				Namespace:     namespace,
+				Name:          name,
+			}
+			now := metav1.Now()
+			newOperation := itemoperation.RestoreOperation{
+				Spec: itemoperation.RestoreOperationSpec{
+					RestoreName:        ctx.restore.Name,
+					RestoreUID:         string(ctx.restore.UID),
+					RestoreItemAction:  action.RestoreItemAction.Name(),
+					ResourceIdentifier: resourceIdentifier,
+					OperationID:        executeOutput.OperationID,
+				},
+				Status: itemoperation.OperationStatus{
+					Phase:   itemoperation.OperationPhaseInProgress,
+					Created: &now,
+				},
+			}
+			itemOperList := ctx.itemOperationsList
+			*itemOperList = append(*itemOperList, &newOperation)
+		}
 		if executeOutput.SkipRestore {
 			ctx.log.Infof("Skipping restore of %s: %v because a registered plugin discarded it", obj.GroupVersionKind().Kind, name)
 			return warnings, errs, itemExists

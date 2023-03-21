@@ -17,8 +17,8 @@ limitations under the License.
 package controller
 
 const (
-	BackupOperations      = "backup-operations"
 	Backup                = "backup"
+	BackupOperations      = "backup-operations"
 	BackupDeletion        = "backup-deletion"
 	BackupFinalizer       = "backup-finalizer"
 	BackupRepo            = "backup-repo"
@@ -29,14 +29,15 @@ const (
 	PodVolumeBackup       = "pod-volume-backup"
 	PodVolumeRestore      = "pod-volume-restore"
 	Restore               = "restore"
+	RestoreOperations     = "restore-operations"
 	Schedule              = "schedule"
 	ServerStatusRequest   = "server-status-request"
 )
 
 // DisableableControllers is a list of controllers that can be disabled
 var DisableableControllers = []string{
-	BackupOperations,
 	Backup,
+	BackupOperations,
 	BackupDeletion,
 	BackupFinalizer,
 	BackupSync,
@@ -44,6 +45,7 @@ var DisableableControllers = []string{
 	GarbageCollection,
 	BackupRepo,
 	Restore,
+	RestoreOperations,
 	Schedule,
 	ServerStatusRequest,
 }

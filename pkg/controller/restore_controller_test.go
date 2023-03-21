@@ -19,7 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -41,7 +41,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -111,6 +110,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
+				60*time.Minute,
 			)
 
 			if test.backupStoreError == nil {
@@ -193,6 +193,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				nil, // backupStoreGetter
 				metrics.NewServerMetrics(),
 				formatFlag,
+				60*time.Minute,
 			)
 
 			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
@@ -422,6 +423,7 @@ func TestRestoreReconcile(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				formatFlag,
+				60*time.Minute,
 			)
 
 			r.clock = clocktesting.NewFakeClock(now)
@@ -444,7 +446,7 @@ func TestRestoreReconcile(t *testing.T) {
 				errors.Velero = append(errors.Velero, "error uploading log file to object storage: "+test.putRestoreLogErr.Error())
 			}
 			if test.expectedRestorerCall != nil {
-				backupStore.On("GetBackupContents", test.backup.Name).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
+				backupStore.On("GetBackupContents", test.backup.Name).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 
 				restorer.On("RestoreWithResolvers", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
@@ -453,6 +455,7 @@ func TestRestoreReconcile(t *testing.T) {
 
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 				backupStore.On("PutRestoredResourceList", test.restore.Name, mock.Anything).Return(nil)
+				backupStore.On("PutRestoreItemOperations", mock.Anything, mock.Anything).Return(nil)
 
 				volumeSnapshots := []*volume.Snapshot{
 					{
@@ -477,7 +480,6 @@ func TestRestoreReconcile(t *testing.T) {
 
 			if test.restore != nil {
 				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
-				pluginManager.On("GetItemSnapshotters").Return([]isv1.ItemSnapshotter{}, nil)
 				pluginManager.On("CleanupClients")
 			}
 
@@ -586,6 +588,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		metrics.NewServerMetrics(),
 		formatFlag,
+		60*time.Minute,
 	)
 
 	restore := &velerov1api.Restore{
@@ -746,7 +749,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 }
 
 func NewRestore(ns, name, backup, includeNS, includeResource string, phase velerov1api.RestorePhase) *builder.RestoreBuilder {
-	restore := builder.ForRestore(ns, name).Phase(phase).Backup(backup)
+	restore := builder.ForRestore(ns, name).Phase(phase).Backup(backup).ItemOperationTimeout(60 * time.Minute)
 
 	if includeNS != "" {
 		restore = restore.IncludedNamespaces(includeNS)
@@ -781,10 +784,9 @@ func (r *fakeRestorer) Restore(
 
 func (r *fakeRestorer) RestoreWithResolvers(req *pkgrestore.Request,
 	resolver framework.RestoreItemActionResolverV2,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (results.Result, results.Result) {
-	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver, itemSnapshotterResolver,
+	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver,
 		r.kbClient, volumeSnapshotterGetter)
 
 	r.calledWithArg = *req.Restore

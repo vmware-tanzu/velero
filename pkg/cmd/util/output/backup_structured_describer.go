@@ -33,6 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -60,8 +61,7 @@ func DescribeBackupInSF(
 			d.Describe("validationErrors", status.ValidationErrors)
 		}
 
-		d.Describe("errors", status.Errors)
-		d.Describe("warnings", status.Warnings)
+		DescribeBackupResultsInSF(ctx, kbClient, d, backup, insecureSkipTLSVerify, caCertFile)
 
 		DescribeBackupSpecInSF(d, backup.Spec)
 
@@ -266,7 +266,7 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 
 	// In consideration of decoding structured output conveniently, the three separate fields were created here
 	// the field of "veleroNativeSnapshots" displays the brief snapshots info
-	// the field of "veleroNativeSnapshotsError" displays the error message if it fails to get snapshot info
+	// the field of "errorGettingSnapshots" displays the error message if it fails to get snapshot info
 	// the field of "veleroNativeSnapshotsDetail" displays the detailed snapshots info
 	if status.VolumeSnapshotsAttempted > 0 {
 		if !details {
@@ -276,13 +276,13 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 
 		buf := new(bytes.Buffer)
 		if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-			backupStatusInfo["veleroNativeSnapshotsError"] = fmt.Sprintf("<error getting snapshot info: %v>", err)
+			backupStatusInfo["errorGettingSnapshots"] = fmt.Sprintf("<error getting snapshot info: %v>", err)
 			return
 		}
 
 		var snapshots []*volume.Snapshot
 		if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
-			backupStatusInfo["veleroNativeSnapshotsError"] = fmt.Sprintf("<error reading snapshot info: %v>", err)
+			backupStatusInfo["errorGettingSnapshots"] = fmt.Sprintf("<error reading snapshot info: %v>", err)
 			return
 		}
 
@@ -298,7 +298,7 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 
 func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]interface{}, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
 	// In consideration of decoding structured output conveniently, the two separate fields were created here(in func describeBackupResourceList, there is only one field describing either error message or resource list)
-	// the field of 'resourceListError' gives specific error message when it fails to get resources list
+	// the field of 'errorGettingResourceList' gives specific error message when it fails to get resources list
 	// the field of 'resourceList' lists the rearranged resources
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
@@ -308,16 +308,16 @@ func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Clien
 			//	- the backup hasn't completed yet; or
 			//	- there was an error uploading the file; or
 			//	- the file was manually deleted after upload
-			backupStatusInfo["resourceListError"] = "<backup resource list not found>"
+			backupStatusInfo["errorGettingResourceList"] = "<backup resource list not found>"
 		} else {
-			backupStatusInfo["resourceListError"] = fmt.Sprintf("<error getting backup resource list: %v>", err)
+			backupStatusInfo["errorGettingResourceList"] = fmt.Sprintf("<error getting backup resource list: %v>", err)
 		}
 		return
 	}
 
 	var resourceList map[string][]string
 	if err := json.NewDecoder(buf).Decode(&resourceList); err != nil {
-		backupStatusInfo["resourceListError"] = fmt.Sprintf("<error reading backup resource list: %v>\n", err)
+		backupStatusInfo["errorGettingResourceList"] = fmt.Sprintf("<error reading backup resource list: %v>\n", err)
 		return
 	}
 	backupStatusInfo["resourceList"] = resourceList
@@ -459,4 +459,60 @@ func DescribeVSCInSF(details bool, vsc snapshotv1api.VolumeSnapshotContent, vscD
 		content["readyToUse"] = *vsc.Status.ReadyToUse
 	}
 	vscDetails[vsc.Name] = content
+}
+
+// DescribeBackupResultsInSF describes errors and warnings in structured format.
+func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
+	if backup.Status.Warnings == 0 && backup.Status.Errors == 0 {
+		return
+	}
+
+	var buf bytes.Buffer
+	var resultMap map[string]results.Result
+
+	errors, warnings := make(map[string]interface{}), make(map[string]interface{})
+	defer func() {
+		d.Describe("errors", errors)
+		d.Describe("warnings", warnings)
+	}()
+
+	// If 'ErrNotFound' occurs, it means the backup bundle in the bucket has already been there before the backup-result file is introduced.
+	// We only display the count of errors and warnings in this case.
+	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	if err == downloadrequest.ErrNotFound {
+		errors["count"] = backup.Status.Errors
+		warnings["count"] = backup.Status.Warnings
+		return
+	} else if err != nil {
+		errors["errorGettingErrors"] = fmt.Errorf("<error getting errors: %v>", err)
+		warnings["errorGettingWarnings"] = fmt.Errorf("<error getting warnings: %v>", err)
+		return
+	}
+
+	if err := json.NewDecoder(&buf).Decode(&resultMap); err != nil {
+		errors["errorGettingErrors"] = fmt.Errorf("<error decoding errors: %v>", err)
+		warnings["errorGettingWarnings"] = fmt.Errorf("<error decoding warnings: %v>", err)
+		return
+	}
+
+	if backup.Status.Warnings > 0 {
+		describeResultInSF(warnings, resultMap["warnings"])
+	}
+	if backup.Status.Errors > 0 {
+		describeResultInSF(errors, resultMap["errors"])
+	}
+}
+
+func describeResultInSF(m map[string]interface{}, result results.Result) {
+	m["velero"], m["cluster"], m["namespace"] = []string{}, []string{}, []string{}
+
+	if len(result.Velero) > 0 {
+		m["velero"] = result.Velero
+	}
+	if len(result.Cluster) > 0 {
+		m["cluster"] = result.Cluster
+	}
+	if len(result.Namespaces) > 0 {
+		m["namespace"] = result.Namespaces
+	}
 }

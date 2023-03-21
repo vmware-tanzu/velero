@@ -29,7 +29,7 @@ import (
 
 // BackupItemAction is an actor that performs an operation on an individual item being backed up.
 type BackupItemAction interface {
-	// Name returns the name of this BIA. Plugins which implement this interface must defined Name,
+	// Name returns the name of this BIA. Plugins which implement this interface must define Name,
 	// but its content is unimportant, as it won't actually be called via RPC. Velero's plugin infrastructure
 	// will implement this directly rather than delegating to the RPC plugin in order to return the name
 	// that the plugin was registered under. The plugins must implement the method to complete the interface.

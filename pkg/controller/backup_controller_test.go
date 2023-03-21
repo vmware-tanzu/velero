@@ -70,9 +70,8 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 }
 
 func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
-	backupItemActionResolver framework.BackupItemActionResolverV2, itemSnapshotterResolver framework.ItemSnapshotterResolver,
-	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
-	args := b.Called(logger, backup, backupFile, backupItemActionResolver, itemSnapshotterResolver, volumeSnapshotterGetter)
+	backupItemActionResolver framework.BackupItemActionResolverV2, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	args := b.Called(logger, backup, backupFile, backupItemActionResolver, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 
@@ -1047,9 +1046,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
-			pluginManager.On("GetItemSnapshotters").Return(nil, nil)
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []biav2.BackupItemAction(nil), pluginManager).Return(nil)
-			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, framework.ItemSnapshotterResolver{}, pluginManager).Return(nil)
+			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, pluginManager).Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
 			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.

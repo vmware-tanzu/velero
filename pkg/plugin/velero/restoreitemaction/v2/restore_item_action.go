@@ -27,6 +27,12 @@ import (
 
 // RestoreItemAction is an actor that performs an operation on an individual item being restored.
 type RestoreItemAction interface {
+	// Name returns the name of this RIA. Plugins which implement this interface must define Name,
+	// but its content is unimportant, as it won't actually be called via RPC. Velero's plugin infrastructure
+	// will implement this directly rather than delegating to the RPC plugin in order to return the name
+	// that the plugin was registered under. The plugins must implement the method to complete the interface.
+	Name() string
+
 	// AppliesTo returns information about which resources this action should be invoked for.
 	// A RestoreItemAction's Execute function will only be invoked on items that match the returned
 	// selector. A zero-valued ResourceSelector matches all resources.
@@ -58,7 +64,7 @@ type RestoreItemAction interface {
 	// slice of AdditionalItems (previously returned by Execute())
 	// are ready. Returns true if all items are ready, and false
 	// otherwise. The second return value is to report errors
-	AreAdditionalItemsReady(AdditionalItems []velero.ResourceIdentifier, restore *api.Restore) (bool, error)
+	AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *api.Restore) (bool, error)
 }
 
 func AsyncOperationsNotSupportedError() error {

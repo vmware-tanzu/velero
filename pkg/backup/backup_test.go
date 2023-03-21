@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
@@ -3191,7 +3190,7 @@ func assertTarballFileContents(t *testing.T, backupFile io.Reader, want map[stri
 		}
 		require.NoError(t, err)
 
-		bytes, err := ioutil.ReadAll(r)
+		bytes, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		items[hdr.Name] = bytes

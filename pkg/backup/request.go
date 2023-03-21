@@ -48,7 +48,6 @@ type Request struct {
 	ResourceIncludesExcludes  collections.IncludesExcludesInterface
 	ResourceHooks             []hook.ResourceHook
 	ResolvedActions           []framework.BackupItemResolvedActionV2
-	ResolvedItemSnapshotters  []framework.ItemSnapshotterResolvedAction
 	VolumeSnapshots           []*volume.Snapshot
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             map[itemKey]struct{}
