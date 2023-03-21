@@ -1374,12 +1374,12 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 	}
 }
 
-func TestDeleteVolumeSnapshot(t *testing.T) {
+func TestDeleteVolumeSnapshots(t *testing.T) {
 	tests := []struct {
 		name             string
 		vsArray          []snapshotv1api.VolumeSnapshot
 		vscArray         []snapshotv1api.VolumeSnapshotContent
-		expectedVSArray  []*snapshotv1api.VolumeSnapshot
+		expectedVSArray  []snapshotv1api.VolumeSnapshot
 		expectedVSCArray []snapshotv1api.VolumeSnapshotContent
 	}{
 		{
@@ -1390,9 +1390,28 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 			vscArray: []snapshotv1api.VolumeSnapshotContent{
 				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
 			},
-			expectedVSArray: []*snapshotv1api.VolumeSnapshot{},
+			expectedVSArray: []snapshotv1api.VolumeSnapshot{},
 			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{
 				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
+			},
+		},
+		{
+			name: "VS is ReadyToUse, and VS has corresponding VSC. Concurrent test.",
+			vsArray: []snapshotv1api.VolumeSnapshot{
+				*builder.ForVolumeSnapshot("velero", "vs1").ObjectMeta(builder.WithLabels("testing-vs", "vs1")).Status().BoundVolumeSnapshotContentName("vsc1").Result(),
+				*builder.ForVolumeSnapshot("velero", "vs2").ObjectMeta(builder.WithLabels("testing-vs", "vs2")).Status().BoundVolumeSnapshotContentName("vsc2").Result(),
+				*builder.ForVolumeSnapshot("velero", "vs3").ObjectMeta(builder.WithLabels("testing-vs", "vs3")).Status().BoundVolumeSnapshotContentName("vsc3").Result(),
+			},
+			vscArray: []snapshotv1api.VolumeSnapshotContent{
+				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
+				*builder.ForVolumeSnapshotContent("vsc2").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
+				*builder.ForVolumeSnapshotContent("vsc3").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
+			},
+			expectedVSArray: []snapshotv1api.VolumeSnapshot{},
+			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{
+				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
+				*builder.ForVolumeSnapshotContent("vsc2").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
+				*builder.ForVolumeSnapshotContent("vsc3").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
 			},
 		},
 		{
@@ -1401,8 +1420,8 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 				*builder.ForVolumeSnapshot("velero", "vs1").ObjectMeta(builder.WithLabels("testing-vs", "vs1")).Status().BoundVolumeSnapshotContentName("vsc1").Result(),
 			},
 			vscArray: []snapshotv1api.VolumeSnapshotContent{},
-			expectedVSArray: []*snapshotv1api.VolumeSnapshot{
-				builder.ForVolumeSnapshot("velero", "vs1").Status().BoundVolumeSnapshotContentName("vsc1").Result(),
+			expectedVSArray: []snapshotv1api.VolumeSnapshot{
+				*builder.ForVolumeSnapshot("velero", "vs1").Status().BoundVolumeSnapshotContentName("vsc1").Result(),
 			},
 			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{},
 		},
@@ -1414,7 +1433,7 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 			vscArray: []snapshotv1api.VolumeSnapshotContent{
 				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
 			},
-			expectedVSArray: []*snapshotv1api.VolumeSnapshot{},
+			expectedVSArray: []snapshotv1api.VolumeSnapshot{},
 			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{
 				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
 			},
@@ -1439,11 +1458,13 @@ func TestDeleteVolumeSnapshot(t *testing.T) {
 			for _, vs := range tc.vsArray {
 				_, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(vs.Namespace).Create(context.Background(), &vs, metav1.CreateOptions{})
 				require.NoError(t, err)
+				require.NoError(t, sharedInformers.Snapshot().V1().VolumeSnapshots().Informer().GetStore().Add(&vs))
 			}
 			logger := logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
 
-			c.deleteVolumeSnapshot(tc.vsArray, tc.vscArray, logger)
-			vsList, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots("velero").List(context.Background(), metav1.ListOptions{})
+			c.deleteVolumeSnapshots(tc.vsArray, tc.vscArray, logger, 30)
+
+			vsList, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots("velero").List(context.TODO(), metav1.ListOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, len(tc.expectedVSArray), len(vsList.Items))
 			for index := range tc.expectedVSArray {
