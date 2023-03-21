@@ -19,7 +19,6 @@ package logging
 import (
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -47,7 +46,7 @@ type tempFileLogger struct {
 
 // NewTempFileLogger creates a DualModeLogger instance that writes logs to both Stdout and a file in the temp folder.
 func NewTempFileLogger(logLevel logrus.Level, logFormat Format, hook *LogHook, fields logrus.Fields) (DualModeLogger, error) {
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp file")
 	}
