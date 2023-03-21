@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	core "k8s.io/client-go/testing"
+	testclocks "k8s.io/utils/clock/testing"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -155,9 +157,11 @@ func numBackups(c ctrlClient.WithWatch, ns string) (int, error) {
 
 var _ = Describe("Backup Sync Reconciler", func() {
 	It("Test Backup Sync Reconciler basic function", func() {
+		fakeClock := testclocks.NewFakeClock(time.Now())
 		type cloudBackupData struct {
-			backup           *velerov1api.Backup
-			podVolumeBackups []*velerov1api.PodVolumeBackup
+			backup               *velerov1api.Backup
+			podVolumeBackups     []*velerov1api.PodVolumeBackup
+			backupShouldSkipSync bool // backups waiting for plugin operations should not sync
 		}
 
 		tests := []struct {
@@ -184,6 +188,98 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					},
 					{
 						backup: builder.ForBackup("ns-1", "backup-2").Result(),
+					},
+				},
+			},
+			{
+				name:      "backups waiting for plugin operations aren't synced",
+				namespace: "ns-1",
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").
+							Phase(velerov1api.BackupPhaseWaitingForPluginOperations).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").
+							Phase(velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-3").
+							Phase(velerov1api.BackupPhaseWaitingForPluginOperations).Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
+						},
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-4").
+							Phase(velerov1api.BackupPhaseFinalizing).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-5").
+							Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-6").
+							Phase(velerov1api.BackupPhaseFinalizing).Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
+						},
+						backupShouldSkipSync: true,
+					},
+				},
+			},
+			{
+				name:      "expired backups waiting for plugin operations are synced",
+				namespace: "ns-1",
+				location:  defaultLocation("ns-1"),
+				cloudBackups: []*cloudBackupData{
+					{
+						backup: builder.ForBackup("ns-1", "backup-1").
+							Phase(velerov1api.BackupPhaseWaitingForPluginOperations).
+							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-2").
+							Phase(velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed).
+							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-3").
+							Phase(velerov1api.BackupPhaseWaitingForPluginOperations).
+							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
+						},
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-4").
+							Phase(velerov1api.BackupPhaseFinalizing).
+							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-5").
+							Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).
+							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
+						backupShouldSkipSync: true,
+					},
+					{
+						backup: builder.ForBackup("ns-1", "backup-6").
+							Phase(velerov1api.BackupPhaseFinalizing).
+							Expiration(fakeClock.Now().Add(-time.Hour)).Result(),
+						podVolumeBackups: []*velerov1api.PodVolumeBackup{
+							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
+						},
+						backupShouldSkipSync: true,
 					},
 				},
 			},
@@ -364,36 +460,42 @@ var _ = Describe("Backup Sync Reconciler", func() {
 						Namespace: cloudBackupData.backup.Namespace,
 						Name:      cloudBackupData.backup.Name},
 					obj)
-				Expect(err).To(BeNil())
-
-				// did this cloud backup already exist in the cluster?
-				var existing *velerov1api.Backup
-				for _, obj := range test.existingBackups {
-					if obj.Name == cloudBackupData.backup.Name {
-						existing = obj
-						break
-					}
-				}
-
-				if existing != nil {
-					// if this cloud backup already exists in the cluster, make sure that what we get from the
-					// client is the existing backup, not the cloud one.
-
-					// verify that the in-cluster backup has its storage location populated, if it's not already.
-					expected := existing.DeepCopy()
-					expected.Spec.StorageLocation = test.location.Name
-
-					Expect(expected).To(BeEquivalentTo(obj))
+				if cloudBackupData.backupShouldSkipSync &&
+					(cloudBackupData.backup.Status.Expiration == nil ||
+						cloudBackupData.backup.Status.Expiration.After(fakeClock.Now())) {
+					Expect(apierrors.IsNotFound(err)).To(BeTrue())
 				} else {
-					// verify that the storage location field and label are set properly
-					Expect(test.location.Name).To(BeEquivalentTo(obj.Spec.StorageLocation))
+					Expect(err).To(BeNil())
 
-					locationName := test.location.Name
-					if test.longLocationNameEnabled {
-						locationName = label.GetValidName(locationName)
+					// did this cloud backup already exist in the cluster?
+					var existing *velerov1api.Backup
+					for _, obj := range test.existingBackups {
+						if obj.Name == cloudBackupData.backup.Name {
+							existing = obj
+							break
+						}
 					}
-					Expect(locationName).To(BeEquivalentTo(obj.Labels[velerov1api.StorageLocationLabel]))
-					Expect(len(obj.Labels[velerov1api.StorageLocationLabel]) <= validation.DNS1035LabelMaxLength).To(BeTrue())
+
+					if existing != nil {
+						// if this cloud backup already exists in the cluster, make sure that what we get from the
+						// client is the existing backup, not the cloud one.
+
+						// verify that the in-cluster backup has its storage location populated, if it's not already.
+						expected := existing.DeepCopy()
+						expected.Spec.StorageLocation = test.location.Name
+
+						Expect(expected).To(BeEquivalentTo(obj))
+					} else {
+						// verify that the storage location field and label are set properly
+						Expect(test.location.Name).To(BeEquivalentTo(obj.Spec.StorageLocation))
+
+						locationName := test.location.Name
+						if test.longLocationNameEnabled {
+							locationName = label.GetValidName(locationName)
+						}
+						Expect(locationName).To(BeEquivalentTo(obj.Labels[velerov1api.StorageLocationLabel]))
+						Expect(len(obj.Labels[velerov1api.StorageLocationLabel]) <= validation.DNS1035LabelMaxLength).To(BeTrue())
+					}
 				}
 
 				// process the cloud pod volume backups for this backup, if any
@@ -406,22 +508,28 @@ var _ = Describe("Backup Sync Reconciler", func() {
 							Name:      podVolumeBackup.Name,
 						},
 						objPodVolumeBackup)
-					Expect(err).ShouldNot(HaveOccurred())
+					if cloudBackupData.backupShouldSkipSync &&
+						(cloudBackupData.backup.Status.Expiration == nil ||
+							cloudBackupData.backup.Status.Expiration.After(fakeClock.Now())) {
+						Expect(apierrors.IsNotFound(err)).To(BeTrue())
+					} else {
+						Expect(err).ShouldNot(HaveOccurred())
 
-					// did this cloud pod volume backup already exist in the cluster?
-					var existingPodVolumeBackup *velerov1api.PodVolumeBackup
-					for _, objPodVolumeBackup := range test.existingPodVolumeBackups {
-						if objPodVolumeBackup.Name == podVolumeBackup.Name {
-							existingPodVolumeBackup = objPodVolumeBackup
-							break
+						// did this cloud pod volume backup already exist in the cluster?
+						var existingPodVolumeBackup *velerov1api.PodVolumeBackup
+						for _, objPodVolumeBackup := range test.existingPodVolumeBackups {
+							if objPodVolumeBackup.Name == podVolumeBackup.Name {
+								existingPodVolumeBackup = objPodVolumeBackup
+								break
+							}
 						}
-					}
 
-					if existingPodVolumeBackup != nil {
-						// if this cloud pod volume backup already exists in the cluster, make sure that what we get from the
-						// client is the existing backup, not the cloud one.
-						expected := existingPodVolumeBackup.DeepCopy()
-						Expect(expected).To(BeEquivalentTo(objPodVolumeBackup))
+						if existingPodVolumeBackup != nil {
+							// if this cloud pod volume backup already exists in the cluster, make sure that what we get from the
+							// client is the existing backup, not the cloud one.
+							expected := existingPodVolumeBackup.DeepCopy()
+							Expect(expected).To(BeEquivalentTo(objPodVolumeBackup))
+						}
 					}
 				}
 			}

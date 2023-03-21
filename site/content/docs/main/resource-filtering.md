@@ -31,7 +31,7 @@ Namespaces to include. Default is `*`, all namespaces.
 
 ### --include-resources
 
-Kubernetes resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use `*` for all resources).
+Kubernetes resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use `*` for all resources). Cannot work with `--include-cluster-scope-resources`, `--exclude-cluster-scope-resources`, `--include-namespaced-resources` and `--exclude-namespaced-resources`.
 
 * Backup all deployments in the cluster.
 
@@ -53,7 +53,7 @@ Kubernetes resources to include in the backup, formatted as resource.group, such
 
 ### --include-cluster-resources
 
-Includes cluster-scoped resources. This option can have three possible values:
+Includes cluster-scoped resources. Cannot work with `--include-cluster-scope-resources`, `--exclude-cluster-scope-resources`, `--include-namespaced-resources` and `--exclude-namespaced-resources`. This option can have three possible values:
 
 * `true`: all cluster-scoped resources are included.
 
@@ -94,11 +94,41 @@ Includes cluster-scoped resources. This option can have three possible values:
   ```
 * Include resources that are not matching the selector
   ```bash
-  velero backup create <backup-name> --selector <key>!=<value>
+  velero backup create <backup-name> --selector "<key> notin (<value>)"
   ```
 
 For more information read the [Kubernetes label selector documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)
 
+### --include-cluster-scope-resources
+Kubernetes cluster-scoped resources to include in the backup, formatted as resource.group, such as `storageclasses.storage.k8s.io`(use '*' for all resources). Cannot work with `--include-resources`, `--exclude-resources` and `--include-cluster-resources`. This parameter only works for backup, not for restore.
+
+* Backup all StorageClasses and ClusterRoles in the cluster.
+
+  ```bash
+  velero backup create <backup-name> --include-cluster-scope-resources="storageclasses,clusterroles"
+  ```
+
+* Backup all cluster-scoped resources in the cluster.
+
+  ```bash
+  velero backup create <backup-name> --include-cluster-scope-resources="*"
+  ```
+
+
+### --include-namespaced-resources
+Kubernetes namespace resources to include in the backup, formatted as resource.group, such as `deployments.apps`(use '*' for all resources). Cannot work with `--include-resources`, `--exclude-resources` and `--include-cluster-resources`. This parameter only works for backup, not for restore.
+
+* Backup all Deployments and ConfigMaps in the cluster.
+
+  ```bash
+  velero backup create <backup-name> --include-namespaced-resources="deployments.apps,configmaps"
+  ```
+
+* Backup all namespace resources in the cluster.
+
+  ```bash
+  velero backup create <backup-name> --include-namespaced-resources="*"
+  ```
 
 ## Excludes
 
@@ -124,7 +154,7 @@ Namespaces to exclude.
 
 ### --exclude-resources
 
-Kubernetes resources to exclude, formatted as resource.group, such as storageclasses.storage.k8s.io.
+Kubernetes resources to exclude, formatted as resource.group, such as storageclasses.storage.k8s.io. Cannot work with `--include-cluster-scope-resources`, `--exclude-cluster-scope-resources`, `--include-namespaced-resources` and `--exclude-namespaced-resources`.
 
 * Exclude secrets from the backup.
 
@@ -141,3 +171,33 @@ Kubernetes resources to exclude, formatted as resource.group, such as storagecla
 ### velero.io/exclude-from-backup=true
 
 * Resources with the label `velero.io/exclude-from-backup=true` are not included in backup, even if it contains a matching selector label.
+
+### --exclude-cluster-scope-resources
+Kubernetes cluster-scoped resources to exclude from the backup, formatted as resource.group, such as `storageclasses.storage.k8s.io`(use '*' for all resources). Cannot work with `--include-resources`, `--exclude-resources` and `--include-cluster-resources`. This parameter only works for backup, not for restore.
+
+* Exclude StorageClasses and ClusterRoles from the backup.
+
+  ```bash
+  velero backup create <backup-name> --exclude-cluster-scope-resources="storageclasses,clusterroles"
+  ```
+
+* Exclude all cluster-scoped resources from the backup.
+
+  ```bash
+  velero backup create <backup-name> --exclude-cluster-scope-resources="*"
+  ```
+
+### --exclude-namespaced-resources
+Kubernetes namespace resources to exclude from the backup, formatted as resource.group, such as `deployments.apps`(use '*' for all resources). Cannot work with `--include-resources`, `--exclude-resources` and `--include-cluster-resources`. This parameter only works for backup, not for restore.
+
+* Exclude all Deployments and ConfigMaps from the backup.
+
+  ```bash
+  velero backup create <backup-name> --exclude-namespaced-resources="deployments.apps,configmaps"
+  ```
+
+* Exclude all namespace resources from the backup.
+
+  ```bash
+  velero backup create <backup-name> --exclude-namespaced-resources="*"
+  ```

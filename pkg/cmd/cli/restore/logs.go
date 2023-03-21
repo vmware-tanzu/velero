@@ -63,8 +63,8 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			}
 
 			switch restore.Status.Phase {
-			case velerov1api.RestorePhaseCompleted, velerov1api.RestorePhaseFailed, velerov1api.RestorePhasePartiallyFailed:
-				// terminal phases, don't exit.
+			case velerov1api.RestorePhaseCompleted, velerov1api.RestorePhaseFailed, velerov1api.RestorePhasePartiallyFailed, velerov1api.RestorePhaseWaitingForPluginOperations, velerov1api.RestorePhaseWaitingForPluginOperationsPartiallyFailed:
+				// terminal and waiting for plugin operations phases, don't exit.
 			default:
 				cmd.Exit("Logs for restore %q are not available until it's finished processing. Please wait "+
 					"until the restore has a phase of Completed or Failed and try again.", restoreName)

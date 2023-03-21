@@ -54,6 +54,22 @@ spec:
                   Use DefaultVolumesToFsBackup instead."
                 nullable: true
                 type: boolean
+              excludedClusterScopeResources:
+                description: ExcludedClusterScopeResources is a slice of cluster scope
+                  resource type names to exclude from the backup. If set to "*", all
+                  cluster scope resource types are excluded.
+                items:
+                  type: string
+                nullable: true
+                type: array
+              excludedNamespacedResources:
+                description: ExcludedNamespacedResources is a slice of namespace scope
+                  resource type names to exclude from the backup. If set to "*", all
+                  namespace scope resource types are excluded.
+                items:
+                  type: string
+                nullable: true
+                type: array
               excludedNamespaces:
                 description: ExcludedNamespaces contains a list of namespaces that
                   are not included in the backup.
@@ -259,6 +275,23 @@ spec:
                   resources should be included for consideration in the backup.
                 nullable: true
                 type: boolean
+              includedClusterScopeResources:
+                description: IncludedClusterScopeResources is a slice of cluster scope
+                  resource type names to include in the backup. If set to "*", all
+                  cluster scope resource types are included. The default value is
+                  empty, which means only related cluster scope resources are included.
+                items:
+                  type: string
+                nullable: true
+                type: array
+              includedNamespacedResources:
+                description: IncludedNamespacedResources is a slice of namespace scope
+                  resource type names to include in the backup. The default value
+                  is "*".
+                items:
+                  type: string
+                nullable: true
+                type: array
               includedNamespaces:
                 description: IncludedNamespaces is a slice of namespace names to include
                   objects from. If empty, all namespaces are included.
@@ -273,6 +306,11 @@ spec:
                   type: string
                 nullable: true
                 type: array
+              itemOperationTimeout:
+                description: ItemOperationTimeout specifies the time used to wait
+                  for asynchronous BackupItemAction operations The default value is
+                  1 hour.
+                type: string
               labelSelector:
                 description: LabelSelector is a metav1.LabelSelector to filter with
                   when adding individual objects to the backup. If empty or nil, all
@@ -415,6 +453,20 @@ spec:
           status:
             description: BackupStatus captures the current status of a Velero backup.
             properties:
+              backupItemOperationsAttempted:
+                description: BackupItemOperationsAttempted is the total number of
+                  attempted async BackupItemAction operations for this backup.
+                type: integer
+              backupItemOperationsCompleted:
+                description: BackupItemOperationsCompleted is the total number of
+                  successfully completed async BackupItemAction operations for this
+                  backup.
+                type: integer
+              backupItemOperationsFailed:
+                description: BackupItemOperationsFailed is the total number of async
+                  BackupItemAction operations for this backup which ended with an
+                  error.
+                type: integer
               completionTimestamp:
                 description: CompletionTimestamp records the time a backup was completed.
                   Completion time is recorded even on failed backups. Completion time
@@ -457,6 +509,8 @@ spec:
                 - InProgress
                 - WaitingForPluginOperations
                 - WaitingForPluginOperationsPartiallyFailed
+                - Finalizing
+                - FinalizingPartiallyFailed
                 - Completed
                 - PartiallyFailed
                 - Failed

@@ -16,12 +16,31 @@ limitations under the License.
 
 package itemoperation
 
+import (
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+)
+
 // RestoreOperation stores information about an async item operation
 // started by a RestoreItemAction plugin (v2 or later)
 type RestoreOperation struct {
 	Spec RestoreOperationSpec `json:"spec"`
 
 	Status OperationStatus `json:"status"`
+}
+
+func (in *RestoreOperation) DeepCopy() *RestoreOperation {
+	if in == nil {
+		return nil
+	}
+	out := new(RestoreOperation)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *RestoreOperation) DeepCopyInto(out *RestoreOperation) {
+	*out = *in
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
 }
 
 type RestoreOperationSpec struct {
@@ -37,8 +56,22 @@ type RestoreOperationSpec struct {
 	RestoreItemAction string `json:"restoreItemAction"`
 
 	// Kubernetes resource identifier for the item
-	ResourceIdentifier string "json:resourceIdentifier"
+	ResourceIdentifier velero.ResourceIdentifier "json:resourceIdentifier"
 
 	// OperationID returned by the RIA plugin
 	OperationID string "json:operationID"
+}
+
+func (in *RestoreOperationSpec) DeepCopy() *RestoreOperationSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(RestoreOperationSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *RestoreOperationSpec) DeepCopyInto(out *RestoreOperationSpec) {
+	*out = *in
+	in.ResourceIdentifier.DeepCopyInto(&out.ResourceIdentifier)
 }

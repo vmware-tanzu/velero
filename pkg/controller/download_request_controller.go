@@ -28,6 +28,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
@@ -41,6 +42,11 @@ type downloadRequestReconciler struct {
 	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 
+	// used to force update of async backup item operations before processing download request
+	backupItemOperationsMap *itemoperationmap.BackupItemOperationsMap
+	// used to force update of async restore item operations before processing download request
+	restoreItemOperationsMap *itemoperationmap.RestoreItemOperationsMap
+
 	log logrus.FieldLogger
 }
 
@@ -51,18 +57,23 @@ func NewDownloadRequestReconciler(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,
+	backupItemOperationsMap *itemoperationmap.BackupItemOperationsMap,
+	restoreItemOperationsMap *itemoperationmap.RestoreItemOperationsMap,
 ) *downloadRequestReconciler {
 	return &downloadRequestReconciler{
-		client:            client,
-		clock:             clock,
-		newPluginManager:  newPluginManager,
-		backupStoreGetter: backupStoreGetter,
-		log:               log,
+		client:                   client,
+		clock:                    clock,
+		newPluginManager:         newPluginManager,
+		backupStoreGetter:        backupStoreGetter,
+		backupItemOperationsMap:  backupItemOperationsMap,
+		restoreItemOperationsMap: restoreItemOperationsMap,
+		log:                      log,
 	}
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=velero.io,resources=downloadrequests/status,verbs=get;update;patch
+
 func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithFields(logrus.Fields{
 		"controller":      "download-request",
@@ -122,7 +133,8 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreLog ||
 			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResults ||
-			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResourceList {
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResourceList ||
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreItemOperations {
 			restore := &velerov1api.Restore{}
 			if err := r.client.Get(ctx, kbclient.ObjectKey{
 				Namespace: downloadRequest.Namespace,
@@ -158,6 +170,20 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 
+		// If this is a request for backup item operations, force upload of in-memory operations that
+		// are not yet uploaded (if there are any)
+		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindBackupItemOperations &&
+			r.backupItemOperationsMap != nil {
+			// ignore errors here. If we can't upload anything here, process the download as usual
+			_ = r.backupItemOperationsMap.UpdateForBackup(backupStore, backupName)
+		}
+		// If this is a request for restore item operations, force upload of in-memory operations that
+		// are not yet uploaded (if there are any)
+		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreItemOperations &&
+			r.restoreItemOperationsMap != nil {
+			// ignore errors here. If we can't upload anything here, process the download as usual
+			_ = r.restoreItemOperationsMap.UpdateForRestore(backupStore, downloadRequest.Spec.Target.Name)
+		}
 		if downloadRequest.Status.DownloadURL, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
 			return ctrl.Result{Requeue: true}, errors.WithStack(err)
 		}

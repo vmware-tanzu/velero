@@ -20,7 +20,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -61,7 +60,9 @@ type BackupStore interface {
 	ListBackups() ([]string, error)
 
 	PutBackup(info BackupInfo) error
+	PutBackupMetadata(backup string, backupMetadata io.Reader) error
 	PutBackupItemOperations(backup string, backupItemOperations io.Reader) error
+	PutBackupContents(backup string, backupContents io.Reader) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupItemOperations(name string) ([]*itemoperation.BackupOperation, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
@@ -79,7 +80,7 @@ type BackupStore interface {
 	PutRestoreLog(backup, restore string, log io.Reader) error
 	PutRestoreResults(backup, restore string, results io.Reader) error
 	PutRestoredResourceList(restore string, results io.Reader) error
-	PutRestoreItemOperations(backup, restore string, restoreItemOperations io.Reader) error
+	PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error
 	GetRestoreItemOperations(name string) ([]*itemoperation.RestoreOperation, error)
 	DeleteRestore(name string) error
 
@@ -296,7 +297,7 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup,
 	}
 	defer res.Close()
 
-	data, err := ioutil.ReadAll(res)
+	data, err := io.ReadAll(res)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -313,6 +314,10 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup,
 	}
 
 	return backupObj, nil
+}
+
+func (s *objectBackupStore) PutBackupMetadata(backup string, backupMetadata io.Reader) error {
+	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(backup), backupMetadata)
 }
 
 func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
@@ -542,12 +547,16 @@ func (s *objectBackupStore) PutRestoredResourceList(restore string, list io.Read
 	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResourceListKey(restore), list)
 }
 
-func (s *objectBackupStore) PutRestoreItemOperations(backup string, restore string, restoreItemOperations io.Reader) error {
+func (s *objectBackupStore) PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error {
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getRestoreItemOperationsKey(restore), restoreItemOperations)
 }
 
 func (s *objectBackupStore) PutBackupItemOperations(backup string, backupItemOperations io.Reader) error {
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupItemOperationsKey(backup), backupItemOperations)
+}
+
+func (s *objectBackupStore) PutBackupContents(backup string, backupContents io.Reader) error {
+	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(backup), backupContents)
 }
 
 func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (string, error) {
@@ -574,6 +583,8 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getCSIVolumeSnapshotKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindCSIBackupVolumeSnapshotContents:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(target.Name), DownloadURLTTL)
+	case velerov1api.DownloadTargetKindBackupResults:
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupResultsKey(target.Name), DownloadURLTTL)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}

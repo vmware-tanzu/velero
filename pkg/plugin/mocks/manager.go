@@ -4,8 +4,6 @@ package mocks
 
 import (
 	mock "github.com/stretchr/testify/mock"
-	item_snapshotterv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
-
 	restoreitemactionv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 
 	restoreitemactionv2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
@@ -154,52 +152,6 @@ func (_m *Manager) GetDeleteItemActions() ([]velero.DeleteItemAction, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]velero.DeleteItemAction)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetItemSnapshotter provides a mock function with given fields: name
-func (_m *Manager) GetItemSnapshotter(name string) (item_snapshotterv1.ItemSnapshotter, error) {
-	ret := _m.Called(name)
-
-	var r0 item_snapshotterv1.ItemSnapshotter
-	if rf, ok := ret.Get(0).(func(string) item_snapshotterv1.ItemSnapshotter); ok {
-		r0 = rf(name)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(item_snapshotterv1.ItemSnapshotter)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetItemSnapshotters provides a mock function with given fields:
-func (_m *Manager) GetItemSnapshotters() ([]item_snapshotterv1.ItemSnapshotter, error) {
-	ret := _m.Called()
-
-	var r0 []item_snapshotterv1.ItemSnapshotter
-	if rf, ok := ret.Get(0).(func() []item_snapshotterv1.ItemSnapshotter); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]item_snapshotterv1.ItemSnapshotter)
 		}
 	}
 

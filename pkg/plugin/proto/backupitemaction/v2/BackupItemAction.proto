@@ -16,6 +16,7 @@ message ExecuteResponse {
     bytes item = 1;
     repeated generated.ResourceIdentifier additionalItems = 2;
     string operationID = 3;
+    repeated generated.ResourceIdentifier postOperationItems = 4;
 }
 
 service BackupItemAction {

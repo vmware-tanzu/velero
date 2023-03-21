@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -47,6 +46,7 @@ type installOptions struct {
 	*install.InstallOptions
 	RegistryCredentialFile string
 	RestoreHelperImage     string
+	VeleroServerDebugMode  bool
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
@@ -98,6 +98,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		InstallOptions:         veleroInstallOptions,
 		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
 		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
+		VeleroServerDebugMode:  veleroCfg.VeleroServerDebugMode,
 	})
 	if err != nil {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
@@ -107,7 +108,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 	return nil
 }
 
-//configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
+// configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
 func configvSpherePlugin(cli TestClient) error {
 	var err error
 	vsphereSecret := "velero-vsphere-config-secret"
@@ -225,14 +226,14 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
 	}
 
-	if err := createVelereResources(ctx, cli, namespace, args, options.RegistryCredentialFile, options.RestoreHelperImage); err != nil {
+	if err := createVelereResources(ctx, cli, namespace, args, options); err != nil {
 		return err
 	}
 
 	return waitVeleroReady(ctx, namespace, options.UseNodeAgent)
 }
 
-func createVelereResources(ctx context.Context, cli, namespace string, args []string, registryCredentialFile, RestoreHelperImage string) error {
+func createVelereResources(ctx context.Context, cli, namespace string, args []string, options *installOptions) error {
 	args = append(args, "--dry-run", "--output", "json", "--crds-only")
 
 	// get the CRD definitions
@@ -277,7 +278,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to unmarshal the resources: %s", stdout)
 	}
 
-	if err = patchResources(ctx, resources, namespace, registryCredentialFile, VeleroCfg.RestoreHelperImage); err != nil {
+	if err = patchResources(ctx, resources, namespace, options); err != nil {
 		return errors.Wrapf(err, "failed to patch resources")
 	}
 
@@ -299,51 +300,86 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 }
 
 // patch the velero resources
-func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace, registryCredentialFile, RestoreHelperImage string) error {
-	// apply the image pull secret to avoid the image pull limit of Docker Hub
-	if len(registryCredentialFile) > 0 {
-		credential, err := ioutil.ReadFile(registryCredentialFile)
-		if err != nil {
-			return errors.Wrapf(err, "failed to read the registry credential file %s", registryCredentialFile)
-		}
+func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace string, options *installOptions) error {
+	i := 0
+	size := 2
+	var deploy apps.Deployment
+	var imagePullSecret corev1.Secret
 
-		imagePullSecret := corev1.Secret{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Secret",
-				APIVersion: corev1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "image-pull-secret",
-				Namespace: namespace,
-			},
-			Type: corev1.SecretTypeDockerConfigJson,
-			Data: map[string][]byte{
-				".dockerconfigjson": credential,
-			},
-		}
-
-		for resourceIndex, resource := range resources.Items {
-			if resource.GetKind() == "ServiceAccount" && resource.GetName() == "velero" {
-				resource.Object["imagePullSecrets"] = []map[string]interface{}{
-					{
-						"name": "image-pull-secret",
-					},
-				}
-				resources.Items[resourceIndex] = resource
-				fmt.Printf("image pull secret %q set for velero serviceaccount \n", "image-pull-secret")
-				break
+	for resourceIndex, resource := range resources.Items {
+		// apply the image pull secret to avoid the image pull limit of Docker Hub
+		if len(options.RegistryCredentialFile) > 0 && resource.GetKind() == "ServiceAccount" &&
+			resource.GetName() == "velero" {
+			credential, err := os.ReadFile(options.RegistryCredentialFile)
+			if err != nil {
+				return errors.Wrapf(err, "failed to read the registry credential file %s", options.RegistryCredentialFile)
 			}
-		}
+			imagePullSecret = corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: corev1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "image-pull-secret",
+					Namespace: namespace,
+				},
+				Type: corev1.SecretTypeDockerConfigJson,
+				Data: map[string][]byte{
+					".dockerconfigjson": credential,
+				},
+			}
+			resource.Object["imagePullSecrets"] = []map[string]interface{}{
+				{
+					"name": "image-pull-secret",
+				},
+			}
+			resources.Items[resourceIndex] = resource
+			fmt.Printf("image pull secret %q set for velero serviceaccount \n", "image-pull-secret")
 
-		un, err := toUnstructured(imagePullSecret)
-		if err != nil {
-			return errors.Wrapf(err, "failed to convert pull secret to unstructure")
+			un, err := toUnstructured(imagePullSecret)
+			if err != nil {
+				return errors.Wrapf(err, "failed to convert pull secret to unstructure")
+			}
+			resources.Items = append(resources.Items, un)
+			i++
+		} else if options.VeleroServerDebugMode && resource.GetKind() == "Deployment" &&
+			resource.GetName() == "velero" {
+			deployJsonStr, err := json.Marshal(resource.Object)
+			if err != nil {
+				return errors.Wrapf(err, "failed to marshal velero deployment")
+			}
+			if err := json.Unmarshal(deployJsonStr, &deploy); err != nil {
+				return errors.Wrapf(err, "failed to unmarshal velero deployment")
+			}
+			veleroDeployIndex := -1
+			for containerIndex, container := range deploy.Spec.Template.Spec.Containers {
+				if container.Name == "velero" {
+					veleroDeployIndex = containerIndex
+					container.Args = append(container.Args, "--log-level", "debug")
+					break
+				}
+			}
+			if veleroDeployIndex >= 0 {
+				deploy.Spec.Template.Spec.Containers[veleroDeployIndex].Args = append(deploy.Spec.Template.Spec.Containers[veleroDeployIndex].Args, "--log-level")
+				deploy.Spec.Template.Spec.Containers[veleroDeployIndex].Args = append(deploy.Spec.Template.Spec.Containers[veleroDeployIndex].Args, "debug")
+				un, err := toUnstructured(deploy)
+				if err != nil {
+					return errors.Wrapf(err, "failed to unstructured velero deployment")
+				}
+				resources.Items = append(resources.Items, un)
+				resources.Items = append(resources.Items[:resourceIndex], resources.Items[resourceIndex+1:]...)
+			} else {
+				return errors.New("failed to get velero container in velero pod")
+			}
+			i++
 		}
-		resources.Items = append(resources.Items, un)
+		if i == size {
+			break
+		}
 	}
 
 	// customize the restic restore helper image
-	if len(VeleroCfg.RestoreHelperImage) > 0 {
+	if len(options.RestoreHelperImage) > 0 {
 		restoreActionConfig := corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
@@ -358,7 +394,7 @@ func patchResources(ctx context.Context, resources *unstructured.UnstructuredLis
 				},
 			},
 			Data: map[string]string{
-				"image": VeleroCfg.RestoreHelperImage,
+				"image": options.RestoreHelperImage,
 			},
 		}
 

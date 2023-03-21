@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"strings"
 	"time"
 )
@@ -62,7 +61,7 @@ func (o *inMemoryObjectStore) PutObject(bucket, key string, body io.Reader) erro
 		return errors.New("bucket not found")
 	}
 
-	obj, err := ioutil.ReadAll(body)
+	obj, err := io.ReadAll(body)
 	if err != nil {
 		return err
 	}
@@ -93,7 +92,7 @@ func (o *inMemoryObjectStore) GetObject(bucket, key string) (io.ReadCloser, erro
 		return nil, errors.New("key not found")
 	}
 
-	return ioutil.NopCloser(bytes.NewReader(obj)), nil
+	return io.NopCloser(bytes.NewReader(obj)), nil
 }
 
 func (o *inMemoryObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {

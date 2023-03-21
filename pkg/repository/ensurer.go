@@ -37,15 +37,17 @@ type RepositoryEnsurer struct {
 
 	// repoLocksMu synchronizes reads/writes to the repoLocks map itself
 	// since maps are not threadsafe.
-	repoLocksMu sync.Mutex
-	repoLocks   map[BackupRepositoryKey]*sync.Mutex
+	repoLocksMu     sync.Mutex
+	repoLocks       map[BackupRepositoryKey]*sync.Mutex
+	resourceTimeout time.Duration
 }
 
-func NewRepositoryEnsurer(repoClient client.Client, log logrus.FieldLogger) *RepositoryEnsurer {
+func NewRepositoryEnsurer(repoClient client.Client, log logrus.FieldLogger, resourceTimeout time.Duration) *RepositoryEnsurer {
 	return &RepositoryEnsurer{
-		log:        log,
-		repoClient: repoClient,
-		repoLocks:  make(map[BackupRepositoryKey]*sync.Mutex),
+		log:             log,
+		repoClient:      repoClient,
+		repoLocks:       make(map[BackupRepositoryKey]*sync.Mutex),
+		resourceTimeout: resourceTimeout,
 	}
 }
 
@@ -124,7 +126,7 @@ func (r *RepositoryEnsurer) createBackupRepositoryAndWait(ctx context.Context, n
 		}
 	}
 
-	err := wait.PollWithContext(ctx, time.Millisecond*500, time.Minute*5, checkFunc)
+	err := wait.PollWithContext(ctx, time.Millisecond*500, r.resourceTimeout, checkFunc)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait BackupRepository")
 	} else {

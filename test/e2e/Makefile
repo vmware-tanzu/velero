@@ -89,6 +89,7 @@ ADDITIONAL_BSL_CONFIG ?=
 
 FEATURES ?=
 DEBUG_E2E_TEST ?= false
+VELERO_SERVER_DEBUG_MODE ?= false
 
 # Parameters to run migration tests along with all other E2E tests, and both of them should
 #   be provided or left them all empty to skip migration tests with no influence to other
@@ -139,6 +140,7 @@ run: ginkgo
 		-registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
 		-kibishii-directory=$(KIBISHII_DIRECTORY) \
 		-debug-e2e-test=$(DEBUG_E2E_TEST) \
+		-velero-server-debug-mode=$(VELERO_SERVER_DEBUG_MODE) \
 		-default-cluster=$(DEFAULT_CLUSTER) \
 		-standby-cluster=$(STANDBY_CLUSTER) \
 		-uploader-type=$(UPLOADER_TYPE)

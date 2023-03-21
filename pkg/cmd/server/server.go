@@ -54,7 +54,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
-	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -66,7 +65,7 @@ import (
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -102,7 +101,10 @@ const (
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
 
-	defaultCSISnapshotTimeout = 10 * time.Minute
+	defaultCSISnapshotTimeout   = 10 * time.Minute
+	defaultItemOperationTimeout = 60 * time.Minute
+
+	resourceTimeout = 10 * time.Minute
 
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
@@ -114,6 +116,7 @@ type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
 	defaultBackupTTL, storeValidationFrequency, defaultCSISnapshotTimeout   time.Duration
+	defaultItemOperationTimeout, resourceTimeout                            time.Duration
 	restoreResourcePriorities                                               restore.Priorities
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -125,6 +128,7 @@ type serverConfig struct {
 	formatFlag                                                              *logging.FormatFlag
 	repoMaintenanceFrequency                                                time.Duration
 	garbageCollectionFrequency                                              time.Duration
+	itemOperationSyncFrequency                                              time.Duration
 	defaultVolumesToFsBackup                                                bool
 	uploaderType                                                            string
 }
@@ -146,6 +150,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 			backupSyncPeriod:               defaultBackupSyncPeriod,
 			defaultBackupTTL:               defaultBackupTTL,
 			defaultCSISnapshotTimeout:      defaultCSISnapshotTimeout,
+			defaultItemOperationTimeout:    defaultItemOperationTimeout,
+			resourceTimeout:                resourceTimeout,
 			storeValidationFrequency:       defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
@@ -221,37 +227,39 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.repoMaintenanceFrequency, "default-repo-maintain-frequency", config.repoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
+	command.Flags().DurationVar(&config.itemOperationSyncFrequency, "item-operation-sync-frequency", config.itemOperationSyncFrequency, "How often to check status on backup/restore operations after backup/restore processing.")
 	command.Flags().BoolVar(&config.defaultVolumesToFsBackup, "default-volumes-to-fs-backup", config.defaultVolumesToFsBackup, "Backup all volumes with pod volume file system backup by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
+	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out.")
+	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 
 	return command
 }
 
 type server struct {
-	namespace                           string
-	metricsAddress                      string
-	kubeClientConfig                    *rest.Config
-	kubeClient                          kubernetes.Interface
-	veleroClient                        clientset.Interface
-	discoveryClient                     discovery.DiscoveryInterface
-	discoveryHelper                     velerodiscovery.Helper
-	dynamicClient                       dynamic.Interface
-	sharedInformerFactory               informers.SharedInformerFactory
-	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
-	csiSnapshotClient                   *snapshotv1client.Clientset
-	ctx                                 context.Context
-	cancelFunc                          context.CancelFunc
-	logger                              logrus.FieldLogger
-	logLevel                            logrus.Level
-	pluginRegistry                      process.Registry
-	repoManager                         repository.Manager
-	repoLocker                          *repository.RepoLocker
-	repoEnsurer                         *repository.RepositoryEnsurer
-	metrics                             *metrics.ServerMetrics
-	config                              serverConfig
-	mgr                                 manager.Manager
-	credentialFileStore                 credentials.FileStore
-	credentialSecretStore               credentials.SecretStore
+	namespace             string
+	metricsAddress        string
+	kubeClientConfig      *rest.Config
+	kubeClient            kubernetes.Interface
+	veleroClient          clientset.Interface
+	discoveryClient       discovery.DiscoveryInterface
+	discoveryHelper       velerodiscovery.Helper
+	dynamicClient         dynamic.Interface
+	csiSnapshotClient     *snapshotv1client.Clientset
+	csiSnapshotLister     snapshotv1listers.VolumeSnapshotLister
+	ctx                   context.Context
+	cancelFunc            context.CancelFunc
+	logger                logrus.FieldLogger
+	logLevel              logrus.Level
+	pluginRegistry        process.Registry
+	repoManager           repository.Manager
+	repoLocker            *repository.RepoLocker
+	repoEnsurer           *repository.RepositoryEnsurer
+	metrics               *metrics.ServerMetrics
+	config                serverConfig
+	mgr                   manager.Manager
+	credentialFileStore   credentials.FileStore
+	credentialSecretStore credentials.SecretStore
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -305,15 +313,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	var csiSnapClient *snapshotv1client.Clientset
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		csiSnapClient, err = snapshotv1client.NewForConfig(clientConfig)
-		if err != nil {
-			cancelFunc()
-			return nil, err
-		}
-	}
-
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
@@ -344,25 +343,39 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	credentialSecretStore, err := credentials.NewNamespacedSecretStore(mgr.GetClient(), f.Namespace())
 
 	s := &server{
-		namespace:                           f.Namespace(),
-		metricsAddress:                      config.metricsAddress,
-		kubeClientConfig:                    clientConfig,
-		kubeClient:                          kubeClient,
-		veleroClient:                        veleroClient,
-		discoveryClient:                     veleroClient.Discovery(),
-		dynamicClient:                       dynamicClient,
-		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
-		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
-		csiSnapshotClient:                   csiSnapClient,
-		ctx:                                 ctx,
-		cancelFunc:                          cancelFunc,
-		logger:                              logger,
-		logLevel:                            logger.Level,
-		pluginRegistry:                      pluginRegistry,
-		config:                              config,
-		mgr:                                 mgr,
-		credentialFileStore:                 credentialFileStore,
-		credentialSecretStore:               credentialSecretStore,
+		namespace:             f.Namespace(),
+		metricsAddress:        config.metricsAddress,
+		kubeClientConfig:      clientConfig,
+		kubeClient:            kubeClient,
+		veleroClient:          veleroClient,
+		discoveryClient:       veleroClient.Discovery(),
+		dynamicClient:         dynamicClient,
+		ctx:                   ctx,
+		cancelFunc:            cancelFunc,
+		logger:                logger,
+		logLevel:              logger.Level,
+		pluginRegistry:        pluginRegistry,
+		config:                config,
+		mgr:                   mgr,
+		credentialFileStore:   credentialFileStore,
+		credentialSecretStore: credentialSecretStore,
+	}
+
+	// Setup CSI snapshot client and lister
+	var csiSnapClient *snapshotv1client.Clientset
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		csiSnapClient, err = snapshotv1client.NewForConfig(clientConfig)
+		if err != nil {
+			cancelFunc()
+			return nil, err
+		}
+		s.csiSnapshotClient = csiSnapClient
+
+		s.csiSnapshotLister, err = s.getCSIVolumeSnapshotListers()
+		if err != nil {
+			cancelFunc()
+			return nil, err
+		}
 	}
 
 	return s, nil
@@ -482,32 +495,32 @@ func (s *server) veleroResourcesExist() error {
 }
 
 // High priorities:
-// - Custom Resource Definitions come before Custom Resource so that they can be
-//   restored with their corresponding CRD.
-// - Namespaces go second because all namespaced resources depend on them.
-// - Storage Classes are needed to create PVs and PVCs correctly.
-// - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
-// - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
-//	 storage provider
-// - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
-// - PVs go before PVCs because PVCs depend on them.
-// - PVCs go before pods or controllers so they can be mounted as volumes.
-// - Service accounts go before secrets so service account token secrets can be filled automatically.
-// - Secrets and config maps go before pods or controllers so they can be mounted
-// 	 as volumes.
-// - Limit ranges go before pods or controllers so pods can use them.
-// - Pods go before controllers so they can be explicitly restored and potentially
-//	 have pod volume restores run before controllers adopt the pods.
-// - Replica sets go before deployments/other controllers so they can be explicitly
-//	 restored and be adopted by controllers.
-// - CAPI ClusterClasses go before Clusters.
+//   - Custom Resource Definitions come before Custom Resource so that they can be
+//     restored with their corresponding CRD.
+//   - Namespaces go second because all namespaced resources depend on them.
+//   - Storage Classes are needed to create PVs and PVCs correctly.
+//   - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
+//   - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
+//     storage provider
+//   - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
+//   - PVs go before PVCs because PVCs depend on them.
+//   - PVCs go before pods or controllers so they can be mounted as volumes.
+//   - Service accounts go before secrets so service account token secrets can be filled automatically.
+//   - Secrets and config maps go before pods or controllers so they can be mounted
+//     as volumes.
+//   - Limit ranges go before pods or controllers so pods can use them.
+//   - Pods go before controllers so they can be explicitly restored and potentially
+//     have pod volume restores run before controllers adopt the pods.
+//   - Replica sets go before deployments/other controllers so they can be explicitly
+//     restored and be adopted by controllers.
+//   - CAPI ClusterClasses go before Clusters.
 //
 // Low priorities:
-// - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
-//   ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
-// - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
-//	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
-//   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
+//   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
+//     ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
+//   - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
+//     Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
+//     See https://github.com/kubernetes-sigs/cluster-api/issues/4105
 var defaultRestorePriorities = restore.Priorities{
 	HighPriorities: []string{
 		"customresourcedefinitions",
@@ -560,43 +573,48 @@ func (s *server) initRepoManager() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger)
+	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
 
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
 	return nil
 }
 
-func (s *server) getCSIVolumeSnapshotListers() snapshotv1listers.VolumeSnapshotLister {
-	// Make empty listers that will only be populated if CSI is properly enabled.
-	var vsLister snapshotv1listers.VolumeSnapshotLister
-	var err error
+func (s *server) getCSIVolumeSnapshotListers() (vsLister snapshotv1listers.VolumeSnapshotLister, err error) {
+	_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
+	switch {
+	case apierrors.IsNotFound(err):
+		// CSI is enabled, but the required CRDs aren't installed, so halt.
+		s.logger.Warnf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
+	case err == nil:
+		wrapper := NewCSIInformerFactoryWrapper(s.csiSnapshotClient)
 
-	// If CSI is enabled, check for the CSI groups and generate the listers
-	// If CSI isn't enabled, return empty listers.
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
-		switch {
-		case apierrors.IsNotFound(err):
-			// CSI is enabled, but the required CRDs aren't installed, so halt.
-			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
-		case err == nil:
-			// CSI is enabled, and the resources were found.
-			// Instantiate the listers fully
-			s.logger.Debug("Creating CSI listers")
-			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1().VolumeSnapshots().Lister()
-		case err != nil:
-			cmd.CheckError(err)
+		s.logger.Debug("Creating CSI listers")
+		// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
+		vsLister = wrapper.factory.Snapshot().V1().VolumeSnapshots().Lister()
+
+		// start the informers & and wait for the caches to sync
+		wrapper.Start(s.ctx.Done())
+		s.logger.Info("Waiting for informer caches to sync")
+		csiCacheSyncResults := wrapper.WaitForCacheSync(s.ctx.Done())
+		s.logger.Info("Done waiting for informer caches to sync")
+
+		for informer, synced := range csiCacheSyncResults {
+			if !synced {
+				err = errors.Errorf("cache was not synced for informer %v", informer)
+				return
+			}
+			s.logger.WithField("informer", informer).Info("Informer cache synced")
 		}
+	case err != nil:
+		s.logger.Errorf("fail to find snapshot v1 schema: %s", err)
 	}
-	return vsLister
+
+	return
 }
 
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
 	s.logger.Info("Starting controllers")
-
-	ctx := s.ctx
 
 	go func() {
 		metricsMux := http.NewServeMux()
@@ -619,116 +637,45 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	backupTracker := controller.NewBackupTracker()
 
-	backupControllerRunInfo := func() controllerRunInfo {
-		backupper, err := backup.NewKubernetesBackupper(
-			s.veleroClient.VeleroV1(),
-			s.discoveryHelper,
-			client.NewDynamicFactory(s.dynamicClient),
-			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			podvolume.NewBackupperFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(), s.kubeClient.CoreV1(),
-				s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
-			s.config.podVolumeOperationTimeout,
-			s.config.defaultVolumesToFsBackup,
-			s.config.clientPageSize,
-			s.config.uploaderType,
-		)
-		cmd.CheckError(err)
-
-		backupController := controller.NewBackupController(
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.veleroClient.VeleroV1(),
-			s.discoveryHelper,
-			backupper,
-			s.logger,
-			s.logLevel,
-			newPluginManager,
-			backupTracker,
-			s.mgr.GetClient(),
-			s.config.defaultBackupLocation,
-			s.config.defaultVolumesToFsBackup,
-			s.config.defaultBackupTTL,
-			s.config.defaultCSISnapshotTimeout,
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
-			defaultVolumeSnapshotLocations,
-			s.metrics,
-			backupStoreGetter,
-			s.config.formatFlag.Parse(),
-			s.getCSIVolumeSnapshotListers(),
-			s.csiSnapshotClient,
-			s.credentialFileStore,
-		)
-
-		return controllerRunInfo{
-			controller: backupController,
-			numWorkers: defaultControllerWorkers,
-		}
-	}
-
 	// By far, PodVolumeBackup, PodVolumeRestore, BackupStorageLocation controllers
 	// are not included in --disable-controllers list.
 	// This is because of PVB and PVR are used by node agent DaemonSet,
 	// and BSL controller is mandatory for Velero to work.
-	enabledControllers := map[string]func() controllerRunInfo{
-		controller.Backup: backupControllerRunInfo,
-	}
 	// Note: all runtime type controllers that can be disabled are grouped separately, below:
 	enabledRuntimeControllers := map[string]struct{}{
-		controller.ServerStatusRequest: {},
-		controller.DownloadRequest:     {},
-		controller.Schedule:            {},
-		controller.BackupRepo:          {},
+		controller.Backup:              {},
 		controller.BackupDeletion:      {},
-		controller.GarbageCollection:   {},
+		controller.BackupFinalizer:     {},
+		controller.BackupOperations:    {},
+		controller.BackupRepo:          {},
 		controller.BackupSync:          {},
+		controller.DownloadRequest:     {},
+		controller.GarbageCollection:   {},
 		controller.Restore:             {},
+		controller.RestoreOperations:   {},
+		controller.Schedule:            {},
+		controller.ServerStatusRequest: {},
 	}
 
 	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 		s.config.disabledControllers = append(s.config.disabledControllers,
 			controller.Backup,
-			controller.Schedule,
-			controller.GarbageCollection,
 			controller.BackupDeletion,
+			controller.BackupFinalizer,
+			controller.BackupOperations,
+			controller.GarbageCollection,
+			controller.Schedule,
 		)
 	}
 
 	// Remove disabled controllers so they are not initialized. If a match is not found we want
 	// to halt the system so the user knows this operation was not possible.
-	if err := removeControllers(s.config.disabledControllers, enabledControllers, enabledRuntimeControllers, s.logger); err != nil {
+	if err := removeControllers(s.config.disabledControllers, enabledRuntimeControllers, s.logger); err != nil {
 		log.Fatal(err, "unable to disable a controller")
 	}
 
-	// Instantiate the enabled controllers. This needs to be done *before*
-	// the shared informer factory is started, because the controller
-	// constructors add event handlers to various informers, which should
-	// be done before the informers are running.
-	controllers := make([]controllerRunInfo, 0, len(enabledControllers))
-	for _, newController := range enabledControllers {
-		controllers = append(controllers, newController())
-	}
-
-	// start the informers & and wait for the caches to sync
-	s.sharedInformerFactory.Start(ctx.Done())
-	s.csiSnapshotterSharedInformerFactory.Start(ctx.Done())
-	s.logger.Info("Waiting for informer caches to sync")
-	cacheSyncResults := s.sharedInformerFactory.WaitForCacheSync(ctx.Done())
-	csiCacheSyncResults := s.csiSnapshotterSharedInformerFactory.WaitForCacheSync(ctx.Done())
-	s.logger.Info("Done waiting for informer caches to sync")
-
-	// Append our CSI informer types into the larger list of caches, so we can check them all at once
-	for informer, synced := range csiCacheSyncResults {
-		cacheSyncResults[informer] = synced
-	}
-
-	for informer, synced := range cacheSyncResults {
-		if !synced {
-			return errors.Errorf("cache was not synced for informer %v", informer)
-		}
-		s.logger.WithField("informer", informer).Info("Informer cache synced")
-	}
-
+	// Enable BSL controller. No need to check whether it's enabled or not.
 	bslr := controller.NewBackupStorageLocationReconciler(
 		s.ctx,
 		s.mgr.GetClient(),
@@ -745,15 +692,51 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
 
-	if _, ok := enabledRuntimeControllers[controller.Schedule]; ok {
-		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
-		}
-	}
-
-	if _, ok := enabledRuntimeControllers[controller.BackupRepo]; ok {
-		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupRepo)
+	if _, ok := enabledRuntimeControllers[controller.Backup]; ok {
+		backupper, err := backup.NewKubernetesBackupper(
+			s.mgr.GetClient(),
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			podvolume.NewBackupperFactory(
+				s.repoLocker,
+				s.repoEnsurer,
+				s.veleroClient,
+				s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(),
+				s.logger,
+			),
+			s.config.podVolumeOperationTimeout,
+			s.config.defaultVolumesToFsBackup,
+			s.config.clientPageSize,
+			s.config.uploaderType,
+		)
+		cmd.CheckError(err)
+		if err := controller.NewBackupReconciler(
+			s.ctx,
+			s.discoveryHelper,
+			backupper,
+			s.logger,
+			s.logLevel,
+			newPluginManager,
+			backupTracker,
+			s.mgr.GetClient(),
+			s.config.defaultBackupLocation,
+			s.config.defaultVolumesToFsBackup,
+			s.config.defaultBackupTTL,
+			s.config.defaultCSISnapshotTimeout,
+			s.config.resourceTimeout,
+			s.config.defaultItemOperationTimeout,
+			defaultVolumeSnapshotLocations,
+			s.metrics,
+			backupStoreGetter,
+			s.config.formatFlag.Parse(),
+			s.csiSnapshotLister,
+			s.csiSnapshotClient,
+			s.credentialFileStore,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.Backup)
 		}
 	}
 
@@ -773,28 +756,60 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
-		if err := controller.NewServerStatusRequestReconciler(
-			s.mgr.GetClient(),
-			s.ctx,
-			s.pluginRegistry,
-			clock.RealClock{},
+	backupOpsMap := itemoperationmap.NewBackupItemOperationsMap()
+	if _, ok := enabledRuntimeControllers[controller.BackupOperations]; ok {
+		r := controller.NewBackupOperationsReconciler(
 			s.logger,
-		).SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
+			s.mgr.GetClient(),
+			s.config.itemOperationSyncFrequency,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			backupOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupOperations)
 		}
 	}
 
-	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
-		r := controller.NewDownloadRequestReconciler(
+	if _, ok := enabledRuntimeControllers[controller.BackupFinalizer]; ok {
+		backupper, err := backup.NewKubernetesBackupper(
+			s.mgr.GetClient(),
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			podvolume.NewBackupperFactory(
+				s.repoLocker,
+				s.repoEnsurer,
+				s.veleroClient,
+				s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(),
+				s.logger,
+			),
+			s.config.podVolumeOperationTimeout,
+			s.config.defaultVolumesToFsBackup,
+			s.config.clientPageSize,
+			s.config.uploaderType,
+		)
+		cmd.CheckError(err)
+		r := controller.NewBackupFinalizerReconciler(
 			s.mgr.GetClient(),
 			clock.RealClock{},
+			backupper,
 			newPluginManager,
 			backupStoreGetter,
 			s.logger,
+			s.metrics,
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupFinalizer)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.BackupRepo]; ok {
+		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupRepo)
 		}
 	}
 
@@ -817,6 +832,38 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
+	restoreOpsMap := itemoperationmap.NewRestoreItemOperationsMap()
+	if _, ok := enabledRuntimeControllers[controller.RestoreOperations]; ok {
+		r := controller.NewRestoreOperationsReconciler(
+			s.logger,
+			s.namespace,
+			s.mgr.GetClient(),
+			s.config.itemOperationSyncFrequency,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			restoreOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupOperations)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.DownloadRequest]; ok {
+		r := controller.NewDownloadRequestReconciler(
+			s.mgr.GetClient(),
+			clock.RealClock{},
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+			backupOpsMap,
+			restoreOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.DownloadRequest)
+		}
+	}
+
 	if _, ok := enabledRuntimeControllers[controller.GarbageCollection]; ok {
 		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient(), s.config.garbageCollectionFrequency)
 		if err := r.SetupWithManager(s.mgr); err != nil {
@@ -830,10 +877,18 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			client.NewDynamicFactory(s.dynamicClient),
 			s.config.restoreResourcePriorities,
 			s.kubeClient.CoreV1().Namespaces(),
-			podvolume.NewRestorerFactory(s.repoLocker, s.repoEnsurer, s.veleroClient, s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(), s.kubeClient, s.sharedInformerFactory.Velero().V1().BackupRepositories().Informer().HasSynced, s.logger),
+			podvolume.NewRestorerFactory(
+				s.repoLocker,
+				s.repoEnsurer,
+				s.veleroClient,
+				s.kubeClient.CoreV1(),
+				s.kubeClient.CoreV1(),
+				s.kubeClient,
+				s.logger,
+			),
 			s.config.podVolumeOperationTimeout,
 			s.config.resourceTerminatingTimeout,
+			s.config.resourceTimeout,
 			s.logger,
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.kubeClient.CoreV1().RESTClient(),
@@ -854,6 +909,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupStoreGetter,
 			s.metrics,
 			s.config.formatFlag.Parse(),
+			s.config.defaultItemOperationTimeout,
 		)
 
 		if err = r.SetupWithManager(s.mgr); err != nil {
@@ -861,15 +917,22 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
-	// TODO(2.0): presuming all controllers and resources are converted to runtime-controller
-	// by v2.0, the block from this line and including the `s.mgr.Start() will be
-	// deprecated, since the manager auto-starts all the caches. Until then, we need to start the
-	// cache for them manually.
-	for i := range controllers {
-		controllerRunInfo := controllers[i]
-		// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
-		// so the manager will ensure the cache is started and ready before all controller are started
-		s.mgr.Add(managercontroller.Runnable(controllerRunInfo.controller, controllerRunInfo.numWorkers))
+	if _, ok := enabledRuntimeControllers[controller.Schedule]; ok {
+		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
+		if err := controller.NewServerStatusRequestReconciler(
+			s.mgr.GetClient(),
+			s.ctx,
+			s.pluginRegistry,
+			clock.RealClock{},
+			s.logger,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
+		}
 	}
 
 	s.logger.Info("Server starting...")
@@ -881,23 +944,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 }
 
 // removeControllers will remove any controller listed to be disabled from the list
-// of controllers to be initialized.  First it will check the legacy list of controllers,
-// then it will check the new runtime controllers. If both checks fail a match
+// of controllers to be initialized. It will check the runtime controllers. If a match
 // wasn't found and it returns an error.
-func removeControllers(disabledControllers []string, enabledControllers map[string]func() controllerRunInfo, enabledRuntimeControllers map[string]struct{}, logger logrus.FieldLogger) error {
+func removeControllers(disabledControllers []string, enabledRuntimeControllers map[string]struct{}, logger logrus.FieldLogger) error {
 	for _, controllerName := range disabledControllers {
-		if _, ok := enabledControllers[controllerName]; ok {
+		if _, ok := enabledRuntimeControllers[controllerName]; ok {
 			logger.Infof("Disabling controller: %s", controllerName)
-			delete(enabledControllers, controllerName)
+			delete(enabledRuntimeControllers, controllerName)
 		} else {
-			// maybe it is a runtime type controllers, so attempt to remove that
-			if _, ok := enabledRuntimeControllers[controllerName]; ok {
-				logger.Infof("Disabling controller: %s", controllerName)
-				delete(enabledRuntimeControllers, controllerName)
-			} else {
-				msg := fmt.Sprintf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(controller.DisableableControllers, ","))
-				return errors.New(msg)
-			}
+			msg := fmt.Sprintf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(controller.DisableableControllers, ","))
+			return errors.New(msg)
 		}
 	}
 	return nil

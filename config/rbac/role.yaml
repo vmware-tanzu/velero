@@ -51,6 +51,19 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - velero.io
   resources:
@@ -151,6 +164,32 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - velero.io
+  resources:
+  - restores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - restores/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - restorestoragelocations
+  verbs:
+  - get
 - apiGroups:
   - velero.io
   resources:

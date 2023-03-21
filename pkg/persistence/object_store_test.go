@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
@@ -37,6 +36,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -461,14 +461,22 @@ func TestGetBackupItemOperations(t *testing.T) {
 	operations := []*itemoperation.BackupOperation{
 		{
 			Spec: itemoperation.BackupOperationSpec{
-				BackupName:         "test-backup",
-				ResourceIdentifier: "item-1",
+				BackupName: "test-backup",
+				ResourceIdentifier: velero.ResourceIdentifier{
+					GroupResource: kuberesource.Pods,
+					Namespace:     "ns",
+					Name:          "item-1",
+				},
 			},
 		},
 		{
 			Spec: itemoperation.BackupOperationSpec{
-				BackupName:         "test-backup",
-				ResourceIdentifier: "item-2",
+				BackupName: "test-backup",
+				ResourceIdentifier: velero.ResourceIdentifier{
+					GroupResource: kuberesource.Pods,
+					Namespace:     "ns",
+					Name:          "item-2",
+				},
 			},
 		},
 	}
@@ -494,7 +502,7 @@ func TestGetBackupContents(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rc)
 
-	data, err := ioutil.ReadAll(rc)
+	data, err := io.ReadAll(rc)
 	require.NoError(t, err)
 	assert.Equal(t, "foo", string(data))
 }

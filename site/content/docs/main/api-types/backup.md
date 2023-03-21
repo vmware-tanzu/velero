@@ -33,6 +33,10 @@ spec:
   # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
   # returning error as timeout. The default value is 10 minute.
   csiSnapshotTimeout: 10m
+  # ItemOperationTimeout specifies the time used to wait for
+  # asynchronous BackupItemAction operations
+  # The default value is 1 hour.
+  itemOperationTimeout: 1h
   # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
@@ -64,6 +68,26 @@ spec:
   # PersistentVolumeClaim is included in the backup, its associated PersistentVolume (which is
   # cluster-scoped) would also be backed up.
   includeClusterResources: null
+  # Array of cluster-scoped resources to exclude from the backup. Resources may be shortcuts 
+  # (for example 'sc' for 'storageclasses'), or fully-qualified. If unspecified, 
+  # no additional cluster-scoped resources are excluded. Optional.
+  # Cannot work with include-resources, exclude-resources and include-cluster-resources.
+  excludedClusterScopeResources: {}
+  # Array of cluster-scoped resources to include from the backup. Resources may be shortcuts 
+  # (for example 'sc' for 'storageclasses'), or fully-qualified. If unspecified, 
+  # no additional cluster-scoped resources are included. Optional.
+  # Cannot work with include-resources, exclude-resources and include-cluster-resources.
+  includedClusterScopeResources: {}
+  # Array of namespace resources to exclude from the backup. Resources may be shortcuts 
+  # (for example 'cm' for 'configmaps'), or fully-qualified. If unspecified, 
+  # no namespace resources are excluded. Optional.
+  # Cannot work with include-resources, exclude-resources and include-cluster-resources.
+  excludedNamespacedResources: {}
+  # Array of namespace resources to include from the backup. Resources may be shortcuts 
+  # (for example 'cm' for 'configmaps'), or fully-qualified. If unspecified, 
+  # all namespace resources are included. Optional.
+  # Cannot work with include-resources, exclude-resources and include-cluster-resources.
+  includedNamespacedResources: {}
   # Individual objects must match this label selector to be included in the backup. Optional.
   labelSelector:
     matchLabels:
@@ -146,7 +170,8 @@ status:
   expiration: null
   # The current phase.
   # Valid values are New, FailedValidation, InProgress, WaitingForPluginOperations,
-  # WaitingForPluginOperationsPartiallyFailed, Completed, PartiallyFailed, Failed.
+  # WaitingForPluginOperationsPartiallyFailed, FinalizingafterPluginOperations,
+  # FinalizingPartiallyFailed, Completed, PartiallyFailed, Failed.
   phase: ""
   # An array of any validation errors encountered.
   validationErrors: null
@@ -158,6 +183,12 @@ status:
   volumeSnapshotsAttempted: 2
   # Number of volume snapshots that Velero successfully created for this backup.
   volumeSnapshotsCompleted: 1
+  # Number of attempted BackupItemAction operations for this backup.
+  backupItemOperationsAttempted: 2
+  # Number of BackupItemAction operations that Velero successfully completed for this backup.
+  backupItemOperationsCompleted: 1
+  # Number of BackupItemAction operations that ended in failure for this backup.
+  backupItemOperationsFailed: 0
   # Number of warnings that were logged by the backup.
   warnings: 2
   # Number of errors that were logged by the backup.

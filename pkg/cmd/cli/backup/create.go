@@ -82,25 +82,29 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name                     string
-	TTL                      time.Duration
-	SnapshotVolumes          flag.OptionalBool
-	DefaultVolumesToFsBackup flag.OptionalBool
-	IncludeNamespaces        flag.StringArray
-	ExcludeNamespaces        flag.StringArray
-	IncludeResources         flag.StringArray
-	ExcludeResources         flag.StringArray
-	Labels                   flag.Map
-	Selector                 flag.LabelSelector
-	IncludeClusterResources  flag.OptionalBool
-	Wait                     bool
-	StorageLocation          string
-	SnapshotLocations        []string
-	FromSchedule             string
-	OrderedResources         string
-	CSISnapshotTimeout       time.Duration
-
-	client veleroclient.Interface
+	Name                         string
+	TTL                          time.Duration
+	SnapshotVolumes              flag.OptionalBool
+	DefaultVolumesToFsBackup     flag.OptionalBool
+	IncludeNamespaces            flag.StringArray
+	ExcludeNamespaces            flag.StringArray
+	IncludeResources             flag.StringArray
+	ExcludeResources             flag.StringArray
+	IncludeClusterScopeResources flag.StringArray
+	ExcludeClusterScopeResources flag.StringArray
+	IncludeNamespacedResources   flag.StringArray
+	ExcludeNamespacedResources   flag.StringArray
+	Labels                       flag.Map
+	Selector                     flag.LabelSelector
+	IncludeClusterResources      flag.OptionalBool
+	Wait                         bool
+	StorageLocation              string
+	SnapshotLocations            []string
+	FromSchedule                 string
+	OrderedResources             string
+	CSISnapshotTimeout           time.Duration
+	ItemOperationTimeout         time.Duration
+	client                       veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -116,20 +120,25 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.TTL, "ttl", o.TTL, "How long before the backup can be garbage collected.")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the backup (use '*' for all namespaces).")
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "Namespaces to exclude from the backup.")
-	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
-	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io.")
+	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources). Cannot work with include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources.")
+	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io. Cannot work with include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources.")
+	flags.Var(&o.IncludeClusterScopeResources, "include-cluster-scope-resources", "Cluster-scoped resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.ExcludeClusterScopeResources, "exclude-cluster-scope-resources", "Cluster-scoped resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.IncludeNamespacedResources, "include-namespaced-resources", "Namespaced resources to include in the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.ExcludeNamespacedResources, "exclude-namespaced-resources", "Namespaced resources to exclude from the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
 	flags.DurationVar(&o.CSISnapshotTimeout, "csi-snapshot-timeout", o.CSISnapshotTimeout, "How long to wait for CSI snapshot creation before timeout.")
+	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "Take snapshots of PersistentVolumes as part of the backup. If the parameter is not set, it is treated as setting to 'true'.")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup")
+	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup. Cannot work with include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources.")
 	f.NoOptDefVal = "true"
 
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
@@ -160,12 +169,18 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
-		return fmt.Errorf("A backup name is required, unless you are creating based on a schedule.")
+		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
 	}
 
 	errs := collections.ValidateNamespaceIncludesExcludes(o.IncludeNamespaces, o.ExcludeNamespaces)
 	if len(errs) > 0 {
 		return kubeerrs.NewAggregate(errs)
+	}
+
+	if o.oldAndNewFilterParametersUsedTogether() {
+		return fmt.Errorf("include-resources, exclude-resources and include-cluster-resources are old filter parameters.\n" +
+			"include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources are new filter parameters.\n" +
+			"They cannot be used together")
 	}
 
 	if o.StorageLocation != "" {
@@ -275,7 +290,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if backup.Status.Phase != velerov1api.BackupPhaseNew && backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+				if backup.Status.Phase == velerov1api.BackupPhaseFailedValidation || backup.Status.Phase == velerov1api.BackupPhaseCompleted ||
+					backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed || backup.Status.Phase == velerov1api.BackupPhaseFailed {
 					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
 					return nil
 				}
@@ -297,13 +313,13 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 func ParseOrderedResources(orderMapStr string) (map[string]string, error) {
 	entries := strings.Split(orderMapStr, ";")
 	if len(entries) == 0 {
-		return nil, fmt.Errorf("Invalid OrderedResources '%s'.", orderMapStr)
+		return nil, fmt.Errorf("invalid OrderedResources '%s'", orderMapStr)
 	}
 	orderedResources := make(map[string]string)
 	for _, entry := range entries {
 		kv := strings.Split(entry, "=")
 		if len(kv) != 2 {
-			return nil, fmt.Errorf("Invalid OrderedResources '%s'.", entry)
+			return nil, fmt.Errorf("invalid OrderedResources '%s'", entry)
 		}
 		kind := strings.TrimSpace(kv[0])
 		order := strings.TrimSpace(kv[1])
@@ -331,11 +347,16 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			ExcludedNamespaces(o.ExcludeNamespaces...).
 			IncludedResources(o.IncludeResources...).
 			ExcludedResources(o.ExcludeResources...).
+			IncludedClusterScopeResources(o.IncludeClusterScopeResources...).
+			ExcludedClusterScopeResources(o.ExcludeClusterScopeResources...).
+			IncludedNamespacedResources(o.IncludeNamespacedResources...).
+			ExcludedNamespacedResources(o.ExcludeNamespacedResources...).
 			LabelSelector(o.Selector.LabelSelector).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...).
-			CSISnapshotTimeout(o.CSISnapshotTimeout)
+			CSISnapshotTimeout(o.CSISnapshotTimeout).
+			ItemOperationTimeout(o.ItemOperationTimeout)
 		if len(o.OrderedResources) > 0 {
 			orders, err := ParseOrderedResources(o.OrderedResources)
 			if err != nil {
@@ -357,4 +378,16 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 
 	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
 	return backup, nil
+}
+
+func (o *CreateOptions) oldAndNewFilterParametersUsedTogether() bool {
+	haveOldResourceFilterParameters := len(o.IncludeResources) > 0 ||
+		len(o.ExcludeResources) > 0 ||
+		o.IncludeClusterResources.Value != nil
+	haveNewResourceFilterParameters := len(o.IncludeClusterScopeResources) > 0 ||
+		(len(o.ExcludeClusterScopeResources) > 0) ||
+		(len(o.IncludeNamespacedResources) > 0) ||
+		(len(o.ExcludeNamespacedResources) > 0)
+
+	return haveOldResourceFilterParameters && haveNewResourceFilterParameters
 }

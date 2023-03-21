@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -49,24 +50,39 @@ func resourceKey(obj runtime.Object) string {
 type Request struct {
 	*velerov1api.Restore
 
-	Log              logrus.FieldLogger
-	Backup           *velerov1api.Backup
-	PodVolumeBackups []*velerov1api.PodVolumeBackup
-	VolumeSnapshots  []*volume.Snapshot
-	BackupReader     io.Reader
-	RestoredItems    map[itemKey]string
+	Log                logrus.FieldLogger
+	Backup             *velerov1api.Backup
+	PodVolumeBackups   []*velerov1api.PodVolumeBackup
+	VolumeSnapshots    []*volume.Snapshot
+	BackupReader       io.Reader
+	RestoredItems      map[itemKey]restoredItemStatus
+	itemOperationsList *[]*itemoperation.RestoreOperation
+}
+
+type restoredItemStatus struct {
+	action     string
+	itemExists bool
+}
+
+// GetItemOperationsList returns ItemOperationsList, initializing it if necessary
+func (r *Request) GetItemOperationsList() *[]*itemoperation.RestoreOperation {
+	if r.itemOperationsList == nil {
+		list := []*itemoperation.RestoreOperation{}
+		r.itemOperationsList = &list
+	}
+	return r.itemOperationsList
 }
 
 // RestoredResourceList returns the list of restored resources grouped by the API
 // Version and Kind
 func (r *Request) RestoredResourceList() map[string][]string {
 	resources := map[string][]string{}
-	for i, action := range r.RestoredItems {
+	for i, item := range r.RestoredItems {
 		entry := i.name
 		if i.namespace != "" {
 			entry = fmt.Sprintf("%s/%s", i.namespace, i.name)
 		}
-		entry = fmt.Sprintf("%s(%s)", entry, action)
+		entry = fmt.Sprintf("%s(%s)", entry, item.action)
 		resources[i.resource] = append(resources[i.resource], entry)
 	}
 

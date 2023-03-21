@@ -45,6 +45,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
@@ -862,7 +863,7 @@ func TestRestoreItems(t *testing.T) {
 		apiResources         []*test.APIResource
 		tarball              io.Reader
 		want                 []*test.APIResource
-		expectedRestoreItems map[itemKey]string
+		expectedRestoreItems map[itemKey]restoredItemStatus
 	}{
 		{
 			name:    "metadata uid/resourceVersion/etc. gets removed",
@@ -894,9 +895,9 @@ func TestRestoreItems(t *testing.T) {
 						Result(),
 				),
 			},
-			expectedRestoreItems: map[itemKey]string{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: "created",
-				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  "created",
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
 			},
 		},
 		{
@@ -1004,9 +1005,9 @@ func TestRestoreItems(t *testing.T) {
 			want: []*test.APIResource{
 				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
-			expectedRestoreItems: map[itemKey]string{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          "created",
-				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: "skipped",
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          {action: "created", itemExists: true},
+				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: {action: "skipped", itemExists: true},
 			},
 		},
 		{
@@ -1022,9 +1023,9 @@ func TestRestoreItems(t *testing.T) {
 			want: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
-			expectedRestoreItems: map[itemKey]string{
-				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  "created",
-				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: "updated",
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
 			},
 		},
 		{
@@ -1183,7 +1184,7 @@ func TestRestoreItems(t *testing.T) {
 				PodVolumeBackups: nil,
 				VolumeSnapshots:  nil,
 				BackupReader:     tc.tarball,
-				RestoredItems:    map[itemKey]string{},
+				RestoredItems:    map[itemKey]restoredItemStatus{},
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -1210,6 +1211,10 @@ type recordResourcesAction struct {
 	operationID                 string
 	waitForAdditionalItems      bool
 	additionalItemsReadyTimeout time.Duration
+}
+
+func (a *recordResourcesAction) Name() string {
+	return ""
 }
 
 func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
@@ -1438,8 +1443,9 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 // pluggableAction is a restore item action that can be plugged with an Execute
 // function body at runtime.
 type pluggableAction struct {
-	selector    velero.ResourceSelector
-	executeFunc func(*velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error)
+	selector     velero.ResourceSelector
+	executeFunc  func(*velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error)
+	progressFunc func(string, *velerov1api.Restore) (velero.OperationProgress, error)
 }
 
 func (a *pluggableAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
@@ -1450,6 +1456,10 @@ func (a *pluggableAction) Execute(input *velero.RestoreItemActionExecuteInput) (
 	}
 
 	return a.executeFunc(input)
+}
+
+func (a *pluggableAction) Name() string {
+	return ""
 }
 
 func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
@@ -1601,6 +1611,174 @@ func TestRestoreActionModifications(t *testing.T) {
 
 			assertEmptyResults(t, warnings, errs)
 			assertRestoredItems(t, h, tc.want)
+		})
+	}
+}
+
+// TestRestoreWithAsyncOperations runs restores which return operationIDs and
+// verifies that the itemoperations are tracked as appropriate. Verification is done by
+// looking at the restore request's itemOperationsList field.
+func TestRestoreWithAsyncOperations(t *testing.T) {
+	// completedOperationAction is a *pluggableAction, whose Execute(...)
+	// method returns an operationID which will always be done when calling Progress.
+	completedOperationAction := &pluggableAction{
+		executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+			obj, ok := input.Item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, errors.Errorf("unexpected type %T", input.Item)
+			}
+			return &velero.RestoreItemActionExecuteOutput{
+				UpdatedItem: obj,
+				OperationID: obj.GetName() + "-1",
+			}, nil
+
+		},
+		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+			return velero.OperationProgress{
+				Completed:   true,
+				Description: "Done!",
+			}, nil
+		},
+	}
+
+	// incompleteOperationAction is a *pluggableAction, whose Execute(...)
+	// method returns an operationID which will never be done when calling Progress.
+	incompleteOperationAction := &pluggableAction{
+		executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+			obj, ok := input.Item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, errors.Errorf("unexpected type %T", input.Item)
+			}
+			return &velero.RestoreItemActionExecuteOutput{
+				UpdatedItem: obj,
+				OperationID: obj.GetName() + "-1",
+			}, nil
+
+		},
+		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+			return velero.OperationProgress{
+				Completed:   false,
+				Description: "Working...",
+			}, nil
+		},
+	}
+
+	// noOperationAction is a *pluggableAction, whose Execute(...)
+	// method does not return an operationID.
+	noOperationAction := &pluggableAction{
+		executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+			obj, ok := input.Item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, errors.Errorf("unexpected type %T", input.Item)
+			}
+			return &velero.RestoreItemActionExecuteOutput{
+				UpdatedItem: obj,
+			}, nil
+
+		},
+	}
+
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		actions      []riav2.RestoreItemAction
+		want         []*itemoperation.RestoreOperation
+	}{
+		{
+			name:         "action that starts a short-running process records operation",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			actions: []riav2.RestoreItemAction{
+				completedOperationAction,
+			},
+			want: []*itemoperation.RestoreOperation{
+				{
+					Spec: itemoperation.RestoreOperationSpec{
+						RestoreName: "restore-1",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-1"},
+						OperationID: "pod-1-1",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase: "InProgress",
+					},
+				},
+			},
+		},
+		{
+			name:         "action that starts a long-running process records operation",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-2").Result()).Done(),
+			actions: []riav2.RestoreItemAction{
+				incompleteOperationAction,
+			},
+			want: []*itemoperation.RestoreOperation{
+				{
+					Spec: itemoperation.RestoreOperationSpec{
+						RestoreName: "restore-1",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-2"},
+						OperationID: "pod-2-1",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase: "InProgress",
+					},
+				},
+			},
+		},
+		{
+			name:         "action that has no operation doesn't record one",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-3").Result()).Done(),
+			actions: []riav2.RestoreItemAction{
+				noOperationAction,
+			},
+			want: []*itemoperation.RestoreOperation{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				tc.actions,
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			resultOper := *data.GetItemOperationsList()
+			// set want Created times so it won't fail the assert.Equal test
+			for i, wantOper := range tc.want {
+				wantOper.Status.Created = resultOper[i].Status.Created
+			}
+			assert.Equal(t, tc.want, *data.GetItemOperationsList())
 		})
 	}
 }

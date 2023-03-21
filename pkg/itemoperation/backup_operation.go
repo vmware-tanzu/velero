@@ -16,12 +16,31 @@ limitations under the License.
 
 package itemoperation
 
+import (
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+)
+
 // BackupOperation stores information about an async item operation
 // started by a BackupItemAction plugin (v2 or later)
 type BackupOperation struct {
 	Spec BackupOperationSpec `json:"spec"`
 
 	Status OperationStatus `json:"status"`
+}
+
+func (in *BackupOperation) DeepCopy() *BackupOperation {
+	if in == nil {
+		return nil
+	}
+	out := new(BackupOperation)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *BackupOperation) DeepCopyInto(out *BackupOperation) {
+	*out = *in
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
 }
 
 type BackupOperationSpec struct {
@@ -37,8 +56,32 @@ type BackupOperationSpec struct {
 	BackupItemAction string `json:"backupItemAction"`
 
 	// Kubernetes resource identifier for the item
-	ResourceIdentifier string "json:resourceIdentifier"
+	ResourceIdentifier velero.ResourceIdentifier "json:resourceIdentifier"
 
 	// OperationID returned by the BIA plugin
 	OperationID string "json:operationID"
+
+	// Items needing to be added to the backup after all async operations have completed
+	PostOperationItems []velero.ResourceIdentifier "json:postOperationItems"
+}
+
+func (in *BackupOperationSpec) DeepCopy() *BackupOperationSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(BackupOperationSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *BackupOperationSpec) DeepCopyInto(out *BackupOperationSpec) {
+	*out = *in
+	in.ResourceIdentifier.DeepCopyInto(&out.ResourceIdentifier)
+	if in.PostOperationItems != nil {
+		in, out := &in.PostOperationItems, &out.PostOperationItems
+		*out = make([]velero.ResourceIdentifier, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 }

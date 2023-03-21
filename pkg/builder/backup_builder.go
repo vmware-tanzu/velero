@@ -150,6 +150,30 @@ func (b *BackupBuilder) ExcludedResources(resources ...string) *BackupBuilder {
 	return b
 }
 
+// IncludedClusterScopeResources sets the Backup's included cluster resources.
+func (b *BackupBuilder) IncludedClusterScopeResources(resources ...string) *BackupBuilder {
+	b.object.Spec.IncludedClusterScopeResources = resources
+	return b
+}
+
+// ExcludedClusterScopeResources sets the Backup's excluded cluster resources.
+func (b *BackupBuilder) ExcludedClusterScopeResources(resources ...string) *BackupBuilder {
+	b.object.Spec.ExcludedClusterScopeResources = resources
+	return b
+}
+
+// IncludedNamespacedResources sets the Backup's included namespaced resources.
+func (b *BackupBuilder) IncludedNamespacedResources(resources ...string) *BackupBuilder {
+	b.object.Spec.IncludedNamespacedResources = resources
+	return b
+}
+
+// ExcludedNamespacedResources sets the Backup's excluded namespaced resources.
+func (b *BackupBuilder) ExcludedNamespacedResources(resources ...string) *BackupBuilder {
+	b.object.Spec.ExcludedNamespacedResources = resources
+	return b
+}
+
 // IncludeClusterResources sets the Backup's "include cluster resources" flag.
 func (b *BackupBuilder) IncludeClusterResources(val bool) *BackupBuilder {
 	b.object.Spec.IncludeClusterResources = &val
@@ -243,5 +267,11 @@ func (b *BackupBuilder) OrderedResources(orders map[string]string) *BackupBuilde
 // CSISnapshotTimeout sets the Backup's CSISnapshotTimeout
 func (b *BackupBuilder) CSISnapshotTimeout(timeout time.Duration) *BackupBuilder {
 	b.object.Spec.CSISnapshotTimeout.Duration = timeout
+	return b
+}
+
+// ItemOperationTimeout sets the Backup's ItemOperationTimeout
+func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuilder {
+	b.object.Spec.ItemOperationTimeout.Duration = timeout
 	return b
 }

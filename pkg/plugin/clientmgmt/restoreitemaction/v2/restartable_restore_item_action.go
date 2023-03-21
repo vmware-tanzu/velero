@@ -95,6 +95,11 @@ func (r *RestartableRestoreItemAction) getDelegate() (riav2.RestoreItemAction, e
 	return r.getRestoreItemAction()
 }
 
+// Name returns the plugin's name.
+func (r *RestartableRestoreItemAction) Name() string {
+	return r.Key.Name
+}
+
 // AppliesTo restarts the plugin's process if needed, then delegates the call.
 func (r RestartableRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	delegate, err := r.getDelegate()
@@ -155,6 +160,11 @@ func NewAdaptedV1RestartableRestoreItemAction(v1Restartable *riav1cli.Restartabl
 		V1Restartable: v1Restartable,
 	}
 	return r
+}
+
+// Name restarts the plugin's name.
+func (r *AdaptedV1RestartableRestoreItemAction) Name() string {
+	return r.V1Restartable.Key.Name
 }
 
 // AppliesTo delegates to the v1 AppliesTo call.

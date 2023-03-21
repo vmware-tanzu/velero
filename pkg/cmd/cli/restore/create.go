@@ -92,6 +92,7 @@ type CreateOptions struct {
 	IncludeClusterResources flag.OptionalBool
 	Wait                    bool
 	AllowPartiallyFailed    flag.OptionalBool
+	ItemOperationTimeout    time.Duration
 
 	client veleroclient.Interface
 }
@@ -120,6 +121,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.StatusIncludeResources, "status-include-resources", "Resources to include in the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.Var(&o.StatusExcludeResources, "status-exclude-resources", "Resources to exclude from the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
+	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
 	// like a normal bool flag
@@ -280,6 +282,9 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			RestorePVs:              o.RestoreVolumes.Value,
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
+			ItemOperationTimeout: metav1.Duration{
+				Duration: o.ItemOperationTimeout,
+			},
 		},
 	}
 
@@ -355,7 +360,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if restore.Status.Phase != api.RestorePhaseNew && restore.Status.Phase != api.RestorePhaseInProgress {
+				if restore.Status.Phase == api.RestorePhaseFailedValidation || restore.Status.Phase == api.RestorePhaseCompleted ||
+					restore.Status.Phase == api.RestorePhasePartiallyFailed || restore.Status.Phase == api.RestorePhaseFailed {
 					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `velero restore describe %s` and `velero restore logs %s`.\n", restore.Status.Phase, restore.Name, restore.Name)
 					return nil
 				}
