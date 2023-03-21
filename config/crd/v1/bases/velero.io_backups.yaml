@@ -430,8 +430,8 @@ spec:
                   "objectname".
                 nullable: true
                 type: object
-              resourcePolices:
-                description: ResourcePolicies specifies the referenced resource policies
+              resourcePolicy:
+                description: ResourcePolicy specifies the referenced resource policies
                   that backup should follow
                 properties:
                   apiGroup:

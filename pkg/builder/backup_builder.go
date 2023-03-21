@@ -125,8 +125,8 @@ func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuil
 		})
 	}
 
-	if schedule.Spec.Template.ResourcePolicies != nil {
-		b.ResourcePolicies(schedule.Spec.Template.ResourcePolicies.Name)
+	if schedule.Spec.Template.ResourcePolicy != nil {
+		b.ResourcePolicies(schedule.Spec.Template.ResourcePolicy.Name)
 	}
 
 	return b
@@ -282,8 +282,8 @@ func (b *BackupBuilder) ItemOperationTimeout(timeout time.Duration) *BackupBuild
 	return b
 }
 
-// resourcePolicies sets the Backup's resource polices.
+// ResourcePolicies sets the Backup's resource polices.
 func (b *BackupBuilder) ResourcePolicies(name string) *BackupBuilder {
-	b.object.Spec.ResourcePolicies = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
+	b.object.Spec.ResourcePolicy = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
 	return b
 }

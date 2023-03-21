@@ -9,47 +9,47 @@ import (
 func TestCapacityConditionValidate(t *testing.T) {
 	testCases := []struct {
 		name     string
-		capacity *Capacity
+		capacity *capacity
 		wantErr  bool
 	}{
 		{
 			name:     "lower and upper are both zero",
-			capacity: &Capacity{lower: *resource.NewQuantity(0, resource.DecimalSI), upper: *resource.NewQuantity(0, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(0, resource.DecimalSI), upper: *resource.NewQuantity(0, resource.DecimalSI)},
 			wantErr:  false,
 		},
 		{
 			name:     "lower is zero and upper is greater than zero",
-			capacity: &Capacity{lower: *resource.NewQuantity(0, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(0, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
 			wantErr:  false,
 		},
 		{
 			name:     "lower is greater than upper",
-			capacity: &Capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(50, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(50, resource.DecimalSI)},
 			wantErr:  true,
 		},
 		{
 			name:     "lower and upper are equal",
-			capacity: &Capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
 			wantErr:  false,
 		},
 		{
 			name:     "lower is greater than zero and upper is zero",
-			capacity: &Capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(0, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(0, resource.DecimalSI)},
 			wantErr:  false,
 		},
 		{
 			name:     "lower and upper are both not zero and lower is less than upper",
-			capacity: &Capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(200, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(200, resource.DecimalSI)},
 			wantErr:  false,
 		},
 		{
 			name:     "lower and upper are both not zero and lower is equal to upper",
-			capacity: &Capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(100, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
 			wantErr:  false,
 		},
 		{
 			name:     "lower and upper are both not zero and lower is greater than upper",
-			capacity: &Capacity{lower: *resource.NewQuantity(200, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
+			capacity: &capacity{lower: *resource.NewQuantity(200, resource.DecimalSI), upper: *resource.NewQuantity(100, resource.DecimalSI)},
 			wantErr:  true,
 		},
 	}
@@ -57,7 +57,7 @@ func TestCapacityConditionValidate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &capacityCondition{capacity: *tc.capacity}
-			err := c.Validate()
+			err := c.validate()
 
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Expected error %v, but got error %v", tc.wantErr, err)
@@ -76,7 +76,7 @@ func TestValidate(t *testing.T) {
 			name: "unknown key in yaml",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{
@@ -97,7 +97,7 @@ func TestValidate(t *testing.T) {
 			name: "error format of capacity",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{
@@ -117,7 +117,7 @@ func TestValidate(t *testing.T) {
 			name: "error format of storageClass",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{
@@ -137,7 +137,7 @@ func TestValidate(t *testing.T) {
 			name: "error format of csi",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{
@@ -154,7 +154,7 @@ func TestValidate(t *testing.T) {
 			name: "unsupported version",
 			res: &resourcePolicies{
 				Version: "v2",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{
@@ -173,7 +173,7 @@ func TestValidate(t *testing.T) {
 			name: "unsupported action",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "unsupported"},
 						Conditions: map[string]interface{}{
@@ -192,7 +192,7 @@ func TestValidate(t *testing.T) {
 			name: "error format of nfs",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{
@@ -209,7 +209,7 @@ func TestValidate(t *testing.T) {
 			name: "supported formart volume policies",
 			res: &resourcePolicies{
 				Version: "v1",
-				VolumePolicies: []VolumePolicy{
+				VolumePolicies: []volumePolicy{
 					{
 						Action: Action{Type: "skip"},
 						Conditions: map[string]interface{}{

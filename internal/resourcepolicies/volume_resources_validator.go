@@ -29,7 +29,7 @@ type volumeConditions struct {
 	CSI          *csiVolumeSource `yaml:"csi,omitempty"`
 }
 
-func (c *capacityCondition) Validate() error {
+func (c *capacityCondition) validate() error {
 	// [0, a]
 	// [a, b]
 	// [b, 0]
@@ -42,17 +42,17 @@ func (c *capacityCondition) Validate() error {
 
 }
 
-func (s *storageClassCondition) Validate() error {
+func (s *storageClassCondition) validate() error {
 	// validate by yamlv3
 	return nil
 }
 
-func (c *nfsCondition) Validate() error {
+func (c *nfsCondition) validate() error {
 	// validate by yamlv3
 	return nil
 }
 
-func (c *csiCondition) Validate() error {
+func (c *csiCondition) validate() error {
 	// validate by yamlv3
 	return nil
 }
@@ -64,9 +64,9 @@ func decodeStruct(r io.Reader, s interface{}) error {
 	return dec.Decode(s)
 }
 
-// Validate check action format
-func (a *Action) Validate() error {
-	// Validate Type
+// validate check action format
+func (a *Action) validate() error {
+	// validate Type
 	if a.Type != Skip {
 		return fmt.Errorf("invalid action type %s", a.Type)
 	}

@@ -11,30 +11,30 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type volumePolicy struct {
+type volPolicy struct {
 	action     Action
-	conditions []VolumeCondition
+	conditions []volumeCondition
 }
 
-type VolumeCondition interface {
-	Match(v *StructuredVolume) bool
-	Validate() error
+type volumeCondition interface {
+	match(v *structuredVolume) bool
+	validate() error
 }
 
-// Capacity consist of the lower and upper boundary
-type Capacity struct {
+// capacity consist of the lower and upper boundary
+type capacity struct {
 	lower resource.Quantity
 	upper resource.Quantity
 }
 
-type StructuredVolume struct {
+type structuredVolume struct {
 	capacity     resource.Quantity
 	storageClass string
 	nfs          *nFSVolumeSource
 	csi          *csiVolumeSource
 }
 
-func (s *StructuredVolume) ParsePV(pv *corev1api.PersistentVolume) {
+func (s *structuredVolume) parsePV(pv *corev1api.PersistentVolume) {
 	s.capacity = *pv.Spec.Capacity.Storage()
 	s.storageClass = pv.Spec.StorageClassName
 	nfs := pv.Spec.NFS
@@ -48,7 +48,7 @@ func (s *StructuredVolume) ParsePV(pv *corev1api.PersistentVolume) {
 	}
 }
 
-func (s *StructuredVolume) ParsePodVolume(vol *corev1api.Volume) {
+func (s *structuredVolume) parsePodVolume(vol *corev1api.Volume) {
 	nfs := vol.NFS
 	if nfs != nil {
 		s.nfs = &nFSVolumeSource{Server: nfs.Server, Path: nfs.Path}
@@ -61,10 +61,10 @@ func (s *StructuredVolume) ParsePodVolume(vol *corev1api.Volume) {
 }
 
 type capacityCondition struct {
-	capacity Capacity
+	capacity capacity
 }
 
-func (c *capacityCondition) Match(v *StructuredVolume) bool {
+func (c *capacityCondition) match(v *structuredVolume) bool {
 	return c.capacity.isInRange(v.capacity)
 }
 
@@ -72,7 +72,7 @@ type storageClassCondition struct {
 	storageClass []string
 }
 
-func (s *storageClassCondition) Match(v *StructuredVolume) bool {
+func (s *storageClassCondition) match(v *structuredVolume) bool {
 	if len(s.storageClass) == 0 {
 		return true
 	}
@@ -94,7 +94,7 @@ type nfsCondition struct {
 	nfs *nFSVolumeSource
 }
 
-func (c *nfsCondition) Match(v *StructuredVolume) bool {
+func (c *nfsCondition) match(v *structuredVolume) bool {
 	if c.nfs == nil {
 		return true
 	}
@@ -128,7 +128,7 @@ type csiCondition struct {
 	csi *csiVolumeSource
 }
 
-func (c *csiCondition) Match(v *StructuredVolume) bool {
+func (c *csiCondition) match(v *structuredVolume) bool {
 	if c.csi == nil {
 		return true
 	}
@@ -141,14 +141,14 @@ func (c *csiCondition) Match(v *StructuredVolume) bool {
 }
 
 // parseCapacity parse string into capacity format
-func parseCapacity(capacity string) (*Capacity, error) {
-	if capacity == "" {
-		capacity = ","
+func parseCapacity(cap string) (*capacity, error) {
+	if cap == "" {
+		cap = ","
 	}
-	capacities := strings.Split(capacity, ",")
+	capacities := strings.Split(cap, ",")
 	var quantities []resource.Quantity
 	if len(capacities) != 2 {
-		return nil, fmt.Errorf("wrong format of Capacity %v", capacity)
+		return nil, fmt.Errorf("wrong format of Capacity %v", cap)
 	} else {
 		for _, v := range capacities {
 			if strings.TrimSpace(v) == "" {
@@ -164,11 +164,11 @@ func parseCapacity(capacity string) (*Capacity, error) {
 			}
 		}
 	}
-	return &Capacity{lower: quantities[0], upper: quantities[1]}, nil
+	return &capacity{lower: quantities[0], upper: quantities[1]}, nil
 }
 
 // isInRange returns true if the quantity y is in range of capacity, or it returns false
-func (c *Capacity) isInRange(y resource.Quantity) bool {
+func (c *capacity) isInRange(y resource.Quantity) bool {
 	if c.lower.IsZero() && c.upper.Cmp(y) >= 0 {
 		// [0, a] y
 		return true

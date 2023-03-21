@@ -371,8 +371,8 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 	}
 	out.CSISnapshotTimeout = in.CSISnapshotTimeout
 	out.ItemOperationTimeout = in.ItemOperationTimeout
-	if in.ResourcePolicies != nil {
-		in, out := &in.ResourcePolicies, &out.ResourcePolicies
+	if in.ResourcePolicy != nil {
+		in, out := &in.ResourcePolicy, &out.ResourcePolicy
 		*out = new(corev1.TypedLocalObjectReference)
 		(*in).DeepCopyInto(*out)
 	}

@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func setStructuredVolume(capacity resource.Quantity, sc string, nfs *nFSVolumeSource, csi *csiVolumeSource) *StructuredVolume {
-	return &StructuredVolume{
+func setStructuredVolume(capacity resource.Quantity, sc string, nfs *nFSVolumeSource, csi *csiVolumeSource) *structuredVolume {
+	return &structuredVolume{
 		capacity:     capacity,
 		storageClass: sc,
 		nfs:          nfs,
@@ -20,14 +20,14 @@ func setStructuredVolume(capacity resource.Quantity, sc string, nfs *nFSVolumeSo
 }
 
 func TestParseCapacity(t *testing.T) {
-	var emptyCapacity Capacity
+	var emptyCapacity capacity
 	tests := []struct {
 		input       string
-		expected    Capacity
+		expected    capacity
 		expectedErr error
 	}{
-		{"10Gi,20Gi", Capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(20<<30, resource.BinarySI)}, nil},
-		{"10Gi,", Capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(0, resource.DecimalSI)}, nil},
+		{"10Gi,20Gi", capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(20<<30, resource.BinarySI)}, nil},
+		{"10Gi,", capacity{lower: *resource.NewQuantity(10<<30, resource.BinarySI), upper: *resource.NewQuantity(0, resource.DecimalSI)}, nil},
 		{"10Gi", emptyCapacity, fmt.Errorf("wrong format of Capacity 10Gi")},
 		{"", emptyCapacity, nil},
 	}
@@ -49,18 +49,18 @@ func TestCapacityIsInRange(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		capacity  *Capacity
+		capacity  *capacity
 		quantity  resource.Quantity
 		isInRange bool
 	}{
-		{&Capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), true},
-		{&Capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)}, *resource.NewQuantity(15<<30, resource.BinarySI), false},
-		{&Capacity{*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)}, *resource.NewQuantity(25<<30, resource.BinarySI), true},
-		{&Capacity{*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)}, *resource.NewQuantity(15<<30, resource.BinarySI), false},
-		{&Capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(15<<30, resource.BinarySI), true},
-		{&Capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), false},
-		{&Capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(25<<30, resource.BinarySI), false},
-		{&Capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(0, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), true},
+		{&capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), true},
+		{&capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(10<<30, resource.BinarySI)}, *resource.NewQuantity(15<<30, resource.BinarySI), false},
+		{&capacity{*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)}, *resource.NewQuantity(25<<30, resource.BinarySI), true},
+		{&capacity{*resource.NewQuantity(20<<30, resource.BinarySI), *resource.NewQuantity(0, resource.DecimalSI)}, *resource.NewQuantity(15<<30, resource.BinarySI), false},
+		{&capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(15<<30, resource.BinarySI), true},
+		{&capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), false},
+		{&capacity{*resource.NewQuantity(10<<30, resource.BinarySI), *resource.NewQuantity(20<<30, resource.BinarySI)}, *resource.NewQuantity(25<<30, resource.BinarySI), false},
+		{&capacity{*resource.NewQuantity(0, resource.BinarySI), *resource.NewQuantity(0, resource.BinarySI)}, *resource.NewQuantity(5<<30, resource.BinarySI), true},
 	}
 
 	for _, test := range tests {
@@ -80,7 +80,7 @@ func TestStorageClassConditionMatch(t *testing.T) {
 	tests := []struct {
 		name          string
 		condition     *storageClassCondition
-		volume        *StructuredVolume
+		volume        *structuredVolume
 		expectedMatch bool
 	}{
 		{
@@ -117,7 +117,7 @@ func TestStorageClassConditionMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			match := tt.condition.Match(tt.volume)
+			match := tt.condition.match(tt.volume)
 			if match != tt.expectedMatch {
 				t.Errorf("expected %v, but got %v", tt.expectedMatch, match)
 			}
@@ -130,7 +130,7 @@ func TestNFSConditionMatch(t *testing.T) {
 	tests := []struct {
 		name          string
 		condition     *nfsCondition
-		volume        *StructuredVolume
+		volume        *structuredVolume
 		expectedMatch bool
 	}{
 		{
@@ -172,7 +172,7 @@ func TestNFSConditionMatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			match := tt.condition.Match(tt.volume)
+			match := tt.condition.match(tt.volume)
 			if match != tt.expectedMatch {
 				t.Errorf("expected %v, but got %v", tt.expectedMatch, match)
 			}
@@ -185,7 +185,7 @@ func TestCSIConditionMatch(t *testing.T) {
 	tests := []struct {
 		name          string
 		condition     *csiCondition
-		volume        *StructuredVolume
+		volume        *structuredVolume
 		expectedMatch bool
 	}{
 		{
@@ -209,7 +209,7 @@ func TestCSIConditionMatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			match := tt.condition.Match(tt.volume)
+			match := tt.condition.match(tt.volume)
 			if match != tt.expectedMatch {
 				t.Errorf("expected %v, but got %v", tt.expectedMatch, match)
 			}
@@ -322,8 +322,8 @@ func TestParsePodVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Call the function
-			structuredVolume := &StructuredVolume{}
-			structuredVolume.ParsePodVolume(tc.inputVolume)
+			structuredVolume := &structuredVolume{}
+			structuredVolume.parsePodVolume(tc.inputVolume)
 
 			// Check the results
 			if tc.expectedNFS != nil {
@@ -384,11 +384,11 @@ func TestParsePV(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Call the function
-			structuredVolume := &StructuredVolume{}
-			structuredVolume.ParsePV(tc.inputVolume)
+			structuredVolume := &structuredVolume{}
+			structuredVolume.parsePV(tc.inputVolume)
 			// Check the results
 			if structuredVolume.capacity != *tc.inputVolume.Spec.Capacity.Storage() {
-				t.Errorf("Capacity does not match expected value")
+				t.Errorf("capacity does not match expected value")
 			}
 			if structuredVolume.storageClass != tc.inputVolume.Spec.StorageClassName {
 				t.Errorf("Storage class does not match expected value")

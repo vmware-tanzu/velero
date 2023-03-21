@@ -324,7 +324,7 @@ func (ib *itemBackupper) executeActions(
 		}
 		log.Info("Executing custom action")
 
-		if act, err := ib.checkResourcePolicies(obj, &groupResource, action.Name()); err != nil {
+		if act, err := ib.getMatchAction(obj, groupResource, action.Name()); err != nil {
 			return nil, itemFiles, errors.WithStack(err)
 		} else if act != nil && act.Type == resourcepolicies.Skip {
 			log.Infof("skip snapshot of pvc %s/%s bound pv for the matched resource policies", namespace, name)
@@ -484,10 +484,10 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	if ib.backupRequest.ResPolicies != nil {
-		structuredVolume := &resourcepolicies.StructuredVolume{}
-		structuredVolume.ParsePV(pv)
-		action := ib.backupRequest.ResPolicies.Match(structuredVolume)
-		if action != nil && action.Type == resourcepolicies.Skip {
+		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(pv); err != nil {
+			log.WithError(err).Errorf("Error getting matched resource policies for pv %s", pv.Name)
+			return nil
+		} else if action != nil && action.Type == resourcepolicies.Skip {
 			log.Infof("skip snapshot of pv %s for the matched resource policies", pv.Name)
 			return nil
 		}
@@ -579,8 +579,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	return kubeerrs.NewAggregate(errs)
 }
 
-func (ib *itemBackupper) checkResourcePolicies(obj runtime.Unstructured, groupResource *schema.GroupResource, actionName string) (*resourcepolicies.Action, error) {
-	if ib.backupRequest.ResPolicies != nil && groupResource.String() == "persistentvolumeclaims" && actionName == "velero.io/csi-pvc-backupper" {
+func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource schema.GroupResource, backupItemActionName string) (*resourcepolicies.Action, error) {
+	if ib.backupRequest.ResPolicies != nil && groupResource == kuberesource.PersistentVolumeClaims && backupItemActionName == "velero.io/csi-pvc-backupper" {
 		pvc := corev1api.PersistentVolumeClaim{}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
 			return nil, errors.WithStack(err)
@@ -595,10 +595,7 @@ func (ib *itemBackupper) checkResourcePolicies(obj runtime.Unstructured, groupRe
 		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
 			return nil, errors.WithStack(err)
 		}
-
-		volume := resourcepolicies.StructuredVolume{}
-		volume.ParsePV(pv)
-		return ib.backupRequest.ResPolicies.Match(&volume), nil
+		return ib.backupRequest.ResPolicies.GetMatchAction(pv)
 	}
 	return nil, nil
 }
