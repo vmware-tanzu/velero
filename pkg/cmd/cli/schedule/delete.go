@@ -48,7 +48,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
   # Delete schedules named "schedule-1" and "schedule-2".
   velero schedule delete schedule-1 schedule-2
 
-  # Delete all schedules labelled with "foo=bar".
+  # Delete all schedules labeled with "foo=bar".
   velero schedule delete --selector foo=bar
 
   # Delete all schedules.

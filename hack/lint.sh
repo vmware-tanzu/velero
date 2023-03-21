@@ -14,23 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LINTERS=${1:-"gosec,goconst,gofmt,goimports,unparam"}
-ALL=${2:-false}
-
 HACK_DIR=$(dirname "${BASH_SOURCE[0]}")
 
 # Printing out cache status
 golangci-lint cache status
 
-if [[ $ALL == true ]] ; then
-  action=""
-else
-  action="-n"
-fi
-
 # Enable GL_DEBUG line below for debug messages for golangci-lint
 # export GL_DEBUG=loader,gocritic,env
-CMD="golangci-lint run -E ${LINTERS} $action -c  $HACK_DIR/../golangci.yaml"
+CMD="golangci-lint run -c $HACK_DIR/../golangci.yaml"
 echo "Running $CMD"
 
 eval $CMD

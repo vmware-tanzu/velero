@@ -48,7 +48,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
   # Delete restores named "restore-1" and "restore-2".
   velero restore delete restore-1 restore-2
 
-  # Delete all restores labelled with "foo=bar".
+  # Delete all restores labeled with "foo=bar".
   velero restore delete --selector foo=bar
 	
   # Delete all restores.

@@ -97,7 +97,6 @@ const (
 
 	defaultProfilerAddress = "localhost:6060"
 
-	defaultControllerWorkers = 1
 	// the default TTL for a backup
 	defaultBackupTTL = 30 * 24 * time.Hour
 
@@ -134,11 +133,6 @@ type serverConfig struct {
 	defaultVolumesToFsBackup                                                bool
 	uploaderType                                                            string
 	maxConcurrentK8SConnections                                             int
-}
-
-type controllerRunInfo struct {
-	controller controller.Interface
-	numWorkers int
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -307,7 +301,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	// cancelFunc is not deferred here because if it was, then ctx would immediately
-	// be cancelled once this function exited, making it useless to any informers using later.
+	// be canceled once this function exited, making it useless to any informers using later.
 	// That, in turn, causes the velero server to halt when the first informer tries to use it.
 	// Therefore, we must explicitly call it on the error paths in this function.
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -625,7 +619,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
 		s.logger.Infof("Starting metric server at address [%s]", s.metricsAddress)
-		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+		server := &http.Server{
+			Addr:              s.metricsAddress,
+			Handler:           metricsMux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil {
 			s.logger.Fatalf("Failed to start metric server at [%s]: %v", s.metricsAddress, err)
 		}
 	}()
@@ -973,7 +972,12 @@ func (s *server) runProfiler() {
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
+	server := &http.Server{
+		Addr:              s.config.profilerAddress,
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
 }

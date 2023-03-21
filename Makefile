@@ -96,9 +96,6 @@ else
 	GIT_TREE_STATE ?= clean
 endif
 
-# The default linters used by lint and local-lint
-LINTERS ?= "gosec,goconst,gofmt,goimports,unparam"
-
 ###
 ### These variables should not need tweaking.
 ###
@@ -221,22 +218,12 @@ endif
 
 lint:
 ifneq ($(SKIP_TESTS), 1)
-	@$(MAKE) shell CMD="-c 'hack/lint.sh $(LINTERS)'"
+	@$(MAKE) shell CMD="-c 'hack/lint.sh'"
 endif
 
 local-lint:
 ifneq ($(SKIP_TESTS), 1)
-	@hack/lint.sh $(LINTERS)
-endif
-
-lint-all:
-ifneq ($(SKIP_TESTS), 1)
-	@$(MAKE) shell CMD="-c 'hack/lint.sh $(LINTERS) true'"
-endif
-
-local-lint-all:
-ifneq ($(SKIP_TESTS), 1)
-	@hack/lint.sh $(LINTERS) true
+	@hack/lint.sh
 endif
 
 update:

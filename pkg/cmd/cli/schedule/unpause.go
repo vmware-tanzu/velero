@@ -37,7 +37,7 @@ func NewUnpauseCommand(f client.Factory, use string) *cobra.Command {
   # Unpause schedules named "schedule-1" and "schedule-2".
   velero schedule unpause schedule-1 schedule-2
 
-  # Unpause all schedules labelled with "foo=bar".
+  # Unpause all schedules labeled with "foo=bar".
   velero schedule unpause --selector foo=bar
 
   # Unpause all schedules.

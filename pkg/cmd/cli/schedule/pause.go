@@ -45,7 +45,7 @@ func NewPauseCommand(f client.Factory, use string) *cobra.Command {
   # Pause schedules named "schedule-1" and "schedule-2".
   velero schedule pause schedule-1 schedule-2
 
-  # Pause all schedules labelled with "foo=bar".
+  # Pause all schedules labeled with "foo=bar".
   velero schedule pause --selector foo=bar
 
   # Pause all schedules.
