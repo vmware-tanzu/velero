@@ -90,7 +90,7 @@ Wildcard takes precedence when both a wildcard and specific resource are include
   ```
 * Include resources that are not matching the selector
   ```bash
-  velero backup create <backup-name> --selector <key>!=<value>
+  velero backup create <backup-name> --selector "<key> notin (<value>)"
   ```
 
 For more information read the [Kubernetes label selector documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)
