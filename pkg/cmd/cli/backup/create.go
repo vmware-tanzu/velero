@@ -104,6 +104,7 @@ type CreateOptions struct {
 	OrderedResources             string
 	CSISnapshotTimeout           time.Duration
 	ItemOperationTimeout         time.Duration
+	ResPoliciesConfigmap         string
 	client                       veleroclient.Interface
 }
 
@@ -143,6 +144,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
 	f.NoOptDefVal = "true"
+
+	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup using")
 }
 
 // BindWait binds the wait flag separately so it is not called by other create
@@ -373,6 +376,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 		if o.DefaultVolumesToFsBackup.Value != nil {
 			backupBuilder.DefaultVolumesToFsBackup(*o.DefaultVolumesToFsBackup.Value)
+		}
+		if o.ResPoliciesConfigmap != "" {
+			backupBuilder.ResourcePolicies(o.ResPoliciesConfigmap)
 		}
 	}
 

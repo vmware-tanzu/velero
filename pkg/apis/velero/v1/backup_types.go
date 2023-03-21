@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -159,6 +160,9 @@ type BackupSpec struct {
 	// The default value is 1 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
+	// ResourcePolicies specifies the referenced resource policies that backup should follow
+	// +optional
+	ResourcePolicies *v1.TypedLocalObjectReference `json:"resourcePolices,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.

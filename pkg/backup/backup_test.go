@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -2882,7 +2883,7 @@ type fakePodVolumeBackupper struct{}
 
 // BackupPodVolumes returns one pod volume backup per entry in volumes, with namespace "velero"
 // and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
-func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
+func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ *resourcepolicies.Policies, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
 	var res []*velerov1.PodVolumeBackup
 
 	anno := pod.GetAnnotations()
