@@ -1038,7 +1038,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 		}
 		updated := backup.DeepCopy()
 		updated.Status.Phase = velerov1api.BackupPhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("get a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
+		updated.Status.FailureReason = fmt.Sprintf("found a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backups.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
@@ -1061,7 +1061,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		}
 		updated := restore.DeepCopy()
 		updated.Status.Phase = velerov1api.RestorePhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("get a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
+		updated.Status.FailureReason = fmt.Sprintf("found a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restores.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
