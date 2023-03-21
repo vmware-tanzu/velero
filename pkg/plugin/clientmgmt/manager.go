@@ -34,7 +34,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
@@ -77,12 +76,6 @@ type Manager interface {
 
 	// GetDeleteItemAction returns the delete item action plugin for name.
 	GetDeleteItemAction(name string) (velero.DeleteItemAction, error)
-
-	// GetItemSnapshotter returns the item snapshotter plugin for name
-	GetItemSnapshotter(name string) (isv1.ItemSnapshotter, error)
-
-	// GetItemSnapshotters returns all item snapshotter plugins
-	GetItemSnapshotters() ([]isv1.ItemSnapshotter, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
@@ -379,37 +372,6 @@ func (m *manager) GetDeleteItemAction(name string) (velero.DeleteItemAction, err
 
 	r := NewRestartableDeleteItemAction(name, restartableProcess)
 	return r, nil
-}
-
-func (m *manager) GetItemSnapshotter(name string) (isv1.ItemSnapshotter, error) {
-	name = sanitizeName(name)
-
-	restartableProcess, err := m.getRestartableProcess(common.PluginKindItemSnapshotter, name)
-	if err != nil {
-		return nil, err
-	}
-
-	r := NewRestartableItemSnapshotter(name, restartableProcess)
-	return r, nil
-}
-
-func (m *manager) GetItemSnapshotters() ([]isv1.ItemSnapshotter, error) {
-	list := m.registry.List(common.PluginKindItemSnapshotter)
-
-	actions := make([]isv1.ItemSnapshotter, 0, len(list))
-
-	for i := range list {
-		id := list[i]
-
-		r, err := m.GetItemSnapshotter(id.Name)
-		if err != nil {
-			return nil, err
-		}
-
-		actions = append(actions, r)
-	}
-
-	return actions, nil
 }
 
 // sanitizeName adds "velero.io" to legacy plugins that weren't namespaced.

@@ -41,7 +41,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
-	isv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/item_snapshotter/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -481,7 +480,6 @@ func TestRestoreReconcile(t *testing.T) {
 
 			if test.restore != nil {
 				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
-				pluginManager.On("GetItemSnapshotters").Return([]isv1.ItemSnapshotter{}, nil)
 				pluginManager.On("CleanupClients")
 			}
 
@@ -786,10 +784,9 @@ func (r *fakeRestorer) Restore(
 
 func (r *fakeRestorer) RestoreWithResolvers(req *pkgrestore.Request,
 	resolver framework.RestoreItemActionResolverV2,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (results.Result, results.Result) {
-	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver, itemSnapshotterResolver,
+	res := r.Called(req.Log, req.Restore, req.Backup, req.BackupReader, resolver,
 		r.kbClient, volumeSnapshotterGetter)
 
 	r.calledWithArg = *req.Restore

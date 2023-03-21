@@ -67,9 +67,7 @@ type Backupper interface {
 	// Backup takes a backup using the specification in the velerov1api.Backup and writes backup and log data
 	// to the given writers.
 	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []biav2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
-	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
-		backupItemActionResolver framework.BackupItemActionResolverV2, itemSnapshotterResolver framework.ItemSnapshotterResolver,
-		volumeSnapshotterGetter VolumeSnapshotterGetter) error
+	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, backupItemActionResolver framework.BackupItemActionResolverV2, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 	FinalizeBackup(log logrus.FieldLogger, backupRequest *Request, inBackupFile io.Reader, outBackupFile io.Writer,
 		backupItemActionResolver framework.BackupItemActionResolverV2,
 		asyncBIAOperations []*itemoperation.BackupOperation) error
@@ -182,16 +180,13 @@ type VolumeSnapshotterGetter interface {
 func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
 	actions []biav2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	backupItemActions := framework.NewBackupItemActionResolverV2(actions)
-	itemSnapshotters := framework.NewItemSnapshotterResolver(nil)
-	return kb.BackupWithResolvers(log, backupRequest, backupFile, backupItemActions, itemSnapshotters,
-		volumeSnapshotterGetter)
+	return kb.BackupWithResolvers(log, backupRequest, backupFile, backupItemActions, volumeSnapshotterGetter)
 }
 
 func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	backupRequest *Request,
 	backupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
-	itemSnapshotterResolver framework.ItemSnapshotterResolver,
 	volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
@@ -236,12 +231,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	backupRequest.ResolvedActions, err = backupItemActionResolver.ResolveActions(kb.discoveryHelper, log)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Debugf("Error from backupItemActionResolver.ResolveActions")
-		return err
-	}
-
-	backupRequest.ResolvedItemSnapshotters, err = itemSnapshotterResolver.ResolveActions(kb.discoveryHelper, log)
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Debugf("Error from itemSnapshotterResolver.ResolveActions")
 		return err
 	}
 
