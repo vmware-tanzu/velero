@@ -1707,7 +1707,7 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 						OperationID: "pod-1-1",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase: "InProgress",
+						Phase: "New",
 					},
 				},
 			},
@@ -1732,7 +1732,7 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 						OperationID: "pod-2-1",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase: "InProgress",
+						Phase: "New",
 					},
 				},
 			},

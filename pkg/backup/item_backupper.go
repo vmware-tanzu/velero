@@ -367,7 +367,7 @@ func (ib *itemBackupper) executeActions(
 					OperationID:        operationID,
 				},
 				Status: itemoperation.OperationStatus{
-					Phase:   itemoperation.OperationPhaseInProgress,
+					Phase:   itemoperation.OperationPhaseNew,
 					Created: &now,
 				},
 			}

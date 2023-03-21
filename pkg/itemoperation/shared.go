@@ -86,7 +86,11 @@ func (in *OperationStatus) DeepCopyInto(out *OperationStatus) {
 }
 
 const (
-	// OperationPhaseNew means the item operation has been created and started
+	// OperationPhaseNew means the item operation has been created but not started
+	// by the plugin
+	OperationPhaseNew OperationPhase = "New"
+
+	// OperationPhaseInProgress means the item operation has been created and started
 	// by the plugin
 	OperationPhaseInProgress OperationPhase = "InProgress"
 

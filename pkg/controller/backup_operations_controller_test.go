@@ -106,7 +106,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 						OperationID: "operation-11",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase:   itemoperation.OperationPhaseInProgress,
+						Phase:   itemoperation.OperationPhaseNew,
 						Created: &metav1Now,
 					},
 				},
@@ -136,7 +136,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 						OperationID: "operation-12",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase:   itemoperation.OperationPhaseInProgress,
+						Phase:   itemoperation.OperationPhaseNew,
 						Created: &metav1Now,
 					},
 				},
@@ -167,7 +167,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 						OperationID: "operation-13",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase:   itemoperation.OperationPhaseInProgress,
+						Phase:   itemoperation.OperationPhaseNew,
 						Created: &metav1Now,
 					},
 				},
@@ -197,7 +197,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 						OperationID: "operation-14",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase:   itemoperation.OperationPhaseInProgress,
+						Phase:   itemoperation.OperationPhaseNew,
 						Created: &metav1Now,
 					},
 				},
@@ -227,7 +227,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 						OperationID: "operation-15",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase:   itemoperation.OperationPhaseInProgress,
+						Phase:   itemoperation.OperationPhaseNew,
 						Created: &metav1Now,
 					},
 				},
@@ -258,7 +258,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 						OperationID: "operation-16",
 					},
 					Status: itemoperation.OperationStatus{
-						Phase:   itemoperation.OperationPhaseInProgress,
+						Phase:   itemoperation.OperationPhaseNew,
 						Created: &metav1Now,
 					},
 				},
