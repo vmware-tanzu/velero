@@ -1221,7 +1221,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					OperationID:        executeOutput.OperationID,
 				},
 				Status: itemoperation.OperationStatus{
-					Phase:   itemoperation.OperationPhaseInProgress,
+					Phase:   itemoperation.OperationPhaseNew,
 					Created: &now,
 				},
 			}

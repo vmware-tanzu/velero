@@ -286,7 +286,8 @@ func getBackupItemOperationProgress(
 	var completedCount, failedCount int
 
 	for _, operation := range operationsList {
-		if operation.Status.Phase == itemoperation.OperationPhaseInProgress {
+		if operation.Status.Phase == itemoperation.OperationPhaseNew ||
+			operation.Status.Phase == itemoperation.OperationPhaseInProgress {
 			bia, err := pluginManager.GetBackupItemActionV2(operation.Spec.BackupItemAction)
 			if err != nil {
 				operation.Status.Phase = itemoperation.OperationPhaseFailed
@@ -322,12 +323,14 @@ func getBackupItemOperationProgress(
 				changes = true
 			}
 			started := metav1.NewTime(operationProgress.Started)
-			if operation.Status.Started == nil || *(operation.Status.Started) != started {
+			if operation.Status.Started == nil && !operationProgress.Started.IsZero() ||
+				operation.Status.Started != nil && *(operation.Status.Started) != started {
 				operation.Status.Started = &started
 				changes = true
 			}
 			updated := metav1.NewTime(operationProgress.Updated)
-			if operation.Status.Updated == nil || *(operation.Status.Updated) != updated {
+			if operation.Status.Updated == nil && !operationProgress.Updated.IsZero() ||
+				operation.Status.Updated != nil && *(operation.Status.Updated) != updated {
 				operation.Status.Updated = &updated
 				changes = true
 			}
@@ -355,6 +358,11 @@ func getBackupItemOperationProgress(
 				changes = true
 				failedCount++
 				continue
+			}
+			if operation.Status.Phase == itemoperation.OperationPhaseNew &&
+				operation.Status.Started != nil {
+				operation.Status.Phase = itemoperation.OperationPhaseInProgress
+				changes = true
 			}
 			// if we reach this point, the operation is still running
 			inProgressOperations = true
