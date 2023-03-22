@@ -48,7 +48,7 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) StartRun() error {
-	err := installStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
+	err := InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return err
 	}
@@ -204,10 +204,4 @@ func fileNotExist(ctx context.Context, namespace, podName, volume string) error 
 		return errors.New(fmt.Sprintf("UNEXPECTED: File %s exist in volume %s of pod %s in namespace %s.",
 			FILE_NAME, volume, podName, namespace))
 	}
-}
-
-func installStorageClass(ctx context.Context, yaml string) error {
-	fmt.Printf("Install storage class with %s.\n", yaml)
-	err := KubectlApplyByFile(ctx, yaml)
-	return err
 }

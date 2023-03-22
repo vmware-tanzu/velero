@@ -108,7 +108,7 @@ func (f *FilteringCase) CreateResources() error {
 		//Create Configmap
 		configmaptName := f.NSBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
-		_, err = CreateConfigMap(f.Client.ClientGo, namespace, configmaptName, f.labels)
+		_, err = CreateConfigMap(f.Client.ClientGo, namespace, configmaptName, f.labels, nil)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to create configmap in the namespace %q", namespace))
 		}

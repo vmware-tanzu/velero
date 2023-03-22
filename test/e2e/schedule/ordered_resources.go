@@ -182,7 +182,7 @@ func (o *OrderedResources) CreateResources() error {
 	//Create Configmap
 	configmapName := fmt.Sprintf("configmap-%s", o.NSBaseName)
 	fmt.Printf("Creating configmap %s in %s namespaces ...\n", configmapName, o.Namespace)
-	_, err = CreateConfigMap(o.Client.ClientGo, o.Namespace, configmapName, label)
+	_, err = CreateConfigMap(o.Client.ClientGo, o.Namespace, configmapName, label, nil)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create configmap in the namespace %q", o.Namespace))
 	}

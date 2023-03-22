@@ -31,11 +31,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func CreateConfigMap(c clientset.Interface, ns, name string, data map[string]string) (*v1.ConfigMap, error) {
+func CreateConfigMap(c clientset.Interface, ns, name string, labels, data map[string]string) (*v1.ConfigMap, error) {
 	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
-			Labels: data,
+			Labels: labels,
 		},
 		Data: data,
 	}

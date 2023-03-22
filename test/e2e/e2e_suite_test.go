@@ -135,6 +135,7 @@ var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specifi
 var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)
 
 var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
+var _ = Describe("[Basic][StorageClass] Storage class of persistent volumes and persistent volume claims can be changed during restores", StorageClasssChangingTest)
 
 func GetKubeconfigContext() error {
 	var err error
