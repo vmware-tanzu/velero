@@ -37,6 +37,11 @@ spec:
   # asynchronous BackupItemAction operations
   # The default value is 1 hour.
   itemOperationTimeout: 1h
+  # resourcePolicy specifies the referenced resource policies that backup should follow
+  # optional
+  resourcePolicy:
+    kind: configmap
+    name: resource-policy-configmap
   # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
