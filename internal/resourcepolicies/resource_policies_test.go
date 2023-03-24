@@ -108,7 +108,7 @@ func TestLoadResourcePolicies(t *testing.T) {
 func TestGetResourceMatchedAction(t *testing.T) {
 	resPolicies := &resourcePolicies{
 		Version: "v1",
-		VolumePolicies: []VolumePolicy{
+		VolumePolicies: []volumePolicy{
 			{
 				Action: Action{Type: "skip"},
 				Conditions: map[string]interface{}{
@@ -145,12 +145,12 @@ func TestGetResourceMatchedAction(t *testing.T) {
 	}
 	testCases := []struct {
 		name           string
-		volume         *StructuredVolume
+		volume         *structuredVolume
 		expectedAction *Action
 	}{
 		{
 			name: "match policy",
-			volume: &StructuredVolume{
+			volume: &structuredVolume{
 				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
 				storageClass: "ebs-sc",
 				csi:          &csiVolumeSource{Driver: "aws.efs.csi.driver"},
@@ -159,7 +159,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 		},
 		{
 			name: "both matches return the first policy",
-			volume: &StructuredVolume{
+			volume: &structuredVolume{
 				capacity:     *resource.NewQuantity(50<<30, resource.BinarySI),
 				storageClass: "ebs-sc",
 				csi:          &csiVolumeSource{Driver: "aws.efs.csi.driver"},
@@ -168,7 +168,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 		},
 		{
 			name: "dismatch all policies",
-			volume: &StructuredVolume{
+			volume: &structuredVolume{
 				capacity:     *resource.NewQuantity(50<<30, resource.BinarySI),
 				storageClass: "ebs-sc",
 				nfs:          &nFSVolumeSource{},
@@ -185,7 +185,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				t.Errorf("Failed to build policy with error %v", err)
 			}
 
-			action := policies.Match(tc.volume)
+			action := policies.match(tc.volume)
 			if action == nil {
 				if tc.expectedAction != nil {
 					t.Errorf("Expected action %v, but got result nil", tc.expectedAction.Type)
@@ -220,11 +220,11 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Check that the returned resourcePolicies object contains the expected data
-	assert.Equal(t, "v1", resPolicies.Version)
-	assert.Len(t, resPolicies.VolumePolicies, 1)
+	assert.Equal(t, "v1", resPolicies.version)
+	assert.Len(t, resPolicies.volumePolicies, 1)
 	policies := resourcePolicies{
 		Version: "v1",
-		VolumePolicies: []VolumePolicy{
+		VolumePolicies: []volumePolicy{
 			{
 				Conditions: map[string]interface{}{
 					"capacity": "0,10Gi",

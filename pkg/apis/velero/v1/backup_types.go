@@ -160,9 +160,9 @@ type BackupSpec struct {
 	// The default value is 1 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
-	// ResourcePolicies specifies the referenced resource policies that backup should follow
+	// ResourcePolicy specifies the referenced resource policies that backup should follow
 	// +optional
-	ResourcePolicies *v1.TypedLocalObjectReference `json:"resourcePolices,omitempty"`
+	ResourcePolicy *v1.TypedLocalObjectReference `json:"resourcePolicy,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.

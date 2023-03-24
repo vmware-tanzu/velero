@@ -463,17 +463,17 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
 	}
 
-	if request.Spec.ResourcePolicies != nil && request.Spec.ResourcePolicies.Kind == resourcepolicies.ConfigmapRefType {
+	if request.Spec.ResourcePolicy != nil && request.Spec.ResourcePolicy.Kind == resourcepolicies.ConfigmapRefType {
 		policiesConfigmap := &v1.ConfigMap{}
-		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolicies.Name}, policiesConfigmap)
+		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolicy.Name}, policiesConfigmap)
 		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolicies.Name, err))
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolicy.Name, err))
 		}
 		res, err := resourcepolicies.GetResourcePoliciesFromConfig(policiesConfigmap)
 		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicies.Name)).Error())
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicy.Name)).Error())
 		} else if err = res.Validate(); err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicies.Name)).Error())
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicy.Name)).Error())
 		}
 		request.ResPolicies = res
 	}

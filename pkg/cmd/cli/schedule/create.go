@@ -161,7 +161,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	if o.BackupOptions.ResPoliciesConfigmap != "" {
-		schedule.Spec.Template.ResourcePolicies = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: o.BackupOptions.ResPoliciesConfigmap}
+		schedule.Spec.Template.ResourcePolicy = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: o.BackupOptions.ResPoliciesConfigmap}
 	}
 
 	if printed, err := output.PrintWithFormat(c, schedule); printed || err != nil {

@@ -10,7 +10,11 @@ import (
 
 type VolumeActionType string
 
-const Skip VolumeActionType = "skip"
+const (
+	// currently only support configmap type of resource config
+	ConfigmapRefType string           = "configmap"
+	Skip             VolumeActionType = "skip"
+)
 
 // Action defined as one action for a specific way of backup
 type Action struct {
@@ -20,33 +24,30 @@ type Action struct {
 	Parameters map[string]interface{} `yaml:"parameters,omitempty"`
 }
 
-// VolumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
-type VolumePolicy struct {
+// volumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
+type volumePolicy struct {
 	// Conditions defined list of conditions to match Volumes
 	Conditions map[string]interface{} `yaml:"conditions"`
 	Action     Action                 `yaml:"action"`
 }
 
-// currently only support configmap type of resource config
-const ConfigmapRefType string = "configmap"
-
 // resourcePolicies currently defined slice of volume policies to handle backup
 type resourcePolicies struct {
 	Version        string         `yaml:"version"`
-	VolumePolicies []VolumePolicy `yaml:"volumePolicies"`
+	VolumePolicies []volumePolicy `yaml:"volumePolicies"`
 	// we may support other resource policies in the future, and they could be added separately
-	// OtherResourcePolicies: []OtherResourcePolicy
+	// OtherResourcePolicies []OtherResourcePolicy
 }
 
 type Policies struct {
-	Version        string
-	VolumePolicies []volumePolicy
+	version        string
+	volumePolicies []volPolicy
 	// OtherPolicies
 }
 
-func unmarshalResourcePolicies(YamlData *string) (*resourcePolicies, error) {
+func unmarshalResourcePolicies(yamlData *string) (*resourcePolicies, error) {
 	resPolicies := &resourcePolicies{}
-	if err := decodeStruct(strings.NewReader(*YamlData), resPolicies); err != nil {
+	if err := decodeStruct(strings.NewReader(*yamlData), resPolicies); err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
 	} else {
 		return resPolicies, nil
@@ -57,59 +58,68 @@ func (policies *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 	for _, vp := range resPolicies.VolumePolicies {
 		con, err := unmarshalVolConditions(vp.Conditions)
 		if err != nil {
-			return errors.Wrap(err, "failed to unmarshl volume conditions")
+			return errors.WithStack(err)
 		}
 		volCap, err := parseCapacity(con.Capacity)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse condition capacity %s", con.Capacity)
+			return errors.WithStack(err)
 		}
-		var p volumePolicy
+		var p volPolicy
 		p.action = vp.Action
 		p.conditions = append(p.conditions, &capacityCondition{capacity: *volCap})
 		p.conditions = append(p.conditions, &storageClassCondition{storageClass: con.StorageClass})
 		p.conditions = append(p.conditions, &nfsCondition{nfs: con.NFS})
 		p.conditions = append(p.conditions, &csiCondition{csi: con.CSI})
-		policies.VolumePolicies = append(policies.VolumePolicies, p)
+		policies.volumePolicies = append(policies.volumePolicies, p)
 	}
 
 	// Other resource policies
 
-	policies.Version = resPolicies.Version
+	policies.version = resPolicies.Version
 	return nil
 }
 
-func (p *Policies) Match(res interface{}) *Action {
-	vol, ok := res.(*StructuredVolume)
-	if ok {
-		for _, policy := range p.VolumePolicies {
-			isAllMatch := false
-			for _, con := range policy.conditions {
-				if !con.Match(vol) {
-					isAllMatch = false
-					break
-				}
-				isAllMatch = true
+func (p *Policies) match(res *structuredVolume) *Action {
+	for _, policy := range p.volumePolicies {
+		isAllMatch := false
+		for _, con := range policy.conditions {
+			if !con.match(res) {
+				isAllMatch = false
+				break
 			}
-			if isAllMatch {
-				return &policy.action
-			}
+			isAllMatch = true
+		}
+		if isAllMatch {
+			return &policy.action
 		}
 	}
 	return nil
+}
+
+func (p *Policies) GetMatchAction(res interface{}) (*Action, error) {
+	structuredVolume := new(structuredVolume)
+	if pv, ok := res.(*v1.PersistentVolume); ok {
+		structuredVolume.parsePV(pv)
+	} else if volume, ok := res.(*v1.Volume); ok {
+		structuredVolume.parsePodVolume(volume)
+	} else {
+		return nil, errors.Errorf("failed to convert object")
+	}
+	return p.match(structuredVolume), nil
 }
 
 func (p *Policies) Validate() error {
-	if p.Version != currentSupportDataVersion {
-		return fmt.Errorf("incompatible version number %s with supported version %s", p.Version, currentSupportDataVersion)
+	if p.version != currentSupportDataVersion {
+		return fmt.Errorf("incompatible version number %s with supported version %s", p.version, currentSupportDataVersion)
 	}
 
-	for _, policy := range p.VolumePolicies {
-		if err := policy.action.Validate(); err != nil {
-			return errors.Wrap(err, "failed to validate config")
+	for _, policy := range p.volumePolicies {
+		if err := policy.action.validate(); err != nil {
+			return errors.WithStack(err)
 		}
 		for _, con := range policy.conditions {
-			if err := con.Validate(); err != nil {
-				return errors.Wrap(err, "failed to validate conditions config")
+			if err := con.validate(); err != nil {
+				return errors.WithStack(err)
 			}
 		}
 	}
