@@ -704,7 +704,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 
 	var backupNS v1.Namespace
 	if err := json.Unmarshal(nsBytes, &backupNS); err != nil {
-		logger.Warnf("Error unmarshalling namespace from backup, creating new one.")
+		logger.Warnf("Error unmarshaling namespace from backup, creating new one.")
 		return &v1.Namespace{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Namespace",

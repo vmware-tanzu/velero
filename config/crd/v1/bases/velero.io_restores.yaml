@@ -56,7 +56,7 @@ spec:
                 nullable: true
                 type: array
               existingResourcePolicy:
-                description: ExistingResourcePolicy specifies the restore behaviour
+                description: ExistingResourcePolicy specifies the restore behavior
                   for the kubernetes resource to be restored
                 nullable: true
                 type: string

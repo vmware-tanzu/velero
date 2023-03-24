@@ -173,7 +173,12 @@ func (s *nodeAgentServer) run() {
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
 		s.logger.Infof("Starting metric server for node agent at address [%s]", s.metricsAddress)
-		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+		server := &http.Server{
+			Addr:              s.metricsAddress,
+			Handler:           metricsMux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil {
 			s.logger.Fatalf("Failed to start metric server for node agent at [%s]: %v", s.metricsAddress, err)
 		}
 	}()

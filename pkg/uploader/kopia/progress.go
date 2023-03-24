@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
-//Throttle throttles controlle the interval of output result
+// Throttle throttles controlle the interval of output result
 type Throttle struct {
 	throttle int64
 	interval time.Duration
@@ -68,7 +68,7 @@ type KopiaProgress struct {
 	Log            logrus.FieldLogger       // output info into log when backup
 }
 
-//UploadedBytes the total bytes has uploaded currently
+// UploadedBytes the total bytes has uploaded currently
 func (p *KopiaProgress) UploadedBytes(numBytes int64) {
 	atomic.AddInt64(&p.uploadedBytes, numBytes)
 	atomic.AddInt32(&p.uploadedFiles, 1)
@@ -76,7 +76,7 @@ func (p *KopiaProgress) UploadedBytes(numBytes int64) {
 	p.UpdateProgress()
 }
 
-//Error statistic the total Error has occurred
+// Error statistic the total Error has occurred
 func (p *KopiaProgress) Error(path string, err error, isIgnored bool) {
 	if isIgnored {
 		atomic.AddInt32(&p.ignoredErrorCount, 1)
@@ -87,7 +87,7 @@ func (p *KopiaProgress) Error(path string, err error, isIgnored bool) {
 	}
 }
 
-//EstimatedDataSize statistic the total size of files to be processed and total files to be processed
+// EstimatedDataSize statistic the total size of files to be processed and total files to be processed
 func (p *KopiaProgress) EstimatedDataSize(fileCount int, totalBytes int64) {
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)
 	atomic.StoreInt32(&p.estimatedFileCount, int32(fileCount))
@@ -95,57 +95,57 @@ func (p *KopiaProgress) EstimatedDataSize(fileCount int, totalBytes int64) {
 	p.UpdateProgress()
 }
 
-//UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
+// UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
 func (p *KopiaProgress) UpdateProgress() {
 	if p.outputThrottle.ShouldOutput() {
 		p.Updater.UpdateProgress(&uploader.UploaderProgress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
 	}
 }
 
-//UploadStarted statistic the total Error has occurred
+// UploadStarted statistic the total Error has occurred
 func (p *KopiaProgress) UploadStarted() {}
 
-//CachedFile statistic the total bytes been cached currently
+// CachedFile statistic the total bytes been cached currently
 func (p *KopiaProgress) CachedFile(fname string, numBytes int64) {
 	atomic.AddInt64(&p.cachedBytes, numBytes)
 	p.UpdateProgress()
 }
 
-//HashedBytes statistic the total bytes been hashed currently
+// HashedBytes statistic the total bytes been hashed currently
 func (p *KopiaProgress) HashedBytes(numBytes int64) {
 	atomic.AddInt64(&p.processedBytes, numBytes)
 	atomic.AddInt64(&p.hashededBytes, numBytes)
 	p.UpdateProgress()
 }
 
-//HashingFile statistic the file been hashed currently
+// HashingFile statistic the file been hashed currently
 func (p *KopiaProgress) HashingFile(fname string) {}
 
-//ExcludedFile statistic the file been excluded currently
+// ExcludedFile statistic the file been excluded currently
 func (p *KopiaProgress) ExcludedFile(fname string, numBytes int64) {}
 
-//ExcludedDir statistic the dir been excluded currently
+// ExcludedDir statistic the dir been excluded currently
 func (p *KopiaProgress) ExcludedDir(dirname string) {}
 
-//FinishedHashingFile which will called when specific file finished hash
+// FinishedHashingFile which will called when specific file finished hash
 func (p *KopiaProgress) FinishedHashingFile(fname string, numBytes int64) {
 	p.UpdateProgress()
 }
 
-//StartedDirectory called when begin to upload one directory
+// StartedDirectory called when begin to upload one directory
 func (p *KopiaProgress) StartedDirectory(dirname string) {}
 
-//FinishedDirectory called when finish to upload one directory
+// FinishedDirectory called when finish to upload one directory
 func (p *KopiaProgress) FinishedDirectory(dirname string) {
 	p.UpdateProgress()
 }
 
-//UploadFinished which report the files flushed after the Upload has completed.
+// UploadFinished which report the files flushed after the Upload has completed.
 func (p *KopiaProgress) UploadFinished() {
 	p.UpdateProgress()
 }
 
-//ProgressBytes which statistic all bytes has been processed currently
+// ProgressBytes which statistic all bytes has been processed currently
 func (p *KopiaProgress) ProgressBytes(processedBytes int64, totalBytes int64) {
 	atomic.StoreInt64(&p.processedBytes, processedBytes)
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)

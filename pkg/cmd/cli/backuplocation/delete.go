@@ -51,7 +51,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
   # Delete backup storage locations named "backup-location-1" and "backup-location-2".
   velero backup-location delete backup-location-1 backup-location-2
 		
-  # Delete all backup storage locations labelled with "foo=bar".
+  # Delete all backup storage locations labeled with "foo=bar".
   velero backup-location delete --selector foo=bar
 
   # Delete all backup storage locations.

@@ -35,18 +35,18 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/service"
 )
 
-//BackupFunc mainly used to make testing more convenient
+// BackupFunc mainly used to make testing more convenient
 var BackupFunc = kopia.Backup
 var RestoreFunc = kopia.Restore
 
-//kopiaProvider recorded info related with kopiaProvider
+// kopiaProvider recorded info related with kopiaProvider
 type kopiaProvider struct {
 	bkRepo     udmrepo.BackupRepo
 	credGetter *credentials.CredentialGetter
 	log        logrus.FieldLogger
 }
 
-//NewKopiaUploaderProvider initialized with open or create a repository
+// NewKopiaUploaderProvider initialized with open or create a repository
 func NewKopiaUploaderProvider(
 	ctx context.Context,
 	credGetter *credentials.CredentialGetter,
@@ -78,7 +78,7 @@ func NewKopiaUploaderProvider(
 	return kp, nil
 }
 
-//CheckContext check context status check if context is timeout or cancel and backup restore once finished it will quit and return
+// CheckContext check context status check if context is timeout or cancel and backup restore once finished it will quit and return
 func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struct{}, restoreChan chan struct{}, uploader *snapshotfs.Uploader) {
 	select {
 	case <-finishChan:
@@ -166,7 +166,7 @@ func (kp *kopiaProvider) GetPassword(param interface{}) (string, error) {
 	return strings.TrimSpace(rawPass), nil
 }
 
-//RunRestore which will restore specific path and update restore progress
+// RunRestore which will restore specific path and update restore progress
 func (kp *kopiaProvider) RunRestore(
 	ctx context.Context,
 	snapshotID string,

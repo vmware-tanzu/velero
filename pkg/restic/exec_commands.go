@@ -59,7 +59,7 @@ func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
 
 	var snapshots []snapshotID
 	if err := json.Unmarshal([]byte(stdout), &snapshots); err != nil {
-		return "", errors.Wrap(err, "error unmarshalling restic snapshots result")
+		return "", errors.Wrap(err, "error unmarshaling restic snapshots result")
 	}
 
 	if len(snapshots) != 1 {
@@ -260,7 +260,7 @@ func getSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string
 	}
 
 	if err := json.Unmarshal([]byte(stdout), &snapshotStats); err != nil {
-		return 0, errors.Wrapf(err, "error unmarshalling restic stats result, stdout=%s", stdout)
+		return 0, errors.Wrapf(err, "error unmarshaling restic stats result, stdout=%s", stdout)
 	}
 
 	return snapshotStats.TotalSize, nil
