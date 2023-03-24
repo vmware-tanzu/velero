@@ -71,7 +71,7 @@ func (h *LogHook) Fire(entry *logrus.Entry) error {
 		entryMessage = fmt.Sprintf("%s name: /%s", entryMessage, nameField.(string))
 	}
 	if isErrorFieldPresent {
-		entryMessage = fmt.Sprintf("%s error: /%s", entryMessage, errorField.(error).Error())
+		entryMessage = fmt.Sprintf("%s error: /%v", entryMessage, errorField)
 	}
 
 	if isNamespacePresent {
