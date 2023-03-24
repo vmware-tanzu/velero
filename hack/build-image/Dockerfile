@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=linux/amd64 golang:1.18
+FROM --platform=linux/amd64 golang:1.19-bullseye
 
 ARG GOPROXY
 
@@ -24,7 +24,9 @@ ENV GOPROXY=${GOPROXY}
 RUN mkdir -p /go/src/k8s.io
 WORKDIR /go/src/k8s.io
 RUN git config --global advice.detachedHead false
-RUN git clone -b v0.22.2 https://github.com/kubernetes/code-generator
+RUN git clone -b v0.25.6 https://github.com/kubernetes/code-generator
+# add -buildvcs=false flag for go command to suppress the VCS error since golang v1.18.
+# RUN sed -i "s/go install /go install -buildvcs=false /" /go/src/k8s.io/code-generator/generate-groups.sh
 
 # kubebuilder test bundle is separated from kubebuilder. Need to setup it for CI test.
 RUN curl -sSLo envtest-bins.tar.gz https://go.kubebuilder.io/test-tools/1.22.1/linux/amd64 && \
@@ -62,7 +64,7 @@ RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v1.1
     chmod +x /usr/bin/goreleaser
 
 # get golangci-lint
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.45.0
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.0
 
 # install kubectl
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl

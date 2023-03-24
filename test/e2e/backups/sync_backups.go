@@ -16,7 +16,7 @@
  * /
  */
 
-//Refer to https://github.com/vmware-tanzu/velero/issues/4253
+// Refer to https://github.com/vmware-tanzu/velero/issues/4253
 package backups
 
 import (

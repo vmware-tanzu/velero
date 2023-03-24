@@ -35,6 +35,8 @@ if ! command -v controller-gen > /dev/null; then
   exit 1
 fi
 
+git config --global --add safe.directory ${GOPATH}/src/k8s.io/code-generator
+
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
   github.com/vmware-tanzu/velero/pkg/generated \
