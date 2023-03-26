@@ -154,7 +154,7 @@
   * Skip completed jobs and pods when restoring (#463, @nrb)
   * Set namespace correctly when syncing backups from object storage (#472, @skriss)
   * When building on macOS, bind-mount volumes with delegated config (#478, @skriss)
-  * Add replica sets and daemonsets to cohabitating resources so they're not backed up twice (#482 #485, @skriss)
+  * Add replica sets and daemonsets to cohabiting resources so they're not backed up twice (#482 #485, @skriss)
   * Shut down the Ark server gracefully on SIGINT/SIGTERM (#483, @skriss)
   * Only back up resources that support GET and DELETE in addition to LIST and CREATE (#486, @nrb)
   * Show a better error message when trying to get an incomplete restore's logs (#496, @nrb)

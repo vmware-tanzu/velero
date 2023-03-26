@@ -1002,7 +1002,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			},
 		},
 		{
-			name:   "when deployments exist that are not in the cohabitating groups those are backed up along with apps/deployments",
+			name:   "when deployments exist that are not in the cohabiting groups those are backed up along with apps/deployments",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.VeleroDeployments(
@@ -1046,11 +1046,11 @@ func TestBackupResourceCohabitation(t *testing.T) {
 	}
 }
 
-// TestBackupUsesNewCohabitatingResourcesForEachBackup ensures that when two backups are
-// run that each include cohabitating resources, one copy of the relevant resources is
+// TestBackupUsesNewCohabitingResourcesForEachBackup ensures that when two backups are
+// run that each include cohabiting resources, one copy of the relevant resources is
 // backed up in each backup. Verification is done by looking at the contents of the backup
 // tarball. This covers a specific issue that was fixed by https://github.com/vmware-tanzu/velero/pull/485.
-func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
+func TestBackupUsesNewCohabitingResourcesForEachBackup(t *testing.T) {
 	h := newHarness(t)
 
 	// run and verify backup 1
