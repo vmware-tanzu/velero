@@ -41,6 +41,11 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
+const (
+	KubeSystemNamespace           = "kube-system"
+	VSphereCSIControllerNamespace = "vmware-system-csi"
+)
+
 // we provide more install options other than the standard install.InstallOptions in E2E test
 type installOptions struct {
 	*install.InstallOptions
@@ -119,7 +124,7 @@ func configvSpherePlugin(cli TestClient) error {
 	if err := CreateNamespace(context.Background(), cli, VeleroCfg.VeleroNamespace); err != nil {
 		return errors.WithMessagef(err, "Failed to create Velero %s namespace", VeleroCfg.VeleroNamespace)
 	}
-	if err := CreateVCCredentialSecret(cli.ClientGo, VeleroCfg.VeleroNamespace); err != nil {
+	if err := createVCCredentialSecret(cli.ClientGo, VeleroCfg.VeleroNamespace); err != nil {
 		return errors.WithMessagef(err, "Failed to create virtual center credential secret in %s namespace", VeleroCfg.VeleroNamespace)
 	}
 	if err := WaitForSecretsComplete(cli.ClientGo, VeleroCfg.VeleroNamespace, vsphereSecret); err != nil {
@@ -462,4 +467,38 @@ func VeleroUninstall(ctx context.Context, cli, namespace string) error {
 	}
 	fmt.Println("Velero uninstalled ⛵")
 	return nil
+}
+
+// createVCCredentialSecret refer to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
+func createVCCredentialSecret(c clientset.Interface, veleroNamespace string) error {
+	secret, err := getVCCredentialSecret(c)
+	if err != nil {
+		return err
+	}
+	vsphereCfg, exist := secret.Data["csi-vsphere.conf"]
+	if !exist {
+		return errors.New("failed to retrieve csi-vsphere config")
+	}
+	se := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "velero-vsphere-config-secret",
+			Namespace: veleroNamespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{"csi-vsphere.conf": vsphereCfg},
+	}
+	_, err = c.CoreV1().Secrets(veleroNamespace).Create(context.TODO(), se, metav1.CreateOptions{})
+	return err
+}
+
+// Reference https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/main/docs/vanilla.md#create-vc-credential-secret
+// Read secret from kube-system namespace first, if not found, try with vmware-system-csi.
+func getVCCredentialSecret(c clientset.Interface) (secret *corev1.Secret, err error) {
+	secret, err = GetSecret(c, KubeSystemNamespace, "vsphere-config-secret")
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			secret, err = GetSecret(c, VSphereCSIControllerNamespace, "vsphere-config-secret")
+		}
+	}
+	return
 }
