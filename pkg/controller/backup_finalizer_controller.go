@@ -44,6 +44,7 @@ type backupFinalizerReconciler struct {
 	clock             clocks.WithTickerAndDelayedExecution
 	backupper         pkgbackup.Backupper
 	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
+	backupTracker     BackupTracker
 	metrics           *metrics.ServerMetrics
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 	log               logrus.FieldLogger
@@ -55,6 +56,7 @@ func NewBackupFinalizerReconciler(
 	clock clocks.WithTickerAndDelayedExecution,
 	backupper pkgbackup.Backupper,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupTracker BackupTracker,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
@@ -64,6 +66,7 @@ func NewBackupFinalizerReconciler(
 		clock:             clock,
 		backupper:         backupper,
 		newPluginManager:  newPluginManager,
+		backupTracker:     backupTracker,
 		backupStoreGetter: backupStoreGetter,
 		log:               log,
 		metrics:           metrics,
@@ -102,6 +105,10 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	original := backup.DeepCopy()
 	defer func() {
+		switch backup.Status.Phase {
+		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
+			r.backupTracker.Delete(backup.Namespace, backup.Name)
+		}
 		// Always attempt to Patch the backup object and status after each reconciliation.
 		if err := r.client.Patch(ctx, backup, kbclient.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Error updating backup")

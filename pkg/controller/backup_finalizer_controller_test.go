@@ -52,6 +52,7 @@ func mockBackupFinalizerReconciler(fakeClient kbclient.Client, fakeClock *testcl
 		fakeClock,
 		backupper,
 		func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+		NewBackupTracker(),
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		logrus.StandardLogger(),
 		metrics.NewServerMetrics(),

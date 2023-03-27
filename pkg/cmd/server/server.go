@@ -803,6 +803,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			clock.RealClock{},
 			backupper,
 			newPluginManager,
+			backupTracker,
 			backupStoreGetter,
 			s.logger,
 			s.metrics,
