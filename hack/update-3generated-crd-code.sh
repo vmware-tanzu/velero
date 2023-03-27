@@ -25,15 +25,17 @@ if [[ -z "${GOPATH}" ]]; then
   GOPATH=~/go
 fi
 
-if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
-  echo "k8s.io/code-generator missing from GOPATH"
-  exit 1
-fi
-
 if ! command -v controller-gen > /dev/null; then
   echo "controller-gen is missing"
   exit 1
 fi
+
+# get code-generation tools (for now keep in GOPATH since they're not fully modules-compatible yet)
+mkdir -p ${GOPATH}/src/k8s.io
+pushd ${GOPATH}/src/k8s.io
+git config --global advice.detachedHead false
+git clone -b v0.25.6 https://github.com/kubernetes/code-generator
+popd
 
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -493,33 +493,35 @@ func (s *server) veleroResourcesExist() error {
 	return nil
 }
 
-// High priorities:
-//   - Custom Resource Definitions come before Custom Resource so that they can be
-//     restored with their corresponding CRD.
-//   - Namespaces go second because all namespaced resources depend on them.
-//   - Storage Classes are needed to create PVs and PVCs correctly.
-//   - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
-//   - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
-//     storage provider
-//   - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
-//   - PVs go before PVCs because PVCs depend on them.
-//   - PVCs go before pods or controllers so they can be mounted as volumes.
-//   - Service accounts go before secrets so service account token secrets can be filled automatically.
-//   - Secrets and config maps go before pods or controllers so they can be mounted
-//     as volumes.
-//   - Limit ranges go before pods or controllers so pods can use them.
-//   - Pods go before controllers so they can be explicitly restored and potentially
-//     have pod volume restores run before controllers adopt the pods.
-//   - Replica sets go before deployments/other controllers so they can be explicitly
-//     restored and be adopted by controllers.
-//   - CAPI ClusterClasses go before Clusters.
-//
-// Low priorities:
-//   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
-//     ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
-//   - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
-//     Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
-//     See https://github.com/kubernetes-sigs/cluster-api/issues/4105
+/*
+High priorities:
+  - Custom Resource Definitions come before Custom Resource so that they can be
+    restored with their corresponding CRD.
+  - Namespaces go second because all namespaced resources depend on them.
+  - Storage Classes are needed to create PVs and PVCs correctly.
+  - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
+  - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
+    storage provider
+  - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
+  - PVs go before PVCs because PVCs depend on them.
+  - PVCs go before pods or controllers so they can be mounted as volumes.
+  - Service accounts go before secrets so service account token secrets can be filled automatically.
+  - Secrets and config maps go before pods or controllers so they can be mounted
+    as volumes.
+  - Limit ranges go before pods or controllers so pods can use them.
+  - Pods go before controllers so they can be explicitly restored and potentially
+    have pod volume restores run before controllers adopt the pods.
+  - Replica sets go before deployments/other controllers so they can be explicitly
+    restored and be adopted by controllers.
+  - CAPI ClusterClasses go before Clusters.
+
+Low priorities:
+  - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
+    ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
+  - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
+    Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
+    See https://github.com/kubernetes-sigs/cluster-api/issues/4105
+*/
 var defaultRestorePriorities = restore.Priorities{
 	HighPriorities: []string{
 		"customresourcedefinitions",
