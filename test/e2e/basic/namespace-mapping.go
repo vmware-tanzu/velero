@@ -29,7 +29,6 @@ var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase
 var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1", NamespaceBaseName + "2"}, UseVolumeSnapshots: true}})
 
 func (n *NamespaceMapping) Init() error {
-	//n.Client = TestClientInstance
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.VeleroCfg.UseVolumeSnapshots = n.UseVolumeSnapshots

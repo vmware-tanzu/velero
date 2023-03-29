@@ -52,7 +52,7 @@ func (b *TTL) Init() {
 	b.testNS = "backup-ttl-test-" + UUIDgen.String()
 	b.backupName = "backup-ttl-test-" + UUIDgen.String()
 	b.restoreName = "restore-ttl-test-" + UUIDgen.String()
-	b.ctx, _ = context.WithTimeout(context.Background(), time.Hour)
+	b.ctx, _ = context.WithTimeout(context.Background(), 2*time.Hour)
 	b.ttl = 20 * time.Minute
 
 }

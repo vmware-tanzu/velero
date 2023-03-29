@@ -48,7 +48,6 @@ func (f *FilteringCase) Init() error {
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}
 	f.labelSelector = "resourcefiltering"
-	//f.Client = TestClientInstance
 	f.VeleroCfg = VeleroCfg
 	f.Client = *f.VeleroCfg.ClientToInstallVelero
 	f.NamespacesTotal = 3
