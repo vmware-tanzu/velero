@@ -580,7 +580,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 }
 
 func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource schema.GroupResource, backupItemActionName string) (*resourcepolicies.Action, error) {
-	if ib.backupRequest.ResPolicies != nil && groupResource == kuberesource.PersistentVolumeClaims && backupItemActionName == "velero.io/csi-pvc-backupper" {
+	if ib.backupRequest.ResPolicies != nil && groupResource == kuberesource.PersistentVolumeClaims && (backupItemActionName == "velero.io/csi-pvc-backupper" || backupItemActionName == "velero.io/vsphere-pvc-backupper") {
 		pvc := corev1api.PersistentVolumeClaim{}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
 			return nil, errors.WithStack(err)
