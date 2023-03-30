@@ -242,3 +242,140 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	}
 	assert.Equal(t, p, resPolicies)
 }
+
+func TestGetMatchAction(t *testing.T) {
+	testCases := []struct {
+		name     string
+		yamlData string
+		vol      *v1.PersistentVolume
+		skip     bool
+	}{
+		{
+			name: "empty csi",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+   csi: {}
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "aws.ebs.csi.driver"},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "empty csi with pv no csi driver",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+   csi: {}
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "csi not configured",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "aws.ebs.csi.driver"},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "empty nfs",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    nfs: {}
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						NFS: &v1.NFSVolumeSource{Server: "192.168.1.20"},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "nfs not configured",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						NFS: &v1.NFSVolumeSource{Server: "192.168.1.20"},
+					},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "empty nfs with pv no nfs volume source",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    nfs: {}
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			skip: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resPolicies, err := unmarshalResourcePolicies(&tc.yamlData)
+			if err != nil {
+				t.Fatalf("got error when get match action %v", err)
+			}
+			assert.Nil(t, err)
+			policies := &Policies{}
+			err = policies.buildPolicy(resPolicies)
+			assert.Nil(t, err)
+			action, err := policies.GetMatchAction(tc.vol)
+			assert.Nil(t, err)
+
+			if tc.skip {
+				if action.Type != Skip {
+					t.Fatalf("Expected action skip but is %v", action.Type)
+				}
+			} else if action != nil && action.Type == Skip {
+				t.Fatalf("Expected action not skip but is %v", action.Type)
+			}
+		})
+	}
+}
