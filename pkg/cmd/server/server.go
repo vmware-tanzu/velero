@@ -508,6 +508,8 @@ func (s *server) veleroResourcesExist() error {
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
 // - CAPI ClusterClasses go before Clusters.
+// - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
+//   for the same clusters
 //
 // Low priorities:
 // - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
@@ -536,6 +538,7 @@ var defaultRestorePriorities = restore.Priorities{
 		// in the backup.
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
+		"services",
 	},
 	LowPriorities: []string{
 		"clusterbootstraps.run.tanzu.vmware.com",
