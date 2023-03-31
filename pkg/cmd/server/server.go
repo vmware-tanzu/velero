@@ -585,6 +585,7 @@ func (s *server) getCSIVolumeSnapshotListers() (vsLister snapshotv1listers.Volum
 	case apierrors.IsNotFound(err):
 		// CSI is enabled, but the required CRDs aren't installed, so halt.
 		s.logger.Warnf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
+		err = nil
 	case err == nil:
 		wrapper := NewCSIInformerFactoryWrapper(s.csiSnapshotClient)
 
