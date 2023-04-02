@@ -323,11 +323,11 @@ func (ib *itemBackupper) executeActions(
 			continue
 		}
 		log.Info("Executing custom action")
-
-		if act, err := ib.getMatchAction(obj, groupResource, action.Name()); err != nil {
+		actionName := action.Name()
+		if act, err := ib.getMatchAction(obj, groupResource, actionName); err != nil {
 			return nil, itemFiles, errors.WithStack(err)
 		} else if act != nil && act.Type == resourcepolicies.Skip {
-			log.Infof("skip snapshot of pvc %s/%s bound pv for the matched resource policies", namespace, name)
+			log.Infof("Skip executing Backup Item Action: %s of resource %s: %s/%s for the matched resource policies", actionName, groupResource, namespace, name)
 			continue
 		}
 
