@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -55,6 +56,10 @@ func DescribeBackupInSF(
 		d.DescribeMetadata(backup.ObjectMeta)
 
 		d.Describe("phase", backup.Status.Phase)
+
+		if backup.Spec.ResourcePolicy != nil {
+			DescribeResourcePoliciesInSF(d, backup.Spec.ResourcePolicy)
+		}
 
 		status := backup.Status
 		if len(status.ValidationErrors) > 0 {
@@ -501,6 +506,14 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 	if backup.Status.Errors > 0 {
 		describeResultInSF(errors, resultMap["errors"])
 	}
+}
+
+// DescribeResourcePoliciesInSF describes resource policies in structured format.
+func DescribeResourcePoliciesInSF(d *StructuredDescriber, resPolicies *v1.TypedLocalObjectReference) {
+	policiesInfo := make(map[string]interface{})
+	policiesInfo["type"] = resPolicies.Kind
+	policiesInfo["name"] = resPolicies.Name
+	d.Describe("resourcePolicies", policiesInfo)
 }
 
 func describeResultInSF(m map[string]interface{}, result results.Result) {
