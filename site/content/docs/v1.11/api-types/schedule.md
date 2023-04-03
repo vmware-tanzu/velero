@@ -73,22 +73,22 @@ spec:
     # (for example 'sc' for 'storageclasses'), or fully-qualified. If unspecified, 
     # no additional cluster-scoped resources are excluded. Optional.
     # Cannot work with include-resources, exclude-resources and include-cluster-resources.
-    excludedClusterScopeResources: {}
+    excludedClusterScopedResources: {}
     # Array of cluster-scoped resources to include from the backup. Resources may be shortcuts 
     # (for example 'sc' for 'storageclasses'), or fully-qualified. If unspecified, 
     # no additional cluster-scoped resources are included. Optional.
     # Cannot work with include-resources, exclude-resources and include-cluster-resources.
-    includedClusterScopeResources: {}
-    # Array of namespace resources to exclude from the backup. Resources may be shortcuts 
+    includedClusterScopedResources: {}
+    # Array of namespace-scoped resources to exclude from the backup. Resources may be shortcuts 
     # (for example 'cm' for 'configmaps'), or fully-qualified. If unspecified, 
-    # no namespace resources are excluded. Optional.
+    # no namespace-scoped resources are excluded. Optional.
     # Cannot work with include-resources, exclude-resources and include-cluster-resources.
-    excludedNamespacedResources: {}
-    # Array of namespace resources to include from the backup. Resources may be shortcuts 
+    excludedNamespaceScopedResources: {}
+    # Array of namespace-scoped resources to include from the backup. Resources may be shortcuts 
     # (for example 'cm' for 'configmaps'), or fully-qualified. If unspecified, 
-    # all namespace resources are included. Optional.
+    # all namespace-scoped resources are included. Optional.
     # Cannot work with include-resources, exclude-resources and include-cluster-resources.
-    includedNamespacedResources: {}
+    includedNamespaceScopedResources: {}
     # Individual objects must match this label selector to be included in the scheduled backup. Optional.
     labelSelector:
       matchLabels:

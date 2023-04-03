@@ -52,6 +52,12 @@ Because of how Kubernetes handles Service objects of `type=LoadBalancer`, when y
 
 Alternatively, you might be able to use the Service's `spec.loadBalancerIP` field to keep connections valid, if your cloud provider supports this value. See [the Kubernetes documentation about Services of Type LoadBalancer](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer).
 
+## Known issue with restoring resources when Admission webhooks are enabled
+
+The [Admission webhooks](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/) may forbid a resource to be created based on the input, it may optionally mutate the input as well.  
+Because velero calls the API server to restore resources, it is possible that the admission webhooks are invoked and cause unexpected failures, depending on the implementation and the configuration of the webhooks.
+To work around such issue, you may disable the webhooks or create a restore item action plugin to modify the resources before they are restored. 
+
 ## Miscellaneous issues
 
 ### Velero reports `custom resource not found` errors when starting up.
