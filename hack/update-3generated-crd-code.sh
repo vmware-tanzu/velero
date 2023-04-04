@@ -33,8 +33,7 @@ fi
 # get code-generation tools (for now keep in GOPATH since they're not fully modules-compatible yet)
 mkdir -p ${GOPATH}/src/k8s.io
 pushd ${GOPATH}/src/k8s.io
-git config --global advice.detachedHead false
-git clone -b v0.25.6 https://github.com/kubernetes/code-generator
+git clone -b v0.22.2 https://github.com/kubernetes/code-generator
 popd
 
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \

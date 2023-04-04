@@ -1,0 +1,1 @@
+Fixed backup deletion bug related to async operations

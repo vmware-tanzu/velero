@@ -267,7 +267,12 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	b.backupTracker.Add(request.Namespace, request.Name)
-	defer b.backupTracker.Delete(request.Namespace, request.Name)
+	defer func() {
+		switch request.Status.Phase {
+		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
+			b.backupTracker.Delete(request.Namespace, request.Name)
+		}
+	}()
 
 	log.Debug("Running backup")
 

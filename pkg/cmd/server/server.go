@@ -543,6 +543,7 @@ var defaultRestorePriorities = restore.Priorities{
 		// in the backup.
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
+		"services",
 	},
 	LowPriorities: []string{
 		"clusterbootstraps.run.tanzu.vmware.com",
@@ -805,6 +806,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			clock.RealClock{},
 			backupper,
 			newPluginManager,
+			backupTracker,
 			backupStoreGetter,
 			s.logger,
 			s.metrics,
