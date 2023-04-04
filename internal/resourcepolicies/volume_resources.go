@@ -103,8 +103,8 @@ func (c *nfsCondition) match(v *structuredVolume) bool {
 	}
 
 	if c.nfs.Path == "" {
-		if c.nfs.Server == "" {
-			return true
+		if c.nfs.Server == "" { // match nfs: {}
+			return v.nfs != nil
 		}
 		if c.nfs.Server != v.nfs.Server {
 			return false
@@ -131,6 +131,10 @@ type csiCondition struct {
 func (c *csiCondition) match(v *structuredVolume) bool {
 	if c.csi == nil {
 		return true
+	}
+
+	if c.csi.Driver == "" { // match csi: {}
+		return v.csi != nil
 	}
 
 	if v.csi == nil {

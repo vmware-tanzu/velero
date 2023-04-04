@@ -97,15 +97,16 @@ func (p *Policies) match(res *structuredVolume) *Action {
 }
 
 func (p *Policies) GetMatchAction(res interface{}) (*Action, error) {
-	structuredVolume := new(structuredVolume)
-	if pv, ok := res.(*v1.PersistentVolume); ok {
-		structuredVolume.parsePV(pv)
-	} else if volume, ok := res.(*v1.Volume); ok {
-		structuredVolume.parsePodVolume(volume)
-	} else {
-		return nil, errors.Errorf("failed to convert object")
+	volume := &structuredVolume{}
+	switch obj := res.(type) {
+	case *v1.PersistentVolume:
+		volume.parsePV(obj)
+	case *v1.Volume:
+		volume.parsePodVolume(obj)
+	default:
+		return nil, errors.New("failed to convert object")
 	}
-	return p.match(structuredVolume), nil
+	return p.match(volume), nil
 }
 
 func (p *Policies) Validate() error {
