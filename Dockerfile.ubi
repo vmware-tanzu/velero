@@ -3,7 +3,7 @@ FROM quay.io/konveyor/builder:latest AS builder
 ENV GOPATH=$APP_ROOT
 COPY . /go/src/github.com/vmware-tanzu/velero
 WORKDIR /go/src/github.com/vmware-tanzu/velero
-RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static" -X github.com/vmware-tanzu/velero/pkg/buildinfo.Version=konveyor-dev' -o /go/src/velero github.com/vmware-tanzu/velero/cmd/velero
+RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static" -X github.com/vmware-tanzu/velero/pkg/buildinfo.Version=v1.11.0-konveyor' -o /go/src/velero github.com/vmware-tanzu/velero/cmd/velero
 
 FROM quay.io/konveyor/builder:latest AS restic-builder
 ENV GOPATH=$APP_ROOT
