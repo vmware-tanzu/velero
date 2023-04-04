@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.18-bullseye as velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.19-bullseye as velero-builder
 
 ARG GOPROXY
 ARG BIN
