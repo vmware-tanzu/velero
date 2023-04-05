@@ -1,0 +1,92 @@
+# warning: verify this inside a container with following:
+# docker run -it --rm -v `pwd`:`pwd` -w `pwd` golang:1.18 bash -c "make -f Makefile.prow ci"
+# 
+# otherwise unintended system changes may include, replacing your currently installed kubectl, binaries in GOBIN, files in GOPATH/src
+# 
+# If formatting needs updating you can run
+# GOFLAGS=-mod=mod make update
+
+GOFLAGS=-mod=mod
+CONGEN_VERSION=0.7.0
+CODEGEN_VERSION=0.22.2
+PROWBIN=/tmp/prowbin
+# Name of this Makefile
+MAKEFILE=Makefile.prow
+# emulate as close as possible upstream ci target
+# upstream ci target: verify-modules verify all test
+#  we only need to modify verify, test, all to avoid docker usage
+.PHONY: ci
+ci:
+	@echo "go version is: $(shell go version)"
+	GOFLAGS=$(GOFLAGS) make verify-modules
+	make -f $(MAKEFILE) verify all test
+
+.PHONY: verify
+verify: goimports controller-gen kubectl #code-generator
+# add PROWBIN to PATH
+	@echo Verifying with PATH=$(PROWBIN):$(PATH)
+# Per
+# https://github.com/vmware-tanzu/velero/blob/dd660882d0db96d430547f39dc3694d1c1bc19f3/Makefile#L160-L163
+# code-generator tools require project to be in heirarchy such as github.com/vmware-tanzu/velero
+#  so we need to copy the project to GOPATH/src/github.com/vmware-tanzu/velero
+#  and then run verify from there
+#  otherwise the code-generator tools will fail
+	mkdir -p $(GOSRC)/github.com/vmware-tanzu/
+	cp -r . $(GOSRC)/github.com/vmware-tanzu/velero
+	cd $(GOSRC)/github.com/vmware-tanzu/velero && \
+	PATH=$(PROWBIN):$(PATH) GOFLAGS=$(GOFLAGS) hack/verify-all.sh
+
+.PHONY: all
+all:
+	GOFLAGS=$(GOFLAGS) make local
+	GOFLAGS=$(GOFLAGS) BIN=velero-restore-helper make local
+
+.PHONY: test
+# our test is modified to avoid docker usage
+test: envtest
+	@echo Testing with KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS)
+	KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS) GOFLAGS=$(GOFLAGS) hack/test.sh
+
+GOPATH:=$(shell go env GOPATH)
+GOBIN:=$(GOPATH)/bin
+GOSRC:=$(GOPATH)/src
+#  if KUBEBUILDER_ASSETS contains space, escape it
+KUBEBUILDER_ASSETS=$(shell echo $(shell $(GOBIN)/setup-envtest use -p path) | sed 's/ /\\ /g')
+.PHONY: envtest
+envtest: $(GOBIN)/setup-envtest
+	$(GOBIN)/setup-envtest use -p path
+
+$(GOBIN)/setup-envtest:
+	@echo Installing envtest tools
+	GOFLAGS= go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	@echo Installed envtest tools
+
+.PHONY: goimports
+goimports: $(GOBIN)/goimports 
+
+$(GOBIN)/goimports:
+	@echo Installing goimports
+	go install golang.org/x/tools/cmd/goimports@latest
+	@echo Installed goimports
+
+.PHONY: code-generator
+code-generator: $(GOSRC)/k8s.io/code-generator
+
+$(GOSRC)/k8s.io/code-generator:
+	mkdir -p $(GOSRC)/k8s.io/
+	cd $(GOSRC)/k8s.io/ && git clone -b v$(CODEGEN_VERSION) https://github.com/kubernetes/code-generator
+
+.PHONY: controller-gen
+controller-gen: $(GOBIN)/controller-gen
+
+$(GOBIN)/controller-gen:
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v$(CONGEN_VERSION)
+
+.PHONY: kubectl
+kubectl: $(PROWBIN)/kubectl
+
+$(PROWBIN)/kubectl:
+	curl -LO "https://dl.k8s.io/release/$(shell curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+	chmod +x ./kubectl
+	mkdir -p $(PROWBIN)
+	mv ./kubectl $(PROWBIN)
