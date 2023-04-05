@@ -19,13 +19,19 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"encoding/json"
 
 	"github.com/pkg/errors"
+	jsonpatch "github.com/evanphx/json-patch"
+
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+
+
 )
 
 func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList []string, pvcAnn, ann map[string]string) (*corev1.Pod, error) {
@@ -112,6 +118,10 @@ func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podNa
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Fail to ge pod %s in namespace %s", podName, namespace))
 	}
+	original, err := json.Marshal(newPod)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Fail to add annotations to pod %s in namespace %s", podName, namespace))
+	}
 	newAnn := newPod.ObjectMeta.Annotations
 	if newAnn == nil {
 		newAnn = make(map[string]string)
@@ -123,7 +133,35 @@ func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podNa
 	newPod.Annotations = newAnn
 	fmt.Println(newPod.Annotations)
 
-	return client.ClientGo.CoreV1().Pods(namespace).Update(ctx, newPod, metav1.UpdateOptions{})
+	updated, err := json.Marshal(newPod)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Fail to add annotations to pod %s in namespace %s", podName, namespace))
+	}
+	patchBytes, err := jsonpatch.CreateMergePatch(original, updated)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Fail to add annotations to pod %s in namespace %s", podName, namespace))
+	}
+
+	return client.ClientGo.CoreV1().Pods(namespace).Patch(ctx, newPod.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+}
+
+func GetAnnotationFromPod(ctx context.Context, client TestClient, namespace, podName string, key string) (string, error) {
+
+	pod, err := GetPod(ctx, client, namespace, podName)
+	if err != nil {
+		return "", errors.Wrap(err, fmt.Sprintf("Fail to ge pod %s in namespace %s", podName, namespace))
+	}
+	annotations := pod.ObjectMeta.Annotations
+	if annotations == nil {
+		return "", nil
+	}
+	val, ok := annotations[key]
+	if !ok {
+		return "", nil
+	}
+	fmt.Println(val)
+
+	return val, nil
 }
 
 func ListPods(ctx context.Context, client TestClient, namespace string) (*corev1.PodList, error) {

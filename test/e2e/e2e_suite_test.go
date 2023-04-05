@@ -36,6 +36,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/api-group"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
+	. "github.com/vmware-tanzu/velero/test/e2e/item-operations"
 	. "github.com/vmware-tanzu/velero/test/e2e/migration"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
@@ -159,6 +160,9 @@ var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specif
 var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
 var _ = Describe("[Basic][StorageClass] Storage class of persistent volumes and persistent volume claims can be changed during restores", StorageClasssChangingTest)
 var _ = Describe("[Basic][SelectedNode] Node selectors of persistent volume claims can be changed during restores", PVCSelectedNodeChangingTest)
+
+var _ = Describe("[ItemOperations][BIABackup] Velero test item operations backup plugin without extra resources", BIAOperationBackupTest)
+var _ = Describe("[ItemOperations][BIABackupExtras] Velero test item operations backup plugin with extra resources", BIAOperationExtrasBackupTest)
 
 func GetKubeconfigContext() error {
 	var err error
