@@ -38,6 +38,8 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	ver "k8s.io/apimachinery/pkg/util/version"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -101,6 +103,13 @@ var pluginsMatrix = map[string]map[string][]string{
 		"vsphere":   {"velero/velero-plugin-for-aws:v1.6.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.4.1"},
 		"gcp":       {"velero/velero-plugin-for-gcp:v1.6.0"},
 		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.6.0", "velero/velero-plugin-for-csi:v0.4.0"},
+	},
+	"v1.11": {
+		"aws":       {"velero/velero-plugin-for-aws:v1.7.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.7.0"},
+		"vsphere":   {"velero/velero-plugin-for-aws:v1.7.0", "vsphereveleroplugin/velero-plugin-for-vsphere:v1.4.2"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.7.0"},
+		"azure-csi": {"velero/velero-plugin-for-microsoft-azure:v1.7.0", "velero/velero-plugin-for-csi:v0.5.0"},
 	},
 	"main": {
 		"aws":       {"velero/velero-plugin-for-aws:main"},
@@ -1289,4 +1298,23 @@ func GetPVB(ctx context.Context, veleroNamespace, namespace string) ([]string, e
 
 func GetPVR(ctx context.Context, veleroNamespace, namespace string) ([]string, error) {
 	return GetVeleroResource(ctx, veleroNamespace, namespace, "podvolumerestore")
+}
+
+func IsSupportUploaderType(version string) (bool, error) {
+	if strings.Contains(version, "self") {
+		return true, nil
+	}
+	verSupportUploaderType, err := ver.ParseSemantic("v1.10.0")
+	if err != nil {
+		return false, err
+	}
+	v, err := ver.ParseSemantic(version)
+	if err != nil {
+		return false, err
+	}
+	if v.AtLeast(verSupportUploaderType) {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
