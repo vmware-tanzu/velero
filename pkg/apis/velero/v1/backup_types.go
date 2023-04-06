@@ -53,35 +53,37 @@ type BackupSpec struct {
 	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
-	// IncludedClusterScopeResources is a slice of cluster scope
+	// IncludedClusterScopedResources is a slice of cluster-scoped
 	// resource type names to include in the backup.
-	// If set to "*", all cluster scope resource types are included.
-	// The default value is empty, which means only related cluster
-	// scope resources are included.
+	// If set to "*", all cluster-scoped resource types are included.
+	// The default value is empty, which means only related
+	// cluster-scoped resources are included.
 	// +optional
 	// +nullable
-	IncludedClusterScopeResources []string `json:"includedClusterScopeResources,omitempty"`
+	IncludedClusterScopedResources []string `json:"includedClusterScopedResources,omitempty"`
 
-	// ExcludedClusterScopeResources is a slice of cluster scope
+	// ExcludedClusterScopedResources is a slice of cluster-scoped
 	// resource type names to exclude from the backup.
-	// If set to "*", all cluster scope resource types are excluded.
+	// If set to "*", all cluster-scoped resource types are excluded.
+	// The default value is empty.
 	// +optional
 	// +nullable
-	ExcludedClusterScopeResources []string `json:"excludedClusterScopeResources,omitempty"`
+	ExcludedClusterScopedResources []string `json:"excludedClusterScopedResources,omitempty"`
 
-	// IncludedNamespacedResources is a slice of namespace scope
+	// IncludedNamespaceScopedResources is a slice of namespace-scoped
 	// resource type names to include in the backup.
 	// The default value is "*".
 	// +optional
 	// +nullable
-	IncludedNamespacedResources []string `json:"includedNamespacedResources,omitempty"`
+	IncludedNamespaceScopedResources []string `json:"includedNamespaceScopedResources,omitempty"`
 
-	// ExcludedNamespacedResources is a slice of namespace scope
+	// ExcludedNamespaceScopedResources is a slice of namespace-scoped
 	// resource type names to exclude from the backup.
-	// If set to "*", all namespace scope resource types are excluded.
+	// If set to "*", all namespace-scoped resource types are excluded.
+	// The default value is empty.
 	// +optional
 	// +nullable
-	ExcludedNamespacedResources []string `json:"excludedNamespacedResources,omitempty"`
+	ExcludedNamespaceScopedResources []string `json:"excludedNamespaceScopedResources,omitempty"`
 
 	// LabelSelector is a metav1.LabelSelector to filter with
 	// when adding individual objects to the backup. If empty

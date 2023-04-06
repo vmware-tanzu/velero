@@ -182,9 +182,9 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		},
 		{
 			name:           "use old filter parameters and new filter parameters together",
-			backup:         defaultBackup().IncludeClusterResources(true).IncludedNamespacedResources("Deployment").IncludedNamespaces("default").Result(),
+			backup:         defaultBackup().IncludeClusterResources(true).IncludedNamespaceScopedResources("Deployment").IncludedNamespaces("default").Result(),
 			backupLocation: defaultBackupLocation,
-			expectedErrs:   []string{"include-resources, exclude-resources and include-cluster-resources are old filter parameters.\ninclude-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources are new filter parameters.\nThey cannot be used together"},
+			expectedErrs:   []string{"include-resources, exclude-resources and include-cluster-resources are old filter parameters.\ninclude-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together"},
 		},
 	}
 

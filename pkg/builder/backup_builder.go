@@ -156,27 +156,27 @@ func (b *BackupBuilder) ExcludedResources(resources ...string) *BackupBuilder {
 	return b
 }
 
-// IncludedClusterScopeResources sets the Backup's included cluster resources.
-func (b *BackupBuilder) IncludedClusterScopeResources(resources ...string) *BackupBuilder {
-	b.object.Spec.IncludedClusterScopeResources = resources
+// IncludedClusterScopedResources sets the Backup's included cluster resources.
+func (b *BackupBuilder) IncludedClusterScopedResources(resources ...string) *BackupBuilder {
+	b.object.Spec.IncludedClusterScopedResources = resources
 	return b
 }
 
-// ExcludedClusterScopeResources sets the Backup's excluded cluster resources.
-func (b *BackupBuilder) ExcludedClusterScopeResources(resources ...string) *BackupBuilder {
-	b.object.Spec.ExcludedClusterScopeResources = resources
+// ExcludedClusterScopedResources sets the Backup's excluded cluster resources.
+func (b *BackupBuilder) ExcludedClusterScopedResources(resources ...string) *BackupBuilder {
+	b.object.Spec.ExcludedClusterScopedResources = resources
 	return b
 }
 
-// IncludedNamespacedResources sets the Backup's included namespaced resources.
-func (b *BackupBuilder) IncludedNamespacedResources(resources ...string) *BackupBuilder {
-	b.object.Spec.IncludedNamespacedResources = resources
+// IncludedNamespaceScopedResources sets the Backup's included namespaced resources.
+func (b *BackupBuilder) IncludedNamespaceScopedResources(resources ...string) *BackupBuilder {
+	b.object.Spec.IncludedNamespaceScopedResources = resources
 	return b
 }
 
-// ExcludedNamespacedResources sets the Backup's excluded namespaced resources.
-func (b *BackupBuilder) ExcludedNamespacedResources(resources ...string) *BackupBuilder {
-	b.object.Spec.ExcludedNamespacedResources = resources
+// ExcludedNamespaceScopedResources sets the Backup's excluded namespaced resources.
+func (b *BackupBuilder) ExcludedNamespaceScopedResources(resources ...string) *BackupBuilder {
+	b.object.Spec.ExcludedNamespaceScopedResources = resources
 	return b
 }
 
