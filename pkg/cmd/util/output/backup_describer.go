@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -83,6 +84,11 @@ func DescribeBackup(
 
 		d.Printf("Phase:\t%s%s\n", phaseString, logsNote)
 
+		if backup.Spec.ResourcePolicy != nil {
+			d.Println()
+			DescribeResourcePolicies(d, backup.Spec.ResourcePolicy)
+		}
+
 		status := backup.Status
 		if len(status.ValidationErrors) > 0 {
 			d.Println()
@@ -116,6 +122,13 @@ func DescribeBackup(
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
 	})
+}
+
+// DescribeResourcePolicies describes resource policiesin human-readable format
+func DescribeResourcePolicies(d *Describer, resPolicies *v1.TypedLocalObjectReference) {
+	d.Printf("Resource policies:\n")
+	d.Printf("\tType:\t%s\n", resPolicies.Kind)
+	d.Printf("\tName:\t%s\n", resPolicies.Name)
 }
 
 // DescribeBackupSpec describes a backup spec in human-readable format.
