@@ -1,1 +1,0 @@
-Make Velero not exits when EnableCSI is on and CSI snapshot not installed
