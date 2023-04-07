@@ -3279,8 +3279,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		actions      []biav2.BackupItemAction
 	}{
 		{
-			name:   "no namespaced resources + some cluster resources",
-			backup: defaultBackup().IncludedClusterScopeResources("persistentvolumes").ExcludedNamespacedResources("*").Result(),
+			name:   "no namespace-scoped resources + some cluster-scoped resources",
+			backup: defaultBackup().IncludedClusterScopedResources("persistentvolumes").ExcludedNamespaceScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3300,8 +3300,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "no namespaced resources + all cluster resources",
-			backup: defaultBackup().IncludedClusterScopeResources("*").ExcludedNamespacedResources("*").Result(),
+			name:   "no namespace-scoped resources + all cluster-scoped resources",
+			backup: defaultBackup().IncludedClusterScopedResources("*").ExcludedNamespaceScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3329,8 +3329,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + no cluster resources 1",
-			backup: defaultBackup().ExcludedClusterScopeResources("*").IncludedNamespaces("foo", "zoo").Result(),
+			name:   "some namespace-scoped resources + no cluster-scoped resources 1",
+			backup: defaultBackup().ExcludedClusterScopedResources("*").IncludedNamespaces("foo", "zoo").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3360,8 +3360,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + no cluster resources 2",
-			backup: defaultBackup().ExcludedClusterScopeResources("*").IncludedNamespacedResources("pods", "deployments").Result(),
+			name:   "some namespace-scoped resources + no cluster-scoped resources 2",
+			backup: defaultBackup().ExcludedClusterScopedResources("*").IncludedNamespaceScopedResources("pods", "deployments").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3391,8 +3391,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + no cluster resources 3",
-			backup: defaultBackup().ExcludedClusterScopeResources("*").IncludedNamespaces("foo").IncludedNamespacedResources("pods", "deployments").Result(),
+			name:   "some namespace-scoped resources + no cluster-scoped resources 3",
+			backup: defaultBackup().ExcludedClusterScopedResources("*").IncludedNamespaces("foo").IncludedNamespaceScopedResources("pods", "deployments").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3418,8 +3418,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + no cluster resources 4",
-			backup: defaultBackup().ExcludedClusterScopeResources("*").ExcludedNamespacedResources("pods").Result(),
+			name:   "some namespace-scoped resources + no cluster-scoped resources 4",
+			backup: defaultBackup().ExcludedClusterScopedResources("*").ExcludedNamespaceScopedResources("pods").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3445,8 +3445,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + only related cluster resources 2",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods", "persistentvolumeclaims").Result(),
+			name:   "some namespace-scoped resources + only related cluster-scoped resources 2",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("pods", "persistentvolumeclaims").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("test-1").Result()).Result(),
@@ -3486,8 +3486,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + only related cluster resources 3",
-			backup: defaultBackup().IncludedNamespaces("foo").ExcludedNamespacedResources("deployments").Result(),
+			name:   "some namespace-scoped resources + only related cluster-scoped resources 3",
+			backup: defaultBackup().IncludedNamespaces("foo").ExcludedNamespaceScopedResources("deployments").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("test-1").Result()).Result(),
@@ -3526,8 +3526,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + some additional cluster resources 1",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopeResources("customresourcedefinitions").Result(),
+			name:   "some namespace-scoped resources + some additional cluster-scoped resources 1",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopedResources("customresourcedefinitions").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3574,8 +3574,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + some additional cluster resources 2",
-			backup: defaultBackup().IncludedNamespacedResources("persistentvolumeclaims").IncludedClusterScopeResources("customresourcedefinitions").Result(),
+			name:   "some namespace-scoped resources + some additional cluster-scoped resources 2",
+			backup: defaultBackup().IncludedNamespaceScopedResources("persistentvolumeclaims").IncludedClusterScopedResources("customresourcedefinitions").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3618,8 +3618,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + some additional cluster resources 3",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods", "persistentvolumeclaims").IncludedClusterScopeResources("customresourcedefinitions").Result(),
+			name:   "some namespace-scoped resources + some additional cluster-scoped resources 3",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("pods", "persistentvolumeclaims").IncludedClusterScopedResources("customresourcedefinitions").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3664,8 +3664,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + some additional cluster resources 4",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods", "persistentvolumeclaims").IncludedClusterScopeResources("*").ExcludedClusterScopeResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
+			name:   "some namespace-scoped resources + some additional cluster-scoped resources 4",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("pods", "persistentvolumeclaims").IncludedClusterScopedResources("*").ExcludedClusterScopedResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3710,8 +3710,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + all cluster resources 1",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopeResources("*").Result(),
+			name:   "some namespace-scoped resources + all cluster-scoped resources 1",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3743,8 +3743,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + all cluster resources 2",
-			backup: defaultBackup().IncludedNamespacedResources("pods").IncludedClusterScopeResources("*").Result(),
+			name:   "some namespace-scoped resources + all cluster-scoped resources 2",
+			backup: defaultBackup().IncludedNamespaceScopedResources("pods").IncludedClusterScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3776,8 +3776,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "some namespaced resources + all cluster resources 3",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("pods").IncludedClusterScopeResources("*").Result(),
+			name:   "some namespace-scoped resources + all cluster-scoped resources 3",
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("pods").IncludedClusterScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3807,8 +3807,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "all namespaced resources + no cluster resources",
-			backup: defaultBackup().ExcludedClusterScopeResources("*").Result(),
+			name:   "all namespace-scoped resources + no cluster-scoped resources",
+			backup: defaultBackup().ExcludedClusterScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3838,8 +3838,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "all namespaced resources + all cluster resources",
-			backup: defaultBackup().IncludedClusterScopeResources("*").Result(),
+			name:   "all namespace-scoped resources + all cluster-scoped resources",
+			backup: defaultBackup().IncludedClusterScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					builder.ForPod("foo", "bar").Result(),
@@ -3876,7 +3876,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 		{
 			name:   "namespace resource should be included even it's not specified in the include list, when IncludedNamespaces has specified value 1",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("Secrets").Result(),
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("Secrets").Result(),
 			apiResources: []*test.APIResource{
 				test.Secrets(
 					builder.ForSecret("foo", "bar").Result(),
@@ -3902,7 +3902,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 		{
 			name:   "namespace resource should be included even it's not specified in the include list, when IncludedNamespaces has specified value 2",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopeResources("persistentvolumes").Result(),
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedClusterScopedResources("persistentvolumes").Result(),
 			apiResources: []*test.APIResource{
 				test.Secrets(
 					builder.ForSecret("foo", "bar").Result(),
@@ -3932,7 +3932,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 		{
 			name:   "namespace resource should be included even it's not specified in the include list, when IncludedNamespaces is asterisk.",
-			backup: defaultBackup().IncludedNamespaces("*").IncludedClusterScopeResources("persistentvolumes").Result(),
+			backup: defaultBackup().IncludedNamespaces("*").IncludedClusterScopedResources("persistentvolumes").Result(),
 			apiResources: []*test.APIResource{
 				test.Secrets(
 					builder.ForSecret("foo", "bar").Result(),
@@ -3968,8 +3968,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "when all namespace resources are involved, cluster resources should be included too",
-			backup: defaultBackup().IncludedNamespaces("*").IncludedNamespacedResources("*").Result(),
+			name:   "when all namespace-scoped resources are involved, cluster-scoped resources should be included too",
+			backup: defaultBackup().IncludedNamespaces("*").IncludedNamespaceScopedResources("*").Result(),
 			apiResources: []*test.APIResource{
 				test.Secrets(
 					builder.ForSecret("foo", "bar").Result(),
@@ -4008,8 +4008,8 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:   "IncludedNamespaces is asterisk, but not all namespaced types are include, additional cluster resource should not be included.",
-			backup: defaultBackup().IncludedNamespaces("*").IncludedNamespacedResources("secrets").Result(),
+			name:   "IncludedNamespaces is asterisk, but not all namespace-scoped resource types are include, additional cluster-scoped resources should not be included.",
+			backup: defaultBackup().IncludedNamespaces("*").IncludedNamespaceScopedResources("secrets").Result(),
 			apiResources: []*test.APIResource{
 				test.Secrets(
 					builder.ForSecret("foo", "bar").Result(),
@@ -4041,7 +4041,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 		{
 			name:   "Resource's CRD should be included",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("volumesnapshotlocations.velero.io", "backups.velero.io").Result(),
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("volumesnapshotlocations.velero.io", "backups.velero.io").Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
 					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),
@@ -4064,7 +4064,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 		{
 			name:   "Resource's CRD is not included, when CRD is excluded.",
-			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespacedResources("volumesnapshotlocations.velero.io", "backups.velero.io").ExcludedClusterScopeResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
+			backup: defaultBackup().IncludedNamespaces("foo").IncludedNamespaceScopedResources("volumesnapshotlocations.velero.io", "backups.velero.io").ExcludedClusterScopedResources("customresourcedefinitions.apiextensions.k8s.io").Result(),
 			apiResources: []*test.APIResource{
 				test.CRDs(
 					builder.ForCustomResourceDefinitionV1Beta1("backups.velero.io").Result(),

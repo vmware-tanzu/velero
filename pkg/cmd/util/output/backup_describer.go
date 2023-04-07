@@ -150,8 +150,8 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("\tExcluded:\t%s\n", s)
 
 	d.Println()
+	d.Printf("Resources:\n")
 	if collections.UseOldResourceFilters(spec) {
-		d.Printf("Resources:\n")
 		if len(spec.IncludedResources) == 0 {
 			s = "*"
 		} else {
@@ -166,31 +166,31 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 		d.Printf("\tExcluded:\t%s\n", s)
 		d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(spec.IncludeClusterResources, "excluded", "included", "auto"))
 	} else {
-		if len(spec.IncludedClusterScopeResources) == 0 {
+		if len(spec.IncludedClusterScopedResources) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.IncludedClusterScopeResources, ", ")
+			s = strings.Join(spec.IncludedClusterScopedResources, ", ")
 		}
 		d.Printf("\tIncluded cluster-scoped:\t%s\n", s)
-		if len(spec.ExcludedClusterScopeResources) == 0 {
+		if len(spec.ExcludedClusterScopedResources) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.ExcludedClusterScopeResources, ", ")
+			s = strings.Join(spec.ExcludedClusterScopedResources, ", ")
 		}
 		d.Printf("\tExcluded cluster-scoped:\t%s\n", s)
 
-		if len(spec.IncludedNamespacedResources) == 0 {
+		if len(spec.IncludedNamespaceScopedResources) == 0 {
 			s = "*"
 		} else {
-			s = strings.Join(spec.IncludedNamespacedResources, ", ")
+			s = strings.Join(spec.IncludedNamespaceScopedResources, ", ")
 		}
-		d.Printf("\tIncluded namespaced:\t%s\n", s)
-		if len(spec.ExcludedNamespacedResources) == 0 {
+		d.Printf("\tIncluded namespace-scoped:\t%s\n", s)
+		if len(spec.ExcludedNamespaceScopedResources) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.ExcludedNamespacedResources, ", ")
+			s = strings.Join(spec.ExcludedNamespaceScopedResources, ", ")
 		}
-		d.Printf("\tExcluded namespaced:\t%s\n", s)
+		d.Printf("\tExcluded namespace-scoped:\t%s\n", s)
 	}
 
 	d.Println()

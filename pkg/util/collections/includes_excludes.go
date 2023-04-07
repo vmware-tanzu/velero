@@ -189,20 +189,20 @@ func (ie *GlobalIncludesExcludes) ShouldExclude(typeName string) bool {
 }
 
 type ScopeIncludesExcludes struct {
-	namespaceResourceFilter IncludesExcludes // namespace scope resource filter
-	clusterResourceFilter   IncludesExcludes // cluster scope resource filter
-	namespaceFilter         IncludesExcludes // namespace filter
+	namespaceScopedResourceFilter IncludesExcludes // namespace-scoped resource filter
+	clusterScopedResourceFilter   IncludesExcludes // cluster-scoped resource filter
+	namespaceFilter               IncludesExcludes // namespace filter
 
 	helper discovery.Helper
 	logger logrus.FieldLogger
 }
 
 // ShouldInclude returns whether the specified resource should be included or not.
-// The function will check whether the resource is namespaced resource first.
-// For namespaced resource, except resources listed in excludes, other things should be included.
-// For cluster resource, except resources listed in excludes, only include the resource specified by the included.
+// The function will check whether the resource is namespace-scoped resource first.
+// For namespace-scoped resource, except resources listed in excludes, other things should be included.
+// For cluster-scoped resource, except resources listed in excludes, only include the resource specified by the included.
 // It also has some exceptional checks. For namespace, as long as it's not excluded, it is involved.
-// If all namespace resources are included, all cluster resource are returned to get a full backup.
+// If all namespace-scoped resources are included, all cluster-scoped resource are returned to get a full backup.
 func (ie *ScopeIncludesExcludes) ShouldInclude(typeName string) bool {
 	_, resource, err := ie.helper.ResourceFor(schema.ParseGroupResource(typeName).WithVersion(""))
 	if err != nil {
@@ -211,30 +211,30 @@ func (ie *ScopeIncludesExcludes) ShouldInclude(typeName string) bool {
 	}
 
 	if resource.Namespaced {
-		if ie.namespaceResourceFilter.excludes.Has("*") || ie.namespaceResourceFilter.excludes.match(typeName) {
+		if ie.namespaceScopedResourceFilter.excludes.Has("*") || ie.namespaceScopedResourceFilter.excludes.match(typeName) {
 			return false
 		}
 
 		// len=0 means include everything
-		return ie.namespaceResourceFilter.includes.Len() == 0 || ie.namespaceResourceFilter.includes.Has("*") || ie.namespaceResourceFilter.includes.match(typeName)
+		return ie.namespaceScopedResourceFilter.includes.Len() == 0 || ie.namespaceScopedResourceFilter.includes.Has("*") || ie.namespaceScopedResourceFilter.includes.match(typeName)
 	}
 
-	if ie.clusterResourceFilter.excludes.Has("*") || ie.clusterResourceFilter.excludes.match(typeName) {
+	if ie.clusterScopedResourceFilter.excludes.Has("*") || ie.clusterScopedResourceFilter.excludes.match(typeName) {
 		return false
 	}
 
-	// when IncludedClusterScopeResources and ExcludedClusterScopeResources are not specified,
+	// when IncludedClusterScopedResources and ExcludedClusterScopedResources are not specified,
 	// only directly back up cluster-scoped resources if we're doing a full-cluster
-	// (all namespaces and all namespace scope types) backup.
-	if len(ie.clusterResourceFilter.includes.List()) == 0 &&
-		len(ie.clusterResourceFilter.excludes.List()) == 0 &&
+	// (all namespaces and all namespace-scoped types) backup.
+	if len(ie.clusterScopedResourceFilter.includes.List()) == 0 &&
+		len(ie.clusterScopedResourceFilter.excludes.List()) == 0 &&
 		ie.namespaceFilter.IncludeEverything() &&
-		ie.namespaceResourceFilter.IncludeEverything() {
+		ie.namespaceScopedResourceFilter.IncludeEverything() {
 		return true
 	}
 
 	// Also include namespace resource by default.
-	return ie.clusterResourceFilter.includes.Has("*") || ie.clusterResourceFilter.includes.match(typeName) || typeName == kuberesource.Namespaces.String()
+	return ie.clusterScopedResourceFilter.includes.Has("*") || ie.clusterScopedResourceFilter.includes.match(typeName) || typeName == kuberesource.Namespaces.String()
 }
 
 // ShouldExclude returns whether the resource type should be excluded or not.
@@ -248,11 +248,11 @@ func (ie *ScopeIncludesExcludes) ShouldExclude(typeName string) bool {
 	}
 
 	if resource.Namespaced {
-		if ie.namespaceResourceFilter.excludes.match(typeName) {
+		if ie.namespaceScopedResourceFilter.excludes.match(typeName) {
 			return true
 		}
 	} else {
-		if ie.clusterResourceFilter.excludes.match(typeName) {
+		if ie.clusterScopedResourceFilter.excludes.match(typeName) {
 			return true
 		}
 	}
@@ -286,11 +286,11 @@ func (ie *IncludesExcludes) IncludeEverything() bool {
 
 func newScopeIncludesExcludes(nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	ret := &ScopeIncludesExcludes{
-		namespaceResourceFilter: IncludesExcludes{
+		namespaceScopedResourceFilter: IncludesExcludes{
 			includes: newGlobStringSet(),
 			excludes: newGlobStringSet(),
 		},
-		clusterResourceFilter: IncludesExcludes{
+		clusterScopedResourceFilter: IncludesExcludes{
 			includes: newGlobStringSet(),
 			excludes: newGlobStringSet(),
 		},
@@ -353,7 +353,7 @@ func ValidateNamespaceIncludesExcludes(includesList, excludesList []string) []er
 	return errs
 }
 
-// ValidateScopedIncludesExcludes checks provided lists of namespaced or cluster-scoped
+// ValidateScopedIncludesExcludes checks provided lists of namespace-scoped or cluster-scoped
 // included and excluded items to ensure they are a valid set of IncludesExcludes data.
 func ValidateScopedIncludesExcludes(includesList, excludesList []string) []error {
 	var errs []error
@@ -447,10 +447,10 @@ func generateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	res := newScopeIncludesExcludes(nsIncludesExcludes, helper, logger)
 
-	generateFilter(res.namespaceResourceFilter.includes, namespacedIncludes, mapFunc, true)
-	generateFilter(res.namespaceResourceFilter.excludes, namespacedExcludes, mapFunc, true)
-	generateFilter(res.clusterResourceFilter.includes, clusterIncludes, mapFunc, false)
-	generateFilter(res.clusterResourceFilter.excludes, clusterExcludes, mapFunc, false)
+	generateFilter(res.namespaceScopedResourceFilter.includes, namespacedIncludes, mapFunc, true)
+	generateFilter(res.namespaceScopedResourceFilter.excludes, namespacedExcludes, mapFunc, true)
+	generateFilter(res.clusterScopedResourceFilter.includes, clusterIncludes, mapFunc, false)
+	generateFilter(res.clusterScopedResourceFilter.excludes, clusterExcludes, mapFunc, false)
 
 	return res
 }
@@ -509,7 +509,7 @@ func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fi
 }
 
 // GetScopeResourceIncludesExcludes's function is similar with GetResourceIncludesExcludes,
-// but it's used for scoped Includes/Excludes, and can handle both cluster and namespace resources.
+// but it's used for scoped Includes/Excludes, and can handle both cluster-scoped and namespace-scoped resources.
 func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes IncludesExcludes) *ScopeIncludesExcludes {
 	ret := generateScopedIncludesExcludes(
 		namespaceIncludes,
@@ -532,27 +532,27 @@ func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fie
 		helper,
 		logger,
 	)
-	logger.Infof("Including namespace scope resources: %s", ret.namespaceResourceFilter.IncludesString())
-	logger.Infof("Excluding namespace scope resources: %s", ret.namespaceResourceFilter.ExcludesString())
-	logger.Infof("Including cluster scope resources: %s", ret.clusterResourceFilter.GetIncludes())
-	logger.Infof("Excluding cluster scope resources: %s", ret.clusterResourceFilter.ExcludesString())
+	logger.Infof("Including namespace-scoped resources: %s", ret.namespaceScopedResourceFilter.IncludesString())
+	logger.Infof("Excluding namespace-scoped resources: %s", ret.namespaceScopedResourceFilter.ExcludesString())
+	logger.Infof("Including cluster-scoped resources: %s", ret.clusterScopedResourceFilter.GetIncludes())
+	logger.Infof("Excluding cluster-scoped resources: %s", ret.clusterScopedResourceFilter.ExcludesString())
 
 	return ret
 }
 
 // UseOldResourceFilters checks whether to use old resource filters (IncludeClusterResources,
 // IncludedResources and ExcludedResources), depending the backup's filters setting.
-// New filters are IncludeClusterScopedResources, ExcludeClusterScopedResources,
-// IncludeNamespacedResources and ExcludeNamespacedResources.
+// New filters are IncludedClusterScopedResources, ExcludedClusterScopedResources,
+// IncludedNamespaceScopedResources and ExcludedNamespaceScopedResources.
 func UseOldResourceFilters(backupSpec velerov1api.BackupSpec) bool {
 	// If all resource filters are none, it is treated as using old parameter filters.
 	if backupSpec.IncludeClusterResources == nil &&
 		len(backupSpec.IncludedResources) == 0 &&
 		len(backupSpec.ExcludedResources) == 0 &&
-		len(backupSpec.IncludedClusterScopeResources) == 0 &&
-		len(backupSpec.ExcludedClusterScopeResources) == 0 &&
-		len(backupSpec.IncludedNamespacedResources) == 0 &&
-		len(backupSpec.ExcludedNamespacedResources) == 0 {
+		len(backupSpec.IncludedClusterScopedResources) == 0 &&
+		len(backupSpec.ExcludedClusterScopedResources) == 0 &&
+		len(backupSpec.IncludedNamespaceScopedResources) == 0 &&
+		len(backupSpec.ExcludedNamespaceScopedResources) == 0 {
 		return true
 	}
 

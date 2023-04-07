@@ -299,23 +299,23 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.IncludedClusterScopeResources != nil {
-		in, out := &in.IncludedClusterScopeResources, &out.IncludedClusterScopeResources
+	if in.IncludedClusterScopedResources != nil {
+		in, out := &in.IncludedClusterScopedResources, &out.IncludedClusterScopedResources
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExcludedClusterScopeResources != nil {
-		in, out := &in.ExcludedClusterScopeResources, &out.ExcludedClusterScopeResources
+	if in.ExcludedClusterScopedResources != nil {
+		in, out := &in.ExcludedClusterScopedResources, &out.ExcludedClusterScopedResources
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.IncludedNamespacedResources != nil {
-		in, out := &in.IncludedNamespacedResources, &out.IncludedNamespacedResources
+	if in.IncludedNamespaceScopedResources != nil {
+		in, out := &in.IncludedNamespaceScopedResources, &out.IncludedNamespaceScopedResources
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExcludedNamespacedResources != nil {
-		in, out := &in.ExcludedNamespacedResources, &out.ExcludedNamespacedResources
+	if in.ExcludedNamespaceScopedResources != nil {
+		in, out := &in.ExcludedNamespaceScopedResources, &out.ExcludedNamespaceScopedResources
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

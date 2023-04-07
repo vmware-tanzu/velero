@@ -435,10 +435,10 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	}
 
 	// validate whether Included/Excluded resources and IncludedClusterResource are mixed with
-	// Included/Excluded cluster-scoped/namespaced resources.
+	// Included/Excluded cluster-scoped/namespace-scoped resources.
 	if oldAndNewFilterParametersUsedTogether(request.Spec) {
 		validatedError := fmt.Sprintf("include-resources, exclude-resources and include-cluster-resources are old filter parameters.\n" +
-			"include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources are new filter parameters.\n" +
+			"include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\n" +
 			"They cannot be used together")
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, validatedError)
 	}
@@ -449,13 +449,13 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	}
 
 	// validate the cluster-scoped included/excluded resources
-	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedClusterScopeResources, request.Spec.ExcludedClusterScopeResources) {
+	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedClusterScopedResources, request.Spec.ExcludedClusterScopedResources) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid cluster-scoped included/excluded resource lists: %s", err))
 	}
 
-	// validate the namespaced included/excluded resources
-	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedNamespacedResources, request.Spec.ExcludedNamespacedResources) {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid namespaced included/excluded resource lists: %s", err))
+	// validate the namespace-scoped included/excluded resources
+	for _, err := range collections.ValidateScopedIncludesExcludes(request.Spec.IncludedNamespaceScopedResources, request.Spec.ExcludedNamespaceScopedResources) {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid namespace-scoped included/excluded resource lists: %s", err))
 	}
 
 	// validate the included/excluded namespaces
@@ -1146,10 +1146,10 @@ func oldAndNewFilterParametersUsedTogether(backupSpec velerov1api.BackupSpec) bo
 	haveOldResourceFilterParameters := len(backupSpec.IncludedResources) > 0 ||
 		(len(backupSpec.ExcludedResources) > 0) ||
 		(backupSpec.IncludeClusterResources != nil)
-	haveNewResourceFilterParameters := len(backupSpec.IncludedClusterScopeResources) > 0 ||
-		(len(backupSpec.ExcludedClusterScopeResources) > 0) ||
-		(len(backupSpec.IncludedNamespacedResources) > 0) ||
-		(len(backupSpec.ExcludedNamespacedResources) > 0)
+	haveNewResourceFilterParameters := len(backupSpec.IncludedClusterScopedResources) > 0 ||
+		(len(backupSpec.ExcludedClusterScopedResources) > 0) ||
+		(len(backupSpec.IncludedNamespaceScopedResources) > 0) ||
+		(len(backupSpec.ExcludedNamespaceScopedResources) > 0)
 
 	return haveOldResourceFilterParameters && haveNewResourceFilterParameters
 }

@@ -82,30 +82,30 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name                         string
-	TTL                          time.Duration
-	SnapshotVolumes              flag.OptionalBool
-	DefaultVolumesToFsBackup     flag.OptionalBool
-	IncludeNamespaces            flag.StringArray
-	ExcludeNamespaces            flag.StringArray
-	IncludeResources             flag.StringArray
-	ExcludeResources             flag.StringArray
-	IncludeClusterScopeResources flag.StringArray
-	ExcludeClusterScopeResources flag.StringArray
-	IncludeNamespacedResources   flag.StringArray
-	ExcludeNamespacedResources   flag.StringArray
-	Labels                       flag.Map
-	Selector                     flag.LabelSelector
-	IncludeClusterResources      flag.OptionalBool
-	Wait                         bool
-	StorageLocation              string
-	SnapshotLocations            []string
-	FromSchedule                 string
-	OrderedResources             string
-	CSISnapshotTimeout           time.Duration
-	ItemOperationTimeout         time.Duration
-	ResPoliciesConfigmap         string
-	client                       veleroclient.Interface
+	Name                            string
+	TTL                             time.Duration
+	SnapshotVolumes                 flag.OptionalBool
+	DefaultVolumesToFsBackup        flag.OptionalBool
+	IncludeNamespaces               flag.StringArray
+	ExcludeNamespaces               flag.StringArray
+	IncludeResources                flag.StringArray
+	ExcludeResources                flag.StringArray
+	IncludeClusterScopedResources   flag.StringArray
+	ExcludeClusterScopedResources   flag.StringArray
+	IncludeNamespaceScopedResources flag.StringArray
+	ExcludeNamespaceScopedResources flag.StringArray
+	Labels                          flag.Map
+	Selector                        flag.LabelSelector
+	IncludeClusterResources         flag.OptionalBool
+	Wait                            bool
+	StorageLocation                 string
+	SnapshotLocations               []string
+	FromSchedule                    string
+	OrderedResources                string
+	CSISnapshotTimeout              time.Duration
+	ItemOperationTimeout            time.Duration
+	ResPoliciesConfigmap            string
+	client                          veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -121,12 +121,12 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.TTL, "ttl", o.TTL, "How long before the backup can be garbage collected.")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the backup (use '*' for all namespaces).")
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "Namespaces to exclude from the backup.")
-	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources). Cannot work with include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources.")
-	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io. Cannot work with include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources.")
-	flags.Var(&o.IncludeClusterScopeResources, "include-cluster-scope-resources", "Cluster-scoped resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
-	flags.Var(&o.ExcludeClusterScopeResources, "exclude-cluster-scope-resources", "Cluster-scoped resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
-	flags.Var(&o.IncludeNamespacedResources, "include-namespaced-resources", "Namespaced resources to include in the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
-	flags.Var(&o.ExcludeNamespacedResources, "exclude-namespaced-resources", "Namespaced resources to exclude from the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources). Cannot work with include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources.")
+	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io. Cannot work with include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources.")
+	flags.Var(&o.IncludeClusterScopedResources, "include-cluster-scoped-resources", "Cluster-scoped resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.ExcludeClusterScopedResources, "exclude-cluster-scoped-resources", "Cluster-scoped resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.IncludeNamespaceScopedResources, "include-namespace-scoped-resources", "Namespaced resources to include in the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
+	flags.Var(&o.ExcludeNamespaceScopedResources, "exclude-namespace-scoped-resources", "Namespaced resources to exclude from the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
@@ -139,7 +139,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
 
-	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup. Cannot work with include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources.")
+	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup. Cannot work with include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources.")
 	f.NoOptDefVal = "true"
 
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
@@ -182,7 +182,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.oldAndNewFilterParametersUsedTogether() {
 		return fmt.Errorf("include-resources, exclude-resources and include-cluster-resources are old filter parameters.\n" +
-			"include-cluster-scope-resources, exclude-cluster-scope-resources, include-namespaced-resources and exclude-namespaced-resources are new filter parameters.\n" +
+			"include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\n" +
 			"They cannot be used together")
 	}
 
@@ -350,10 +350,10 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			ExcludedNamespaces(o.ExcludeNamespaces...).
 			IncludedResources(o.IncludeResources...).
 			ExcludedResources(o.ExcludeResources...).
-			IncludedClusterScopeResources(o.IncludeClusterScopeResources...).
-			ExcludedClusterScopeResources(o.ExcludeClusterScopeResources...).
-			IncludedNamespacedResources(o.IncludeNamespacedResources...).
-			ExcludedNamespacedResources(o.ExcludeNamespacedResources...).
+			IncludedClusterScopedResources(o.IncludeClusterScopedResources...).
+			ExcludedClusterScopedResources(o.ExcludeClusterScopedResources...).
+			IncludedNamespaceScopedResources(o.IncludeNamespaceScopedResources...).
+			ExcludedNamespaceScopedResources(o.ExcludeNamespaceScopedResources...).
 			LabelSelector(o.Selector.LabelSelector).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
@@ -390,10 +390,10 @@ func (o *CreateOptions) oldAndNewFilterParametersUsedTogether() bool {
 	haveOldResourceFilterParameters := len(o.IncludeResources) > 0 ||
 		len(o.ExcludeResources) > 0 ||
 		o.IncludeClusterResources.Value != nil
-	haveNewResourceFilterParameters := len(o.IncludeClusterScopeResources) > 0 ||
-		(len(o.ExcludeClusterScopeResources) > 0) ||
-		(len(o.IncludeNamespacedResources) > 0) ||
-		(len(o.ExcludeNamespacedResources) > 0)
+	haveNewResourceFilterParameters := len(o.IncludeClusterScopedResources) > 0 ||
+		(len(o.ExcludeClusterScopedResources) > 0) ||
+		(len(o.IncludeNamespaceScopedResources) > 0) ||
+		(len(o.ExcludeNamespaceScopedResources) > 0)
 
 	return haveOldResourceFilterParameters && haveNewResourceFilterParameters
 }

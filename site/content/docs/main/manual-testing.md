@@ -92,7 +92,7 @@ The following are test cases that are not currently performed as part of a Veler
   - `velero.io/exclude-from-backup=true` label
 
 - Since v1.11, new resource filters are added. The new filters only work for backup, and cannot work with old filters (`--include-resources`, `--exclude-resources` and `--include-cluster-resources`). Need to verify backups correctly apply the following new resource filters:
-  - `--exclude-cluster-scope-resources`
-  - `--include-cluster-scope-resources`
-  - `--exclude-namespaced-resources` 
-  - `--include-namespaced-resources`
+  - `--exclude-cluster-scoped-resources`
+  - `--include-cluster-scoped-resources`
+  - `--exclude-namespace-scoped-resources` 
+  - `--include-namespace-scoped-resources`

@@ -211,10 +211,10 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 			*backupRequest.NamespaceIncludesExcludes)
 	} else {
 		backupRequest.ResourceIncludesExcludes = collections.GetScopeResourceIncludesExcludes(kb.discoveryHelper, log,
-			backupRequest.Spec.IncludedNamespacedResources,
-			backupRequest.Spec.ExcludedNamespacedResources,
-			backupRequest.Spec.IncludedClusterScopeResources,
-			backupRequest.Spec.ExcludedClusterScopeResources,
+			backupRequest.Spec.IncludedNamespaceScopedResources,
+			backupRequest.Spec.ExcludedNamespaceScopedResources,
+			backupRequest.Spec.IncludedClusterScopedResources,
+			backupRequest.Spec.ExcludedClusterScopedResources,
 			*backupRequest.NamespaceIncludesExcludes,
 		)
 	}
