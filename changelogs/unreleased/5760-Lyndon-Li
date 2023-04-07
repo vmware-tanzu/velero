@@ -1,1 +1,0 @@
-Fix issue 5043, after the restore pod is scheduled, check if the node-agent pod is running in the same node.

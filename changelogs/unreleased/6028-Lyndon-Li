@@ -1,1 +1,0 @@
-Fix issue #5972, don't assume errorField as error type when dealing with logger.WithError

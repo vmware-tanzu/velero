@@ -1,1 +1,0 @@
-Fix issue #5935, refactor the logics for backup/restore persistent log, so as to remove the contest to gzip writer
