@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
-	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -64,12 +63,12 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
 				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
-				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1api.PodRunning)))
+				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1.PodRunning)))
 				return false, nil
 			}
 			// If any pod is still waiting we don't need to check any more so return and wait for next poll interval
-			if checkPod.Status.Phase != corev1api.PodRunning {
-				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1api.PodRunning)
+			if checkPod.Status.Phase != corev1.PodRunning {
+				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1.PodRunning)
 				return false, nil
 			}
 		}
@@ -254,35 +253,6 @@ func GetPVByPodName(client TestClient, namespace, podName string) (string, error
 		return "", err
 	}
 	return pv_value.Name, nil
-}
-func CreatePodWithPVC(client TestClient, ns, podName, sc, pvcName string, volumeNameList []string, pvcAnn map[string]string) (*corev1.Pod, error) {
-	volumes := []corev1.Volume{}
-	for _, volume := range volumeNameList {
-		var _pvcName string
-		if pvcName == "" {
-			_pvcName = fmt.Sprintf("pvc-%s", volume)
-		} else {
-			_pvcName = pvcName
-		}
-		pvc, err := CreatePVC(client, ns, _pvcName, sc, pvcAnn)
-		if err != nil {
-			return nil, err
-		}
-		volumes = append(volumes, corev1.Volume{
-			Name: volume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
-					ReadOnly:  false,
-				},
-			},
-		})
-	}
-	pod, err := CreatePod(client, ns, podName, volumes)
-	if err != nil {
-		return nil, err
-	}
-	return pod, nil
 }
 
 func CreateFileToPod(ctx context.Context, namespace, podName, volume, filename, content string) error {
