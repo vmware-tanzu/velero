@@ -38,7 +38,7 @@ func CreatePVC(client TestClient, ns, name, sc string, ann map[string]string) (*
 			},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
+					corev1.ResourceStorage: resource.MustParse("1Mi"),
 				},
 			},
 			StorageClassName: &sc,
