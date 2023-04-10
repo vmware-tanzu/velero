@@ -8,4 +8,5 @@
   {{ $styles := resources.Get "styles.scss" | toCSS $options | resources.Fingerprint }}
   <link rel="stylesheet" href="{{ $styles.RelPermalink }}" integrity="{{ $styles.Data.Integrity }}">
   {{/* TODO  {% seo %}*/}}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3" />
 </head>
