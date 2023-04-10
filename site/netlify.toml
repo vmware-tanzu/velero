@@ -1,0 +1,8 @@
+[[plugins]]
+  package = "@algolia/netlify-plugin-crawler"
+    [plugins.inputs]
+    branches = ['*']
+    disabled = false
+    pathPrefix = "/docs"
+    customDomain = "velero.io"
+    renderJavaScript = true
