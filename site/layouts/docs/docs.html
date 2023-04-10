@@ -28,14 +28,15 @@
             {{ .Render "versions" }}
             <br/>
             <div id="docsearch">
-            <form class="d-flex align-items-center">
-                         <span class="algolia-autocomplete" style="position: relative; display: inline-block; direction: ltr;">
-                            <input type="search" class="form-control docsearch" id="search-input" placeholder="Search..."
-                                   aria-label="Search for..." autocomplete="off" spellcheck="false" role="combobox"
-                                   aria-autocomplete="list" aria-expanded="false" aria-owns="algolia-autocomplete-listbox-0"
-                                   dir="auto" style="position: relative; vertical-align: top;">
-                          </span></div>
-            </form>
+              <!-- <form class="d-flex align-items-center">
+                <span class="algolia-autocomplete" style="position: relative; display: inline-block; direction: ltr;">
+                  <input type="search" class="form-control docsearch" id="search-input" placeholder="Search..."
+                          aria-label="Search for..." autocomplete="off" spellcheck="false" role="combobox"
+                          aria-autocomplete="list" aria-expanded="false" aria-owns="algolia-autocomplete-listbox-0"
+                          dir="auto" style="position: relative; vertical-align: top;">
+                </span>
+            </form> -->
+          </div>
             {{ .Render "nav" }}
           </div>
           <div class="col-md-8">
@@ -63,6 +64,8 @@
     apiKey: '170ba79bfa16cebfdf10726ae4771d7e',
     indexName: 'velero_new',
     container: '#docsearch',
+    searchParameters: {
+      facetFilters: ["version:{{ .CurrentSection.Params.version }}"]},
   });
 </script>
 </body>
