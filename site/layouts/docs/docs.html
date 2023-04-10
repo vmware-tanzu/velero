@@ -56,13 +56,15 @@
     {{ .Render "footer" }}
   </div>
 </div>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"></script>
-<script type="text/javascript"> docsearch({
-    apiKey: '3d80f66bb5ecf85f8e2760caef383f24',
-    indexName: 'velero',
-    inputSelector: '.docsearch-input',
-    algoliaOptions: {'facetFilters': ["version:{{ .CurrentSection.Params.version }}"]},
-    debug: false // Set debug to true if you want to inspect the dropdown
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@algolia/algoliasearch-netlify-frontend@1/dist/algoliasearchNetlify.css" />
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@algolia/algoliasearch-netlify-frontend@1/dist/algoliasearchNetlify.js"></script>
+<script type="text/javascript">
+  algoliasearchNetlify({
+    appId: 'ZFU0FM5FV6',
+    apiKey: 'e2fd96866957f232e8f2d4625738e472',
+    siteId: 'b15cafc2-5072-405a-8d65-ceeaba8835a9',
+    branch: 'main',
+    selector: 'div#search',
   });
 </script>
 </body>
