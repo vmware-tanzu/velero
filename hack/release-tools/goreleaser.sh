@@ -48,12 +48,10 @@ if [[ "${PUBLISH:-}" != "TRUE" ]]; then
     goreleaser release \
         --clean \
         --release-notes="${RELEASE_NOTES_FILE}" \
-        --skip-publish \
-        --config goreleaser.yaml
+        --skip-publish
 else
     echo "Getting ready to publish"
     goreleaser release \
         --clean \
         --release-notes="${RELEASE_NOTES_FILE}"
-        --config goreleaser.yaml
 fi
