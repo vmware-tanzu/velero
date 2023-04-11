@@ -60,6 +60,11 @@ var nonRestorableResources = []string{
 	"events",
 	"events.events.k8s.io",
 
+	// The restored endpointslices are removed immediately and that causes the following patch operation for managedFields failed
+	// The control plane automatically creates EndpointSlices for any Kubernetes Service that has a selector specified.
+	// So don't need to restore it
+	"endpointslices",
+
 	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
 	// https://github.com/vmware-tanzu/velero/issues/622
 	"backups.velero.io",
