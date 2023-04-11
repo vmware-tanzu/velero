@@ -24,28 +24,67 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreatePVC(client TestClient, ns, name, sc string, ann map[string]string) (*corev1.PersistentVolumeClaim, error) {
+// PVCBuilder builds PVC objects.
+type PVCBuilder struct {
+	*corev1.PersistentVolumeClaim
+}
+
+func (p *PVCBuilder) Result() *corev1.PersistentVolumeClaim {
+	return p.PersistentVolumeClaim
+}
+
+func NewPVC(ns, name string) *PVCBuilder {
 	oMeta := metav1.ObjectMeta{}
-	oMeta = metav1.ObjectMeta{Name: name}
-	if ann != nil {
-		oMeta.Annotations = ann
-	}
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: oMeta,
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
-			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
+	oMeta = metav1.ObjectMeta{Name: name, Namespace: ns}
+	return &PVCBuilder{
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: oMeta,
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce, // Default read write once
+				},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"), // Default 1Gi
+					},
 				},
 			},
-			StorageClassName: &sc,
 		},
 	}
-	return client.ClientGo.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
 }
+
+func (p *PVCBuilder) WithAnnotation(ann map[string]string) *PVCBuilder {
+	p.Annotations = ann
+	return p
+}
+
+func (p *PVCBuilder) WithStorageClass(sc string) *PVCBuilder {
+	p.Spec.StorageClassName = &sc
+	return p
+}
+
+func (p *PVCBuilder) WithResourceStorage(q resource.Quantity) *PVCBuilder {
+	p.Spec.Resources.Requests[corev1.ResourceStorage] = q
+	return p
+}
+
+func CreatePVC(client TestClient, ns, name, sc string, ann map[string]string) (*corev1.PersistentVolumeClaim, error) {
+	pvcBulder := NewPVC(ns, name)
+	if ann != nil {
+		pvcBulder.WithAnnotation(ann)
+	}
+	if sc != "" {
+		pvcBulder.WithStorageClass(sc)
+	}
+
+	return client.ClientGo.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvcBulder.Result(), metav1.CreateOptions{})
+}
+
+func CreatePvc(client TestClient, pvcBulder *PVCBuilder) error {
+	_, err := client.ClientGo.CoreV1().PersistentVolumeClaims(pvcBulder.Namespace).Create(context.TODO(), pvcBulder.Result(), metav1.CreateOptions{})
+	return err
+}
+
 func GetPVC(ctx context.Context, client TestClient, namespace string, pvcName string) (*corev1.PersistentVolumeClaim, error) {
 	return client.ClientGo.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
 }

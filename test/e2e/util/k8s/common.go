@@ -255,6 +255,22 @@ func GetPVByPodName(client TestClient, namespace, podName string) (string, error
 	}
 	return pv_value.Name, nil
 }
+
+func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
+	for i, volume := range volumeNameList {
+		vols = append(vols, &corev1.Volume{
+			Name: volume,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("pvc-%d", i),
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
+	return
+}
+
 func CreatePodWithPVC(client TestClient, ns, podName, sc, pvcName string, volumeNameList []string, pvcAnn map[string]string) (*corev1.Pod, error) {
 	volumes := []corev1.Volume{}
 	for _, volume := range volumeNameList {
@@ -285,15 +301,15 @@ func CreatePodWithPVC(client TestClient, ns, podName, sc, pvcName string, volume
 	return pod, nil
 }
 
-func CreateFileToPod(ctx context.Context, namespace, podName, volume, filename, content string) error {
-	arg := []string{"exec", "-n", namespace, "-c", podName, podName,
+func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
-func ReadFileFromPodVolume(ctx context.Context, namespace, podName, volume, filename string) (string, error) {
-	arg := []string{"exec", "-n", namespace, "-c", podName, podName,
+func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, error) {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
