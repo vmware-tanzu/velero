@@ -62,6 +62,7 @@ To fix CVEs and keep pace with Golang, Velero made changes as follows:
 
 
 ### All Changes
+* Ignore not found error during patching managedFields (#6110, @ywk253100)
 * Modify new scope resource filters name. (#6089, @blackpiglet)
 * Make Velero not exits when EnableCSI is on and CSI snapshot not installed (#6062, @blackpiglet)
 * Restore Services before Clusters (#6057, @ywk253100)
