@@ -46,6 +46,9 @@ archives:
     files:
       - LICENSE
       - examples/**/*
+    # Add the setting to resolve the DEPRECATED warning. Actually, Velero's case is not affected by the rlcp behavior change.
+    # https://github.com/orgs/goreleaser/discussions/3659#discussioncomment-4587257
+    rlcp: true 
 checksum:
   name_template: 'CHECKSUM'
 release:
@@ -54,3 +57,10 @@ release:
     name: velero
   draft: true
   prerelease: auto
+
+git:
+  # What should be used to sort tags when gathering the current and previous
+  # tags if there are more than one tag in the same commit.
+  #
+  # Default: `-version:refname`
+  tag_sort: -version:creatordate
