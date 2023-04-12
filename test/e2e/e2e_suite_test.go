@@ -117,6 +117,7 @@ var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to
 
 var _ = Describe("[Schedule][BR][Pause][LongTime] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
 var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
+var _ = Describe("[Schedule][BackupCreation] Schedule controller wouldn't create a new backup when it still has pending or InProgress backup", ScheduleBackupCreationTest)
 
 var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
 

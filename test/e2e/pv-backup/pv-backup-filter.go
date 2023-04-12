@@ -97,7 +97,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				podName := fmt.Sprintf("pod-%d", i)
 				pods = append(pods, podName)
 				By(fmt.Sprintf("Create pod %s in namespace %s", podName, ns), func() {
-					pod, err := CreatePodWithPVC(p.Client, ns, podName, "e2e-storage-class", "", volumes, nil)
+					pod, err := CreatePod(p.Client, ns, podName, "e2e-storage-class", "", volumes, nil, nil)
 					Expect(err).To(Succeed())
 					ann := map[string]string{
 						p.annotation: volumesToAnnotation,
