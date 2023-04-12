@@ -1514,10 +1514,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	if patchBytes != nil {
 		if _, err = resourceClient.Patch(name, patchBytes); err != nil {
 			ctx.log.Errorf("error patch for managed fields %s: %v", kube.NamespaceAndName(obj), err)
-			errs.Add(namespace, err)
-			return warnings, errs, itemExists
+			if !apierrors.IsNotFound(err) {
+				errs.Add(namespace, err)
+				return warnings, errs, itemExists
+			}
+		} else {
+			ctx.log.Infof("the managed fields for %s is patched", kube.NamespaceAndName(obj))
 		}
-		ctx.log.Infof("the managed fields for %s is patched", kube.NamespaceAndName(obj))
 	}
 
 	if groupResource == kuberesource.Pods {
