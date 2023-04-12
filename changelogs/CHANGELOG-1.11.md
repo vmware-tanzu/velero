@@ -43,6 +43,9 @@ In Velero, some code pieces need to communicate with the k8s API server. Before 
 #### Add resource list in the output of the restore describe command
 Before this feature, Velero restore didn't have a restored resources list as the Velero backup. It's not convenient for users to learn what is restored. This feature adds the resources list and the handling result of the resources (including created, updated, failed, and skipped).
 
+#### Support JSON format output of backup describe command 
+Before the Velero v1.11 release, users could not choose Velero's backup describe command's output format. The command output format is friendly for human reading, but it's not a structured output, and it's not easy for other programs to get information from it. Velero v1.11 adds a JSON format output for the backup describe command.
+
 #### Refactor controllers with controller-runtime
 In v1.11, Backup Controller and Restore controller are refactored with controller-runtime. Till v1.11, all Velero controllers use the controller-runtime framework.
 
