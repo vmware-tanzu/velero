@@ -31,7 +31,7 @@ func (n *ScheduleBackup) Init() error {
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
-	n.verifyTimes = 5 // More verify times more confidence
+	n.verifyTimes = 5 // More larger verify times more confidence we have
 	n.TestMsg = &TestMSG{
 		Desc:      "Set up a scheduled backup defined by a Cron expression",
 		FailedMSG: "Failed to schedule a backup",
