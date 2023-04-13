@@ -97,6 +97,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			UUIDgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
 			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+			supportUploaderType, err := IsSupportUploaderType(veleroCLI2Version.VeleroVersion)
+			Expect(err).To(Succeed())
 			if veleroCLI2Version.VeleroCLI == "" {
 				//Assume tag of velero server image is identical to velero CLI version
 				//Download velero CLI if it's empty according to velero CLI version
@@ -118,8 +120,13 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfgForOldVeleroInstall.RestoreHelperImage = ""
 				tmpCfgForOldVeleroInstall.Plugins = ""
 				tmpCfgForOldVeleroInstall.UploaderType = ""
-				tmpCfgForOldVeleroInstall.UseNodeAgent = false
-				tmpCfgForOldVeleroInstall.UseRestic = !useVolumeSnapshots
+				if supportUploaderType {
+					tmpCfgForOldVeleroInstall.UseRestic = false
+					tmpCfgForOldVeleroInstall.UseNodeAgent = !useVolumeSnapshots
+				} else {
+					tmpCfgForOldVeleroInstall.UseRestic = !useVolumeSnapshots
+					tmpCfgForOldVeleroInstall.UseNodeAgent = false
+				}
 
 				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,
@@ -152,7 +159,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				BackupCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
 				BackupCfg.Selector = ""
 				//TODO: pay attention to this param, remove it when restic is not the default backup tool any more.
-				BackupCfg.UseResticIfFSBackup = true
+				BackupCfg.UseResticIfFSBackup = !supportUploaderType
 				Expect(VeleroBackupNamespace(oneHourTimeout, tmpCfg.UpgradeFromVeleroCLI,
 					tmpCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
 					RunDebug(context.Background(), tmpCfg.UpgradeFromVeleroCLI, tmpCfg.VeleroNamespace,
@@ -202,13 +209,22 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			}
 
 			By(fmt.Sprintf("Upgrade Velero by CLI %s", tmpCfg.VeleroCLI), func() {
+
 				tmpCfg.GCFrequency = ""
-				tmpCfg.UseNodeAgent = !useVolumeSnapshots
 				tmpCfg.UseRestic = false
-				tmpCfg.UploaderType = "restic"
-				Expect(VeleroUpgrade(context.Background(), tmpCfg)).To(Succeed())
-				Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
-					tmpCfg.VeleroVersion)).To(Succeed())
+				tmpCfg.UseNodeAgent = !useVolumeSnapshots
+				Expect(err).To(Succeed())
+				if supportUploaderType {
+					Expect(VeleroInstall(context.Background(), &tmpCfg)).To(Succeed())
+					Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
+						tmpCfg.VeleroVersion)).To(Succeed())
+				} else {
+					// For upgrade from v1.9 or other version below v1.9
+					tmpCfg.UploaderType = "restic"
+					Expect(VeleroUpgrade(context.Background(), tmpCfg)).To(Succeed())
+					Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
+						tmpCfg.VeleroVersion)).To(Succeed())
+				}
 			})
 
 			By(fmt.Sprintf("Restore %s", upgradeNamespace), func() {

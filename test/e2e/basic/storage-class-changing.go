@@ -85,7 +85,7 @@ func (s *StorageClasssChanging) CreateResources() error {
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
-		_, err := CreatePodWithPVC(s.Client, s.namespace, s.podName, s.srcStorageClass, "", []string{s.volume}, nil)
+		_, err := CreatePod(s.Client, s.namespace, s.podName, s.srcStorageClass, "", []string{s.volume}, nil, nil)
 		Expect(err).To(Succeed())
 	})
 	By(fmt.Sprintf("Create ConfigMap %s in namespace %s", s.configmaptName, s.VeleroCfg.VeleroNamespace), func() {

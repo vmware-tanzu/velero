@@ -84,7 +84,8 @@ func (r *ResourcePoliciesCase) Init() error {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--resource-policies-configmap", r.cmName,
 		"--include-namespaces", strings.Join(*r.NSIncluded, ","),
-		"--default-volumes-to-fs-backup", "--wait",
+		"--default-volumes-to-fs-backup",
+		"--snapshot-volumes=false", "--wait",
 	}
 
 	r.RestoreArgs = []string{
@@ -104,7 +105,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	r.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 
 	By(("Installing storage class..."), func() {
-		Expect(r.installTestStorageClass(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
+		Expect(r.installTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
 
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {
@@ -130,7 +131,6 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 		})
 
 		// Create deployment
-		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 		By(fmt.Sprintf("Creating deployment in namespaces ...%s\n", namespace), func() {
 			Expect(r.createDeploymentWithVolume(namespace, volList)).To(Succeed(), fmt.Sprintf("Failed to create deployment namespace %s", namespace))
 		})
@@ -196,7 +196,7 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 	var err error
 	for i := range volList {
 		pvcName := fmt.Sprintf("pvc-%d", i)
-		fmt.Printf("Creating PVC %s in namespaces ...%s\n", pvcName, namespace)
+		By(fmt.Sprintf("Creating PVC %s in namespaces ...%s\n", pvcName, namespace))
 		if index%3 == 0 {
 			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass("e2e-storage-class") // Testing sc should not backup
 			err = CreatePvc(r.Client, pvcBuilder)
@@ -255,7 +255,7 @@ func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error
 	return nil
 }
 
-func (r *ResourcePoliciesCase) installTestStorageClass(path string) error {
+func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
 	err := InstallStorageClass(r.Ctx, path)
 	if err != nil {
 		return err

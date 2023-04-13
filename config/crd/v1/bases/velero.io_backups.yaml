@@ -54,18 +54,20 @@ spec:
                   Use DefaultVolumesToFsBackup instead."
                 nullable: true
                 type: boolean
-              excludedClusterScopeResources:
-                description: ExcludedClusterScopeResources is a slice of cluster scope
+              excludedClusterScopedResources:
+                description: ExcludedClusterScopedResources is a slice of cluster-scoped
                   resource type names to exclude from the backup. If set to "*", all
-                  cluster scope resource types are excluded.
+                  cluster-scoped resource types are excluded. The default value is
+                  empty.
                 items:
                   type: string
                 nullable: true
                 type: array
-              excludedNamespacedResources:
-                description: ExcludedNamespacedResources is a slice of namespace scope
+              excludedNamespaceScopedResources:
+                description: ExcludedNamespaceScopedResources is a slice of namespace-scoped
                   resource type names to exclude from the backup. If set to "*", all
-                  namespace scope resource types are excluded.
+                  namespace-scoped resource types are excluded. The default value
+                  is empty.
                 items:
                   type: string
                 nullable: true
@@ -275,17 +277,17 @@ spec:
                   resources should be included for consideration in the backup.
                 nullable: true
                 type: boolean
-              includedClusterScopeResources:
-                description: IncludedClusterScopeResources is a slice of cluster scope
+              includedClusterScopedResources:
+                description: IncludedClusterScopedResources is a slice of cluster-scoped
                   resource type names to include in the backup. If set to "*", all
-                  cluster scope resource types are included. The default value is
-                  empty, which means only related cluster scope resources are included.
+                  cluster-scoped resource types are included. The default value is
+                  empty, which means only related cluster-scoped resources are included.
                 items:
                   type: string
                 nullable: true
                 type: array
-              includedNamespacedResources:
-                description: IncludedNamespacedResources is a slice of namespace scope
+              includedNamespaceScopedResources:
+                description: IncludedNamespaceScopedResources is a slice of namespace-scoped
                   resource type names to include in the backup. The default value
                   is "*".
                 items:

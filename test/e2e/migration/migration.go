@@ -100,7 +100,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			flag.Parse()
 			UUIDgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
-
+			supportUploaderType, err := IsSupportUploaderType(veleroCLI2Version.VeleroVersion)
+			Expect(err).To(Succeed())
 			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
 
 			if veleroCLI2Version.VeleroCLI == "" {
@@ -126,14 +127,20 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				OriginVeleroCfg.UseNodeAgent = !useVolumeSnapshots
 				// TODO: self means 1.10 and upper version
 				if veleroCLI2Version.VeleroVersion != "self" {
+					Expect(err).To(Succeed())
 					fmt.Printf("Using default images address of Velero CLI %s\n", veleroCLI2Version.VeleroVersion)
 					OriginVeleroCfg.VeleroImage = ""
 					OriginVeleroCfg.RestoreHelperImage = ""
 					OriginVeleroCfg.Plugins = ""
 					//TODO: Remove this once origin Velero version is 1.10 and upper
 					OriginVeleroCfg.UploaderType = ""
-					OriginVeleroCfg.UseNodeAgent = false
-					OriginVeleroCfg.UseRestic = !useVolumeSnapshots
+					if supportUploaderType {
+						OriginVeleroCfg.UseRestic = false
+						OriginVeleroCfg.UseNodeAgent = !useVolumeSnapshots
+					} else {
+						OriginVeleroCfg.UseRestic = !useVolumeSnapshots
+						OriginVeleroCfg.UseNodeAgent = false
+					}
 				}
 
 				Expect(VeleroInstall(context.Background(), &OriginVeleroCfg)).To(Succeed())
@@ -165,11 +172,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupStorageClassCfg.IncludeResources = "StorageClass"
 				BackupStorageClassCfg.IncludeClusterResources = true
 				//TODO Remove UseRestic parameter once minor version is 1.10 or upper
-				BackupStorageClassCfg.UseResticIfFSBackup = true
-				if veleroCLI2Version.VeleroVersion == "self" {
-					BackupStorageClassCfg.UseResticIfFSBackup = false
-				}
-
+				BackupStorageClassCfg.UseResticIfFSBackup = !supportUploaderType
 				Expect(VeleroBackupNamespace(context.Background(), OriginVeleroCfg.VeleroCLI,
 					OriginVeleroCfg.VeleroNamespace, BackupStorageClassCfg)).To(Succeed(), func() string {
 					RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupStorageClassCfg.BackupName, "")
@@ -184,10 +187,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				BackupCfg.Selector = ""
 				BackupCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
 				//TODO Remove UseRestic parameter once minor version is 1.10 or upper
-				BackupCfg.UseResticIfFSBackup = true
-				if veleroCLI2Version.VeleroVersion == "self" {
-					BackupCfg.UseResticIfFSBackup = false
-				}
+				BackupCfg.UseResticIfFSBackup = !supportUploaderType
+
 				Expect(VeleroBackupNamespace(context.Background(), OriginVeleroCfg.VeleroCLI,
 					OriginVeleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
 					RunDebug(context.Background(), OriginVeleroCfg.VeleroCLI, OriginVeleroCfg.VeleroNamespace, BackupCfg.BackupName, "")

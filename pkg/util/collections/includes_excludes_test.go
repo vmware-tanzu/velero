@@ -370,14 +370,14 @@ func TestValidateScopedIncludesExcludes(t *testing.T) {
 	}
 }
 
-func TestNamespaceScopeShouldInclude(t *testing.T) {
+func TestNamespaceScopedShouldInclude(t *testing.T) {
 	tests := []struct {
-		name              string
-		namespaceIncludes []string
-		namespaceExcludes []string
-		item              string
-		want              bool
-		apiResources      []*test.APIResource
+		name                    string
+		namespaceScopedIncludes []string
+		namespaceScopedExcludes []string
+		item                    string
+		want                    bool
+		apiResources            []*test.APIResource
 	}{
 		{
 			name: "empty string should include every item",
@@ -388,104 +388,104 @@ func TestNamespaceScopeShouldInclude(t *testing.T) {
 			},
 		},
 		{
-			name:              "include * should include every item",
-			namespaceIncludes: []string{"*"},
-			item:              "pods",
-			want:              true,
+			name:                    "include * should include every item",
+			namespaceScopedIncludes: []string{"*"},
+			item:                    "pods",
+			want:                    true,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "item in includes list should include item",
-			namespaceIncludes: []string{"foo", "bar", "pods"},
-			item:              "pods",
-			want:              true,
+			name:                    "item in includes list should include item",
+			namespaceScopedIncludes: []string{"foo", "bar", "pods"},
+			item:                    "pods",
+			want:                    true,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "item not in includes list should not include item",
-			namespaceIncludes: []string{"foo", "baz"},
-			item:              "pods",
-			want:              false,
+			name:                    "item not in includes list should not include item",
+			namespaceScopedIncludes: []string{"foo", "baz"},
+			item:                    "pods",
+			want:                    false,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "include *, excluded item should not include item",
-			namespaceIncludes: []string{"*"},
-			namespaceExcludes: []string{"pods"},
-			item:              "pods",
-			want:              false,
+			name:                    "include *, excluded item should not include item",
+			namespaceScopedIncludes: []string{"*"},
+			namespaceScopedExcludes: []string{"pods"},
+			item:                    "pods",
+			want:                    false,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "include *, exclude foo, bar should be included",
-			namespaceIncludes: []string{"*"},
-			namespaceExcludes: []string{"foo"},
-			item:              "pods",
-			want:              true,
+			name:                    "include *, exclude foo, bar should be included",
+			namespaceScopedIncludes: []string{"*"},
+			namespaceScopedExcludes: []string{"foo"},
+			item:                    "pods",
+			want:                    true,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "an item both included and excluded should not be included",
-			namespaceIncludes: []string{"pods"},
-			namespaceExcludes: []string{"pods"},
-			item:              "pods",
-			want:              false,
+			name:                    "an item both included and excluded should not be included",
+			namespaceScopedIncludes: []string{"pods"},
+			namespaceScopedExcludes: []string{"pods"},
+			item:                    "pods",
+			want:                    false,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "wildcard should include item",
-			namespaceIncludes: []string{"*s"},
-			item:              "pods",
-			want:              true,
+			name:                    "wildcard should include item",
+			namespaceScopedIncludes: []string{"*s"},
+			item:                    "pods",
+			want:                    true,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "wildcard mismatch should not include item",
-			namespaceIncludes: []string{"*.bar"},
-			item:              "pods",
-			want:              false,
+			name:                    "wildcard mismatch should not include item",
+			namespaceScopedIncludes: []string{"*.bar"},
+			item:                    "pods",
+			want:                    false,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "exclude * should include nothing",
-			namespaceExcludes: []string{"*"},
-			item:              "pods",
-			want:              false,
+			name:                    "exclude * should include nothing",
+			namespaceScopedExcludes: []string{"*"},
+			item:                    "pods",
+			want:                    false,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "wildcard exclude should not include item",
-			namespaceIncludes: []string{"*"},
-			namespaceExcludes: []string{"*s"},
-			item:              "pods",
-			want:              false,
+			name:                    "wildcard exclude should not include item",
+			namespaceScopedIncludes: []string{"*"},
+			namespaceScopedExcludes: []string{"*s"},
+			item:                    "pods",
+			want:                    false,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
 		},
 		{
-			name:              "wildcard exclude mismatch should include item",
-			namespaceExcludes: []string{"*.bar"},
-			item:              "pods",
-			want:              true,
+			name:                    "wildcard exclude mismatch should include item",
+			namespaceScopedExcludes: []string{"*.bar"},
+			item:                    "pods",
+			want:                    true,
 			apiResources: []*test.APIResource{
 				test.Pods(),
 			},
@@ -501,7 +501,7 @@ func TestNamespaceScopeShouldInclude(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			discoveryHelper := setupDiscoveryClientWithResources(tc.apiResources)
 			logger := logrus.StandardLogger()
-			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceIncludes, tc.namespaceExcludes, []string{}, []string{}, *NewIncludesExcludes())
+			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, []string{}, []string{}, *NewIncludesExcludes())
 
 			if got := scopeIncludesExcludes.ShouldInclude((tc.item)); got != tc.want {
 				t.Errorf("want %t, got %t", tc.want, got)
@@ -512,13 +512,13 @@ func TestNamespaceScopeShouldInclude(t *testing.T) {
 
 func TestClusterScopedShouldInclude(t *testing.T) {
 	tests := []struct {
-		name            string
-		clusterIncludes []string
-		clusterExcludes []string
-		nsIncludes      []string
-		item            string
-		want            bool
-		apiResources    []*test.APIResource
+		name                  string
+		clusterScopedIncludes []string
+		clusterScopedExcludes []string
+		nsIncludes            []string
+		item                  string
+		want                  bool
+		apiResources          []*test.APIResource
 	}{
 		{
 			name:       "empty string should include nothing",
@@ -530,106 +530,106 @@ func TestClusterScopedShouldInclude(t *testing.T) {
 			},
 		},
 		{
-			name:            "include * should include every item",
-			clusterIncludes: []string{"*"},
-			item:            "persistentvolumes",
-			want:            true,
+			name:                  "include * should include every item",
+			clusterScopedIncludes: []string{"*"},
+			item:                  "persistentvolumes",
+			want:                  true,
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
 		},
 		{
-			name:            "item in includes list should include item",
-			clusterIncludes: []string{"namespaces", "bar", "baz"},
-			item:            "namespaces",
-			want:            true,
+			name:                  "item in includes list should include item",
+			clusterScopedIncludes: []string{"namespaces", "bar", "baz"},
+			item:                  "namespaces",
+			want:                  true,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "item not in includes list should not include item",
-			clusterIncludes: []string{"foo", "baz"},
-			nsIncludes:      []string{"default"},
-			item:            "persistentvolumes",
-			want:            false,
+			name:                  "item not in includes list should not include item",
+			clusterScopedIncludes: []string{"foo", "baz"},
+			nsIncludes:            []string{"default"},
+			item:                  "persistentvolumes",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
 		},
 		{
-			name:            "include *, excluded item should not include item",
-			clusterIncludes: []string{"*"},
-			clusterExcludes: []string{"namespaces"},
-			item:            "namespaces",
-			want:            false,
+			name:                  "include *, excluded item should not include item",
+			clusterScopedIncludes: []string{"*"},
+			clusterScopedExcludes: []string{"namespaces"},
+			item:                  "namespaces",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "include *, exclude foo, bar should be included",
-			clusterIncludes: []string{"*"},
-			clusterExcludes: []string{"foo"},
-			item:            "namespaces",
-			want:            true,
+			name:                  "include *, exclude foo, bar should be included",
+			clusterScopedIncludes: []string{"*"},
+			clusterScopedExcludes: []string{"foo"},
+			item:                  "namespaces",
+			want:                  true,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "an item both included and excluded should not be included",
-			clusterIncludes: []string{"namespaces"},
-			clusterExcludes: []string{"namespaces"},
-			item:            "namespaces",
-			want:            false,
+			name:                  "an item both included and excluded should not be included",
+			clusterScopedIncludes: []string{"namespaces"},
+			clusterScopedExcludes: []string{"namespaces"},
+			item:                  "namespaces",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "wildcard should include item",
-			clusterIncludes: []string{"*spaces"},
-			item:            "namespaces",
-			want:            true,
+			name:                  "wildcard should include item",
+			clusterScopedIncludes: []string{"*spaces"},
+			item:                  "namespaces",
+			want:                  true,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "wildcard mismatch should not include item",
-			clusterIncludes: []string{"*.bar"},
-			nsIncludes:      []string{"default"},
-			item:            "persistentvolumes",
-			want:            false,
+			name:                  "wildcard mismatch should not include item",
+			clusterScopedIncludes: []string{"*.bar"},
+			nsIncludes:            []string{"default"},
+			item:                  "persistentvolumes",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
 		},
 		{
-			name:            "exclude * should include nothing",
-			clusterExcludes: []string{"*"},
-			item:            "namespaces",
-			want:            false,
+			name:                  "exclude * should include nothing",
+			clusterScopedExcludes: []string{"*"},
+			item:                  "namespaces",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "wildcard exclude should not include item",
-			clusterIncludes: []string{"*"},
-			clusterExcludes: []string{"*spaces"},
-			item:            "namespaces",
-			want:            false,
+			name:                  "wildcard exclude should not include item",
+			clusterScopedIncludes: []string{"*"},
+			clusterScopedExcludes: []string{"*spaces"},
+			item:                  "namespaces",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "wildcard exclude mismatch should not include item",
-			clusterExcludes: []string{"*spaces"},
-			item:            "namespaces",
-			want:            false,
+			name:                  "wildcard exclude mismatch should not include item",
+			clusterScopedExcludes: []string{"*spaces"},
+			item:                  "namespaces",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
@@ -640,31 +640,31 @@ func TestClusterScopedShouldInclude(t *testing.T) {
 			want: false,
 		},
 		{
-			name:            "even namespaces is not in the include list, it should also be involved.",
-			clusterIncludes: []string{"foo", "baz"},
-			item:            "namespaces",
-			want:            true,
+			name:                  "even namespaces is not in the include list, it should also be involved.",
+			clusterScopedIncludes: []string{"foo", "baz"},
+			item:                  "namespaces",
+			want:                  true,
 			apiResources: []*test.APIResource{
 				test.Namespaces(),
 			},
 		},
 		{
-			name:            "When all namespaces and namespace scope resources are included, cluster resource should be included.",
-			clusterIncludes: []string{},
-			nsIncludes:      []string{"*"},
-			item:            "persistentvolumes",
-			want:            true,
+			name:                  "When all namespaces and namespace scope resources are included, cluster resource should be included.",
+			clusterScopedIncludes: []string{},
+			nsIncludes:            []string{"*"},
+			item:                  "persistentvolumes",
+			want:                  true,
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
 		},
 		{
-			name:            "When all namespaces and namespace scope resources are included, but cluster resource is excluded.",
-			clusterIncludes: []string{},
-			clusterExcludes: []string{"persistentvolumes"},
-			nsIncludes:      []string{"*"},
-			item:            "persistentvolumes",
-			want:            false,
+			name:                  "When all namespaces and namespace scope resources are included, but cluster resource is excluded.",
+			clusterScopedIncludes: []string{},
+			clusterScopedExcludes: []string{"persistentvolumes"},
+			nsIncludes:            []string{"*"},
+			item:                  "persistentvolumes",
+			want:                  false,
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
@@ -675,7 +675,7 @@ func TestClusterScopedShouldInclude(t *testing.T) {
 			discoveryHelper := setupDiscoveryClientWithResources(tc.apiResources)
 			logger := logrus.StandardLogger()
 			nsIncludeExclude := NewIncludesExcludes().Includes(tc.nsIncludes...)
-			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, []string{}, []string{}, tc.clusterIncludes, tc.clusterExcludes, *nsIncludeExclude)
+			scopeIncludesExcludes := GetScopeResourceIncludesExcludes(discoveryHelper, logger, []string{}, []string{}, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *nsIncludeExclude)
 
 			if got := scopeIncludesExcludes.ShouldInclude((tc.item)); got != tc.want {
 				t.Errorf("want %t, got %t", tc.want, got)
@@ -686,25 +686,25 @@ func TestClusterScopedShouldInclude(t *testing.T) {
 
 func TestGetScopedResourceIncludesExcludes(t *testing.T) {
 	tests := []struct {
-		name                      string
-		namespaceIncludes         []string
-		namespaceExcludes         []string
-		clusterIncludes           []string
-		clusterExcludes           []string
-		expectedNamespaceIncludes []string
-		expectedNamespaceExcludes []string
-		expectedClusterIncludes   []string
-		expectedClusterExcludes   []string
-		apiResources              []*test.APIResource
+		name                            string
+		namespaceScopedIncludes         []string
+		namespaceScopedExcludes         []string
+		clusterScopedIncludes           []string
+		clusterScopedExcludes           []string
+		expectedNamespaceScopedIncludes []string
+		expectedNamespaceScopedExcludes []string
+		expectedClusterScopedIncludes   []string
+		expectedClusterScopedExcludes   []string
+		apiResources                    []*test.APIResource
 	}{
 		{
-			name:                      "only include namespace resources in IncludesExcludes, when namespaced is set to true",
-			namespaceIncludes:         []string{"deployments.apps", "persistentvolumes"},
-			namespaceExcludes:         []string{"pods", "persistentvolumes"},
-			expectedNamespaceIncludes: []string{"deployments.apps"},
-			expectedNamespaceExcludes: []string{"pods"},
-			expectedClusterIncludes:   []string{},
-			expectedClusterExcludes:   []string{},
+			name:                            "only include namespace-scoped resources in IncludesExcludes",
+			namespaceScopedIncludes:         []string{"deployments.apps", "persistentvolumes"},
+			namespaceScopedExcludes:         []string{"pods", "persistentvolumes"},
+			expectedNamespaceScopedIncludes: []string{"deployments.apps"},
+			expectedNamespaceScopedExcludes: []string{"pods"},
+			expectedClusterScopedIncludes:   []string{},
+			expectedClusterScopedExcludes:   []string{},
 			apiResources: []*test.APIResource{
 				test.Deployments(),
 				test.PVs(),
@@ -712,13 +712,13 @@ func TestGetScopedResourceIncludesExcludes(t *testing.T) {
 			},
 		},
 		{
-			name:                      "only include cluster-scoped resources in IncludesExcludes, when namespaced is set to false",
-			clusterIncludes:           []string{"deployments.apps", "persistentvolumes"},
-			clusterExcludes:           []string{"pods", "persistentvolumes"},
-			expectedNamespaceIncludes: []string{},
-			expectedNamespaceExcludes: []string{},
-			expectedClusterIncludes:   []string{"persistentvolumes"},
-			expectedClusterExcludes:   []string{"persistentvolumes"},
+			name:                            "only include cluster-scoped resources in IncludesExcludes",
+			clusterScopedIncludes:           []string{"deployments.apps", "persistentvolumes"},
+			clusterScopedExcludes:           []string{"pods", "persistentvolumes"},
+			expectedNamespaceScopedIncludes: []string{},
+			expectedNamespaceScopedExcludes: []string{},
+			expectedClusterScopedIncludes:   []string{"persistentvolumes"},
+			expectedClusterScopedExcludes:   []string{"persistentvolumes"},
 			apiResources: []*test.APIResource{
 				test.Deployments(),
 				test.PVs(),
@@ -732,12 +732,12 @@ func TestGetScopedResourceIncludesExcludes(t *testing.T) {
 
 			logger := logrus.StandardLogger()
 			nsIncludeExclude := NewIncludesExcludes()
-			resources := GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.namespaceIncludes, tc.namespaceExcludes, tc.clusterIncludes, tc.clusterExcludes, *nsIncludeExclude)
+			resources := GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *nsIncludeExclude)
 
-			assert.Equal(t, tc.expectedNamespaceIncludes, resources.namespaceResourceFilter.includes.List())
-			assert.Equal(t, tc.expectedNamespaceExcludes, resources.namespaceResourceFilter.excludes.List())
-			assert.Equal(t, tc.expectedClusterIncludes, resources.clusterResourceFilter.includes.List())
-			assert.Equal(t, tc.expectedClusterExcludes, resources.clusterResourceFilter.excludes.List())
+			assert.Equal(t, tc.expectedNamespaceScopedIncludes, resources.namespaceScopedResourceFilter.includes.List())
+			assert.Equal(t, tc.expectedNamespaceScopedExcludes, resources.namespaceScopedResourceFilter.excludes.List())
+			assert.Equal(t, tc.expectedClusterScopedIncludes, resources.clusterScopedResourceFilter.includes.List())
+			assert.Equal(t, tc.expectedClusterScopedExcludes, resources.clusterScopedResourceFilter.excludes.List())
 		})
 	}
 }
@@ -760,7 +760,7 @@ func TestUseOldResourceFilters(t *testing.T) {
 		},
 		{
 			name:                  "backup with only new filters should use new filters",
-			backup:                *defaultBackup().IncludedClusterScopeResources("StorageClass").Result(),
+			backup:                *defaultBackup().IncludedClusterScopedResources("StorageClass").Result(),
 			useOldResourceFilters: false,
 		},
 		{
@@ -768,7 +768,7 @@ func TestUseOldResourceFilters(t *testing.T) {
 			// filters used together. So this is only used for UT checking, and I assume old filters
 			// have higher priority, because old parameter should be the default one.
 			name:                  "backup with both old and new filters should use old filters",
-			backup:                *defaultBackup().IncludeClusterResources(true).IncludedClusterScopeResources("StorageClass").Result(),
+			backup:                *defaultBackup().IncludeClusterResources(true).IncludedClusterScopedResources("StorageClass").Result(),
 			useOldResourceFilters: true,
 		},
 	}
