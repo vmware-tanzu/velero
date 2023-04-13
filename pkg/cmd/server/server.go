@@ -489,34 +489,34 @@ func (s *server) veleroResourcesExist() error {
 }
 
 // High priorities:
-// - Custom Resource Definitions come before Custom Resource so that they can be
-//   restored with their corresponding CRD.
-// - Namespaces go second because all namespaced resources depend on them.
-// - Storage Classes are needed to create PVs and PVCs correctly.
-// - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
-// - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
-//	 storage provider
-// - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
-// - PVs go before PVCs because PVCs depend on them.
-// - PVCs go before pods or controllers so they can be mounted as volumes.
-// - Service accounts go before secrets so service account token secrets can be filled automatically.
-// - Secrets and config maps go before pods or controllers so they can be mounted
-// 	 as volumes.
-// - Limit ranges go before pods or controllers so pods can use them.
-// - Pods go before controllers so they can be explicitly restored and potentially
-//	 have pod volume restores run before controllers adopt the pods.
-// - Replica sets go before deployments/other controllers so they can be explicitly
-//	 restored and be adopted by controllers.
-// - CAPI ClusterClasses go before Clusters.
-// - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
-//   for the same clusters
+//   - Custom Resource Definitions come before Custom Resource so that they can be
+//     restored with their corresponding CRD.
+//   - Namespaces go second because all namespaced resources depend on them.
+//   - Storage Classes are needed to create PVs and PVCs correctly.
+//   - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
+//   - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
+//     storage provider
+//   - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
+//   - PVs go before PVCs because PVCs depend on them.
+//   - PVCs go before pods or controllers so they can be mounted as volumes.
+//   - Service accounts go before secrets so service account token secrets can be filled automatically.
+//   - Secrets and config maps go before pods or controllers so they can be mounted
+//     as volumes.
+//   - Limit ranges go before pods or controllers so pods can use them.
+//   - Pods go before controllers so they can be explicitly restored and potentially
+//     have pod volume restores run before controllers adopt the pods.
+//   - Replica sets go before deployments/other controllers so they can be explicitly
+//     restored and be adopted by controllers.
+//   - CAPI ClusterClasses go before Clusters.
+//   - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
+//     for the same clusters
 //
 // Low priorities:
-// - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
-//   ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
-// - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
-//	 Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
-//   See https://github.com/kubernetes-sigs/cluster-api/issues/4105
+//   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
+//     ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
+//   - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
+//     Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
+//     See https://github.com/kubernetes-sigs/cluster-api/issues/4105
 var defaultRestorePriorities = restore.Priorities{
 	HighPriorities: []string{
 		"customresourcedefinitions",
@@ -612,7 +612,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
 		s.logger.Infof("Starting metric server at address [%s]", s.metricsAddress)
-		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+		server := &http.Server{
+			Addr:              s.metricsAddress,
+			Handler:           metricsMux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil {
 			s.logger.Fatalf("Failed to start metric server at [%s]: %v", s.metricsAddress, err)
 		}
 	}()
@@ -925,7 +930,12 @@ func (s *server) runProfiler() {
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
+	server := &http.Server{
+		Addr:              s.config.profilerAddress,
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
 }

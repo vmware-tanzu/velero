@@ -319,7 +319,7 @@ func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.
 	return &RestoreProgressUpdater{pvr, log, ctx, r.Client}
 }
 
-//UpdateProgress which implement ProgressUpdater interface to update pvr progress status
+// UpdateProgress which implement ProgressUpdater interface to update pvr progress status
 func (r *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
 	original := r.PodVolumeRestore.DeepCopy()
 	r.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}

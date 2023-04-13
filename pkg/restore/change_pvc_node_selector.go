@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,8 +59,9 @@ func (p *ChangePVCNodeSelectorAction) AppliesTo() (velero.ResourceSelector, erro
 }
 
 // Execute updates the pvc's selected-node annotation:
-//    a) if node mapping found in the config map for the plugin
-//	  b) if node mentioned in annotation doesn't exist
+//
+//	a) if node mapping found in the config map for the plugin
+//	b) if node mentioned in annotation doesn't exist
 func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	p.logger.Info("Executing ChangePVCNodeSelectorAction")
 	defer p.logger.Info("Done executing ChangePVCNodeSelectorAction")

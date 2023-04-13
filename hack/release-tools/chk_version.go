@@ -24,6 +24,7 @@ import (
 
 // This regex should match both our GA format (example: v1.4.3) and pre-release formats (v1.2.4-beta.2, v1.5.0-rc.1)
 // The following sub-capture groups are defined:
+//
 //	major
 //	minor
 //	patch
