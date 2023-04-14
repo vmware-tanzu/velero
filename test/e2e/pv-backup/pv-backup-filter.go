@@ -48,7 +48,7 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) StartRun() error {
-	err := InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
+	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,6 @@ func (p *PVBackupFiltering) StartRun() error {
 	return nil
 }
 func (p *PVBackupFiltering) CreateResources() error {
-	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
 			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
@@ -124,7 +123,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				WaitForPods(p.Ctx, p.Client, ns, p.podsList[index])
 				for i, pod := range p.podsList[index] {
 					for j := range p.volumesList[i] {
-						Expect(CreateFileToPod(p.Ctx, ns, pod, p.volumesList[i][j],
+						Expect(CreateFileToPod(p.Ctx, ns, pod, pod, p.volumesList[i][j],
 							FILE_NAME, fileContent(ns, pod, p.volumesList[i][j]))).To(Succeed())
 					}
 				}
@@ -135,7 +134,6 @@ func (p *PVBackupFiltering) CreateResources() error {
 }
 
 func (p *PVBackupFiltering) Verify() error {
-	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Waiting for all pods to start %s", p.podsList), func() {
 		for index, ns := range *p.NSIncluded {
 			By(fmt.Sprintf("Waiting for all pods to start %d in namespace %s", index, ns), func() {
@@ -182,7 +180,7 @@ func fileContent(namespace, podName, volume string) string {
 }
 
 func fileExist(ctx context.Context, namespace, podName, volume string) error {
-	c, err := ReadFileFromPodVolume(ctx, namespace, podName, volume, FILE_NAME)
+	c, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s ",
 			FILE_NAME, volume, podName, namespace))
@@ -197,7 +195,7 @@ func fileExist(ctx context.Context, namespace, podName, volume string) error {
 	}
 }
 func fileNotExist(ctx context.Context, namespace, podName, volume string) error {
-	_, err := ReadFileFromPodVolume(ctx, namespace, podName, volume, FILE_NAME)
+	_, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {
 		return nil
 	} else {

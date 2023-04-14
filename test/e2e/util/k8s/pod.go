@@ -106,3 +106,7 @@ func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podNa
 
 	return client.ClientGo.CoreV1().Pods(namespace).Update(ctx, newPod, metav1.UpdateOptions{})
 }
+
+func ListPods(ctx context.Context, client TestClient, namespace string) (*corev1.PodList, error) {
+	return client.ClientGo.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+}
