@@ -26,9 +26,10 @@ const (
 )
 
 // Priorities defines the desired order of resource operations:
-//   Resources in the HighPriorities list will be handled first
-//   Resources in the LowPriorities list will be handled last
-//   Other resources will be handled alphabetically after the high prioritized resources and before the low prioritized resources
+//
+//	Resources in the HighPriorities list will be handled first
+//	Resources in the LowPriorities list will be handled last
+//	Other resources will be handled alphabetically after the high prioritized resources and before the low prioritized resources
 type Priorities struct {
 	HighPriorities []string
 	LowPriorities  []string
