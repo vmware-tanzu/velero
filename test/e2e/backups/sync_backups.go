@@ -13,10 +13,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * /
  */
 
-//Refer to https://github.com/vmware-tanzu/velero/issues/4253
+// Refer to https://github.com/vmware-tanzu/velero/issues/4253
 package backups
 
 import (
