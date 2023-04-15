@@ -47,6 +47,8 @@ type InstallOptions struct {
 	BucketName                string
 	Prefix                    string
 	ProviderName              string
+	InstallAnnotations        flag.Map
+	InstallLabels             flag.Map
 	PodAnnotations            flag.Map
 	PodLabels                 flag.Map
 	ServiceAccountAnnotations flag.Map
@@ -90,6 +92,8 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and node agent pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.Var(&o.InstallAnnotations, "install-annotations", "Annotations to add to installation resources. Overrides --pod-annotations for the same key. Optional. Format is key1=value1,key2=value2")
+	flags.Var(&o.InstallLabels, "install-labels", "Labels to add to installation resources. Overrides --pod-labels for the same key. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.PodLabels, "pod-labels", "Labels to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "Annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
@@ -127,6 +131,8 @@ func NewInstallOptions() *InstallOptions {
 		Image:                     velero.DefaultVeleroImage(),
 		BackupStorageConfig:       flag.NewMap(),
 		VolumeSnapshotConfig:      flag.NewMap(),
+		InstallAnnotations:        flag.NewMap(),
+		InstallLabels:             flag.NewMap(),
 		PodAnnotations:            flag.NewMap(),
 		PodLabels:                 flag.NewMap(),
 		ServiceAccountAnnotations: flag.NewMap(),
@@ -277,6 +283,8 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 		resources = install.AllResources(vo)
 	}
 
+	ApplyLabelAnnotations(resources, o.InstallLabels.Data(), o.InstallAnnotations.Data())
+
 	if _, err := output.PrintWithFormat(c, resources); err != nil {
 		return err
 	}
@@ -418,4 +426,25 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	}
 
 	return nil
+}
+
+// Apply label and annotations to all resources in the list
+func ApplyLabelAnnotations(resources *unstructured.UnstructuredList, label, annotation map[string]string) {
+	for i := range resources.Items {
+		resources.Items[i].SetLabels(concatMapStringString(label, resources.Items[i].GetLabels()))
+		resources.Items[i].SetAnnotations(concatMapStringString(annotation, resources.Items[i].GetAnnotations()))
+	}
+}
+
+// Concatenate a list of maps into a single map. If a key is present in multiple maps, the value from the first map
+func concatMapStringString(maps ...map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, m := range maps {
+		for k, v := range m {
+			if _, ok := result[k]; !ok {
+				result[k] = v
+			}
+		}
+	}
+	return result
 }
