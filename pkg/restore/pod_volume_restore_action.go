@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -108,7 +107,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	// TODO we might want/need to get plugin config at the top of this method at some point; for now, wait
 	// until we know we're doing a restore before getting config.
 	log.Debugf("Getting plugin config")
-	config, err := getPluginConfig(common.PluginKindRestoreItemAction, "velero.io/pod-volume-restore", a.client)
+	config, err := common.GetPluginConfig(common.PluginKindRestoreItemAction, "velero.io/pod-volume-restore", a.client)
 	if err != nil {
 		return nil, err
 	}
@@ -258,35 +257,6 @@ func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (strin
 		config.Data["secCtxRunAsGroup"],
 		config.Data["secCtxAllowPrivilegeEscalation"],
 		config.Data["secCtx"]
-}
-
-// TODO eventually this can move to pkg/plugin/framework since it'll be used across multiple
-// plugins.
-func getPluginConfig(kind common.PluginKind, name string, client corev1client.ConfigMapInterface) (*corev1.ConfigMap, error) {
-	opts := metav1.ListOptions{
-		// velero.io/plugin-config: true
-		// velero.io/pod-volume-restore: RestoreItemAction
-		LabelSelector: fmt.Sprintf("velero.io/plugin-config,%s=%s", name, kind),
-	}
-
-	list, err := client.List(context.TODO(), opts)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if len(list.Items) == 0 {
-		return nil, nil
-	}
-
-	if len(list.Items) > 1 {
-		var items []string
-		for _, item := range list.Items {
-			items = append(items, item.Name)
-		}
-		return nil, errors.Errorf("found more than one ConfigMap matching label selector %q: %v", opts.LabelSelector, items)
-	}
-
-	return &list.Items[0], nil
 }
 
 func newRestoreInitContainerBuilder(image, restoreUID string) *builder.ContainerBuilder {
