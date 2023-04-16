@@ -33,7 +33,7 @@ func (n *NamespaceMapping) Init() error {
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.VeleroCfg.UseVolumeSnapshots = n.UseVolumeSnapshots
 	n.VeleroCfg.UseNodeAgent = !n.UseVolumeSnapshots
-	n.kibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
+	n.kibishiiData = &KibishiiData{Levels: 2, DirsPerLevel: 10, FilesPerLevel: 10, FileLength: 1024, BlockSize: 1024, PassNum: 0, ExpectedNodes: 2}
 	backupType := "restic"
 	if n.UseVolumeSnapshots {
 		backupType = "snapshot"
