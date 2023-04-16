@@ -56,13 +56,13 @@ type BackupOperationSpec struct {
 	BackupItemAction string `json:"backupItemAction"`
 
 	// Kubernetes resource identifier for the item
-	ResourceIdentifier velero.ResourceIdentifier "json:resourceIdentifier"
+	ResourceIdentifier velero.ResourceIdentifier `json:"resourceIdentifier"`
 
 	// OperationID returned by the BIA plugin
-	OperationID string "json:operationID"
+	OperationID string `json:"operationID"`
 
 	// Items needing to be added to the backup after all async operations have completed
-	PostOperationItems []velero.ResourceIdentifier "json:postOperationItems"
+	PostOperationItems []velero.ResourceIdentifier `json:"postOperationItems"`
 }
 
 func (in *BackupOperationSpec) DeepCopy() *BackupOperationSpec {
