@@ -17,10 +17,13 @@
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 
 echo "Running all verification scripts"
-
+SCRIPTS_TO_RUN=""
 for f in ${HACK_DIR}/verify-*.sh; do
   if [[ $f = "${HACK_DIR}/verify-all.sh" ]]; then
     continue
   fi
-  $f
+  SCRIPTS_TO_RUN="${SCRIPTS_TO_RUN} ${f}"
 done
+echo "Running scripts: ${SCRIPTS_TO_RUN}"
+(echo "${SCRIPTS_TO_RUN}" | xargs -n 1 -P 10 bash -c ) && \
+  echo "All verification scripts succeeded"
