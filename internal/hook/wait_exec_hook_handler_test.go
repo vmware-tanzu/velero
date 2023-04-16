@@ -738,7 +738,9 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			ctx := context.Background()
 			if test.sharedHooksContextTimeout > 0 {
-				ctx, _ = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
+				var ctxCancel context.CancelFunc
+				ctx, ctxCancel = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
+				defer ctxCancel()
 			}
 
 			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer)

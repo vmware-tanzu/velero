@@ -43,6 +43,7 @@ type TTL struct {
 	backupName  string
 	restoreName string
 	ctx         context.Context
+	ctxCancel   context.CancelFunc
 	ttl         time.Duration
 }
 
@@ -52,7 +53,7 @@ func (b *TTL) Init() {
 	b.testNS = "backup-ttl-test-" + UUIDgen.String()
 	b.backupName = "backup-ttl-test-" + UUIDgen.String()
 	b.restoreName = "restore-ttl-test-" + UUIDgen.String()
-	b.ctx, _ = context.WithTimeout(context.Background(), 2*time.Hour)
+	b.ctx, b.ctxCancel = context.WithTimeout(context.Background(), 2*time.Hour)
 	b.ttl = 20 * time.Minute
 
 }
@@ -93,6 +94,7 @@ func TTLTest() {
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
+		defer test.ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS), func() {
 			Expect(CreateNamespace(test.ctx, client, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))

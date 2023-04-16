@@ -40,6 +40,7 @@ type SyncBackups struct {
 	testNS     string
 	backupName string
 	ctx        context.Context
+	ctxCancel  context.CancelFunc
 }
 
 func (b *SyncBackups) Init() {
@@ -47,7 +48,7 @@ func (b *SyncBackups) Init() {
 	UUIDgen, _ = uuid.NewRandom()
 	b.testNS = "sync-bsl-test-" + UUIDgen.String()
 	b.backupName = "sync-bsl-test-" + UUIDgen.String()
-	b.ctx, _ = context.WithTimeout(context.Background(), time.Minute*10)
+	b.ctx, b.ctxCancel = context.WithTimeout(context.Background(), time.Minute*10)
 }
 
 func BackupsSyncTest() {
@@ -79,6 +80,7 @@ func BackupsSyncTest() {
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
+		defer test.ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS))
 		Expect(CreateNamespace(test.ctx, *VeleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", test.testNS))
@@ -119,6 +121,7 @@ func BackupsSyncTest() {
 
 	It("Deleted backups in object storage are synced to be deleted in Velero", func() {
 		test.Init()
+		defer test.ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace in %s namespace", test.testNS), func() {
 			Expect(CreateNamespace(test.ctx, *VeleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
