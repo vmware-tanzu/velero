@@ -1,0 +1,1 @@
+velero can now via install options, uninstall velero without deleting namespace

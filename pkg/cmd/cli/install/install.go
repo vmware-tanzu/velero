@@ -79,6 +79,8 @@ type InstallOptions struct {
 	Features                        string
 	DefaultVolumesToFsBackup        bool
 	UploaderType                    string
+	Uninstall                       bool
+	PreserveUninstallNamespace      bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -118,6 +120,8 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the node-agent daemonset, if node-agent is enabled")
 	flags.BoolVar(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", o.DefaultVolumesToFsBackup, "Bool flag to configure Velero server to use pod volume file system backup by default for all volumes on all backups. Optional.")
 	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
+	flags.BoolVar(&o.Uninstall, "uninstall", o.Uninstall, "Uninstall Velero from the cluster. Optional.")
+	flags.BoolVar(&o.PreserveUninstallNamespace, "preserve-uninstall-namespace", o.PreserveUninstallNamespace, "Preserve the namespace used for uninstalling Velero. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -293,6 +297,14 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err
+	}
+	if o.Uninstall {
+		if err := install.Uninstall(dynamicFactory, resources, os.Stdout, o.PreserveUninstallNamespace); err != nil {
+			return err
+		} else {
+			fmt.Println("Velero is uninstalled!")
+			return nil
+		}
 	}
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 

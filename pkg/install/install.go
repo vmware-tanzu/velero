@@ -297,6 +297,29 @@ func createResource(r *unstructured.Unstructured, factory client.DynamicFactory,
 	return nil
 }
 
+func deleteResource(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer) error {
+	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
+
+	// Helper to reduce boilerplate message about the same object
+	log := func(f string, a ...interface{}) {
+		format := strings.Join([]string{id, ": ", f, "\n"}, "")
+		fmt.Fprintf(w, format, a...)
+	}
+	log("attempting to delete resource")
+
+	c, err := CreateClient(r, factory, w)
+	if err != nil {
+		return err
+	}
+
+	if err := c.Delete(r.GetName(), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "Error deleting resource %s", id)
+	}
+
+	log("deleted")
+	return nil
+}
+
 // CreateClient creates a client for an unstructured resource
 func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer) (client.Dynamic, error) {
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
@@ -350,6 +373,27 @@ func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, res
 	// Install all other resources
 	for _, r := range rg.OtherResources {
 		if err = createResource(r, dynamicFactory, w); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Uninstall(dynamicFactory client.DynamicFactory, resources *unstructured.UnstructuredList, w io.Writer, preserveNamespace bool) error {
+	rg := GroupResources(resources)
+
+	for _, r := range rg.OtherResources {
+		if r.GroupVersionKind().Kind == "Namespace" && preserveNamespace {
+			continue
+		}
+		if err := deleteResource(r, dynamicFactory, w); err != nil {
+			return err
+		}
+	}
+
+	for _, r := range rg.CRDResources {
+		if err := deleteResource(r, dynamicFactory, w); err != nil {
 			return err
 		}
 	}
