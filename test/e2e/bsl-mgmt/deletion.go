@@ -96,6 +96,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 	When("kibishii is the sample workload", func() {
 		It("Local backups and restic repos (if Velero was installed with Restic) will be deleted once the corresponding backup storage location is deleted", func() {
+			oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+			defer ctxCancel()
 			if veleroCfg.AdditionalBSLProvider == "" {
 				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
@@ -141,8 +143,6 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 			backupName_1 := "backup1-" + UUIDgen.String()
 			backupName_2 := "backup2-" + UUIDgen.String()
-			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
-
 			backupLocation_1 := "default"
 			backupLocation_2 := additionalBsl
 			podName_1 := "kibishii-deployment-0"

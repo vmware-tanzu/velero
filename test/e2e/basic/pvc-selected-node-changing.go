@@ -74,7 +74,6 @@ func (p *PVCSelectedNodeChanging) StartRun() error {
 	return nil
 }
 func (p *PVCSelectedNodeChanging) CreateResources() error {
-	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(context.Background(), p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
@@ -125,8 +124,10 @@ func (p *PVCSelectedNodeChanging) Destroy() error {
 }
 
 func (p *PVCSelectedNodeChanging) Restore() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
 	By(fmt.Sprintf("Start to restore %s .....", p.RestoreName), func() {
-		Expect(VeleroRestoreExec(context.Background(), p.VeleroCfg.VeleroCLI,
+		Expect(VeleroRestoreExec(ctx, p.VeleroCfg.VeleroCLI,
 			p.VeleroCfg.VeleroNamespace, p.RestoreName,
 			p.RestoreArgs, velerov1api.RestorePhaseCompleted)).To(
 			Succeed(),
@@ -135,7 +136,7 @@ func (p *PVCSelectedNodeChanging) Restore() error {
 					p.VeleroCfg.VeleroNamespace, "", p.RestoreName)
 				return "Fail to restore workload"
 			})
-		err := WaitForPods(p.Ctx, p.Client, p.mappedNS, []string{p.podName})
+		err := WaitForPods(ctx, p.Client, p.mappedNS, []string{p.podName})
 		Expect(err).To(Succeed())
 	})
 	return nil
