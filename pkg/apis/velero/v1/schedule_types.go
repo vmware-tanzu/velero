@@ -42,6 +42,10 @@ type ScheduleSpec struct {
 	// Paused specifies whether the schedule is paused or not
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+
+	// RotationScheme is the name of the rotation scheme to apply to this schedule
+	// +optional
+	RotationScheme string `json:"rotationScheme,omitempty"`
 }
 
 // SchedulePhase is a string representation of the lifecycle phase
