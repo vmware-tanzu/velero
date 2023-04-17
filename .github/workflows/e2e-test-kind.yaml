@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: '1.20'
         id: go
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
@@ -70,9 +70,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: '1.20'
         id: go
       - name: Check out the code
         uses: actions/checkout@v2
