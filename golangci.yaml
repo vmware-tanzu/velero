@@ -181,7 +181,7 @@ linters-settings:
         #     reason: "testing if blocked version constraint works."  # Reason why the version constraint exists. (Optional)
   govet:
     # report about shadowed variables
-    check-shadowing: true
+    # check-shadowing: true
 
     # settings per analyzer
     settings:
@@ -296,6 +296,7 @@ linters:
     - goheader
     - goimports
     - gosec
+    - govet
     - misspell
     - typecheck
     - unparam
