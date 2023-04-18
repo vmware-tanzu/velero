@@ -82,7 +82,6 @@ CheckVersion:
 					break CheckVersion
 				}
 			}
-
 		}
 	}
 	if !supportv1b1 {
@@ -142,7 +141,6 @@ func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResour
 	item := &unstructured.Unstructured{Object: m}
 
 	return item, nil
-
 }
 
 // hasPreserveUnknownFields determines whether or not a CRD is set to preserve unknown fields or not.

@@ -121,7 +121,6 @@ func InvokeDeleteActions(ctx *Context) error {
 					// Since we want to keep looping even on errors, log them instead of just returning.
 					if err != nil {
 						itemLog.WithError(err).Error("plugin error")
-
 					}
 				}
 			}

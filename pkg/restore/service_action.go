@@ -130,7 +130,6 @@ func deleteNodePorts(service *corev1api.Service) error {
 						} else {
 							explicitNodePorts.Insert(portName.(string))
 						}
-
 					}
 				}
 			}

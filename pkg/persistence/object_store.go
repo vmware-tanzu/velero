@@ -429,7 +429,6 @@ func (s *objectBackupStore) GetCSIVolumeSnapshotClasses(name string) ([]*snapsho
 		return nil, err
 	}
 	return csiVSClasses, nil
-
 }
 
 func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error) {

@@ -84,7 +84,6 @@ func (m *BackupItemOperationsMap) UploadProgressAndPutOperationsForBackup(
 	backupStore persistence.BackupStore,
 	operations *OperationsForBackup,
 	backupName string) error {
-
 	m.opsLock.Lock()
 	defer m.opsLock.Unlock()
 

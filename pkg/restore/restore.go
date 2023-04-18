@@ -1283,7 +1283,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		} else if !available {
 			errs.Add(namespace, fmt.Errorf("Additional items for %s are not ready to use.", resourceID))
 		}
-
 	}
 
 	// This comes after running item actions because we have built-in actions that restore

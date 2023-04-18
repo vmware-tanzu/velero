@@ -528,7 +528,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	asyncBIAOperations []*itemoperation.BackupOperation) error {
-
 	gzw := gzip.NewWriter(outBackupFile)
 	defer gzw.Close()
 	tw := tar.NewWriter(gzw)
@@ -623,7 +622,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 					updateFiles[itemFile.FilePath] = itemFile
 				}
 			}
-
 		}()
 
 		// updated total is computed as "how many items we've backed up so far, plus
@@ -694,7 +692,6 @@ func buildFinalTarball(tr *tar.Reader, tw *tar.Writer, updateFiles map[string]Fi
 		}
 	}
 	return nil
-
 }
 
 type tarWriter interface {

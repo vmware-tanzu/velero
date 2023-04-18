@@ -152,7 +152,6 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed ||
 			backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
 			backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
-
 			if backup.Status.Expiration == nil || backup.Status.Expiration.After(time.Now()) {
 				log.Debugf("Skipping non-expired incomplete backup %v", backup.Name)
 				continue

@@ -216,7 +216,6 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 	operations *itemoperationmap.OperationsForRestore,
 	changes bool,
 	completionChanges bool) error {
-
 	if len(operations.ErrsSinceUpdate) > 0 {
 		// FIXME: download/upload results
 	}
@@ -225,7 +224,6 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 		// remove local operations list if complete
 		if removeIfComplete && (restore.Status.Phase == velerov1api.RestorePhaseCompleted ||
 			restore.Status.Phase == velerov1api.RestorePhasePartiallyFailed) {
-
 			r.itemOperationsMap.DeleteOperationsForRestore(restore.Name)
 		} else if changes {
 			r.itemOperationsMap.PutOperationsForRestore(operations, restore.Name)
