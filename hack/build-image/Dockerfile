@@ -50,7 +50,7 @@ RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v
 RUN go install github.com/golang/protobuf/protoc-gen-go@v1.4.3
 
 # get goreleaser
-RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v1.12.3/goreleaser_Linux_x86_64.tar.gz && \
+RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_x86_64.tar.gz && \
     tar xvf goreleaser_Linux_x86_64.tar.gz && \
     mv goreleaser /usr/bin/goreleaser && \
     chmod +x /usr/bin/goreleaser
