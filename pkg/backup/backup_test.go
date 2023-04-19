@@ -1046,11 +1046,11 @@ func TestBackupResourceCohabitation(t *testing.T) {
 	}
 }
 
-// TestBackupUsesNewCohabitatingResourcesForEachBackup ensures that when two backups are
+// TestBackupUsesNewCohabitingResourcesForEachBackup ensures that when two backups are
 // run that each include cohabiting resources, one copy of the relevant resources is
 // backed up in each backup. Verification is done by looking at the contents of the backup
 // tarball. This covers a specific issue that was fixed by https://github.com/vmware-tanzu/velero/pull/485.
-func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
+func TestBackupUsesNewCohabitingResourcesForEachBackup(t *testing.T) {
 	h := newHarness(t)
 
 	// run and verify backup 1
