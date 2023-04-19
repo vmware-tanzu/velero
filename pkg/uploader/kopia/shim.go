@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,18 +31,18 @@ import (
 	"github.com/kopia/kopia/repo/object"
 )
 
-//shimRepository which is one adapter for unifited repo and kopia.
-//it implement kopia RepositoryWriter interfaces
+// shimRepository which is one adapter for unifited repo and kopia.
+// it implement kopia RepositoryWriter interfaces
 type shimRepository struct {
 	udmRepo udmrepo.BackupRepo
 }
 
-//shimObjectWriter object writer for unifited repo
+// shimObjectWriter object writer for unifited repo
 type shimObjectWriter struct {
 	repoWriter udmrepo.ObjectWriter
 }
 
-//shimObjectReader object reader for unifited repo
+// shimObjectReader object reader for unifited repo
 type shimObjectReader struct {
 	repoReader udmrepo.ObjectReader
 }
@@ -53,7 +53,7 @@ func NewShimRepo(repo udmrepo.BackupRepo) repo.RepositoryWriter {
 	}
 }
 
-//OpenObject open specific object
+// OpenObject open specific object
 func (sr *shimRepository) OpenObject(ctx context.Context, id object.ID) (object.Reader, error) {
 	reader, err := sr.udmRepo.OpenObject(ctx, udmrepo.ID(id))
 	if err != nil {
@@ -94,7 +94,7 @@ func (sr *shimRepository) FindManifests(ctx context.Context, labels map[string]s
 	}
 }
 
-//GetKopiaManifestEntries get metadata from specific ManifestEntryMetadata
+// GetKopiaManifestEntries get metadata from specific ManifestEntryMetadata
 func GetKopiaManifestEntry(uMani *udmrepo.ManifestEntryMetadata) *manifest.EntryMetadata {
 	var ret manifest.EntryMetadata
 
@@ -106,7 +106,7 @@ func GetKopiaManifestEntry(uMani *udmrepo.ManifestEntryMetadata) *manifest.Entry
 	return &ret
 }
 
-//GetKopiaManifestEntries get metadata list from specific ManifestEntryMetadata
+// GetKopiaManifestEntries get metadata list from specific ManifestEntryMetadata
 func GetKopiaManifestEntries(uMani []*udmrepo.ManifestEntryMetadata) []*manifest.EntryMetadata {
 	var ret []*manifest.EntryMetadata
 
@@ -123,12 +123,12 @@ func GetKopiaManifestEntries(uMani []*udmrepo.ManifestEntryMetadata) []*manifest
 	return ret
 }
 
-//Time Get the local time of the unified repo
+// Time Get the local time of the unified repo
 func (sr *shimRepository) Time() time.Time {
 	return sr.udmRepo.Time()
 }
 
-//ClientOptions is not supported by unified repo
+// ClientOptions is not supported by unified repo
 func (sr *shimRepository) ClientOptions() repo.ClientOptions {
 	return repo.ClientOptions{}
 }
@@ -143,26 +143,26 @@ func (sr *shimRepository) ContentInfo(ctx context.Context, contentID content.ID)
 	return nil, errors.New("not supported")
 }
 
-//PrefetchContents is not supported by unified repo
+// PrefetchContents is not supported by unified repo
 func (sr *shimRepository) PrefetchContents(ctx context.Context, contentIDs []content.ID, hint string) []content.ID {
 	return nil
 }
 
-//PrefetchObjects is not supported by unified repo
+// PrefetchObjects is not supported by unified repo
 func (sr *shimRepository) PrefetchObjects(ctx context.Context, objectIDs []object.ID, hint string) ([]content.ID, error) {
 	return nil, errors.New("not supported")
 }
 
-//UpdateDescription is not supported by unified repo
+// UpdateDescription is not supported by unified repo
 func (sr *shimRepository) UpdateDescription(d string) {
 }
 
-//NewWriter is not supported by unified repo
+// NewWriter is not supported by unified repo
 func (sr *shimRepository) NewWriter(ctx context.Context, option repo.WriteSessionOptions) (context.Context, repo.RepositoryWriter, error) {
 	return nil, nil, errors.New("not supported")
 }
 
-//Close will close unified repo
+// Close will close unified repo
 func (sr *shimRepository) Close(ctx context.Context) error {
 	return sr.udmRepo.Close(ctx)
 }
@@ -222,7 +222,7 @@ func (sr *shimObjectReader) Seek(offset int64, whence int) (int64, error) {
 	return sr.repoReader.Seek(offset, whence)
 }
 
-//Close current io for ObjectReader
+// Close current io for ObjectReader
 func (sr *shimObjectReader) Close() error {
 	return sr.repoReader.Close()
 }

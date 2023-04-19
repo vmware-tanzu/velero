@@ -299,7 +299,7 @@ func (r *PodVolumeBackupReconciler) NewBackupProgressUpdater(pvb *velerov1api.Po
 	return &BackupProgressUpdater{pvb, log, ctx, r.Client}
 }
 
-//UpdateProgress which implement ProgressUpdater interface to update pvb progress status
+// UpdateProgress which implement ProgressUpdater interface to update pvb progress status
 func (b *BackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
 	original := b.PodVolumeBackup.DeepCopy()
 	b.PodVolumeBackup.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
