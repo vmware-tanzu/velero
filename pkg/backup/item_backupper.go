@@ -150,7 +150,6 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			log.Info("Excluding item because resource is excluded")
 			return false, itemFiles, nil
 		}
-
 	}
 
 	if metadata.GetDeletionTimestamp() != nil {

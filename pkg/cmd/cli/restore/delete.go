@@ -57,7 +57,6 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
 			cmd.CheckError(Run(o))
-
 		},
 	}
 	o.BindFlags(c.Flags())

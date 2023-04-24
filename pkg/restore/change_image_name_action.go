@@ -102,7 +102,6 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 		return nil, errors.Errorf("object was of unexpected type %T", input.Item)
 	}
 	if obj.GetKind() == "Pod" {
-
 		err = a.replaceImageName(obj, config, "spec", "containers")
 		if err != nil {
 			a.logger.Infof("replace image name meet error: %v", err)
@@ -114,7 +113,6 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 			a.logger.Infof("replace image name meet error: %v", err)
 			return nil, errors.Wrap(err, "error getting item's spec.containers")
 		}
-
 	} else if obj.GetKind() == "CronJob" {
 		//handle containers
 		err = a.replaceImageName(obj, config, "spec", "jobTemplate", "spec", "template", "spec", "containers")
@@ -128,7 +126,6 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 			a.logger.Infof("replace image name meet error: %v", err)
 			return nil, errors.Wrap(err, "error getting item's spec.containers")
 		}
-
 	} else {
 		//handle containers
 		err = a.replaceImageName(obj, config, "spec", "template", "spec", "containers")
@@ -148,7 +145,6 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 }
 
 func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured, config *corev1.ConfigMap, filed ...string) error {
-
 	log := a.logger.WithFields(map[string]interface{}{
 		"kind":      obj.GetKind(),
 		"namespace": obj.GetNamespace(),

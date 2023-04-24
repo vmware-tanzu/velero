@@ -121,7 +121,6 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 						fmt.Printf("\n\n%s", s)
 					}
 				}
-
 			}
 			cmd.CheckError(err)
 		},

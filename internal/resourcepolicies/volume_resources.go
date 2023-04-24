@@ -121,7 +121,6 @@ func (c *nfsCondition) match(v *structuredVolume) bool {
 		return false
 	}
 	return true
-
 }
 
 type csiCondition struct {

@@ -35,7 +35,6 @@ var release_regex *regexp.Regexp = regexp.MustCompile(`^v(?P<major>[[:digit:]]+)
 // Calling it with --verify will verify whether or not the VELERO_VERSION environment variable is a valid version string, without parsing for its components.
 // Calling it without --verify will try to parse the version into its component pieces.
 func main() {
-
 	velero_version := os.Getenv("VELERO_VERSION")
 
 	submatches := reSubMatchMap(release_regex, velero_version)

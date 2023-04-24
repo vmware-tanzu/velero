@@ -53,7 +53,6 @@ func (tw *TarWriter) AddItems(groupResource string, items ...metav1.Object) *Tar
 	tw.t.Helper()
 
 	for _, obj := range items {
-
 		var path string
 		if obj.GetNamespace() == "" {
 			path = fmt.Sprintf("resources/%s/cluster/%s.json", groupResource, obj.GetName())

@@ -300,6 +300,8 @@ linters:
     - typecheck
     - unparam
     - unused
+    - usestdlibvars
+    - whitespace
   fast: false
 
 

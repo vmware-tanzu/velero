@@ -62,7 +62,6 @@ type kubernetesResource struct {
 // getItemsFromResourceIdentifiers converts ResourceIdentifiers to
 // kubernetesResources
 func (r *itemCollector) getItemsFromResourceIdentifiers(resourceIDs []velero.ResourceIdentifier) []*kubernetesResource {
-
 	grResourceIDsMap := make(map[schema.GroupResource][]velero.ResourceIdentifier)
 	for _, resourceID := range resourceIDs {
 		grResourceIDsMap[resourceID.GroupResource] = append(grResourceIDsMap[resourceID.GroupResource], resourceID)

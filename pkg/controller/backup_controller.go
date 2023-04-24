@@ -118,7 +118,6 @@ func NewBackupReconciler(
 	credentialStore credentials.FileStore,
 	maxConcurrentK8SConnections int,
 ) *backupReconciler {
-
 	b := &backupReconciler{
 		ctx:                         ctx,
 		discoveryHelper:             discoveryHelper,

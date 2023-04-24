@@ -84,7 +84,6 @@ func (m *RestoreItemOperationsMap) UploadProgressAndPutOperationsForRestore(
 	backupStore persistence.BackupStore,
 	operations *OperationsForRestore,
 	restoreName string) error {
-
 	m.opsLock.Lock()
 	defer m.opsLock.Unlock()
 

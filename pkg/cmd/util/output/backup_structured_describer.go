@@ -242,7 +242,6 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 	}
 	if status.CompletionTimestamp == nil || status.CompletionTimestamp.Time.IsZero() {
 		backupStatusInfo["completed"] = "<n/a>"
-
 	} else {
 		backupStatusInfo["completed"] = status.CompletionTimestamp.Time.String()
 	}
@@ -258,7 +257,6 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 		if backup.Status.Phase == velerov1api.BackupPhaseInProgress {
 			backupStatusInfo["estimatedTotalItemsToBeBackedUp"] = backup.Status.Progress.TotalItems
 			backupStatusInfo["itemsBackedUpSoFar"] = backup.Status.Progress.ItemsBackedUp
-
 		} else {
 			backupStatusInfo["totalItemsToBeBackedUp"] = backup.Status.Progress.TotalItems
 			backupStatusInfo["itemsBackedUp"] = backup.Status.Progress.ItemsBackedUp
@@ -298,7 +296,6 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 		backupStatusInfo["veleroNativeSnapshotsDetail"] = snapshotDetails
 		return
 	}
-
 }
 
 func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]interface{}, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
@@ -340,7 +337,6 @@ func describeSnapshotInSF(pvName, snapshotID, volumeType, volumeAZ string, iops 
 	snapshotInfo["availabilityZone"] = volumeAZ
 	snapshotInfo["IOPS"] = iopsString
 	snapshotDetails[pvName] = snapshotInfo
-
 }
 
 // DescribeDeleteBackupRequestsInSF describes delete backup requests in structured format.
@@ -457,7 +453,6 @@ func DescribeVSCInSF(details bool, vsc snapshotv1api.VolumeSnapshotContent, vscD
 
 	if vsc.Status.RestoreSize != nil {
 		content["snapshotSize(bytes)"] = *vsc.Status.RestoreSize
-
 	}
 
 	if vsc.Status.ReadyToUse != nil {
