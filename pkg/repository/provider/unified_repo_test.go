@@ -660,9 +660,8 @@ func TestPrepareRepo(t *testing.T) {
 			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return nil
-				} else {
-					return errors.New("fake-error")
 				}
+				return errors.New("fake-error")
 			},
 		},
 		{
@@ -681,9 +680,8 @@ func TestPrepareRepo(t *testing.T) {
 			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return errors.New("fake-error-1")
-				} else {
-					return errors.New("fake-error-2")
 				}
+				return errors.New("fake-error-2")
 			},
 			expectedErr: "error to init backup repo: fake-error-2",
 		},

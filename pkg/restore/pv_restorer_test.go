@@ -53,27 +53,27 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 	}{
 		{
 			name:        "no name should error",
-			obj:         NewTestUnstructured().WithMetadata().Unstructured,
+			obj:         newTestUnstructured().WithMetadata().Unstructured,
 			restore:     builder.ForRestore(api.DefaultNamespace, "").Result(),
 			expectedErr: true,
 		},
 		{
 			name:        "ensure spec.storageClassName is retained",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
+			obj:         newTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
 			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
 			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).Result(),
-			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("storageClassName", "someOtherField").Unstructured,
+			expectedRes: newTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
+			obj:         newTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).SnapshotVolumes(false).Result(),
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
+			expectedRes: newTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:    "restore.spec.restorePVs=false, return early",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
 			backup:  defaultBackup().Phase(api.BackupPhaseInProgress).Result(),
 			volumeSnapshots: []*volume.Snapshot{
@@ -83,11 +83,11 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
 			},
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			expectedRes: newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
 			name:    "volumeSnapshots is empty: return early",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Result(),
 			locations: []*api.VolumeSnapshotLocation{
@@ -95,11 +95,11 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{},
-			expectedRes:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			expectedRes:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
 			name:    "volumeSnapshots doesn't have a snapshot for PV: return early",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Result(),
 			locations: []*api.VolumeSnapshotLocation{
@@ -110,7 +110,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 				newSnapshot("non-matching-pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
 				newSnapshot("non-matching-pv-2", "loc-2", "type-2", "az-2", "snap-2", 2),
 			},
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			expectedRes: newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 	}
 
@@ -165,7 +165,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	}{
 		{
 			name:    "backup with a matching volume.Snapshot for PV executes restore",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Result(),
 			locations: []*api.VolumeSnapshotLocation{
@@ -221,11 +221,11 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 type providerToVolumeSnapshotterMap map[string]vsv1.VolumeSnapshotter
 
 func (g providerToVolumeSnapshotterMap) GetVolumeSnapshotter(provider string) (vsv1.VolumeSnapshotter, error) {
-	if bs, ok := g[provider]; !ok {
+	bs, ok := g[provider]
+	if !ok {
 		return nil, errors.New("volume snapshotter not found for provider")
-	} else {
-		return bs, nil
 	}
+	return bs, nil
 }
 
 func newSnapshot(pvName, location, volumeType, volumeAZ, snapshotID string, volumeIOPS int64) *volume.Snapshot {
@@ -252,7 +252,7 @@ type testUnstructured struct {
 	*unstructured.Unstructured
 }
 
-func NewTestUnstructured() *testUnstructured {
+func newTestUnstructured() *testUnstructured {
 	obj := &testUnstructured{
 		Unstructured: &unstructured.Unstructured{
 			Object: make(map[string]interface{}),

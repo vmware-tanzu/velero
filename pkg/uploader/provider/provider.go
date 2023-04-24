@@ -81,10 +81,9 @@ func NewUploaderProvider(
 			return nil, errors.Wrap(err, "failed to connect repository")
 		}
 		return NewKopiaUploaderProvider(ctx, credGetter, backupRepo, log)
-	} else {
-		if err := provider.NewResticRepositoryProvider(credGetter.FromFile, filesystem.NewFileSystem(), log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
-			return nil, errors.Wrap(err, "failed to connect repository")
-		}
-		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	}
+	if err := provider.NewResticRepositoryProvider(credGetter.FromFile, filesystem.NewFileSystem(), log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
+		return nil, errors.Wrap(err, "failed to connect repository")
+	}
+	return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 }

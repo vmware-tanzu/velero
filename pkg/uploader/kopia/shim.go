@@ -87,11 +87,11 @@ func (sr *shimRepository) GetManifest(ctx context.Context, id manifest.ID, paylo
 
 // Get one or more manifest data that match the given labels
 func (sr *shimRepository) FindManifests(ctx context.Context, labels map[string]string) ([]*manifest.EntryMetadata, error) {
-	if metadata, err := sr.udmRepo.FindManifests(ctx, udmrepo.ManifestFilter{Labels: labels}); err != nil {
+	metadata, err := sr.udmRepo.FindManifests(ctx, udmrepo.ManifestFilter{Labels: labels})
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get manifests with labels %v", labels)
-	} else {
-		return GetKopiaManifestEntries(metadata), nil
 	}
+	return GetKopiaManifestEntries(metadata), nil
 }
 
 // GetKopiaManifestEntries get metadata from specific ManifestEntryMetadata

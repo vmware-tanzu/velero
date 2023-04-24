@@ -52,7 +52,7 @@ func (r *restartableDeleteItemAction) getDeleteItemAction() (velero.DeleteItemAc
 
 	deleteItemAction, ok := plugin.(velero.DeleteItemAction)
 	if !ok {
-		return nil, errors.Errorf("%T is not a DeleteItemAction!", plugin)
+		return nil, errors.Errorf("plugin %T is not a DeleteItemAction", plugin)
 	}
 
 	return deleteItemAction, nil

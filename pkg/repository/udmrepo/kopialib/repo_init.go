@@ -35,7 +35,7 @@ type kopiaBackendStore struct {
 }
 
 // backendStores lists the supported backend storages at present
-var backendStores []kopiaBackendStore = []kopiaBackendStore{
+var backendStores = []kopiaBackendStore{
 	{udmrepo.StorageTypeAzure, "an Azure blob storage", &backend.AzureBackend{}},
 	{udmrepo.StorageTypeFs, "a filesystem", &backend.FsBackend{}},
 	{udmrepo.StorageTypeGcs, "a Google Cloud Storage bucket", &backend.GCSBackend{}},

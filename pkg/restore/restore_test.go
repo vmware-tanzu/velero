@@ -3088,21 +3088,21 @@ func TestResetMetadata(t *testing.T) {
 		},
 		{
 			name:        "keep name, namespace, labels, annotations, managedFields, finalizers",
-			obj:         NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
+			obj:         newTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
 		},
 		{
 			name:        "remove uid, ownerReferences",
-			obj:         NewTestUnstructured().WithMetadata("name", "namespace", "uid", "ownerReferences").Unstructured,
+			obj:         newTestUnstructured().WithMetadata("name", "namespace", "uid", "ownerReferences").Unstructured,
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace").Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata("name", "namespace").Unstructured,
 		},
 		{
 			name:        "keep status",
-			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			obj:         newTestUnstructured().WithMetadata().WithStatus().Unstructured,
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata().WithStatus().Unstructured,
 		},
 	}
 
@@ -3130,8 +3130,8 @@ func TestResetStatus(t *testing.T) {
 		},
 		{
 			name:        "remove status",
-			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
-			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
+			obj:         newTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata().Unstructured,
 		},
 	}
 
@@ -3447,7 +3447,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 	}{
 		{
 			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
-			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
+			obj: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").WithAnnotations(
 				kubeutil.KubeAnnBindCompleted,
 				kubeutil.KubeAnnBoundByController,
@@ -3457,7 +3457,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				"name":            "pvc-1",
 				"uid":             "abc",
 				"resourceVersion": "1"}).Unstructured,
-			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
+			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
 				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
 				WithSpecField("claimRef", map[string]interface{}{
@@ -3465,12 +3465,12 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 		},
 		{
 			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
-			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+			obj: newTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations(
 				kubeutil.KubeAnnBindCompleted,
 				kubeutil.KubeAnnBoundByController,
 			).WithSpecField("volumeName", "pv-1").Unstructured,
-			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations().
 				WithSpecField("volumeName", "pv-1").Unstructured,
 		},

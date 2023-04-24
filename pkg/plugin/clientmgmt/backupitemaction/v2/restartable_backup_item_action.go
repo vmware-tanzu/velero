@@ -81,7 +81,7 @@ func (r *RestartableBackupItemAction) getBackupItemAction() (biav2.BackupItemAct
 
 	backupItemAction, ok := plugin.(biav2.BackupItemAction)
 	if !ok {
-		return nil, errors.Errorf("%T (returned for %v) is not a BackupItemActionV2!", plugin, r.Key)
+		return nil, errors.Errorf("plugin %T (returned for %v) is not a BackupItemActionV2", plugin, r.Key)
 	}
 
 	return backupItemAction, nil

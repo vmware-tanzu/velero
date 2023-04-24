@@ -72,5 +72,5 @@ func AsyncOperationsNotSupportedError() error {
 }
 
 func InvalidOperationIDError(operationID string) error {
-	return errors.New(fmt.Sprintf("Operation ID %v is invalid.", operationID))
+	return fmt.Errorf("operation ID %v is invalid", operationID)
 }
