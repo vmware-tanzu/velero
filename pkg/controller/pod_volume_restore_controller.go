@@ -122,7 +122,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if err = c.processRestore(ctx, pvr, pod, log); err != nil {
-		if e := UpdatePVRStatusToFailed(c, ctx, pvr, err.Error(), c.clock.Now()); e != nil {
+		if e := UpdatePVRStatusToFailed(ctx, c, pvr, err.Error(), c.clock.Now()); e != nil {
 			log.WithError(err).Error("Unable to update status to failed")
 		}
 
@@ -141,7 +141,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{}, nil
 }
 
-func UpdatePVRStatusToFailed(c client.Client, ctx context.Context, pvr *velerov1api.PodVolumeRestore, errString string, time time.Time) error {
+func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvr *velerov1api.PodVolumeRestore, errString string, time time.Time) error {
 	original := pvr.DeepCopy()
 	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
 	pvr.Status.Message = errString
@@ -278,7 +278,7 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 		}
 	}()
 
-	if err = uploaderProv.RunRestore(ctx, req.Spec.SnapshotID, volumePath, c.NewRestoreProgressUpdater(req, log, ctx)); err != nil {
+	if err = uploaderProv.RunRestore(ctx, req.Spec.SnapshotID, volumePath, c.NewRestoreProgressUpdater(ctx, req, log)); err != nil {
 		return errors.Wrapf(err, "error running restore err=%v", err)
 	}
 
@@ -314,12 +314,12 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	return nil
 }
 
-func (c *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger, ctx context.Context) *RestoreProgressUpdater {
+func (c *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(ctx context.Context, pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger) *RestoreProgressUpdater {
 	return &RestoreProgressUpdater{pvr, log, ctx, c.Client}
 }
 
 // UpdateProgress which implement ProgressUpdater interface to update pvr progress status
-func (c *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
+func (c *RestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {
 	original := c.PodVolumeRestore.DeepCopy()
 	c.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
 	if c.Cli == nil {

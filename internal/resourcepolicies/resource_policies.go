@@ -47,11 +47,11 @@ type Policies struct {
 
 func unmarshalResourcePolicies(yamlData *string) (*resourcePolicies, error) {
 	resPolicies := &resourcePolicies{}
-	if err := decodeStruct(strings.NewReader(*yamlData), resPolicies); err != nil {
+	err := decodeStruct(strings.NewReader(*yamlData), resPolicies)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
-	} else {
-		return resPolicies, nil
 	}
+	return resPolicies, nil
 }
 
 func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {

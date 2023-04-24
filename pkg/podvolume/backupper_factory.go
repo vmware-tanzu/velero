@@ -40,7 +40,7 @@ type BackupperFactory interface {
 
 func NewBackupperFactory(
 	repoLocker *repository.RepoLocker,
-	repoEnsurer *repository.RepositoryEnsurer,
+	repoEnsurer *repository.Ensurer,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
@@ -60,7 +60,7 @@ func NewBackupperFactory(
 
 type backupperFactory struct {
 	repoLocker   *repository.RepoLocker
-	repoEnsurer  *repository.RepositoryEnsurer
+	repoEnsurer  *repository.Ensurer
 	veleroClient clientset.Interface
 	pvcClient    corev1client.PersistentVolumeClaimsGetter
 	pvClient     corev1client.PersistentVolumesGetter

@@ -144,7 +144,7 @@ func GetProviderPluginsByVersion(version, providerName, feature string) ([]strin
 
 // getProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
 func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
-	plugins []string) (*cliinstall.InstallOptions, error) {
+	plugins []string) (*cliinstall.Options, error) {
 
 	if veleroCfg.CloudCredentialsFile == "" {
 		return nil, errors.Errorf("No credentials were supplied to use for E2E tests")

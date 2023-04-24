@@ -152,21 +152,22 @@ func parseCapacity(cap string) (*capacity, error) {
 	var quantities []resource.Quantity
 	if len(capacities) != 2 {
 		return nil, fmt.Errorf("wrong format of Capacity %v", cap)
-	} else {
-		for _, v := range capacities {
-			if strings.TrimSpace(v) == "" {
-				// case similar "10Gi,"
-				// if empty, the quantity will assigned with 0
-				quantities = append(quantities, *resource.NewQuantity(int64(0), resource.DecimalSI))
-			} else {
-				if quantity, err := resource.ParseQuantity(strings.TrimSpace(v)); err != nil {
-					return nil, fmt.Errorf("wrong format of Capacity %v with err %v", v, err)
-				} else {
-					quantities = append(quantities, quantity)
-				}
+	}
+
+	for _, v := range capacities {
+		if strings.TrimSpace(v) == "" {
+			// case similar "10Gi,"
+			// if empty, the quantity will assigned with 0
+			quantities = append(quantities, *resource.NewQuantity(int64(0), resource.DecimalSI))
+		} else {
+			quantity, err := resource.ParseQuantity(strings.TrimSpace(v))
+			if err != nil {
+				return nil, fmt.Errorf("wrong format of Capacity %v with err %v", v, err)
 			}
+			quantities = append(quantities, quantity)
 		}
 	}
+
 	return &capacity{lower: quantities[0], upper: quantities[1]}, nil
 }
 

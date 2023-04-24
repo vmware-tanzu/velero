@@ -30,8 +30,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-// RepositoryEnsurer ensures that backup repositories are created and ready.
-type RepositoryEnsurer struct {
+// Ensurer ensures that backup repositories are created and ready.
+type Ensurer struct {
 	log        logrus.FieldLogger
 	repoClient client.Client
 
@@ -42,8 +42,8 @@ type RepositoryEnsurer struct {
 	resourceTimeout time.Duration
 }
 
-func NewRepositoryEnsurer(repoClient client.Client, log logrus.FieldLogger, resourceTimeout time.Duration) *RepositoryEnsurer {
-	return &RepositoryEnsurer{
+func NewEnsurer(repoClient client.Client, log logrus.FieldLogger, resourceTimeout time.Duration) *Ensurer {
+	return &Ensurer{
 		log:             log,
 		repoClient:      repoClient,
 		repoLocks:       make(map[BackupRepositoryKey]*sync.Mutex),
@@ -51,7 +51,7 @@ func NewRepositoryEnsurer(repoClient client.Client, log logrus.FieldLogger, reso
 	}
 }
 
-func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation, repositoryType string) (*velerov1api.BackupRepository, error) {
+func (r *Ensurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation, repositoryType string) (*velerov1api.BackupRepository, error) {
 	if volumeNamespace == "" || backupLocation == "" || repositoryType == "" {
 		return nil, errors.Errorf("wrong parameters, namespace %q, backup storage location %q, repository type %q", volumeNamespace, backupLocation, repositoryType)
 	}
@@ -96,7 +96,7 @@ func (r *RepositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	return r.createBackupRepositoryAndWait(ctx, namespace, backupRepoKey)
 }
 
-func (r *RepositoryEnsurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
+func (r *Ensurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
 	r.repoLocksMu.Lock()
 	defer r.repoLocksMu.Unlock()
 
@@ -107,7 +107,7 @@ func (r *RepositoryEnsurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
 	return r.repoLocks[key]
 }
 
-func (r *RepositoryEnsurer) createBackupRepositoryAndWait(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
+func (r *Ensurer) createBackupRepositoryAndWait(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
 	toCreate := newBackupRepository(namespace, backupRepoKey)
 	if err := r.repoClient.Create(ctx, toCreate, &client.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "unable to create backup repository resource")
@@ -129,7 +129,7 @@ func (r *RepositoryEnsurer) createBackupRepositoryAndWait(ctx context.Context, n
 	err := wait.PollWithContext(ctx, time.Millisecond*500, r.resourceTimeout, checkFunc)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait BackupRepository")
-	} else {
-		return repo, nil
 	}
+
+	return repo, nil
 }

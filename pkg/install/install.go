@@ -200,9 +200,8 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 		if readyObservations > 4 {
 			isReady = true
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 	return isReady, err
 }
@@ -247,9 +246,8 @@ func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, er
 		if readyObservations > 4 {
 			isReady = true
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 	return isReady, err
 }

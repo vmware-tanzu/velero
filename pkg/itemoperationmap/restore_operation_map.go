@@ -154,7 +154,7 @@ func (m *OperationsForRestore) DeepCopyInto(out *OperationsForRestore) {
 func (m *OperationsForRestore) uploadProgress(backupStore persistence.BackupStore, restoreName string) error {
 	if len(m.Operations) > 0 {
 		var restoreItemOperations *bytes.Buffer
-		restoreItemOperations, errs := encode.EncodeToJSONGzip(m.Operations, "restore item operations list")
+		restoreItemOperations, errs := encode.ToJSONGzip(m.Operations, "restore item operations list")
 		if errs != nil {
 			return errors.Wrap(errs[0], "error encoding item operations json")
 		}

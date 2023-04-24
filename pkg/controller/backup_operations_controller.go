@@ -243,7 +243,7 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 		// update file store
 		if backupStore != nil {
 			backupJSON := new(bytes.Buffer)
-			if err := encode.EncodeTo(backup, "json", backupJSON); err != nil {
+			if err := encode.To(backup, "json", backupJSON); err != nil {
 				removeIfComplete = false
 				return errors.Wrap(err, "error encoding backup json")
 			}
