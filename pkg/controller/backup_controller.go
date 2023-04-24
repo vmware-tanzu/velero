@@ -671,7 +671,6 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		if len(vscList.Items) >= 0 {
 			volumeSnapshotContents = vscList.Items
 		}
-
 		vsClassSet := sets.NewString()
 		for index := range volumeSnapshotContents {
 			// persist the volumesnapshotclasses referenced by vsc
@@ -941,7 +940,7 @@ func (b *backupReconciler) waitVolumeSnapshotReadyToUse(ctx context.Context,
 	csiSnapshotTimeout time.Duration, backupName string) ([]snapshotv1api.VolumeSnapshot, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	timeout := csiSnapshotTimeout
-	interval := 5 * time.Second
+	interval := 10 * time.Second
 	volumeSnapshots := make([]snapshotv1api.VolumeSnapshot, 0)
 
 	if b.volumeSnapshotLister != nil {
@@ -958,30 +957,75 @@ func (b *backupReconciler) waitVolumeSnapshotReadyToUse(ctx context.Context,
 	vsChannel := make(chan snapshotv1api.VolumeSnapshot, len(volumeSnapshots))
 	defer close(vsChannel)
 
+	type ErrorAndReadyToUse struct {
+		err        error
+		readyToUse bool
+	}
+
+	vsStatusMap := make(map[string]ErrorAndReadyToUse)
+
 	for index := range volumeSnapshots {
-		volumeSnapshot := volumeSnapshots[index]
-		eg.Go(func() error {
-			err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-				tmpVS, err := b.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(volumeSnapshot.Namespace).Get(b.ctx, volumeSnapshot.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name))
+		vsStatusMap[volumeSnapshots[index].Name] = ErrorAndReadyToUse{err: nil, readyToUse: false}
+	}
+	eg.Go(func() error {
+		err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+			// we only make one list call instead of GET calls for each VolumeSnapshot
+			tmpVSs, err := b.volumeSnapshotLister.List(label.NewSelectorForBackup(backupName))
+			if err != nil {
+				return false, errors.Wrapf(err, fmt.Sprintf("failed to get volumesnapshot for label selector with backupName %s", backupName))
+			}
+			tempVSMap := make(map[string]snapshotv1api.VolumeSnapshot)
+			for _, vs := range tmpVSs {
+				tempVSMap[vs.Name] = *vs
+			}
+			for _, vs := range volumeSnapshots {
+				if vsStatusMap[vs.Name].readyToUse {
+					continue
 				}
-				if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
-					b.logger.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s. Retrying in %ds", volumeSnapshot.Namespace, volumeSnapshot.Name, interval/time.Second)
+				tempVS, ok := tempVSMap[vs.Name]
+				if ok {
+					if tempVS.Status == nil || tempVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tempVS.Status.ReadyToUse) {
+						b.logger.Infof("Waiting for CSI driver to reconcile volumesnapshot %s/%s.", vs.Namespace, vs.Name)
+						continue
+					}
+					vsStatusMap[vs.Name] = ErrorAndReadyToUse{err: nil, readyToUse: true}
+					b.logger.Debugf("VolumeSnapshot %s/%s turned into ReadyToUse.", vs.Namespace, vs.Name)
+					vsChannel <- tempVS
+				}
+			}
+			for _, vs := range volumeSnapshots {
+				if !vsStatusMap[vs.Name].readyToUse {
+					// even if one of the VolumeSnapshot is not ready to use, return false
+					b.logger.Infof("All VolumeSnapshots are not ready yet, will poll again after %ds", interval/time.Second)
 					return false, nil
 				}
-
-				b.logger.Debugf("VolumeSnapshot %s/%s turned into ReadyToUse.", volumeSnapshot.Namespace, volumeSnapshot.Name)
-				// Put the ReadyToUse VolumeSnapshot element in the result channel.
-				vsChannel <- *tmpVS
-				return true, nil
-			})
-			if err == wait.ErrWaitTimeout {
-				b.logger.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			}
-			return err
+			return true, nil
 		})
-	}
+		if err == wait.ErrWaitTimeout {
+			for _, vs := range volumeSnapshots {
+				if !vsStatusMap[vs.Name].readyToUse {
+					// we ignore any errors when fetching the VSC since it is only for logging purposes
+					vsc, _ := b.volumeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Get(ctx, *vs.Status.BoundVolumeSnapshotContentName, metav1.GetOptions{})
+					if vsc == nil {
+						vsStatusMap[vs.Name] = ErrorAndReadyToUse{err: errors.Errorf("VolumeSnapshotContent %s is not found", *vs.Status.BoundVolumeSnapshotContentName), readyToUse: false}
+					} else {
+						vsStatusMap[vs.Name] = ErrorAndReadyToUse{err: errors.New(*vsc.Status.Error.Message), readyToUse: false}
+					}
+					b.logger.Errorf("Timed out awaiting reconciliation of volumesnapshot %s/%s. Error: %v. VolumeSnapshotContent: %v", vs.Namespace, vs.Name, vsStatusMap[vs.Name].err, vsc)
+
+					// We delete the orphan VS which are not tracked by the backup metadata.
+					// This is to avoid the orphan VSs are not deleted when the backup is GCed.
+					// Such orphan snapshots will lead to continuous retries by the CSI drivers if not cleaned up.
+					b.logger.Infof("Deleting orphan volumesnapshot %s/%s", vs.Namespace, vs.Name)
+					if err := b.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(vs.Namespace).Delete(ctx, vs.Name, metav1.DeleteOptions{}); err != nil {
+						b.logger.Errorf("Failed to delete volumesnapshot %s/%s: %v", vs.Namespace, vs.Name, err)
+					}
+				}
+			}
+		}
+		return err
+	})
 
 	err := eg.Wait()
 

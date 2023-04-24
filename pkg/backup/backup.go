@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -346,9 +347,55 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	}()
 
 	backedUpGroupResources := map[schema.GroupResource]bool{}
+	backedUpItems := map[string]bool{}
 	totalItems := len(items)
 
+	var wg sync.WaitGroup
+	
+
+	for _, item:= range items {
+		if item.groupResource.String() == "persistentvolumeclaims" {
+			backedUpItems[item.groupResource.String() + item.name] = true
+			log.WithFields(map[string]interface{}{
+				"progress":  "",
+				"resource":  item.groupResource.String(),
+				"namespace": item.namespace,
+				"name":      item.name,
+			}).Infof("Processing item")
+	
+			// use an anonymous func so we can defer-close/remove the file
+			// as soon as we're done with it
+			wg.Add(1)
+	
+			go func(item *kubernetesResource) {
+				defer wg.Done()
+				var unstructured unstructured.Unstructured
+	
+				f, err := os.Open(item.path)
+				if err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error opening file containing item")
+					return
+				}
+				defer f.Close()
+				defer os.Remove(f.Name())
+	
+				if err := json.NewDecoder(f).Decode(&unstructured); err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error decoding JSON from file")
+					return
+				}
+	
+				if backedUp := kb.backupItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR); backedUp {
+					backedUpGroupResources[item.groupResource] = true
+				}
+			}(item)
+		}
+	}
+	wg.Wait()
+
 	for i, item := range items {
+		if backedUpItems[item.groupResource.String() + item.name] {
+			continue
+		}
 		log.WithFields(map[string]interface{}{
 			"progress":  "",
 			"resource":  item.groupResource.String(),
