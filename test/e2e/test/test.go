@@ -159,8 +159,12 @@ func (t *TestCase) StartRun() error {
 }
 
 func (t *TestCase) Backup() error {
+	fmt.Println("========t.Ctx.Deadline()========")
+	fmt.Println(t.Ctx.Deadline())
 	veleroCfg := t.GetTestCase().VeleroCfg
-	if err := VeleroBackupExec(t.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*5))
+	defer cancel()
+	if err := VeleroBackupExec(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, "")
 		return errors.Wrapf(err, "Failed to backup resources")
 	}
@@ -168,14 +172,21 @@ func (t *TestCase) Backup() error {
 }
 
 func (t *TestCase) Destroy() error {
+	fmt.Println("========t.Ctx.Deadline()========")
+	fmt.Println(t.Ctx.Deadline())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*5))
+	defer cancel()
 	By(fmt.Sprintf("Start to destroy namespace %s......", t.NSBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(t.Ctx, t.Client, t.NSBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
+		Expect(CleanupNamespacesWithPoll(ctx, t.Client, t.NSBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
 	})
 	return nil
 }
 
 func (t *TestCase) Restore() error {
+	fmt.Println("========t.Ctx.Deadline()========")
+	fmt.Println(t.Ctx.Deadline())
 	veleroCfg := t.GetTestCase().VeleroCfg
+
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
@@ -188,7 +199,9 @@ func (t *TestCase) Restore() error {
 		if t.RestorePhaseExpect == "" {
 			t.RestorePhaseExpect = velerov1api.RestorePhaseCompleted
 		}
-		Expect(VeleroRestoreExec(t.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs, t.RestorePhaseExpect)).To(Succeed(), func() string {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*5))
+		defer cancel()
+		Expect(VeleroRestoreExec(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.RestoreName, t.RestoreArgs, t.RestorePhaseExpect)).To(Succeed(), func() string {
 			RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", t.RestoreName)
 			return "Fail to restore workload"
 		})
@@ -202,12 +215,14 @@ func (t *TestCase) Verify() error {
 
 func (t *TestCase) Clean() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*5))
+	defer cancel()
 	if !veleroCfg.Debug {
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.NSBaseName), func() {
-			CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+			CleanupNamespaces(ctx, t.Client, t.NSBaseName)
 		})
 		By("Clean backups after test", func() {
-			DeleteBackups(t.Ctx, t.Client)
+			DeleteBackups(ctx, t.Client)
 		})
 	}
 	return nil

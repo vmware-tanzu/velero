@@ -79,7 +79,6 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 			Volumes: volumes,
 		},
 	}
-
 	return client.ClientGo.CoreV1().Pods(ns).Create(context.TODO(), p, metav1.CreateOptions{})
 }
 

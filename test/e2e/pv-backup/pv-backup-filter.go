@@ -44,14 +44,18 @@ func (p *PVBackupFiltering) Init() error {
 		FailedMSG: "Failed to PVs filtering by opt-in/opt-out annotation",
 		Text:      fmt.Sprintf("Should backup PVs in namespace %s according to annotation %s", *p.NSIncluded, p.annotation),
 	}
+	fmt.Println("========p.Ctx.Deadline()========")
+	fmt.Println(p.Ctx.Deadline())
 	return nil
 }
 
 func (p *PVBackupFiltering) StartRun() error {
-	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
-	if err != nil {
-		return err
-	}
+	fmt.Println("========p.Ctx.Deadline()========")
+	fmt.Println(p.Ctx.Deadline())
+	By("Create a storage class", func() {
+		Expect(InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml",
+			p.VeleroCfg.CloudProvider))).To(Succeed())
+	})
 	p.BackupName = p.BackupName + "backup-" + p.id + "-" + UUIDgen.String()
 	p.RestoreName = p.RestoreName + "restore-" + p.id + "-" + UUIDgen.String()
 	p.BackupArgs = []string{
@@ -72,9 +76,11 @@ func (p *PVBackupFiltering) StartRun() error {
 	return nil
 }
 func (p *PVBackupFiltering) CreateResources() error {
+	fmt.Println("========p.Ctx.Deadline()========")
+	fmt.Println(p.Ctx.Deadline())
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
-			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(CreateNamespace(context.Background(), p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		var pods []string
 		By(fmt.Sprintf("Deploy a few pods with several PVs in namespace %s", ns), func() {
@@ -96,13 +102,13 @@ func (p *PVBackupFiltering) CreateResources() error {
 				podName := fmt.Sprintf("pod-%d", i)
 				pods = append(pods, podName)
 				By(fmt.Sprintf("Create pod %s in namespace %s", podName, ns), func() {
-					pod, err := CreatePod(p.Client, ns, podName, "e2e-storage-class", "", volumes, nil, nil)
+					pod, err := CreatePod(p.Client, ns, podName, StorageClassName, "", volumes, nil, nil)
 					Expect(err).To(Succeed())
 					ann := map[string]string{
 						p.annotation: volumesToAnnotation,
 					}
 					By(fmt.Sprintf("Add annotation to pod %s of namespace %s", pod.Name, ns), func() {
-						_, err := AddAnnotationToPod(p.Ctx, p.Client, ns, pod.Name, ann)
+						_, err := AddAnnotationToPod(context.Background(), p.Client, ns, pod.Name, ann)
 						Expect(err).To(Succeed())
 					})
 				})
@@ -134,6 +140,8 @@ func (p *PVBackupFiltering) CreateResources() error {
 }
 
 func (p *PVBackupFiltering) Verify() error {
+	fmt.Println("========p.Ctx.Deadline()========")
+	fmt.Println(p.Ctx.Deadline())
 	By(fmt.Sprintf("Waiting for all pods to start %s", p.podsList), func() {
 		for index, ns := range *p.NSIncluded {
 			By(fmt.Sprintf("Waiting for all pods to start %d in namespace %s", index, ns), func() {
