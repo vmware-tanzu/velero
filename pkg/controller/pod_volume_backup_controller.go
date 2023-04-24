@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
@@ -303,7 +304,7 @@ func (r *PodVolumeBackupReconciler) NewBackupProgressUpdater(pvb *velerov1api.Po
 // UpdateProgress which implement ProgressUpdater interface to update pvb progress status
 func (b *BackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
 	original := b.PodVolumeBackup.DeepCopy()
-	b.PodVolumeBackup.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	b.PodVolumeBackup.Status.Progress = veleroapishared.DataMoveOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
 	if b.Cli == nil {
 		b.Log.Errorf("failed to update backup pod %s volume %s progress with uninitailize client", b.PodVolumeBackup.Spec.Pod.Name, b.PodVolumeBackup.Spec.Volume)
 		return

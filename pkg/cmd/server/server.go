@@ -55,6 +55,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1alpha1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -314,6 +315,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	velerov1alpha1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
 	snapshotv1api.AddToScheme(scheme)
 

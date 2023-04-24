@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1alpha1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 )
 
@@ -154,6 +155,7 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	velerov1alpha1api.AddToScheme(scheme)
 	k8scheme.AddToScheme(scheme)
 	apiextv1beta1.AddToScheme(scheme)
 	apiextv1.AddToScheme(scheme)

@@ -12,6 +12,8 @@ k8s_yaml([
     'config/crd/v1/bases/velero.io_schedules.yaml',
     'config/crd/v1/bases/velero.io_serverstatusrequests.yaml',
     'config/crd/v1/bases/velero.io_volumesnapshotlocations.yaml',
+    'config/crd/v1alpha1/bases/velero.io_datauploads.yaml',
+    'config/crd/v1alpha1/bases/velero.io_datadownloads.yaml',    
 ])
 
 # default values

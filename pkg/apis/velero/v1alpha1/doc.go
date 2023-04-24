@@ -1,5 +1,5 @@
 /*
-Copyright The Velero Contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+// +k8s:deepcopy-gen=package
 
-// PodVolumeOperationProgress represents the progress of a
-// PodVolumeBackup/Restore operation
-type PodVolumeOperationProgress struct {
-	// +optional
-	TotalBytes int64 `json:"totalBytes,omitempty"`
-
-	// +optional
-	BytesDone int64 `json:"bytesDone,omitempty"`
-}
+// Package v1alpha1 is the v1alpha1 version of the API.
+// +groupName=velero.io
+package v1alpha1
