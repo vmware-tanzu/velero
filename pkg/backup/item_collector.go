@@ -62,7 +62,6 @@ type kubernetesResource struct {
 // getItemsFromResourceIdentifiers converts ResourceIdentifiers to
 // kubernetesResources
 func (r *itemCollector) getItemsFromResourceIdentifiers(resourceIDs []velero.ResourceIdentifier) []*kubernetesResource {
-
 	grResourceIDsMap := make(map[schema.GroupResource][]velero.ResourceIdentifier)
 	for _, resourceID := range resourceIDs {
 		grResourceIDsMap[resourceID.GroupResource] = append(grResourceIDsMap[resourceID.GroupResource], resourceID)
@@ -226,6 +225,10 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 				},
 			).Infof("Getting item")
 			resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, resourceID.Namespace)
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error getting client for resource")
+				continue
+			}
 			unstructured, err := resourceClient.Get(resourceID.Name, metav1.GetOptions{})
 			if err != nil {
 				log.WithError(errors.WithStack(err)).Error("Error getting item")

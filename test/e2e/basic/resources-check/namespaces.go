@@ -93,14 +93,15 @@ func (m *MultiNSBackup) StartRun() error {
 }
 
 func (m *MultiNSBackup) CreateResources() error {
-	m.Ctx, _ = context.WithTimeout(context.Background(), m.TimeoutDuration)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
 	fmt.Printf("Creating namespaces ...\n")
 	labels := map[string]string{
 		"ns-test": "true",
 	}
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
-		if err := CreateNamespaceWithLabel(m.Ctx, m.Client, createNSName, labels); err != nil {
+		if err := CreateNamespaceWithLabel(ctx, m.Client, createNSName, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
@@ -108,10 +109,12 @@ func (m *MultiNSBackup) CreateResources() error {
 }
 
 func (m *MultiNSBackup) Verify() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), m.TimeoutDuration)
+	defer ctxCancel()
 	// Verify that we got back all of the namespaces we created
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
 		checkNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
-		checkNS, err := GetNamespace(m.Ctx, m.Client, checkNSName)
+		checkNS, err := GetNamespace(ctx, m.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		} else if checkNS.Name != checkNSName {
@@ -122,10 +125,11 @@ func (m *MultiNSBackup) Verify() error {
 }
 
 func (m *MultiNSBackup) Destroy() error {
-	m.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-	err := CleanupNamespaces(m.Ctx, m.Client, m.NSBaseName)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
+	err := CleanupNamespaces(ctx, m.Client, m.NSBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}
-	return WaitAllSelectedNSDeleted(m.Ctx, m.Client, "ns-test=true")
+	return WaitAllSelectedNSDeleted(ctx, m.Client, "ns-test=true")
 }

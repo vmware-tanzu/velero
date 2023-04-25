@@ -33,7 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-// mainly used to make testing more convenient
+// ResticBackupCMDFunc and ResticRestoreCMDFunc are mainly used to make testing more convenient
 var ResticBackupCMDFunc = restic.BackupCommand
 var ResticRestoreCMDFunc = restic.RestoreCommand
 
@@ -144,13 +144,13 @@ func (rp *resticProvider) RunBackup(
 		return "", false, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
 	}
 	// GetSnapshotID
-	snapshotIdCmd := restic.GetSnapshotCommand(rp.repoIdentifier, rp.credentialsFile, tags)
-	snapshotIdCmd.Env = rp.cmdEnv
-	snapshotIdCmd.CACertFile = rp.caCertFile
+	snapshotIDCmd := restic.GetSnapshotCommand(rp.repoIdentifier, rp.credentialsFile, tags)
+	snapshotIDCmd.Env = rp.cmdEnv
+	snapshotIDCmd.CACertFile = rp.caCertFile
 	if len(rp.extraFlags) != 0 {
-		snapshotIdCmd.ExtraFlags = append(snapshotIdCmd.ExtraFlags, rp.extraFlags...)
+		snapshotIDCmd.ExtraFlags = append(snapshotIDCmd.ExtraFlags, rp.extraFlags...)
 	}
-	snapshotID, err := restic.GetSnapshotID(snapshotIdCmd)
+	snapshotID, err := restic.GetSnapshotID(snapshotIDCmd)
 	if err != nil {
 		return "", false, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
 	}

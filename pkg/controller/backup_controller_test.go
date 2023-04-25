@@ -298,8 +298,8 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		name                             string
 		backup                           *velerov1api.Backup
 		backupLocationNameInBackup       string
-		backupLocationInApiServer        *velerov1api.BackupStorageLocation
-		defaultBackupLocationInApiServer *velerov1api.BackupStorageLocation
+		backupLocationInAPIServer        *velerov1api.BackupStorageLocation
+		defaultBackupLocationInAPIServer *velerov1api.BackupStorageLocation
 		expectedBackupLocation           string
 		expectedSuccess                  bool
 		expectedValidationError          string
@@ -308,8 +308,8 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			name:                             "BackupLocation is specified in backup CR'spec and it can be found in ApiServer",
 			backup:                           builder.ForBackup("velero", "backup-1").Result(),
 			backupLocationNameInBackup:       "test-backup-location",
-			backupLocationInApiServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
-			defaultBackupLocationInApiServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
+			backupLocationInAPIServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
+			defaultBackupLocationInAPIServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
 			expectedBackupLocation:           "test-backup-location",
 			expectedSuccess:                  true,
 		},
@@ -317,8 +317,8 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			name:                             "BackupLocation is specified in backup CR'spec and it can't be found in ApiServer",
 			backup:                           builder.ForBackup("velero", "backup-1").Result(),
 			backupLocationNameInBackup:       "test-backup-location",
-			backupLocationInApiServer:        nil,
-			defaultBackupLocationInApiServer: nil,
+			backupLocationInAPIServer:        nil,
+			defaultBackupLocationInAPIServer: nil,
 			expectedSuccess:                  false,
 			expectedValidationError:          "an existing backup storage location wasn't specified at backup creation time and the default 'test-backup-location' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"test-backup-location\" not found",
 		},
@@ -326,8 +326,8 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			name:                             "Using default BackupLocation and it can be found in ApiServer",
 			backup:                           builder.ForBackup("velero", "backup-1").Result(),
 			backupLocationNameInBackup:       "",
-			backupLocationInApiServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
-			defaultBackupLocationInApiServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
+			backupLocationInAPIServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
+			defaultBackupLocationInAPIServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
 			expectedBackupLocation:           defaultBackupLocation,
 			expectedSuccess:                  true,
 		},
@@ -335,8 +335,8 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			name:                             "Using default BackupLocation and it can't be found in ApiServer",
 			backup:                           builder.ForBackup("velero", "backup-1").Result(),
 			backupLocationNameInBackup:       "",
-			backupLocationInApiServer:        nil,
-			defaultBackupLocationInApiServer: nil,
+			backupLocationInAPIServer:        nil,
+			defaultBackupLocationInAPIServer: nil,
 			expectedSuccess:                  false,
 			expectedValidationError:          fmt.Sprintf("an existing backup storage location wasn't specified at backup creation time and the server default '%s' doesn't exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"%s\" not found", defaultBackupLocation, defaultBackupLocation),
 		},
@@ -353,11 +353,11 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 
 			// objects that should init with client
 			objects := make([]runtime.Object, 0)
-			if test.backupLocationInApiServer != nil {
-				objects = append(objects, test.backupLocationInApiServer)
+			if test.backupLocationInAPIServer != nil {
+				objects = append(objects, test.backupLocationInAPIServer)
 			}
-			if test.defaultBackupLocationInApiServer != nil {
-				objects = append(objects, test.defaultBackupLocationInApiServer)
+			if test.defaultBackupLocationInAPIServer != nil {
+				objects = append(objects, test.defaultBackupLocationInAPIServer)
 			}
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objects...)
 
@@ -725,7 +725,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
-					Expiration:     &metav1.Time{now.Add(10 * time.Minute)},
+					Expiration:     &metav1.Time{Time: now.Add(10 * time.Minute)},
 					StartTimestamp: &timestamp,
 				},
 			},

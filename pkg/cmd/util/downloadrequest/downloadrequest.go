@@ -60,11 +60,11 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 
 	key := kbclient.ObjectKey{Name: created.Name, Namespace: namespace}
 	timeStreamFirstCheck := time.Now()
-	downloadUrlTimeout := false
+	downloadURLTimeout := false
 	checkFunc := func() {
 		// if timeout has been reached, cancel request
 		if time.Now().After(timeStreamFirstCheck.Add(timeout)) {
-			downloadUrlTimeout = true
+			downloadURLTimeout = true
 			cancel()
 		}
 		updated := &velerov1api.DownloadRequest{}
@@ -85,7 +85,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	}
 
 	wait.Until(checkFunc, 25*time.Millisecond, ctx.Done())
-	if downloadUrlTimeout {
+	if downloadURLTimeout {
 		return ErrDownloadRequestDownloadURLTimeout
 	}
 
@@ -123,7 +123,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
 	}
 
-	httpReq, err := http.NewRequest("GET", created.Status.DownloadURL, nil)
+	httpReq, err := http.NewRequest(http.MethodGet, created.Status.DownloadURL, nil)
 	if err != nil {
 		return err
 	}

@@ -132,6 +132,21 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, nil
 	}
 
+	err := kube.IsPodRunning(pod)
+	if err != nil {
+		for _, volumeName := range volumesToBackup {
+			err = errors.Wrapf(err, "backup for volume %s is skipped", volumeName)
+			log.WithError(err).Warn("Skip pod volume")
+		}
+
+		return nil, nil
+	}
+
+	err = nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.podClient)
+	if err != nil {
+		return nil, []error{err}
+	}
+
 	repositoryType := getRepositoryType(b.uploaderType)
 	if repositoryType == "" {
 		err := errors.Errorf("empty repository type, uploader %s", b.uploaderType)
@@ -139,16 +154,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	}
 
 	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace, backup.Spec.StorageLocation, repositoryType)
-	if err != nil {
-		return nil, []error{err}
-	}
-
-	err = kube.IsPodRunning(pod)
-	if err != nil {
-		return nil, []error{err}
-	}
-
-	err = nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.podClient)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -229,7 +234,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, b.uploaderType, pvc)
-		if volumeBackup, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
+		if _, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
 		}

@@ -54,7 +54,7 @@ func unmarshalResourcePolicies(yamlData *string) (*resourcePolicies, error) {
 	}
 }
 
-func (policies *Policies) buildPolicy(resPolicies *resourcePolicies) error {
+func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 	for _, vp := range resPolicies.VolumePolicies {
 		con, err := unmarshalVolConditions(vp.Conditions)
 		if err != nil {
@@ -64,18 +64,18 @@ func (policies *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		var p volPolicy
-		p.action = vp.Action
-		p.conditions = append(p.conditions, &capacityCondition{capacity: *volCap})
-		p.conditions = append(p.conditions, &storageClassCondition{storageClass: con.StorageClass})
-		p.conditions = append(p.conditions, &nfsCondition{nfs: con.NFS})
-		p.conditions = append(p.conditions, &csiCondition{csi: con.CSI})
-		policies.volumePolicies = append(policies.volumePolicies, p)
+		var volP volPolicy
+		volP.action = vp.Action
+		volP.conditions = append(volP.conditions, &capacityCondition{capacity: *volCap})
+		volP.conditions = append(volP.conditions, &storageClassCondition{storageClass: con.StorageClass})
+		volP.conditions = append(volP.conditions, &nfsCondition{nfs: con.NFS})
+		volP.conditions = append(volP.conditions, &csiCondition{csi: con.CSI})
+		p.volumePolicies = append(p.volumePolicies, volP)
 	}
 
 	// Other resource policies
 
-	policies.version = resPolicies.Version
+	p.version = resPolicies.Version
 	return nil
 }
 

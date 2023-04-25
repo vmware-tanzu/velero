@@ -355,7 +355,6 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	}
 
 	if o.NoDefaultBackupLocation {
-
 		if o.BucketName != "" {
 			return errors.New("Cannot use both --bucket and --no-default-backup-location at the same time")
 		}
@@ -375,7 +374,6 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		if o.BucketName == "" {
 			return errors.New("--bucket is required")
 		}
-
 	}
 
 	if o.UseVolumeSnapshots {

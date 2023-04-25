@@ -54,7 +54,7 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 			Name:      "repo",
 		},
 		Spec: velerov1api.BackupRepositorySpec{
-			MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
+			MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
 		},
 	}
 
@@ -153,7 +153,7 @@ func TestBackupRepoReconcile(t *testing.T) {
 					Name:      "unknown",
 				},
 				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
+					MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
 				},
 			},
 			expectNil: true,
@@ -166,7 +166,7 @@ func TestBackupRepoReconcile(t *testing.T) {
 					Name:      "repo",
 				},
 				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
+					MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
 				},
 			},
 			expectNil: true,
@@ -179,7 +179,7 @@ func TestBackupRepoReconcile(t *testing.T) {
 					Name:      "repo",
 				},
 				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency: metav1.Duration{testMaintenanceFrequency},
+					MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
 				},
 				Status: velerov1api.BackupRepositoryStatus{
 					Phase: velerov1api.BackupRepositoryPhaseNew,

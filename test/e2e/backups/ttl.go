@@ -42,7 +42,6 @@ type TTL struct {
 	testNS      string
 	backupName  string
 	restoreName string
-	ctx         context.Context
 	ttl         time.Duration
 }
 
@@ -52,12 +51,13 @@ func (b *TTL) Init() {
 	b.testNS = "backup-ttl-test-" + UUIDgen.String()
 	b.backupName = "backup-ttl-test-" + UUIDgen.String()
 	b.restoreName = "restore-ttl-test-" + UUIDgen.String()
-	b.ctx, _ = context.WithTimeout(context.Background(), 2*time.Hour)
 	b.ttl = 20 * time.Minute
 
 }
 
 func TTLTest() {
+	ctx, contextCancel := context.WithCancel(context.Background())
+	defer contextCancel()
 	var err error
 	var veleroCfg VeleroConfig
 	useVolumeSnapshots := true
@@ -87,19 +87,19 @@ func TTLTest() {
 			if veleroCfg.InstallVelero {
 				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
 			}
-			Expect(DeleteNamespace(test.ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
+			Expect(DeleteNamespace(ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 		}
 	})
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS), func() {
-			Expect(CreateNamespace(test.ctx, client, test.testNS)).To(Succeed(),
+			Expect(CreateNamespace(ctx, client, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
 		})
 
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(test.ctx, client, veleroCfg.CloudProvider,
+			Expect(KibishiiPrepareBeforeBackup(ctx, client, veleroCfg.CloudProvider,
 				test.testNS, veleroCfg.RegistryCredentialFile, veleroCfg.Features,
 				veleroCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
 		})
@@ -113,7 +113,7 @@ func TTLTest() {
 		BackupCfg.TTL = test.ttl
 
 		By(fmt.Sprintf("Backup the workload in %s namespace", test.testNS), func() {
-			Expect(VeleroBackupNamespace(test.ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
+			Expect(VeleroBackupNamespace(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
 				RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.backupName, "")
 				return "Fail to backup workload"
 			})
@@ -124,7 +124,7 @@ func TTLTest() {
 			if veleroCfg.CloudProvider == "vsphere" {
 				// TODO - remove after upload progress monitoring is implemented
 				By("Waiting for vSphere uploads to complete", func() {
-					Expect(WaitForVSphereUploadCompletion(test.ctx, time.Hour,
+					Expect(WaitForVSphereUploadCompletion(ctx, time.Hour,
 						test.testNS, 2)).To(Succeed())
 				})
 			}
@@ -137,7 +137,7 @@ func TTLTest() {
 		}
 
 		By(fmt.Sprintf("Simulating a disaster by removing namespace %s\n", BackupCfg.BackupName), func() {
-			Expect(DeleteNamespace(test.ctx, client, BackupCfg.BackupName, true)).To(Succeed(),
+			Expect(DeleteNamespace(ctx, client, BackupCfg.BackupName, true)).To(Succeed(),
 				fmt.Sprintf("Failed to delete namespace %s", BackupCfg.BackupName))
 		})
 
@@ -147,9 +147,9 @@ func TTLTest() {
 		}
 
 		By(fmt.Sprintf("Restore %s", test.testNS), func() {
-			Expect(VeleroRestore(test.ctx, veleroCfg.VeleroCLI,
+			Expect(VeleroRestore(ctx, veleroCfg.VeleroCLI,
 				veleroCfg.VeleroNamespace, test.restoreName, test.backupName, "")).To(Succeed(), func() string {
-				RunDebug(test.ctx, veleroCfg.VeleroCLI,
+				RunDebug(ctx, veleroCfg.VeleroCLI,
 					veleroCfg.VeleroNamespace, "", test.restoreName)
 				return "Fail to restore workload"
 			})
@@ -164,7 +164,7 @@ func TTLTest() {
 		})
 
 		By("Check TTL was set correctly", func() {
-			ttl, err := GetBackupTTL(test.ctx, veleroCfg.VeleroNamespace, test.backupName)
+			ttl, err := GetBackupTTL(ctx, veleroCfg.VeleroNamespace, test.backupName)
 			Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 			t, _ := time.ParseDuration(strings.ReplaceAll(ttl, "'", ""))
 			fmt.Println(t.Round(time.Minute).String())
@@ -176,7 +176,7 @@ func TTLTest() {
 		})
 
 		By("Check if backups are deleted by GC", func() {
-			Expect(WaitBackupDeleted(test.ctx, veleroCfg.VeleroCLI, test.backupName, time.Minute*10)).To(Succeed(), fmt.Sprintf("Backup %s was not deleted by GC", test.backupName))
+			Expect(WaitBackupDeleted(ctx, veleroCfg.VeleroCLI, test.backupName, time.Minute*10)).To(Succeed(), fmt.Sprintf("Backup %s was not deleted by GC", test.backupName))
 		})
 
 		By("Backup file from cloud object storage should be deleted", func() {

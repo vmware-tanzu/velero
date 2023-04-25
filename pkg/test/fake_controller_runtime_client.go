@@ -53,5 +53,5 @@ func NewFakeControllerRuntimeClient(t *testing.T, initObjs ...runtime.Object) cl
 	require.NoError(t, err)
 	err = snapshotv1api.AddToScheme(scheme)
 	require.NoError(t, err)
-	return k8sfake.NewFakeClientWithScheme(scheme, initObjs...)
+	return k8sfake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(initObjs...).Build()
 }

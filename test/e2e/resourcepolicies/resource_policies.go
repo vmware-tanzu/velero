@@ -102,8 +102,8 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
-	r.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	By(("Installing storage class..."), func() {
 		Expect(r.installTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
@@ -119,7 +119,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
-			Expect(CreateNamespace(r.Ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
+			Expect(CreateNamespace(ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
 		volName := fmt.Sprintf("vol-%s-%00000d", r.NSBaseName, nsNum)
@@ -145,12 +145,14 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 }
 
 func (r *ResourcePoliciesCase) Verify() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for i, ns := range *r.NSIncluded {
 		By(fmt.Sprintf("Verify pod data in namespace %s", ns), func() {
 			By(fmt.Sprintf("Waiting for deployment %s in namespace %s ready", r.NSBaseName, ns), func() {
 				Expect(WaitForReadyDeployment(r.Client.ClientGo, ns, r.NSBaseName)).To(Succeed(), fmt.Sprintf("Failed to waiting for deployment %s in namespace %s ready", r.NSBaseName, ns))
 			})
-			podList, err := ListPods(r.Ctx, r.Client, ns)
+			podList, err := ListPods(ctx, r.Client, ns)
 			Expect(err).To(Succeed(), fmt.Sprintf("failed to list pods in namespace: %q with error %v", ns, err))
 
 			volName := fmt.Sprintf("vol-%s-%00000d", r.NSBaseName, i)
@@ -159,7 +161,7 @@ func (r *ResourcePoliciesCase) Verify() error {
 					if vol.Name != volName {
 						continue
 					}
-					content, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
+					content, err := ReadFileFromPodVolume(ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
 					if i%2 == 0 {
 						Expect(err).To(HaveOccurred(), "Expected file not found") // File should not exist
 					} else {
@@ -228,7 +230,9 @@ func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volL
 }
 
 func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) error {
-	podList, err := ListPods(r.Ctx, r.Client, namespace)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
+	podList, err := ListPods(ctx, r.Client, namespace)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to list pods in namespace: %q with error %v", namespace, err))
 	}
@@ -237,7 +241,7 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if vol.Name != volName {
 				continue
 			}
-			err := CreateFileToPod(r.Ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
+			err := CreateFileToPod(ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}
@@ -247,8 +251,10 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 }
 
 func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for _, v := range scList {
-		if err := DeleteStorageClass(r.Ctx, r.Client, v); err != nil {
+		if err := DeleteStorageClass(ctx, r.Client, v); err != nil {
 			return err
 		}
 	}
@@ -256,7 +262,9 @@ func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error
 }
 
 func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
-	err := InstallStorageClass(r.Ctx, path)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
+	err := InstallStorageClass(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -277,5 +285,5 @@ func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
 	if _, err := tmpFile.WriteString(newContent); err != nil {
 		return errors.Wrapf(err, "failed to write content into temp file %s when install storage class", tmpFile.Name())
 	}
-	return InstallStorageClass(r.Ctx, tmpFile.Name())
+	return InstallStorageClass(ctx, tmpFile.Name())
 }

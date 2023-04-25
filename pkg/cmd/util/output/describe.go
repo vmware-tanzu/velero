@@ -149,7 +149,7 @@ func NewStructuredDescriber(format string) *StructuredDescriber {
 func DescribeInSF(fn func(d *StructuredDescriber), format string) string {
 	d := NewStructuredDescriber(format)
 	fn(d)
-	return d.JsonEncode()
+	return d.JSONEncode()
 }
 
 // Describe adds all types of argument to d.output.
@@ -167,8 +167,8 @@ func (d *StructuredDescriber) DescribeMetadata(metadata metav1.ObjectMeta) {
 	d.Describe("metadata", metadataInfo)
 }
 
-// JsonEncode encodes d.output to json
-func (d *StructuredDescriber) JsonEncode() string {
+// JSONEncode encodes d.output to json
+func (d *StructuredDescriber) JSONEncode() string {
 	byteBuffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(byteBuffer)
 	encoder.SetEscapeHTML(false)

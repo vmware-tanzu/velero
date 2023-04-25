@@ -66,7 +66,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	. "github.com/vmware-tanzu/velero/pkg/util/results"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -80,12 +80,12 @@ type Restorer interface {
 	Restore(req *Request,
 		actions []riav2.RestoreItemAction,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
-	) (Result, Result)
+	) (results.Result, results.Result)
 	RestoreWithResolvers(
 		req *Request,
 		restoreItemActionResolver framework.RestoreItemActionResolverV2,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
-	) (Result, Result)
+	) (results.Result, results.Result)
 }
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
@@ -134,11 +134,11 @@ func NewKubernetesRestorer(
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
 		pvRenamer: func(string) (string, error) {
-			veleroCloneUuid, err := uuid.NewRandom()
+			veleroCloneUUID, err := uuid.NewRandom()
 			if err != nil {
 				return "", errors.WithStack(err)
 			}
-			veleroCloneName := "velero-clone-" + veleroCloneUuid.String()
+			veleroCloneName := "velero-clone-" + veleroCloneUUID.String()
 			return veleroCloneName, nil
 		},
 		fileSystem:          filesystem.NewFileSystem(),
@@ -156,7 +156,7 @@ func (kr *kubernetesRestorer) Restore(
 	req *Request,
 	actions []riav2.RestoreItemAction,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
-) (Result, Result) {
+) (results.Result, results.Result) {
 	resolver := framework.NewRestoreItemActionResolverV2(actions)
 	return kr.RestoreWithResolvers(req, resolver, volumeSnapshotterGetter)
 }
@@ -165,7 +165,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	req *Request,
 	restoreItemActionResolver framework.RestoreItemActionResolverV2,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
-) (Result, Result) {
+) (results.Result, results.Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -180,7 +180,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		for _, s := range req.Restore.Spec.OrLabelSelectors {
 			labelAsSelector, err := metav1.LabelSelectorAsSelector(s)
 			if err != nil {
-				return Result{}, Result{Velero: []string{err.Error()}}
+				return results.Result{}, results.Result{Velero: []string{err.Error()}}
 			}
 			OrSelectors = append(OrSelectors, labelAsSelector)
 		}
@@ -188,7 +188,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 
 	selector, err := metav1.LabelSelectorAsSelector(ls)
 	if err != nil {
-		return Result{}, Result{Velero: []string{err.Error()}}
+		return results.Result{}, results.Result{Velero: []string{err.Error()}}
 	}
 
 	// Get resource includes-excludes.
@@ -216,7 +216,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 
 	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
-		return Result{}, Result{Velero: []string{err.Error()}}
+		return results.Result{}, results.Result{Velero: []string{err.Error()}}
 	}
 
 	podVolumeTimeout := kr.podVolumeTimeout
@@ -239,13 +239,13 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	if kr.podVolumeRestorerFactory != nil {
 		podVolumeRestorer, err = kr.podVolumeRestorerFactory.NewRestorer(ctx, req.Restore)
 		if err != nil {
-			return Result{}, Result{Velero: []string{err.Error()}}
+			return results.Result{}, results.Result{Velero: []string{err.Error()}}
 		}
 	}
 
 	resourceRestoreHooks, err := hook.GetRestoreHooksFromSpec(&req.Restore.Spec.Hooks)
 	if err != nil {
-		return Result{}, Result{Velero: []string{err.Error()}}
+		return results.Result{}, results.Result{Velero: []string{err.Error()}}
 	}
 	hooksCtx, hooksCancelFunc := go_context.WithCancel(go_context.Background())
 	waitExecHookHandler := &hook.DefaultWaitExecHookHandler{
@@ -390,8 +390,8 @@ type progressUpdate struct {
 	totalItems, itemsRestored int
 }
 
-func (ctx *restoreContext) execute() (Result, Result) {
-	warnings, errs := Result{}, Result{}
+func (ctx *restoreContext) execute() (results.Result, results.Result) {
+	warnings, errs := results.Result{}, results.Result{}
 
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
@@ -482,7 +482,7 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	}
 
 	for _, selectedResource := range crdResourceCollection {
-		var w, e Result
+		var w, e results.Result
 		// Restore this resource
 		processedItems, w, e = ctx.processSelectedResource(
 			selectedResource,
@@ -514,7 +514,7 @@ func (ctx *restoreContext) execute() (Result, Result) {
 	}
 
 	for _, selectedResource := range selectedResourceCollection {
-		var w, e Result
+		var w, e results.Result
 		// Restore this resource
 		processedItems, w, e = ctx.processSelectedResource(
 			selectedResource,
@@ -590,8 +590,8 @@ func (ctx *restoreContext) processSelectedResource(
 	processedItems int,
 	existingNamespaces sets.String,
 	update chan progressUpdate,
-) (int, Result, Result) {
-	warnings, errs := Result{}, Result{}
+) (int, results.Result, results.Result) {
+	warnings, errs := results.Result{}, results.Result{}
 	groupResource := schema.ParseGroupResource(selectedResource.resource)
 
 	for namespace, selectedItems := range selectedResource.selectedItemsByNamespace {
@@ -939,8 +939,8 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 	return fmt.Sprintf("%s/%s/%s", groupResource.String(), namespace, name)
 }
 
-func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (Result, Result, bool) {
-	warnings, errs := Result{}, Result{}
+func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (results.Result, results.Result, bool) {
+	warnings, errs := results.Result{}, results.Result{}
 	// itemExists bool is used to determine whether to include this item in the "wait for additional items" list
 	itemExists := false
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
@@ -1281,9 +1281,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		if err != nil {
 			errs.Add(namespace, errors.Wrapf(err, "error verifying additional items are ready to use"))
 		} else if !available {
-			errs.Add(namespace, fmt.Errorf("Additional items for %s are not ready to use.", resourceID))
+			errs.Add(namespace, fmt.Errorf("additional items for %s are not ready to use", resourceID))
 		}
-
 	}
 
 	// This comes after running item actions because we have built-in actions that restore
@@ -1549,7 +1548,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		if err != nil {
 			errs.Add(namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
 		} else if !available {
-			errs.Add(namespace, fmt.Errorf("CRD %s is not available to use for custom resources.", name))
+			errs.Add(namespace, fmt.Errorf("the CRD %s is not available to use for custom resources", name))
 		}
 	}
 
@@ -1912,8 +1911,8 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 	processedResources sets.String,
 	resourcePriorities Priorities,
 	includeAllResources bool,
-) ([]restoreableResource, sets.String, Result, Result) {
-	var warnings, errs Result
+) ([]restoreableResource, sets.String, results.Result, results.Result) {
+	var warnings, errs results.Result
 	// Iterate through an ordered list of resources to restore, checking each
 	// one to see if it should be restored. Note that resources *may* be in this
 	// list twice, i.e. once due to being a prioritized resource, and once due
@@ -2013,8 +2012,8 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 // getSelectedRestoreableItems applies Kubernetes selectors on individual items
 // of each resource type to create a list of items which will be actually
 // restored.
-func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, Result, Result) {
-	warnings, errs := Result{}, Result{}
+func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) {
+	warnings, errs := results.Result{}, results.Result{}
 
 	restorable := restoreableResource{
 		resource: resource,
@@ -2113,7 +2112,7 @@ func removeRestoreLabels(obj metav1.Object) {
 }
 
 // updates the backup/restore labels
-func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs Result) {
+func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) {
 	patchBytes, err := generatePatch(fromCluster, fromClusterWithLabels)
 	if err != nil {
 		ctx.log.Errorf("error generating patch for %s %s: %v", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster), err)
@@ -2141,7 +2140,7 @@ func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWit
 
 // function to process existingResourcePolicy as update, tries to patch the diff between in-cluster and restore obj first
 // if the patch fails then tries to update the backup/restore labels for the in-cluster version
-func (ctx *restoreContext) processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs Result) {
+func (ctx *restoreContext) processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) {
 	ctx.log.Infof("restore API has existingResourcePolicy defined as update , executing restore workflow accordingly for changed resource %s %s ", obj.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
 	ctx.log.Infof("attempting patch on %s %q", fromCluster.GetKind(), fromCluster.GetName())
 	// remove restore labels so that we apply the latest backup/restore names on the object via patch

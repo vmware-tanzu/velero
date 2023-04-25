@@ -31,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	corev1api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -118,7 +117,6 @@ func NewBackupReconciler(
 	credentialStore credentials.FileStore,
 	maxConcurrentK8SConnections int,
 ) *backupReconciler {
-
 	b := &backupReconciler{
 		ctx:                         ctx,
 		discoveryHelper:             discoveryHelper,
@@ -469,7 +467,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	}
 
 	if request.Spec.ResourcePolicy != nil && request.Spec.ResourcePolicy.Kind == resourcepolicies.ConfigmapRefType {
-		policiesConfigmap := &v1.ConfigMap{}
+		policiesConfigmap := &corev1api.ConfigMap{}
 		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolicy.Name}, policiesConfigmap)
 		if err != nil {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolicy.Name, err))
@@ -1126,7 +1124,7 @@ func (b *backupReconciler) recreateVolumeSnapshotContent(vsc snapshotv1api.Volum
 	// validation webhook will check whether name and namespace are nil.
 	// external-snapshotter needs Source pointing to snapshot and VolumeSnapshot
 	// reference's UID to nil to determine the VolumeSnapshotContent is deletable.
-	vsc.Spec.VolumeSnapshotRef = v1.ObjectReference{
+	vsc.Spec.VolumeSnapshotRef = corev1api.ObjectReference{
 		APIVersion: snapshotv1api.SchemeGroupVersion.String(),
 		Kind:       "VolumeSnapshot",
 		Namespace:  "ns-" + string(vsc.UID),

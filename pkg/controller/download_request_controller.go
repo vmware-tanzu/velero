@@ -104,7 +104,6 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && downloadRequest.Status.Expiration != nil {
 		if downloadRequest.Status.Expiration.Time.Before(r.clock.Now()) {
-
 			// Delete any request that is expired, regardless of the phase: it is not
 			// worth proceeding and trying/retrying to find it.
 			log.Debug("DownloadRequest has expired - deleting")
@@ -113,9 +112,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, errors.WithStack(err)
 			}
 			return ctrl.Result{Requeue: false}, nil
-
 		} else if downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-
 			// Requeue the request if is not yet expired and has already been processed before,
 			// since it might still be in use by the logs streaming and shouldn't
 			// be deleted until after its expiration.
@@ -127,7 +124,6 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Process a brand new request.
 	backupName := downloadRequest.Spec.Target.Name
 	if downloadRequest.Status.Phase == "" || downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseNew {
-
 		// Update the expiration.
 		downloadRequest.Status.Expiration = &metav1.Time{Time: r.clock.Now().Add(persistence.DownloadURLTTL)}
 

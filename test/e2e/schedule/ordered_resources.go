@@ -64,13 +64,15 @@ func ScheduleOrderedResources() {
 	})
 
 	It("Create a schedule to backup resources in a specific order should be successful", func() {
+		ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer ctxCancel()
 		test := &OrderedResources{}
 		test.VeleroCfg = VeleroCfg
 		err := test.Init()
 		Expect(err).To(Succeed(), err)
 		defer func() {
-			Expect(DeleteNamespace(test.Ctx, test.Client, test.Namespace, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.Namespace))
-			err = VeleroScheduleDelete(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName)
+			Expect(DeleteNamespace(ctx, test.Client, test.Namespace, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.Namespace))
+			err = VeleroScheduleDelete(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete schedule with err %v", err))
 			err = test.DeleteBackups()
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete backups with err %v", err))
@@ -82,24 +84,24 @@ func ScheduleOrderedResources() {
 		})
 
 		By(fmt.Sprintf("Create schedule the workload in %s namespace", test.Namespace), func() {
-			err = VeleroScheduleCreate(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.ScheduleArgs)
+			err = VeleroScheduleCreate(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.ScheduleArgs)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to create schedule %s  with err %v", test.ScheduleName, err))
 		})
 
 		By(fmt.Sprintf("Checking resource order in %s schedule cr", test.ScheduleName), func() {
-			err = CheckScheduleWithResourceOrder(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.OrderMap)
+			err = CheckScheduleWithResourceOrder(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.OrderMap)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to check schedule %s with err %v", test.ScheduleName, err))
 		})
 
 		By("Checking resource order in backup cr", func() {
 			backupList := new(velerov1api.BackupList)
 			err = waitutil.PollImmediate(10*time.Second, time.Minute*5, func() (bool, error) {
-				if err = test.Client.Kubebuilder.List(test.Ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
+				if err = test.Client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
 					return false, fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 				}
 
 				for _, backup := range backupList.Items {
-					if err = CheckBackupWithResourceOrder(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name, test.OrderMap); err == nil {
+					if err = CheckBackupWithResourceOrder(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name, test.OrderMap); err == nil {
 						return true, nil
 					}
 				}
@@ -139,21 +141,22 @@ func (o *OrderedResources) Init() error {
 
 func (o *OrderedResources) CreateResources() error {
 	veleroCfg := o.VeleroCfg
-	o.Ctx, _ = context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	label := map[string]string{
 		"orderedresources": "true",
 	}
 	fmt.Printf("Creating resources in %s namespace ...\n", o.Namespace)
-	if err := CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
+	if err := CreateNamespace(ctx, o.Client, o.Namespace); err != nil {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
 	}
 	serviceAccountName := "default"
 	// wait until the service account is created before patch the image pull secret
-	if err := WaitUntilServiceAccountCreated(o.Ctx, o.Client, o.Namespace, serviceAccountName, 10*time.Minute); err != nil {
+	if err := WaitUntilServiceAccountCreated(ctx, o.Client, o.Namespace, serviceAccountName, 10*time.Minute); err != nil {
 		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, o.Namespace)
 	}
 	// add the image pull secret to avoid the image pull limit issue of Docker Hub
-	if err := PatchServiceAccountWithImagePullSecret(o.Ctx, o.Client, o.Namespace, serviceAccountName, veleroCfg.RegistryCredentialFile); err != nil {
+	if err := PatchServiceAccountWithImagePullSecret(ctx, o.Client, o.Namespace, serviceAccountName, veleroCfg.RegistryCredentialFile); err != nil {
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, o.Namespace)
 	}
 	//Create deployment
@@ -194,13 +197,15 @@ func (o *OrderedResources) CreateResources() error {
 }
 
 func (o *OrderedResources) DeleteBackups() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	veleroCfg := o.VeleroCfg
 	backupList := new(velerov1api.BackupList)
-	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
+	if err := o.Client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
 		return fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
-		if err := VeleroBackupDelete(o.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name); err != nil {
+		if err := VeleroBackupDelete(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name); err != nil {
 			return err
 		}
 	}
