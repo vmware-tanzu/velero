@@ -107,7 +107,6 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 		if item.namespace != "" {
 			fileWithVersion = fileWithVersion + "/v1-preferredversion/" + "namespaces/" + item.namespace
 		} else {
-			file = file + "/cluster"
 			fileWithVersion = fileWithVersion + "/v1-preferredversion" + "/cluster"
 		}
 		fileWithVersion = fileWithVersion + "/" + item.name + ".json"

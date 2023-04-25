@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	//lint:ignore SA1019 grpc-go still depends on github.com/golang/protobuf/proto
 	goproto "github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"

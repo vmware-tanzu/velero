@@ -34,7 +34,7 @@ import (
 func TestResticRunBackup(t *testing.T) {
 	var rp resticProvider
 	rp.log = logrus.New()
-	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: rp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
+	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()}
 	testCases := []struct {
 		name              string
 		hookBackupFunc    func(repoIdentifier string, passwordFile string, path string, tags map[string]string) *restic.Command
@@ -74,7 +74,7 @@ func TestResticRunBackup(t *testing.T) {
 func TestResticRunRestore(t *testing.T) {
 	var rp resticProvider
 	rp.log = logrus.New()
-	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: rp.log, Ctx: context.Background(), Cli: fake.NewFakeClientWithScheme(scheme.Scheme)}
+	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()}
 	ResticRestoreCMDFunc = func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
 		return &restic.Command{Args: []string{""}}
 	}

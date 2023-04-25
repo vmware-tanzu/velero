@@ -18,9 +18,10 @@ package cli
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 )
@@ -64,6 +65,6 @@ func (o *SelectOptions) Validate() error {
 
 // BindFlags binds options for this command to flags.
 func (o *SelectOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.All, "all", o.All, strings.Title(o.CMD)+" all "+o.SingularTypeName+"s")
-	flags.VarP(&o.Selector, "selector", "l", strings.Title(o.CMD)+" all "+o.SingularTypeName+"s matching this label selector.")
+	flags.BoolVar(&o.All, "all", o.All, cases.Title(language.Und).String(o.CMD)+" all "+o.SingularTypeName+"s")
+	flags.VarP(&o.Selector, "selector", "l", cases.Title(language.Und).String(o.CMD)+" all "+o.SingularTypeName+"s matching this label selector.")
 }

@@ -412,7 +412,7 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 
 	// volumesnapshots file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumesnapshots.json.gz", newStringReadSeeker("foo"))
-	res, err = harness.GetBackupVolumeSnapshots("test-backup")
+	_, err = harness.GetBackupVolumeSnapshots("test-backup")
 	assert.NotNil(t, err)
 
 	// volumesnapshots file containing gzipped json data should return correctly
@@ -454,7 +454,7 @@ func TestGetBackupItemOperations(t *testing.T) {
 
 	// itemoperations file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemoperations.json.gz", newStringReadSeeker("foo"))
-	res, err = harness.GetBackupItemOperations("test-backup")
+	_, err = harness.GetBackupItemOperations("test-backup")
 	assert.NotNil(t, err)
 
 	// itemoperations file containing gzipped json data should return correctly

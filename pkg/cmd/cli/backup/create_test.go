@@ -105,10 +105,10 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 }
 
 func TestCreateOptions_OrderedResources(t *testing.T) {
-	orderedResources, err := ParseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
+	_, err := ParseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
 	assert.NotNil(t, err)
 
-	orderedResources, err = ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
+	orderedResources, err := ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
 	assert.NoError(t, err)
 
 	expectedResources := map[string]string{
