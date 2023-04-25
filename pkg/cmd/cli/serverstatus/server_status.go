@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -48,7 +47,7 @@ func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*
 	ctx, cancel := context.WithCancel(g.Context)
 	defer cancel()
 
-	key := client.ObjectKey{Name: created.Name, Namespace: g.Namespace}
+	key := kbclient.ObjectKey{Name: created.Name, Namespace: g.Namespace}
 	checkFunc := func() {
 		updated := &velerov1api.ServerStatusRequest{}
 		if err := kbClient.Get(ctx, key, updated); err != nil {

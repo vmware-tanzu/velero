@@ -52,7 +52,6 @@ import (
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/test"
-	testutil "github.com/vmware-tanzu/velero/pkg/test"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -107,7 +106,6 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 		if item.namespace != "" {
 			fileWithVersion = fileWithVersion + "/v1-preferredversion/" + "namespaces/" + item.namespace
 		} else {
-			file = file + "/cluster"
 			fileWithVersion = fileWithVersion + "/v1-preferredversion" + "/cluster"
 		}
 		fileWithVersion = fileWithVersion + "/" + item.name + ".json"
@@ -2845,7 +2843,7 @@ func TestBackupWithHooks(t *testing.T) {
 				h                  = newHarness(t)
 				req                = &Request{Backup: tc.backup}
 				backupFile         = bytes.NewBuffer([]byte{})
-				podCommandExecutor = new(testutil.MockPodCommandExecutor)
+				podCommandExecutor = new(test.MockPodCommandExecutor)
 			)
 
 			h.backupper.podCommandExecutor = podCommandExecutor

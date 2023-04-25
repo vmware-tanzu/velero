@@ -314,19 +314,19 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	return nil
 }
 
-func (r *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger, ctx context.Context) *RestoreProgressUpdater {
-	return &RestoreProgressUpdater{pvr, log, ctx, r.Client}
+func (c *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger, ctx context.Context) *RestoreProgressUpdater {
+	return &RestoreProgressUpdater{pvr, log, ctx, c.Client}
 }
 
 // UpdateProgress which implement ProgressUpdater interface to update pvr progress status
-func (r *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
-	original := r.PodVolumeRestore.DeepCopy()
-	r.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
-	if r.Cli == nil {
-		r.Log.Errorf("failed to update restore pod %s volume %s progress with uninitailize client", r.PodVolumeRestore.Spec.Pod.Name, r.PodVolumeRestore.Spec.Volume)
+func (c *RestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {
+	original := c.PodVolumeRestore.DeepCopy()
+	c.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	if c.Cli == nil {
+		c.Log.Errorf("failed to update restore pod %s volume %s progress with uninitailize client", c.PodVolumeRestore.Spec.Pod.Name, c.PodVolumeRestore.Spec.Volume)
 		return
 	}
-	if err := r.Cli.Patch(r.Ctx, r.PodVolumeRestore, client.MergeFrom(original)); err != nil {
-		r.Log.Errorf("update restore pod %s volume %s progress with %v", r.PodVolumeRestore.Spec.Pod.Name, r.PodVolumeRestore.Spec.Volume, err)
+	if err := c.Cli.Patch(c.Ctx, c.PodVolumeRestore, client.MergeFrom(original)); err != nil {
+		c.Log.Errorf("update restore pod %s volume %s progress with %v", c.PodVolumeRestore.Spec.Pod.Name, c.PodVolumeRestore.Spec.Volume, err)
 	}
 }

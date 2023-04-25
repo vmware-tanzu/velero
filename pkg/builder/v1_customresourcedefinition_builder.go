@@ -98,8 +98,8 @@ func (c *V1CustomResourceDefinitionConditionBuilder) Status(cs apiextv1.Conditio
 }
 
 // Result returns the built CustomResourceDefinitionCondition.
-func (b *V1CustomResourceDefinitionConditionBuilder) Result() apiextv1.CustomResourceDefinitionCondition {
-	return b.object
+func (c *V1CustomResourceDefinitionConditionBuilder) Result() apiextv1.CustomResourceDefinitionCondition {
+	return c.object
 }
 
 // V1CustomResourceDefinitionVersionBuilder builds CustomResourceDefinitionVersion objects.
@@ -115,26 +115,26 @@ func ForV1CustomResourceDefinitionVersion(name string) *V1CustomResourceDefiniti
 }
 
 // Served sets the Served field on a CustomResourceDefinitionVersion.
-func (b *V1CustomResourceDefinitionVersionBuilder) Served(s bool) *V1CustomResourceDefinitionVersionBuilder {
-	b.object.Served = s
-	return b
+func (c *V1CustomResourceDefinitionVersionBuilder) Served(s bool) *V1CustomResourceDefinitionVersionBuilder {
+	c.object.Served = s
+	return c
 }
 
 // Storage sets the Storage field on a CustomResourceDefinitionVersion.
-func (b *V1CustomResourceDefinitionVersionBuilder) Storage(s bool) *V1CustomResourceDefinitionVersionBuilder {
-	b.object.Storage = s
-	return b
+func (c *V1CustomResourceDefinitionVersionBuilder) Storage(s bool) *V1CustomResourceDefinitionVersionBuilder {
+	c.object.Storage = s
+	return c
 }
 
-func (b *V1CustomResourceDefinitionVersionBuilder) Schema(s *apiextv1.JSONSchemaProps) *V1CustomResourceDefinitionVersionBuilder {
-	if b.object.Schema == nil {
-		b.object.Schema = new(apiextv1.CustomResourceValidation)
+func (c *V1CustomResourceDefinitionVersionBuilder) Schema(s *apiextv1.JSONSchemaProps) *V1CustomResourceDefinitionVersionBuilder {
+	if c.object.Schema == nil {
+		c.object.Schema = new(apiextv1.CustomResourceValidation)
 	}
-	b.object.Schema.OpenAPIV3Schema = s
-	return b
+	c.object.Schema.OpenAPIV3Schema = s
+	return c
 }
 
 // Result returns the built CustomResourceDefinitionVersion.
-func (b *V1CustomResourceDefinitionVersionBuilder) Result() apiextv1.CustomResourceDefinitionVersion {
-	return b.object
+func (c *V1CustomResourceDefinitionVersionBuilder) Result() apiextv1.CustomResourceDefinitionVersion {
+	return c.object
 }

@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	DELIMITER_VALUE = ","
+	delimiterValue = ","
 )
 
 // ChangeImageNameAction updates a deployment or Pod's image name
@@ -194,13 +194,13 @@ func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldIm
 	//"case3":"abc:test,edf:test"
 	//"case4":"1.1.1.1:5000/abc:test,2.2.2.2:3000/edf:test"
 	for _, row := range cm.Data {
-		if !strings.Contains(row, DELIMITER_VALUE) {
+		if !strings.Contains(row, delimiterValue) {
 			continue
 		}
-		if strings.Contains(oldImageName, strings.TrimSpace(row[0:strings.Index(row, DELIMITER_VALUE)])) && len(row[strings.Index(row, DELIMITER_VALUE):]) > len(DELIMITER_VALUE) {
+		if strings.Contains(oldImageName, strings.TrimSpace(row[0:strings.Index(row, delimiterValue)])) && len(row[strings.Index(row, delimiterValue):]) > len(delimiterValue) {
 			log.Infoln("match specific case:", row)
-			oldImagePart := strings.TrimSpace(row[0:strings.Index(row, DELIMITER_VALUE)])
-			newImagePart := strings.TrimSpace(row[strings.Index(row, DELIMITER_VALUE)+len(DELIMITER_VALUE):])
+			oldImagePart := strings.TrimSpace(row[0:strings.Index(row, delimiterValue)])
+			newImagePart := strings.TrimSpace(row[strings.Index(row, delimiterValue)+len(delimiterValue):])
 			newImageName = strings.Replace(oldImageName, oldImagePart, newImagePart, -1)
 			return true, newImageName, nil
 		}
