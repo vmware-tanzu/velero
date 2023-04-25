@@ -33,7 +33,7 @@ func (n *NamespaceMapping) Init() error {
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.VeleroCfg.UseVolumeSnapshots = n.UseVolumeSnapshots
 	n.VeleroCfg.UseNodeAgent = !n.UseVolumeSnapshots
-	n.kibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
+	n.kibishiiData = &KibishiiData{Levels: 2, DirsPerLevel: 10, FilesPerLevel: 10, FileLength: 1024, BlockSize: 1024, PassNum: 0, ExpectedNodes: 2}
 	backupType := "restic"
 	if n.UseVolumeSnapshots {
 		backupType = "snapshot"
@@ -82,15 +82,15 @@ func (n *NamespaceMapping) StartRun() error {
 	return nil
 }
 func (n *NamespaceMapping) CreateResources() error {
-	n.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
 	for index, ns := range *n.NSIncluded {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Creating namespaces ...%s\n", ns), func() {
-			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(CreateNamespace(ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(n.Ctx, n.Client, VeleroCfg.CloudProvider,
+			Expect(KibishiiPrepareBeforeBackup(ctx, n.Client, VeleroCfg.CloudProvider,
 				ns, VeleroCfg.RegistryCredentialFile, VeleroCfg.Features,
 				VeleroCfg.KibishiiDirectory, false, n.kibishiiData)).To(Succeed())
 		})
@@ -99,17 +99,18 @@ func (n *NamespaceMapping) CreateResources() error {
 }
 
 func (n *NamespaceMapping) Verify() error {
-	n.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
 	for index, ns := range n.MappedNamespaceList {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Verify workload %s after restore ", ns), func() {
 			Expect(KibishiiVerifyAfterRestore(n.Client, ns,
-				n.Ctx, n.kibishiiData)).To(Succeed(), "Fail to verify workload after restore")
+				ctx, n.kibishiiData)).To(Succeed(), "Fail to verify workload after restore")
 		})
 	}
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Verify namespace %s for backup is no longer exist after restore with namespace mapping", ns), func() {
-			Expect(NamespaceShouldNotExist(n.Ctx, n.Client, ns)).To(Succeed())
+			Expect(NamespaceShouldNotExist(ctx, n.Client, ns)).To(Succeed())
 		})
 	}
 	return nil

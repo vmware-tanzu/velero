@@ -69,7 +69,6 @@ func (n *ScheduleBackupCreation) StartRun() error {
 	return nil
 }
 func (p *ScheduleBackupCreation) CreateResources() error {
-	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(context.Background(), p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
@@ -85,6 +84,8 @@ func (p *ScheduleBackupCreation) CreateResources() error {
 }
 
 func (n *ScheduleBackupCreation) Backup() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	// Wait until the beginning of the given period to create schedule, it will give us
 	//   a predictable period to wait for the first scheduled backup, and verify no immediate
 	//   scheduled backup was created between schedule creation and first scheduled backup.
@@ -94,7 +95,7 @@ func (n *ScheduleBackupCreation) Backup() error {
 			now := time.Now().Minute()
 			triggerNow := now % n.Period
 			if triggerNow == 0 {
-				Expect(VeleroScheduleCreate(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
+				Expect(VeleroScheduleCreate(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
 					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
 					return "Fail to restore workload"
 				})

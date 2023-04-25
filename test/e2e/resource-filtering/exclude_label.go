@@ -76,7 +76,8 @@ func (e *ExcludeFromBackup) Init() error {
 }
 
 func (e *ExcludeFromBackup) CreateResources() error {
-	e.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	namespace := e.NSBaseName
 	// These 2 labels for resources to be included
 	label1 := map[string]string{
@@ -86,16 +87,16 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		"velero.io/exclude-from-backup": "false",
 	}
 	fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
+	if err := CreateNamespace(ctx, e.Client, namespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 	}
 	serviceAccountName := "default"
 	// wait until the service account is created before patch the image pull secret
-	if err := WaitUntilServiceAccountCreated(e.Ctx, e.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+	if err := WaitUntilServiceAccountCreated(ctx, e.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
 		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
 	}
 	// add the image pull secret to avoid the image pull limit issue of Docker Hub
-	if err := PatchServiceAccountWithImagePullSecret(e.Ctx, e.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+	if err := PatchServiceAccountWithImagePullSecret(ctx, e.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
 	}
 	//Create deployment: to be included
@@ -139,10 +140,12 @@ func (e *ExcludeFromBackup) CreateResources() error {
 }
 
 func (e *ExcludeFromBackup) Verify() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	namespace := e.NSBaseName
 	By(fmt.Sprintf("Checking resources in namespaces ...%s\n", namespace), func() {
 		//Check namespace
-		checkNS, err := GetNamespace(e.Ctx, e.Client, namespace)
+		checkNS, err := GetNamespace(ctx, e.Client, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Could not retrieve test namespace %s", namespace))
 		Expect(checkNS.Name == namespace).To(Equal(true), fmt.Sprintf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name))
 

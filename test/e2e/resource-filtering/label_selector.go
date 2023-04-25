@@ -75,7 +75,8 @@ func (l *LabelSelector) Init() error {
 }
 
 func (l *LabelSelector) CreateResources() error {
-	l.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
@@ -85,17 +86,17 @@ func (l *LabelSelector) CreateResources() error {
 				"resourcefiltering": "false",
 			}
 		}
-		if err := CreateNamespaceWithLabel(l.Ctx, l.Client, namespace, labels); err != nil {
+		if err := CreateNamespaceWithLabel(ctx, l.Client, namespace, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 
 		serviceAccountName := "default"
 		// wait until the service account is created before patch the image pull secret
-		if err := WaitUntilServiceAccountCreated(l.Ctx, l.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+		if err := WaitUntilServiceAccountCreated(ctx, l.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
 			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
 		}
 		// add the image pull secret to avoid the image pull limit issue of Docker Hub
-		if err := PatchServiceAccountWithImagePullSecret(l.Ctx, l.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+		if err := PatchServiceAccountWithImagePullSecret(ctx, l.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
 			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
 		}
 		//Create deployment

@@ -55,7 +55,8 @@ var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment
 func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
 	client := *veleroCfg.ClientToInstallVelero
-	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+	defer ctxCancel()
 	veleroCLI := veleroCfg.VeleroCLI
 	providerName := veleroCfg.CloudProvider
 	veleroNamespace := veleroCfg.VeleroNamespace
@@ -221,7 +222,8 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 	timeout := 30 * time.Minute
 	interval := 1 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
+		timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
+		defer ctxCancel()
 		kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 			"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
@@ -246,7 +248,8 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
+		timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
+		defer ctxCancel()
 		kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 			"/usr/local/bin/verify.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),

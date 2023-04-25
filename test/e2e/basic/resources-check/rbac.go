@@ -84,21 +84,22 @@ func (r *RBACCase) Init() error {
 }
 
 func (r *RBACCase) CreateResources() error {
-	r.Ctx, _ = context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
-		if err := CreateNamespace(r.Ctx, r.Client, createNSName); err != nil {
+		if err := CreateNamespace(ctx, r.Client, createNSName); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 		serviceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.NSBaseName, nsNum)
 		fmt.Printf("Creating service account ...%s\n", createNSName)
-		if err := CreateServiceAccount(r.Ctx, r.Client, createNSName, serviceAccountName); err != nil {
+		if err := CreateServiceAccount(ctx, r.Client, createNSName, serviceAccountName); err != nil {
 			return errors.Wrapf(err, "Failed to create service account %s", serviceAccountName)
 		}
 		clusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", r.NSBaseName, nsNum)
 		clusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", r.NSBaseName, nsNum)
-		if err := CreateRBACWithBindingSA(r.Ctx, r.Client, createNSName, serviceAccountName, clusterRoleName, clusterRoleBindingName); err != nil {
+		if err := CreateRBACWithBindingSA(ctx, r.Client, createNSName, serviceAccountName, clusterRoleName, clusterRoleBindingName); err != nil {
 			return errors.Wrapf(err, "Failed to create cluster role %s with role binding %s", clusterRoleName, clusterRoleBindingName)
 		}
 	}
@@ -106,13 +107,14 @@ func (r *RBACCase) CreateResources() error {
 }
 
 func (r *RBACCase) Verify() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		checkNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
 		checkServiceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.NSBaseName, nsNum)
 		checkClusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", r.NSBaseName, nsNum)
 		checkClusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", r.NSBaseName, nsNum)
-
-		checkNS, err := GetNamespace(r.Ctx, r.Client, checkNSName)
+		checkNS, err := GetNamespace(ctx, r.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}
@@ -121,7 +123,7 @@ func (r *RBACCase) Verify() error {
 		}
 
 		//getting service account from the restore
-		checkSA, err := GetServiceAccount(r.Ctx, r.Client, checkNSName, checkServiceAccountName)
+		checkSA, err := GetServiceAccount(ctx, r.Client, checkNSName, checkServiceAccountName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test service account %s", checkSA)
@@ -132,7 +134,7 @@ func (r *RBACCase) Verify() error {
 		}
 
 		//getting cluster role from the restore
-		checkClusterRole, err := GetClusterRole(r.Ctx, r.Client, checkClusterRoleName)
+		checkClusterRole, err := GetClusterRole(ctx, r.Client, checkClusterRoleName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role %s", checkClusterRole)
@@ -143,7 +145,7 @@ func (r *RBACCase) Verify() error {
 		}
 
 		//getting cluster role binding from the restore
-		checkClusterRoleBinding, err := GetClusterRoleBinding(r.Ctx, r.Client, checkClusterRoleBindingName)
+		checkClusterRoleBinding, err := GetClusterRoleBinding(ctx, r.Client, checkClusterRoleBindingName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role binding %s", checkClusterRoleBinding)
@@ -164,19 +166,21 @@ func (r *RBACCase) Verify() error {
 }
 
 func (r *RBACCase) Destroy() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	//cleanup clusterrole
-	err := CleanupClusterRole(r.Ctx, r.Client, r.NSBaseName)
+	err := CleanupClusterRole(ctx, r.Client, r.NSBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could not cleanup clusterroles")
 	}
 
 	//cleanup cluster rolebinding
-	err = CleanupClusterRoleBinding(r.Ctx, r.Client, r.NSBaseName)
+	err = CleanupClusterRoleBinding(ctx, r.Client, r.NSBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could not cleanup clusterrolebindings")
 	}
 
-	err = CleanupNamespacesWithPoll(r.Ctx, r.Client, r.NSBaseName)
+	err = CleanupNamespacesWithPoll(ctx, r.Client, r.NSBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}

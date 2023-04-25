@@ -725,7 +725,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Phase:          velerov1api.BackupPhaseFinalizing,
 					Version:        1,
 					FormatVersion:  "1.1.0",
-					Expiration:     &metav1.Time{now.Add(10 * time.Minute)},
+					Expiration:     &metav1.Time{Time: now.Add(10 * time.Minute)},
 					StartTimestamp: &timestamp,
 				},
 			},

@@ -115,6 +115,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metri
 
 	clientConfig, err := factory.ClientConfig()
 	if err != nil {
+		cancelFunc()
 		return nil, err
 	}
 
@@ -139,6 +140,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metri
 		NewCache: cache.BuilderWithOptions(cacheOption),
 	})
 	if err != nil {
+		cancelFunc()
 		return nil, err
 	}
 

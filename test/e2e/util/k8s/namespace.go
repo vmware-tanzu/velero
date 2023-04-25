@@ -67,7 +67,8 @@ func GetNamespace(ctx context.Context, client TestClient, namespace string) (*co
 }
 
 func DeleteNamespace(ctx context.Context, client TestClient, namespace string, wait bool) error {
-	tenMinuteTimeout, _ := context.WithTimeout(context.Background(), time.Minute*10)
+	tenMinuteTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*10)
+	defer ctxCancel()
 	if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 	}
