@@ -422,7 +422,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 		if err != nil {
 			return map[string]string{}, errors.Wrap(err, "error get s3 credentials")
 		}
-		result[udmrepo.StoreOptionS3KeyId] = credValue.AccessKeyID
+		result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
 		result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
 		result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
 		result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
@@ -467,35 +467,35 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	region := config["region"]
 
 	if backendType == repoconfig.AWSBackend {
-		s3Url := config["s3Url"]
-		disableTls := false
+		s3URL := config["s3Url"]
+		disableTLS := false
 
 		var err error
-		if s3Url == "" {
+		if s3URL == "" {
 			region, err = getS3BucketRegion(bucket)
 			if err != nil {
 				return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
 			}
 
-			s3Url = fmt.Sprintf("s3-%s.amazonaws.com", region)
-			disableTls = false
+			s3URL = fmt.Sprintf("s3-%s.amazonaws.com", region)
+			disableTLS = false
 		} else {
-			url, err := url.Parse(s3Url)
+			url, err := url.Parse(s3URL)
 			if err != nil {
-				return map[string]string{}, errors.Wrapf(err, "error to parse s3Url %s", s3Url)
+				return map[string]string{}, errors.Wrapf(err, "error to parse s3Url %s", s3URL)
 			}
 
 			if url.Path != "" && url.Path != "/" {
-				return map[string]string{}, errors.Errorf("path is not expected in s3Url %s", s3Url)
+				return map[string]string{}, errors.Errorf("path is not expected in s3Url %s", s3URL)
 			}
 
-			s3Url = url.Host
-			disableTls = (url.Scheme == "http")
+			s3URL = url.Host
+			disableTLS = (url.Scheme == "http")
 		}
 
-		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3Url, "/")
-		result[udmrepo.StoreOptionS3DisableTlsVerify] = config["insecureSkipTLSVerify"]
-		result[udmrepo.StoreOptionS3DisableTls] = strconv.FormatBool(disableTls)
+		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3URL, "/")
+		result[udmrepo.StoreOptionS3DisableTLSVerify] = config["insecureSkipTLSVerify"]
+		result[udmrepo.StoreOptionS3DisableTLS] = strconv.FormatBool(disableTLS)
 	} else if backendType == repoconfig.AzureBackend {
 		domain, err := getAzureStorageDomain(config)
 		if err != nil {

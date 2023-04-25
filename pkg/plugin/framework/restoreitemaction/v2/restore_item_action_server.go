@@ -266,6 +266,6 @@ func restoreResourceIdentifierToProto(id velero.ResourceIdentifier) *proto.Resou
 
 // This shouldn't be called on the GRPC server since the server won't ever receive this request, as
 // the RestartableRestoreItemAction in Velero won't delegate this to the server
-func (c *RestoreItemActionGRPCServer) Name() string {
+func (s *RestoreItemActionGRPCServer) Name() string {
 	return ""
 }

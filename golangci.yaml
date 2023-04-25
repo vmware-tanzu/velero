@@ -298,6 +298,7 @@ linters:
     - gosec
     - govet
     - misspell
+    - stylecheck
     - typecheck
     - unparam
     - unused

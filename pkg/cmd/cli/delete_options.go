@@ -58,7 +58,7 @@ func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 // Validate validates the fields of the DeleteOptions struct.
 func (o *DeleteOptions) Validate(c *cobra.Command, f client.Factory, args []string) error {
 	if o.Client == nil {
-		return errors.New("Velero client is not set; unable to proceed")
+		return errors.New("velero client is not set; unable to proceed")
 	}
 
 	return o.SelectOptions.Validate()

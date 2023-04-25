@@ -167,8 +167,8 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 			res, err := a.Execute(input)
 
 			// Make sure mapped selected-node exists.
-			log_output := buf.String()
-			assert.Equal(t, strings.Contains(log_output, "Selected-node's mapped node doesn't exist"), false)
+			logOutput := buf.String()
+			assert.Equal(t, strings.Contains(logOutput, "Selected-node's mapped node doesn't exist"), false)
 
 			// validate for both error and non-error cases
 			switch {

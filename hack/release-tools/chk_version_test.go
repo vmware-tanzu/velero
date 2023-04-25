@@ -56,7 +56,7 @@ func TestRegexMatching(t *testing.T) {
 	for _, test := range tests {
 		name := fmt.Sprintf("Testing version string %s", test.version)
 		t.Run(name, func(t *testing.T) {
-			results := reSubMatchMap(release_regex, test.version)
+			results := reSubMatchMap(releaseRegex, test.version)
 
 			if len(results) == 0 && test.expectMatch {
 				t.Fail()

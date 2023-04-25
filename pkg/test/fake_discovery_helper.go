@@ -149,7 +149,7 @@ func (dh *FakeDiscoveryHelper) APIGroups() []metav1.APIGroup {
 
 type FakeServerResourcesInterface struct {
 	ResourceList []*metav1.APIResourceList
-	ApiGroup     []*metav1.APIGroup
+	APIGroup     []*metav1.APIGroup
 	FailedGroups map[schema.GroupVersion]error
 	ReturnError  error
 }
@@ -166,18 +166,18 @@ func (di *FakeServerResourcesInterface) ServerPreferredResources() ([]*metav1.AP
 
 func (di *FakeServerResourcesInterface) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	if di.ReturnError != nil {
-		return di.ApiGroup, di.ResourceList, di.ReturnError
+		return di.APIGroup, di.ResourceList, di.ReturnError
 	}
 	if di.FailedGroups == nil || len(di.FailedGroups) == 0 {
-		return di.ApiGroup, di.ResourceList, nil
+		return di.APIGroup, di.ResourceList, nil
 	}
-	return di.ApiGroup, di.ResourceList, &discovery.ErrGroupDiscoveryFailed{Groups: di.FailedGroups}
+	return di.APIGroup, di.ResourceList, &discovery.ErrGroupDiscoveryFailed{Groups: di.FailedGroups}
 }
 
 func NewFakeServerResourcesInterface(resourceList []*metav1.APIResourceList, apiGroup []*metav1.APIGroup, failedGroups map[schema.GroupVersion]error, returnError error) *FakeServerResourcesInterface {
 	helper := &FakeServerResourcesInterface{
 		ResourceList: resourceList,
-		ApiGroup:     apiGroup,
+		APIGroup:     apiGroup,
 		FailedGroups: failedGroups,
 		ReturnError:  returnError,
 	}

@@ -47,8 +47,8 @@ type backupStatusLine struct {
 
 // GetSnapshotID runs provided 'restic snapshots' command to get the ID of a snapshot
 // and an error if a unique snapshot cannot be identified.
-func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
-	stdout, stderr, err := exec.RunCommand(snapshotIdCmd.Cmd())
+func GetSnapshotID(snapshotIDCmd *Command) (string, error) {
+	stdout, stderr, err := exec.RunCommand(snapshotIDCmd.Cmd())
 	if err != nil {
 		return "", errors.Wrapf(err, "error running command, stderr=%s", stderr)
 	}
@@ -63,7 +63,7 @@ func GetSnapshotID(snapshotIdCmd *Command) (string, error) {
 	}
 
 	if len(snapshots) != 1 {
-		return "", errors.Errorf("expected one matching snapshot by command: %s, got %d", snapshotIdCmd.String(), len(snapshots))
+		return "", errors.Errorf("expected one matching snapshot by command: %s, got %d", snapshotIDCmd.String(), len(snapshots))
 	}
 
 	return snapshots[0].ShortID, nil
