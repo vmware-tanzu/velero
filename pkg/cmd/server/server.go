@@ -617,7 +617,7 @@ func (s *server) getCSIVolumeSnapshotListers() (vsLister snapshotv1listers.Volum
 		s.logger.Errorf("fail to find snapshot v1 schema: %s", err)
 	}
 
-	return
+	return vsLister, err
 }
 
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {

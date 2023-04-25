@@ -72,10 +72,7 @@ func (m *RestoreItemOperationsMap) DeleteOperationsForRestore(restoreName string
 	// lock operations map
 	m.opsLock.Lock()
 	defer m.opsLock.Unlock()
-	if _, ok := m.opsMap[restoreName]; ok {
-		delete(m.opsMap, restoreName)
-	}
-	return
+	delete(m.opsMap, restoreName)
 }
 
 // UploadProgressAndPutOperationsForRestore will upload the item operations for this restore to
