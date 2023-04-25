@@ -102,8 +102,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
 							OnError:     velerov1api.HookErrorModeContinue,
-							ExecTimeout: metav1.Duration{time.Second},
-							WaitTimeout: metav1.Duration{time.Minute},
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
 						},
 					},
 				},
@@ -115,7 +115,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Container: "container1",
 						Command:   []string{"/usr/bin/foo"},
 						OnError:   velerov1api.HookErrorModeContinue,
-						Timeout:   metav1.Duration{time.Second},
+						Timeout:   metav1.Duration{Duration: time.Second},
 					},
 					error: nil,
 					pod: builder.ForPod("default", "my-pod").
@@ -171,8 +171,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
 							OnError:     velerov1api.HookErrorModeFail,
-							ExecTimeout: metav1.Duration{time.Second},
-							WaitTimeout: metav1.Duration{time.Minute},
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
 						},
 					},
 				},
@@ -184,7 +184,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Container: "container1",
 						Command:   []string{"/usr/bin/foo"},
 						OnError:   velerov1api.HookErrorModeFail,
-						Timeout:   metav1.Duration{time.Second},
+						Timeout:   metav1.Duration{Duration: time.Second},
 					},
 					error: errors.New("pod hook error"),
 					pod: builder.ForPod("default", "my-pod").
@@ -240,8 +240,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
 							OnError:     velerov1api.HookErrorModeContinue,
-							ExecTimeout: metav1.Duration{time.Second},
-							WaitTimeout: metav1.Duration{time.Minute},
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
 						},
 					},
 				},
@@ -253,7 +253,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Container: "container1",
 						Command:   []string{"/usr/bin/foo"},
 						OnError:   velerov1api.HookErrorModeContinue,
-						Timeout:   metav1.Duration{time.Second},
+						Timeout:   metav1.Duration{Duration: time.Second},
 					},
 					error: errors.New("pod hook error"),
 					pod: builder.ForPod("default", "my-pod").
@@ -309,8 +309,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
 							OnError:     velerov1api.HookErrorModeContinue,
-							ExecTimeout: metav1.Duration{time.Second},
-							WaitTimeout: metav1.Duration{time.Minute},
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
 						},
 					},
 				},
@@ -322,7 +322,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Container: "container1",
 						Command:   []string{"/usr/bin/foo"},
 						OnError:   velerov1api.HookErrorModeContinue,
-						Timeout:   metav1.Duration{time.Second},
+						Timeout:   metav1.Duration{Duration: time.Second},
 					},
 					error: nil,
 					pod: builder.ForPod("default", "my-pod").
@@ -444,7 +444,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
 							OnError:     velerov1api.HookErrorModeContinue,
-							WaitTimeout: metav1.Duration{time.Millisecond},
+							WaitTimeout: metav1.Duration{Duration: time.Millisecond},
 						},
 					},
 				},
@@ -475,7 +475,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 							Container:   "container1",
 							Command:     []string{"/usr/bin/foo"},
 							OnError:     velerov1api.HookErrorModeFail,
-							WaitTimeout: metav1.Duration{time.Millisecond},
+							WaitTimeout: metav1.Duration{Duration: time.Millisecond},
 						},
 					},
 				},
@@ -738,7 +738,9 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			ctx := context.Background()
 			if test.sharedHooksContextTimeout > 0 {
-				ctx, _ = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
+				var ctxCancel context.CancelFunc
+				ctx, ctxCancel = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
+				defer ctxCancel()
 			}
 
 			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer)
@@ -878,13 +880,13 @@ func TestMaxHookWait(t *testing.T) {
 				"container1": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							ExecTimeout: metav1.Duration{time.Second},
-							WaitTimeout: metav1.Duration{0},
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: 0},
 						},
 					},
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							WaitTimeout: metav1.Duration{-1},
+							WaitTimeout: metav1.Duration{Duration: -1},
 						},
 					},
 				},
@@ -897,24 +899,24 @@ func TestMaxHookWait(t *testing.T) {
 				"container1": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							WaitTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Second},
 						},
 					},
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							WaitTimeout: metav1.Duration{time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Second},
 						},
 					},
 				},
 				"container2": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							WaitTimeout: metav1.Duration{time.Hour},
+							WaitTimeout: metav1.Duration{Duration: time.Hour},
 						},
 					},
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							WaitTimeout: metav1.Duration{time.Minute},
+							WaitTimeout: metav1.Duration{Duration: time.Minute},
 						},
 					},
 				},
@@ -927,13 +929,13 @@ func TestMaxHookWait(t *testing.T) {
 				"container1": {
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							ExecTimeout: metav1.Duration{time.Second},
-							WaitTimeout: metav1.Duration{time.Second},
+							ExecTimeout: metav1.Duration{Duration: time.Second},
+							WaitTimeout: metav1.Duration{Duration: time.Second},
 						},
 					},
 					{
 						Hook: velerov1api.ExecRestoreHook{
-							WaitTimeout: metav1.Duration{0},
+							WaitTimeout: metav1.Duration{Duration: 0},
 						},
 					},
 				},

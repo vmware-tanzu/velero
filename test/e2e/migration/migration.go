@@ -97,13 +97,13 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 	})
 	When("kibishii is the sample workload", func() {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
+			oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+			defer ctxCancel()
 			flag.Parse()
 			UUIDgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
 			supportUploaderType, err := IsSupportUploaderType(veleroCLI2Version.VeleroVersion)
 			Expect(err).To(Succeed())
-			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
-
 			if veleroCLI2Version.VeleroCLI == "" {
 				//Assume tag of velero server image is identical to velero CLI version
 				//Download velero CLI if it's empty according to velero CLI version

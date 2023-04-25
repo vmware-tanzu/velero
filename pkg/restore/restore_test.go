@@ -53,9 +53,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
-	testutil "github.com/vmware-tanzu/velero/pkg/test"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	. "github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -3203,13 +3200,13 @@ func TestIsCompleted(t *testing.T) {
 			groupResource: schema.GroupResource{Group: "", Resource: "namespaces"},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			u := testutil.UnstructuredOrDie(test.content)
-			backup, err := isCompleted(u, test.groupResource)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := test.UnstructuredOrDie(tt.content)
+			backup, err := isCompleted(u, tt.groupResource)
 
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expected, backup)
+			if assert.Equal(t, tt.expectedErr, err != nil) {
+				assert.Equal(t, tt.expected, backup)
 			}
 		})
 	}
@@ -3392,7 +3389,7 @@ func newHarness(t *testing.T) *harness {
 
 	apiServer := test.NewAPIServer(t)
 	log := logrus.StandardLogger()
-	kbClient := velerotest.NewFakeControllerRuntimeClient(t)
+	kbClient := test.NewFakeControllerRuntimeClient(t)
 
 	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
 	require.NoError(t, err)
@@ -3405,7 +3402,7 @@ func newHarness(t *testing.T) *harness {
 			namespaceClient:            apiServer.KubeClient.CoreV1().Namespaces(),
 			resourceTerminatingTimeout: time.Minute,
 			logger:                     log,
-			fileSystem:                 testutil.NewFakeFileSystem(),
+			fileSystem:                 test.NewFakeFileSystem(),
 
 			// unsupported
 			podVolumeRestorerFactory: nil,
@@ -3452,9 +3449,9 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
 			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").WithAnnotations(
-				kube.KubeAnnBindCompleted,
-				kube.KubeAnnBoundByController,
-				kube.KubeAnnDynamicallyProvisioned,
+				kubeutil.KubeAnnBindCompleted,
+				kubeutil.KubeAnnBoundByController,
+				kubeutil.KubeAnnDynamicallyProvisioned,
 			).WithSpecField("claimRef", map[string]interface{}{
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
@@ -3462,7 +3459,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				"resourceVersion": "1"}).Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
-				WithAnnotations(kube.KubeAnnDynamicallyProvisioned).
+				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
 				WithSpecField("claimRef", map[string]interface{}{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
@@ -3470,8 +3467,8 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
 			obj: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations(
-				kube.KubeAnnBindCompleted,
-				kube.KubeAnnBoundByController,
+				kubeutil.KubeAnnBindCompleted,
+				kubeutil.KubeAnnBoundByController,
 			).WithSpecField("volumeName", "pv-1").Unstructured,
 			expected: NewTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
 				WithName("pvc-1").WithAnnotations().

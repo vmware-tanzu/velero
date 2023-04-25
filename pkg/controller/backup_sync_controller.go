@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	kuberrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -174,10 +173,10 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// attempt to create backup custom resource via API
 		err = b.client.Create(ctx, backup, &client.CreateOptions{})
 		switch {
-		case err != nil && kuberrs.IsAlreadyExists(err):
+		case err != nil && apierrors.IsAlreadyExists(err):
 			log.Debug("Backup already exists in cluster")
 			continue
-		case err != nil && !kuberrs.IsAlreadyExists(err):
+		case err != nil && !apierrors.IsAlreadyExists(err):
 			log.WithError(errors.WithStack(err)).Error("Error syncing backup into cluster")
 			continue
 		default:
@@ -211,10 +210,10 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 			err = b.client.Create(ctx, podVolumeBackup, &client.CreateOptions{})
 			switch {
-			case err != nil && kuberrs.IsAlreadyExists(err):
+			case err != nil && apierrors.IsAlreadyExists(err):
 				log.Debug("Pod volume backup already exists in cluster")
 				continue
-			case err != nil && !kuberrs.IsAlreadyExists(err):
+			case err != nil && !apierrors.IsAlreadyExists(err):
 				log.WithError(errors.WithStack(err)).Error("Error syncing pod volume backup into cluster")
 				continue
 			default:
@@ -235,10 +234,10 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				vsClass.ResourceVersion = ""
 				err := b.client.Create(ctx, vsClass, &client.CreateOptions{})
 				switch {
-				case err != nil && kuberrs.IsAlreadyExists(err):
+				case err != nil && apierrors.IsAlreadyExists(err):
 					log.Debugf("VolumeSnapshotClass %s already exists in cluster", vsClass.Name)
 					continue
-				case err != nil && !kuberrs.IsAlreadyExists(err):
+				case err != nil && !apierrors.IsAlreadyExists(err):
 					log.WithError(errors.WithStack(err)).Errorf("Error syncing VolumeSnapshotClass %s into cluster", vsClass.Name)
 					continue
 				default:
@@ -259,10 +258,10 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				snapCont.ResourceVersion = ""
 				err := b.client.Create(ctx, snapCont, &client.CreateOptions{})
 				switch {
-				case err != nil && kuberrs.IsAlreadyExists(err):
+				case err != nil && apierrors.IsAlreadyExists(err):
 					log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
 					continue
-				case err != nil && !kuberrs.IsAlreadyExists(err):
+				case err != nil && !apierrors.IsAlreadyExists(err):
 					log.WithError(errors.WithStack(err)).Errorf("Error syncing volumesnapshotcontent %s into cluster", snapCont.Name)
 					continue
 				default:

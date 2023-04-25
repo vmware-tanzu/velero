@@ -138,7 +138,8 @@ func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig
 	}
 	if cloudProvider == "vsphere" {
 		var retSnapshotIDs []string
-		ctx, _ := context.WithTimeout(context.Background(), time.Minute*2)
+		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*2)
+		defer ctxCancel()
 		retSnapshotIDs, err = velero.GetVsphereSnapshotIDs(ctx, time.Hour, snapshotCheck.NamespaceBackedUp, snapshotCheck.PodName)
 		if err != nil {
 			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot CRs of backup%s", backupName))

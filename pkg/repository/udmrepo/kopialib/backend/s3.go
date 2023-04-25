@@ -36,7 +36,7 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string) error {
 		return err
 	}
 
-	c.options.AccessKeyID, err = mustHaveString(udmrepo.StoreOptionS3KeyId, flags)
+	c.options.AccessKeyID, err = mustHaveString(udmrepo.StoreOptionS3KeyID, flags)
 	if err != nil {
 		return err
 	}
@@ -49,8 +49,8 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string) error {
 	c.options.Endpoint = optionalHaveString(udmrepo.StoreOptionS3Endpoint, flags)
 	c.options.Region = optionalHaveString(udmrepo.StoreOptionOssRegion, flags)
 	c.options.Prefix = optionalHaveString(udmrepo.StoreOptionPrefix, flags)
-	c.options.DoNotUseTLS = optionalHaveBool(ctx, udmrepo.StoreOptionS3DisableTls, flags)
-	c.options.DoNotVerifyTLS = optionalHaveBool(ctx, udmrepo.StoreOptionS3DisableTlsVerify, flags)
+	c.options.DoNotUseTLS = optionalHaveBool(ctx, udmrepo.StoreOptionS3DisableTLS, flags)
+	c.options.DoNotVerifyTLS = optionalHaveBool(ctx, udmrepo.StoreOptionS3DisableTLSVerify, flags)
 	c.options.SessionToken = optionalHaveString(udmrepo.StoreOptionS3Token, flags)
 
 	c.options.Limits = setupLimits(ctx, flags)

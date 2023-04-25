@@ -43,7 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-// For unit test to mock function
+// NewUploaderProviderFunc is used for unit test to mock function
 var NewUploaderProviderFunc = provider.NewUploaderProvider
 
 // PodVolumeBackupReconciler reconciles a PodVolumeBackup object

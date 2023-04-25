@@ -96,7 +96,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			flag.Parse()
 			UUIDgen, err = uuid.NewRandom()
 			Expect(err).To(Succeed())
-			oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+			oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+			defer ctxCancel()
 			supportUploaderType, err := IsSupportUploaderType(veleroCLI2Version.VeleroVersion)
 			Expect(err).To(Succeed())
 			if veleroCLI2Version.VeleroCLI == "" {

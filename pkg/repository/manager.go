@@ -247,7 +247,7 @@ func (m *manager) getRepositoryProvider(repo *velerov1api.BackupRepository) (pro
 
 func (m *manager) assembleRepoParam(repo *velerov1api.BackupRepository) (provider.RepoParam, error) {
 	bsl := &velerov1api.BackupStorageLocation{}
-	if err := m.client.Get(context.Background(), client.ObjectKey{m.namespace, repo.Spec.BackupStorageLocation}, bsl); err != nil {
+	if err := m.client.Get(context.Background(), client.ObjectKey{Namespace: m.namespace, Name: repo.Spec.BackupStorageLocation}, bsl); err != nil {
 		return provider.RepoParam{}, errors.WithStack(err)
 	}
 	return provider.RepoParam{

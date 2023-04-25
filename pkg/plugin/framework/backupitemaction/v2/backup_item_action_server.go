@@ -216,6 +216,6 @@ func backupResourceIdentifierToProto(id velero.ResourceIdentifier) *proto.Resour
 
 // This shouldn't be called on the GRPC server since the server won't ever receive this request, as
 // the RestartableBackupItemAction in Velero won't delegate this to the server
-func (c *BackupItemActionGRPCServer) Name() string {
+func (s *BackupItemActionGRPCServer) Name() string {
 	return ""
 }

@@ -1092,7 +1092,7 @@ func GetVersionList(veleroCli, veleroVersion string) []VeleroCLI2Version {
 
 	for _, veleroVersion := range veleroVersionList {
 		veleroCLI2VersionList = append(veleroCLI2VersionList,
-			VeleroCLI2Version{veleroVersion, ""})
+			VeleroCLI2Version{VeleroVersion: veleroVersion, VeleroCLI: ""})
 	}
 	for i, veleroCli := range veleroCliList {
 		if i == len(veleroVersionList)-1 {

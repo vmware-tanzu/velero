@@ -66,20 +66,21 @@ func (f *FilteringCase) Init() error {
 }
 
 func (f *FilteringCase) CreateResources() error {
-	f.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
+		if err := CreateNamespace(ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		serviceAccountName := "default"
 		// wait until the service account is created before patch the image pull secret
-		if err := WaitUntilServiceAccountCreated(f.Ctx, f.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
+		if err := WaitUntilServiceAccountCreated(ctx, f.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
 			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
 		}
 		// add the image pull secret to avoid the image pull limit issue of Docker Hub
-		if err := PatchServiceAccountWithImagePullSecret(f.Ctx, f.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
+		if err := PatchServiceAccountWithImagePullSecret(ctx, f.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
 			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
 		}
 		//Create deployment
@@ -120,11 +121,13 @@ func (f *FilteringCase) CreateResources() error {
 }
 
 func (f *FilteringCase) Verify() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check namespace
-		checkNS, err := GetNamespace(f.Ctx, f.Client, namespace)
+		checkNS, err := GetNamespace(ctx, f.Client, namespace)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", namespace)
 		}
