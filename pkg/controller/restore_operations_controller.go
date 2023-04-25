@@ -218,6 +218,7 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 	completionChanges bool) error {
 	if len(operations.ErrsSinceUpdate) > 0 {
 		// FIXME: download/upload results
+		r.logger.WithField("restore", restore.Name).Infof("Restore has %d errors", len(operations.ErrsSinceUpdate))
 	}
 	removeIfComplete := true
 	defer func() {

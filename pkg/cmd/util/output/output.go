@@ -219,10 +219,6 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 		return false, errors.Errorf("type %T is not supported", obj)
 	}
 
-	if table == nil {
-		return false, errors.Errorf("error generating table for type %T", obj)
-	}
-
 	// 2. print table
 	tablePrinter, err := NewPrinter(cmd)
 	if err != nil {

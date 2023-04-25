@@ -83,7 +83,7 @@ func TestPrintVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				kbClient           = fake.NewFakeClientWithScheme(scheme.Scheme)
+				kbClient           = fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 				serverStatusGetter = new(mockServerStatusGetter)
 				buf                = new(bytes.Buffer)
 			)

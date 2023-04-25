@@ -346,7 +346,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	}()
 
 	backedUpGroupResources := map[schema.GroupResource]bool{}
-	totalItems := len(items)
 
 	for i, item := range items {
 		log.WithFields(map[string]interface{}{
@@ -381,7 +380,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
-		totalItems = len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
 
 		// send a progress update
 		update <- progressUpdate{
@@ -587,7 +586,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 	}
 	updateFiles := make(map[string]FileForArchive)
 	backedUpGroupResources := map[schema.GroupResource]bool{}
-	totalItems := len(items)
 
 	for i, item := range items {
 		log.WithFields(map[string]interface{}{
@@ -626,7 +624,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
-		totalItems = len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
 
 		log.WithFields(map[string]interface{}{
 			"progress":  "",

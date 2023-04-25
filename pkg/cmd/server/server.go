@@ -340,6 +340,10 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	credentialSecretStore, err := credentials.NewNamespacedSecretStore(mgr.GetClient(), f.Namespace())
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	s := &server{
 		namespace:             f.Namespace(),
