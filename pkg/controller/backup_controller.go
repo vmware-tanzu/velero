@@ -463,7 +463,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
 	if request.Spec.OrLabelSelectors != nil && request.Spec.LabelSelector != nil {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified")
 	}
 
 	if request.Spec.ResourcePolicy != nil && request.Spec.ResourcePolicy.Kind == resourcepolicies.ConfigmapRefType {

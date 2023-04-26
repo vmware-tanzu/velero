@@ -72,10 +72,7 @@ func (m *BackupItemOperationsMap) DeleteOperationsForBackup(backupName string) {
 	// lock operations map
 	m.opsLock.Lock()
 	defer m.opsLock.Unlock()
-	if _, ok := m.opsMap[backupName]; ok {
-		delete(m.opsMap, backupName)
-	}
-	return
+	delete(m.opsMap, backupName)
 }
 
 // UploadProgressAndPutOperationsForBackup will upload the item operations for this backup to

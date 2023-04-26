@@ -270,7 +270,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) backupInfo
 
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
 	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != nil {
-		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"))
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified")
 	}
 
 	// validate that exactly one of BackupName and ScheduleName have been specified

@@ -255,8 +255,6 @@ linters-settings:
   rowserrcheck:
     packages:
       - github.com/jmoiron/sqlx
-  staticcheck:
-    
   testpackage:
     # regexp pattern to skip files
     skip-regexp: (export|internal)_test\.go
@@ -298,18 +296,31 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
+    - dogsled
+    - durationcheck
+    - exportloopref
     - goconst
     - gofmt
     - goheader
     - goimports
+    - goprintffuncname
     - gosec
+    - gosimple
     - govet
+    - importas
+    - ineffassign
     - misspell
+    - nakedret
+    - nosprintfhostport
     - staticcheck
     - stylecheck
     - revive
     - typecheck
+    - unconvert
     - unparam
     - unused
     - usestdlibvars

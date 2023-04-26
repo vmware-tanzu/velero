@@ -89,7 +89,7 @@ type FileForArchive struct {
 func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
 	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize)
 	// return if not selected, an error occurred, there are no files to add, or for finalize
-	if selectedForBackup == false || err != nil || len(files) == 0 || finalize {
+	if !selectedForBackup || err != nil || len(files) == 0 || finalize {
 		return selectedForBackup, files, err
 	}
 	for _, file := range files {
@@ -340,9 +340,7 @@ func (ib *itemBackupper) executeActions(
 		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true" || finalize
 		// remove the annotation as it's for communication between BIA and velero server,
 		// we don't want the resource be restored with this annotation.
-		if _, ok := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation]; ok {
-			delete(u.GetAnnotations(), mustIncludeAdditionalItemAnnotation)
-		}
+		delete(u.GetAnnotations(), mustIncludeAdditionalItemAnnotation)
 		obj = u
 
 		// If async plugin started async operation, add it to the ItemOperations list
