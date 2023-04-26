@@ -1,0 +1,1 @@
+Fix issue #6182. If pod is not running, don't treat it as an error, let it go and leave a warning.
