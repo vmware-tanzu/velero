@@ -119,7 +119,7 @@ func (kp *kopiaProvider) RunBackup(
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
 	kpUploader := snapshotfs.NewUploader(repoWriter)
-	progress := new(kopia.KopiaProgress)
+	progress := new(kopia.Progress)
 	progress.InitThrottle(backupProgressCheckInterval)
 	progress.Updater = updater
 	progress.Log = log
@@ -144,7 +144,7 @@ func (kp *kopiaProvider) RunBackup(
 
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
 	updater.UpdateProgress(
-		&uploader.UploaderProgress{
+		&uploader.Progress{
 			TotalBytes: snapshotInfo.Size,
 			BytesDone:  snapshotInfo.Size,
 		},
@@ -177,7 +177,7 @@ func (kp *kopiaProvider) RunRestore(
 		"volumePath": volumePath,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
-	prorgess := new(kopia.KopiaProgress)
+	prorgess := new(kopia.Progress)
 	prorgess.InitThrottle(restoreProgressCheckInterval)
 	prorgess.Updater = updater
 	restoreCancel := make(chan struct{})
@@ -200,7 +200,7 @@ func (kp *kopiaProvider) RunRestore(
 	}
 
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
-	updater.UpdateProgress(&uploader.UploaderProgress{
+	updater.UpdateProgress(&uploader.Progress{
 		TotalBytes: size,
 		BytesDone:  size,
 	})

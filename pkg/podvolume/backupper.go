@@ -48,7 +48,7 @@ type Backupper interface {
 type backupper struct {
 	ctx          context.Context
 	repoLocker   *repository.RepoLocker
-	repoEnsurer  *repository.RepositoryEnsurer
+	repoEnsurer  *repository.Ensurer
 	veleroClient clientset.Interface
 	pvcClient    corev1client.PersistentVolumeClaimsGetter
 	pvClient     corev1client.PersistentVolumesGetter
@@ -62,7 +62,7 @@ type backupper struct {
 func newBackupper(
 	ctx context.Context,
 	repoLocker *repository.RepoLocker,
-	repoEnsurer *repository.RepositoryEnsurer,
+	repoEnsurer *repository.Ensurer,
 	podVolumeBackupInformer cache.SharedIndexInformer,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,

@@ -81,7 +81,7 @@ type manager struct {
 	providers   map[string]provider.Provider
 	client      client.Client
 	repoLocker  *RepoLocker
-	repoEnsurer *RepositoryEnsurer
+	repoEnsurer *Ensurer
 	fileSystem  filesystem.Interface
 	log         logrus.FieldLogger
 }
@@ -91,7 +91,7 @@ func NewManager(
 	namespace string,
 	client client.Client,
 	repoLocker *RepoLocker,
-	repoEnsurer *RepositoryEnsurer,
+	repoEnsurer *Ensurer,
 	credentialFileStore credentials.FileStore,
 	credentialSecretStore credentials.SecretStore,
 	log logrus.FieldLogger,

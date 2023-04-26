@@ -349,7 +349,7 @@ func (ib *itemBackupper) executeActions(
 		// ignore during finalize phase
 		if operationID != "" {
 			if finalize {
-				return nil, itemFiles, errors.New(fmt.Sprintf("Backup Item Action created operation during finalize (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name))
+				return nil, itemFiles, fmt.Errorf("backup Item Action created operation during finalize (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 			}
 			resourceIdentifier := velero.ResourceIdentifier{
 				GroupResource: groupResource,

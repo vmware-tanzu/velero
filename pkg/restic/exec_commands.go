@@ -104,7 +104,7 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.Prog
 					// if the line contains a non-empty bytes_done field, we can update the
 					// caller with the progress
 					if stat.BytesDone != 0 {
-						updater.UpdateProgress(&uploader.UploaderProgress{
+						updater.UpdateProgress(&uploader.Progress{
 							TotalBytes: stat.TotalBytes,
 							BytesDone:  stat.BytesDone,
 						})
@@ -136,7 +136,7 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.Prog
 	}
 
 	// update progress to 100%
-	updater.UpdateProgress(&uploader.UploaderProgress{
+	updater.UpdateProgress(&uploader.Progress{
 		TotalBytes: stat.TotalBytesProcessed,
 		BytesDone:  stat.TotalBytesProcessed,
 	})
@@ -198,7 +198,7 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updater uploader.Pr
 		return "", "", errors.Wrap(err, "error getting snapshot size")
 	}
 
-	updater.UpdateProgress(&uploader.UploaderProgress{
+	updater.UpdateProgress(&uploader.Progress{
 		TotalBytes: snapshotSize,
 	})
 
@@ -217,7 +217,7 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updater uploader.Pr
 				}
 
 				if volumeSize != 0 {
-					updater.UpdateProgress(&uploader.UploaderProgress{
+					updater.UpdateProgress(&uploader.Progress{
 						TotalBytes: snapshotSize,
 						BytesDone:  volumeSize,
 					})
@@ -233,7 +233,7 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updater uploader.Pr
 	quit <- struct{}{}
 
 	// update progress to 100%
-	updater.UpdateProgress(&uploader.UploaderProgress{
+	updater.UpdateProgress(&uploader.Progress{
 		TotalBytes: snapshotSize,
 		BytesDone:  snapshotSize,
 	})

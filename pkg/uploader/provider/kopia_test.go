@@ -85,19 +85,19 @@ func TestRunRestore(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		hookRestoreFunc func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.KopiaProgress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error)
+		hookRestoreFunc func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error)
 		notError        bool
 	}{
 		{
 			name: "normal restore",
-			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.KopiaProgress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
+			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 				return 0, 0, nil
 			},
 			notError: true,
 		},
 		{
 			name: "failed to restore",
-			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.KopiaProgress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
+			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 				return 0, 0, errors.New("failed to restore")
 			},
 			notError: false,
@@ -124,7 +124,7 @@ type FakeBackupProgressUpdater struct {
 	Cli             client.Client
 }
 
-func (f *FakeBackupProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {}
+func (f *FakeBackupProgressUpdater) UpdateProgress(p *uploader.Progress) {}
 
 type FakeRestoreProgressUpdater struct {
 	PodVolumeRestore *velerov1api.PodVolumeRestore
@@ -133,4 +133,4 @@ type FakeRestoreProgressUpdater struct {
 	Cli              client.Client
 }
 
-func (f *FakeRestoreProgressUpdater) UpdateProgress(p *uploader.UploaderProgress) {}
+func (f *FakeRestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {}

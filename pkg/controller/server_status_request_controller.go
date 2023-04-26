@@ -58,8 +58,8 @@ type serverStatusRequestReconciler struct {
 
 // NewServerStatusRequestReconciler initializes and returns serverStatusRequestReconciler struct.
 func NewServerStatusRequestReconciler(
-	client client.Client,
 	ctx context.Context,
+	client client.Client,
 	pluginRegistry PluginLister,
 	clock clocks.WithTickerAndDelayedExecution,
 	log logrus.FieldLogger) *serverStatusRequestReconciler {
