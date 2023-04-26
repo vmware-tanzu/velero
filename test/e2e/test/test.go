@@ -72,12 +72,18 @@ type TestCase struct {
 	UseVolumeSnapshots bool
 	VeleroCfg          VeleroConfig
 	RestorePhaseExpect velerov1api.RestorePhase
+	Timeout            time.Duration
 }
 
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		veleroCfg := test.GetTestCase().VeleroCfg
+		// If TestCase.Timeout is not set, then make 10 minutes as default value for backup
+		// or restore CLI
+		if test.GetTestCase().Timeout == 0 {
+			test.GetTestCase().Timeout = 10 * time.Minute
+		}
 		BeforeEach(func() {
 			flag.Parse()
 			veleroCfg := test.GetTestCase().VeleroCfg
@@ -110,6 +116,9 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 		var veleroCfg VeleroConfig
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
+			if tests[k].GetTestCase().Timeout == 0 {
+				tests[k].GetTestCase().Timeout = 10 * time.Minute
+			}
 			veleroCfg = tests[k].GetTestCase().VeleroCfg
 			useVolumeSnapshots = tests[k].GetTestCase().UseVolumeSnapshots
 		}
@@ -158,7 +167,7 @@ func (t *TestCase) StartRun() error {
 }
 
 func (t *TestCase) Backup() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), t.Timeout)
 	defer ctxCancel()
 	veleroCfg := t.GetTestCase().VeleroCfg
 	if err := VeleroBackupExec(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
@@ -169,7 +178,7 @@ func (t *TestCase) Backup() error {
 }
 
 func (t *TestCase) Destroy() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer ctxCancel()
 	By(fmt.Sprintf("Start to destroy namespace %s......", t.NSBaseName), func() {
 		Expect(CleanupNamespacesWithPoll(ctx, t.Client, t.NSBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
@@ -178,7 +187,7 @@ func (t *TestCase) Destroy() error {
 }
 
 func (t *TestCase) Restore() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), t.Timeout)
 	defer ctxCancel()
 	veleroCfg := t.GetTestCase().VeleroCfg
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
@@ -206,7 +215,7 @@ func (t *TestCase) Verify() error {
 }
 
 func (t *TestCase) Clean() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer ctxCancel()
 	veleroCfg := t.GetTestCase().VeleroCfg
 	if !veleroCfg.Debug {

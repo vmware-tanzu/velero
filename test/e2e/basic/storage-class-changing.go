@@ -49,7 +49,7 @@ func (s *StorageClasssChanging) Init() error {
 	s.BackupName = "backup-sc-" + UUIDgen.String()
 	s.RestoreName = "restore-" + UUIDgen.String()
 	s.srcStorageClass = "default"
-	s.desStorageClass = "e2e-storage-class"
+	s.desStorageClass = StorageClassName
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
 		"velero.io/plugin-config": ""}
 	s.data = map[string]string{s.srcStorageClass: s.desStorageClass}
