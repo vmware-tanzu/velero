@@ -151,9 +151,8 @@ func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) []
 func getUploaderTypeOrDefault(uploaderType string) string {
 	if uploaderType != "" {
 		return uploaderType
-	} else {
-		return uploader.ResticType
 	}
+	return uploader.ResticType
 }
 
 // getRepositoryType returns the hardcode repositoryType for different backup methods - Restic or Kopia,uploaderType

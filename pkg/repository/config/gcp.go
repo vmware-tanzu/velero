@@ -41,7 +41,6 @@ func GetGCPResticEnvVars(config map[string]string) (map[string]string, error) {
 func GetGCPCredentials(config map[string]string) string {
 	if credentialsFile, ok := config[CredentialsFileKey]; ok {
 		return credentialsFile
-	} else {
-		return os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	}
+	return os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 }

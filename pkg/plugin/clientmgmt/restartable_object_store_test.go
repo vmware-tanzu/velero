@@ -47,7 +47,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a ObjectStore!",
+			expectedError: "plugin int is not a ObjectStore",
 		},
 		{
 			name:   "happy path",
@@ -97,7 +97,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	}
 
 	err := r.Reinitialize(3)
-	assert.EqualError(t, err, "int is not a ObjectStore!")
+	assert.EqualError(t, err, "plugin int is not a ObjectStore")
 
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)

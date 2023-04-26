@@ -42,7 +42,7 @@ type mockArgs struct {
 	returns    []interface{}
 }
 
-func InjectSnapshotFuncs() *snapshotMockes {
+func injectSnapshotFuncs() *snapshotMockes {
 	s := &snapshotMockes{
 		policyMock:     &uploadermocks.Policy{},
 		snapshotMock:   &uploadermocks.Snapshot{},
@@ -184,7 +184,7 @@ func TestSnapshotSource(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			s := InjectSnapshotFuncs()
+			s := injectSnapshotFuncs()
 			MockFuncs(s, tc.args)
 			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, "/", log, "TestSnapshotSource")
 			if tc.notError {
