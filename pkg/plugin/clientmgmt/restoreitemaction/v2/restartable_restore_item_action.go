@@ -80,7 +80,7 @@ func (r *RestartableRestoreItemAction) getRestoreItemAction() (riav2.RestoreItem
 
 	restoreItemAction, ok := plugin.(riav2.RestoreItemAction)
 	if !ok {
-		return nil, errors.Errorf("%T is not a RestoreItemActionV2!", plugin)
+		return nil, errors.Errorf("plugin %T is not a RestoreItemActionV2", plugin)
 	}
 
 	return restoreItemAction, nil

@@ -40,7 +40,7 @@ type RestorerFactory interface {
 }
 
 func NewRestorerFactory(repoLocker *repository.RepoLocker,
-	repoEnsurer *repository.RepositoryEnsurer,
+	repoEnsurer *repository.Ensurer,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	podClient corev1client.PodsGetter,
@@ -59,7 +59,7 @@ func NewRestorerFactory(repoLocker *repository.RepoLocker,
 
 type restorerFactory struct {
 	repoLocker   *repository.RepoLocker
-	repoEnsurer  *repository.RepositoryEnsurer
+	repoEnsurer  *repository.Ensurer
 	veleroClient clientset.Interface
 	pvcClient    corev1client.PersistentVolumeClaimsGetter
 	podClient    corev1client.PodsGetter

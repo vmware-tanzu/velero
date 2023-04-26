@@ -36,13 +36,13 @@ const (
 )
 
 var (
-	DaemonsetNotFound = errors.New("daemonset not found")
+	ErrDaemonSetNotFound = errors.New("daemonset not found")
 )
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found
 func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
 	if _, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, daemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-		return DaemonsetNotFound
+		return ErrDaemonSetNotFound
 	} else if err != nil {
 		return err
 	} else {

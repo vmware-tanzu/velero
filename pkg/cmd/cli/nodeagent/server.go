@@ -313,7 +313,7 @@ func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVBStatusToFailed(client, s.ctx, &pvbs.Items[i],
+		if err := controller.UpdatePVBStatusToFailed(s.ctx, client, &pvbs.Items[i],
 			fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
 			time.Now()); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
@@ -349,7 +349,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVRStatusToFailed(client, s.ctx, &pvrs.Items[i],
+		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i],
 			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
 			time.Now()); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())

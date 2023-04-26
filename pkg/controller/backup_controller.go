@@ -463,7 +463,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
 	if request.Spec.OrLabelSelectors != nil && request.Spec.LabelSelector != nil {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"))
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified")
 	}
 
 	if request.Spec.ResourcePolicy != nil && request.Spec.ResourcePolicy.Kind == resourcepolicies.ConfigmapRefType {
@@ -838,47 +838,47 @@ func persistBackup(backup *pkgbackup.Request,
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
 
-	if err := encode.EncodeTo(backup.Backup, "json", backupJSON); err != nil {
+	if err := encode.To(backup.Backup, "json", backupJSON); err != nil {
 		persistErrs = append(persistErrs, errors.Wrap(err, "error encoding backup"))
 	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
-	nativeVolumeSnapshots, errs := encode.EncodeToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
+	nativeVolumeSnapshots, errs := encode.ToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
 	var backupItemOperations *bytes.Buffer
-	backupItemOperations, errs = encode.EncodeToJSONGzip(backup.GetItemOperationsList(), "backup item operations list")
+	backupItemOperations, errs = encode.ToJSONGzip(backup.GetItemOperationsList(), "backup item operations list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	podVolumeBackups, errs := encode.EncodeToJSONGzip(backup.PodVolumeBackups, "pod volume backups list")
+	podVolumeBackups, errs := encode.ToJSONGzip(backup.PodVolumeBackups, "pod volume backups list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	csiSnapshotJSON, errs := encode.EncodeToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
+	csiSnapshotJSON, errs := encode.ToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	csiSnapshotContentsJSON, errs := encode.EncodeToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
+	csiSnapshotContentsJSON, errs := encode.ToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
-	csiSnapshotClassesJSON, errs := encode.EncodeToJSONGzip(csiVolumesnapshotClasses, "csi volume snapshot classes list")
-	if errs != nil {
-		persistErrs = append(persistErrs, errs...)
-	}
-
-	backupResourceList, errs := encode.EncodeToJSONGzip(backup.BackupResourceList(), "backup resources list")
+	csiSnapshotClassesJSON, errs := encode.ToJSONGzip(csiVolumesnapshotClasses, "csi volume snapshot classes list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	backupResult, errs := encode.EncodeToJSONGzip(results, "backup results")
+	backupResourceList, errs := encode.ToJSONGzip(backup.BackupResourceList(), "backup resources list")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
+
+	backupResult, errs := encode.ToJSONGzip(results, "backup results")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}

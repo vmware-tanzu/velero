@@ -977,19 +977,19 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// namespace into which the resource is being restored into exists.
 		// This is the *remapped* namespace that we are ensuring exists.
 		nsToEnsure := getNamespace(ctx.log, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
-		if _, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+		_, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout)
+		if err != nil {
 			errs.AddVeleroError(err)
 			return warnings, errs, itemExists
-		} else {
-			// Add the newly created namespace to the list of restored items.
-			if nsCreated {
-				itemKey := itemKey{
-					resource:  resourceKey(nsToEnsure),
-					namespace: nsToEnsure.Namespace,
-					name:      nsToEnsure.Name,
-				}
-				ctx.restoredItems[itemKey] = restoredItemStatus{action: itemRestoreResultCreated, itemExists: true}
+		}
+		// Add the newly created namespace to the list of restored items.
+		if nsCreated {
+			itemKey := itemKey{
+				resource:  resourceKey(nsToEnsure),
+				namespace: nsToEnsure.Namespace,
+				name:      nsToEnsure.Name,
 			}
+			ctx.restoredItems[itemKey] = restoredItemStatus{action: itemRestoreResultCreated, itemExists: true}
 		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
@@ -1429,7 +1429,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 					// existingResourcePolicy is set as none, add warning
 					if resourcePolicy == velerov1api.PolicyTypeNone {
-						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
+						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
 							obj.GetKind(), obj.GetName())
 						warnings.Add(namespace, e)
 						// existingResourcePolicy is set as update, attempt patch on the resource and add warning if it fails
@@ -1445,7 +1445,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					}
 				} else {
 					// Preserved Velero behavior when existingResourcePolicy is not specified by the user
-					e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version.",
+					e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
 						obj.GetKind(), obj.GetName())
 					warnings.Add(namespace, e)
 				}

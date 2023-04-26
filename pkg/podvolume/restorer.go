@@ -55,7 +55,7 @@ type Restorer interface {
 type restorer struct {
 	ctx          context.Context
 	repoLocker   *repository.RepoLocker
-	repoEnsurer  *repository.RepositoryEnsurer
+	repoEnsurer  *repository.Ensurer
 	veleroClient clientset.Interface
 	pvcClient    corev1client.PersistentVolumeClaimsGetter
 	podClient    corev1client.PodsGetter
@@ -70,7 +70,7 @@ type restorer struct {
 func newRestorer(
 	ctx context.Context,
 	repoLocker *repository.RepoLocker,
-	repoEnsurer *repository.RepositoryEnsurer,
+	repoEnsurer *repository.Ensurer,
 	podVolumeRestoreInformer cache.SharedIndexInformer,
 	veleroClient clientset.Interface,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
@@ -194,9 +194,8 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			err = kube.IsPodScheduled(newObj)
 			if err != nil {
 				return false, nil
-			} else {
-				return true, nil
 			}
+			return true, nil
 		}
 
 		err := wait.PollWithContext(checkCtx, time.Millisecond*500, time.Minute*10, checkFunc)

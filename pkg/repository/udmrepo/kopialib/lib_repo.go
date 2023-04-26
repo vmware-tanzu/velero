@@ -100,9 +100,8 @@ func (ks *kopiaRepoService) Init(ctx context.Context, repoOption udmrepo.RepoOpt
 		}
 
 		return writeInitParameters(repoCtx, repoOption, ks.logger)
-	} else {
-		return ConnectBackupRepo(repoCtx, repoOption)
 	}
+	return ConnectBackupRepo(repoCtx, repoOption)
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {
@@ -480,19 +479,19 @@ func getCompressorForObject(opt udmrepo.ObjectWriteOptions) compression.Name {
 	return ""
 }
 
-func getManifestEntryFromKopia(kMani *manifest.EntryMetadata) *udmrepo.ManifestEntryMetadata {
+func getManifestEntryFromKopia(mani *manifest.EntryMetadata) *udmrepo.ManifestEntryMetadata {
 	return &udmrepo.ManifestEntryMetadata{
-		ID:      udmrepo.ID(kMani.ID),
-		Labels:  kMani.Labels,
-		Length:  int32(kMani.Length),
-		ModTime: kMani.ModTime,
+		ID:      udmrepo.ID(mani.ID),
+		Labels:  mani.Labels,
+		Length:  int32(mani.Length),
+		ModTime: mani.ModTime,
 	}
 }
 
-func getManifestEntriesFromKopia(kMani []*manifest.EntryMetadata) []*udmrepo.ManifestEntryMetadata {
+func getManifestEntriesFromKopia(mani []*manifest.EntryMetadata) []*udmrepo.ManifestEntryMetadata {
 	var ret []*udmrepo.ManifestEntryMetadata
 
-	for _, entry := range kMani {
+	for _, entry := range mani {
 		ret = append(ret, &udmrepo.ManifestEntryMetadata{
 			ID:      udmrepo.ID(entry.ID),
 			Labels:  entry.Labels,

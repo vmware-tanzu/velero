@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-type ServerStatusGetter interface {
+type Getter interface {
 	GetServerStatus(kbClient kbclient.Client) (*velerov1api.ServerStatusRequest, error)
 }
 

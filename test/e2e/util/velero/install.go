@@ -48,7 +48,7 @@ const (
 
 // we provide more install options other than the standard install.InstallOptions in E2E test
 type installOptions struct {
-	*install.InstallOptions
+	*install.Options
 	RegistryCredentialFile string
 	RestoreHelperImage     string
 	VeleroServerDebugMode  bool
@@ -100,7 +100,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 	veleroInstallOptions.GarbageCollectionFrequency = GCFrequency
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
-		InstallOptions:         veleroInstallOptions,
+		Options:                veleroInstallOptions,
 		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
 		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
 		VeleroServerDebugMode:  veleroCfg.VeleroServerDebugMode,

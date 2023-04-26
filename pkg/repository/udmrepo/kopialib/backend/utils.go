@@ -28,9 +28,8 @@ import (
 func mustHaveString(key string, flags map[string]string) (string, error) {
 	if value, exist := flags[key]; exist {
 		return value, nil
-	} else {
-		return "", errors.New("key " + key + " not found")
 	}
+	return "", errors.New("key " + key + " not found")
 }
 
 func optionalHaveString(key string, flags map[string]string) string {
@@ -68,9 +67,8 @@ func optionalHaveFloat64(ctx context.Context, key string, flags map[string]strin
 func optionalHaveStringWithDefault(key string, flags map[string]string, defValue string) string {
 	if value, exist := flags[key]; exist {
 		return value
-	} else {
-		return defValue
 	}
+	return defValue
 }
 
 func optionalHaveDuration(ctx context.Context, key string, flags map[string]string) time.Duration {

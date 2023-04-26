@@ -218,11 +218,10 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 		// tag-less image name: add default image tag for this version of Velero
 		log.Infof("Plugin config contains image name without tag. Adding tag: %q", tag)
 		return fmt.Sprintf("%s:%s", image, tag)
-	} else {
-		// tagged image name
-		log.Debugf("Plugin config contains image name with tag")
-		return image
 	}
+	// tagged image name
+	log.Debugf("Plugin config contains image name with tag")
+	return image
 }
 
 // getResourceRequests extracts the CPU and memory requests from a ConfigMap.
