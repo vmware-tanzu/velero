@@ -117,6 +117,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			velerov1api.BackupPhaseFailed,
 			velerov1api.BackupPhaseFailedValidation:
 			r.backupTracker.Delete(backup.Namespace, backup.Name)
+			r.metrics.DecrementActiveBackupTotal()
 		}
 		// Always attempt to Patch the backup object and status after each reconciliation.
 		if err := r.client.Patch(ctx, backup, kbclient.MergeFrom(original)); err != nil {
