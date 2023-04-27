@@ -39,40 +39,37 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/datapath"
+	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
-	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-func NewPodVolumeRestoreReconciler(logger logrus.FieldLogger, client client.Client, credentialGetter *credentials.CredentialGetter) *PodVolumeRestoreReconciler {
+func NewPodVolumeRestoreReconciler(client client.Client, ensurer *repository.Ensurer,
+	credentialGetter *credentials.CredentialGetter, logger logrus.FieldLogger) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
-		Client:           client,
-		logger:           logger.WithField("controller", "PodVolumeRestore"),
-		credentialGetter: credentialGetter,
-		fileSystem:       filesystem.NewFileSystem(),
-		clock:            &clocks.RealClock{},
+		Client:            client,
+		logger:            logger.WithField("controller", "PodVolumeRestore"),
+		repositoryEnsurer: ensurer,
+		credentialGetter:  credentialGetter,
+		fileSystem:        filesystem.NewFileSystem(),
+		clock:             &clocks.RealClock{},
+		dataPathMgr:       datapath.NewManager(1),
 	}
 }
 
 type PodVolumeRestoreReconciler struct {
 	client.Client
-	logger           logrus.FieldLogger
-	credentialGetter *credentials.CredentialGetter
-	fileSystem       filesystem.Interface
-	clock            clocks.WithTickerAndDelayedExecution
-}
-
-type RestoreProgressUpdater struct {
-	PodVolumeRestore *velerov1api.PodVolumeRestore
-	Log              logrus.FieldLogger
-	Ctx              context.Context
-	Cli              client.Client
+	logger            logrus.FieldLogger
+	repositoryEnsurer *repository.Ensurer
+	credentialGetter  *credentials.CredentialGetter
+	fileSystem        filesystem.Interface
+	clock             clocks.WithTickerAndDelayedExecution
+	dataPathMgr       *datapath.Manager
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -113,41 +110,69 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.Info("Restore starting")
+
+	callbacks := datapath.Callbacks{
+		OnCompleted: c.OnDataPathCompleted,
+		OnFailed:    c.OnDataPathFailed,
+		OnCancelled: c.OnDataPathCancelled,
+		OnProgress:  c.OnDataPathProgress,
+	}
+
+	fsRestore, err := c.dataPathMgr.CreateFileSystemBR(pvr.Name, pVBRRequestor, ctx, c.Client, pvr.Namespace, callbacks, log)
+	if err != nil {
+		if err == datapath.ConcurrentLimitExceed {
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute}, nil
+		} else {
+			return c.errorOut(ctx, pvr, err, "error to create data path", log)
+		}
+	}
+
 	original := pvr.DeepCopy()
 	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseInProgress
 	pvr.Status.StartTimestamp = &metav1.Time{Time: c.clock.Now()}
 	if err = c.Patch(ctx, pvr, client.MergeFrom(original)); err != nil {
-		log.WithError(err).Error("Unable to update status to in progress")
-		return ctrl.Result{}, err
+		return c.errorOut(ctx, pvr, err, "error to update status to in progress", log)
 	}
 
-	if err = c.processRestore(ctx, pvr, pod, log); err != nil {
-		if e := UpdatePVRStatusToFailed(ctx, c, pvr, err.Error(), c.clock.Now()); e != nil {
-			log.WithError(err).Error("Unable to update status to failed")
-		}
-
-		log.WithError(err).Error("Unable to process the PodVolumeRestore")
-		return ctrl.Result{}, err
+	volumePath, err := exposer.GetPodVolumeHostPath(ctx, pod, pvr.Spec.Volume, c.Client, c.fileSystem, log)
+	if err != nil {
+		return c.errorOut(ctx, pvr, err, "error exposing host path for pod volume", log)
 	}
 
-	original = pvr.DeepCopy()
-	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseCompleted
-	pvr.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
-	if err = c.Patch(ctx, pvr, client.MergeFrom(original)); err != nil {
-		log.WithError(err).Error("Unable to update status to completed")
-		return ctrl.Result{}, err
+	log.WithField("path", volumePath.ByPath).Debugf("Found host path")
+
+	if err := fsRestore.Init(ctx, pvr.Spec.BackupStorageLocation, pvr.Spec.Pod.Namespace, pvr.Spec.UploaderType,
+		podvolume.GetPvrRepositoryType(pvr), c.repositoryEnsurer, c.credentialGetter); err != nil {
+		return c.errorOut(ctx, pvr, err, "error to initialize data path", log)
 	}
-	log.Info("Restore completed")
+
+	if err := fsRestore.StartRestore(pvr.Spec.SnapshotID, volumePath); err != nil {
+		return c.errorOut(ctx, pvr, err, "error starting data path restore", log)
+	}
+
+	log.WithField("path", volumePath.ByPath).Info("Async fs restore data path started")
+
 	return ctrl.Result{}, nil
 }
 
-func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvr *velerov1api.PodVolumeRestore, errString string, time time.Time) error {
-	original := pvr.DeepCopy()
-	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
-	pvr.Status.Message = errString
-	pvr.Status.CompletionTimestamp = &metav1.Time{Time: time}
+func (c *PodVolumeRestoreReconciler) errorOut(ctx context.Context, pvr *velerov1api.PodVolumeRestore, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
+	c.closeDataPath(ctx, pvr.Name)
+	_ = UpdatePVRStatusToFailed(ctx, c.Client, pvr, errors.WithMessage(err, msg).Error(), c.clock.Now(), log)
+	return ctrl.Result{}, err
+}
 
-	return c.Patch(ctx, pvr, client.MergeFrom(original))
+func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1api.PodVolumeRestore, errString string, time time.Time, log logrus.FieldLogger) error {
+	original := pvb.DeepCopy()
+	pvb.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
+	pvb.Status.Message = errString
+	pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
+
+	if err := c.Patch(ctx, pvb, client.MergeFrom(original)); err != nil {
+		log.WithError(err).Error("error updating PodVolumeRestore status")
+		return err
+	} else {
+		return nil
+	}
 }
 
 func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, *corev1api.Pod, error) {
@@ -232,54 +257,23 @@ func getInitContainerIndex(pod *corev1api.Pod) int {
 	return -1
 }
 
-func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *velerov1api.PodVolumeRestore, pod *corev1api.Pod, log logrus.FieldLogger) error {
-	volumeDir, err := kube.GetVolumeDirectory(ctx, log, pod, req.Spec.Volume, c.Client)
-	if err != nil {
-		return errors.Wrap(err, "error getting volume directory name")
+func (c *PodVolumeRestoreReconciler) OnDataPathCompleted(ctx context.Context, namespace string, pvrName string, result datapath.Result) {
+	defer c.closeDataPath(ctx, pvrName)
+
+	log := c.logger.WithField("pvr", pvrName)
+
+	log.WithField("PVR", pvrName).Info("Async fs restore data path completed")
+
+	var pvr velerov1api.PodVolumeRestore
+	if err := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); err != nil {
+		log.WithError(err).Warn("Failed to get PVR on completion")
+		return
 	}
 
-	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
-	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
-	volumePath, err := kube.SinglePathMatch(
-		fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir),
-		c.fileSystem, log)
-	if err != nil {
-		return errors.Wrap(err, "error identifying path of volume")
-	}
-
-	backupLocation := &velerov1api.BackupStorageLocation{}
-	if err := c.Get(ctx, client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
-	}, backupLocation); err != nil {
-		return errors.Wrap(err, "error getting backup storage location")
-	}
-
-	// need to check backup repository in source namespace rather than in pod namespace
-	// such as in case of namespace mapping issue
-	backupRepo, err := repository.GetBackupRepository(ctx, c.Client, req.Namespace, repository.BackupRepositoryKey{
-		VolumeNamespace: req.Spec.SourceNamespace,
-		BackupLocation:  req.Spec.BackupStorageLocation,
-		RepositoryType:  podvolume.GetPvrRepositoryType(req),
-	})
-	if err != nil {
-		return errors.Wrap(err, "error getting backup repository")
-	}
-
-	uploaderProv, err := provider.NewUploaderProvider(ctx, c.Client, req.Spec.UploaderType,
-		req.Spec.RepoIdentifier, backupLocation, backupRepo, c.credentialGetter, repokey.RepoKeySelector(), log)
-	if err != nil {
-		return errors.Wrap(err, "error creating uploader")
-	}
-
-	defer func() {
-		if err := uploaderProv.Close(ctx); err != nil {
-			log.Errorf("failed to close uploader provider with error %v", err)
-		}
-	}()
-
-	if err = uploaderProv.RunRestore(ctx, req.Spec.SnapshotID, volumePath, c.NewRestoreProgressUpdater(ctx, req, log)); err != nil {
-		return errors.Wrapf(err, "error running restore err=%v", err)
+	volumePath := result.Restore.Target.ByPath
+	if volumePath == "" {
+		_, _ = c.errorOut(ctx, &pvr, errors.New("path is empty"), "invalid restore target", log)
+		return
 	}
 
 	// Remove the .velero directory from the restored volume (it may contain done files from previous restores
@@ -291,7 +285,7 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	}
 
 	var restoreUID types.UID
-	for _, owner := range req.OwnerReferences {
+	for _, owner := range pvr.OwnerReferences {
 		if boolptr.IsSetToTrue(owner.Controller) {
 			restoreUID = owner.UID
 			break
@@ -301,32 +295,80 @@ func (c *PodVolumeRestoreReconciler) processRestore(ctx context.Context, req *ve
 	// Create the .velero directory within the volume dir so we can write a done file
 	// for this restore.
 	if err := os.MkdirAll(filepath.Join(volumePath, ".velero"), 0755); err != nil {
-		return errors.Wrap(err, "error creating .velero directory for done file")
+		_, _ = c.errorOut(ctx, &pvr, err, "error creating .velero directory for done file", log)
+		return
 	}
 
 	// Write a done file with name=<restore-uid> into the just-created .velero dir
 	// within the volume. The velero init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
 	if err := os.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec
-		return errors.Wrap(err, "error writing done file")
-	}
-
-	return nil
-}
-
-func (c *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(ctx context.Context, pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger) *RestoreProgressUpdater {
-	return &RestoreProgressUpdater{pvr, log, ctx, c.Client}
-}
-
-// UpdateProgress which implement ProgressUpdater interface to update pvr progress status
-func (c *RestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {
-	original := c.PodVolumeRestore.DeepCopy()
-	c.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
-	if c.Cli == nil {
-		c.Log.Errorf("failed to update restore pod %s volume %s progress with uninitailize client", c.PodVolumeRestore.Spec.Pod.Name, c.PodVolumeRestore.Spec.Volume)
+		_, _ = c.errorOut(ctx, &pvr, err, "error writing done file", log)
 		return
 	}
-	if err := c.Cli.Patch(c.Ctx, c.PodVolumeRestore, client.MergeFrom(original)); err != nil {
-		c.Log.Errorf("update restore pod %s volume %s progress with %v", c.PodVolumeRestore.Spec.Pod.Name, c.PodVolumeRestore.Spec.Volume, err)
+
+	original := pvr.DeepCopy()
+	pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseCompleted
+	pvr.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
+	if err := c.Patch(ctx, &pvr, client.MergeFrom(original)); err != nil {
+		log.WithError(err).Error("error updating PodVolumeRestore status")
 	}
+
+	log.Info("Restore completed")
+}
+
+func (c *PodVolumeRestoreReconciler) OnDataPathFailed(ctx context.Context, namespace string, pvrName string, err error) {
+	defer c.closeDataPath(ctx, pvrName)
+
+	log := c.logger.WithField("pvr", pvrName)
+
+	log.WithError(err).Info("Async fs restore data path failed")
+
+	var pvr velerov1api.PodVolumeRestore
+	if err := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); err != nil {
+		log.WithError(err).Warn("Failed to get PVR on failure")
+	} else {
+		_, _ = c.errorOut(ctx, &pvr, err, "data path restore failed", log)
+	}
+}
+
+func (c *PodVolumeRestoreReconciler) OnDataPathCancelled(ctx context.Context, namespace string, pvrName string) {
+	defer c.closeDataPath(ctx, pvrName)
+
+	log := c.logger.WithField("pvr", pvrName)
+
+	log.Info("Async fs restore data path canceled")
+
+	var pvr velerov1api.PodVolumeRestore
+	if err := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); err != nil {
+		log.WithError(err).Warn("Failed to get PVR on cancel")
+	} else {
+		_, _ = c.errorOut(ctx, &pvr, err, "data path restore canceled", log)
+	}
+}
+
+func (c *PodVolumeRestoreReconciler) OnDataPathProgress(ctx context.Context, namespace string, pvrName string, progress *uploader.Progress) {
+	log := c.logger.WithField("pvr", pvrName)
+
+	var pvr velerov1api.PodVolumeRestore
+	if err := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); err != nil {
+		log.WithError(err).Warn("Failed to get PVB on progress")
+		return
+	}
+
+	original := pvr.DeepCopy()
+	pvr.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
+
+	if err := c.Client.Patch(ctx, &pvr, client.MergeFrom(original)); err != nil {
+		log.WithError(err).Error("Failed to update progress")
+	}
+}
+
+func (c *PodVolumeRestoreReconciler) closeDataPath(ctx context.Context, pvbName string) {
+	fsRestore := c.dataPathMgr.GetAsyncBR(pvbName)
+	if fsRestore != nil {
+		fsRestore.Close(ctx)
+	}
+
+	c.dataPathMgr.RemoveAsyncBR(pvbName)
 }

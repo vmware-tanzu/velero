@@ -113,6 +113,7 @@ func (rp *resticProvider) RunBackup(
 	ctx context.Context,
 	path string,
 	tags map[string]string,
+	forceFull bool,
 	parentSnapshot string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {

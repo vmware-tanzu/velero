@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	ResticType = "restic"
-	KopiaType  = "kopia"
+	ResticType           = "restic"
+	KopiaType            = "kopia"
+	SnapshotRequestorTag = "snapshot-requestor"
 )
 
 // ValidateUploaderType validates if the input param is a valid uploader type.

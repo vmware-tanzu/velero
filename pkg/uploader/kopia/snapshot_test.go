@@ -186,7 +186,7 @@ func TestSnapshotSource(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := injectSnapshotFuncs()
 			MockFuncs(s, tc.args)
-			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, "/", log, "TestSnapshotSource")
+			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, false, "/", nil, log, "TestSnapshotSource")
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
