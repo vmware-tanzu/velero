@@ -401,7 +401,11 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		errs.AddVeleroError(err)
 		return warnings, errs
 	}
-	defer ctx.fileSystem.RemoveAll(dir)
+	defer func() {
+		if err := ctx.fileSystem.RemoveAll(dir); err != nil {
+			ctx.log.Errorf("error removing temporary directory %s: %s", dir, err.Error())
+		}
+	}()
 
 	// Need to set this for additionalItems to be restored.
 	ctx.restoreDir = dir

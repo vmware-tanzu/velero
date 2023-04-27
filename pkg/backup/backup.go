@@ -635,7 +635,11 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 	}
 
 	// write new tar archive replacing files in original with content updateFiles for matches
-	buildFinalTarball(tr, tw, updateFiles)
+	if err := buildFinalTarball(tr, tw, updateFiles); err != nil {
+		log.Errorf("Error building final tarball: %s", err.Error())
+		return err
+	}
+
 	log.WithField("progress", "").Infof("Updated a total of %d items", len(backupRequest.BackedUpItems))
 
 	return nil

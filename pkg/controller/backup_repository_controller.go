@@ -96,7 +96,9 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change"))
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change")); err != nil {
+			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
+		}
 	}
 
 	return []reconcile.Request{}
