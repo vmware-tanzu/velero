@@ -21,7 +21,7 @@ package fake
 import (
 	"context"
 
-	v1alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1alpha1"
+	v2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,29 +32,29 @@ import (
 
 // FakeDataUploads implements DataUploadInterface
 type FakeDataUploads struct {
-	Fake *FakeVeleroV1alpha1
+	Fake *FakeVeleroV2alpha1
 	ns   string
 }
 
-var datauploadsResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1alpha1", Resource: "datauploads"}
+var datauploadsResource = schema.GroupVersionResource{Group: "velero.io", Version: "v2alpha1", Resource: "datauploads"}
 
-var datauploadsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1alpha1", Kind: "DataUpload"}
+var datauploadsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v2alpha1", Kind: "DataUpload"}
 
 // Get takes name of the dataUpload, and returns the corresponding dataUpload object, and an error if there is any.
-func (c *FakeDataUploads) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.DataUpload, err error) {
+func (c *FakeDataUploads) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2alpha1.DataUpload, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(datauploadsResource, c.ns, name), &v1alpha1.DataUpload{})
+		Invokes(testing.NewGetAction(datauploadsResource, c.ns, name), &v2alpha1.DataUpload{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.DataUpload), err
+	return obj.(*v2alpha1.DataUpload), err
 }
 
 // List takes label and field selectors, and returns the list of DataUploads that match those selectors.
-func (c *FakeDataUploads) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.DataUploadList, err error) {
+func (c *FakeDataUploads) List(ctx context.Context, opts v1.ListOptions) (result *v2alpha1.DataUploadList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(datauploadsResource, datauploadsKind, c.ns, opts), &v1alpha1.DataUploadList{})
+		Invokes(testing.NewListAction(datauploadsResource, datauploadsKind, c.ns, opts), &v2alpha1.DataUploadList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +64,8 @@ func (c *FakeDataUploads) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.DataUploadList{ListMeta: obj.(*v1alpha1.DataUploadList).ListMeta}
-	for _, item := range obj.(*v1alpha1.DataUploadList).Items {
+	list := &v2alpha1.DataUploadList{ListMeta: obj.(*v2alpha1.DataUploadList).ListMeta}
+	for _, item := range obj.(*v2alpha1.DataUploadList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -81,43 +81,43 @@ func (c *FakeDataUploads) Watch(ctx context.Context, opts v1.ListOptions) (watch
 }
 
 // Create takes the representation of a dataUpload and creates it.  Returns the server's representation of the dataUpload, and an error, if there is any.
-func (c *FakeDataUploads) Create(ctx context.Context, dataUpload *v1alpha1.DataUpload, opts v1.CreateOptions) (result *v1alpha1.DataUpload, err error) {
+func (c *FakeDataUploads) Create(ctx context.Context, dataUpload *v2alpha1.DataUpload, opts v1.CreateOptions) (result *v2alpha1.DataUpload, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(datauploadsResource, c.ns, dataUpload), &v1alpha1.DataUpload{})
+		Invokes(testing.NewCreateAction(datauploadsResource, c.ns, dataUpload), &v2alpha1.DataUpload{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.DataUpload), err
+	return obj.(*v2alpha1.DataUpload), err
 }
 
 // Update takes the representation of a dataUpload and updates it. Returns the server's representation of the dataUpload, and an error, if there is any.
-func (c *FakeDataUploads) Update(ctx context.Context, dataUpload *v1alpha1.DataUpload, opts v1.UpdateOptions) (result *v1alpha1.DataUpload, err error) {
+func (c *FakeDataUploads) Update(ctx context.Context, dataUpload *v2alpha1.DataUpload, opts v1.UpdateOptions) (result *v2alpha1.DataUpload, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(datauploadsResource, c.ns, dataUpload), &v1alpha1.DataUpload{})
+		Invokes(testing.NewUpdateAction(datauploadsResource, c.ns, dataUpload), &v2alpha1.DataUpload{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.DataUpload), err
+	return obj.(*v2alpha1.DataUpload), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDataUploads) UpdateStatus(ctx context.Context, dataUpload *v1alpha1.DataUpload, opts v1.UpdateOptions) (*v1alpha1.DataUpload, error) {
+func (c *FakeDataUploads) UpdateStatus(ctx context.Context, dataUpload *v2alpha1.DataUpload, opts v1.UpdateOptions) (*v2alpha1.DataUpload, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(datauploadsResource, "status", c.ns, dataUpload), &v1alpha1.DataUpload{})
+		Invokes(testing.NewUpdateSubresourceAction(datauploadsResource, "status", c.ns, dataUpload), &v2alpha1.DataUpload{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.DataUpload), err
+	return obj.(*v2alpha1.DataUpload), err
 }
 
 // Delete takes name of the dataUpload and deletes it. Returns an error if one occurs.
 func (c *FakeDataUploads) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(datauploadsResource, c.ns, name), &v1alpha1.DataUpload{})
+		Invokes(testing.NewDeleteAction(datauploadsResource, c.ns, name), &v2alpha1.DataUpload{})
 
 	return err
 }
@@ -126,17 +126,17 @@ func (c *FakeDataUploads) Delete(ctx context.Context, name string, opts v1.Delet
 func (c *FakeDataUploads) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(datauploadsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.DataUploadList{})
+	_, err := c.Fake.Invokes(action, &v2alpha1.DataUploadList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched dataUpload.
-func (c *FakeDataUploads) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.DataUpload, err error) {
+func (c *FakeDataUploads) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.DataUpload, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(datauploadsResource, c.ns, name, pt, data, subresources...), &v1alpha1.DataUpload{})
+		Invokes(testing.NewPatchSubresourceAction(datauploadsResource, c.ns, name, pt, data, subresources...), &v2alpha1.DataUpload{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.DataUpload), err
+	return obj.(*v2alpha1.DataUpload), err
 }

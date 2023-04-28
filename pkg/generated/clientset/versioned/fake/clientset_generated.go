@@ -22,8 +22,8 @@ import (
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	fakevelerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/fake"
-	velerov1alpha1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1alpha1"
-	fakevelerov1alpha1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1alpha1/fake"
+	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v2alpha1"
+	fakevelerov2alpha1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v2alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -86,7 +86,7 @@ func (c *Clientset) VeleroV1() velerov1.VeleroV1Interface {
 	return &fakevelerov1.FakeVeleroV1{Fake: &c.Fake}
 }
 
-// VeleroV1alpha1 retrieves the VeleroV1alpha1Client
-func (c *Clientset) VeleroV1alpha1() velerov1alpha1.VeleroV1alpha1Interface {
-	return &fakevelerov1alpha1.FakeVeleroV1alpha1{Fake: &c.Fake}
+// VeleroV2alpha1 retrieves the VeleroV2alpha1Client
+func (c *Clientset) VeleroV2alpha1() velerov2alpha1.VeleroV2alpha1Interface {
+	return &fakevelerov2alpha1.FakeVeleroV2alpha1{Fake: &c.Fake}
 }

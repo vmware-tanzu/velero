@@ -40,7 +40,7 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
   github.com/vmware-tanzu/velero/pkg/generated \
   github.com/vmware-tanzu/velero/pkg/apis \
-  "velero:v1,v1alpha1" \
+  "velero:v1,v2alpha1" \
   --go-header-file ./hack/boilerplate.go.txt \
   --output-base ../../.. \
   $@
@@ -56,22 +56,22 @@ controller-gen \
   object \
   paths=./pkg/apis/velero/v1/...
 
-# Generate CRD for v1alpha1.
+# Generate CRD for v2alpha1.
 controller-gen \
   crd:crdVersions=v1 \
-  paths=./pkg/apis/velero/v1alpha1/... \
+  paths=./pkg/apis/velero/v2alpha1/... \
   paths=./pkg/controller/... \
-  output:crd:artifacts:config=config/crd/v1alpha1/bases \
+  output:crd:artifacts:config=config/crd/v2alpha1/bases \
   object \
-  paths=./pkg/apis/velero/v1alpha1/...
+  paths=./pkg/apis/velero/v2alpha1/...
 
 # Generate RBAC.
 controller-gen \
   paths=./pkg/apis/velero/v1/... \
-  paths=./pkg/apis/velero/v1alpha1/... \
+  paths=./pkg/apis/velero/v2alpha1/... \
   paths=./pkg/controller/... \
   rbac:roleName=velero-perms
 
 go generate ./config/crd/v1/crds
 
-go generate ./config/crd/v1alpha1/crds
+go generate ./config/crd/v2alpha1/crds

@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1alpha1"
+	v2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -77,11 +77,11 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1.SchemeGroupVersion.WithResource("volumesnapshotlocations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().VolumeSnapshotLocations().Informer()}, nil
 
-		// Group=velero.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("datadownloads"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1alpha1().DataDownloads().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("datauploads"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1alpha1().DataUploads().Informer()}, nil
+		// Group=velero.io, Version=v2alpha1
+	case v2alpha1.SchemeGroupVersion.WithResource("datadownloads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V2alpha1().DataDownloads().Informer()}, nil
+	case v2alpha1.SchemeGroupVersion.WithResource("datauploads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V2alpha1().DataUploads().Informer()}, nil
 
 	}
 

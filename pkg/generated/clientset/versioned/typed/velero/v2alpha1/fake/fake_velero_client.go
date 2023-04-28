@@ -19,26 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1alpha1"
+	v2alpha1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v2alpha1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeVeleroV1alpha1 struct {
+type FakeVeleroV2alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeVeleroV1alpha1) DataDownloads(namespace string) v1alpha1.DataDownloadInterface {
+func (c *FakeVeleroV2alpha1) DataDownloads(namespace string) v2alpha1.DataDownloadInterface {
 	return &FakeDataDownloads{c, namespace}
 }
 
-func (c *FakeVeleroV1alpha1) DataUploads(namespace string) v1alpha1.DataUploadInterface {
+func (c *FakeVeleroV2alpha1) DataUploads(namespace string) v2alpha1.DataUploadInterface {
 	return &FakeDataUploads{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeVeleroV1alpha1) RESTClient() rest.Interface {
+func (c *FakeVeleroV2alpha1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }
