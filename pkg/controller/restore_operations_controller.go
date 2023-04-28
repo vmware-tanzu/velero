@@ -96,7 +96,6 @@ func (r *restoreOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:rbac:groups=velero.io,resources=restores,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=velero.io,resources=restores/status,verbs=get
-// +kubebuilder:rbac:groups=velero.io,resources=restorestoragelocations,verbs=get
 
 func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.logger.WithField("restore operations for restore", req.String())
