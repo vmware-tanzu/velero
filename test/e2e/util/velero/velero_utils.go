@@ -336,6 +336,20 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 		if backupCfg.ProvideSnapshotsVolumeParam && !backupCfg.UseVolumeSnapshots {
 			args = append(args, "--snapshot-volumes=false")
 		} // if "--snapshot-volumes" is not provide, snapshot should be taken as default behavior.
+	} else { // DefaultVolumesToFsBackup is false
+		// Althrough DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
+		// was set to true in installation CLI in snapshot volume test, so set DefaultVolumesToFsBackup
+		// to false specifically to make sure volume snapshot was taken
+		if backupCfg.UseVolumeSnapshots {
+			if backupCfg.UseResticIfFSBackup {
+				args = append(args, "--default-volumes-to-restic=false")
+			} else {
+				args = append(args, "--default-volumes-to-fs-backup=false")
+			}
+		}
+		// Also Althrough DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
+		// was set to true in installation CLI in FS volume backup test, so do nothing here, no DefaultVolumesToFsBackup
+		// appear in backup CLI
 	}
 	if backupCfg.BackupLocation != "" {
 		args = append(args, "--storage-location", backupCfg.BackupLocation)

@@ -58,7 +58,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		var err error
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
-		kibishiiNamespace = "kibishii-workload" + UUIDgen.String()
+		kibishiiNamespace = "k-" + UUIDgen.String()
 		Expect(err).To(Succeed())
 	})
 
@@ -87,6 +87,9 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				if useVolumeSnapshots {
 					//Install node agent also
 					veleroCfg.UseNodeAgent = useVolumeSnapshots
+					// DefaultVolumesToFsBackup should be mutually exclusive with useVolumeSnapshots in installation CLI,
+					// otherwise DefaultVolumesToFsBackup need to be set to false in backup CLI when taking volume snapshot
+					// Make sure DefaultVolumesToFsBackup was set to false in backup CLI
 					veleroCfg.DefaultVolumesToFsBackup = useVolumeSnapshots
 				} else {
 					veleroCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
@@ -121,9 +124,11 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			if veleroCfg.InstallVelero {
 				if useVolumeSnapshots {
 					veleroCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
-				} else {
+				} else { //FS volume backup
 					// Install VolumeSnapshots also
 					veleroCfg.UseVolumeSnapshots = !useVolumeSnapshots
+					// DefaultVolumesToFsBackup is false in installation CLI here,
+					// so must set DefaultVolumesToFsBackup to be true in backup CLI come after
 					veleroCfg.DefaultVolumesToFsBackup = useVolumeSnapshots
 				}
 
@@ -144,7 +149,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			Expect(CreateSecretFromFiles(context.TODO(), *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace, secretName, files)).To(Succeed())
 
 			// Create additional BSL using credential
-			additionalBsl := fmt.Sprintf("bsl-%s", UUIDgen)
+			additionalBsl := "add-bsl"
 			Expect(VeleroCreateBackupLocation(context.TODO(),
 				veleroCfg.VeleroCLI,
 				veleroCfg.VeleroNamespace,
@@ -169,7 +174,8 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 					restoreName = fmt.Sprintf("%s-%s", restoreName, UUIDgen)
 				}
 				veleroCfg.ProvideSnapshotsVolumeParam = !provideSnapshotVolumesParmInBackup
-				Expect(RunKibishiiTests(veleroCfg, backupName, restoreName, bsl, kibishiiNamespace, useVolumeSnapshots, !useVolumeSnapshots)).To(Succeed(),
+				workloadNmespace := kibishiiNamespace + bsl
+				Expect(RunKibishiiTests(veleroCfg, backupName, restoreName, bsl, workloadNmespace, useVolumeSnapshots, !useVolumeSnapshots)).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
 			}
 		})
