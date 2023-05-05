@@ -24,9 +24,9 @@ type NamespaceMapping struct {
 const NamespaceBaseName string = "ns-mp-"
 
 var OneNamespaceMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1"}, UseVolumeSnapshots: false}})
-var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1", NamespaceBaseName + "2"}, UseVolumeSnapshots: false}})
-var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1"}, UseVolumeSnapshots: true}})
-var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1", NamespaceBaseName + "2"}, UseVolumeSnapshots: true}})
+var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "2", NamespaceBaseName + "3"}, UseVolumeSnapshots: false}})
+var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "4"}, UseVolumeSnapshots: true}})
+var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "5", NamespaceBaseName + "6"}, UseVolumeSnapshots: true}})
 
 func (n *NamespaceMapping) Init() error {
 	n.VeleroCfg = VeleroCfg

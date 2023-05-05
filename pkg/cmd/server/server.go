@@ -314,10 +314,22 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	scheme := runtime.NewScheme()
-	velerov1api.AddToScheme(scheme)
-	velerov2alpha1api.AddToScheme(scheme)
-	corev1api.AddToScheme(scheme)
-	snapshotv1api.AddToScheme(scheme)
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := velerov2alpha1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := corev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	ctrl.SetLogger(logrusr.New(logger))
 

@@ -122,10 +122,22 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metri
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	velerov1api.AddToScheme(scheme)
-	velerov2alpha1api.AddToScheme(scheme)
-	v1.AddToScheme(scheme)
-	storagev1api.AddToScheme(scheme)
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := velerov2alpha1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := v1.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := storagev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	nodeName := os.Getenv("NODE_NAME")
 

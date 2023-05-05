@@ -61,7 +61,9 @@ func ClearOutputFlagDefault(cmd *cobra.Command) {
 		return
 	}
 	f.DefValue = ""
-	f.Value.Set("")
+	if err := f.Value.Set(""); err != nil {
+		fmt.Printf("error clear the default value of output flag: %s\n", err.Error())
+	}
 }
 
 // GetOutputFlagValue returns the value of the "output" flag

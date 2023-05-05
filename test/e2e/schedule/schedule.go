@@ -92,7 +92,7 @@ func (n *ScheduleBackup) Backup() error {
 	return nil
 }
 func (n *ScheduleBackup) Destroy() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer ctxCancel()
 	By(fmt.Sprintf("Schedule %s is created without any delay\n", n.ScheduleName), func() {
 		creationTimestamp, err := GetSchedule(context.Background(), VeleroCfg.VeleroNamespace, n.ScheduleName)

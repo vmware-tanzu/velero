@@ -69,7 +69,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	defer a.logger.Info("Done executing ChangeStorageClassAction")
 
 	a.logger.Debug("Getting plugin config")
-	config, err := getPluginConfig(common.PluginKindRestoreItemAction, "velero.io/change-storage-class", a.configMapClient)
+	config, err := common.GetPluginConfig(common.PluginKindRestoreItemAction, "velero.io/change-storage-class", a.configMapClient)
 	if err != nil {
 		return nil, err
 	}

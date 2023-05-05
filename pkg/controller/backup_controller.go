@@ -561,8 +561,7 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 				continue
 			}
 			location := &velerov1api.VolumeSnapshotLocation{}
-			b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: backup.Namespace, Name: defaultLocation}, location)
-			if err != nil {
+			if err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: backup.Namespace, Name: defaultLocation}, location); err != nil {
 				errors = append(errors, fmt.Sprintf("error getting volume snapshot location named %s: %v", defaultLocation, err))
 				continue
 			}

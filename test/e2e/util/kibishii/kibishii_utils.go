@@ -54,6 +54,7 @@ var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment
 // RunKibishiiTests runs kibishii tests on the provider.
 func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
+	pvCount := len(KibishiiPodNameList)
 	client := *veleroCfg.ClientToInstallVelero
 	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
 	defer ctxCancel()
@@ -101,9 +102,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 	var snapshotCheckPoint SnapshotCheckPoint
 	var err error
 	pvbs, err := GetPVB(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+	}
 	if useVolumeSnapshots {
-		if err != nil || len(pvbs) != 0 {
-			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		if len(pvbs) != 0 {
+			return errors.New(fmt.Sprintln("PVB count should be 0 in namespace %s", kibishiiNamespace))
 		}
 		if providerName == "vsphere" {
 			// Wait for uploads started by the Velero Plug-in for vSphere to complete
@@ -124,8 +128,8 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	} else {
-		if err != nil || len(pvbs) != 2 {
-			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		if len(pvbs) != pvCount {
+			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", len(pvbs), pvCount, kibishiiNamespace))
 		}
 		if providerName == "vsphere" {
 			// Wait for uploads started by the Velero Plug-in for vSphere to complete
@@ -174,8 +178,10 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 	}
 	if !useVolumeSnapshots {
 		pvrs, err := GetPVR(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
-		if err != nil || len(pvrs) != 2 {
-			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get PVR for namespace %s", kibishiiNamespace)
+		} else if len(pvrs) != pvCount {
+			return errors.New(fmt.Sprintf("PVR count %d is not as expected %d", len(pvrs), pvCount))
 		}
 	}
 
