@@ -31,14 +31,14 @@ type StorageClasssChanging struct {
 
 const SCCBaseName string = "scc-"
 
-var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{
-	namespace: SCCBaseName + "1", TestCase: TestCase{NSBaseName: SCCBaseName}})
+var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{})
 
 func (s *StorageClasssChanging) Init() error {
 	s.VeleroCfg = VeleroCfg
 	s.Client = *s.VeleroCfg.ClientToInstallVelero
+	UUIDgen := s.GenerateUUID()
 	s.NSBaseName = SCCBaseName
-	s.namespace = s.NSBaseName + UUIDgen.String()
+	s.namespace = s.NSBaseName + UUIDgen
 	s.mappedNS = s.namespace + "-mapped"
 	s.TestMsg = &TestMSG{
 		Desc:      "Changing PV/PVC Storage Classes",
@@ -46,8 +46,8 @@ func (s *StorageClasssChanging) Init() error {
 		Text: "Change the storage class of persistent volumes and persistent" +
 			" volume claims during restores",
 	}
-	s.BackupName = "backup-sc-" + UUIDgen.String()
-	s.RestoreName = "restore-" + UUIDgen.String()
+	s.BackupName = "backup-sc-" + UUIDgen
+	s.RestoreName = "restore-" + UUIDgen
 	s.srcStorageClass = "default"
 	s.desStorageClass = "e2e-storage-class"
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
@@ -56,12 +56,8 @@ func (s *StorageClasssChanging) Init() error {
 	s.configmaptName = "change-storage-class-config"
 	s.volume = "volume-1"
 	s.podName = "pod-1"
-	return nil
-}
-
-func (s *StorageClasssChanging) StartRun() error {
-	s.BackupName = s.BackupName + "backup-" + UUIDgen.String()
-	s.RestoreName = s.RestoreName + "restore-" + UUIDgen.String()
+	s.BackupName = SCCBaseName + "backup-" + UUIDgen
+	s.RestoreName = SCCBaseName + "restore-" + UUIDgen
 	s.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", s.BackupName,
 		"--include-namespaces", s.namespace,
@@ -73,10 +69,11 @@ func (s *StorageClasssChanging) StartRun() error {
 	}
 	return nil
 }
+
 func (s *StorageClasssChanging) CreateResources() error {
 	s.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create a storage class %s", s.desStorageClass), func() {
-		Expect(InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml",
+		Expect(InstallStorageClass(s.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml",
 			s.VeleroCfg.CloudProvider))).To(Succeed())
 	})
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {

@@ -37,10 +37,6 @@ func (n *ScheduleBackup) Init() error {
 		FailedMSG: "Failed to schedule a backup",
 		Text:      "should backup periodly according to the schedule",
 	}
-	return nil
-}
-
-func (n *ScheduleBackup) StartRun() error {
 	n.NSIncluded = &[]string{fmt.Sprintf("%s-%s", n.NSBaseName, "ns")}
 	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
 	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
@@ -52,6 +48,7 @@ func (n *ScheduleBackup) StartRun() error {
 	Expect(n.Period < 30).To(Equal(true))
 	return nil
 }
+
 func (n *ScheduleBackup) CreateResources() error {
 	n.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	for _, ns := range *n.NSIncluded {

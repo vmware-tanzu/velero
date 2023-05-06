@@ -208,7 +208,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				snapshotCheckPoint.NamespaceBackedUp = migrationNamespace
 				By("Snapshot should be created in cloud object store", func() {
 					snapshotCheckPoint, err := GetSnapshotCheckPoint(*veleroCfg.DefaultClient, veleroCfg, 2,
-						migrationNamespace, backupName, KibishiiPodNameList)
+						migrationNamespace, backupName, KibishiiPVCNameList)
 					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
 					Expect(SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
 						veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
@@ -226,7 +226,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-			if (veleroCfg.CloudProvider == "aws" || veleroCfg.CloudProvider == "vsphere") && useVolumeSnapshots {
+			if veleroCfg.CloudProvider == "aws" && useVolumeSnapshots {
 				fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 				time.Sleep(5 * time.Minute)
 			}

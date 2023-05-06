@@ -138,7 +138,6 @@ func (o *OrderedResources) Init() error {
 }
 
 func (o *OrderedResources) CreateResources() error {
-	veleroCfg := o.VeleroCfg
 	o.Ctx, _ = context.WithTimeout(context.Background(), 5*time.Minute)
 	label := map[string]string{
 		"orderedresources": "true",
@@ -146,15 +145,6 @@ func (o *OrderedResources) CreateResources() error {
 	fmt.Printf("Creating resources in %s namespace ...\n", o.Namespace)
 	if err := CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
-	}
-	serviceAccountName := "default"
-	// wait until the service account is created before patch the image pull secret
-	if err := WaitUntilServiceAccountCreated(o.Ctx, o.Client, o.Namespace, serviceAccountName, 10*time.Minute); err != nil {
-		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, o.Namespace)
-	}
-	// add the image pull secret to avoid the image pull limit issue of Docker Hub
-	if err := PatchServiceAccountWithImagePullSecret(o.Ctx, o.Client, o.Namespace, serviceAccountName, veleroCfg.RegistryCredentialFile); err != nil {
-		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, o.Namespace)
 	}
 	//Create deployment
 	deploymentName := fmt.Sprintf("deploy-%s", o.NSBaseName)
@@ -194,13 +184,12 @@ func (o *OrderedResources) CreateResources() error {
 }
 
 func (o *OrderedResources) DeleteBackups() error {
-	veleroCfg := o.VeleroCfg
 	backupList := new(velerov1api.BackupList)
-	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
+	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
+		return fmt.Errorf("failed to list backup object in %s namespace with err %v", o.VeleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
-		if err := VeleroBackupDelete(o.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name); err != nil {
+		if err := VeleroBackupDelete(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name); err != nil {
 			return err
 		}
 	}

@@ -8,4 +8,4 @@ parameters:
   StoragePolicyName: "vSAN Default Storage Policy"
 provisioner: csi.vsphere.vmware.com
 reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate

@@ -64,11 +64,11 @@ func SSRTest() {
 			fmt.Sprintf("Failed to create %s namespace", testNS))
 
 		By(fmt.Sprintf("Get version in %s namespace", testNS), func() {
-			Expect(VeleroVersion(context.Background(), veleroCfg.VeleroCLI, testNS)).To(Succeed(),
+			Expect(VeleroVersion(ctx, veleroCfg.VeleroCLI, testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create an ssr object in the %s namespace", testNS))
 		})
 		By(fmt.Sprintf("Get version in %s namespace", veleroCfg.VeleroNamespace), func() {
-			Expect(VeleroVersion(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed(),
+			Expect(VeleroVersion(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed(),
 				fmt.Sprintf("Failed to create an ssr object in %s namespace", veleroCfg.VeleroNamespace))
 		})
 		ssrListResp := new(v1.ServerStatusRequestList)

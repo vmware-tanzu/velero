@@ -64,10 +64,7 @@ func (m *MultiNSBackup) Init() error {
 			FailedMSG: "Failed to successfully backup and restore multiple namespaces",
 		}
 	}
-	return nil
-}
 
-func (m *MultiNSBackup) StartRun() error {
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
 	// we will exclude all of the namespaces that existed prior to the test from the backup
 	namespaces, err := m.Client.ClientGo.CoreV1().Namespaces().List(context.Background(), v1.ListOptions{})
@@ -89,6 +86,7 @@ func (m *MultiNSBackup) StartRun() error {
 		"create", "--namespace", m.VeleroCfg.VeleroNamespace, "restore", m.RestoreName,
 		"--from-backup", m.BackupName, "--wait",
 	}
+
 	return nil
 }
 
@@ -122,7 +120,6 @@ func (m *MultiNSBackup) Verify() error {
 }
 
 func (m *MultiNSBackup) Destroy() error {
-	m.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
 	err := CleanupNamespaces(m.Ctx, m.Client, m.NSBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")

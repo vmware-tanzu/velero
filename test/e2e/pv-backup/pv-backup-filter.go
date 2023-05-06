@@ -36,7 +36,7 @@ func (p *PVBackupFiltering) Init() error {
 	p.Client = *p.VeleroCfg.ClientToInstallVelero
 	p.VeleroCfg.UseVolumeSnapshots = false
 	p.VeleroCfg.UseNodeAgent = true
-	p.NSBaseName = "ns"
+	p.NSBaseName = "pv-filter"
 	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 2)}
 
 	p.TestMsg = &TestMSG{
@@ -44,16 +44,9 @@ func (p *PVBackupFiltering) Init() error {
 		FailedMSG: "Failed to PVs filtering by opt-in/opt-out annotation",
 		Text:      fmt.Sprintf("Should backup PVs in namespace %s according to annotation %s", *p.NSIncluded, p.annotation),
 	}
-	return nil
-}
 
-func (p *PVBackupFiltering) StartRun() error {
-	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
-	if err != nil {
-		return err
-	}
-	p.BackupName = p.BackupName + "backup-" + p.id + "-" + UUIDgen.String()
-	p.RestoreName = p.RestoreName + "restore-" + p.id + "-" + UUIDgen.String()
+	p.BackupName = p.NSBaseName + "backup-" + p.id + "-" + UUIDgen.String()
+	p.RestoreName = p.NSBaseName + "restore-" + p.id + "-" + UUIDgen.String()
 	p.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", strings.Join(*p.NSIncluded, ","),
@@ -69,9 +62,15 @@ func (p *PVBackupFiltering) StartRun() error {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", p.RestoreName,
 		"--from-backup", p.BackupName, "--wait",
 	}
+
 	return nil
 }
+
 func (p *PVBackupFiltering) CreateResources() error {
+	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
+	if err != nil {
+		return err
+	}
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
 			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))

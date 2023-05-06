@@ -53,10 +53,6 @@ func (n *ScheduleBackupCreation) Init() error {
 	n.volume = "volume-1"
 	n.podName = "pod-1"
 	n.pvcName = "pvc-1"
-	return nil
-}
-
-func (n *ScheduleBackupCreation) StartRun() error {
 	n.namespace = fmt.Sprintf("%s-%s", n.NSBaseName, "ns")
 	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
 	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
@@ -68,17 +64,18 @@ func (n *ScheduleBackupCreation) StartRun() error {
 	Expect(n.Period < 30).To(Equal(true))
 	return nil
 }
-func (p *ScheduleBackupCreation) CreateResources() error {
-	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
-		Expect(CreateNamespace(context.Background(), p.Client, p.namespace)).To(Succeed(),
-			fmt.Sprintf("Failed to create namespace %s", p.namespace))
+
+func (s *ScheduleBackupCreation) CreateResources() error {
+	s.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
+		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
+			fmt.Sprintf("Failed to create namespace %s", s.namespace))
 	})
 
-	By(fmt.Sprintf("Create pod %s in namespace %s", p.podName, p.namespace), func() {
-		_, err := CreatePod(p.Client, p.namespace, p.podName, "default", p.pvcName, []string{p.volume}, nil, p.podAnn)
+	By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
+		_, err := CreatePod(s.Client, s.namespace, s.podName, "default", s.pvcName, []string{s.volume}, nil, s.podAnn)
 		Expect(err).To(Succeed())
-		err = WaitForPods(context.Background(), p.Client, p.namespace, []string{p.podName})
+		err = WaitForPods(s.Ctx, s.Client, s.namespace, []string{s.podName})
 		Expect(err).To(Succeed())
 	})
 	return nil
@@ -113,7 +110,7 @@ func (n *ScheduleBackupCreation) Backup() error {
 			mi, _ := time.ParseDuration("60s")
 			time.Sleep(n.podSleepDuration + mi)
 			bMap := make(map[string]string)
-			backupsInfo, err := GetScheduledBackupsCreationTime(context.Background(), VeleroCfg.VeleroCLI, "default", n.ScheduleName)
+			backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 			Expect(err).To(Succeed())
 			Expect(len(backupsInfo) == i).To(Equal(true))
 			for index, bi := range backupsInfo {

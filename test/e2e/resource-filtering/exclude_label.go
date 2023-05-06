@@ -89,15 +89,6 @@ func (e *ExcludeFromBackup) CreateResources() error {
 	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 	}
-	serviceAccountName := "default"
-	// wait until the service account is created before patch the image pull secret
-	if err := WaitUntilServiceAccountCreated(e.Ctx, e.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
-		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
-	}
-	// add the image pull secret to avoid the image pull limit issue of Docker Hub
-	if err := PatchServiceAccountWithImagePullSecret(e.Ctx, e.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
-		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
-	}
 	//Create deployment: to be included
 	fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 	deployment := NewDeployment(e.NSBaseName, namespace, e.replica, label2, nil).Result()

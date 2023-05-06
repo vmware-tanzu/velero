@@ -115,6 +115,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
+
 	err := ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLPrefix, veleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)
 	if err != nil {
 		return err
@@ -149,7 +150,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 	}
 	var snapshotCheckPoint SnapshotCheckPoint
 	if useVolumeSnapshots {
-		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, deletionTest, backupName, KibishiiPodNameList)
+		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, deletionTest, backupName, KibishiiPVCNameList)
 		Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 		err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
 			veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslConfig,

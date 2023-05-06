@@ -32,7 +32,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/backups"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/api-group"
-	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/migration"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
@@ -41,6 +40,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/resourcepolicies"
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
+	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
@@ -66,7 +66,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.VeleroNamespace, "velero-namespace", "velero", "namespace to install Velero into")
 	flag.BoolVar(&VeleroCfg.InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
 	flag.StringVar(&VeleroCfg.RegistryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
-	flag.StringVar(&VeleroCfg.KibishiiDirectory, "kibishii-directory", "github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/", "The file directory or URL path to install Kibishii. Optional.")
+	flag.StringVar(&VeleroCfg.KibishiiDirectory, "kibishii-directory", "github.com/qiuming-best/distributed-data-generator/kubernetes/yaml", "The file directory or URL path to install Kibishii. Optional.")
 	//vmware-tanzu-experiments
 	// Flags to create an additional BSL for multiple credentials test
 	flag.StringVar(&VeleroCfg.AdditionalBSLProvider, "additional-bsl-object-store-provider", "", "Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.")
@@ -84,15 +84,15 @@ func init() {
 
 }
 
-var _ = Describe("[APIGroup][Common] Velero tests with various CRD API group versions", APIGropuVersionsTest)
+var _ = Describe("[APIGroup][APIVersion] Velero tests with various CRD API group versions", APIGropuVersionsTest)
 var _ = Describe("[APIGroup][APIExtensions] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
 
 // Test backup and restore of Kibishi using restic
 var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
 
-var _ = Describe("[Basic][Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+var _ = Describe("[Basic][Common] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
 
-var _ = Describe("[Basic][ClusterResource] Backup/restore of cluster resources", ResourcesCheckTest)
+var _ = Describe("[Basic][ClusterResourcex] Backup/restore of cluster resources", ResourcesCheckTest)
 
 var _ = Describe("[Scale][LongTime] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
 
@@ -101,17 +101,9 @@ var _ = Describe("[Upgrade][Restic] Velero upgrade tests on cluster using the pl
 var _ = Describe("[Upgrade][Snapshot] Velero upgrade tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupUpgradeRestoreWithSnapshots)
 
 // test filter objects by namespace, type, or labels when backup or restore.
-var _ = Describe("[ResourceFiltering][ExcludeFromBackup] Resources with the label velero.io/exclude-from-backup=true are not included in backup", ExcludeFromBackupTest)
-var _ = Describe("[ResourceFiltering][ExcludeNamespaces][Backup] Velero test on exclude namespace from the cluster backup", BackupWithExcludeNamespaces)
-var _ = Describe("[ResourceFiltering][ExcludeNamespaces][Restore] Velero test on exclude namespace from the cluster restore", RestoreWithExcludeNamespaces)
-var _ = Describe("[ResourceFiltering][ExcludeResources][Backup] Velero test on exclude resources from the cluster backup", BackupWithExcludeResources)
-var _ = Describe("[ResourceFiltering][ExcludeResources][Restore] Velero test on exclude resources from the cluster restore", RestoreWithExcludeResources)
-var _ = Describe("[ResourceFiltering][IncludeNamespaces][Backup] Velero test on include namespace from the cluster backup", BackupWithIncludeNamespaces)
-var _ = Describe("[ResourceFiltering][IncludeNamespaces][Restore] Velero test on include namespace from the cluster restore", RestoreWithIncludeNamespaces)
-var _ = Describe("[ResourceFiltering][IncludeResources][Backup] Velero test on include resources from the cluster backup", BackupWithIncludeResources)
-var _ = Describe("[ResourceFiltering][IncludeResources][Restore] Velero test on include resources from the cluster restore", RestoreWithIncludeResources)
-var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup include resources matching the label selector", BackupWithLabelSelector)
-var _ = Describe("[ResourceFiltering][ResourcePolicies] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
+var _ = Describe("[ResourceFiltering] Velero test on filter objects by namespace, type, or labels when backup or restore", ResourcesFilterTest)
+var _ = Describe("[abc] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
+var _ = Describe("[BasicCase] Velero test on skip backup of volume by resource policies", BasicSnapshotCaseTest)
 
 var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
@@ -130,10 +122,8 @@ var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be
 var _ = Describe("[Migration][Restic] Migrate resources between clusters by Restic", MigrationWithRestic)
 var _ = Describe("[Migration][Snapshot] Migrate resources between clusters by snapshot", MigrationWithSnapshots)
 
-var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
-var _ = Describe("[NamespaceMapping][Multiple][Restic] Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
-var _ = Describe("[NamespaceMapping][Single][Snapshot] Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
-var _ = Describe("[NamespaceMapping][Multiple][Snapshot] Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Restic] Backup resources should restored into mapping namespace", NamespaceMappingResticTest)
+var _ = Describe("[NamespaceMapping][Snapshot] Backup resources should restored into mapping namespace", NamespaceMappingSnapshotTest)
 
 var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
 var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)

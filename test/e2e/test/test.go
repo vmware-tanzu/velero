@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -42,9 +43,9 @@ depends on your test patterns.
 */
 type VeleroBackupRestoreTest interface {
 	Init() error
-	StartRun() error
 	CreateResources() error
 	Backup() error
+	WaitForBackup() error
 	Destroy() error
 	Restore() error
 	Verify() error
@@ -154,16 +155,17 @@ func (t *TestCase) CreateResources() error {
 	return nil
 }
 
-func (t *TestCase) StartRun() error {
-	return nil
-}
-
 func (t *TestCase) Backup() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
 	if err := VeleroBackupExec(t.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, "")
 		return errors.Wrapf(err, "Failed to backup resources")
 	}
+	return nil
+}
+
+func (t *TestCase) WaitForBackup() error {
+	fmt.Printf("TestCase WaitForBackup\n")
 	return nil
 }
 
@@ -179,7 +181,7 @@ func (t *TestCase) Restore() error {
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-	if t.UseVolumeSnapshots {
+	if t.UseVolumeSnapshots && veleroCfg.CloudProvider != "vsphere" {
 		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 		time.Sleep(5 * time.Minute)
 	}
@@ -221,35 +223,48 @@ func (t *TestCase) GetTestCase() *TestCase {
 	return t
 }
 func RunTestCase(test VeleroBackupRestoreTest) error {
-	fmt.Printf("Running test case %s\n", test.GetTestMsg().Desc)
+	fmt.Printf("Running test case %s %s\n", test.GetTestMsg().Desc, time.Now().Format("2006-01-02 15:04:05"))
 	if test == nil {
 		return errors.New("No case should be tested")
 	}
 
 	defer test.Clean()
-	err := test.StartRun()
+
+	fmt.Printf("CreateResources %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	err := test.CreateResources()
 	if err != nil {
 		return err
 	}
-	err = test.CreateResources()
-	if err != nil {
-		return err
-	}
+	fmt.Printf("Backup %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	err = test.Backup()
 	if err != nil {
 		return err
 	}
+	fmt.Printf("WaitForBackup %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	err = test.WaitForBackup()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Destroy %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	err = test.Destroy()
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Restore %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	err = test.Restore()
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Verify %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	err = test.Verify()
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Finish run test %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
+}
+
+func (t *TestCase) GenerateUUID() string {
+	rand.Seed(time.Now().UnixNano())
+	return fmt.Sprintf("%08d", rand.Intn(100000000))
 }
