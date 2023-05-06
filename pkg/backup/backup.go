@@ -346,7 +346,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	}()
 
 	backedUpGroupResources := map[schema.GroupResource]bool{}
-	totalItems := len(items)
 
 	for i, item := range items {
 		log.WithFields(map[string]interface{}{
@@ -381,7 +380,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
-		totalItems = len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
 
 		// send a progress update
 		update <- progressUpdate{
@@ -528,7 +527,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	asyncBIAOperations []*itemoperation.BackupOperation) error {
-
 	gzw := gzip.NewWriter(outBackupFile)
 	defer gzw.Close()
 	tw := tar.NewWriter(gzw)
@@ -588,7 +586,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 	}
 	updateFiles := make(map[string]FileForArchive)
 	backedUpGroupResources := map[schema.GroupResource]bool{}
-	totalItems := len(items)
 
 	for i, item := range items {
 		log.WithFields(map[string]interface{}{
@@ -623,12 +620,11 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 					updateFiles[itemFile.FilePath] = itemFile
 				}
 			}
-
 		}()
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
-		totalItems = len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
 
 		log.WithFields(map[string]interface{}{
 			"progress":  "",
@@ -639,7 +635,11 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 	}
 
 	// write new tar archive replacing files in original with content updateFiles for matches
-	buildFinalTarball(tr, tw, updateFiles)
+	if err := buildFinalTarball(tr, tw, updateFiles); err != nil {
+		log.Errorf("Error building final tarball: %s", err.Error())
+		return err
+	}
+
 	log.WithField("progress", "").Infof("Updated a total of %d items", len(backupRequest.BackedUpItems))
 
 	return nil
@@ -694,7 +694,6 @@ func buildFinalTarball(tr *tar.Reader, tw *tar.Writer, updateFiles map[string]Fi
 		}
 	}
 	return nil
-
 }
 
 type tarWriter interface {

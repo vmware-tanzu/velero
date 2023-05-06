@@ -37,8 +37,8 @@ type BackupRepositoryKey struct {
 }
 
 var (
-	backupRepoNotFoundError       = errors.New("backup repository not found")
-	backupRepoNotProvisionedError = errors.New("backup repository not provisioned")
+	errBackupRepoNotFound       = errors.New("backup repository not found")
+	errBackupRepoNotProvisioned = errors.New("backup repository not provisioned")
 )
 
 func repoLabelsFromKey(key BackupRepositoryKey) labels.Set {
@@ -69,7 +69,7 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 	}
 
 	if len(backupRepoList.Items) == 0 {
-		return nil, backupRepoNotFoundError
+		return nil, errBackupRepoNotFound
 	}
 
 	if len(backupRepoList.Items) > 1 {
@@ -84,7 +84,7 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 		}
 
 		if repo.Status.Phase == "" || repo.Status.Phase == velerov1api.BackupRepositoryPhaseNew {
-			return nil, backupRepoNotProvisionedError
+			return nil, errBackupRepoNotProvisioned
 		}
 	}
 
@@ -107,9 +107,9 @@ func newBackupRepository(namespace string, key BackupRepositoryKey) *velerov1api
 }
 
 func isBackupRepositoryNotFoundError(err error) bool {
-	return (err == backupRepoNotFoundError)
+	return (err == errBackupRepoNotFound)
 }
 
 func isBackupRepositoryNotProvisionedError(err error) bool {
-	return (err == backupRepoNotProvisionedError)
+	return (err == errBackupRepoNotProvisioned)
 }

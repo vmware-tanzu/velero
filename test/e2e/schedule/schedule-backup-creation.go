@@ -34,6 +34,7 @@ type ScheduleBackupCreation struct {
 var ScheduleBackupCreationTest func() = TestFunc(&ScheduleBackupCreation{namespace: "sch1", TestCase: TestCase{NSBaseName: "schedule-backup-creation-test"}})
 
 func (n *ScheduleBackupCreation) Init() error {
+	n.TestCase.Init()
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
@@ -54,8 +55,8 @@ func (n *ScheduleBackupCreation) Init() error {
 	n.podName = "pod-1"
 	n.pvcName = "pvc-1"
 	n.namespace = fmt.Sprintf("%s-%s", n.NSBaseName, "ns")
-	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
-	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
+	n.ScheduleName = n.ScheduleName + "schedule-" + n.UUIDgen
+	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + n.UUIDgen
 
 	n.ScheduleArgs = []string{
 		"--include-namespaces", n.namespace,
@@ -66,7 +67,9 @@ func (n *ScheduleBackupCreation) Init() error {
 }
 
 func (s *ScheduleBackupCreation) CreateResources() error {
-	s.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var cancelFunc context.CancelFunc
+	s.Ctx, cancelFunc = context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancelFunc()
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
 		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
@@ -82,6 +85,8 @@ func (s *ScheduleBackupCreation) CreateResources() error {
 }
 
 func (n *ScheduleBackupCreation) Backup() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	// Wait until the beginning of the given period to create schedule, it will give us
 	//   a predictable period to wait for the first scheduled backup, and verify no immediate
 	//   scheduled backup was created between schedule creation and first scheduled backup.
@@ -91,7 +96,7 @@ func (n *ScheduleBackupCreation) Backup() error {
 			now := time.Now().Minute()
 			triggerNow := now % n.Period
 			if triggerNow == 0 {
-				Expect(VeleroScheduleCreate(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
+				Expect(VeleroScheduleCreate(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
 					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
 					return "Fail to restore workload"
 				})

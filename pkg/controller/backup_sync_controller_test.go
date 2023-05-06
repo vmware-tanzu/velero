@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	core "k8s.io/client-go/testing"
 	testclocks "k8s.io/utils/clock/testing"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -669,22 +668,10 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				logger:                  velerotest.NewLogger(),
 			}
 
-			expectedDeleteActions := make([]core.Action, 0)
-
 			for _, backup := range test.k8sBackups {
 				// add test backup to client
 				err := client.Create(context.TODO(), backup, &ctrlClient.CreateOptions{})
 				Expect(err).ShouldNot(HaveOccurred())
-
-				// if we expect this backup to be deleted, set up the expected DeleteAction
-				if test.expectedDeletes.Has(backup.Name) {
-					actionDelete := core.NewDeleteAction(
-						velerov1api.SchemeGroupVersion.WithResource("backups"),
-						test.namespace,
-						backup.Name,
-					)
-					expectedDeleteActions = append(expectedDeleteActions, actionDelete)
-				}
 			}
 
 			bslName := "default"

@@ -28,7 +28,7 @@ var NamespaceMappingSnapshotTest func() = TestFuncWithMultiIt([]VeleroBackupRest
 	&NamespaceMapping{BasicSnapshotCase: BasicSnapshotCase{TestCase: TestCase{NamespacesTotal: 2, UseVolumeSnapshots: true}}}})
 
 func (n *NamespaceMapping) Init() error {
-	UUIDgen := n.GenerateUUID()
+	n.TestCase.Init()
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.VeleroCfg.UseVolumeSnapshots = n.UseVolumeSnapshots
@@ -37,7 +37,7 @@ func (n *NamespaceMapping) Init() error {
 	if n.UseVolumeSnapshots {
 		backupType = "snapshot"
 	}
-	n.NSBaseName = "ns-mp-" + UUIDgen
+	n.NSBaseName = "ns-mp-" + n.UUIDgen
 	var mappedNS string
 	var mappedNSList []string
 	n.NSIncluded = &[]string{}
@@ -51,8 +51,8 @@ func (n *NamespaceMapping) Init() error {
 		return r == ','
 	})
 
-	n.BackupName = n.NSBaseName + "-backup-" + UUIDgen
-	n.RestoreName = n.NSBaseName + "-restore-" + UUIDgen
+	n.BackupName = n.NSBaseName + "-backup-" + n.UUIDgen
+	n.RestoreName = n.NSBaseName + "-restore-" + n.UUIDgen
 
 	n.MappedNamespaceList = mappedNSList
 	fmt.Println(mappedNSList)
@@ -71,7 +71,10 @@ func (n *NamespaceMapping) Init() error {
 		"--from-backup", n.BackupName, "--namespace-mappings", mappedNS,
 		"--wait",
 	}
-	n.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCancel context.CancelFunc
+	n.Ctx, ctxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
+
 	n.TestMsg = &TestMSG{
 		Desc:      fmt.Sprintf("Restore namespace %s with namespace mapping by %s test", *n.NSIncluded, backupType),
 		FailedMSG: "Failed to restore with namespace mapping",

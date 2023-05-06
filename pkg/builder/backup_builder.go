@@ -83,7 +83,7 @@ func (b *BackupBuilder) ObjectMeta(opts ...ObjectMetaOpt) *BackupBuilder {
 
 // FromSchedule sets the Backup's spec and labels from the Schedule template
 func (b *BackupBuilder) FromSchedule(schedule *velerov1api.Schedule) *BackupBuilder {
-	var labels = make(map[string]string)
+	var labels map[string]string
 
 	// Check if there's explicit Labels defined in the Schedule object template
 	// and if present then copy it to the backup object.

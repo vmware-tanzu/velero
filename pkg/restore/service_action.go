@@ -111,13 +111,13 @@ func deleteNodePorts(service *corev1api.Service) error {
 				}
 				if nodePortBool {
 					nodePortInt := 0
-					switch nodePort.(type) {
+					switch nodePort := nodePort.(type) {
 					case int32:
-						nodePortInt = int(nodePort.(int32))
+						nodePortInt = int(nodePort)
 					case float64:
-						nodePortInt = int(nodePort.(float64))
+						nodePortInt = int(nodePort)
 					case string:
-						nodePortInt, err = strconv.Atoi(nodePort.(string))
+						nodePortInt, err = strconv.Atoi(nodePort)
 						if err != nil {
 							return errors.WithStack(err)
 						}
@@ -130,7 +130,6 @@ func deleteNodePorts(service *corev1api.Service) error {
 						} else {
 							explicitNodePorts.Insert(portName.(string))
 						}
-
 					}
 				}
 			}

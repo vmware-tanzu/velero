@@ -39,7 +39,6 @@ func (c *capacityCondition) validate() error {
 		return nil
 	}
 	return errors.Errorf("illegal values for capacity %v", c.capacity)
-
 }
 
 func (s *storageClassCondition) validate() error {

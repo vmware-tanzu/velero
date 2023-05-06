@@ -29,20 +29,19 @@ import (
 //	minor
 //	patch
 //	prerelease (this will be alpha/beta/rc followed by a ".", followed by 1 or more digits (alpha.5)
-var release_regex *regexp.Regexp = regexp.MustCompile(`^v(?P<major>[[:digit:]]+)\.(?P<minor>[[:digit:]]+)\.(?P<patch>[[:digit:]]+)(-{1}(?P<prerelease>(alpha|beta|rc)\.[[:digit:]]+))*`)
+var releaseRegex = regexp.MustCompile(`^v(?P<major>[[:digit:]]+)\.(?P<minor>[[:digit:]]+)\.(?P<patch>[[:digit:]]+)(-{1}(?P<prerelease>(alpha|beta|rc)\.[[:digit:]]+))*`)
 
 // This small program exists because checking the VELERO_VERSION rules in bash is difficult, and difficult to test for correctness.
 // Calling it with --verify will verify whether or not the VELERO_VERSION environment variable is a valid version string, without parsing for its components.
 // Calling it without --verify will try to parse the version into its component pieces.
 func main() {
+	veleroVersion := os.Getenv("VELERO_VERSION")
 
-	velero_version := os.Getenv("VELERO_VERSION")
-
-	submatches := reSubMatchMap(release_regex, velero_version)
+	submatches := reSubMatchMap(releaseRegex, veleroVersion)
 
 	// Didn't match the regex, exit.
 	if len(submatches) == 0 {
-		fmt.Printf("VELERO_VERSION of %s was not valid. Please correct the value and retry.", velero_version)
+		fmt.Printf("VELERO_VERSION of %s was not valid. Please correct the value and retry.", veleroVersion)
 		os.Exit(1)
 	}
 

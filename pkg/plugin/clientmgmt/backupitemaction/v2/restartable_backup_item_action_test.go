@@ -48,7 +48,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int (returned for {BackupItemActionV2 pod}) is not a BackupItemActionV2!",
+			expectedError: "plugin int (returned for {BackupItemActionV2 pod}) is not a BackupItemActionV2",
 		},
 		{
 			name:   "happy path",

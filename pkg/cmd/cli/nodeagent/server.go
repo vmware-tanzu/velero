@@ -115,14 +115,24 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metri
 
 	clientConfig, err := factory.ClientConfig()
 	if err != nil {
+		cancelFunc()
 		return nil, err
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	velerov1api.AddToScheme(scheme)
-	v1.AddToScheme(scheme)
-	storagev1api.AddToScheme(scheme)
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := v1.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := storagev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	nodeName := os.Getenv("NODE_NAME")
 
@@ -139,6 +149,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metri
 		NewCache: cache.BuilderWithOptions(cacheOption),
 	})
 	if err != nil {
+		cancelFunc()
 		return nil, err
 	}
 
@@ -309,7 +320,7 @@ func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVBStatusToFailed(client, s.ctx, &pvbs.Items[i],
+		if err := controller.UpdatePVBStatusToFailed(s.ctx, client, &pvbs.Items[i],
 			fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
 			time.Now()); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
@@ -345,7 +356,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVRStatusToFailed(client, s.ctx, &pvrs.Items[i],
+		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i],
 			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
 			time.Now()); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())

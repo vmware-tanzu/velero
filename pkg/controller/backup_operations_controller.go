@@ -215,7 +215,6 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 	operations *itemoperationmap.OperationsForBackup,
 	changes bool,
 	completionChanges bool) error {
-
 	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 
 	if len(operations.ErrsSinceUpdate) > 0 {
@@ -229,7 +228,6 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 			backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed ||
 			backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
 			backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed) {
-
 			c.itemOperationsMap.DeleteOperationsForBackup(backup.Name)
 		} else if changes {
 			c.itemOperationsMap.PutOperationsForBackup(operations, backup.Name)
@@ -245,7 +243,7 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 		// update file store
 		if backupStore != nil {
 			backupJSON := new(bytes.Buffer)
-			if err := encode.EncodeTo(backup, "json", backupJSON); err != nil {
+			if err := encode.To(backup, "json", backupJSON); err != nil {
 				removeIfComplete = false
 				return errors.Wrap(err, "error encoding backup json")
 			}

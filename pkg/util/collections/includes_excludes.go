@@ -138,7 +138,7 @@ func (ie *GlobalIncludesExcludes) ShouldInclude(typeName string) bool {
 		return false
 	}
 
-	if resource.Namespaced == false && boolptr.IsSetToFalse(ie.includeClusterResources) {
+	if !resource.Namespaced && boolptr.IsSetToFalse(ie.includeClusterResources) {
 		ie.logger.Info("Skipping resource %s, because it's cluster-scoped, and IncludeClusterResources is set to false.", typeName)
 		return false
 	}
@@ -150,7 +150,7 @@ func (ie *GlobalIncludesExcludes) ShouldInclude(typeName string) bool {
 	// may still be backed up if triggered by a custom action (e.g. PVC->PV).
 	// If we're processing namespaces themselves, we will not skip here, they may be
 	// filtered out later.
-	if typeName != kuberesource.Namespaces.String() && resource.Namespaced == false &&
+	if typeName != kuberesource.Namespaces.String() && !resource.Namespaced &&
 		ie.includeClusterResources == nil && !ie.namespaceFilter.IncludeEverything() {
 		ie.logger.Infof("Skipping resource %s, because it's cluster-scoped and only specific namespaces or namespace scope types are included in the backup.", typeName)
 		return false

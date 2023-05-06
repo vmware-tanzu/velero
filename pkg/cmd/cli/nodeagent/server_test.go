@@ -23,7 +23,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -51,7 +50,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 			name: "no error when pod volumes are present and there are mirror pods",
 			pods: []*corev1.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
-				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(v1.MirrorPodAnnotationKey, "baz")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(corev1.MirrorPodAnnotationKey, "baz")).Result(),
 			},
 			dirs:    []string{"foo", "baz"},
 			wantErr: false,

@@ -283,7 +283,6 @@ func (h *NoOpItemHookHandler) HandleHooks(
 	resourceHooks []ResourceHook,
 	phase hookPhase,
 ) error {
-
 	return nil
 }
 

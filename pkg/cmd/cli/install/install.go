@@ -40,8 +40,8 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-// InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
-type InstallOptions struct {
+// Options collects all the options for installing Velero into a Kubernetes cluster.
+type Options struct {
 	Namespace                 string
 	Image                     string
 	BucketName                string
@@ -82,7 +82,7 @@ type InstallOptions struct {
 }
 
 // BindFlags adds command line values to the options struct.
-func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
+func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "Provider name for backup and volume storage")
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "Name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "File containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
@@ -121,8 +121,8 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
-func NewInstallOptions() *InstallOptions {
-	return &InstallOptions{
+func NewInstallOptions() *Options {
+	return &Options{
 		Namespace:                 velerov1api.DefaultNamespace,
 		Image:                     velero.DefaultVeleroImage(),
 		BackupStorageConfig:       flag.NewMap(),
@@ -148,7 +148,7 @@ func NewInstallOptions() *InstallOptions {
 }
 
 // AsVeleroOptions translates the values provided at the command line into values used to instantiate Kubernetes resources
-func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
+func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 	var secretData []byte
 	if o.SecretFile != "" && !o.NoSecret {
 		realPath, err := filepath.Abs(o.SecretFile)
@@ -264,7 +264,7 @@ This is useful as a starting point for more customized installations.
 }
 
 // Run executes a command in the context of the provided arguments.
-func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
+func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 	var resources *unstructured.UnstructuredList
 	if o.CRDsOnly {
 		resources = install.AllCRDs()
@@ -327,13 +327,13 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 }
 
 // Complete completes options for a command.
-func (o *InstallOptions) Complete(args []string, f client.Factory) error {
+func (o *Options) Complete(args []string, f client.Factory) error {
 	o.Namespace = f.Namespace()
 	return nil
 }
 
 // Validate validates options provided to a command.
-func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
 	}
@@ -355,7 +355,6 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	}
 
 	if o.NoDefaultBackupLocation {
-
 		if o.BucketName != "" {
 			return errors.New("Cannot use both --bucket and --no-default-backup-location at the same time")
 		}
@@ -375,7 +374,6 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		if o.BucketName == "" {
 			return errors.New("--bucket is required")
 		}
-
 	}
 
 	if o.UseVolumeSnapshots {

@@ -53,7 +53,6 @@ func (tw *TarWriter) AddItems(groupResource string, items ...metav1.Object) *Tar
 	tw.t.Helper()
 
 	for _, obj := range items {
-
 		var path string
 		if obj.GetNamespace() == "" {
 			path = fmt.Sprintf("resources/%s/cluster/%s.json", groupResource, obj.GetName())
@@ -73,11 +72,11 @@ func (tw *TarWriter) Add(name string, obj interface{}) *TarWriter {
 	var data []byte
 	var err error
 
-	switch obj.(type) {
+	switch objType := obj.(type) {
 	case runtime.Object:
-		data, err = encode.Encode(obj.(runtime.Object), "json")
+		data, err = encode.Encode(objType, "json")
 	case []byte:
-		data = obj.([]byte)
+		data = objType
 	default:
 		data, err = json.Marshal(obj)
 	}

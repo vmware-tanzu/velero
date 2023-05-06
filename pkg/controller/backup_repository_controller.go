@@ -96,7 +96,9 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change"))
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change")); err != nil {
+			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
+		}
 	}
 
 	return []reconcile.Request{}
@@ -251,17 +253,17 @@ func (r *BackupRepoReconciler) getRepositoryMaintenanceFrequency(req *velerov1ap
 	if r.maintenanceFrequency > 0 {
 		r.logger.WithField("frequency", r.maintenanceFrequency).Info("Set user defined maintenance frequency")
 		return r.maintenanceFrequency
-	} else {
-		frequency, err := r.repositoryManager.DefaultMaintenanceFrequency(req)
-		if err != nil || frequency <= 0 {
-			r.logger.WithError(err).WithField("returned frequency", frequency).Warn("Failed to get maitanance frequency, use the default one")
-			frequency = defaultMaintainFrequency
-		} else {
-			r.logger.WithField("frequency", frequency).Info("Set matainenance according to repository suggestion")
-		}
-
-		return frequency
 	}
+
+	frequency, err := r.repositoryManager.DefaultMaintenanceFrequency(req)
+	if err != nil || frequency <= 0 {
+		r.logger.WithError(err).WithField("returned frequency", frequency).Warn("Failed to get maitanance frequency, use the default one")
+		frequency = defaultMaintainFrequency
+	} else {
+		r.logger.WithField("frequency", frequency).Info("Set matainenance according to repository suggestion")
+	}
+
+	return frequency
 }
 
 // ensureRepo calls repo manager's PrepareRepo to ensure the repo is ready for use.

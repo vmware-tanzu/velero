@@ -28,6 +28,7 @@ type ScheduleBackup struct {
 var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "schedule-test"}})
 
 func (n *ScheduleBackup) Init() error {
+	n.TestCase.Init()
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
@@ -38,8 +39,8 @@ func (n *ScheduleBackup) Init() error {
 		Text:      "should backup periodly according to the schedule",
 	}
 	n.NSIncluded = &[]string{fmt.Sprintf("%s-%s", n.NSBaseName, "ns")}
-	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
-	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
+	n.ScheduleName = n.ScheduleName + "schedule-" + n.UUIDgen
+	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + n.UUIDgen
 
 	n.ScheduleArgs = []string{
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
@@ -50,7 +51,9 @@ func (n *ScheduleBackup) Init() error {
 }
 
 func (n *ScheduleBackup) CreateResources() error {
-	n.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCanel context.CancelFunc
+	n.Ctx, ctxCanel = context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCanel()
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Creating namespaces %s ......\n", ns), func() {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
@@ -87,7 +90,7 @@ func (n *ScheduleBackup) Backup() error {
 }
 func (n *ScheduleBackup) Destroy() error {
 	By(fmt.Sprintf("Schedule %s is created without any delay\n", n.ScheduleName), func() {
-		creationTimestamp, err := GetSchedule(context.Background(), VeleroCfg.VeleroNamespace, n.ScheduleName)
+		creationTimestamp, err := GetSchedule(n.Ctx, VeleroCfg.VeleroNamespace, n.ScheduleName)
 		Expect(err).To(Succeed())
 
 		creationTime, err := time.Parse(time.RFC3339, strings.Replace(creationTimestamp, "'", "", -1))
@@ -105,7 +108,7 @@ func (n *ScheduleBackup) Destroy() error {
 			fmt.Printf("Get backup for #%d time at %v\n", i, now)
 			//Ignore the last minute in the period avoiding met the 1st backup by schedule
 			if i != n.Period-1 {
-				backupsInfo, err := GetScheduledBackupsCreationTime(context.Background(), VeleroCfg.VeleroCLI, "default", n.ScheduleName)
+				backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 				Expect(err).To(Succeed())
 				Expect(len(backupsInfo) == 0).To(Equal(true))
 			}

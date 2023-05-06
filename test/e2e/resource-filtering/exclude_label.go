@@ -45,9 +45,9 @@ var ExcludeFromBackupTest func() = TestFunc(&ExcludeFromBackup{testInBackup})
 
 func (e *ExcludeFromBackup) Init() error {
 	e.FilteringCase.Init()
-	e.BackupName = "backup-exclude-from-backup-" + UUIDgen.String()
-	e.RestoreName = "restore-" + UUIDgen.String()
-	e.NSBaseName = "exclude-from-backup-" + UUIDgen.String()
+	e.BackupName = "backup-exclude-from-backup-" + e.UUIDgen
+	e.RestoreName = "restore-" + e.UUIDgen
+	e.NSBaseName = "exclude-from-backup-" + e.UUIDgen
 	e.TestMsg = &TestMSG{
 		Desc:      "Backup with the label velero.io/exclude-from-backup=true are not included test",
 		Text:      "Should not backup resources with the label velero.io/exclude-from-backup=true",
@@ -76,7 +76,9 @@ func (e *ExcludeFromBackup) Init() error {
 }
 
 func (e *ExcludeFromBackup) CreateResources() error {
-	e.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCancel context.CancelFunc
+	e.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	namespace := e.NSBaseName
 	// These 2 labels for resources to be included
 	label1 := map[string]string{

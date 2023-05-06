@@ -161,7 +161,6 @@ func (l *logrusAdapter) StandardLogger(opts *hclog.StandardLoggerOptions) *log.L
 // Updates the level. This should affect all sub-loggers as well. If an
 // implementation cannot update the level on the fly, it should no-op.
 func (l *logrusAdapter) SetLevel(_ hclog.Level) {
-	return
 }
 
 // ImpliedArgs returns With key/value pairs

@@ -57,7 +57,7 @@ func NewRestartableObjectStore(name string, sharedPluginProcess process.Restarta
 func (r *restartableObjectStore) Reinitialize(dispensed interface{}) error {
 	objectStore, ok := dispensed.(velero.ObjectStore)
 	if !ok {
-		return errors.Errorf("%T is not a ObjectStore!", dispensed)
+		return errors.Errorf("plugin %T is not a ObjectStore", dispensed)
 	}
 
 	return r.init(objectStore, r.config)
@@ -73,7 +73,7 @@ func (r *restartableObjectStore) getObjectStore() (velero.ObjectStore, error) {
 
 	objectStore, ok := plugin.(velero.ObjectStore)
 	if !ok {
-		return nil, errors.Errorf("%T is not a ObjectStore!", plugin)
+		return nil, errors.Errorf("plugin %T is not a ObjectStore", plugin)
 	}
 
 	return objectStore, nil

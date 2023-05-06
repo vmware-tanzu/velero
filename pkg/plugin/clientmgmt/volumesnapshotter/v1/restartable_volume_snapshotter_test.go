@@ -46,7 +46,7 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a VolumeSnapshotter!",
+			expectedError: "plugin int is not a VolumeSnapshotter",
 		},
 		{
 			name:   "happy path",
@@ -96,7 +96,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 	}
 
 	err := r.Reinitialize(3)
-	assert.EqualError(t, err, "int is not a VolumeSnapshotter!")
+	assert.EqualError(t, err, "plugin int is not a VolumeSnapshotter")
 
 	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)

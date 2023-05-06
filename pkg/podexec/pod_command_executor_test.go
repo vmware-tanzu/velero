@@ -211,11 +211,11 @@ func TestExecutePodCommand(t *testing.T) {
 			defer streamExecutorFactory.AssertExpectations(t)
 			podCommandExecutor.streamExecutorFactory = streamExecutorFactory
 
-			baseUrl, _ := url.Parse("https://some.server")
+			baseURL, _ := url.Parse("https://some.server")
 			contentConfig := rest.ClientContentConfig{
 				GroupVersion: schema.GroupVersion{Group: "", Version: "v1"},
 			}
-			poster.On("Post").Return(rest.NewRequestWithClient(baseUrl, "/api/v1", contentConfig, nil))
+			poster.On("Post").Return(rest.NewRequestWithClient(baseURL, "/api/v1", contentConfig, nil))
 
 			streamExecutor := &mockStreamExecutor{}
 			defer streamExecutor.AssertExpectations(t)

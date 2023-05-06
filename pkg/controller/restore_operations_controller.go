@@ -96,7 +96,6 @@ func (r *restoreOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:rbac:groups=velero.io,resources=restores,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=velero.io,resources=restores/status,verbs=get
-// +kubebuilder:rbac:groups=velero.io,resources=restorestoragelocations,verbs=get
 
 func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.logger.WithField("restore operations for restore", req.String())
@@ -216,16 +215,15 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 	operations *itemoperationmap.OperationsForRestore,
 	changes bool,
 	completionChanges bool) error {
-
 	if len(operations.ErrsSinceUpdate) > 0 {
 		// FIXME: download/upload results
+		r.logger.WithField("restore", restore.Name).Infof("Restore has %d errors", len(operations.ErrsSinceUpdate))
 	}
 	removeIfComplete := true
 	defer func() {
 		// remove local operations list if complete
 		if removeIfComplete && (restore.Status.Phase == velerov1api.RestorePhaseCompleted ||
 			restore.Status.Phase == velerov1api.RestorePhasePartiallyFailed) {
-
 			r.itemOperationsMap.DeleteOperationsForRestore(restore.Name)
 		} else if changes {
 			r.itemOperationsMap.PutOperationsForRestore(operations, restore.Name)

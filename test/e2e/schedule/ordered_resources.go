@@ -21,11 +21,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -64,13 +62,15 @@ func ScheduleOrderedResources() {
 	})
 
 	It("Create a schedule to backup resources in a specific order should be successful", func() {
+		ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer ctxCancel()
 		test := &OrderedResources{}
 		test.VeleroCfg = VeleroCfg
 		err := test.Init()
 		Expect(err).To(Succeed(), err)
 		defer func() {
-			Expect(DeleteNamespace(test.Ctx, test.Client, test.Namespace, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.Namespace))
-			err = VeleroScheduleDelete(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName)
+			Expect(DeleteNamespace(ctx, test.Client, test.Namespace, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.Namespace))
+			err = VeleroScheduleDelete(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete schedule with err %v", err))
 			err = test.DeleteBackups()
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete backups with err %v", err))
@@ -82,24 +82,24 @@ func ScheduleOrderedResources() {
 		})
 
 		By(fmt.Sprintf("Create schedule the workload in %s namespace", test.Namespace), func() {
-			err = VeleroScheduleCreate(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.ScheduleArgs)
+			err = VeleroScheduleCreate(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.ScheduleArgs)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to create schedule %s  with err %v", test.ScheduleName, err))
 		})
 
 		By(fmt.Sprintf("Checking resource order in %s schedule cr", test.ScheduleName), func() {
-			err = CheckScheduleWithResourceOrder(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.OrderMap)
+			err = CheckScheduleWithResourceOrder(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, test.ScheduleName, test.OrderMap)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to check schedule %s with err %v", test.ScheduleName, err))
 		})
 
 		By("Checking resource order in backup cr", func() {
 			backupList := new(velerov1api.BackupList)
 			err = waitutil.PollImmediate(10*time.Second, time.Minute*5, func() (bool, error) {
-				if err = test.Client.Kubebuilder.List(test.Ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
+				if err = test.Client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
 					return false, fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 				}
 
 				for _, backup := range backupList.Items {
-					if err = CheckBackupWithResourceOrder(test.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name, test.OrderMap); err == nil {
+					if err = CheckBackupWithResourceOrder(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name, test.OrderMap); err == nil {
 						return true, nil
 					}
 				}
@@ -113,13 +113,12 @@ func ScheduleOrderedResources() {
 }
 
 func (o *OrderedResources) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	o.TestCase.Init()
 	o.VeleroCfg = VeleroCfg
 	o.Client = *o.VeleroCfg.ClientToInstallVelero
-	o.ScheduleName = "schedule-ordered-resources-" + UUIDgen.String()
+	o.ScheduleName = "schedule-ordered-resources-" + o.UUIDgen
 	o.NSBaseName = "schedule-ordered-resources"
-	o.Namespace = o.NSBaseName + "-" + UUIDgen.String()
+	o.Namespace = o.NSBaseName + "-" + o.UUIDgen
 	o.OrderMap = map[string]string{
 		"deployments": fmt.Sprintf("deploy-%s", o.NSBaseName),
 		"secrets":     fmt.Sprintf("secret-%s", o.NSBaseName),
@@ -138,7 +137,9 @@ func (o *OrderedResources) Init() error {
 }
 
 func (o *OrderedResources) CreateResources() error {
-	o.Ctx, _ = context.WithTimeout(context.Background(), 5*time.Minute)
+	var ctxCancel context.CancelFunc
+	o.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	label := map[string]string{
 		"orderedresources": "true",
 	}

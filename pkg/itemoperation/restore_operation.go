@@ -56,10 +56,10 @@ type RestoreOperationSpec struct {
 	RestoreItemAction string `json:"restoreItemAction"`
 
 	// Kubernetes resource identifier for the item
-	ResourceIdentifier velero.ResourceIdentifier "json:resourceIdentifier"
+	ResourceIdentifier velero.ResourceIdentifier `json:"resourceIdentifier"`
 
 	// OperationID returned by the RIA plugin
-	OperationID string "json:operationID"
+	OperationID string `json:"operationID"`
 }
 
 func (in *RestoreOperationSpec) DeepCopy() *RestoreOperationSpec {

@@ -34,19 +34,19 @@ const NodeportBaseName string = "nodeport-"
 var NodePortTest func() = TestFunc(&NodePort{})
 
 func (n *NodePort) Init() error {
+	n.TestCase.Init()
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
-	UUIDgen := n.GenerateUUID()
 	n.NamespacesTotal = 1
-	n.NSBaseName = NodeportBaseName + UUIDgen
+	n.NSBaseName = NodeportBaseName + n.UUIDgen
 	n.TestMsg = &TestMSG{
 		Desc:      fmt.Sprintf("Nodeport preservation"),
 		FailedMSG: "Failed to restore with nodeport preservation",
 		Text:      fmt.Sprintf("Nodeport can be preserved or omit during restore"),
 	}
-	n.BackupName = "backup-nodeport-" + UUIDgen
-	n.RestoreName = "restore-" + UUIDgen
-	n.serviceName = "nginx-service-" + UUIDgen
+	n.BackupName = "backup-nodeport-" + n.UUIDgen
+	n.RestoreName = "restore-" + n.UUIDgen
+	n.serviceName = "nginx-service-" + n.UUIDgen
 	n.labels = map[string]string{"app": "nginx"}
 	n.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
@@ -65,7 +65,9 @@ func (n *NodePort) Init() error {
 	return nil
 }
 func (n *NodePort) CreateResources() error {
-	n.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCancel context.CancelFunc
+	n.Ctx, ctxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Creating service %s in namespaces %s ......\n", n.serviceName, ns), func() {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))

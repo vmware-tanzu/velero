@@ -69,11 +69,12 @@ type TestCase struct {
 	NamespacesTotal    int
 	TestMsg            *TestMSG
 	Client             TestClient
-	Ctx                context.Context
 	NSIncluded         *[]string
 	UseVolumeSnapshots bool
 	VeleroCfg          VeleroConfig
 	RestorePhaseExpect velerov1api.RestorePhase
+	Ctx                context.Context
+	UUIDgen            string
 }
 
 func TestFunc(test VeleroBackupRestoreTest) func() {
@@ -148,6 +149,10 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 }
 
 func (t *TestCase) Init() error {
+	var ctxCancel context.CancelFunc
+	t.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
+	t.UUIDgen = t.GenerateUUID()
 	return nil
 }
 
@@ -227,7 +232,6 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 	if test == nil {
 		return errors.New("No case should be tested")
 	}
-
 	defer test.Clean()
 
 	fmt.Printf("CreateResources %s\n", time.Now().Format("2006-01-02 15:04:05"))

@@ -54,8 +54,10 @@ var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibis
 // RunKibishiiTests runs kibishii tests on the provider.
 func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
+	pvCount := len(KibishiiPVCNameList)
 	client := *veleroCfg.ClientToInstallVelero
-	oneHourTimeout, _ := context.WithTimeout(context.Background(), time.Minute*60)
+	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+	defer ctxCancel()
 	veleroCLI := veleroCfg.VeleroCLI
 	providerName := veleroCfg.CloudProvider
 	veleroNamespace := veleroCfg.VeleroNamespace
@@ -123,8 +125,10 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		}
 	} else {
 		pvbs, err := GetPVB(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
-		if err != nil || len(pvbs) != 2 {
+		if err != nil {
 			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		} else if len(pvbs) != pvCount {
+			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", len(pvbs), pvCount, kibishiiNamespace))
 		}
 		if providerName == "vsphere" {
 			// Wait for uploads started by the Velero Plug-in for vSphere to complete
@@ -177,8 +181,10 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 	fmt.Printf("VeleroRestore done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if !useVolumeSnapshots {
 		pvrs, err := GetPVR(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
-		if err != nil || len(pvrs) != 2 {
-			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get PVR for namespace %s", kibishiiNamespace)
+		} else if len(pvrs) != pvCount {
+			return errors.New(fmt.Sprintf("PVR count %d is not as expected %d", len(pvrs), pvCount))
 		}
 	}
 	fmt.Printf("KibishiiVerifyAfterRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
@@ -226,8 +232,7 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 	timeout := 30 * time.Minute
 	interval := 1 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
-		kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
+		kibishiiGenerateCmd := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 			"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
 			strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum), strconv.Itoa(kibishiiData.ExpectedNodes))
@@ -251,8 +256,7 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		timeout, _ := context.WithTimeout(context.Background(), time.Minute*20)
-		kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
+		kibishiiVerifyCmd := exec.CommandContext(ctx, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
 			"/usr/local/bin/verify.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
 			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
 			strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum),
@@ -320,7 +324,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 	if err := waitForKibishiiPods(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
-	//time.Sleep(60 * time.Second)
+
 	// TODO - check that namespace exists
 	fmt.Printf("running kibishii verify\n")
 	if err := verifyData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {

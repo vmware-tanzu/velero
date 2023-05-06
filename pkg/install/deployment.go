@@ -156,7 +156,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 	imageParts := strings.Split(c.image, ":")
 	if len(imageParts) == 2 && imageParts[1] != "latest" {
 		pullPolicy = corev1.PullIfNotPresent
-
 	}
 
 	args := []string{"server"}
@@ -308,7 +307,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 			container := *builder.ForPluginContainer(image, pullPolicy).Result()
 			deployment.Spec.Template.Spec.InitContainers = append(deployment.Spec.Template.Spec.InitContainers, container)
 		}
-
 	}
 
 	return deployment

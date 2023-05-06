@@ -19,11 +19,9 @@ package basic
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,11 +38,10 @@ type MultiNSBackup struct {
 }
 
 func (m *MultiNSBackup) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
-	m.BackupName = "backup-" + UUIDgen.String()
-	m.RestoreName = "restore-" + UUIDgen.String()
-	m.NSBaseName = "nstest-" + UUIDgen.String()
+	m.TestCase.Init()
+	m.BackupName = "backup-" + m.UUIDgen
+	m.RestoreName = "restore-" + m.UUIDgen
+	m.NSBaseName = "nstest-" + m.UUIDgen
 	m.VeleroCfg = VeleroCfg
 	m.Client = *m.VeleroCfg.ClientToInstallVelero
 	m.NSExcluded = &[]string{}
@@ -91,7 +88,9 @@ func (m *MultiNSBackup) Init() error {
 }
 
 func (m *MultiNSBackup) CreateResources() error {
-	m.Ctx, _ = context.WithTimeout(context.Background(), m.TimeoutDuration)
+	var ctxCancel context.CancelFunc
+	m.Ctx, ctxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
+	defer ctxCancel()
 	fmt.Printf("Creating namespaces ...\n")
 	labels := map[string]string{
 		"ns-test": "true",

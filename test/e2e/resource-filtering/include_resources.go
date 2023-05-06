@@ -42,12 +42,9 @@ type IncludeResources struct {
 	FilteringCase
 }
 
-var BackupWithIncludeResources func() = TestFunc(&IncludeResources{testInBackup})
-var RestoreWithIncludeResources func() = TestFunc(&IncludeResources{testInRestore})
-
 func (i *IncludeResources) Init() error {
 	i.FilteringCase.Init()
-	i.NSBaseName = "include-resources-" + UUIDgen.String()
+	i.NSBaseName = "include-resources-" + i.UUIDgen
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
 		*i.NSIncluded = append(*i.NSIncluded, createNSName)
@@ -58,8 +55,8 @@ func (i *IncludeResources) Init() error {
 			Text:      "Should backup resources which is included others should not be backup",
 			FailedMSG: "Failed to backup with resource include",
 		}
-		i.BackupName = "backup-include-resources-" + UUIDgen.String()
-		i.RestoreName = "restore-" + UUIDgen.String()
+		i.BackupName = "backup-include-resources-" + i.UUIDgen
+		i.RestoreName = "restore-" + i.UUIDgen
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-resources", "deployments,configmaps",
@@ -76,8 +73,8 @@ func (i *IncludeResources) Init() error {
 			Text:      "Should restore resources which is included others should not be backup",
 			FailedMSG: "Failed to restore with resource include",
 		}
-		i.BackupName = "backup-" + UUIDgen.String()
-		i.RestoreName = "restore-include-resources-" + UUIDgen.String()
+		i.BackupName = "backup-" + i.UUIDgen
+		i.RestoreName = "restore-include-resources-" + i.UUIDgen
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-namespaces", strings.Join(*i.NSIncluded, ","),

@@ -61,7 +61,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			cmd.CheckError(err)
 
 			if outputFormat != "plaintext" && outputFormat != "json" {
-				cmd.CheckError(fmt.Errorf("Invalid output format '%s'. Valid value are 'plaintext, json'", outputFormat))
+				cmd.CheckError(fmt.Errorf("invalid output format '%s'. valid value are 'plaintext, json'", outputFormat))
 			}
 
 			var backups *velerov1api.BackupList
@@ -121,7 +121,6 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 						fmt.Printf("\n\n%s", s)
 					}
 				}
-
 			}
 			cmd.CheckError(err)
 		},

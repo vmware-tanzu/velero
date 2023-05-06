@@ -270,7 +270,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) backupInfo
 
 	// validate that only one exists orLabelSelector or just labelSelector (singular)
 	if restore.Spec.OrLabelSelectors != nil && restore.Spec.LabelSelector != nil {
-		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified"))
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in restore spec, only one can be specified")
 	}
 
 	// validate that exactly one of BackupName and ScheduleName have been specified
@@ -305,10 +305,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) backupInfo
 		}))
 
 		backupList := &api.BackupList{}
-		r.kbClient.List(context.Background(), backupList, &client.ListOptions{
-			LabelSelector: selector,
-		})
-		if err != nil {
+		if err := r.kbClient.List(context.Background(), backupList, &client.ListOptions{LabelSelector: selector}); err != nil {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Unable to list backups for schedule")
 			return backupInfo{}
 		}

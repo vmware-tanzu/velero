@@ -40,9 +40,8 @@ func GetVersionedItemFilePath(rootDir, groupResource, namespace, name, versionPa
 func GetScopeDir(namespace string) string {
 	if namespace == "" {
 		return velerov1api.ClusterScopedDir
-	} else {
-		return velerov1api.NamespaceScopedDir
 	}
+	return velerov1api.NamespaceScopedDir
 }
 
 // Unmarshal reads the specified file, unmarshals the JSON contained within it

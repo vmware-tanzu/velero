@@ -30,7 +30,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	. "github.com/vmware-tanzu/velero/test/e2e"
+	"github.com/vmware-tanzu/velero/test/e2e"
 )
 
 type GCSStorage string
@@ -101,7 +101,7 @@ func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	}
 }
 
-func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck SnapshotCheckPoint) error {
+func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck e2e.SnapshotCheckPoint) error {
 	ctx := context.Background()
 	data, err := os.ReadFile(cloudCredentialsFile)
 	if err != nil {

@@ -41,13 +41,13 @@ func (t *Throttle) ShouldOutput() bool {
 	return false
 }
 
-func (p *KopiaProgress) InitThrottle(interval time.Duration) {
+func (p *Progress) InitThrottle(interval time.Duration) {
 	p.outputThrottle.throttle = 0
 	p.outputThrottle.interval = interval
 }
 
-// KopiaProgress represents a backup or restore counters.
-type KopiaProgress struct {
+// Progress represents a backup or restore counters.
+type Progress struct {
 	// all int64 must precede all int32 due to alignment requirements on ARM
 	// +checkatomic
 	uploadedBytes int64 //the total bytes has uploaded
@@ -69,7 +69,7 @@ type KopiaProgress struct {
 }
 
 // UploadedBytes the total bytes has uploaded currently
-func (p *KopiaProgress) UploadedBytes(numBytes int64) {
+func (p *Progress) UploadedBytes(numBytes int64) {
 	atomic.AddInt64(&p.uploadedBytes, numBytes)
 	atomic.AddInt32(&p.uploadedFiles, 1)
 
@@ -77,7 +77,7 @@ func (p *KopiaProgress) UploadedBytes(numBytes int64) {
 }
 
 // Error statistic the total Error has occurred
-func (p *KopiaProgress) Error(path string, err error, isIgnored bool) {
+func (p *Progress) Error(path string, err error, isIgnored bool) {
 	if isIgnored {
 		atomic.AddInt32(&p.ignoredErrorCount, 1)
 		p.Log.Warnf("Ignored error when processing %v: %v", path, err)
@@ -88,7 +88,7 @@ func (p *KopiaProgress) Error(path string, err error, isIgnored bool) {
 }
 
 // EstimatedDataSize statistic the total size of files to be processed and total files to be processed
-func (p *KopiaProgress) EstimatedDataSize(fileCount int, totalBytes int64) {
+func (p *Progress) EstimatedDataSize(fileCount int, totalBytes int64) {
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)
 	atomic.StoreInt32(&p.estimatedFileCount, int32(fileCount))
 
@@ -96,57 +96,57 @@ func (p *KopiaProgress) EstimatedDataSize(fileCount int, totalBytes int64) {
 }
 
 // UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
-func (p *KopiaProgress) UpdateProgress() {
+func (p *Progress) UpdateProgress() {
 	if p.outputThrottle.ShouldOutput() {
-		p.Updater.UpdateProgress(&uploader.UploaderProgress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
+		p.Updater.UpdateProgress(&uploader.Progress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
 	}
 }
 
 // UploadStarted statistic the total Error has occurred
-func (p *KopiaProgress) UploadStarted() {}
+func (p *Progress) UploadStarted() {}
 
 // CachedFile statistic the total bytes been cached currently
-func (p *KopiaProgress) CachedFile(fname string, numBytes int64) {
+func (p *Progress) CachedFile(fname string, numBytes int64) {
 	atomic.AddInt64(&p.cachedBytes, numBytes)
 	p.UpdateProgress()
 }
 
 // HashedBytes statistic the total bytes been hashed currently
-func (p *KopiaProgress) HashedBytes(numBytes int64) {
+func (p *Progress) HashedBytes(numBytes int64) {
 	atomic.AddInt64(&p.processedBytes, numBytes)
 	atomic.AddInt64(&p.hashededBytes, numBytes)
 	p.UpdateProgress()
 }
 
 // HashingFile statistic the file been hashed currently
-func (p *KopiaProgress) HashingFile(fname string) {}
+func (p *Progress) HashingFile(fname string) {}
 
 // ExcludedFile statistic the file been excluded currently
-func (p *KopiaProgress) ExcludedFile(fname string, numBytes int64) {}
+func (p *Progress) ExcludedFile(fname string, numBytes int64) {}
 
 // ExcludedDir statistic the dir been excluded currently
-func (p *KopiaProgress) ExcludedDir(dirname string) {}
+func (p *Progress) ExcludedDir(dirname string) {}
 
 // FinishedHashingFile which will called when specific file finished hash
-func (p *KopiaProgress) FinishedHashingFile(fname string, numBytes int64) {
+func (p *Progress) FinishedHashingFile(fname string, numBytes int64) {
 	p.UpdateProgress()
 }
 
 // StartedDirectory called when begin to upload one directory
-func (p *KopiaProgress) StartedDirectory(dirname string) {}
+func (p *Progress) StartedDirectory(dirname string) {}
 
 // FinishedDirectory called when finish to upload one directory
-func (p *KopiaProgress) FinishedDirectory(dirname string) {
+func (p *Progress) FinishedDirectory(dirname string) {
 	p.UpdateProgress()
 }
 
 // UploadFinished which report the files flushed after the Upload has completed.
-func (p *KopiaProgress) UploadFinished() {
+func (p *Progress) UploadFinished() {
 	p.UpdateProgress()
 }
 
 // ProgressBytes which statistic all bytes has been processed currently
-func (p *KopiaProgress) ProgressBytes(processedBytes int64, totalBytes int64) {
+func (p *Progress) ProgressBytes(processedBytes int64, totalBytes int64) {
 	atomic.StoreInt64(&p.processedBytes, processedBytes)
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)
 	p.UpdateProgress()

@@ -19,10 +19,8 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,8 +41,7 @@ var testInBackup = FilteringCase{IsTestInBackup: true}
 var testInRestore = FilteringCase{IsTestInBackup: false}
 
 func (f *FilteringCase) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	f.TestCase.Init()
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}
 	f.labelSelector = "resourcefiltering"
@@ -66,7 +63,9 @@ func (f *FilteringCase) Init() error {
 }
 
 func (f *FilteringCase) CreateResources() error {
-	f.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCancel context.CancelFunc
+	f.Ctx, ctxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
@@ -129,7 +128,7 @@ func (f *FilteringCase) Verify() error {
 		}
 
 		//Check secrets
-		secretsList, err := f.Client.ClientGo.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
+		secretsList, err := f.Client.ClientGo.CoreV1().Secrets(namespace).List(f.Ctx, metav1.ListOptions{
 			LabelSelector: f.labelSelector})
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
@@ -138,7 +137,7 @@ func (f *FilteringCase) Verify() error {
 		}
 
 		//Check configmap
-		configmapList, err := f.Client.ClientGo.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{
+		configmapList, err := f.Client.ClientGo.CoreV1().ConfigMaps(namespace).List(f.Ctx, metav1.ListOptions{
 			LabelSelector: f.labelSelector})
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list configmap in namespace: %q", namespace))

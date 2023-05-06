@@ -44,9 +44,9 @@ var BackupWithLabelSelector func() = TestFunc(&LabelSelector{testInBackup})
 
 func (l *LabelSelector) Init() error {
 	l.FilteringCase.Init()
-	l.BackupName = "backup-label-selector-" + UUIDgen.String()
-	l.RestoreName = "restore-" + UUIDgen.String()
-	l.NSBaseName = "backup-label-selector-" + UUIDgen.String()
+	l.BackupName = "backup-label-selector-" + l.UUIDgen
+	l.RestoreName = "restore-" + l.UUIDgen
+	l.NSBaseName = "backup-label-selector-" + l.UUIDgen
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
 		*l.NSIncluded = append(*l.NSIncluded, createNSName)
@@ -75,7 +75,9 @@ func (l *LabelSelector) Init() error {
 }
 
 func (l *LabelSelector) CreateResources() error {
-	l.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCancel context.CancelFunc
+	l.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
@@ -138,7 +140,7 @@ func (l *LabelSelector) Verify() error {
 		}
 
 		//Check secrets
-		secretsList, err := l.Client.ClientGo.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
+		secretsList, err := l.Client.ClientGo.CoreV1().Secrets(namespace).List(l.Ctx, metav1.ListOptions{
 			LabelSelector: l.labelSelector,
 		})
 

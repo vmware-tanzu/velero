@@ -23,8 +23,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"golang.org/x/net/context"
+
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 func InstallCRD(ctx context.Context, yaml string) error {

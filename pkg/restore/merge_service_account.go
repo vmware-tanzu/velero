@@ -33,7 +33,6 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 	desired := new(corev1api.ServiceAccount)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(fromCluster.UnstructuredContent(), desired); err != nil {
 		return nil, errors.Wrap(err, "unable to convert from-cluster service account from unstructured to serviceaccount")
-
 	}
 
 	backupSA := new(corev1api.ServiceAccount)

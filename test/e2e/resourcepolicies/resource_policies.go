@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -28,7 +27,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -61,15 +59,14 @@ type ResourcePoliciesCase struct {
 var ResourcePoliciesTest func() = TestFunc(&ResourcePoliciesCase{})
 
 func (r *ResourcePoliciesCase) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	r.TestCase.Init()
 	r.yamlConfig = yamlData
 	r.VeleroCfg = VeleroCfg
 	r.Client = *r.VeleroCfg.ClientToInstallVelero
 	r.VeleroCfg.UseVolumeSnapshots = false
 	r.VeleroCfg.UseNodeAgent = true
 	r.NamespacesTotal = 3
-	r.NSBaseName = "resource-policies-" + UUIDgen.String()
+	r.NSBaseName = "resource-policies-" + r.UUIDgen
 	r.cmName = "cm-resource-policies-sc"
 	r.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
@@ -77,8 +74,8 @@ func (r *ResourcePoliciesCase) Init() error {
 		*r.NSIncluded = append(*r.NSIncluded, createNSName)
 	}
 
-	r.BackupName = "backup-resource-policies-" + UUIDgen.String()
-	r.RestoreName = "restore-resource-policies-" + UUIDgen.String()
+	r.BackupName = "backup-resource-policies-" + r.UUIDgen
+	r.RestoreName = "restore-resource-policies-" + r.UUIDgen
 
 	r.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
@@ -102,8 +99,9 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
-	r.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
-
+	var ctxCancel context.CancelFunc
+	r.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	By(("Installing storage class..."), func() {
 		Expect(r.installTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
@@ -228,7 +226,9 @@ func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volL
 }
 
 func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) error {
-	podList, err := ListPods(r.Ctx, r.Client, namespace)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
+	podList, err := ListPods(ctx, r.Client, namespace)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to list pods in namespace: %q with error %v", namespace, err))
 	}
@@ -237,7 +237,7 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if vol.Name != volName {
 				continue
 			}
-			err := CreateFileToPod(r.Ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
+			err := CreateFileToPod(ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}

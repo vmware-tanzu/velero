@@ -17,6 +17,7 @@ limitations under the License.
 package install
 
 import (
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -250,7 +251,9 @@ func AllCRDs() *unstructured.UnstructuredList {
 
 	for _, crd := range v1crds.CRDs {
 		crd.SetLabels(Labels())
-		appendUnstructured(resources, crd)
+		if err := appendUnstructured(resources, crd); err != nil {
+			fmt.Printf("error appending CRD %s: %s\n", crd.GetName(), err.Error())
+		}
 	}
 
 	return resources
@@ -262,32 +265,44 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	resources := AllCRDs()
 
 	ns := Namespace(o.Namespace)
-	appendUnstructured(resources, ns)
+	if err := appendUnstructured(resources, ns); err != nil {
+		fmt.Printf("error appending Namespace %s: %s\n", ns.GetName(), err.Error())
+	}
 
 	serviceAccountName := defaultServiceAccountName
 	if o.ServiceAccountName == "" {
 		crb := ClusterRoleBinding(o.Namespace)
-		appendUnstructured(resources, crb)
+		if err := appendUnstructured(resources, crb); err != nil {
+			fmt.Printf("error appending ClusterRoleBinding %s: %s\n", crb.GetName(), err.Error())
+		}
 		sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
-		appendUnstructured(resources, sa)
+		if err := appendUnstructured(resources, sa); err != nil {
+			fmt.Printf("error appending ServiceAccount %s: %s\n", sa.GetName(), err.Error())
+		}
 	} else {
 		serviceAccountName = o.ServiceAccountName
 	}
 
 	if o.SecretData != nil {
 		sec := Secret(o.Namespace, o.SecretData)
-		appendUnstructured(resources, sec)
+		if err := appendUnstructured(resources, sec); err != nil {
+			fmt.Printf("error appending Secret %s: %s\n", sec.GetName(), err.Error())
+		}
 	}
 
 	if !o.NoDefaultBackupLocation {
 		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig, o.CACertData)
-		appendUnstructured(resources, bsl)
+		if err := appendUnstructured(resources, bsl); err != nil {
+			fmt.Printf("error appending BackupStorageLocation %s: %s\n", bsl.GetName(), err.Error())
+		}
 	}
 
 	// A snapshot location may not be desirable for users relying on pod volume backup/restore
 	if o.UseVolumeSnapshots {
 		vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
-		appendUnstructured(resources, vsl)
+		if err := appendUnstructured(resources, vsl); err != nil {
+			fmt.Printf("error appending VolumeSnapshotLocation %s: %s\n", vsl.GetName(), err.Error())
+		}
 	}
 
 	secretPresent := o.SecretData != nil
@@ -322,7 +337,9 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 
 	deploy := Deployment(o.Namespace, deployOpts...)
 
-	appendUnstructured(resources, deploy)
+	if err := appendUnstructured(resources, deploy); err != nil {
+		fmt.Printf("error appending Deployment %s: %s\n", deploy.GetName(), err.Error())
+	}
 
 	if o.UseNodeAgent {
 		dsOpts := []podTemplateOption{
@@ -337,7 +354,9 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
 		}
 		ds := DaemonSet(o.Namespace, dsOpts...)
-		appendUnstructured(resources, ds)
+		if err := appendUnstructured(resources, ds); err != nil {
+			fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())
+		}
 	}
 
 	return resources

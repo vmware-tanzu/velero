@@ -51,18 +51,18 @@ var RestoreWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringC
 func (e *ExcludeNamespaces) Init() error {
 	e.FilteringCase.Init()
 	e.namespacesExcluded = e.NamespacesTotal / 2
-	e.NSBaseName = "exclude-namespaces-" + UUIDgen.String()
+	e.NSBaseName = "exclude-namespaces-" + e.UUIDgen
 	if e.IsTestInBackup {
-		e.BackupName = "backup-exclude-namespaces-" + UUIDgen.String()
-		e.RestoreName = "restore-" + UUIDgen.String()
+		e.BackupName = "backup-exclude-namespaces-" + e.UUIDgen
+		e.RestoreName = "restore-" + e.UUIDgen
 		e.TestMsg = &TestMSG{
 			Desc:      "Backup resources with exclude namespace test",
 			FailedMSG: "Failed to backup and restore with namespace include",
 			Text:      fmt.Sprintf("should not backup %d namespaces of %d", e.namespacesExcluded, e.NamespacesTotal),
 		}
 	} else {
-		e.BackupName = "backup-" + UUIDgen.String()
-		e.RestoreName = "restore-exclude-namespaces-" + UUIDgen.String()
+		e.BackupName = "backup-" + e.UUIDgen
+		e.RestoreName = "restore-exclude-namespaces-" + e.UUIDgen
 		e.TestMsg = &TestMSG{
 			Desc:      "Restore resources with exclude namespace test",
 			FailedMSG: "Failed to restore with namespace exclude",
@@ -109,7 +109,9 @@ func (e *ExcludeNamespaces) Init() error {
 }
 
 func (e *ExcludeNamespaces) CreateResources() error {
-	e.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	var ctxCancel context.CancelFunc
+	e.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)

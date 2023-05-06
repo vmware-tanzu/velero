@@ -31,7 +31,7 @@ var OptInPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_AN
 var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "opt-out"})
 
 func (p *PVBackupFiltering) Init() error {
-	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	p.TestCase.Init()
 	p.VeleroCfg = VeleroCfg
 	p.Client = *p.VeleroCfg.ClientToInstallVelero
 	p.VeleroCfg.UseVolumeSnapshots = false
@@ -45,8 +45,8 @@ func (p *PVBackupFiltering) Init() error {
 		Text:      fmt.Sprintf("Should backup PVs in namespace %s according to annotation %s", *p.NSIncluded, p.annotation),
 	}
 
-	p.BackupName = p.NSBaseName + "backup-" + p.id + "-" + UUIDgen.String()
-	p.RestoreName = p.NSBaseName + "restore-" + p.id + "-" + UUIDgen.String()
+	p.BackupName = p.NSBaseName + "backup-" + p.id + "-" + p.UUIDgen
+	p.RestoreName = p.NSBaseName + "restore-" + p.id + "-" + p.UUIDgen
 	p.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", strings.Join(*p.NSIncluded, ","),
@@ -67,10 +67,14 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) CreateResources() error {
+	var ctxCancel context.CancelFunc
+	p.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
 	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return err
 	}
+
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
 			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
@@ -95,7 +99,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				podName := fmt.Sprintf("pod-%d", i)
 				pods = append(pods, podName)
 				By(fmt.Sprintf("Create pod %s in namespace %s", podName, ns), func() {
-					pod, err := CreatePod(p.Client, ns, podName, "e2e-storage-class", "", volumes, nil, nil)
+					pod, err := CreatePod(p.Client, ns, podName, StorageClassName, "", volumes, nil, nil)
 					Expect(err).To(Succeed())
 					ann := map[string]string{
 						p.annotation: volumesToAnnotation,

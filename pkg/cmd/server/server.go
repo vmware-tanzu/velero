@@ -253,7 +253,7 @@ type server struct {
 	pluginRegistry        process.Registry
 	repoManager           repository.Manager
 	repoLocker            *repository.RepoLocker
-	repoEnsurer           *repository.RepositoryEnsurer
+	repoEnsurer           *repository.Ensurer
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
 	mgr                   manager.Manager
@@ -313,9 +313,18 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	scheme := runtime.NewScheme()
-	velerov1api.AddToScheme(scheme)
-	corev1api.AddToScheme(scheme)
-	snapshotv1api.AddToScheme(scheme)
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := corev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	ctrl.SetLogger(logrusr.New(logger))
 
@@ -340,6 +349,10 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	credentialSecretStore, err := credentials.NewNamespacedSecretStore(mgr.GetClient(), f.Namespace())
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	s := &server{
 		namespace:             f.Namespace(),
@@ -466,7 +479,7 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	if veleroGroupVersion == nil {
-		return errors.Errorf("Velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", velerov1api.SchemeGroupVersion)
+		return fmt.Errorf("velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it", velerov1api.SchemeGroupVersion)
 	}
 
 	foundResources := sets.NewString()
@@ -554,7 +567,7 @@ var defaultRestorePriorities = restore.Priorities{
 
 func (s *server) checkNodeAgent() {
 	// warn if node agent does not exist
-	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
+	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
 		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
 	} else if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
@@ -563,7 +576,7 @@ func (s *server) checkNodeAgent() {
 
 func (s *server) initRepoManager() error {
 	// warn if node agent does not exist
-	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.DaemonsetNotFound {
+	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
 		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
 	} else if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
@@ -575,7 +588,7 @@ func (s *server) initRepoManager() error {
 	}
 
 	s.repoLocker = repository.NewRepoLocker()
-	s.repoEnsurer = repository.NewRepositoryEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
+	s.repoEnsurer = repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
 
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
@@ -613,7 +626,7 @@ func (s *server) getCSIVolumeSnapshotListers() (vsLister snapshotv1listers.Volum
 		s.logger.Errorf("fail to find snapshot v1 schema: %s", err)
 	}
 
-	return
+	return vsLister, err
 }
 
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
@@ -935,8 +948,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	if _, ok := enabledRuntimeControllers[controller.ServerStatusRequest]; ok {
 		if err := controller.NewServerStatusRequestReconciler(
-			s.mgr.GetClient(),
 			s.ctx,
+			s.mgr.GetClient(),
 			s.pluginRegistry,
 			clock.RealClock{},
 			s.logger,

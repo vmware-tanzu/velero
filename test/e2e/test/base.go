@@ -19,14 +19,12 @@ package test
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
@@ -45,22 +43,21 @@ type BasicSnapshotCase struct {
 var BasicSnapshotCaseTest func() = TestFunc(&BasicSnapshotCase{})
 
 func (b *BasicSnapshotCase) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	b.TestCase.Init()
 	b.VeleroCfg = VeleroCfg
 	b.Client = *b.VeleroCfg.ClientToInstallVelero
 	b.VeleroCfg.UseVolumeSnapshots = true
 	b.VeleroCfg.UseNodeAgent = false
 	b.NamespacesTotal = 1
-	b.NSBaseName = "basic-test-" + UUIDgen.String()
+	b.NSBaseName = "basic-test-" + b.UUIDgen
 	b.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < b.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", b.NSBaseName, nsNum)
 		*b.NSIncluded = append(*b.NSIncluded, createNSName)
 	}
 
-	b.BackupName = "basic-snapshot-case-" + UUIDgen.String()
-	b.RestoreName = "basic-snapshot-case-" + UUIDgen.String()
+	b.BackupName = "basic-snapshot-case-" + b.UUIDgen
+	b.RestoreName = "basic-snapshot-case-" + b.UUIDgen
 
 	b.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", b.BackupName,
@@ -79,8 +76,9 @@ func (b *BasicSnapshotCase) Init() error {
 		FailedMSG: "Failed to backup and restore of volume",
 		Text:      fmt.Sprintf("Should backup and restore PVs in namespace %s", *b.NSIncluded),
 	}
-
-	b.Ctx, _ = context.WithTimeout(context.Background(), 20*time.Minute)
+	var ctxCancel context.CancelFunc
+	b.Ctx, ctxCancel = context.WithTimeout(context.Background(), 20*time.Minute)
+	defer ctxCancel()
 
 	return nil
 }

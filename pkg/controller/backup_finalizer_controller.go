@@ -188,7 +188,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// update backup metadata in object store
 	backupJSON := new(bytes.Buffer)
-	if err := encode.EncodeTo(backup, "json", backupJSON); err != nil {
+	if err := encode.To(backup, "json", backupJSON); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error encoding backup json")
 	}
 	err = backupStore.PutBackupMetadata(backup.Name, backupJSON)
