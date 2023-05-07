@@ -69,6 +69,7 @@ func BackupsSyncTest() {
 				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
 			})
 			if VeleroCfg.InstallVelero {
+				By("velero uninstall in sync backups case")
 				Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
 			}
 		}

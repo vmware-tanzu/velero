@@ -147,7 +147,9 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 
 			snapshotCheckPoint, err := GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 0,
 				kibishiiNamespace, backupName, KibishiiPVCNameList)
-
+			if err != nil {
+				return errors.Wrap(err, "failed to get snapshot checkPoint")
+			}
 			if !strings.EqualFold(veleroFeatures, "EnableCSI") {
 				err = SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
 					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,

@@ -21,11 +21,8 @@ import (
 
 type NodePort struct {
 	TestCase
-	replica     int32
 	labels      map[string]string
-	containers  *[]v1.Container
 	serviceName string
-	serviceSpec *v1.ServiceSpec
 	nodePort    int32
 }
 
@@ -38,11 +35,11 @@ func (n *NodePort) Init() error {
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.NamespacesTotal = 1
-	n.NSBaseName = NodeportBaseName + n.UUIDgen
+	n.CaseBaseName = NodeportBaseName + n.UUIDgen
 	n.TestMsg = &TestMSG{
-		Desc:      fmt.Sprintf("Nodeport preservation"),
+		Desc:      "Nodeport preservation",
 		FailedMSG: "Failed to restore with nodeport preservation",
-		Text:      fmt.Sprintf("Nodeport can be preserved or omit during restore"),
+		Text:      "Nodeport can be preserved or omit during restore",
 	}
 	n.BackupName = "backup-nodeport-" + n.UUIDgen
 	n.RestoreName = "restore-" + n.UUIDgen
@@ -50,13 +47,16 @@ func (n *NodePort) Init() error {
 	n.labels = map[string]string{"app": "nginx"}
 	n.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", n.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)
 	}
 	n.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
-		"--include-namespaces", strings.Join(*n.NSIncluded, ","), "--wait",
+		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
+		"--snapshot-volumes=false", "--default-volumes-to-fs-backup",
+		"--wait",
 	}
+
 	n.RestoreArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore",
 		"--from-backup", n.BackupName,
@@ -65,9 +65,7 @@ func (n *NodePort) Init() error {
 	return nil
 }
 func (n *NodePort) CreateResources() error {
-	var ctxCancel context.CancelFunc
-	n.Ctx, ctxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
+	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Creating service %s in namespaces %s ......\n", n.serviceName, ns), func() {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
@@ -85,15 +83,15 @@ func (n *NodePort) CreateResources() error {
 
 func (n *NodePort) Destroy() error {
 	for _, ns := range *n.NSIncluded {
-		By(fmt.Sprintf("Start to destroy namespace %s......", n.NSBaseName), func() {
+		By(fmt.Sprintf("Start to destroy namespace %s......", n.CaseBaseName), func() {
 			Expect(CleanupNamespacesWithPoll(n.Ctx, n.Client, NodeportBaseName)).To(Succeed(),
-				fmt.Sprintf("Failed to delete namespace %s", n.NSBaseName))
+				fmt.Sprintf("Failed to delete namespace %s", n.CaseBaseName))
 			Expect(WaitForServiceDelete(n.Client, ns, n.serviceName, false)).To(Succeed(), "fail to delete service")
 			_, err := GetAllService(n.Ctx)
 			Expect(err).To(Succeed(), "fail to get service")
 		})
 
-		namespaceToCollision := ns + "tmp"
+		namespaceToCollision := ns + "-tmp"
 		By(fmt.Sprintf("Creating a new service which has the same nodeport as backed up service has in a new namespaces for nodeport collision ...%s\n", namespaceToCollision), func() {
 			Expect(CreateNamespace(n.Ctx, n.Client, namespaceToCollision)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespaceToCollision))
 			Expect(createServiceWithNodeport(n.Ctx, n.Client, namespaceToCollision, n.serviceName, n.labels, n.nodePort)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
@@ -143,7 +141,7 @@ func (n *NodePort) Restore() error {
 			fmt.Println(service.Spec.Ports)
 			Expect(DeleteNamespace(n.Ctx, n.Client, ns, true)).To(Succeed())
 		})
-		namespaceToCollision := ns + "tmp"
+		namespaceToCollision := ns + "-tmp"
 		By(fmt.Sprintf("Start to delete service %s in namespace %s ......", n.serviceName, namespaceToCollision), func() {
 			Expect(WaitForServiceDelete(n.Client, namespaceToCollision, n.serviceName, true)).To(Succeed(), "fail to delete service")
 			_, err := GetAllService(n.Ctx)

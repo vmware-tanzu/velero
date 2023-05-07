@@ -42,9 +42,6 @@ func GetResourcesCheckTestCases() []VeleroBackupRestoreTest {
 		&NSAnnotationCase{},
 		&MultiNSBackup{IsScalTest: false},
 		&RBACCase{},
-		&NodePort{},
-		&PVCSelectedNodeChanging{},
-		&StorageClasssChanging{},
 	}
 }
 

@@ -958,6 +958,7 @@ func GetScheduledBackupsCreationTime(ctx context.Context, veleroCLI, bslName, sc
 	}
 	return creationTimes, nil
 }
+
 func GetBackupsCreationTime(ctx context.Context, veleroCLI, bslName string) ([]string, error) {
 	args1 := []string{"get", "backups"}
 	createdTime := "$1,\",\" $5,$6,$7,$8"

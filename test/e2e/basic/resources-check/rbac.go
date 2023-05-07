@@ -51,13 +51,14 @@ type RBACCase struct {
 
 func (r *RBACCase) Init() error {
 	r.TestCase.Init()
-	r.BackupName = "backup-rbac" + r.UUIDgen
-	r.RestoreName = "restore-rbac" + r.UUIDgen
-	r.NSBaseName = "rabc-" + r.UUIDgen
+	r.CaseBaseName = "rabc-" + r.UUIDgen
+	r.BackupName = "backup-" + r.CaseBaseName
+	r.RestoreName = "restore-" + r.CaseBaseName
+
 	r.NamespacesTotal = 1
 	r.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		*r.NSIncluded = append(*r.NSIncluded, createNSName)
 	}
 	r.TestMsg = &TestMSG{
@@ -68,6 +69,7 @@ func (r *RBACCase) Init() error {
 	r.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--include-namespaces", strings.Join(*r.NSIncluded, ","),
+		"--snapshot-volumes=false",
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
@@ -81,22 +83,21 @@ func (r *RBACCase) Init() error {
 }
 
 func (r *RBACCase) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
-		if err := CreateNamespace(ctx, r.Client, createNSName); err != nil {
+		if err := CreateNamespace(r.Ctx, r.Client, createNSName); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
-		serviceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.NSBaseName, nsNum)
+		serviceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.CaseBaseName, nsNum)
 		fmt.Printf("Creating service account ...%s\n", createNSName)
-		if err := CreateServiceAccount(ctx, r.Client, createNSName, serviceAccountName); err != nil {
+		if err := CreateServiceAccount(r.Ctx, r.Client, createNSName, serviceAccountName); err != nil {
 			return errors.Wrapf(err, "Failed to create service account %s", serviceAccountName)
 		}
-		clusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", r.NSBaseName, nsNum)
-		clusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", r.NSBaseName, nsNum)
-		if err := CreateRBACWithBindingSA(ctx, r.Client, createNSName, serviceAccountName, clusterRoleName, clusterRoleBindingName); err != nil {
+		clusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", r.CaseBaseName, nsNum)
+		clusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", r.CaseBaseName, nsNum)
+		if err := CreateRBACWithBindingSA(r.Ctx, r.Client, createNSName, serviceAccountName, clusterRoleName, clusterRoleBindingName); err != nil {
 			return errors.Wrapf(err, "Failed to create cluster role %s with role binding %s", clusterRoleName, clusterRoleBindingName)
 		}
 	}
@@ -104,14 +105,12 @@ func (r *RBACCase) CreateResources() error {
 }
 
 func (r *RBACCase) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		checkNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
-		checkServiceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.NSBaseName, nsNum)
-		checkClusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", r.NSBaseName, nsNum)
-		checkClusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", r.NSBaseName, nsNum)
-		checkNS, err := GetNamespace(ctx, r.Client, checkNSName)
+		checkNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
+		checkServiceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.CaseBaseName, nsNum)
+		checkClusterRoleName := fmt.Sprintf("clusterrole-%s-%00000d", r.CaseBaseName, nsNum)
+		checkClusterRoleBindingName := fmt.Sprintf("clusterrolebinding-%s-%00000d", r.CaseBaseName, nsNum)
+		checkNS, err := GetNamespace(r.Ctx, r.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}
@@ -120,7 +119,7 @@ func (r *RBACCase) Verify() error {
 		}
 
 		//getting service account from the restore
-		checkSA, err := GetServiceAccount(ctx, r.Client, checkNSName, checkServiceAccountName)
+		checkSA, err := GetServiceAccount(r.Ctx, r.Client, checkNSName, checkServiceAccountName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test service account %s", checkSA)
@@ -131,7 +130,7 @@ func (r *RBACCase) Verify() error {
 		}
 
 		//getting cluster role from the restore
-		checkClusterRole, err := GetClusterRole(ctx, r.Client, checkClusterRoleName)
+		checkClusterRole, err := GetClusterRole(r.Ctx, r.Client, checkClusterRoleName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role %s", checkClusterRole)
@@ -142,7 +141,7 @@ func (r *RBACCase) Verify() error {
 		}
 
 		//getting cluster role binding from the restore
-		checkClusterRoleBinding, err := GetClusterRoleBinding(ctx, r.Client, checkClusterRoleBindingName)
+		checkClusterRoleBinding, err := GetClusterRoleBinding(r.Ctx, r.Client, checkClusterRoleBindingName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role binding %s", checkClusterRoleBinding)
@@ -163,21 +162,19 @@ func (r *RBACCase) Verify() error {
 }
 
 func (r *RBACCase) Destroy() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	//cleanup clusterrole
-	err := CleanupClusterRole(ctx, r.Client, r.NSBaseName)
+	err := CleanupClusterRole(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could not cleanup clusterroles")
 	}
 
 	//cleanup cluster rolebinding
-	err = CleanupClusterRoleBinding(ctx, r.Client, r.NSBaseName)
+	err = CleanupClusterRoleBinding(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could not cleanup clusterrolebindings")
 	}
 
-	err = CleanupNamespacesWithPoll(ctx, r.Client, r.NSBaseName)
+	err = CleanupNamespacesWithPoll(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}

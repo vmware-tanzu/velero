@@ -50,6 +50,7 @@ func (f *FilteringCase) Init() error {
 	f.NamespacesTotal = 3
 	f.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", f.BackupName,
+		"--snapshot-volumes=false",
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
@@ -63,18 +64,16 @@ func (f *FilteringCase) Init() error {
 }
 
 func (f *FilteringCase) CreateResources() error {
-	var ctxCancel context.CancelFunc
-	f.Ctx, ctxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
-	defer ctxCancel()
+	f.Ctx, f.CtxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
 		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels, nil).Result()
+		deployment := NewDeployment(f.CaseBaseName, namespace, f.replica, f.labels, nil).Result()
 		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
@@ -84,7 +83,7 @@ func (f *FilteringCase) CreateResources() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
 		}
 		//Create Secret
-		secretName := f.NSBaseName
+		secretName := f.CaseBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
 		_, err = CreateSecret(f.Client.ClientGo, namespace, secretName, f.labels)
 		if err != nil {
@@ -95,7 +94,7 @@ func (f *FilteringCase) CreateResources() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
 		}
 		//Create Configmap
-		configmaptName := f.NSBaseName
+		configmaptName := f.CaseBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
 		_, err = CreateConfigMap(f.Client.ClientGo, namespace, configmaptName, f.labels, nil)
 		if err != nil {
@@ -111,7 +110,7 @@ func (f *FilteringCase) CreateResources() error {
 
 func (f *FilteringCase) Verify() error {
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check namespace
 		checkNS, err := GetNamespace(f.Ctx, f.Client, namespace)
@@ -122,7 +121,7 @@ func (f *FilteringCase) Verify() error {
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name)
 		}
 		//Check deployment
-		_, err = GetDeployment(f.Client.ClientGo, namespace, f.NSBaseName)
+		_, err = GetDeployment(f.Client.ClientGo, namespace, f.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}

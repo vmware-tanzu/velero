@@ -41,7 +41,7 @@ func (m *MultiNSBackup) Init() error {
 	m.TestCase.Init()
 	m.BackupName = "backup-" + m.UUIDgen
 	m.RestoreName = "restore-" + m.UUIDgen
-	m.NSBaseName = "nstest-" + m.UUIDgen
+	m.CaseBaseName = "nstest-" + m.UUIDgen
 	m.VeleroCfg = VeleroCfg
 	m.Client = *m.VeleroCfg.ClientToInstallVelero
 	m.NSExcluded = &[]string{}
@@ -76,6 +76,7 @@ func (m *MultiNSBackup) Init() error {
 	m.BackupArgs = []string{
 		"create", "--namespace", m.VeleroCfg.VeleroNamespace, "backup", m.BackupName,
 		"--exclude-namespaces", strings.Join(*m.NSExcluded, ","),
+		"--snapshot-volumes=false",
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
@@ -88,15 +89,13 @@ func (m *MultiNSBackup) Init() error {
 }
 
 func (m *MultiNSBackup) CreateResources() error {
-	var ctxCancel context.CancelFunc
-	m.Ctx, ctxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
+	m.Ctx, m.CtxCancel = context.WithTimeout(context.Background(), m.TimeoutDuration)
 	fmt.Printf("Creating namespaces ...\n")
 	labels := map[string]string{
 		"ns-test": "true",
 	}
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", m.CaseBaseName, nsNum)
 		if err := CreateNamespaceWithLabel(m.Ctx, m.Client, createNSName, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
@@ -107,7 +106,7 @@ func (m *MultiNSBackup) CreateResources() error {
 func (m *MultiNSBackup) Verify() error {
 	// Verify that we got back all of the namespaces we created
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
-		checkNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
+		checkNSName := fmt.Sprintf("%s-%00000d", m.CaseBaseName, nsNum)
 		checkNS, err := GetNamespace(m.Ctx, m.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
@@ -119,7 +118,7 @@ func (m *MultiNSBackup) Verify() error {
 }
 
 func (m *MultiNSBackup) Destroy() error {
-	err := CleanupNamespaces(m.Ctx, m.Client, m.NSBaseName)
+	err := CleanupNamespaces(m.Ctx, m.Client, m.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}

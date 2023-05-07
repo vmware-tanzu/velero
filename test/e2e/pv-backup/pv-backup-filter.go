@@ -36,8 +36,8 @@ func (p *PVBackupFiltering) Init() error {
 	p.Client = *p.VeleroCfg.ClientToInstallVelero
 	p.VeleroCfg.UseVolumeSnapshots = false
 	p.VeleroCfg.UseNodeAgent = true
-	p.NSBaseName = "pv-filter"
-	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 2)}
+	p.CaseBaseName = "pv-filter-" + p.UUIDgen
+	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.CaseBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.CaseBaseName, p.id, 2)}
 
 	p.TestMsg = &TestMSG{
 		Desc:      "Backup PVs filtering by opt-in/opt-out annotation",
@@ -45,8 +45,8 @@ func (p *PVBackupFiltering) Init() error {
 		Text:      fmt.Sprintf("Should backup PVs in namespace %s according to annotation %s", *p.NSIncluded, p.annotation),
 	}
 
-	p.BackupName = p.NSBaseName + "backup-" + p.id + "-" + p.UUIDgen
-	p.RestoreName = p.NSBaseName + "restore-" + p.id + "-" + p.UUIDgen
+	p.BackupName = p.CaseBaseName + "backup-" + p.id
+	p.RestoreName = p.CaseBaseName + "restore-" + p.id
 	p.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", strings.Join(*p.NSIncluded, ","),
@@ -67,9 +67,7 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) CreateResources() error {
-	var ctxCancel context.CancelFunc
-	p.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return err
@@ -101,6 +99,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				By(fmt.Sprintf("Create pod %s in namespace %s", podName, ns), func() {
 					pod, err := CreatePod(p.Client, ns, podName, StorageClassName, "", volumes, nil, nil)
 					Expect(err).To(Succeed())
+					Expect(WaitForPods(p.Ctx, p.Client, ns, []string{podName})).To(Succeed())
 					ann := map[string]string{
 						p.annotation: volumesToAnnotation,
 					}

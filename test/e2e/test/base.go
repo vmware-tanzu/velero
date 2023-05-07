@@ -26,33 +26,34 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const fileName = "test-data.txt"
 
-type BasicSnapshotCase struct {
+type BasicCase struct {
 	TestCase
+	PVCount int
 }
 
-var BasicSnapshotCaseTest func() = TestFunc(&BasicSnapshotCase{})
+var BasicCaseTest func() = TestFunc(&BasicCase{})
 
-func (b *BasicSnapshotCase) Init() error {
+func (b *BasicCase) Init() error {
 	b.TestCase.Init()
 	b.VeleroCfg = VeleroCfg
 	b.Client = *b.VeleroCfg.ClientToInstallVelero
-	b.VeleroCfg.UseVolumeSnapshots = true
-	b.VeleroCfg.UseNodeAgent = false
 	b.NamespacesTotal = 1
-	b.NSBaseName = "basic-test-" + b.UUIDgen
+	b.PVCount = 1
+	b.CaseBaseName = "basic-test-" + b.UUIDgen
 	b.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < b.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", b.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", b.CaseBaseName, nsNum)
 		*b.NSIncluded = append(*b.NSIncluded, createNSName)
 	}
 
@@ -62,8 +63,15 @@ func (b *BasicSnapshotCase) Init() error {
 	b.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", b.BackupName,
 		"--include-namespaces", strings.Join(*b.NSIncluded, ","),
-		"--default-volumes-to-fs-backup=false",
-		"--snapshot-volumes", "--wait",
+		"--wait",
+	}
+
+	if b.VeleroCfg.UseVolumeSnapshots {
+		b.BackupArgs = append(b.BackupArgs, "--default-volumes-to-fs-backup=false")
+		b.BackupArgs = append(b.BackupArgs, "--snapshot-volumes")
+	} else {
+		b.BackupArgs = append(b.BackupArgs, "--default-volumes-to-fs-backup=true")
+		b.BackupArgs = append(b.BackupArgs, "--snapshot-volumes=false")
 	}
 
 	b.RestoreArgs = []string{
@@ -72,18 +80,15 @@ func (b *BasicSnapshotCase) Init() error {
 	}
 
 	b.TestMsg = &TestMSG{
-		Desc:      "Basic snapshot test case",
+		Desc:      "Basic backup and restore test case",
 		FailedMSG: "Failed to backup and restore of volume",
 		Text:      fmt.Sprintf("Should backup and restore PVs in namespace %s", *b.NSIncluded),
 	}
-	var ctxCancel context.CancelFunc
-	b.Ctx, ctxCancel = context.WithTimeout(context.Background(), 20*time.Minute)
-	defer ctxCancel()
-
 	return nil
 }
 
-func (b *BasicSnapshotCase) CreateResources() error {
+func (b *BasicCase) CreateResources() error {
+	b.Ctx, b.CtxCancel = context.WithTimeout(context.Background(), 20*time.Minute)
 	By(("Installing storage class..."), func() {
 		yamlFile := fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider)
 		if strings.EqualFold(b.VeleroCfg.CloudProvider, "azure") && strings.EqualFold(b.VeleroCfg.Features, "EnableCSI") {
@@ -93,12 +98,12 @@ func (b *BasicSnapshotCase) CreateResources() error {
 	})
 
 	for nsNum := 0; nsNum < b.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", b.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", b.CaseBaseName, nsNum)
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
 			Expect(CreateNamespace(b.Ctx, b.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
-		volName := fmt.Sprintf("vol-%s-%00000d", b.NSBaseName, nsNum)
+		volName := fmt.Sprintf("vol-%s-%00000d", b.CaseBaseName, nsNum)
 		volList := PrepareVolumeList([]string{volName})
 
 		// Create PVC
@@ -120,13 +125,41 @@ func (b *BasicSnapshotCase) CreateResources() error {
 	return nil
 }
 
-func (b *BasicSnapshotCase) WaitForBackup() error {
+func (b *BasicCase) WaitForBackup() error {
 	if !b.UseVolumeSnapshots {
-		return fmt.Errorf("only test for volume snapshots")
+		for index := 0; index < b.NamespacesTotal; index++ {
+			ns := fmt.Sprintf("%s-%00000d", b.CaseBaseName, index)
+			pvbs, err := GetPVB(b.Ctx, b.VeleroCfg.VeleroNamespace, ns)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get PVB for namespace %s", ns)
+			} else if len(pvbs) != b.PVCount {
+				return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", len(pvbs), b.PVCount, ns))
+			}
+			if b.VeleroCfg.CloudProvider != "vsphere" {
+				// wait for a period to confirm no snapshots exist for the backup
+				if index == 0 {
+					time.Sleep(5 * time.Minute)
+				}
+				snapshotCheckPoint, err := GetSnapshotCheckPoint(b.Client, b.VeleroCfg, 0,
+					ns, b.BackupName, []string{"pvc-0"})
+				if err != nil {
+					return errors.Wrap(err, "failed to get snapshot checkPoint")
+				}
+				if !strings.EqualFold(b.VeleroCfg.Features, "EnableCSI") {
+					err = SnapshotsShouldNotExistInCloud(b.VeleroCfg.CloudProvider,
+						b.VeleroCfg.CloudCredentialsFile, b.VeleroCfg.BSLBucket, b.VeleroCfg.BSLConfig,
+						b.BackupName, snapshotCheckPoint)
+					if err != nil {
+						return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
+					}
+				}
+			}
+		}
+		return nil
 	}
 
-	for nsNum := 0; nsNum < b.NamespacesTotal; nsNum++ {
-		ns := fmt.Sprintf("%s-%00000d", b.NSBaseName, nsNum)
+	for index := 0; index < b.NamespacesTotal; index++ {
+		ns := fmt.Sprintf("%s-%00000d", b.CaseBaseName, index)
 		if b.VeleroCfg.CloudProvider == "vsphere" {
 			// Wait for uploads started by the Velero Plug-in for vSphere to complete
 			// TODO - remove after upload progress monitoring is implemented
@@ -150,17 +183,17 @@ func (b *BasicSnapshotCase) WaitForBackup() error {
 	return nil
 }
 
-func (b *BasicSnapshotCase) Verify() error {
+func (b *BasicCase) Verify() error {
 	for i, ns := range *b.NSIncluded {
 		By(fmt.Sprintf("Verify pod data in namespace %s", ns), func() {
 			By(fmt.Sprintf("wait for ready deployment in namespace %s", ns), func() {
-				err := WaitForReadyDeployment(b.Client.ClientGo, ns, b.NSBaseName)
+				err := WaitForReadyDeployment(b.Client.ClientGo, ns, b.CaseBaseName)
 				Expect(err).To(Succeed(), fmt.Sprintf("failed to wait for ready deployment in namespace: %q with error %v", ns, err))
 			})
 
 			podList, err := ListPods(b.Ctx, b.Client, ns)
 			Expect(err).To(Succeed(), fmt.Sprintf("failed to list pod in namespace: %q with error %v", ns, err))
-			err = b.VerifyDataByNamespace(ns, ns, fmt.Sprintf("vol-%s-%00000d", b.NSBaseName, i), podList)
+			err = b.VerifyDataByNamespace(ns, ns, fmt.Sprintf("vol-%s-%00000d", b.CaseBaseName, i), podList)
 			Expect(err).To(Succeed(), fmt.Sprintf("failed to verify pod volume data in namespace: %q with error %v", ns, err))
 		})
 
@@ -168,7 +201,7 @@ func (b *BasicSnapshotCase) Verify() error {
 	return nil
 }
 
-func (b *BasicSnapshotCase) VerifyDataByNamespace(ns, originalNS, volName string, podList *v1.PodList) error {
+func (b *BasicCase) VerifyDataByNamespace(ns, originalNS, volName string, podList *v1.PodList) error {
 	for _, pod := range podList.Items {
 		for _, vol := range pod.Spec.Volumes {
 			if vol.Name != volName {
@@ -190,7 +223,7 @@ func (b *BasicSnapshotCase) VerifyDataByNamespace(ns, originalNS, volName string
 	return nil
 }
 
-func (b *BasicSnapshotCase) Clean() error {
+func (b *BasicCase) Clean() error {
 	if err := DeleteStorageClass(b.Ctx, b.Client, "e2e-storage-class"); err != nil {
 		return err
 	}
@@ -198,7 +231,7 @@ func (b *BasicSnapshotCase) Clean() error {
 	return b.GetTestCase().Clean()
 }
 
-func (b *BasicSnapshotCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
+func (b *BasicCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
 	var err error
 	for i := range volList {
 		pvcName := fmt.Sprintf("pvc-%d", i)
@@ -212,8 +245,8 @@ func (b *BasicSnapshotCase) createPVC(index int, namespace string, volList []*v1
 	return nil
 }
 
-func (b *BasicSnapshotCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
-	deployment := NewDeployment(b.NSBaseName, namespace, 1, map[string]string{"test-case": "basic"}, nil).WithVolume(volList).Result()
+func (b *BasicCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
+	deployment := NewDeployment(b.CaseBaseName, namespace, 1, map[string]string{"test-case": "basic"}, nil).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(b.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))
@@ -225,7 +258,7 @@ func (b *BasicSnapshotCase) createDeploymentWithVolume(namespace string, volList
 	return nil
 }
 
-func (b *BasicSnapshotCase) writeDataIntoPods(namespace, volName string) error {
+func (b *BasicCase) writeDataIntoPods(namespace, volName string) error {
 	podList, err := ListPods(b.Ctx, b.Client, namespace)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to list pods in namespace: %q with error %v", namespace, err))

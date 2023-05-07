@@ -63,7 +63,7 @@ type TestMSG struct {
 type TestCase struct {
 	BackupName         string
 	RestoreName        string
-	NSBaseName         string
+	CaseBaseName       string
 	BackupArgs         []string
 	RestoreArgs        []string
 	NamespacesTotal    int
@@ -74,6 +74,7 @@ type TestCase struct {
 	VeleroCfg          VeleroConfig
 	RestorePhaseExpect velerov1api.RestorePhase
 	Ctx                context.Context
+	CtxCancel          context.CancelFunc
 	UUIDgen            string
 }
 
@@ -81,25 +82,38 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
 		veleroCfg := test.GetTestCase().VeleroCfg
+		defer test.GetTestCase().CtxCancel()
+
 		BeforeEach(func() {
 			flag.Parse()
-			veleroCfg := test.GetTestCase().VeleroCfg
+			ready, err := IsVeleroReady(context.Background(), veleroCfg.VeleroNamespace, true)
+			if err != nil { // if velero not in running status we could reuninstall it
+				By(fmt.Sprintf("velero uninstall in %s case for err %v", test.GetTestCase().CaseBaseName, err))
+				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
+				ready = false
+			}
+			if ready {
+				fmt.Printf("velero is ready %s \n", test.GetTestCase().CaseBaseName)
+			} else {
+				fmt.Printf("need to install velero %s \n", test.GetTestCase().CaseBaseName)
+			}
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
-			if veleroCfg.CloudProvider == "azure" && strings.Contains(test.GetTestCase().NSBaseName, "nodeport") {
+			if veleroCfg.CloudProvider == "azure" && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
 				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
 			}
-			if veleroCfg.InstallVelero {
+			if veleroCfg.InstallVelero && !ready { // we use ready variable to reduce unnecessary installation
 				veleroCfg.UseVolumeSnapshots = test.GetTestCase().UseVolumeSnapshots
-				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+				fmt.Println("velero is ready")
+				Expect(VeleroInstall(context.Background(), &VeleroCfg)).To(Succeed())
 			}
 		})
-		AfterEach(func() {
+		/*AfterEach(func() {
 			if !veleroCfg.Debug {
 				if veleroCfg.InstallVelero {
-					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
+					Expect(VeleroUninstall(test.GetTestCase().Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
 				}
 			}
-		})
+		})*/
 		It(test.GetTestMsg().Text, func() {
 			Expect(RunTestCase(test)).To(Succeed(), test.GetTestMsg().FailedMSG)
 		})
@@ -108,34 +122,23 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		var countIt int
-		var useVolumeSnapshots bool
 		var veleroCfg VeleroConfig
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
 			veleroCfg = tests[k].GetTestCase().VeleroCfg
-			useVolumeSnapshots = tests[k].GetTestCase().UseVolumeSnapshots
+			defer tests[k].GetTestCase().CtxCancel()
 		}
 
 		BeforeEach(func() {
 			flag.Parse()
-			if veleroCfg.InstallVelero {
-				if countIt == 0 {
-					veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
-					veleroCfg.UseNodeAgent = !useVolumeSnapshots
-					Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
-				}
-				countIt++
+			ready, err := IsVeleroReady(context.Background(), veleroCfg.VeleroNamespace, true)
+			if err != nil { // if velero not in running status we could reuninstall it
+				By(fmt.Sprintf("velero uninstall in %s case for err %v", tests[0].GetTestCase().CaseBaseName, err))
+				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
+				ready = false
 			}
-		})
-
-		AfterEach(func() {
-			if !veleroCfg.Debug {
-				if veleroCfg.InstallVelero {
-					if countIt == len(tests) && !veleroCfg.Debug {
-						Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
-					}
-				}
+			if veleroCfg.InstallVelero && !ready {
+				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
 			}
 		})
 
@@ -149,9 +152,7 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 }
 
 func (t *TestCase) Init() error {
-	var ctxCancel context.CancelFunc
-	t.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
 	t.UUIDgen = t.GenerateUUID()
 	return nil
 }
@@ -175,13 +176,17 @@ func (t *TestCase) WaitForBackup() error {
 }
 
 func (t *TestCase) Destroy() error {
-	By(fmt.Sprintf("Start to destroy namespace %s......", t.NSBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(t.Ctx, t.Client, t.NSBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
+	By(fmt.Sprintf("Start to destroy namespace %s......", t.CaseBaseName), func() {
+		Expect(CleanupNamespacesWithPoll(t.Ctx, t.Client, t.CaseBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
 	})
 	return nil
 }
 
 func (t *TestCase) Restore() error {
+	if len(t.RestoreArgs) == 0 {
+		return nil
+	}
+
 	veleroCfg := t.GetTestCase().VeleroCfg
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
@@ -210,8 +215,8 @@ func (t *TestCase) Verify() error {
 func (t *TestCase) Clean() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
 	if !veleroCfg.Debug {
-		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.NSBaseName), func() {
-			CleanupNamespaces(t.Ctx, t.Client, t.NSBaseName)
+		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.CaseBaseName), func() {
+			CleanupNamespaces(t.Ctx, t.Client, t.CaseBaseName)
 		})
 		By("Clean backups after test", func() {
 			DeleteBackups(t.Ctx, t.Client)

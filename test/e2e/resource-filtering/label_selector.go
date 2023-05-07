@@ -46,9 +46,9 @@ func (l *LabelSelector) Init() error {
 	l.FilteringCase.Init()
 	l.BackupName = "backup-label-selector-" + l.UUIDgen
 	l.RestoreName = "restore-" + l.UUIDgen
-	l.NSBaseName = "backup-label-selector-" + l.UUIDgen
+	l.CaseBaseName = "backup-label-selector-" + l.UUIDgen
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		*l.NSIncluded = append(*l.NSIncluded, createNSName)
 	}
 	l.TestMsg = &TestMSG{
@@ -64,6 +64,7 @@ func (l *LabelSelector) Init() error {
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", l.BackupName,
 		"--selector", "resourcefiltering=true",
 		"--include-namespaces", strings.Join(*l.NSIncluded, ","),
+		"--snapshot-volumes=false",
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
@@ -75,11 +76,9 @@ func (l *LabelSelector) Init() error {
 }
 
 func (l *LabelSelector) CreateResources() error {
-	var ctxCancel context.CancelFunc
-	l.Ctx, ctxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	l.Ctx, l.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
 		labels := l.labels
 		if nsNum%2 == 0 {
@@ -94,7 +93,7 @@ func (l *LabelSelector) CreateResources() error {
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 
-		deployment := NewDeployment(l.NSBaseName, namespace, l.replica, labels, nil).Result()
+		deployment := NewDeployment(l.CaseBaseName, namespace, l.replica, labels, nil).Result()
 		deployment, err := CreateDeployment(l.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
@@ -104,7 +103,7 @@ func (l *LabelSelector) CreateResources() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
 		}
 		//Create Secret
-		secretName := l.NSBaseName
+		secretName := l.CaseBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
 		_, err = CreateSecret(l.Client.ClientGo, namespace, secretName, l.labels)
 		if err != nil {
@@ -120,10 +119,10 @@ func (l *LabelSelector) CreateResources() error {
 
 func (l *LabelSelector) Verify() error {
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check deployment
-		_, err := GetDeployment(l.Client.ClientGo, namespace, l.NSBaseName)
+		_, err := GetDeployment(l.Client.ClientGo, namespace, l.CaseBaseName)
 		if nsNum%2 == 1 { //include
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))

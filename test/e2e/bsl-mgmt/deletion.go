@@ -69,8 +69,19 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
-		if veleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+		ready, err := IsVeleroReady(context.Background(), veleroCfg.VeleroNamespace, true)
+		if err != nil { // if velero not in running status we could reuninstall it
+			By(fmt.Sprintf("velero uninstall in bsl deletion case %v", err))
+			Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
+			ready = false
+		}
+		if ready {
+			fmt.Println("velero is ready for case  backup deletion test")
+		} else {
+			fmt.Println("need to install velero backup deletion test")
+		}
+		if veleroCfg.InstallVelero && !ready {
+			Expect(VeleroInstall(context.Background(), &VeleroCfg)).To(Succeed())
 		}
 	})
 
@@ -84,12 +95,6 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					true)).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q",
 					bslDeletionTestNs))
 			})
-			if veleroCfg.InstallVelero {
-				By("Uninstall Velero", func() {
-					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
-				})
-			}
 		}
 
 	})

@@ -43,16 +43,19 @@ func SSRTest() {
 	BeforeEach(func() {
 		flag.Parse()
 		veleroCfg.UseVolumeSnapshots = false
-		if veleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+		ready, err := IsVeleroReady(context.Background(), veleroCfg.VeleroNamespace, true)
+		if err != nil { // if velero not in running status we could reuninstall it
+			By(fmt.Sprintf("velero uninstall in ssr case for err %v", err))
+			Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
+			ready = false
 		}
-	})
-
-	AfterEach(func() {
-		if veleroCfg.InstallVelero {
-			if !veleroCfg.Debug {
-				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
-			}
+		if ready {
+			fmt.Println("velero is ready for case  backup deletion test")
+		} else {
+			fmt.Println("need to install velero backup deletion test")
+		}
+		if veleroCfg.InstallVelero && !ready {
+			Expect(VeleroInstall(context.Background(), &VeleroCfg)).To(Succeed())
 		}
 	})
 

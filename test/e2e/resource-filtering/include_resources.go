@@ -42,11 +42,14 @@ type IncludeResources struct {
 	FilteringCase
 }
 
+var BackupWithIncludeResources func() = TestFunc(&IncludeResources{testInBackup})
+var RestoreWithIncludeResources func() = TestFunc(&IncludeResources{testInRestore})
+
 func (i *IncludeResources) Init() error {
 	i.FilteringCase.Init()
-	i.NSBaseName = "include-resources-" + i.UUIDgen
+	i.CaseBaseName = "include-resources-" + i.UUIDgen
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", i.CaseBaseName, nsNum)
 		*i.NSIncluded = append(*i.NSIncluded, createNSName)
 	}
 	if i.IsTestInBackup { // testing case backup with include-resources option
@@ -60,6 +63,7 @@ func (i *IncludeResources) Init() error {
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-resources", "deployments,configmaps",
+			"--snapshot-volumes=false",
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 
@@ -78,6 +82,7 @@ func (i *IncludeResources) Init() error {
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
+			"--snapshot-volumes=false",
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 		i.RestoreArgs = []string{
@@ -91,10 +96,10 @@ func (i *IncludeResources) Init() error {
 
 func (i *IncludeResources) Verify() error {
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", i.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check deployment
-		_, err := GetDeployment(i.Client.ClientGo, namespace, i.NSBaseName)
+		_, err := GetDeployment(i.Client.ClientGo, namespace, i.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}

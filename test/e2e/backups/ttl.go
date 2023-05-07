@@ -70,6 +70,7 @@ func TTLTest() {
 			// Make sure GCFrequency is shorter than backup TTL
 			veleroCfg.GCFrequency = "4m0s"
 			veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
+
 			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
 		}
 	})
@@ -81,6 +82,7 @@ func TTLTest() {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 			if veleroCfg.InstallVelero {
+				By("velero uninstall in ttl case")
 				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
 			}
 			ctx, ctxCancel := context.WithTimeout(context.Background(), 5*time.Minute)

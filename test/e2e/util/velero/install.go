@@ -55,6 +55,7 @@ type installOptions struct {
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
+	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if veleroCfg.CloudProvider != "kind" {
 		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
 		veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
@@ -109,7 +110,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
-
+	fmt.Printf("Finish velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
 
@@ -458,6 +459,42 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 
 	fmt.Printf("Velero is installed and ready to be tested in the %s namespace! ⛵ \n", namespace)
 	return nil
+}
+
+func IsVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) (bool, error) {
+	if useNodeAgent {
+		stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/node-agent",
+			"-o", "json", "-n", namespace))
+		if err == nil {
+			daemonset := &apps.DaemonSet{}
+			if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
+				return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
+			}
+			if daemonset.Status.DesiredNumberScheduled == daemonset.Status.NumberAvailable {
+				return true, nil
+			}
+			return false, fmt.Errorf("the available number pod %d in node-agent daemonset not equal to scheduled number %d", daemonset.Status.NumberAvailable, daemonset.Status.DesiredNumberScheduled)
+		} else if !apierrors.IsNotFound(err) {
+			return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
+		}
+	}
+
+	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "deployment/velero",
+		"-o", "json", "-n", namespace))
+	if err == nil {
+		deployment := &apps.Deployment{}
+		if err = json.Unmarshal([]byte(stdout), deployment); err != nil {
+			return false, errors.Wrapf(err, "failed to unmarshal the velero deployment")
+		}
+		if deployment.Status.AvailableReplicas == deployment.Status.Replicas {
+			return true, nil
+		}
+		return false, fmt.Errorf("the available replicas %d in velero deployment not equal to replicas %d", deployment.Status.AvailableReplicas, deployment.Status.Replicas)
+	} else if !apierrors.IsNotFound(err) {
+		return false, errors.Wrapf(err, "failed to get the velero deployment stdout=%s, stderr=%s", stdout, stderr)
+	}
+
+	return true, nil
 }
 
 func VeleroUninstall(ctx context.Context, cli, namespace string) error {

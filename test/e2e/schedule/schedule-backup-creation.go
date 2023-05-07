@@ -31,16 +31,19 @@ type ScheduleBackupCreation struct {
 	podSleepDuration time.Duration
 }
 
-var ScheduleBackupCreationTest func() = TestFunc(&ScheduleBackupCreation{namespace: "sch1", TestCase: TestCase{NSBaseName: "schedule-backup-creation-test"}})
+var ScheduleBackupCreationTest func() = TestFunc(&ScheduleBackupCreation{})
 
 func (n *ScheduleBackupCreation) Init() error {
 	n.TestCase.Init()
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
-	n.verifyTimes = 5 // More larger verify times more confidence we have
+	n.verifyTimes = 5 // More larger verify times more confidence we have"
 	podSleepDurationStr := "300s"
 	n.podSleepDuration, _ = time.ParseDuration(podSleepDurationStr)
+	n.CaseBaseName = "schedule-backup-creation-test" + n.UUIDgen
+	n.namespace = n.CaseBaseName
+
 	n.TestMsg = &TestMSG{
 		Desc:      "Schedule controller wouldn't create a new backup when it still has pending or InProgress backup",
 		FailedMSG: "Failed to verify schedule back creation behavior",
@@ -54,9 +57,7 @@ func (n *ScheduleBackupCreation) Init() error {
 	n.volume = "volume-1"
 	n.podName = "pod-1"
 	n.pvcName = "pvc-1"
-	n.namespace = fmt.Sprintf("%s-%s", n.NSBaseName, "ns")
-	n.ScheduleName = n.ScheduleName + "schedule-" + n.UUIDgen
-	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + n.UUIDgen
+	n.ScheduleName = "schedule-" + n.CaseBaseName
 
 	n.ScheduleArgs = []string{
 		"--include-namespaces", n.namespace,
@@ -67,9 +68,7 @@ func (n *ScheduleBackupCreation) Init() error {
 }
 
 func (s *ScheduleBackupCreation) CreateResources() error {
-	var cancelFunc context.CancelFunc
-	s.Ctx, cancelFunc = context.WithTimeout(context.Background(), 60*time.Minute)
-	defer cancelFunc()
+	s.Ctx, s.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
 		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
@@ -85,8 +84,6 @@ func (s *ScheduleBackupCreation) CreateResources() error {
 }
 
 func (n *ScheduleBackupCreation) Backup() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	// Wait until the beginning of the given period to create schedule, it will give us
 	//   a predictable period to wait for the first scheduled backup, and verify no immediate
 	//   scheduled backup was created between schedule creation and first scheduled backup.
@@ -96,9 +93,9 @@ func (n *ScheduleBackupCreation) Backup() error {
 			now := time.Now().Minute()
 			triggerNow := now % n.Period
 			if triggerNow == 0 {
-				Expect(VeleroScheduleCreate(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
+				Expect(VeleroScheduleCreate(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
 					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
-					return "Fail to restore workload"
+					return "Fail to create schedule"
 				})
 				break
 			}
@@ -111,7 +108,7 @@ func (n *ScheduleBackupCreation) Backup() error {
 
 	By(fmt.Sprintf("Get backups every %d minute, and backups count should increase 1 more step in the same pace\n", n.Period), func() {
 		for i := 1; i <= n.verifyTimes; i++ {
-			fmt.Printf("Start to sleep %d minute #%d time...\n", n.podSleepDuration, i)
+			fmt.Printf("Start to sleep %f minute #%d time...\n", n.podSleepDuration.Minutes(), i)
 			mi, _ := time.ParseDuration("60s")
 			time.Sleep(n.podSleepDuration + mi)
 			bMap := make(map[string]string)
@@ -134,6 +131,10 @@ func (n *ScheduleBackupCreation) Backup() error {
 	return nil
 }
 
-func (n *ScheduleBackupCreation) Restore() error {
+func (n *ScheduleBackupCreation) Clean() error {
+	if !n.VeleroCfg.Debug {
+		Expect(VeleroScheduleDelete(n.Ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, n.ScheduleName)).To(Succeed())
+		Expect(n.TestCase.Clean()).To(Succeed())
+	}
 	return nil
 }

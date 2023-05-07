@@ -47,7 +47,6 @@ func BackupDeletionWithRestic() {
 func backup_deletion_test(useVolumeSnapshots bool) {
 	var (
 		backupName string
-		err        error
 		veleroCfg  VeleroConfig
 	)
 	veleroCfg = VeleroCfg
@@ -60,9 +59,20 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 		}
 		var err error
 		flag.Parse()
+		ready, err := IsVeleroReady(context.Background(), veleroCfg.VeleroNamespace, true)
+		if err != nil { // if velero not in running status we could reuninstall it
+			By(fmt.Sprintf("velero uninstall in %s case for err %v", deletionTest, err))
+			Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
+			ready = false
+		}
+		if ready {
+			fmt.Println("velero is ready for case  backup deletion test")
+		} else {
+			fmt.Println("need to install velero backup deletion test")
+		}
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
-		if veleroCfg.InstallVelero {
+		if veleroCfg.InstallVelero && !ready {
 			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
 		}
 	})
@@ -72,10 +82,10 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 			By("Clean backups after test", func() {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
-			if veleroCfg.InstallVelero {
+			/*if veleroCfg.InstallVelero {
 				err = VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
 				Expect(err).To(Succeed())
-			}
+			}*/
 		}
 	})
 

@@ -100,7 +100,7 @@ func APIGropuVersionsTest() {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 			if veleroCfg.InstallVelero {
-				By("Uninstall Velero", func() {
+				By("Uninstall Velero in api group version", func() {
 					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
 				})
 			}

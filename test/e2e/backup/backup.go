@@ -68,6 +68,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 			if veleroCfg.InstallVelero {
+				By("velero uninstall in basic backup case")
 				err = VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
 				Expect(err).To(Succeed())
 			}
