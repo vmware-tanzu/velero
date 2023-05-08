@@ -25,8 +25,8 @@ import (
 	"github.com/kopia/kopia/repo/blob/throttling"
 	"github.com/kopia/kopia/repo/content"
 	"github.com/kopia/kopia/repo/encryption"
+	"github.com/kopia/kopia/repo/format"
 	"github.com/kopia/kopia/repo/hashing"
-	"github.com/kopia/kopia/repo/object"
 	"github.com/kopia/kopia/repo/splitter"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -51,12 +51,12 @@ func setupLimits(ctx context.Context, flags map[string]string) throttling.Limits
 // SetupNewRepositoryOptions setups the options when creating a new Kopia repository
 func SetupNewRepositoryOptions(ctx context.Context, flags map[string]string) repo.NewRepositoryOptions {
 	return repo.NewRepositoryOptions{
-		BlockFormat: content.FormattingOptions{
+		BlockFormat: format.ContentFormat{
 			Hash:       optionalHaveStringWithDefault(udmrepo.StoreOptionGenHashAlgo, flags, hashing.DefaultAlgorithm),
 			Encryption: optionalHaveStringWithDefault(udmrepo.StoreOptionGenEncryptAlgo, flags, encryption.DefaultAlgorithm),
 		},
 
-		ObjectFormat: object.Format{
+		ObjectFormat: format.ObjectFormat{
 			Splitter: optionalHaveStringWithDefault(udmrepo.StoreOptionGenSplitAlgo, flags, splitter.DefaultAlgorithm),
 		},
 

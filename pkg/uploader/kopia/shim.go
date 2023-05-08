@@ -55,7 +55,7 @@ func NewShimRepo(repo udmrepo.BackupRepo) repo.RepositoryWriter {
 
 // OpenObject open specific object
 func (sr *shimRepository) OpenObject(ctx context.Context, id object.ID) (object.Reader, error) {
-	reader, err := sr.udmRepo.OpenObject(ctx, udmrepo.ID(id))
+	reader, err := sr.udmRepo.OpenObject(ctx, udmrepo.ID(id.String()))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open object with id %v", id)
 	}
@@ -70,7 +70,7 @@ func (sr *shimRepository) OpenObject(ctx context.Context, id object.ID) (object.
 
 // VerifyObject not supported
 func (sr *shimRepository) VerifyObject(ctx context.Context, id object.ID) ([]content.ID, error) {
-	return nil, errors.New("not supported")
+	return nil, errors.New("VerifyObject is not supported")
 }
 
 // Get one or more manifest data that match the specific manifest id
@@ -135,12 +135,12 @@ func (sr *shimRepository) ClientOptions() repo.ClientOptions {
 
 // Refresh not supported
 func (sr *shimRepository) Refresh(ctx context.Context) error {
-	return errors.New("not supported")
+	return errors.New("Refresh is not supported")
 }
 
 // ContentInfo not supported
 func (sr *shimRepository) ContentInfo(ctx context.Context, contentID content.ID) (content.Info, error) {
-	return nil, errors.New("not supported")
+	return nil, errors.New("ContentInfo is not supported")
 }
 
 // PrefetchContents is not supported by unified repo
@@ -150,7 +150,7 @@ func (sr *shimRepository) PrefetchContents(ctx context.Context, contentIDs []con
 
 // PrefetchObjects is not supported by unified repo
 func (sr *shimRepository) PrefetchObjects(ctx context.Context, objectIDs []object.ID, hint string) ([]content.ID, error) {
-	return nil, errors.New("not supported")
+	return nil, errors.New("PrefetchObjects is not supported")
 }
 
 // UpdateDescription is not supported by unified repo
@@ -159,7 +159,7 @@ func (sr *shimRepository) UpdateDescription(d string) {
 
 // NewWriter is not supported by unified repo
 func (sr *shimRepository) NewWriter(ctx context.Context, option repo.WriteSessionOptions) (context.Context, repo.RepositoryWriter, error) {
-	return nil, nil, errors.New("not supported")
+	return nil, nil, errors.New("NewWriter is not supported")
 }
 
 // Close will close unified repo
@@ -208,9 +208,20 @@ func (sr *shimRepository) DeleteManifest(ctx context.Context, id manifest.ID) er
 	return sr.udmRepo.DeleteManifest(ctx, udmrepo.ID(id))
 }
 
+func (sr *shimRepository) ReplaceManifests(ctx context.Context, labels map[string]string, payload interface{}) (manifest.ID, error) {
+	return manifest.ID(""), errors.New("ReplaceManifests is not supported")
+}
+
 // Flush all the unifited repository data
 func (sr *shimRepository) Flush(ctx context.Context) error {
 	return sr.udmRepo.Flush(ctx)
+}
+
+func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []object.ID) (object.ID, error) {
+	return object.ID{}, errors.New("ConcatenateObjects is not supported")
+}
+
+func (sr *shimRepository) OnSuccessfulFlush(callback repo.RepositoryWriterCallback) {
 }
 
 // Flush all the unifited repository data
@@ -240,13 +251,31 @@ func (sr *shimObjectWriter) Write(p []byte) (n int, err error) {
 // Periodically called to preserve the state of data written to the repo so far.
 func (sr *shimObjectWriter) Checkpoint() (object.ID, error) {
 	id, err := sr.repoWriter.Checkpoint()
-	return object.ID(id), err
+	if err != nil {
+		return object.ID{}, err
+	}
+
+	objID, err := object.ParseID(string(id))
+	if err != nil {
+		return object.ID{}, errors.Wrapf(err, "error to parse object ID from %v", id)
+	}
+
+	return objID, err
 }
 
 // Result returns the object's unified identifier after the write completes.
 func (sr *shimObjectWriter) Result() (object.ID, error) {
 	id, err := sr.repoWriter.Result()
-	return object.ID(id), err
+	if err != nil {
+		return object.ID{}, err
+	}
+
+	objID, err := object.ParseID(string(id))
+	if err != nil {
+		return object.ID{}, errors.Wrapf(err, "error to parse object ID from %v", id)
+	}
+
+	return objID, err
 }
 
 // Close closes the repository and releases all resources.

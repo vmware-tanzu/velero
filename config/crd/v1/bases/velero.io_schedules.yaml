@@ -1,11 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.0
   name: schedules.velero.io
 spec:
   group: velero.io
@@ -206,6 +204,7 @@ spec:
                                     requirements are ANDed.
                                   type: object
                               type: object
+                              x-kubernetes-map-type: atomic
                             name:
                               description: Name is the name of this hook.
                               type: string
@@ -396,6 +395,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-map-type: atomic
                   metadata:
                     properties:
                       labels:
@@ -456,6 +456,7 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
+                      x-kubernetes-map-type: atomic
                     nullable: true
                     type: array
                   orderedResources:
@@ -488,6 +489,7 @@ spec:
                     - kind
                     - name
                     type: object
+                    x-kubernetes-map-type: atomic
                   snapshotVolumes:
                     description: SnapshotVolumes specifies whether to take snapshots
                       of any PV's referenced in the set of objects included in the
@@ -545,9 +547,3 @@ spec:
     served: true
     storage: true
     subresources: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
