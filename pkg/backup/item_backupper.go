@@ -173,42 +173,11 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 
 	var (
 		backupErrs []error
-		pod        *corev1api.Pod
-		pvbVolumes []string
 	)
 
 	log.Debug("Executing pre hooks")
 	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre); err != nil {
 		return false, itemFiles, err
-	}
-
-	if groupResource == kuberesource.Pods {
-		// pod needs to be initialized for the unstructured converter
-		pod = new(corev1api.Pod)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
-			backupErrs = append(backupErrs, errors.WithStack(err))
-			// nil it on error since it's not valid
-			pod = nil
-		} else {
-			// Get the list of volumes to back up using pod volume backup from the pod's annotations. Remove from this list
-			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
-			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			for _, volume := range podvolume.GetVolumesByPod(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup)) {
-				// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
-				// via an item action in the next step, we don't snapshot PVs that will have their data backed up
-				// with pod volume backup.
-				ib.podVolumeSnapshotTracker.Track(pod, volume)
-
-				if found, pvcName := ib.podVolumeSnapshotTracker.TakenForPodVolume(pod, volume); found {
-					log.WithFields(map[string]interface{}{
-						"podVolume": volume,
-						"pvcName":   pvcName,
-					}).Info("Pod volume uses a persistent volume claim which has already been backed up from another pod, skipping.")
-					continue
-				}
-				pvbVolumes = append(pvbVolumes, volume)
-			}
-		}
 	}
 
 	// capture the version of the object before invoking plugin actions as the plugin may update
@@ -242,17 +211,46 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		}
 	}
 
-	if groupResource == kuberesource.Pods && pod != nil {
-		// this function will return partial results, so process podVolumeBackups
-		// even if there are errors.
-		podVolumeBackups, errs := ib.backupPodVolumes(log, pod, pvbVolumes)
+	if groupResource == kuberesource.Pods {
+		// pod needs to be initialized for the unstructured converter
+		pod := new(corev1api.Pod)
+		var pvbVolumes []string
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+			backupErrs = append(backupErrs, errors.WithStack(err))
+			// nil it on error since it's not valid
+			pod = nil
+		} else {
+			// Get the list of volumes to back up using pod volume backup from the pod's annotations. Remove from this list
+			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
+			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
+			for _, volume := range podvolume.GetVolumesByPod(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup)) {
+				// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
+				// via an item action in the next step, we don't snapshot PVs that will have their data backed up
+				// with pod volume backup.
+				ib.podVolumeSnapshotTracker.Track(pod, volume)
 
-		ib.backupRequest.PodVolumeBackups = append(ib.backupRequest.PodVolumeBackups, podVolumeBackups...)
-		backupErrs = append(backupErrs, errs...)
+				if found, pvcName := ib.podVolumeSnapshotTracker.TakenForPodVolume(pod, volume); found {
+					log.WithFields(map[string]interface{}{
+						"podVolume": volume,
+						"pvcName":   pvcName,
+					}).Info("Pod volume uses a persistent volume claim which has already been backed up from another pod, skipping.")
+					continue
+				}
+				pvbVolumes = append(pvbVolumes, volume)
+			}
+		}
+		if pod != nil {
+			// this function will return partial results, so process podVolumeBackups
+			// even if there are errors.
+			podVolumeBackups, errs := ib.backupPodVolumes(log, pod, pvbVolumes)
 
-		// Mark the volumes that has been processed by pod volume backup as Taken in the tracker.
-		for _, pvb := range podVolumeBackups {
-			ib.podVolumeSnapshotTracker.Take(pod, pvb.Spec.Volume)
+			ib.backupRequest.PodVolumeBackups = append(ib.backupRequest.PodVolumeBackups, podVolumeBackups...)
+			backupErrs = append(backupErrs, errs...)
+
+			// Mark the volumes that has been processed by pod volume backup as Taken in the tracker.
+			for _, pvb := range podVolumeBackups {
+				ib.podVolumeSnapshotTracker.Take(pod, pvb.Spec.Volume)
+			}
 		}
 	}
 
