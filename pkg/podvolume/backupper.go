@@ -131,7 +131,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	if len(volumesToBackup) == 0 {
 		return nil, nil
 	}
-
+	log.Infof("pod %s/%s has volumes to backup: %v", pod.Namespace, pod.Name, volumesToBackup)
 	err := kube.IsPodRunning(pod)
 	if err != nil {
 		for _, volumeName := range volumesToBackup {

@@ -17,13 +17,19 @@ limitations under the License.
 package podvolume
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 func TestIsHostPathVolume(t *testing.T) {
@@ -138,4 +144,63 @@ func (g *fakePVGetter) Get(ctx context.Context, name string, opts metav1.GetOpti
 	}
 
 	return nil, errors.New("item not found")
+}
+
+func Test_backupper_BackupPodVolumes_log_test(t *testing.T) {
+	type args struct {
+		backup          *velerov1api.Backup
+		pod             *corev1api.Pod
+		volumesToBackup []string
+		resPolicies     *resourcepolicies.Policies
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantLog string
+	}{
+		{
+			name: "backup pod volumes should log volume names",
+			args: args{
+				backup: &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup-1",
+						Namespace: "ns-1",
+					},
+				},
+				pod: &corev1api.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod-1",
+						Namespace: "ns-1",
+					},
+					Spec: corev1api.PodSpec{
+						Volumes: []corev1api.Volume{
+							{
+								Name: "vol-1",
+							},
+							{
+								Name: "vol-2",
+							},
+						},
+					},
+				},
+				volumesToBackup: []string{"vol-1", "vol-2"},
+				resPolicies:     nil,
+			},
+			wantLog: "pod ns-1/pod-1 has volumes to backup: [vol-1 vol-2]",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &backupper{
+				ctx: context.Background(),
+			}
+			logOutput := bytes.Buffer{}
+			var log = logrus.New()
+			log.SetOutput(&logOutput)
+			b.BackupPodVolumes(tt.args.backup, tt.args.pod, tt.args.volumesToBackup, tt.args.resPolicies, log)
+			fmt.Println(logOutput.String())
+			assert.Contains(t, logOutput.String(), tt.wantLog)
+
+		})
+	}
 }
