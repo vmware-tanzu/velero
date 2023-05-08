@@ -27,3 +27,10 @@ func NewLogger() logrus.FieldLogger {
 	logger.Out = io.Discard
 	return logrus.NewEntry(logger)
 }
+
+func NewLoggerWithLevel(level logrus.Level) logrus.FieldLogger {
+	logger := logrus.New()
+	logger.Out = io.Discard
+	logger.Level = level
+	return logrus.NewEntry(logger)
+}
