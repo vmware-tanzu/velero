@@ -36,16 +36,8 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string) error {
 		return err
 	}
 
-	c.options.AccessKeyID, err = mustHaveString(udmrepo.StoreOptionS3KeyID, flags)
-	if err != nil {
-		return err
-	}
-
-	c.options.SecretAccessKey, err = mustHaveString(udmrepo.StoreOptionS3SecretKey, flags)
-	if err != nil {
-		return err
-	}
-
+	c.options.AccessKeyID = optionalHaveString(udmrepo.StoreOptionS3KeyID, flags)
+	c.options.SecretAccessKey = optionalHaveString(udmrepo.StoreOptionS3SecretKey, flags)
 	c.options.Endpoint = optionalHaveString(udmrepo.StoreOptionS3Endpoint, flags)
 	c.options.Region = optionalHaveString(udmrepo.StoreOptionOssRegion, flags)
 	c.options.Prefix = optionalHaveString(udmrepo.StoreOptionPrefix, flags)

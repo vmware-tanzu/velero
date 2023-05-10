@@ -44,7 +44,7 @@ func TestGetStorageCredentials(t *testing.T) {
 		credStoreError      error
 		credStorePath       string
 		getAzureCredentials func(map[string]string) (string, string, error)
-		getS3Credentials    func(map[string]string) (awscredentials.Value, error)
+		getS3Credentials    func(map[string]string) (*awscredentials.Value, error)
 		getGCPCredentials   func(map[string]string) string
 		expected            map[string]string
 		expectedErr         string
@@ -88,8 +88,8 @@ func TestGetStorageCredentials(t *testing.T) {
 					},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (awscredentials.Value, error) {
-				return awscredentials.Value{
+			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
+				return &awscredentials.Value{
 					AccessKeyID: "from: " + config["credentialsFile"],
 				}, nil
 			},
@@ -114,8 +114,8 @@ func TestGetStorageCredentials(t *testing.T) {
 			},
 			credFileStore: new(credmock.FileStore),
 			credStorePath: "credentials-from-credential-key",
-			getS3Credentials: func(config map[string]string) (awscredentials.Value, error) {
-				return awscredentials.Value{
+			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
+				return &awscredentials.Value{
 					AccessKeyID: "from: " + config["credentialsFile"],
 				}, nil
 			},
@@ -137,12 +137,26 @@ func TestGetStorageCredentials(t *testing.T) {
 					},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (awscredentials.Value, error) {
-				return awscredentials.Value{}, errors.New("fake error")
+			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
+				return nil, errors.New("fake error")
 			},
 			credFileStore: new(credmock.FileStore),
 			expected:      map[string]string{},
 			expectedErr:   "error get s3 credentials: fake error",
+		},
+		{
+			name: "aws, credential file not exist",
+			backupLocation: velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "velero.io/aws",
+					Config:   map[string]string{},
+				},
+			},
+			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
+				return nil, nil
+			},
+			credFileStore: new(credmock.FileStore),
+			expected:      map[string]string{},
 		},
 		{
 			name: "azure, Credential section exists in BSL",

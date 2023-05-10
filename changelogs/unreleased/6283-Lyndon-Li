@@ -1,0 +1,1 @@
+Fix issue #5875. Since Kopia has supported IAM, Velero should not require static credentials all the time

@@ -36,21 +36,6 @@ func TestS3Setup(t *testing.T) {
 			flags:       map[string]string{},
 			expectedErr: "key " + udmrepo.StoreOptionOssBucket + " not found",
 		},
-		{
-			name: "must have access key Id",
-			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket: "fake-bucket",
-			},
-			expectedErr: "key " + udmrepo.StoreOptionS3KeyID + " not found",
-		},
-		{
-			name: "must have access key",
-			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket: "fake-bucket",
-				udmrepo.StoreOptionS3KeyID:   "fake-key-id",
-			},
-			expectedErr: "key " + udmrepo.StoreOptionS3SecretKey + " not found",
-		},
 	}
 
 	for _, tc := range testCases {

@@ -422,11 +422,13 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 		if err != nil {
 			return map[string]string{}, errors.Wrap(err, "error get s3 credentials")
 		}
-		result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
-		result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
-		result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
-		result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
 
+		if credValue != nil {
+			result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
+			result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
+			result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
+			result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
+		}
 	case repoconfig.AzureBackend:
 		storageAccount, accountKey, err := getAzureCredentials(config)
 		if err != nil {
