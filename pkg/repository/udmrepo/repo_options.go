@@ -42,6 +42,7 @@ const (
 	StoreOptionS3Endpoint         = "endpoint"
 	StoreOptionS3DisableTLS       = "doNotUseTLS"
 	StoreOptionS3DisableTLSVerify = "skipTLSVerify"
+	StoreOptionS3CustomCA         = "customCA"
 
 	StoreOptionAzureKey            = "storageKey"
 	StoreOptionAzureDomain         = "storageDomain"
