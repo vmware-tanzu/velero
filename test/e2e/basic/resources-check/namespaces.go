@@ -19,11 +19,9 @@ package basic
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,11 +38,11 @@ type MultiNSBackup struct {
 }
 
 func (m *MultiNSBackup) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
-	m.BackupName = "backup-" + UUIDgen.String()
-	m.RestoreName = "restore-" + UUIDgen.String()
-	m.NSBaseName = "nstest-" + UUIDgen.String()
+	m.TestCase.Init()
+	m.CaseBaseName = "nstest-" + m.UUIDgen
+	m.BackupName = "backup-" + m.CaseBaseName
+	m.RestoreName = "restore-" + m.CaseBaseName
+
 	m.VeleroCfg = VeleroCfg
 	m.Client = *m.VeleroCfg.ClientToInstallVelero
 	m.NSExcluded = &[]string{}
@@ -64,10 +62,7 @@ func (m *MultiNSBackup) Init() error {
 			FailedMSG: "Failed to successfully backup and restore multiple namespaces",
 		}
 	}
-	return nil
-}
 
-func (m *MultiNSBackup) StartRun() error {
 	// Currently it's hard to build a large list of namespaces to include and wildcards do not work so instead
 	// we will exclude all of the namespaces that existed prior to the test from the backup
 	namespaces, err := m.Client.ClientGo.CoreV1().Namespaces().List(context.Background(), v1.ListOptions{})
@@ -100,7 +95,7 @@ func (m *MultiNSBackup) CreateResources() error {
 		"ns-test": "true",
 	}
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", m.CaseBaseName, nsNum)
 		if err := CreateNamespaceWithLabel(ctx, m.Client, createNSName, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
@@ -113,7 +108,7 @@ func (m *MultiNSBackup) Verify() error {
 	defer ctxCancel()
 	// Verify that we got back all of the namespaces we created
 	for nsNum := 0; nsNum < m.NamespacesTotal; nsNum++ {
-		checkNSName := fmt.Sprintf("%s-%00000d", m.NSBaseName, nsNum)
+		checkNSName := fmt.Sprintf("%s-%00000d", m.CaseBaseName, nsNum)
 		checkNS, err := GetNamespace(ctx, m.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
@@ -127,7 +122,7 @@ func (m *MultiNSBackup) Verify() error {
 func (m *MultiNSBackup) Destroy() error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer ctxCancel()
-	err := CleanupNamespaces(ctx, m.Client, m.NSBaseName)
+	err := CleanupNamespaces(ctx, m.Client, m.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
 	}

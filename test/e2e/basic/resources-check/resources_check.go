@@ -33,15 +33,14 @@ limitations under the License.
 package basic
 
 import (
-	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 )
 
 func GetResourcesCheckTestCases() []VeleroBackupRestoreTest {
 	return []VeleroBackupRestoreTest{
-		&NSAnnotationCase{TestCase{VeleroCfg: VeleroCfg}},
-		&MultiNSBackup{IsScalTest: false, TestCase: TestCase{VeleroCfg: VeleroCfg}},
-		&RBACCase{TestCase{VeleroCfg: VeleroCfg}},
+		&NSAnnotationCase{},
+		&MultiNSBackup{IsScalTest: false},
+		&RBACCase{},
 	}
 }
 

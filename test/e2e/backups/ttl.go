@@ -128,7 +128,7 @@ func TTLTest() {
 						test.testNS, 2)).To(Succeed())
 				})
 			}
-			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, test.testNS, test.backupName, KibishiiPodNameList)
+			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, test.testNS, test.backupName, KibishiiPVCNameList)
 			Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 
 			Expect(SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,

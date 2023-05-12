@@ -19,10 +19,8 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,8 +41,8 @@ var testInBackup = FilteringCase{IsTestInBackup: true}
 var testInRestore = FilteringCase{IsTestInBackup: false}
 
 func (f *FilteringCase) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	f.TestCase.Init()
+
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}
 	f.labelSelector = "resourcefiltering"
@@ -69,23 +67,14 @@ func (f *FilteringCase) CreateResources() error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer ctxCancel()
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
 		if err := CreateNamespace(ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-		serviceAccountName := "default"
-		// wait until the service account is created before patch the image pull secret
-		if err := WaitUntilServiceAccountCreated(ctx, f.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
-			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
-		}
-		// add the image pull secret to avoid the image pull limit issue of Docker Hub
-		if err := PatchServiceAccountWithImagePullSecret(ctx, f.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
-			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
-		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-		deployment := NewDeployment(f.NSBaseName, namespace, f.replica, f.labels, nil).Result()
+		deployment := NewDeployment(f.CaseBaseName, namespace, f.replica, f.labels, nil).Result()
 		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
@@ -95,7 +84,7 @@ func (f *FilteringCase) CreateResources() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
 		}
 		//Create Secret
-		secretName := f.NSBaseName
+		secretName := f.CaseBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
 		_, err = CreateSecret(f.Client.ClientGo, namespace, secretName, f.labels)
 		if err != nil {
@@ -106,7 +95,7 @@ func (f *FilteringCase) CreateResources() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
 		}
 		//Create Configmap
-		configmaptName := f.NSBaseName
+		configmaptName := f.CaseBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
 		_, err = CreateConfigMap(f.Client.ClientGo, namespace, configmaptName, f.labels, nil)
 		if err != nil {
@@ -124,7 +113,7 @@ func (f *FilteringCase) Verify() error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer ctxCancel()
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", f.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check namespace
 		checkNS, err := GetNamespace(ctx, f.Client, namespace)
@@ -135,7 +124,7 @@ func (f *FilteringCase) Verify() error {
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name)
 		}
 		//Check deployment
-		_, err = GetDeployment(f.Client.ClientGo, namespace, f.NSBaseName)
+		_, err = GetDeployment(f.Client.ClientGo, namespace, f.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}

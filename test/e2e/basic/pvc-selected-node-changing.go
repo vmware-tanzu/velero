@@ -31,24 +31,22 @@ type PVCSelectedNodeChanging struct {
 	ann            string
 }
 
-const PSNCBaseName string = "psnc-"
-
-var PVCSelectedNodeChangingTest func() = TestFunc(&PVCSelectedNodeChanging{
-	namespace: PSNCBaseName + "1", TestCase: TestCase{NSBaseName: PSNCBaseName}})
+var PVCSelectedNodeChangingTest func() = TestFunc(&PVCSelectedNodeChanging{})
 
 func (p *PVCSelectedNodeChanging) Init() error {
+	p.TestCase.Init()
+	p.CaseBaseName = "psnc-" + p.UUIDgen
+	p.namespace = p.CaseBaseName
+	p.mappedNS = p.namespace + "-mapped"
 	p.VeleroCfg = VeleroCfg
 	p.Client = *p.VeleroCfg.ClientToInstallVelero
-	p.NSBaseName = PSNCBaseName
-	p.namespace = p.NSBaseName + UUIDgen.String()
-	p.mappedNS = p.namespace + "-mapped"
 	p.TestMsg = &TestMSG{
 		Desc:      "Changing PVC node selector",
 		FailedMSG: "Failed to changing PVC node selector",
 		Text:      "Change node selectors of persistent volume claims during restores",
 	}
-	p.BackupName = "backup-sc-" + UUIDgen.String()
-	p.RestoreName = "restore-" + UUIDgen.String()
+	p.BackupName = "backup-" + p.CaseBaseName
+	p.RestoreName = "restore-" + p.CaseBaseName
 	p.labels = map[string]string{"velero.io/plugin-config": "",
 		"velero.io/change-pvc-node-selector": "RestoreItemAction"}
 	p.configmaptName = "change-pvc-node-selector-config"
@@ -56,12 +54,6 @@ func (p *PVCSelectedNodeChanging) Init() error {
 	p.podName = "pod-1"
 	p.pvcName = "pvc-1"
 	p.ann = "volume.kubernetes.io/selected-node"
-	return nil
-}
-
-func (p *PVCSelectedNodeChanging) StartRun() error {
-	p.BackupName = p.BackupName + "backup-" + UUIDgen.String()
-	p.RestoreName = p.RestoreName + "restore-" + UUIDgen.String()
 	p.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", p.namespace,
@@ -73,6 +65,7 @@ func (p *PVCSelectedNodeChanging) StartRun() error {
 	}
 	return nil
 }
+
 func (p *PVCSelectedNodeChanging) CreateResources() error {
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(context.Background(), p.Client, p.namespace)).To(Succeed(),
@@ -116,9 +109,9 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 }
 
 func (p *PVCSelectedNodeChanging) Destroy() error {
-	By(fmt.Sprintf("Start to destroy namespace %s......", p.NSBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(context.Background(), p.Client, p.NSBaseName)).To(Succeed(),
-			fmt.Sprintf("Failed to delete namespace %s", p.NSBaseName))
+	By(fmt.Sprintf("Start to destroy namespace %s......", p.CaseBaseName), func() {
+		Expect(CleanupNamespacesWithPoll(context.Background(), p.Client, p.CaseBaseName)).To(Succeed(),
+			fmt.Sprintf("Failed to delete namespace %s", p.CaseBaseName))
 	})
 	return nil
 }
@@ -150,5 +143,15 @@ func (p *PVCSelectedNodeChanging) Verify() error {
 		Expect(err).To(Succeed())
 		Expect(pvc.Annotations[p.ann]).To(Equal(p.newNodeName))
 	})
+	return nil
+}
+
+func (p *PVCSelectedNodeChanging) Clean() error {
+	if !p.VeleroCfg.Debug {
+		p.TestCase.Clean()
+		By(fmt.Sprintf("Clean namespace with prefix %s after test", p.mappedNS), func() {
+			CleanupNamespaces(context.Background(), p.Client, p.mappedNS)
+		})
+	}
 	return nil
 }

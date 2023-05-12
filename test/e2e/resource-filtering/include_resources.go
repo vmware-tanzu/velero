@@ -47,9 +47,9 @@ var RestoreWithIncludeResources func() = TestFunc(&IncludeResources{testInRestor
 
 func (i *IncludeResources) Init() error {
 	i.FilteringCase.Init()
-	i.NSBaseName = "include-resources-" + UUIDgen.String()
+	i.CaseBaseName = "include-resources-" + i.UUIDgen
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", i.CaseBaseName, nsNum)
 		*i.NSIncluded = append(*i.NSIncluded, createNSName)
 	}
 	if i.IsTestInBackup { // testing case backup with include-resources option
@@ -58,8 +58,8 @@ func (i *IncludeResources) Init() error {
 			Text:      "Should backup resources which is included others should not be backup",
 			FailedMSG: "Failed to backup with resource include",
 		}
-		i.BackupName = "backup-include-resources-" + UUIDgen.String()
-		i.RestoreName = "restore-" + UUIDgen.String()
+		i.BackupName = "backup-" + i.CaseBaseName
+		i.RestoreName = "restore-" + i.UUIDgen
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-resources", "deployments,configmaps",
@@ -76,8 +76,8 @@ func (i *IncludeResources) Init() error {
 			Text:      "Should restore resources which is included others should not be backup",
 			FailedMSG: "Failed to restore with resource include",
 		}
-		i.BackupName = "backup-" + UUIDgen.String()
-		i.RestoreName = "restore-include-resources-" + UUIDgen.String()
+		i.BackupName = "backup-" + i.UUIDgen
+		i.RestoreName = "restore-" + i.CaseBaseName
 		i.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
@@ -94,10 +94,10 @@ func (i *IncludeResources) Init() error {
 
 func (i *IncludeResources) Verify() error {
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", i.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", i.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check deployment
-		_, err := GetDeployment(i.Client.ClientGo, namespace, i.NSBaseName)
+		_, err := GetDeployment(i.Client.ClientGo, namespace, i.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}

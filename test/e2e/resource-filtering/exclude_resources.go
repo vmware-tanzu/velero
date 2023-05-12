@@ -49,9 +49,9 @@ var RestoreWithExcludeResources func() = TestFunc(&ExcludeResources{testInRestor
 
 func (e *ExcludeResources) Init() error {
 	e.FilteringCase.Init()
-	e.NSBaseName = "exclude-resources-" + UUIDgen.String()
+	e.CaseBaseName = "exclude-resources-" + e.UUIDgen
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
 		*e.NSIncluded = append(*e.NSIncluded, createNSName)
 	}
 	if e.IsTestInBackup { // testing case backup with exclude-resources option
@@ -60,7 +60,7 @@ func (e *ExcludeResources) Init() error {
 			Text:      "Should not backup resources which is excluded others should be backup",
 			FailedMSG: "Failed to backup with resource exclude",
 		}
-		e.BackupName = "backup-exclude-resources-" + UUIDgen.String()
+		e.BackupName = "backup-" + e.CaseBaseName
 		e.RestoreName = "restore-" + UUIDgen.String()
 		e.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
@@ -74,15 +74,13 @@ func (e *ExcludeResources) Init() error {
 			"--from-backup", e.BackupName, "--wait",
 		}
 	} else { // testing case restore with exclude-resources option
-		e.BackupName = "backup-" + UUIDgen.String()
-		e.RestoreName = "restore-exclude-resources-" + UUIDgen.String()
+		e.BackupName = "backup-" + e.UUIDgen
+		e.RestoreName = "restore-" + e.CaseBaseName
 		e.TestMsg = &TestMSG{
 			Desc:      "Restore resources with resources included test",
 			Text:      "Should not restore resources which is excluded others should be backup",
 			FailedMSG: "Failed to restore with resource exclude",
 		}
-		e.BackupName = "backup-exclude-resources-" + UUIDgen.String()
-		e.RestoreName = "restore-exclude-resources-" + UUIDgen.String()
 		e.BackupArgs = []string{
 			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
@@ -99,10 +97,10 @@ func (e *ExcludeResources) Init() error {
 
 func (e *ExcludeResources) Verify() error {
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check deployment
-		_, err := GetDeployment(e.Client.ClientGo, namespace, e.NSBaseName)
+		_, err := GetDeployment(e.Client.ClientGo, namespace, e.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}
