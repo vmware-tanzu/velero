@@ -33,6 +33,8 @@ toc:
         url: /migration-case
       - page: Resource filtering
         url: /resource-filtering
+      - page: CLI Reference
+        url: /cli-reference
       - page: Backup reference
         url: /backup-reference
       - page: Restore reference

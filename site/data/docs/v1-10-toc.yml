@@ -35,6 +35,8 @@ toc:
         url: /enable-api-group-versions-feature
       - page: Resource filtering
         url: /resource-filtering
+      - page: CLI Reference
+        url: /cli-reference
       - page: Backup reference
         url: /backup-reference
       - page: Backup hooks
