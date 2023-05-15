@@ -390,11 +390,6 @@ spec:
                   restore from the most recent successful backup created from this
                   schedule.
                 type: string
-              snapshotMoveData:
-                description: SnapshotMoveData specifies whether snapshot data should
-                  be moved
-                nullable: true
-                type: boolean
             required:
             - backupName
             type: object

@@ -117,11 +117,6 @@ type RestoreSpec struct {
 	// The default value is 1 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
-
-	// SnapshotMoveData specifies whether snapshot data should be moved
-	// +optional
-	// +nullable
-	SnapshotMoveData *bool `json:"snapshotMoveData,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
