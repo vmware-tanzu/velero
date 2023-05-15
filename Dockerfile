@@ -68,7 +68,7 @@ RUN mkdir -p /output/usr/bin && \
 # Velero image packing section
 FROM gcr.io/distroless/base-nossl-debian11:nonroot
 
-LABEL maintainer="Nolan Brubaker <brubakern@vmware.com>"
+LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
 COPY --from=velero-builder /output /
 
