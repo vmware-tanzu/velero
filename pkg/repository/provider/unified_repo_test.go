@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
 
@@ -364,6 +365,42 @@ func TestGetStorageVariables(t *testing.T) {
 				"endpoint":      "fake-url",
 				"doNotUseTLS":   "true",
 				"skipTLSVerify": "false",
+			},
+		},
+		{
+			name: "aws, ObjectStorage section exists in BSL, s3Url exist, https, custom CA exist",
+			backupLocation: velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "velero.io/aws",
+					Config: map[string]string{
+						"bucket":                "fake-bucket-config",
+						"prefix":                "fake-prefix-config",
+						"region":                "fake-region",
+						"s3Url":                 "https://fake-url/",
+						"insecureSkipTLSVerify": "false",
+					},
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "fake-bucket-object-store",
+							Prefix: "fake-prefix-object-store",
+							CACert: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+						},
+					},
+				},
+			},
+			getS3BucketRegion: func(bucket string) (string, error) {
+				return "region from bucket: " + bucket, nil
+			},
+			repoBackend: "fake-repo-type",
+			expected: map[string]string{
+				"bucket":        "fake-bucket-object-store",
+				"prefix":        "fake-prefix-object-store/fake-repo-type/",
+				"region":        "fake-region",
+				"fspath":        "",
+				"endpoint":      "fake-url",
+				"doNotUseTLS":   "false",
+				"skipTLSVerify": "false",
+				"customCA":      base64.StdEncoding.EncodeToString([]byte{0x01, 0x02, 0x03, 0x04, 0x05}),
 			},
 		},
 		{

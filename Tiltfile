@@ -62,7 +62,7 @@ RUN wget --output-document /restart.sh --quiet https://raw.githubusercontent.com
 
 additional_docker_helper_commands = """
 # Install delve to allow debugging
-RUN go get github.com/go-delve/delve/cmd/dlv
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 RUN wget -qO- https://dl.k8s.io/v1.25.2/kubernetes-client-linux-amd64.tar.gz | tar xvz
 RUN wget -qO- https://get.docker.com | sh

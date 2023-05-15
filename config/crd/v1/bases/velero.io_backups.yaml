@@ -1,11 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.0
   name: backups.velero.io
 spec:
   group: velero.io
@@ -180,6 +178,7 @@ spec:
                                 contains only "value". The requirements are ANDed.
                               type: object
                           type: object
+                          x-kubernetes-map-type: atomic
                         name:
                           description: Name is the name of this hook.
                           type: string
@@ -365,6 +364,7 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               metadata:
                 properties:
                   labels:
@@ -425,6 +425,7 @@ spec:
                         are ANDed.
                       type: object
                   type: object
+                  x-kubernetes-map-type: atomic
                 nullable: true
                 type: array
               orderedResources:
@@ -457,6 +458,7 @@ spec:
                 - kind
                 - name
                 type: object
+                x-kubernetes-map-type: atomic
               snapshotMoveData:
                 description: SnapshotMoveData specifies whether snapshot data should
                   be moved
@@ -601,9 +603,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

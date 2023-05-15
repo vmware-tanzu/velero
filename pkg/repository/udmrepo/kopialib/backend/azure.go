@@ -56,5 +56,5 @@ func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error
 }
 
 func (c *AzureBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
-	return azure.New(ctx, &c.options)
+	return azure.New(ctx, &c.options, false)
 }
