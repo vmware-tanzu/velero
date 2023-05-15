@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/kopia/kopia/repo"
+	"github.com/kopia/kopia/repo/manifest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -262,14 +263,14 @@ func TestMaintain(t *testing.T) {
 func TestWriteInitParameters(t *testing.T) {
 	var directRpo *repomocks.DirectRepository
 	testCases := []struct {
-		name               string
-		repoOptions        udmrepo.RepoOptions
-		returnRepo         *repomocks.DirectRepository
-		returnRepoWriter   *repomocks.DirectRepositoryWriter
-		repoOpen           func(context.Context, string, string, *repo.Options) (repo.Repository, error)
-		newRepoWriterError error
-		findManifestError  error
-		expectedErr        string
+		name                 string
+		repoOptions          udmrepo.RepoOptions
+		returnRepo           *repomocks.DirectRepository
+		returnRepoWriter     *repomocks.DirectRepositoryWriter
+		repoOpen             func(context.Context, string, string, *repo.Options) (repo.Repository, error)
+		newRepoWriterError   error
+		replaceManifestError error
+		expectedErr          string
 	}{
 		{
 			name: "repo open fail, repo not exist",
@@ -315,10 +316,10 @@ func TestWriteInitParameters(t *testing.T) {
 			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
 				return directRpo, nil
 			},
-			returnRepo:        new(repomocks.DirectRepository),
-			returnRepoWriter:  new(repomocks.DirectRepositoryWriter),
-			findManifestError: errors.New("fake-find-manifest-error"),
-			expectedErr:       "error to init write repo parameters: error to set maintenance params: error looking for maintenance manifest: fake-find-manifest-error",
+			returnRepo:           new(repomocks.DirectRepository),
+			returnRepoWriter:     new(repomocks.DirectRepositoryWriter),
+			replaceManifestError: errors.New("fake-replace-manifest-error"),
+			expectedErr:          "error to init write repo parameters: error to set maintenance params: put manifest: fake-replace-manifest-error",
 		},
 	}
 
@@ -343,7 +344,7 @@ func TestWriteInitParameters(t *testing.T) {
 
 			if tc.returnRepoWriter != nil {
 				tc.returnRepoWriter.On("Close", mock.Anything).Return(nil)
-				tc.returnRepoWriter.On("FindManifests", mock.Anything, mock.Anything).Return(nil, tc.findManifestError)
+				tc.returnRepoWriter.On("ReplaceManifests", mock.Anything, mock.Anything, mock.Anything).Return(manifest.ID(""), tc.replaceManifestError)
 			}
 
 			err := writeInitParameters(ctx, tc.repoOptions, logger)

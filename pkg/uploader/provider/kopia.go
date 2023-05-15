@@ -177,9 +177,9 @@ func (kp *kopiaProvider) RunRestore(
 		"volumePath": volumePath,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
-	prorgess := new(kopia.Progress)
-	prorgess.InitThrottle(restoreProgressCheckInterval)
-	prorgess.Updater = updater
+	progress := new(kopia.Progress)
+	progress.InitThrottle(restoreProgressCheckInterval)
+	progress.Updater = updater
 	restoreCancel := make(chan struct{})
 	quit := make(chan struct{})
 
@@ -193,7 +193,7 @@ func (kp *kopiaProvider) RunRestore(
 		close(quit)
 	}()
 
-	size, fileCount, err := RestoreFunc(ctx, repoWriter, prorgess, snapshotID, volumePath, log, restoreCancel)
+	size, fileCount, err := RestoreFunc(ctx, repoWriter, progress, snapshotID, volumePath, log, restoreCancel)
 
 	if err != nil {
 		return errors.Wrapf(err, "Failed to run kopia restore")

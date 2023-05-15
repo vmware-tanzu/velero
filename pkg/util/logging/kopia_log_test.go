@@ -19,66 +19,147 @@ package logging
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func TestGetLogFields(t *testing.T) {
+func TestEnabled(t *testing.T) {
 	testCases := []struct {
 		name     string
-		pairs    []interface{}
-		expected map[string]interface{}
+		level    logrus.Level
+		zapLevel zapcore.Level
+		expected bool
 	}{
 		{
-			name: "normal",
-			pairs: []interface{}{
-				"fake-key1",
-				"fake-value1",
-				"fake-key2",
-				10,
-				"fake-key3",
-				struct{ v int }{v: 10},
+			name:     "check debug again debug",
+			level:    logrus.DebugLevel,
+			zapLevel: zapcore.DebugLevel,
+			expected: true,
+		},
+		{
+			name:     "check debug again info",
+			level:    logrus.InfoLevel,
+			zapLevel: zapcore.DebugLevel,
+			expected: false,
+		},
+		{
+			name:     "check info again debug",
+			level:    logrus.DebugLevel,
+			zapLevel: zapcore.InfoLevel,
+			expected: true,
+		},
+		{
+			name:     "check info again info",
+			level:    logrus.InfoLevel,
+			zapLevel: zapcore.InfoLevel,
+			expected: true,
+		},
+		{
+			name:     "check info again error",
+			level:    logrus.ErrorLevel,
+			zapLevel: zapcore.InfoLevel,
+			expected: false,
+		},
+		{
+			name:     "check error again error",
+			level:    logrus.ErrorLevel,
+			zapLevel: zapcore.ErrorLevel,
+			expected: true,
+		},
+		{
+			name:     "check panic again error",
+			level:    logrus.ErrorLevel,
+			zapLevel: zapcore.PanicLevel,
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log := kopiaLog{
+				logger: test.NewLoggerWithLevel(tc.level),
+			}
+			m := log.Enabled(tc.zapLevel)
+
+			require.Equal(t, tc.expected, m)
+		})
+	}
+}
+
+func TestWrite(t *testing.T) {
+	testCases := []struct {
+		name      string
+		module    string
+		zapEntry  zapcore.Entry
+		zapFields []zapcore.Field
+		expected  logrus.Fields
+	}{
+		{
+			name:   "debug with nil fields",
+			module: "module-01",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.DebugLevel,
 			},
-			expected: map[string]interface{}{
-				"fake-key1": "fake-value1",
-				"fake-key2": 10,
-				"fake-key3": struct{ v int }{v: 10},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule": "kopia/module-01",
 			},
 		},
 		{
-			name: "non string key",
-			pairs: []interface{}{
-				"fake-key1",
-				"fake-value1",
-				10,
-				10,
-				"fake-key3",
-				struct{ v int }{v: 10},
+			name:   "error with nil fields",
+			module: "module-02",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.ErrorLevel,
 			},
-			expected: map[string]interface{}{
-				"fake-key1":      "fake-value1",
-				"non-string-key": 10,
-				"fake-key3":      struct{ v int }{v: 10},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule": "kopia/module-02",
+				"sublevel":  "error",
 			},
 		},
 		{
-			name: "missing value",
-			pairs: []interface{}{
-				"fake-key1",
-				"fake-value1",
-				"fake-key2",
-				10,
-				"fake-key3",
+			name:   "info with nil string filed",
+			module: "module-03",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.InfoLevel,
 			},
-			expected: map[string]interface{}{
-				"fake-key1": "fake-value1",
-				"fake-key2": 10,
+			zapFields: []zapcore.Field{
+				{
+					Key:    "key-01",
+					Type:   zapcore.StringType,
+					String: "value-01",
+				},
+			},
+			expected: logrus.Fields{
+				"logModule": "kopia/module-03",
+				"key-01":    "value-01",
+			},
+		},
+		{
+			name:   "info with logger name",
+			module: "module-04",
+			zapEntry: zapcore.Entry{
+				Level:      zapcore.InfoLevel,
+				LoggerName: "logger-name-01",
+			},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule":   "kopia/module-04",
+				"logger name": "logger-name-01",
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := getLogFields(tc.pairs...)
+			log := kopiaLog{
+				module: tc.module,
+				logger: test.NewLogger(),
+			}
+			m := log.logrusFieldsForWrite(tc.zapEntry, tc.zapFields)
 
 			require.Equal(t, tc.expected, m)
 		})
