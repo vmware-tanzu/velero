@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -35,7 +34,7 @@ func TestGetPluginConfig(t *testing.T) {
 		name    string
 		objects []runtime.Object
 	}
-	pluginLabelsSet, _ := labels.ConvertSelectorToLabelsMap(PluginConfigLabelSelector(PluginKindRestoreItemAction, "foo"))
+	pluginLabelsMap := map[string]string{"velero.io/plugin-config": "", "foo": "RestoreItemAction"}
 	testConfigMap := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ConfigMap",
@@ -43,7 +42,7 @@ func TestGetPluginConfig(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo-config",
 			Namespace: velerov1.DefaultNamespace,
-			Labels:    pluginLabelsSet,
+			Labels:    pluginLabelsMap,
 		},
 	}
 	tests := []struct {
@@ -75,7 +74,7 @@ func TestGetPluginConfig(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo-config",
 							Namespace: velerov1.DefaultNamespace,
-							Labels:    pluginLabelsSet,
+							Labels:    pluginLabelsMap,
 						},
 					},
 					&corev1.ConfigMap{
@@ -85,7 +84,7 @@ func TestGetPluginConfig(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo-config-duplicate",
 							Namespace: velerov1.DefaultNamespace,
-							Labels:    pluginLabelsSet,
+							Labels:    pluginLabelsMap,
 						},
 					},
 				},
