@@ -38,6 +38,7 @@ _testmain.go
 # Hugo compiled data
 site/public
 site/resources
+site/.hugo_build.lock
 
 .vs
 
