@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This code embeds the CRD manifests in config/crd/v1/bases in
-// config/crd/v1/crds/crds.go.
+// This code embeds the CRD manifests in ../bases in ../crds/crds.go
 
 package main
 

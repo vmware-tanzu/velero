@@ -19,6 +19,8 @@ package v1
 import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 )
 
 // PodVolumeBackupSpec is the specification for a PodVolumeBackup.
@@ -100,7 +102,7 @@ type PodVolumeBackupStatus struct {
 	// number of backed up bytes. This can be used to display progress information
 	// about the backup operation.
 	// +optional
-	Progress PodVolumeOperationProgress `json:"progress,omitempty"`
+	Progress shared.DataMoveOperationProgress `json:"progress,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runttime-controller client,

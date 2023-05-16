@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
@@ -321,7 +322,7 @@ func (c *PodVolumeRestoreReconciler) NewRestoreProgressUpdater(ctx context.Conte
 // UpdateProgress which implement ProgressUpdater interface to update pvr progress status
 func (c *RestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {
 	original := c.PodVolumeRestore.DeepCopy()
-	c.PodVolumeRestore.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
+	c.PodVolumeRestore.Status.Progress = veleroapishared.DataMoveOperationProgress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone}
 	if c.Cli == nil {
 		c.Log.Errorf("failed to update restore pod %s volume %s progress with uninitailize client", c.PodVolumeRestore.Spec.Pod.Name, c.PodVolumeRestore.Spec.Volume)
 		return
