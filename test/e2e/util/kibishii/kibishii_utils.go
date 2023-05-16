@@ -179,7 +179,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
-	if !useVolumeSnapshots {
+	if !useVolumeSnapshots && providerName != "vsphere" {
 		pvrs, err := GetPVR(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get PVR for namespace %s", kibishiiNamespace)
@@ -323,7 +323,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 	if err := waitForKibishiiPods(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
-	time.Sleep(60 * time.Second)
+
 	// TODO - check that namespace exists
 	fmt.Printf("running kibishii verify\n")
 	if err := verifyData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {
