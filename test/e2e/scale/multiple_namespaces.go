@@ -17,10 +17,8 @@ limitations under the License.
 package scale
 
 import (
-	"time"
-
 	basic "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 )
 
-var MultiNSBackupRestore func() = TestFunc(&basic.MultiNSBackup{IsScalTest: true, TestCase: TestCase{Timeout: time.Hour}})
+var MultiNSBackupRestore func() = TestFunc(&basic.MultiNSBackup{IsScalTest: true})

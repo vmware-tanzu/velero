@@ -25,9 +25,14 @@ type ScheduleBackup struct {
 	verifyTimes    int
 }
 
-var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{TestCase: TestCase{NSBaseName: "schedule-test"}})
+var ScheduleBackupTest func() = TestFunc(&ScheduleBackup{})
 
 func (n *ScheduleBackup) Init() error {
+	n.TestCase.Init()
+	n.CaseBaseName = "schedule-backup-" + n.UUIDgen
+	n.NSIncluded = &[]string{n.CaseBaseName}
+	n.ScheduleName = "schedule-" + n.CaseBaseName
+
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
@@ -37,14 +42,6 @@ func (n *ScheduleBackup) Init() error {
 		FailedMSG: "Failed to schedule a backup",
 		Text:      "should backup periodly according to the schedule",
 	}
-	return nil
-}
-
-func (n *ScheduleBackup) StartRun() error {
-	n.NSIncluded = &[]string{fmt.Sprintf("%s-%s", n.NSBaseName, "ns")}
-	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
-	n.RestoreName = n.RestoreName + "restore-ns-mapping-" + UUIDgen.String()
-
 	n.ScheduleArgs = []string{
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
 		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
@@ -52,6 +49,7 @@ func (n *ScheduleBackup) StartRun() error {
 	Expect(n.Period < 30).To(Equal(true))
 	return nil
 }
+
 func (n *ScheduleBackup) CreateResources() error {
 	ctx, ctxCanel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer ctxCanel()
@@ -59,7 +57,7 @@ func (n *ScheduleBackup) CreateResources() error {
 		By(fmt.Sprintf("Creating namespaces %s ......\n", ns), func() {
 			Expect(CreateNamespace(ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
-		configmaptName := n.NSBaseName
+		configmaptName := n.CaseBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, ns)
 		_, err := CreateConfigMap(n.Client.ClientGo, ns, configmaptName, nil, nil)
 		Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", ns))
@@ -70,7 +68,7 @@ func (n *ScheduleBackup) CreateResources() error {
 }
 
 func (n *ScheduleBackup) Backup() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer ctxCancel()
 	// Wait until the beginning of the given period to create schedule, it will give us
 	//   a predictable period to wait for the first scheduled backup, and verify no immediate
@@ -83,17 +81,13 @@ func (n *ScheduleBackup) Backup() error {
 			if triggerNow == 0 {
 				Expect(VeleroScheduleCreate(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
 					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
-					return "Fail to restore workload"
+					return "Fail to create schedule"
 				})
 				break
 			}
 		}
 	})
-	return nil
-}
-func (n *ScheduleBackup) Destroy() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
+
 	By(fmt.Sprintf("Schedule %s is created without any delay\n", n.ScheduleName), func() {
 		creationTimestamp, err := GetSchedule(context.Background(), VeleroCfg.VeleroNamespace, n.ScheduleName)
 		Expect(err).To(Succeed())
@@ -121,7 +115,7 @@ func (n *ScheduleBackup) Destroy() error {
 	})
 
 	By("Delay one more minute to make sure the new backup was created in the given period", func() {
-		time.Sleep(1 * time.Minute)
+		time.Sleep(time.Minute)
 	})
 
 	By(fmt.Sprintf("Get backups every %d minute, and backups count should increase 1 more step in the same pace\n", n.Period), func() {
@@ -149,14 +143,8 @@ func (n *ScheduleBackup) Destroy() error {
 	n.BackupName = strings.Replace(n.randBackupName, " ", "", -1)
 
 	By("Delete all namespaces", func() {
-		Expect(CleanupNamespacesWithPoll(ctx, n.Client, n.NSBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
+		Expect(CleanupNamespacesWithPoll(ctx, n.Client, n.CaseBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
 	})
-
-	n.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
-		"--from-backup", n.BackupName,
-		"--wait",
-	}
 
 	backupsInfo, err := GetScheduledBackupsCreationTime(context.Background(), VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 	Expect(err).To(Succeed(), fmt.Sprintf("Fail to get backups from schedule %s", n.ScheduleName))
@@ -166,7 +154,7 @@ func (n *ScheduleBackup) Destroy() error {
 	By(fmt.Sprintf("Pause schedule %s ......\n", n.ScheduleName), func() {
 		Expect(VeleroSchedulePause(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName)).To(Succeed(), func() string {
 			RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
-			return "Fail to restore workload"
+			return "Fail to pause schedule"
 		})
 	})
 
@@ -211,11 +199,23 @@ func (n *ScheduleBackup) Destroy() error {
 func (n *ScheduleBackup) Verify() error {
 	By("Namespaces were restored", func() {
 		for _, ns := range *n.NSIncluded {
-			configmap, err := GetConfigmap(n.Client.ClientGo, ns, n.NSBaseName)
+			configmap, err := GetConfigmap(n.Client.ClientGo, ns, n.CaseBaseName)
 			fmt.Printf("Restored configmap is %v\n", configmap)
 			Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list configmap in namespace: %q\n", ns))
 		}
 
 	})
+	return nil
+}
+
+func (n *ScheduleBackup) Destroy() error {
+	return nil
+}
+
+func (n *ScheduleBackup) Clean() error {
+	if !n.VeleroCfg.Debug {
+		Expect(VeleroScheduleDelete(context.Background(), n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, n.ScheduleName)).To(Succeed())
+		Expect(n.TestCase.Clean()).To(Succeed())
+	}
 	return nil
 }

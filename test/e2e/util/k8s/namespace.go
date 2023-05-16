@@ -89,14 +89,14 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 		})
 }
 
-func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseName string) error {
+func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, CaseBaseName string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 	for _, checkNamespace := range namespaces.Items {
-		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
+		if strings.HasPrefix(checkNamespace.Name, CaseBaseName) {
 			err := DeleteNamespace(ctx, client, checkNamespace.Name, true)
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
@@ -107,13 +107,13 @@ func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseNam
 	return nil
 }
 
-func CleanupNamespaces(ctx context.Context, client TestClient, nsBaseName string) error {
+func CleanupNamespaces(ctx context.Context, client TestClient, CaseBaseName string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 	for _, checkNamespace := range namespaces.Items {
-		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
+		if strings.HasPrefix(checkNamespace.Name, CaseBaseName) {
 			err = client.ClientGo.CoreV1().Namespaces().Delete(ctx, checkNamespace.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
