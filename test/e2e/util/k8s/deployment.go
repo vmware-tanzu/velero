@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 const (
@@ -52,6 +54,19 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 				Name:    "container-busybox",
 				Image:   "gcr.io/velero-gcp/busybox:latest",
 				Command: []string{"sleep", "1000000"},
+				// Make pod obeys the restricted pod security standards.
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: boolptr.False(),
+					Capabilities: &v1.Capabilities{
+						Drop: []v1.Capability{"ALL"},
+					},
+					RunAsNonRoot: boolptr.True(),
+					RunAsUser:    func(i int64) *int64 { return &i }(65534),
+					RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+					SeccompProfile: &v1.SeccompProfile{
+						Type: v1.SeccompProfileTypeRuntimeDefault,
+					},
+				},
 			},
 		}
 	}

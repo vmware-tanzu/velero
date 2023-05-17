@@ -22,8 +22,10 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList []string, pvcAnn, ann map[string]string) (*corev1.Pod, error) {
@@ -74,6 +76,19 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 					Image:        "gcr.io/velero-gcp/busybox",
 					Command:      []string{"sleep", "3600"},
 					VolumeMounts: vmList,
+					// Make pod obeys the restricted pod security standards.
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: boolptr.False(),
+						Capabilities: &v1.Capabilities{
+							Drop: []v1.Capability{"ALL"},
+						},
+						RunAsNonRoot: boolptr.True(),
+						RunAsUser:    func(i int64) *int64 { return &i }(65534),
+						RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+						SeccompProfile: &v1.SeccompProfile{
+							Type: v1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 				},
 			},
 			Volumes: volumes,
