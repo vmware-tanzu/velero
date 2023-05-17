@@ -336,6 +336,20 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 		if backupCfg.ProvideSnapshotsVolumeParam && !backupCfg.UseVolumeSnapshots {
 			args = append(args, "--snapshot-volumes=false")
 		} // if "--snapshot-volumes" is not provide, snapshot should be taken as default behavior.
+	} else { // DefaultVolumesToFsBackup is false
+		// Althrough DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
+		// was set to true in installation CLI in snapshot volume test, so set DefaultVolumesToFsBackup
+		// to false specifically to make sure volume snapshot was taken
+		if backupCfg.UseVolumeSnapshots {
+			if backupCfg.UseResticIfFSBackup {
+				args = append(args, "--default-volumes-to-restic=false")
+			} else {
+				args = append(args, "--default-volumes-to-fs-backup=false")
+			}
+		}
+		// Also Althrough DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
+		// was set to true in installation CLI in FS volume backup test, so do nothing here, no DefaultVolumesToFsBackup
+		// appear in backup CLI
 	}
 	if backupCfg.BackupLocation != "" {
 		args = append(args, "--storage-location", backupCfg.BackupLocation)
@@ -613,7 +627,7 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 		actualCount := 0
 
 		for _, curLine := range lines {
-			fmt.Println(curLine)
+			fmt.Printf("%s %s\n", curLine, time.Now().Format("2006-01-02 15:04:05"))
 			comps := strings.Split(curLine, "=")
 			// SnapshotPhase represents the lifecycle phase of a Snapshot.
 			// New - No work yet, next phase is InProgress
@@ -654,7 +668,7 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 	return err
 }
 
-func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace string, podNameList []string) ([]string, error) {
+func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace string, pvcNameList []string) ([]string, error) {
 	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.snapshotID}{\"\\n\"}{end}'")
 	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -674,8 +688,8 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 			continue
 		}
 		var Exist bool
-		for _, podName := range podNameList {
-			if podName != "" && strings.Contains(curLine, podName) {
+		for _, pvcName := range pvcNameList {
+			if pvcName != "" && strings.Contains(curLine, pvcName) {
 				Exist = true
 				break
 			}
@@ -1056,12 +1070,12 @@ func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, kibishiiPodNameList []string) (SnapshotCheckPoint, error) {
+func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
 	var err error
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
-	snapshotCheckPoint.PodName = kibishiiPodNameList
+	snapshotCheckPoint.PodName = KibishiiPVCNameList
 	if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
 		snapshotCheckPoint.EnableCSI = true
 		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, backupName, expectCount); err != nil {

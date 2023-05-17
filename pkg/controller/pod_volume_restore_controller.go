@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
@@ -167,12 +168,12 @@ func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 	pvb.Status.Message = errString
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
 
-	if err := c.Patch(ctx, pvb, client.MergeFrom(original)); err != nil {
+	err := c.Patch(ctx, pvb, client.MergeFrom(original))
+	if err != nil {
 		log.WithError(err).Error("error updating PodVolumeRestore status")
-		return err
-	} else {
-		return nil
 	}
+
+	return err
 }
 
 func (c *PodVolumeRestoreReconciler) shouldProcess(ctx context.Context, log logrus.FieldLogger, pvr *velerov1api.PodVolumeRestore) (bool, *corev1api.Pod, error) {
@@ -357,7 +358,7 @@ func (c *PodVolumeRestoreReconciler) OnDataPathProgress(ctx context.Context, nam
 	}
 
 	original := pvr.DeepCopy()
-	pvr.Status.Progress = velerov1api.PodVolumeOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
+	pvr.Status.Progress = veleroapishared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
 
 	if err := c.Client.Patch(ctx, &pvr, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("Failed to update progress")

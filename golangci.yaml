@@ -302,6 +302,7 @@ linters:
     - bodyclose
     - dogsled
     - durationcheck
+    - errcheck
     - exportloopref
     - goconst
     - gofmt

@@ -94,6 +94,13 @@ spec:
       matchLabels:
         app: velero
         component: server
+    # Individual object when matched with any of the label selector specified in the set are to be included in the backup. Optional.
+    # orLabelSelectors as well as labelSelector cannot co-exist, only one of them can be specified in the backup request
+    orLabelSelectors:
+      - matchLabels:
+          app: velero
+      - matchLabels:
+          app: data-protection
     # Whether to snapshot volumes. Valid values are true, false, and null/unset. If unset, Velero performs snapshots as long as
     # a persistent volume provider is configured for Velero.
     snapshotVolumes: null

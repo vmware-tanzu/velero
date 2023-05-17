@@ -75,7 +75,7 @@ func GetClusterRoleBinding(ctx context.Context, client TestClient, rolebinding s
 	return client.ClientGo.RbacV1().ClusterRoleBindings().Get(ctx, rolebinding, metav1.GetOptions{})
 }
 
-func CleanupClusterRole(ctx context.Context, client TestClient, nsBaseName string) error {
+func CleanupClusterRole(ctx context.Context, client TestClient, CaseBaseName string) error {
 
 	clusterroles, err := client.ClientGo.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -83,7 +83,7 @@ func CleanupClusterRole(ctx context.Context, client TestClient, nsBaseName strin
 	}
 
 	for _, checkClusterRole := range clusterroles.Items {
-		if strings.HasPrefix(checkClusterRole.Name, "clusterrole-"+nsBaseName) {
+		if strings.HasPrefix(checkClusterRole.Name, "clusterrole-"+CaseBaseName) {
 			fmt.Printf("Cleaning up clusterrole %s\n", checkClusterRole.Name)
 			err = client.ClientGo.RbacV1().ClusterRoles().Delete(ctx, checkClusterRole.Name, metav1.DeleteOptions{})
 			if err != nil {
@@ -94,7 +94,7 @@ func CleanupClusterRole(ctx context.Context, client TestClient, nsBaseName strin
 	return nil
 }
 
-func CleanupClusterRoleBinding(ctx context.Context, client TestClient, nsBaseName string) error {
+func CleanupClusterRoleBinding(ctx context.Context, client TestClient, CaseBaseName string) error {
 
 	clusterrolebindings, err := client.ClientGo.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -102,7 +102,7 @@ func CleanupClusterRoleBinding(ctx context.Context, client TestClient, nsBaseNam
 	}
 
 	for _, checkClusterRoleBinding := range clusterrolebindings.Items {
-		if strings.HasPrefix(checkClusterRoleBinding.Name, "clusterrolebinding-"+nsBaseName) {
+		if strings.HasPrefix(checkClusterRoleBinding.Name, "clusterrolebinding-"+CaseBaseName) {
 			fmt.Printf("Cleaning up clusterrolebinding %s\n", checkClusterRoleBinding.Name)
 			err = client.ClientGo.RbacV1().ClusterRoleBindings().Delete(ctx, checkClusterRoleBinding.Name, metav1.DeleteOptions{})
 			if err != nil {

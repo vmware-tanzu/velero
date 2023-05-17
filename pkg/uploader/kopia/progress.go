@@ -151,3 +151,5 @@ func (p *Progress) ProgressBytes(processedBytes int64, totalBytes int64) {
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)
 	p.UpdateProgress()
 }
+
+func (p *Progress) FinishedFile(fname string, err error) {}

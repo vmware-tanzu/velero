@@ -24,6 +24,8 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
+const StorageClassName = "e2e-storage-class"
+
 var UUIDgen uuid.UUID
 
 var VeleroCfg VeleroConfig

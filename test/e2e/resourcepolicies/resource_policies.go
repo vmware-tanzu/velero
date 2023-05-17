@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -28,7 +27,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -61,19 +59,19 @@ type ResourcePoliciesCase struct {
 var ResourcePoliciesTest func() = TestFunc(&ResourcePoliciesCase{})
 
 func (r *ResourcePoliciesCase) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	r.TestCase.Init()
+	r.CaseBaseName = "resource-policies-" + r.UUIDgen
+	r.cmName = "cm-" + r.CaseBaseName
 	r.yamlConfig = yamlData
 	r.VeleroCfg = VeleroCfg
 	r.Client = *r.VeleroCfg.ClientToInstallVelero
 	r.VeleroCfg.UseVolumeSnapshots = false
 	r.VeleroCfg.UseNodeAgent = true
 	r.NamespacesTotal = 3
-	r.NSBaseName = "resource-policies-" + UUIDgen.String()
-	r.cmName = "cm-resource-policies-sc"
+
 	r.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		*r.NSIncluded = append(*r.NSIncluded, createNSName)
 	}
 
@@ -117,12 +115,12 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	})
 
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
 			Expect(CreateNamespace(ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
-		volName := fmt.Sprintf("vol-%s-%00000d", r.NSBaseName, nsNum)
+		volName := fmt.Sprintf("vol-%s-%00000d", r.CaseBaseName, nsNum)
 		volList := PrepareVolumeList([]string{volName})
 
 		// Create PVC
@@ -149,13 +147,13 @@ func (r *ResourcePoliciesCase) Verify() error {
 	defer ctxCancel()
 	for i, ns := range *r.NSIncluded {
 		By(fmt.Sprintf("Verify pod data in namespace %s", ns), func() {
-			By(fmt.Sprintf("Waiting for deployment %s in namespace %s ready", r.NSBaseName, ns), func() {
-				Expect(WaitForReadyDeployment(r.Client.ClientGo, ns, r.NSBaseName)).To(Succeed(), fmt.Sprintf("Failed to waiting for deployment %s in namespace %s ready", r.NSBaseName, ns))
+			By(fmt.Sprintf("Waiting for deployment %s in namespace %s ready", r.CaseBaseName, ns), func() {
+				Expect(WaitForReadyDeployment(r.Client.ClientGo, ns, r.CaseBaseName)).To(Succeed(), fmt.Sprintf("Failed to waiting for deployment %s in namespace %s ready", r.CaseBaseName, ns))
 			})
 			podList, err := ListPods(ctx, r.Client, ns)
 			Expect(err).To(Succeed(), fmt.Sprintf("failed to list pods in namespace: %q with error %v", ns, err))
 
-			volName := fmt.Sprintf("vol-%s-%00000d", r.NSBaseName, i)
+			volName := fmt.Sprintf("vol-%s-%00000d", r.CaseBaseName, i)
 			for _, pod := range podList.Items {
 				for _, vol := range pod.Spec.Volumes {
 					if vol.Name != volName {
@@ -183,15 +181,18 @@ func (r *ResourcePoliciesCase) Verify() error {
 }
 
 func (r *ResourcePoliciesCase) Clean() error {
-	if err := r.deleteTestStorageClassList([]string{"e2e-storage-class", "e2e-storage-class-2"}); err != nil {
-		return err
-	}
+	if !r.VeleroCfg.Debug {
+		if err := r.deleteTestStorageClassList([]string{"e2e-storage-class", "e2e-storage-class-2"}); err != nil {
+			return err
+		}
 
-	if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
-		return err
-	}
+		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
+			return err
+		}
 
-	return r.GetTestCase().Clean()
+		return r.GetTestCase().Clean()
+	}
+	return nil
 }
 
 func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
@@ -217,7 +218,7 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 }
 
 func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
-	deployment := NewDeployment(r.NSBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
+	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))

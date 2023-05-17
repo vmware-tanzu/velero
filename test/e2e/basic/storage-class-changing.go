@@ -31,15 +31,17 @@ type StorageClasssChanging struct {
 
 const SCCBaseName string = "scc-"
 
-var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{
-	namespace: SCCBaseName + "1", TestCase: TestCase{NSBaseName: SCCBaseName}})
+var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{})
 
 func (s *StorageClasssChanging) Init() error {
+	s.TestCase.Init()
+	s.CaseBaseName = SCCBaseName + s.UUIDgen
+	s.namespace = s.CaseBaseName
+	s.BackupName = "backup-" + s.CaseBaseName
+	s.RestoreName = "restore-" + s.CaseBaseName
+	s.mappedNS = s.namespace + "-mapped"
 	s.VeleroCfg = VeleroCfg
 	s.Client = *s.VeleroCfg.ClientToInstallVelero
-	s.NSBaseName = SCCBaseName
-	s.namespace = s.NSBaseName + UUIDgen.String()
-	s.mappedNS = s.namespace + "-mapped"
 	s.TestMsg = &TestMSG{
 		Desc:      "Changing PV/PVC Storage Classes",
 		FailedMSG: "Failed to changing PV/PVC Storage Classes",
@@ -49,17 +51,14 @@ func (s *StorageClasssChanging) Init() error {
 	s.BackupName = "backup-sc-" + UUIDgen.String()
 	s.RestoreName = "restore-" + UUIDgen.String()
 	s.srcStorageClass = "default"
-	s.desStorageClass = "e2e-storage-class"
+	s.desStorageClass = StorageClassName
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
 		"velero.io/plugin-config": ""}
 	s.data = map[string]string{s.srcStorageClass: s.desStorageClass}
 	s.configmaptName = "change-storage-class-config"
 	s.volume = "volume-1"
 	s.podName = "pod-1"
-	return nil
-}
 
-func (s *StorageClasssChanging) StartRun() error {
 	s.BackupName = s.BackupName + "backup-" + UUIDgen.String()
 	s.RestoreName = s.RestoreName + "restore-" + UUIDgen.String()
 	s.BackupArgs = []string{
@@ -109,9 +108,9 @@ func (s *StorageClasssChanging) Destroy() error {
 			fmt.Sprintf("PV storage %s is not as expected %s", pv.Spec.StorageClassName, s.srcStorageClass))
 	})
 
-	By(fmt.Sprintf("Start to destroy namespace %s......", s.NSBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(ctx, s.Client, s.NSBaseName)).To(Succeed(),
-			fmt.Sprintf("Failed to delete namespace %s", s.NSBaseName))
+	By(fmt.Sprintf("Start to destroy namespace %s......", s.CaseBaseName), func() {
+		Expect(CleanupNamespacesWithPoll(ctx, s.Client, s.CaseBaseName)).To(Succeed(),
+			fmt.Sprintf("Failed to delete namespace %s", s.CaseBaseName))
 	})
 	return nil
 }
@@ -145,5 +144,16 @@ func (s *StorageClasssChanging) Verify() error {
 		Expect(pv.Spec.StorageClassName).To(Equal(s.desStorageClass),
 			fmt.Sprintf("PV storage %s is not as expected %s", pv.Spec.StorageClassName, s.desStorageClass))
 	})
+	return nil
+}
+
+func (s *StorageClasssChanging) Clean() error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer ctxCancel()
+	if !s.VeleroCfg.Debug {
+		DeleteConfigmap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.configmaptName)
+		DeleteStorageClass(ctx, s.Client, s.desStorageClass)
+		s.TestCase.Clean()
+	}
 	return nil
 }

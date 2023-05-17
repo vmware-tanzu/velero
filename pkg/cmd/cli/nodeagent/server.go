@@ -44,6 +44,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -134,9 +135,22 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	velerov1api.AddToScheme(scheme)
-	v1.AddToScheme(scheme)
-	storagev1api.AddToScheme(scheme)
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := velerov2alpha1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := v1.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := storagev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	nodeName := os.Getenv("NODE_NAME")
 

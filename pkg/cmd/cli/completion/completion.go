@@ -64,7 +64,10 @@ $ velero completion fish > ~/.config/fish/completions/velero.fish
 			shell := args[0]
 			switch shell {
 			case "bash":
-				cmd.Root().GenBashCompletion(os.Stdout)
+				if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
+					fmt.Println("fail to generate bash completion script", err)
+					os.Exit(1)
+				}
 			case "zsh":
 				// # fix #4912
 				// cobra does not support zsh completion ouptput used by source command
@@ -72,11 +75,20 @@ $ velero completion fish > ~/.config/fish/completions/velero.fish
 				// Need to append compdef manually to do that.
 				zshHead := "#compdef velero\ncompdef _velero velero\n"
 				out := os.Stdout
-				out.Write([]byte(zshHead))
+				if _, err := out.Write([]byte(zshHead)); err != nil {
+					fmt.Println("fail to append compdef command into zsh completion script: ", err)
+					os.Exit(1)
+				}
 
-				cmd.Root().GenZshCompletion(out)
+				if err := cmd.Root().GenZshCompletion(out); err != nil {
+					fmt.Println("fail to generate zsh completion script: ", err)
+					os.Exit(1)
+				}
 			case "fish":
-				cmd.Root().GenFishCompletion(os.Stdout, true)
+				if err := cmd.Root().GenFishCompletion(os.Stdout, true); err != nil {
+					fmt.Println("fail to generate fish completion script: ", err)
+					os.Exit(1)
+				}
 			default:
 				fmt.Println("Invalid shell specified, specify bash, zsh, or fish")
 				os.Exit(1)

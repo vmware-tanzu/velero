@@ -31,30 +31,22 @@ var OptInPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_AN
 var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "opt-out"})
 
 func (p *PVBackupFiltering) Init() error {
+	p.TestCase.Init()
+	p.CaseBaseName = "pv-filter-" + p.UUIDgen
+	p.BackupName = "backup-" + p.CaseBaseName + p.id
+	p.RestoreName = "restore-" + p.CaseBaseName + p.id
 	p.VeleroCfg = VeleroCfg
 	p.Client = *p.VeleroCfg.ClientToInstallVelero
 	p.VeleroCfg.UseVolumeSnapshots = false
 	p.VeleroCfg.UseNodeAgent = true
-	p.NSBaseName = "ns"
-	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.NSBaseName, p.id, 2)}
+	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.CaseBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.CaseBaseName, p.id, 2)}
 
 	p.TestMsg = &TestMSG{
 		Desc:      "Backup PVs filtering by opt-in/opt-out annotation",
 		FailedMSG: "Failed to PVs filtering by opt-in/opt-out annotation",
 		Text:      fmt.Sprintf("Should backup PVs in namespace %s according to annotation %s", *p.NSIncluded, p.annotation),
 	}
-	return nil
-}
 
-func (p *PVBackupFiltering) StartRun() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
-	err := InstallStorageClass(ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
-	if err != nil {
-		return err
-	}
-	p.BackupName = p.BackupName + "backup-" + p.id + "-" + UUIDgen.String()
-	p.RestoreName = p.RestoreName + "restore-" + p.id + "-" + UUIDgen.String()
 	p.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", strings.Join(*p.NSIncluded, ","),
@@ -72,9 +64,16 @@ func (p *PVBackupFiltering) StartRun() error {
 	}
 	return nil
 }
+
 func (p *PVBackupFiltering) CreateResources() error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer ctxCancel()
+
+	err := InstallStorageClass(ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
+	if err != nil {
+		return errors.Wrapf(err, "failed to install storage class for pv backup filtering test")
+	}
+
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
 			Expect(CreateNamespace(ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
@@ -99,7 +98,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				podName := fmt.Sprintf("pod-%d", i)
 				pods = append(pods, podName)
 				By(fmt.Sprintf("Create pod %s in namespace %s", podName, ns), func() {
-					pod, err := CreatePod(p.Client, ns, podName, "e2e-storage-class", "", volumes, nil, nil)
+					pod, err := CreatePod(p.Client, ns, podName, StorageClassName, "", volumes, nil, nil)
 					Expect(err).To(Succeed())
 					ann := map[string]string{
 						p.annotation: volumesToAnnotation,

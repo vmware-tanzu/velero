@@ -305,10 +305,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) backupInfo
 		}))
 
 		backupList := &api.BackupList{}
-		r.kbClient.List(context.Background(), backupList, &client.ListOptions{
-			LabelSelector: selector,
-		})
-		if err != nil {
+		if err := r.kbClient.List(context.Background(), backupList, &client.ListOptions{LabelSelector: selector}); err != nil {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Unable to list backups for schedule")
 			return backupInfo{}
 		}

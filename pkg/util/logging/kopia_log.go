@@ -21,6 +21,8 @@ import (
 
 	"github.com/kopia/kopia/repo/logging"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type kopiaLog struct {
@@ -32,59 +34,129 @@ type kopiaLog struct {
 // call the logger in the context to write logs
 func SetupKopiaLog(ctx context.Context, logger logrus.FieldLogger) context.Context {
 	return logging.WithLogger(ctx, func(module string) logging.Logger {
-		return &kopiaLog{
-			module: module,
-			logger: logger,
-		}
+		kpLog := &kopiaLog{module, logger}
+		return zap.New(kpLog).Sugar()
 	})
 }
 
-func (kl *kopiaLog) Debugf(msg string, args ...interface{}) {
-	logger := kl.logger.WithField("logModule", kl.getLogModule())
-	logger.Debugf(msg, args...)
+// Enabled decides whether a given logging level is enabled when logging a message
+func (kl *kopiaLog) Enabled(level zapcore.Level) bool {
+	entry := kl.logger.WithField("null", "null")
+	switch level {
+	case zapcore.DebugLevel:
+		return (entry.Logger.GetLevel() >= logrus.DebugLevel)
+	case zapcore.InfoLevel:
+		return (entry.Logger.GetLevel() >= logrus.InfoLevel)
+	case zapcore.WarnLevel:
+		return (entry.Logger.GetLevel() >= logrus.WarnLevel)
+	case zapcore.ErrorLevel:
+		return (entry.Logger.GetLevel() >= logrus.ErrorLevel)
+	case zapcore.DPanicLevel:
+		return (entry.Logger.GetLevel() >= logrus.PanicLevel)
+	case zapcore.PanicLevel:
+		return (entry.Logger.GetLevel() >= logrus.PanicLevel)
+	case zapcore.FatalLevel:
+		return (entry.Logger.GetLevel() >= logrus.FatalLevel)
+	default:
+		return false
+	}
 }
 
-func (kl *kopiaLog) Debugw(msg string, keyValuePairs ...interface{}) {
-	logger := kl.logger.WithField("logModule", kl.getLogModule())
-	logger.WithFields(getLogFields(keyValuePairs...)).Debug(msg)
+// With adds structured context to the Core.
+func (kl *kopiaLog) With(fields []zapcore.Field) zapcore.Core {
+	copied := kl.logrusFields(fields)
+
+	return &kopiaLog{
+		module: kl.module,
+		logger: kl.logger.WithFields(copied),
+	}
 }
 
-func (kl *kopiaLog) Infof(msg string, args ...interface{}) {
-	logger := kl.logger.WithField("logModule", kl.getLogModule())
-	logger.Infof(msg, args...)
+// Check determines whether the supplied Entry should be logged. If the entry
+// should be logged, the Core adds itself to the CheckedEntry and returns the result.
+func (kl *kopiaLog) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if kl.Enabled(ent.Level) {
+		return ce.AddCore(ent, kl)
+	}
+
+	return ce
 }
 
-func (kl *kopiaLog) Warnf(msg string, args ...interface{}) {
-	logger := kl.logger.WithField("logModule", kl.getLogModule())
-	logger.Warnf(msg, args...)
+// Write serializes the Entry and any Fields supplied at the log site and writes them to their destination.
+func (kl *kopiaLog) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	copied := kl.logrusFieldsForWrite(ent, fields)
+	logger := kl.logger.WithFields(copied)
+
+	switch ent.Level {
+	case zapcore.DebugLevel:
+		logger.Debug(ent.Message)
+	case zapcore.InfoLevel:
+		logger.Info(ent.Message)
+	case zapcore.WarnLevel:
+		logger.Warn(ent.Message)
+	case zapcore.ErrorLevel:
+		// We see Kopia generates error logs for some normal cases or non-critical
+		// cases. So Kopia's error logs are regarded as warning logs so that they don't
+		// affect Velero's workflow.
+		logger.Warn(ent.Message)
+	case zapcore.DPanicLevel:
+		logger.Panic(ent.Message)
+	case zapcore.PanicLevel:
+		logger.Panic(ent.Message)
+	case zapcore.FatalLevel:
+		logger.Fatal(ent.Message)
+	}
+
+	return nil
 }
 
-// We see Kopia generates error logs for some normal cases or non-critical
-// cases. So Kopia's error logs are regarded as warning logs so that they don't
-// affect Velero's workflow.
-func (kl *kopiaLog) Errorf(msg string, args ...interface{}) {
-	logger := kl.logger.WithFields(logrus.Fields{
-		"logModule": kl.getLogModule(),
-		"sublevel":  "error",
-	})
+// Sync flushes buffered logs (if any).
+func (kl *kopiaLog) Sync() error {
+	return nil
+}
 
-	logger.Warnf(msg, args...)
+func (kl *kopiaLog) logrusFields(fields []zapcore.Field) logrus.Fields {
+	if fields == nil {
+		return logrus.Fields{}
+	}
+
+	m := zapcore.NewMapObjectEncoder()
+	for _, field := range fields {
+		field.AddTo(m)
+	}
+
+	return m.Fields
 }
 
 func (kl *kopiaLog) getLogModule() string {
 	return "kopia/" + kl.module
 }
 
-func getLogFields(keyValuePairs ...interface{}) map[string]interface{} {
-	m := map[string]interface{}{}
-	for i := 0; i+1 < len(keyValuePairs); i += 2 {
-		s, ok := keyValuePairs[i].(string)
-		if !ok {
-			s = "non-string-key"
-		}
+func (kl *kopiaLog) logrusFieldsForWrite(ent zapcore.Entry, fields []zapcore.Field) logrus.Fields {
+	copied := kl.logrusFields(fields)
 
-		m[s] = keyValuePairs[i+1]
+	copied["logModule"] = kl.getLogModule()
+
+	if ent.Caller.Function != "" {
+		copied["function"] = ent.Caller.Function
 	}
 
-	return m
+	path := ent.Caller.FullPath()
+	if path != "undefined" {
+		copied["path"] = path
+	}
+
+	if ent.LoggerName != "" {
+		copied["logger name"] = ent.LoggerName
+	}
+
+	if ent.Stack != "" {
+		copied["stack"] = ent.Stack
+	}
+
+	if ent.Level == zap.ErrorLevel {
+		copied["sublevel"] = "error"
+	}
+
+	return copied
 }

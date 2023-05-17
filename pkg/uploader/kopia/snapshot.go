@@ -44,9 +44,7 @@ import (
 )
 
 // All function mainly used to make testing more convenient
-var treeForSourceFunc = policy.TreeForSource
 var applyRetentionPolicyFunc = policy.ApplyRetentionPolicy
-var setPolicyFunc = policy.SetPolicy
 var saveSnapshotFunc = snapshot.SaveSnapshot
 var loadSnapshotFunc = snapshot.LoadSnapshot
 
@@ -72,24 +70,17 @@ func newOptionalBool(b bool) *policy.OptionalBool {
 }
 
 // setupDefaultPolicy set default policy for kopia
-func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo) error {
-	return setPolicyFunc(ctx, rep, sourceInfo, &policy.Policy{
-		RetentionPolicy: policy.RetentionPolicy{
-			KeepLatest: newOptionalInt(math.MaxInt32),
-		},
-		CompressionPolicy: policy.CompressionPolicy{
-			CompressorName: "none",
-		},
-		UploadPolicy: policy.UploadPolicy{
-			MaxParallelFileReads: newOptionalInt(runtime.NumCPU()),
-		},
-		SchedulingPolicy: policy.SchedulingPolicy{
-			Manual: true,
-		},
-		ErrorHandlingPolicy: policy.ErrorHandlingPolicy{
-			IgnoreUnknownTypes: newOptionalBool(true),
-		},
-	})
+func setupDefaultPolicy() *policy.Tree {
+	defaultPolicy := *policy.DefaultPolicy
+
+	defaultPolicy.RetentionPolicy.KeepLatest = newOptionalInt(math.MaxInt32)
+	defaultPolicy.CompressionPolicy.CompressorName = "none"
+	defaultPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(runtime.NumCPU())
+	defaultPolicy.UploadPolicy.ParallelUploadAboveSize = nil
+	defaultPolicy.SchedulingPolicy.Manual = true
+	defaultPolicy.ErrorHandlingPolicy.IgnoreUnknownTypes = newOptionalBool(true)
+
+	return policy.BuildTree(nil, &defaultPolicy)
 }
 
 // Backup backup specific sourcePath and update progress
@@ -198,17 +189,9 @@ func SnapshotSource(
 		}
 	}
 
-	var manifest *snapshot.Manifest
-	if err := setupDefaultPolicy(ctx, rep, sourceInfo); err != nil {
-		return "", 0, errors.Wrapf(err, "unable to set policy for si %v", sourceInfo)
-	}
+	policyTree := setupDefaultPolicy()
 
-	policyTree, err := treeForSourceFunc(ctx, rep, sourceInfo)
-	if err != nil {
-		return "", 0, errors.Wrapf(err, "unable to create policy getter for si %v", sourceInfo)
-	}
-
-	manifest, err = u.Upload(ctx, rootDir, policyTree, sourceInfo, previous...)
+	manifest, err := u.Upload(ctx, rootDir, policyTree, sourceInfo, previous...)
 	if err != nil {
 		return "", 0, errors.Wrapf(err, "Failed to upload the kopia snapshot for si %v", sourceInfo)
 	}
@@ -254,7 +237,7 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 
 // findPreviousSnapshotManifest returns the list of previous snapshots for a given source, including
 // last complete snapshot following it.
-func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sourceInfo snapshot.SourceInfo, snapshotTags map[string]string, noLaterThan *time.Time) ([]*snapshot.Manifest, error) {
+func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sourceInfo snapshot.SourceInfo, snapshotTags map[string]string, noLaterThan *fs.UTCTimestamp) ([]*snapshot.Manifest, error) {
 	man, err := snapshot.ListSnapshots(ctx, rep, sourceInfo)
 	if err != nil {
 		return nil, err
@@ -311,6 +294,11 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		OverwriteFiles:         true,
 		OverwriteSymlinks:      true,
 		IgnorePermissionErrors: true,
+	}
+
+	err = output.Init(ctx)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "error to init output")
 	}
 
 	stat, err := restore.Entry(kopiaCtx, rep, output, rootEntry, restore.Options{

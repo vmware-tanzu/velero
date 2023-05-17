@@ -32,6 +32,7 @@ import (
 	"github.com/fatih/color"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -597,7 +598,7 @@ type volumesByPod struct {
 
 // Add adds a pod volume with the specified pod namespace, name
 // and volume to the appropriate group.
-func (v *volumesByPod) Add(namespace, name, volume, phase string, progress velerov1api.PodVolumeOperationProgress) {
+func (v *volumesByPod) Add(namespace, name, volume, phase string, progress veleroapishared.DataMoveOperationProgress) {
 	if v.volumesByPodMap == nil {
 		v.volumesByPodMap = make(map[string]*podVolumeGroup)
 	}

@@ -44,11 +44,12 @@ var BackupWithLabelSelector func() = TestFunc(&LabelSelector{testInBackup})
 
 func (l *LabelSelector) Init() error {
 	l.FilteringCase.Init()
-	l.BackupName = "backup-label-selector-" + UUIDgen.String()
-	l.RestoreName = "restore-" + UUIDgen.String()
-	l.NSBaseName = "backup-label-selector-" + UUIDgen.String()
+	l.CaseBaseName = "backup-label-selector-" + l.UUIDgen
+	l.BackupName = "backup-" + l.CaseBaseName
+	l.RestoreName = "restore-" + l.CaseBaseName
+
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		*l.NSIncluded = append(*l.NSIncluded, createNSName)
 	}
 	l.TestMsg = &TestMSG{
@@ -78,7 +79,7 @@ func (l *LabelSelector) CreateResources() error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer ctxCancel()
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
 		labels := l.labels
 		if nsNum%2 == 0 {
@@ -89,20 +90,10 @@ func (l *LabelSelector) CreateResources() error {
 		if err := CreateNamespaceWithLabel(ctx, l.Client, namespace, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-
-		serviceAccountName := "default"
-		// wait until the service account is created before patch the image pull secret
-		if err := WaitUntilServiceAccountCreated(ctx, l.Client, namespace, serviceAccountName, 10*time.Minute); err != nil {
-			return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, namespace)
-		}
-		// add the image pull secret to avoid the image pull limit issue of Docker Hub
-		if err := PatchServiceAccountWithImagePullSecret(ctx, l.Client, namespace, serviceAccountName, VeleroCfg.RegistryCredentialFile); err != nil {
-			return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, namespace)
-		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 
-		deployment := NewDeployment(l.NSBaseName, namespace, l.replica, labels, nil).Result()
+		deployment := NewDeployment(l.CaseBaseName, namespace, l.replica, labels, nil).Result()
 		deployment, err := CreateDeployment(l.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
@@ -112,7 +103,7 @@ func (l *LabelSelector) CreateResources() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
 		}
 		//Create Secret
-		secretName := l.NSBaseName
+		secretName := l.CaseBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
 		_, err = CreateSecret(l.Client.ClientGo, namespace, secretName, l.labels)
 		if err != nil {
@@ -128,10 +119,10 @@ func (l *LabelSelector) CreateResources() error {
 
 func (l *LabelSelector) Verify() error {
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", l.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check deployment
-		_, err := GetDeployment(l.Client.ClientGo, namespace, l.NSBaseName)
+		_, err := GetDeployment(l.Client.ClientGo, namespace, l.CaseBaseName)
 		if nsNum%2 == 1 { //include
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))

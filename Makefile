@@ -229,6 +229,10 @@ endif
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
+# update-crd is for development purpose only, it is faster than update, so is a shortcut when you want to generate CRD changes only
+update-crd:
+	@$(MAKE) shell CMD="-c 'hack/update-3generated-crd-code.sh'"	
+
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
