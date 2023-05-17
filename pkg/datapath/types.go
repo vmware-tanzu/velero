@@ -58,7 +58,7 @@ type AccessPoint struct {
 // AsyncBR is the interface for asynchronous data path methods
 type AsyncBR interface {
 	// Init initializes an asynchronous data path instance
-	Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error
+	Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string, repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error
 
 	// StartBackup starts an asynchronous data path instance for backup
 	StartBackup(source AccessPoint, parentSnapshot string, forceFull bool, tags map[string]string) error

@@ -30,6 +30,7 @@ import (
 	repoProvider "github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 type fileSystemBR struct {
@@ -61,7 +62,7 @@ func newFileSystemBR(jobName string, requestorType string, client client.Client,
 }
 
 func (fs *fileSystemBR) Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string,
-	repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error {
+	repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error {
 	var err error
 	defer func() {
 		if err != nil {
@@ -91,7 +92,7 @@ func (fs *fileSystemBR) Init(ctx context.Context, bslName string, sourceNamespac
 		return errors.Wrapf(err, "error to boost backup repository connection %s-%s-%s", bslName, sourceNamespace, repositoryType)
 	}
 
-	fs.uploaderProv, err = provider.NewUploaderProvider(ctx, fs.client, uploaderType, fs.requestorType, "",
+	fs.uploaderProv, err = provider.NewUploaderProvider(ctx, fs.client, uploaderType, fs.requestorType, repoIdentifier,
 		fs.backupLocation, fs.backupRepo, credentialGetter, repokey.RepoKeySelector(), fs.log)
 	if err != nil {
 		return errors.Wrapf(err, "error creating uploader %s", uploaderType)
@@ -137,11 +138,11 @@ func (fs *fileSystemBR) StartBackup(source AccessPoint, parentSnapshot string, f
 		snapshotID, emptySnapshot, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, tags, forceFull, parentSnapshot, fs)
 
 		if err == provider.ErrorCanceled {
-			fs.callbacks.OnCancelled(fs.ctx, fs.namespace, fs.jobName)
+			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
 		} else if err != nil {
-			fs.callbacks.OnFailed(fs.ctx, fs.namespace, fs.jobName, err)
+			fs.callbacks.OnFailed(context.Background(), fs.namespace, fs.jobName, err)
 		} else {
-			fs.callbacks.OnCompleted(fs.ctx, fs.namespace, fs.jobName, Result{Backup: BackupResult{snapshotID, emptySnapshot, source}})
+			fs.callbacks.OnCompleted(context.Background(), fs.namespace, fs.jobName, Result{Backup: BackupResult{snapshotID, emptySnapshot, source}})
 		}
 	}()
 
@@ -157,11 +158,11 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint) erro
 		err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, fs)
 
 		if err == provider.ErrorCanceled {
-			fs.callbacks.OnCancelled(fs.ctx, fs.namespace, fs.jobName)
+			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
 		} else if err != nil {
-			fs.callbacks.OnFailed(fs.ctx, fs.namespace, fs.jobName, err)
+			fs.callbacks.OnFailed(context.Background(), fs.namespace, fs.jobName, err)
 		} else {
-			fs.callbacks.OnCompleted(fs.ctx, fs.namespace, fs.jobName, Result{Restore: RestoreResult{Target: target}})
+			fs.callbacks.OnCompleted(context.Background(), fs.namespace, fs.jobName, Result{Restore: RestoreResult{Target: target}})
 		}
 	}()
 
@@ -171,7 +172,7 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint) erro
 // UpdateProgress which implement ProgressUpdater interface to update progress status
 func (fs *fileSystemBR) UpdateProgress(p *uploader.Progress) {
 	if fs.callbacks.OnProgress != nil {
-		fs.callbacks.OnProgress(fs.ctx, fs.namespace, fs.jobName, &uploader.Progress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone})
+		fs.callbacks.OnProgress(context.Background(), fs.namespace, fs.jobName, &uploader.Progress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone})
 	}
 }
 
@@ -186,7 +187,7 @@ func (fs *fileSystemBR) boostRepoConnect(ctx context.Context, repositoryType str
 			return err
 		}
 	} else {
-		if err := repoProvider.NewUnifiedRepoProvider(*credentialGetter, repositoryType, fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo}); err != nil {
+		if err := repoProvider.NewResticRepositoryProvider(credentialGetter.FromFile, filesystem.NewFileSystem(), fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo}); err != nil {
 			return err
 		}
 	}

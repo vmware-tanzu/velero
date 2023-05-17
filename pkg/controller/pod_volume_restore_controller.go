@@ -143,7 +143,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	log.WithField("path", volumePath.ByPath).Debugf("Found host path")
 
 	if err := fsRestore.Init(ctx, pvr.Spec.BackupStorageLocation, pvr.Spec.Pod.Namespace, pvr.Spec.UploaderType,
-		podvolume.GetPvrRepositoryType(pvr), c.repositoryEnsurer, c.credentialGetter); err != nil {
+		podvolume.GetPvrRepositoryType(pvr), pvr.Spec.RepoIdentifier, c.repositoryEnsurer, c.credentialGetter); err != nil {
 		return c.errorOut(ctx, pvr, err, "error to initialize data path", log)
 	}
 
@@ -326,8 +326,8 @@ func (c *PodVolumeRestoreReconciler) OnDataPathFailed(ctx context.Context, names
 	log.WithError(err).Info("Async fs restore data path failed")
 
 	var pvr velerov1api.PodVolumeRestore
-	if err := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); err != nil {
-		log.WithError(err).Warn("Failed to get PVR on failure")
+	if getErr := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); getErr != nil {
+		log.WithError(getErr).Warn("Failed to get PVR on failure")
 	} else {
 		_, _ = c.errorOut(ctx, &pvr, err, "data path restore failed", log)
 	}
@@ -341,10 +341,10 @@ func (c *PodVolumeRestoreReconciler) OnDataPathCancelled(ctx context.Context, na
 	log.Info("Async fs restore data path canceled")
 
 	var pvr velerov1api.PodVolumeRestore
-	if err := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); err != nil {
-		log.WithError(err).Warn("Failed to get PVR on cancel")
+	if getErr := c.Client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, &pvr); getErr != nil {
+		log.WithError(getErr).Warn("Failed to get PVR on cancel")
 	} else {
-		_, _ = c.errorOut(ctx, &pvr, err, "data path restore canceled", log)
+		_, _ = c.errorOut(ctx, &pvr, errors.New("PVR is canceled"), "data path restore canceled", log)
 	}
 }
 

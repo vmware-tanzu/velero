@@ -159,7 +159,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	log.WithField("path", path.ByPath).Debugf("Found host path")
 
 	if err := fsBackup.Init(ctx, pvb.Spec.BackupStorageLocation, pvb.Spec.Pod.Namespace, pvb.Spec.UploaderType,
-		podvolume.GetPvbRepositoryType(&pvb), r.repositoryEnsurer, r.credentialGetter); err != nil {
+		podvolume.GetPvbRepositoryType(&pvb), pvb.Spec.RepoIdentifier, r.repositoryEnsurer, r.credentialGetter); err != nil {
 		return r.errorOut(ctx, &pvb, err, "error to initialize data path", log)
 	}
 
@@ -233,8 +233,8 @@ func (r *PodVolumeBackupReconciler) OnDataPathFailed(ctx context.Context, namesp
 	log.WithError(err).Error("Async fs backup data path failed")
 
 	var pvb velerov1api.PodVolumeBackup
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, &pvb); err != nil {
-		log.WithError(err).Warn("Failed to get PVB on failure")
+	if getErr := r.Client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, &pvb); getErr != nil {
+		log.WithError(getErr).Warn("Failed to get PVB on failure")
 	} else {
 		_, _ = r.errorOut(ctx, &pvb, err, "data path backup failed", log)
 	}
@@ -248,10 +248,10 @@ func (r *PodVolumeBackupReconciler) OnDataPathCancelled(ctx context.Context, nam
 	log.Warn("Async fs backup data path canceled")
 
 	var pvb velerov1api.PodVolumeBackup
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, &pvb); err != nil {
-		log.WithError(err).Warn("Failed to get PVB on cancel")
+	if getErr := r.Client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, &pvb); getErr != nil {
+		log.WithError(getErr).Warn("Failed to get PVB on cancel")
 	} else {
-		_, _ = r.errorOut(ctx, &pvb, err, "data path backup canceled", log)
+		_, _ = r.errorOut(ctx, &pvb, errors.New("PVB is canceled"), "data path backup canceled", log)
 	}
 }
 
