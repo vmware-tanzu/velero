@@ -66,12 +66,11 @@ func (n *NSAnnotationCase) Init() error {
 }
 
 func (n *NSAnnotationCase) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
+	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		createAnnotationName := fmt.Sprintf("annotation-%s-%00000d", n.CaseBaseName, nsNum)
-		if err := CreateNamespaceWithAnnotation(ctx, n.Client, createNSName, map[string]string{"testAnnotation": createAnnotationName}); err != nil {
+		if err := CreateNamespaceWithAnnotation(n.Ctx, n.Client, createNSName, map[string]string{"testAnnotation": createAnnotationName}); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
@@ -79,12 +78,10 @@ func (n *NSAnnotationCase) CreateResources() error {
 }
 
 func (n *NSAnnotationCase) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		checkNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		checkAnnoName := fmt.Sprintf("annotation-%s-%00000d", n.CaseBaseName, nsNum)
-		checkNS, err := GetNamespace(ctx, n.Client, checkNSName)
+		checkNS, err := GetNamespace(n.Ctx, n.Client, checkNSName)
 
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)

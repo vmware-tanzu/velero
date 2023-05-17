@@ -67,13 +67,14 @@ func (p *PVCSelectedNodeChanging) Init() error {
 }
 
 func (p *PVCSelectedNodeChanging) CreateResources() error {
+	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
-		Expect(CreateNamespace(context.Background(), p.Client, p.namespace)).To(Succeed(),
+		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.podName, p.namespace), func() {
-		nodeNameList, err := GetWorkerNodes(context.Background())
+		nodeNameList, err := GetWorkerNodes(p.Ctx)
 		Expect(err).To(Succeed())
 		for _, nodeName := range nodeNameList {
 			p.oldNodeName = nodeName
@@ -81,14 +82,14 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 			pvcAnn := map[string]string{p.ann: nodeName}
 			_, err := CreatePod(p.Client, p.namespace, p.podName, "default", p.pvcName, []string{p.volume}, pvcAnn, nil)
 			Expect(err).To(Succeed())
-			err = WaitForPods(context.Background(), p.Client, p.namespace, []string{p.podName})
+			err = WaitForPods(p.Ctx, p.Client, p.namespace, []string{p.podName})
 			Expect(err).To(Succeed())
 			break
 		}
 	})
 
 	By("Prepare ConfigMap data", func() {
-		nodeNameList, err := GetWorkerNodes(context.Background())
+		nodeNameList, err := GetWorkerNodes(p.Ctx)
 		Expect(err).To(Succeed())
 		Expect(len(nodeNameList) > 2).To(Equal(true))
 		for _, nodeName := range nodeNameList {
@@ -110,17 +111,15 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 
 func (p *PVCSelectedNodeChanging) Destroy() error {
 	By(fmt.Sprintf("Start to destroy namespace %s......", p.CaseBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(context.Background(), p.Client, p.CaseBaseName)).To(Succeed(),
+		Expect(CleanupNamespacesWithPoll(p.Ctx, p.Client, p.CaseBaseName)).To(Succeed(),
 			fmt.Sprintf("Failed to delete namespace %s", p.CaseBaseName))
 	})
 	return nil
 }
 
 func (p *PVCSelectedNodeChanging) Restore() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
 	By(fmt.Sprintf("Start to restore %s .....", p.RestoreName), func() {
-		Expect(VeleroRestoreExec(ctx, p.VeleroCfg.VeleroCLI,
+		Expect(VeleroRestoreExec(p.Ctx, p.VeleroCfg.VeleroCLI,
 			p.VeleroCfg.VeleroNamespace, p.RestoreName,
 			p.RestoreArgs, velerov1api.RestorePhaseCompleted)).To(
 			Succeed(),
@@ -129,17 +128,17 @@ func (p *PVCSelectedNodeChanging) Restore() error {
 					p.VeleroCfg.VeleroNamespace, "", p.RestoreName)
 				return "Fail to restore workload"
 			})
-		err := WaitForPods(ctx, p.Client, p.mappedNS, []string{p.podName})
+		err := WaitForPods(p.Ctx, p.Client, p.mappedNS, []string{p.podName})
 		Expect(err).To(Succeed())
 	})
 	return nil
 }
 func (p *PVCSelectedNodeChanging) Verify() error {
 	By(fmt.Sprintf("PVC selected node should be %s", p.newNodeName), func() {
-		pvcNameList, err := GetPvcByPodName(context.Background(), p.mappedNS, p.pvcName)
+		pvcNameList, err := GetPvcByPodName(p.Ctx, p.mappedNS, p.pvcName)
 		Expect(err).To(Succeed())
 		Expect(len(pvcNameList)).Should(Equal(1))
-		pvc, err := GetPVC(context.Background(), p.Client, p.mappedNS, pvcNameList[0])
+		pvc, err := GetPVC(p.Ctx, p.Client, p.mappedNS, pvcNameList[0])
 		Expect(err).To(Succeed())
 		Expect(pvc.Annotations[p.ann]).To(Equal(p.newNodeName))
 	})
@@ -150,7 +149,7 @@ func (p *PVCSelectedNodeChanging) Clean() error {
 	if !p.VeleroCfg.Debug {
 		p.TestCase.Clean()
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", p.mappedNS), func() {
-			CleanupNamespaces(context.Background(), p.Client, p.mappedNS)
+			CleanupNamespaces(p.Ctx, p.Client, p.mappedNS)
 		})
 	}
 	return nil

@@ -75,13 +75,12 @@ func (o *OrderedResources) Init() error {
 }
 
 func (o *OrderedResources) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	o.Ctx, o.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	label := map[string]string{
 		"orderedresources": "true",
 	}
 	fmt.Printf("Creating resources in %s namespace ...\n", o.Namespace)
-	if err := CreateNamespace(ctx, o.Client, o.Namespace); err != nil {
+	if err := CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
 	}
 	//Create deployment
@@ -122,32 +121,28 @@ func (o *OrderedResources) CreateResources() error {
 }
 
 func (o *OrderedResources) Backup() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	By(fmt.Sprintf("Create schedule the workload in %s namespace", o.Namespace), func() {
-		err := VeleroScheduleCreate(ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.ScheduleArgs)
+		err := VeleroScheduleCreate(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.ScheduleArgs)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to create schedule %s  with err %v", o.ScheduleName, err))
 	})
 	return nil
 }
 
 func (o *OrderedResources) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	By(fmt.Sprintf("Checking resource order in %s schedule cr", o.ScheduleName), func() {
-		err := CheckScheduleWithResourceOrder(ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.OrderMap)
+		err := CheckScheduleWithResourceOrder(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.OrderMap)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to check schedule %s with err %v", o.ScheduleName, err))
 	})
 
 	By("Checking resource order in backup cr", func() {
 		backupList := new(velerov1api.BackupList)
 		err := waitutil.PollImmediate(10*time.Second, time.Minute*5, func() (bool, error) {
-			if err := o.Client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
+			if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
 				return false, fmt.Errorf("failed to list backup object in %s namespace with err %v", o.VeleroCfg.VeleroNamespace, err)
 			}
 
 			for _, backup := range backupList.Items {
-				if err := CheckBackupWithResourceOrder(ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name, o.OrderMap); err == nil {
+				if err := CheckBackupWithResourceOrder(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name, o.OrderMap); err == nil {
 					return true, nil
 				}
 			}
@@ -160,24 +155,20 @@ func (o *OrderedResources) Verify() error {
 }
 
 func (o *OrderedResources) Clean() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	if !o.VeleroCfg.Debug {
-		Expect(VeleroScheduleDelete(ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName)).To(Succeed())
+		Expect(VeleroScheduleDelete(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName)).To(Succeed())
 		Expect(o.TestCase.Clean()).To(Succeed())
 	}
 	return nil
 }
 
 func (o *OrderedResources) DeleteBackups() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	backupList := new(velerov1api.BackupList)
-	if err := o.Client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
+	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
 		return fmt.Errorf("failed to list backup object in %s namespace with err %v", o.VeleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
-		if err := VeleroBackupDelete(ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name); err != nil {
+		if err := VeleroBackupDelete(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name); err != nil {
 			return err
 		}
 	}

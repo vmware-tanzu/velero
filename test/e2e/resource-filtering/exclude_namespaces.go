@@ -110,12 +110,11 @@ func (e *ExcludeNamespaces) Init() error {
 }
 
 func (e *ExcludeNamespaces) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	e.Ctx, e.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
-		if err := CreateNamespace(ctx, e.Client, createNSName); err != nil {
+		if err := CreateNamespace(e.Ctx, e.Client, createNSName); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
@@ -123,12 +122,10 @@ func (e *ExcludeNamespaces) CreateResources() error {
 }
 
 func (e *ExcludeNamespaces) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	// Verify that we got back all of the namespaces we created
 	for nsNum := 0; nsNum < e.namespacesExcluded; nsNum++ {
 		excludeNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
-		_, err := GetNamespace(ctx, e.Client, excludeNSName)
+		_, err := GetNamespace(e.Ctx, e.Client, excludeNSName)
 		if err == nil {
 			return errors.Wrapf(err, "Resource filtering with exclude namespace but exclude namespace %s exist", excludeNSName)
 		}
@@ -140,7 +137,7 @@ func (e *ExcludeNamespaces) Verify() error {
 
 	for nsNum := e.namespacesExcluded; nsNum < e.NamespacesTotal; nsNum++ {
 		checkNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
-		checkNS, err := GetNamespace(ctx, e.Client, checkNSName)
+		checkNS, err := GetNamespace(e.Ctx, e.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}

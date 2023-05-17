@@ -76,8 +76,7 @@ func (l *LabelSelector) Init() error {
 }
 
 func (l *LabelSelector) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	l.Ctx, l.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
@@ -87,7 +86,7 @@ func (l *LabelSelector) CreateResources() error {
 				"resourcefiltering": "false",
 			}
 		}
-		if err := CreateNamespaceWithLabel(ctx, l.Client, namespace, labels); err != nil {
+		if err := CreateNamespaceWithLabel(l.Ctx, l.Client, namespace, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		//Create deployment
@@ -139,7 +138,7 @@ func (l *LabelSelector) Verify() error {
 		}
 
 		//Check secrets
-		secretsList, err := l.Client.ClientGo.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
+		secretsList, err := l.Client.ClientGo.CoreV1().Secrets(namespace).List(l.Ctx, metav1.ListOptions{
 			LabelSelector: l.labelSelector,
 		})
 

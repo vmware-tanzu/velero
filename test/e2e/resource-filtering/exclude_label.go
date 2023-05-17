@@ -77,8 +77,7 @@ func (e *ExcludeFromBackup) Init() error {
 }
 
 func (e *ExcludeFromBackup) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	e.Ctx, e.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	namespace := e.CaseBaseName
 	// These 2 labels for resources to be included
 	label1 := map[string]string{
@@ -88,7 +87,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		"velero.io/exclude-from-backup": "false",
 	}
 	fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-	if err := CreateNamespace(ctx, e.Client, namespace); err != nil {
+	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 	}
 	//Create deployment: to be included
@@ -132,12 +131,10 @@ func (e *ExcludeFromBackup) CreateResources() error {
 }
 
 func (e *ExcludeFromBackup) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	namespace := e.CaseBaseName
 	By(fmt.Sprintf("Checking resources in namespaces ...%s\n", namespace), func() {
 		//Check namespace
-		checkNS, err := GetNamespace(ctx, e.Client, namespace)
+		checkNS, err := GetNamespace(e.Ctx, e.Client, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Could not retrieve test namespace %s", namespace))
 		Expect(checkNS.Name == namespace).To(Equal(true), fmt.Sprintf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name))
 
