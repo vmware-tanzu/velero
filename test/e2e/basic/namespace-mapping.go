@@ -23,12 +23,16 @@ type NamespaceMapping struct {
 
 const NamespaceBaseName string = "ns-mp-"
 
-var OneNamespaceMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "1"}, UseVolumeSnapshots: false}})
-var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "2", NamespaceBaseName + "3"}, UseVolumeSnapshots: false}})
-var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "4"}, UseVolumeSnapshots: true}})
-var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NSBaseName: NamespaceBaseName, NSIncluded: &[]string{NamespaceBaseName + "5", NamespaceBaseName + "6"}, UseVolumeSnapshots: true}})
+var OneNamespaceMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 1, UseVolumeSnapshots: false}})
+var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 2, UseVolumeSnapshots: false}})
+var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 1, UseVolumeSnapshots: true}})
+var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 2, UseVolumeSnapshots: true}})
 
 func (n *NamespaceMapping) Init() error {
+	n.TestCase.Init()
+	n.CaseBaseName = "ns-mp-" + n.UUIDgen
+	n.BackupName = "backup-" + n.CaseBaseName
+	n.RestoreName = "restore-" + n.CaseBaseName
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.VeleroCfg.UseVolumeSnapshots = n.UseVolumeSnapshots
@@ -38,30 +42,25 @@ func (n *NamespaceMapping) Init() error {
 	if n.UseVolumeSnapshots {
 		backupType = "snapshot"
 	}
+	var mappedNS string
+	var mappedNSList []string
+	n.NSIncluded = &[]string{}
+	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
+		*n.NSIncluded = append(*n.NSIncluded, createNSName)
+		mappedNS = mappedNS + createNSName + ":" + createNSName + "-mapped"
+		mappedNSList = append(mappedNSList, createNSName+"-mapped")
+		mappedNS = mappedNS + ","
+	}
+	mappedNS = strings.TrimRightFunc(mappedNS, func(r rune) bool {
+		return r == ','
+	})
+
 	n.TestMsg = &TestMSG{
 		Desc:      fmt.Sprintf("Restore namespace %s with namespace mapping by %s test", *n.NSIncluded, backupType),
 		FailedMSG: "Failed to restore with namespace mapping",
 		Text:      fmt.Sprintf("should restore namespace %s with namespace mapping by %s", *n.NSIncluded, backupType),
 	}
-	return nil
-}
-
-func (n *NamespaceMapping) StartRun() error {
-	var mappedNS string
-	var mappedNSList []string
-
-	for index, ns := range *n.NSIncluded {
-		mappedNS = mappedNS + ns + ":" + ns + UUIDgen.String()
-		mappedNSList = append(mappedNSList, ns+UUIDgen.String())
-		if index+1 != len(*n.NSIncluded) {
-			mappedNS = mappedNS + ","
-		}
-		n.BackupName = n.BackupName + ns
-		n.RestoreName = n.RestoreName + ns
-	}
-	n.BackupName = n.BackupName + UUIDgen.String()
-	n.RestoreName = n.RestoreName + UUIDgen.String()
-
 	n.MappedNamespaceList = mappedNSList
 	fmt.Println(mappedNSList)
 	n.BackupArgs = []string{
@@ -81,16 +80,16 @@ func (n *NamespaceMapping) StartRun() error {
 	}
 	return nil
 }
+
 func (n *NamespaceMapping) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
+	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	for index, ns := range *n.NSIncluded {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Creating namespaces ...%s\n", ns), func() {
-			Expect(CreateNamespace(ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(ctx, n.Client, VeleroCfg.CloudProvider,
+			Expect(KibishiiPrepareBeforeBackup(n.Ctx, n.Client, VeleroCfg.CloudProvider,
 				ns, VeleroCfg.RegistryCredentialFile, VeleroCfg.Features,
 				VeleroCfg.KibishiiDirectory, false, n.kibishiiData)).To(Succeed())
 		})
@@ -99,19 +98,33 @@ func (n *NamespaceMapping) CreateResources() error {
 }
 
 func (n *NamespaceMapping) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
 	for index, ns := range n.MappedNamespaceList {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Verify workload %s after restore ", ns), func() {
 			Expect(KibishiiVerifyAfterRestore(n.Client, ns,
-				ctx, n.kibishiiData)).To(Succeed(), "Fail to verify workload after restore")
+				n.Ctx, n.kibishiiData)).To(Succeed(), "Fail to verify workload after restore")
 		})
 	}
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Verify namespace %s for backup is no longer exist after restore with namespace mapping", ns), func() {
-			Expect(NamespaceShouldNotExist(ctx, n.Client, ns)).To(Succeed())
+			Expect(NamespaceShouldNotExist(n.Ctx, n.Client, ns)).To(Succeed())
 		})
+	}
+	return nil
+}
+
+func (n *NamespaceMapping) Clean() error {
+	if !n.VeleroCfg.Debug {
+		if err := DeleteStorageClass(context.Background(), n.Client, "kibishii-storage-class"); err != nil {
+			return err
+		}
+		for _, ns := range n.MappedNamespaceList {
+			if err := DeleteNamespace(context.Background(), n.Client, ns, false); err != nil {
+				return err
+			}
+		}
+
+		return n.GetTestCase().Clean()
 	}
 	return nil
 }

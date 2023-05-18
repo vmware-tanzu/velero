@@ -55,6 +55,7 @@ type installOptions struct {
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
+	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if veleroCfg.CloudProvider != "kind" {
 		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
 		veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
@@ -109,7 +110,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
-
+	fmt.Printf("Finish velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
 

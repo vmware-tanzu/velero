@@ -50,19 +50,20 @@ var RestoreWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringC
 
 func (e *ExcludeNamespaces) Init() error {
 	e.FilteringCase.Init()
+	e.CaseBaseName = "exclude-namespaces-" + e.UUIDgen
 	e.namespacesExcluded = e.NamespacesTotal / 2
-	e.NSBaseName = "exclude-namespaces-" + UUIDgen.String()
+
 	if e.IsTestInBackup {
-		e.BackupName = "backup-exclude-namespaces-" + UUIDgen.String()
-		e.RestoreName = "restore-" + UUIDgen.String()
+		e.BackupName = "backup-" + e.CaseBaseName
+		e.RestoreName = "restore-" + e.UUIDgen
 		e.TestMsg = &TestMSG{
 			Desc:      "Backup resources with exclude namespace test",
 			FailedMSG: "Failed to backup and restore with namespace include",
 			Text:      fmt.Sprintf("should not backup %d namespaces of %d", e.namespacesExcluded, e.NamespacesTotal),
 		}
 	} else {
-		e.BackupName = "backup-" + UUIDgen.String()
-		e.RestoreName = "restore-exclude-namespaces-" + UUIDgen.String()
+		e.BackupName = "backup-" + e.UUIDgen
+		e.RestoreName = "restore-" + e.CaseBaseName
 		e.TestMsg = &TestMSG{
 			Desc:      "Restore resources with exclude namespace test",
 			FailedMSG: "Failed to restore with namespace exclude",
@@ -71,7 +72,7 @@ func (e *ExcludeNamespaces) Init() error {
 	}
 	e.nsExcluded = &[]string{}
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
 		if nsNum < e.namespacesExcluded {
 			*e.nsExcluded = append(*e.nsExcluded, createNSName)
 		} else {
@@ -109,12 +110,11 @@ func (e *ExcludeNamespaces) Init() error {
 }
 
 func (e *ExcludeNamespaces) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	e.Ctx, e.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
+		createNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
-		if err := CreateNamespace(ctx, e.Client, createNSName); err != nil {
+		if err := CreateNamespace(e.Ctx, e.Client, createNSName); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
@@ -122,12 +122,10 @@ func (e *ExcludeNamespaces) CreateResources() error {
 }
 
 func (e *ExcludeNamespaces) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	// Verify that we got back all of the namespaces we created
 	for nsNum := 0; nsNum < e.namespacesExcluded; nsNum++ {
-		excludeNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
-		_, err := GetNamespace(ctx, e.Client, excludeNSName)
+		excludeNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
+		_, err := GetNamespace(e.Ctx, e.Client, excludeNSName)
 		if err == nil {
 			return errors.Wrapf(err, "Resource filtering with exclude namespace but exclude namespace %s exist", excludeNSName)
 		}
@@ -138,8 +136,8 @@ func (e *ExcludeNamespaces) Verify() error {
 	}
 
 	for nsNum := e.namespacesExcluded; nsNum < e.NamespacesTotal; nsNum++ {
-		checkNSName := fmt.Sprintf("%s-%00000d", e.NSBaseName, nsNum)
-		checkNS, err := GetNamespace(ctx, e.Client, checkNSName)
+		checkNSName := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
+		checkNS, err := GetNamespace(e.Ctx, e.Client, checkNSName)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}

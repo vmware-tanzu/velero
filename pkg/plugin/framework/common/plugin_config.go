@@ -27,7 +27,7 @@ import (
 )
 
 func PluginConfigLabelSelector(kind PluginKind, name string) string {
-	return fmt.Sprintf("velero.io/plugin-config=true,%s=%s", name, kind)
+	return fmt.Sprintf("velero.io/plugin-config,%s=%s", name, kind)
 }
 
 func GetPluginConfig(kind PluginKind, name string, client corev1client.ConfigMapInterface) (*corev1.ConfigMap, error) {

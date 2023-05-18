@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
+	v2alpha1crds "github.com/vmware-tanzu/velero/config/crd/v2alpha1/crds"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -252,7 +253,14 @@ func AllCRDs() *unstructured.UnstructuredList {
 	for _, crd := range v1crds.CRDs {
 		crd.SetLabels(Labels())
 		if err := appendUnstructured(resources, crd); err != nil {
-			fmt.Printf("error appending CRD %s: %s\n", crd.GetName(), err.Error())
+			fmt.Printf("error appending v1 CRD %s: %s\n", crd.GetName(), err.Error())
+		}
+	}
+
+	for _, crd := range v2alpha1crds.CRDs {
+		crd.SetLabels(Labels())
+		if err := appendUnstructured(resources, crd); err != nil {
+			fmt.Printf("error appending v2alpha1 CRD %s: %s\n", crd.GetName(), err.Error())
 		}
 	}
 

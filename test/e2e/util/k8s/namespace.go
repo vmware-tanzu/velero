@@ -69,7 +69,13 @@ func GetNamespace(ctx context.Context, client TestClient, namespace string) (*co
 func DeleteNamespace(ctx context.Context, client TestClient, namespace string, wait bool) error {
 	tenMinuteTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer ctxCancel()
-	if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{}); err != nil {
+
+	var zero int64 = 0
+	policy := metav1.DeletePropagationForeground
+	if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{
+		GracePeriodSeconds: &zero,
+		PropagationPolicy:  &policy,
+	}); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 	}
 	if !wait {
@@ -89,14 +95,14 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 		})
 }
 
-func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseName string) error {
+func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, CaseBaseName string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 	for _, checkNamespace := range namespaces.Items {
-		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
+		if strings.HasPrefix(checkNamespace.Name, CaseBaseName) {
 			err := DeleteNamespace(ctx, client, checkNamespace.Name, true)
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)
@@ -107,13 +113,13 @@ func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, nsBaseNam
 	return nil
 }
 
-func CleanupNamespaces(ctx context.Context, client TestClient, nsBaseName string) error {
+func CleanupNamespaces(ctx context.Context, client TestClient, CaseBaseName string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
 	for _, checkNamespace := range namespaces.Items {
-		if strings.HasPrefix(checkNamespace.Name, nsBaseName) {
+		if strings.HasPrefix(checkNamespace.Name, CaseBaseName) {
 			err = client.ClientGo.CoreV1().Namespaces().Delete(ctx, checkNamespace.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "Could not delete namespace %s", checkNamespace.Name)

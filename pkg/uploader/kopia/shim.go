@@ -174,6 +174,7 @@ func (sr *shimRepository) NewObjectWriter(ctx context.Context, option object.Wri
 	opt.Prefix = udmrepo.ID(option.Prefix)
 	opt.FullPath = ""
 	opt.AccessMode = udmrepo.ObjectDataAccessModeFile
+	opt.AsyncWrites = option.AsyncWrites
 
 	if strings.HasPrefix(option.Description, "DIR:") {
 		opt.DataType = udmrepo.ObjectDataTypeMetadata
