@@ -17,7 +17,6 @@ limitations under the License.
 package filtering
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -102,7 +101,7 @@ func (i *IncludeResources) Verify() error {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}
 		//Check secrets
-		secretsList, err := i.Client.ClientGo.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: i.labelSelector})
+		secretsList, err := i.Client.ClientGo.CoreV1().Secrets(namespace).List(i.Ctx, metav1.ListOptions{LabelSelector: i.labelSelector})
 		if err != nil {
 			if apierrors.IsNotFound(err) { //resource should be excluded
 				return nil
@@ -113,7 +112,7 @@ func (i *IncludeResources) Verify() error {
 		}
 
 		//Check configmap
-		configmapList, err := i.Client.ClientGo.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: i.labelSelector})
+		configmapList, err := i.Client.ClientGo.CoreV1().ConfigMaps(namespace).List(i.Ctx, metav1.ListOptions{LabelSelector: i.labelSelector})
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list configmap in namespace: %q", namespace))
 		} else if len(configmapList.Items) == 0 {

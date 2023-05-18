@@ -64,12 +64,11 @@ func (f *FilteringCase) Init() error {
 }
 
 func (f *FilteringCase) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	f.Ctx, f.CtxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-		if err := CreateNamespace(ctx, f.Client, namespace); err != nil {
+		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		//Create deployment
@@ -110,13 +109,11 @@ func (f *FilteringCase) CreateResources() error {
 }
 
 func (f *FilteringCase) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check namespace
-		checkNS, err := GetNamespace(ctx, f.Client, namespace)
+		checkNS, err := GetNamespace(f.Ctx, f.Client, namespace)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", namespace)
 		}
