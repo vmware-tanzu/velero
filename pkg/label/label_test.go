@@ -47,3 +47,13 @@ func TestGetValidLabelName(t *testing.T) {
 		})
 	}
 }
+
+func TestNewSelectorForBackup(t *testing.T) {
+	selector := NewSelectorForBackup("my-backup")
+	assert.Equal(t, "velero.io/backup-name=my-backup", selector.String())
+}
+
+func TestNewListOptionsForBackup(t *testing.T) {
+	option := NewListOptionsForBackup("my-backup")
+	assert.Equal(t, "velero.io/backup-name=my-backup", option.LabelSelector)
+}
