@@ -70,6 +70,10 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 			Annotations: ann,
 		},
 		Spec: corev1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+				FSGroup:             func(i int64) *int64 { return &i }(65534),
+				FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
+			},
 			Containers: []corev1.Container{
 				{
 					Name:         name,

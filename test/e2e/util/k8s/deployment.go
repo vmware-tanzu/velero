@@ -93,6 +93,10 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 						Labels: labels,
 					},
 					Spec: v1.PodSpec{
+						SecurityContext: &v1.PodSecurityContext{
+							FSGroup:             func(i int64) *int64 { return &i }(65534),
+							FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
+						},
 						Containers: containers,
 					},
 				},
