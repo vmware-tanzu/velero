@@ -196,8 +196,8 @@ func isProvisionedByCSI(log logrus.FieldLogger, pv *corev1api.PersistentVolume, 
 	return false, nil
 }
 
-// SinglePathMatch function will be called by PVB and PVR controller to check whether pass-in volume path is valid.
-// Check whether there is only one match by the path's pattern (/host_pods/%s/volumes/*/volume_name/[mount|]).
+// SinglePathMatch checks whether pass-in volume path is valid.
+// Check whether there is only one match by the path's pattern.
 func SinglePathMatch(path string, fs filesystem.Interface, log logrus.FieldLogger) (string, error) {
 	matches, err := fs.Glob(path)
 	if err != nil {

@@ -64,7 +64,7 @@ func TestResticRunBackup(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ResticBackupCMDFunc = tc.hookBackupFunc
-			_, _, err := rp.RunBackup(context.Background(), "var", nil, "", &updater)
+			_, _, err := rp.RunBackup(context.Background(), "var", nil, false, "", &updater)
 			rp.log.Infof("test name %v error %v", tc.name, err)
 			require.Equal(t, true, tc.errorHandleFunc(err))
 		})
