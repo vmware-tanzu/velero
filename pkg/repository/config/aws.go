@@ -54,23 +54,27 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 
 // GetS3Credentials gets the S3 credential values according to the information
 // of the provided config or the system's environment variables
-func GetS3Credentials(config map[string]string) (credentials.Value, error) {
+func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
+	if len(os.Getenv("AWS_ROLE_ARN")) > 0 {
+		return nil, nil
+	}
+
 	credentialsFile := config[CredentialsFileKey]
 	if credentialsFile == "" {
 		credentialsFile = os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
 	}
 
 	if credentialsFile == "" {
-		return credentials.Value{}, errors.New("missing credential file")
+		return nil, errors.New("missing credential file")
 	}
 
 	creds := credentials.NewSharedCredentials(credentialsFile, "")
 	credValue, err := creds.Get()
 	if err != nil {
-		return credValue, err
+		return nil, err
 	}
 
-	return credValue, nil
+	return &credValue, nil
 }
 
 // GetAWSBucketRegion returns the AWS region that a bucket is in, or an error
