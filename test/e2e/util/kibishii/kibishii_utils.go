@@ -210,6 +210,13 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
 
+	labelNamespaceCmd := exec.CommandContext(ctx, "kubectl", "label", "namespace", namespace, "pod-security.kubernetes.io/enforce=baseline", "pod-security.kubernetes.io/enforce-version=latest", "--overwrite=true")
+	_, stderr, err = veleroexec.RunCommand(labelNamespaceCmd)
+	fmt.Printf("Label namespace with PSA policy: %s\n", labelNamespaceCmd)
+	if err != nil {
+		return errors.Wrapf(err, "failed to label namespace with PSA policy, stderr=%s", stderr)
+	}
+
 	kibishiiSetWaitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
 		"-n", namespace, "-w", "--timeout=30m")
 	_, stderr, err = veleroexec.RunCommand(kibishiiSetWaitCmd)
