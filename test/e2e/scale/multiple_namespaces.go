@@ -22,3 +22,5 @@ import (
 )
 
 var MultiNSBackupRestore func() = TestFunc(&basic.MultiNSBackup{IsScalTest: true})
+
+//TestCase: TestCase{UseVolumeSnapshots: false},

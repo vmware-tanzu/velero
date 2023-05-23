@@ -77,7 +77,7 @@ func (m *MultiNSBackup) Init() error {
 	m.BackupArgs = []string{
 		"create", "--namespace", m.VeleroCfg.VeleroNamespace, "backup", m.BackupName,
 		"--exclude-namespaces", strings.Join(*m.NSExcluded, ","),
-		"--default-volumes-to-fs-backup", "--wait",
+		"--wait",
 	}
 
 	m.RestoreArgs = []string{

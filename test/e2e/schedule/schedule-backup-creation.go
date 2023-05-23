@@ -37,6 +37,7 @@ func (n *ScheduleBackupCreation) Init() error {
 	n.TestCase.Init()
 	n.CaseBaseName = "schedule-backup-creation-test" + n.UUIDgen
 	n.ScheduleName = n.ScheduleName + "schedule-" + UUIDgen.String()
+	n.UseVolumeSnapshots = false
 	n.namespace = n.CaseBaseName
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero

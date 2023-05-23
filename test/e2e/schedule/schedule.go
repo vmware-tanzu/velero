@@ -32,6 +32,7 @@ func (n *ScheduleBackup) Init() error {
 	n.CaseBaseName = "schedule-backup-" + n.UUIDgen
 	n.NSIncluded = &[]string{n.CaseBaseName}
 	n.ScheduleName = "schedule-" + n.CaseBaseName
+	n.UseVolumeSnapshots = false
 
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero

@@ -90,6 +90,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 			}
 			if veleroCfg.InstallVelero {
 				veleroCfg.UseVolumeSnapshots = test.GetTestCase().UseVolumeSnapshots
+				veleroCfg.UseNodeAgent = !veleroCfg.UseVolumeSnapshots
 				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
 			}
 		})
