@@ -256,6 +256,15 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 			continue
 		}
 
+		uploaderName, found := p.Tags[uploader.SnapshotUploaderTag]
+		if !found {
+			continue
+		}
+
+		if uploaderName != snapshotTags[uploader.SnapshotUploaderTag] {
+			continue
+		}
+
 		if noLaterThan != nil && p.StartTime.After(*noLaterThan) {
 			continue
 		}
@@ -277,6 +286,13 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 	log.Info("Start to restore...")
 
 	kopiaCtx := logging.SetupKopiaLog(ctx, log)
+
+	snapshot, err := snapshot.LoadSnapshot(kopiaCtx, rep, manifest.ID(snapshotID))
+	if err != nil {
+		return 0, 0, errors.Wrapf(err, "Unable to load snapshot %v", snapshotID)
+	}
+
+	log.Infof("Restore from snapshot %s, description %s, created time %v, tags %v", snapshotID, snapshot.Description, snapshot.EndTime.ToTime(), snapshot.Tags)
 
 	rootEntry, err := snapshotfs.FilesystemEntryFromIDWithPath(kopiaCtx, rep, snapshotID, false)
 	if err != nil {
