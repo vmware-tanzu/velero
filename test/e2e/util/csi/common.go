@@ -63,6 +63,7 @@ func GetCsiSnapshotHandle(client TestClient, backupName string) ([]string, error
 	if err1 != nil {
 		return nil, err
 	}
+
 	var snapshotHandleList []string
 	for _, i := range vscList.Items {
 		if i.Status == nil {
@@ -84,11 +85,9 @@ func GetCsiSnapshotHandle(client TestClient, backupName string) ([]string, error
 			snapshotHandleList = append(snapshotHandleList, tmp[len(tmp)-1])
 		}
 	}
-	if err != nil {
-		return nil, err
-	}
+
 	if len(snapshotHandleList) == 0 {
-		return snapshotHandleList, errors.New(fmt.Sprintf("No VolumeSnapshotContent from backup %s", backupName))
+		fmt.Printf("No VolumeSnapshotContent from backup %s", backupName)
 	}
 	return snapshotHandleList, nil
 }
@@ -132,9 +131,11 @@ func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, ba
 func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount int) ([]string, error) {
 	var err error
 	var snapshotContentNameList []string
-	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil ||
-		len(snapshotContentNameList) != expectedCount {
+	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil {
 		return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+	}
+	if len(snapshotContentNameList) != expectedCount {
+		return nil, errors.New(fmt.Sprintf("Snapshot count %d is not as expect %d", len(snapshotContentNameList), expectedCount))
 	}
 	fmt.Println(snapshotContentNameList)
 	return snapshotContentNameList, nil
