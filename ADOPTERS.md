@@ -3,6 +3,7 @@
 If you're using Velero and want to add your organization to this list, 
 [follow these directions][1]!
 
+<a href="https://www.pitsdatarecovery.net/" border="0" target="_blank"><img alt="pitsdatarecovery.net" src="site/static/img/adopters/PITSGlobalDataRecoveryServices.svg" height="50"></a>
 <a href="https://www.bitgo.com" border="0" target="_blank"><img alt="bitgo.com" src="site/static/img/adopters/BitGo.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://www.nirmata.com" border="0" target="_blank"><img alt="nirmata.com" src="site/static/img/adopters/nirmata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://kyma-project.io/" border="0" target="_blank"><img alt="kyma-project.io" src="site/static/img/adopters/kyma.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
