@@ -71,7 +71,7 @@ func NewUploaderProvider(
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	if credGetter.FromFile == nil {
-		return nil, errors.New("uninitialized FileStore credentail is not supported")
+		return nil, errors.New("uninitialized FileStore credential is not supported")
 	}
 	if uploaderType == uploader.KopiaType {
 		// We use the hardcode repositoryType velerov1api.BackupRepositoryTypeKopia for now, because we have only one implementation of unified repo.
