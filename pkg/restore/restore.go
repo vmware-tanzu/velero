@@ -487,13 +487,14 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	for _, selectedResource := range crdResourceCollection {
 		var w, e results.Result
-		// Restore this resource
+		// Restore this resource, the update channel is set to nil, to avoid misleading value of "totalItems"
+		// more details see #5990
 		processedItems, w, e = ctx.processSelectedResource(
 			selectedResource,
 			totalItems,
 			processedItems,
 			existingNamespaces,
-			update,
+			nil,
 		)
 		warnings.Merge(&w)
 		errs.Merge(&e)
@@ -661,9 +662,11 @@ func (ctx *restoreContext) processSelectedResource(
 			// time, we don't want previously known items counted twice as
 			// they are present in both restoredItems and totalItems.
 			actualTotalItems := len(ctx.restoredItems) + (totalItems - processedItems)
-			update <- progressUpdate{
-				totalItems:    actualTotalItems,
-				itemsRestored: len(ctx.restoredItems),
+			if update != nil {
+				update <- progressUpdate{
+					totalItems:    actualTotalItems,
+					itemsRestored: len(ctx.restoredItems),
+				}
 			}
 			ctx.log.WithFields(map[string]interface{}{
 				"progress":  "",
