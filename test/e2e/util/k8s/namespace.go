@@ -35,6 +35,11 @@ import (
 
 func CreateNamespace(ctx context.Context, client TestClient, namespace string) error {
 	ns := builder.ForNamespace(namespace).Result()
+	// Add label to avoid PSA check.
+	ns.Labels = map[string]string{
+		"pod-security.kubernetes.io/enforce":         "baseline",
+		"pod-security.kubernetes.io/enforce-version": "latest",
+	}
 	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
@@ -45,6 +50,9 @@ func CreateNamespace(ctx context.Context, client TestClient, namespace string) e
 func CreateNamespaceWithLabel(ctx context.Context, client TestClient, namespace string, label map[string]string) error {
 	ns := builder.ForNamespace(namespace).Result()
 	ns.Labels = label
+	// Add label to avoid PSA check.
+	ns.Labels["pod-security.kubernetes.io/enforce"] = "baseline"
+	ns.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
 	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
@@ -54,6 +62,11 @@ func CreateNamespaceWithLabel(ctx context.Context, client TestClient, namespace 
 
 func CreateNamespaceWithAnnotation(ctx context.Context, client TestClient, namespace string, annotation map[string]string) error {
 	ns := builder.ForNamespace(namespace).Result()
+	// Add label to avoid PSA check.
+	ns.Labels = map[string]string{
+		"pod-security.kubernetes.io/enforce":         "baseline",
+		"pod-security.kubernetes.io/enforce-version": "latest",
+	}
 	ns.ObjectMeta.Annotations = annotation
 	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
