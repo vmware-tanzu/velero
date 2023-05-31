@@ -186,9 +186,8 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			restore.Status.Phase = velerov1api.RestorePhaseWaitingForPluginOperationsPartiallyFailed
 		}
 		if restore.Status.Phase == velerov1api.RestorePhaseWaitingForPluginOperations {
-			log.Infof("Marking restore %s completed", restore.Name)
-			restore.Status.Phase = velerov1api.RestorePhaseCompleted
-			r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
+			log.Infof("Restore %s plugin operations completed, wait for post restore actions", restore.Name)
+			restore.Status.Phase = velerov1api.RestorePhaseWaitingForPostRestoreActions
 		} else {
 			log.Infof("Marking restore %s FinalizingPartiallyFailed", restore.Name)
 			restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed

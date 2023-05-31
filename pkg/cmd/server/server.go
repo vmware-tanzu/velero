@@ -685,6 +685,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.RestoreOperations:   {},
 		controller.Schedule:            {},
 		controller.ServerStatusRequest: {},
+		controller.PostRestoreActions:  {},
+		controller.PostBackupActions:   {},
 	}
 
 	if s.config.restoreOnly {
@@ -694,6 +696,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			controller.BackupDeletion,
 			controller.BackupFinalizer,
 			controller.BackupOperations,
+			controller.PostBackupActions,
 			controller.GarbageCollection,
 			controller.Schedule,
 		)
@@ -964,6 +967,37 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.PostRestoreActions]; ok {
+		if err := controller.NewPostRestoreActionsReconciler(
+			s.ctx,
+			s.namespace,
+			s.mgr.GetClient(),
+			s.logger,
+			s.logLevel,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			s.config.formatFlag.Parse(),
+			s.config.defaultItemOperationTimeout,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.PostRestoreActions)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.PostBackupActions]; ok {
+		if err := controller.NewPostBackupActionsReconciler(
+			s.logger,
+			s.logLevel,
+			s.config.formatFlag.Parse(),
+			s.mgr.GetClient(),
+			s.metrics,
+			backupStoreGetter,
+			newPluginManager,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.PostBackupActions)
 		}
 	}
 

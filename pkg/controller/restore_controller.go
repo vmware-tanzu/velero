@@ -199,7 +199,9 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err := r.runValidatedRestore(restore, info); err != nil {
 		log.WithError(err).Debug("Restore failed")
-		restore.Status.Phase = api.RestorePhaseFailed
+		if restore.Status.Phase != api.RestorePhaseFailedPreRestoreActions {
+			restore.Status.Phase = api.RestorePhaseFailed
+		}
 		restore.Status.FailureReason = err.Error()
 		r.metrics.RegisterRestoreFailed(backupScheduleName)
 	}
@@ -207,7 +209,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// mark completion if in terminal phase
 	if restore.Status.Phase == api.RestorePhaseFailed ||
 		restore.Status.Phase == api.RestorePhasePartiallyFailed ||
-		restore.Status.Phase == api.RestorePhaseCompleted {
+		restore.Status.Phase == api.RestorePhaseCompleted ||
+		restore.Status.Phase == api.RestorePhaseFailedPreRestoreActions {
 		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	}
 	log.Debug("Updating restore's final status")
@@ -452,6 +455,36 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
+	restoreLog.Info("Getting pre restore actions")
+	preRestoreActions, err := pluginManager.GetPreRestoreActions()
+	if err != nil {
+		return errors.Wrap(err, "error getting pre restore actions")
+	}
+
+	if len(preRestoreActions) > 0 {
+		restoreLog.Info("Pre restore actions are present, running them")
+		for _, action := range preRestoreActions {
+			err = action.Execute(restore)
+			if err != nil {
+				preRestoreError := errors.Wrap(err, "error executing pre restore action")
+				restoreLog.WithError(err).WithField(Restore, restore.Name).Error("Pre action failed")
+				restoreLog.DoneForPersist(r.logger)
+				restoreLogFile, err := restoreLog.GetPersistFile()
+				if err != nil {
+					return errors.Wrap(preRestoreError, "error getting persisted file")
+				}
+				err = backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, restoreLogFile)
+				if err != nil {
+					r.logger.Errorf("Error while put restore log, err: %s", err)
+				}
+				restore.Status.Phase = api.RestorePhaseFailedPreRestoreActions
+				return preRestoreError
+			}
+		}
+	} else {
+		r.logger.Info("Pre restore actions are not present")
+	}
+
 	restoreLog.Info("starting restore")
 
 	var podVolumeBackups []*api.PodVolumeBackup
@@ -569,8 +602,8 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 			r.logger.Debug("Restore WaitingForPluginOperations")
 			restore.Status.Phase = api.RestorePhaseWaitingForPluginOperations
 		} else {
-			r.logger.Debug("Restore completed")
-			restore.Status.Phase = api.RestorePhaseCompleted
+			r.logger.Debug("Restore completed, wait for post restore")
+			restore.Status.Phase = api.RestorePhaseWaitingForPostRestoreActions
 			r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
 		}
 	}

@@ -272,7 +272,7 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting;FailedPreBackupActions;FailedPostBackupActions;WaitingForPostBackupActions
 type BackupPhase string
 
 const (
@@ -333,6 +333,18 @@ const (
 
 	// BackupPhaseDeleting means the backup and all its associated data are being deleted.
 	BackupPhaseDeleting BackupPhase = "Deleting"
+
+	// BackupPhaseFailedPreBackupActions means one or more Pre Backup Actions has failed
+	// and backup will not run
+	BackupPhaseFailedPreBackupActions BackupPhase = "FailedPreBackupActions"
+
+	// BackupPhaseFailedPostBackupActions means one or more Post Backup Actions has failed
+	// but backup was completed and persisted
+	BackupPhaseFailedPostBackupActions BackupPhase = "FailedPostBackupActions"
+
+	// BackupPhaseWaitingForPostBackupActions means backup run successfully and now waiting
+	// post backup actions
+	BackupPhaseWaitingForPostBackupActions BackupPhase = "WaitingForPostBackupActions"
 )
 
 // BackupStatus captures the current status of a Velero backup.

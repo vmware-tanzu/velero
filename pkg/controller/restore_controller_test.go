@@ -41,6 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -233,6 +234,7 @@ func TestRestoreReconcile(t *testing.T) {
 		backupStoreGetBackupMetadataErr error
 		backupStoreGetBackupContentsErr error
 		putRestoreLogErr                error
+		preRestoreActionsErr            bool
 		expectedFinalPhase              string
 	}{
 		{
@@ -391,6 +393,17 @@ func TestRestoreReconcile(t *testing.T) {
 			backupStoreGetBackupContentsErr: errors.New("Couldn't download backup"),
 			backup:                          defaultBackup().StorageLocation("default").Result(),
 		},
+		{
+			name:                  "pre restore actions failure results in PreRestoreActionsFailed",
+			location:              defaultStorageLocation,
+			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
+			backup:                defaultBackup().StorageLocation("default").Result(),
+			expectedErr:           false,
+			expectedFinalPhase:    string(velerov1api.BackupPhaseFailedPreBackupActions),
+			expectedStartTime:     &timestamp,
+			expectedCompletedTime: &timestamp,
+			preRestoreActionsErr:  true,
+		},
 	}
 
 	formatFlag := logging.FormatText
@@ -480,6 +493,22 @@ func TestRestoreReconcile(t *testing.T) {
 
 			if test.restore != nil {
 				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
+				if test.preRestoreActionsErr {
+					backupStore.On("GetBackupContents", test.backup.Name).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
+					volumeSnapshots := []*volume.Snapshot{
+						{
+							Spec: volume.SnapshotSpec{
+								PersistentVolumeName: "test-pv",
+								BackupName:           test.backup.Name,
+							},
+						},
+					}
+					backupStore.On("GetBackupVolumeSnapshots", test.backup.Name).Return(volumeSnapshots, nil)
+					backupStore.On("PutRestoreLog", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
+					pluginManager.On("GetPreRestoreActions").Return([]velero.PreRestoreAction{&failPreRestoreAction{}}, nil)
+				} else {
+					pluginManager.On("GetPreRestoreActions").Return(nil, nil)
+				}
 				pluginManager.On("CleanupClients")
 			}
 
@@ -792,4 +821,11 @@ func (r *fakeRestorer) RestoreWithResolvers(req *pkgrestore.Request,
 	r.calledWithArg = *req.Restore
 
 	return res.Get(0).(results.Result), res.Get(1).(results.Result)
+}
+
+type failPreRestoreAction struct {
+}
+
+func (a *failPreRestoreAction) Execute(restore *velerov1api.Restore) error {
+	return errors.New("error")
 }

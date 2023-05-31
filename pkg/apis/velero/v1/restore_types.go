@@ -225,7 +225,7 @@ type InitRestoreHook struct {
 
 // RestorePhase is a string representation of the lifecycle phase
 // of a Velero restore
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed;FailedPreRestoreActions;FailedPostRestoreActions;WaitingForPostRestoreActions
 type RestorePhase string
 
 const (
@@ -264,6 +264,17 @@ const (
 	// RestorePhaseFailed means the restore was unable to execute.
 	// The failing error is recorded in status.FailureReason.
 	RestorePhaseFailed RestorePhase = "Failed"
+
+	// BackupPhaseFailedPreBackupActions means one or more Pre Restore Actions has failed
+	// and restore will not run
+	RestorePhaseFailedPreRestoreActions RestorePhase = "FailedPreRestoreActions"
+
+	// RestorePhaseFailedPostRestoreActions means one or more Post Restore Actions has failed
+	RestorePhaseFailedPostRestoreActions RestorePhase = "FailedPostRestoreActions"
+
+	// RestorePhaseWaitingForPostRestoreActions means restore run successfully and waiting
+	// post restore actions
+	RestorePhaseWaitingForPostRestoreActions = "WaitingForPostRestoreActions"
 
 	// PolicyTypeNone means velero will not overwrite the resource
 	// in cluster with the one in backup whether changed/unchanged.

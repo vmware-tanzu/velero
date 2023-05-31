@@ -80,7 +80,7 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 				StartTimestamp(fakeClock.Now()).
 				Phase(velerov1api.BackupPhaseFinalizing).Result(),
 			backupLocation: defaultBackupLocation,
-			expectPhase:    velerov1api.BackupPhaseCompleted,
+			expectPhase:    velerov1api.BackupPhaseWaitingForPostBackupActions,
 			backupOperations: []*itemoperation.BackupOperation{
 				{
 					Spec: itemoperation.BackupOperationSpec{

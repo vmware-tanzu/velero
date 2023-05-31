@@ -32,6 +32,8 @@ const (
 	RestoreOperations     = "restore-operations"
 	Schedule              = "schedule"
 	ServerStatusRequest   = "server-status-request"
+	PostRestoreActions    = "post-restore-actions"
+	PostBackupActions     = "post-backup-actions"
 )
 
 // DisableableControllers is a list of controllers that can be disabled
@@ -48,4 +50,6 @@ var DisableableControllers = []string{
 	RestoreOperations,
 	Schedule,
 	ServerStatusRequest,
+	PostRestoreActions,
+	PostBackupActions,
 }

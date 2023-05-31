@@ -23,9 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -839,6 +842,82 @@ func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
 			require.Equal(t, tc.wantConfig, objStore.Config)
 		})
 	}
+}
+
+func TestPutPostBackupLog(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("foo", "")
+	logger := logrus.New()
+	harness.logger = logger
+
+	backup := "test-backup"
+
+	oldLog, err := createGzip("log1\nlog2\n")
+	require.Nil(t, err)
+	harness.PutBackupLog(backup, oldLog)
+
+	newLog, err := createGzip("log3\nlog4\n")
+	require.Nil(t, err)
+	harness.PutPostBackupLog(backup, newLog)
+
+	logGzip, err := harness.objectStore.GetObject("foo", harness.layout.getBackupLogKey(backup))
+	log, err := readString(logGzip)
+	require.NoError(t, err)
+	require.Equal(t, "log1\nlog2\nlog3\nlog4\n", log)
+}
+
+func TestPutPostRestoreLog(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("foo", "")
+	logger := logrus.New()
+	harness.logger = logger
+
+	backup := "test-backup"
+	restore := "test-restore"
+
+	oldLog, err := createGzip("log1\nlog2\n")
+	require.Nil(t, err)
+	harness.PutRestoreLog(backup, restore, oldLog)
+
+	newLog, err := createGzip("log3\nlog4\n")
+	require.Nil(t, err)
+	harness.PutPostRestoreLog(backup, restore, newLog)
+
+	logGzip, err := harness.objectStore.GetObject("foo", harness.layout.getRestoreLogKey(restore))
+	log, err := readString(logGzip)
+	require.NoError(t, err)
+	require.Equal(t, "log1\nlog2\nlog3\nlog4\n", log)
+}
+
+func createGzip(data string) (io.Reader, error) {
+	file, err := os.CreateTemp("", "")
+	if err != nil {
+		return nil, err
+	}
+	writer := gzip.NewWriter(file)
+	_, err = io.Copy(writer, strings.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func readString(reader io.Reader) (string, error) {
+	gzipReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return "", err
+	}
+	data, err := io.ReadAll(gzipReader)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func encodeToBytes(obj runtime.Object) []byte {
