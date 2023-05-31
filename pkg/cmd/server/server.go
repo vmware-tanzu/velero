@@ -510,11 +510,10 @@ func (s *server) veleroResourcesExist() error {
 //   - CAPI ClusterClasses go before Clusters.
 //   - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
 //     for the same clusters
-//   - IPAM GlobalInClusterPool/InClusterPool/IPAddress go before IPAddressClaim so no new IPAddress is created for the claim
 //
 // Low priorities:
 //   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
-//   - ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
+//     ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
 //   - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 //     Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 //     See https://github.com/kubernetes-sigs/cluster-api/issues/4105
@@ -540,10 +539,6 @@ var defaultRestorePriorities = restore.Priorities{
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
 		"services",
-		"globalinclusterippools.ipam.cluster.x-k8s.io",
-		"inclusterippools.ipam.cluster.x-k8s.io",
-		"ipaddresses.ipam.cluster.x-k8s.io",
-		"ipaddressclaims.ipam.cluster.x-k8s.io",
 	},
 	LowPriorities: []string{
 		"clusterbootstraps.run.tanzu.vmware.com",
