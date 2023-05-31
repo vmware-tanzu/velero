@@ -21,9 +21,9 @@ set -o pipefail
 
 export CGO_ENABLED=0
 
-TARGETS=(
+TARGETS=($(go list ./pkg/... | grep -v "github.com/vmware-tanzu/velero/pkg/builder"))
+TARGETS+=(
   ./cmd/...
-  ./pkg/...
   ./internal/...
 )
 
