@@ -128,6 +128,10 @@ func (o *OrderedResources) Backup() error {
 	return nil
 }
 
+func (o *OrderedResources) Destroy() error {
+	return nil
+}
+
 func (o *OrderedResources) Verify() error {
 	By(fmt.Sprintf("Checking resource order in %s schedule cr", o.ScheduleName), func() {
 		err := CheckScheduleWithResourceOrder(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.OrderMap)

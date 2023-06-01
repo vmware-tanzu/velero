@@ -238,7 +238,7 @@ func GetPVByPodName(client TestClient, namespace, podName string) (string, error
 		return "", err
 	}
 	if len(pvcList) != 1 {
-		return "", errors.New(fmt.Sprintf("Only 1 PVC of pod %s should be found under namespace %s", podName, namespace))
+		return "", errors.New(fmt.Sprintf("Only 1 PVC of pod %s should be found under namespace %s but got %v", podName, namespace, pvcList))
 	}
 	pvList, err := GetPvByPvc(context.Background(), namespace, pvcList[0])
 	if err != nil {

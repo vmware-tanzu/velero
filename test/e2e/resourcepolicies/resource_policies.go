@@ -59,25 +59,31 @@ type ResourcePoliciesCase struct {
 var ResourcePoliciesTest func() = TestFunc(&ResourcePoliciesCase{})
 
 func (r *ResourcePoliciesCase) Init() error {
+	// generate random number as UUIDgen and set one default timeout duration
 	r.TestCase.Init()
-	r.CaseBaseName = "resource-policies-" + r.UUIDgen
-	r.cmName = "cm-" + r.CaseBaseName
-	r.yamlConfig = yamlData
-	r.VeleroCfg = VeleroCfg
-	r.Client = *r.VeleroCfg.ClientToInstallVelero
-	r.VeleroCfg.UseVolumeSnapshots = false
-	r.VeleroCfg.UseNodeAgent = true
-	r.NamespacesTotal = 3
 
+	// generate variable names based on CaseBaseName + UUIDgen
+	r.CaseBaseName = "resource-policies-" + r.UUIDgen
+	r.BackupName = "backup-" + r.CaseBaseName
+	r.RestoreName = "restore-" + r.CaseBaseName
+	r.cmName = "cm-" + r.CaseBaseName
+
+	// generate namespaces by NamespacesTotal
+	r.NamespacesTotal = 3
 	r.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		*r.NSIncluded = append(*r.NSIncluded, createNSName)
 	}
 
-	r.BackupName = "backup-resource-policies-" + UUIDgen.String()
-	r.RestoreName = "restore-resource-policies-" + UUIDgen.String()
+	// assign values to the inner variable for specific case
+	r.yamlConfig = yamlData
+	r.VeleroCfg = VeleroCfg
+	r.Client = *r.VeleroCfg.ClientToInstallVelero
+	r.VeleroCfg.UseVolumeSnapshots = false
+	r.VeleroCfg.UseNodeAgent = true
 
+	// NEED explicitly specify the value of the variables for snapshot-volumes or default-volumes-to-fs-backup
 	r.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--resource-policies-configmap", r.cmName,
@@ -91,6 +97,7 @@ func (r *ResourcePoliciesCase) Init() error {
 		"--from-backup", r.BackupName, "--wait",
 	}
 
+	// Message output by ginkgo
 	r.TestMsg = &TestMSG{
 		Desc:      "Skip backup of volume by resource policies",
 		FailedMSG: "Failed to skip backup of volume by resource policies",
@@ -100,7 +107,9 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
+	// It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
 	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+
 	By(("Installing storage class..."), func() {
 		Expect(r.installTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
@@ -178,6 +187,7 @@ func (r *ResourcePoliciesCase) Verify() error {
 }
 
 func (r *ResourcePoliciesCase) Clean() error {
+	// If created some resources which is not in current test namespace, we NEED to override the base Clean function
 	if !r.VeleroCfg.Debug {
 		if err := r.deleteTestStorageClassList([]string{"e2e-storage-class", "e2e-storage-class-2"}); err != nil {
 			return err
@@ -187,7 +197,7 @@ func (r *ResourcePoliciesCase) Clean() error {
 			return err
 		}
 
-		return r.GetTestCase().Clean()
+		return r.GetTestCase().Clean() // only clean up resources in test namespace
 	}
 	return nil
 }
