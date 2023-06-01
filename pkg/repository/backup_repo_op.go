@@ -91,7 +91,7 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 	return repo, nil
 }
 
-func newBackupRepository(namespace string, key BackupRepositoryKey) *velerov1api.BackupRepository {
+func NewBackupRepository(namespace string, key BackupRepositoryKey) *velerov1api.BackupRepository {
 	return &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,

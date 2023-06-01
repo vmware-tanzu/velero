@@ -21,15 +21,28 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"k8s.io/client-go/kubernetes"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	clientTesting "k8s.io/client-go/testing"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	velerofake "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/vmware-tanzu/velero/pkg/repository"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestIsHostPathVolume(t *testing.T) {
@@ -201,6 +214,458 @@ func Test_backupper_BackupPodVolumes_log_test(t *testing.T) {
 			fmt.Println(logOutput.String())
 			assert.Contains(t, logOutput.String(), tt.wantLog)
 
+		})
+	}
+}
+
+type reactor struct {
+	verb        string
+	resource    string
+	reactorFunc clientTesting.ReactionFunc
+}
+
+func createBackupRepoObj() *velerov1api.BackupRepository {
+	bkRepoObj := repository.NewBackupRepository(velerov1api.DefaultNamespace, repository.BackupRepositoryKey{
+		VolumeNamespace: "fake-ns",
+		BackupLocation:  "fake-bsl",
+		RepositoryType:  "kopia",
+	})
+
+	bkRepoObj.Status.Phase = velerov1api.BackupRepositoryPhaseReady
+
+	return bkRepoObj
+}
+
+func createPodObj(running bool, withVolume bool, withVolumeMounted bool, volumeNum int) *corev1api.Pod {
+	podObj := builder.ForPod("fake-ns", "fake-pod").Result()
+	if running {
+		podObj.Status.Phase = corev1api.PodRunning
+		podObj.Spec.NodeName = "fake-node-name"
+	}
+
+	if withVolume {
+		for i := 0; i < volumeNum; i++ {
+			podObj.Spec.Volumes = append(podObj.Spec.Volumes, corev1api.Volume{
+				Name: fmt.Sprintf("fake-volume-%d", i+1),
+				VolumeSource: corev1api.VolumeSource{
+					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+						ClaimName: fmt.Sprintf("fake-pvc-%d", i+1),
+					},
+				},
+			})
+		}
+
+		if withVolumeMounted {
+			volumeMount := []corev1api.VolumeMount{}
+			for i := 0; i < volumeNum; i++ {
+				volumeMount = append(volumeMount, corev1api.VolumeMount{
+					Name: fmt.Sprintf("fake-volume-%d", i+1),
+				})
+			}
+			podObj.Spec.Containers = []corev1api.Container{
+				{
+					Name:         "fake-container",
+					VolumeMounts: volumeMount,
+				},
+			}
+		}
+	}
+
+	return podObj
+}
+
+func createNodeAgentPodObj(running bool) *corev1api.Pod {
+	podObj := builder.ForPod(velerov1api.DefaultNamespace, "fake-node-agent").Result()
+	podObj.Labels = map[string]string{"name": "node-agent"}
+
+	if running {
+		podObj.Status.Phase = corev1api.PodRunning
+		podObj.Spec.NodeName = "fake-node-name"
+	}
+
+	return podObj
+}
+
+func createPVObj(index int, withHostPath bool) *corev1api.PersistentVolume {
+	pvObj := builder.ForPersistentVolume(fmt.Sprintf("fake-pv-%d", index)).Result()
+	if withHostPath {
+		pvObj.Spec.HostPath = &corev1api.HostPathVolumeSource{Path: "fake-host-path"}
+	}
+
+	return pvObj
+}
+
+func createPVCObj(index int) *corev1api.PersistentVolumeClaim {
+	pvcObj := builder.ForPersistentVolumeClaim("fake-ns", fmt.Sprintf("fake-pvc-%d", index)).VolumeName(fmt.Sprintf("fake-pv-%d", index)).Result()
+	return pvcObj
+}
+
+func createPVBObj(fail bool, withSnapshot bool, index int, uploaderType string) *velerov1api.PodVolumeBackup {
+	pvbObj := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, fmt.Sprintf("fake-pvb-%d", index)).
+		PodName("fake-pod").PodNamespace("fake-ns").Volume(fmt.Sprintf("fake-volume-%d", index)).Result()
+	if fail {
+		pvbObj.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
+		pvbObj.Status.Message = "fake-message"
+	} else {
+		pvbObj.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
+	}
+
+	if withSnapshot {
+		pvbObj.Status.SnapshotID = fmt.Sprintf("fake-snapshot-id-%d", index)
+	}
+
+	pvbObj.Spec.UploaderType = uploaderType
+
+	return pvbObj
+}
+
+func TestBackupPodVolumes(t *testing.T) {
+	scheme := runtime.NewScheme()
+	velerov1api.AddToScheme(scheme)
+
+	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	failedPVB := createPVBObj(true, false, 1, "")
+	completedPVB := createPVBObj(false, false, 1, "")
+
+	tests := []struct {
+		name            string
+		ctx             context.Context
+		bsl             string
+		uploaderType    string
+		volumes         []string
+		sourcePod       *corev1api.Pod
+		kubeClientObj   []runtime.Object
+		ctlClientObj    []runtime.Object
+		veleroClientObj []runtime.Object
+		veleroReactors  []reactor
+		runtimeScheme   *runtime.Scheme
+		retPVBs         []*velerov1api.PodVolumeBackup
+		pvbs            []*velerov1api.PodVolumeBackup
+		errs            []string
+	}{
+		{
+			name: "empty volume list",
+		},
+		{
+			name: "pod is not running",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(false, false, false, 2),
+		},
+		{
+			name: "node-agent pod is not running in node",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, false, false, 2),
+			errs: []string{
+				"daemonset pod not found in running state in node fake-node-name",
+			},
+		},
+		{
+			name: "wrong repository type",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, false, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+			},
+			uploaderType: "fake-uploader-type",
+			errs: []string{
+				"empty repository type, uploader fake-uploader-type",
+			},
+		},
+		{
+			name: "ensure repo fail",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, false, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+			},
+			uploaderType: "kopia",
+			errs: []string{
+				"wrong parameters, namespace \"fake-ns\", backup storage location \"\", repository type \"kopia\"",
+			},
+		},
+		{
+			name: "volume not found in pod",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, false, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+		},
+		{
+			name: "PVC not found",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, true, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			errs: []string{
+				"error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-1\" not found",
+				"error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-2\" not found",
+			},
+		},
+		{
+			name: "check host path fail",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, true, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVCObj(2),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			errs: []string{
+				"error checking if volume is a hostPath volume: persistentvolumes \"fake-pv-1\" not found",
+				"error checking if volume is a hostPath volume: persistentvolumes \"fake-pv-2\" not found",
+			},
+		},
+		{
+			name: "host path volume should be skipped",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, true, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVCObj(2),
+				createPVObj(1, true),
+				createPVObj(2, true),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+		},
+		{
+			name: "volume not mounted by pod should be skipped",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, true, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVCObj(2),
+				createPVObj(1, false),
+				createPVObj(2, false),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+		},
+		{
+			name: "create PVB fail",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, true, true, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVCObj(2),
+				createPVObj(1, false),
+				createPVObj(2, false),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			veleroReactors: []reactor{
+				{
+					verb:     "create",
+					resource: "podvolumebackups",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-create-error")
+					},
+				},
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			errs: []string{
+				"fake-create-error",
+				"fake-create-error",
+			},
+		},
+		{
+			name: "context cancelled",
+			ctx:  ctxWithCancel,
+			volumes: []string{
+				"fake-volume-1",
+			},
+			sourcePod: createPodObj(true, true, true, 1),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVObj(1, false),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			errs: []string{
+				"timed out waiting for all PodVolumeBackups to complete",
+			},
+		},
+		{
+			name: "return failed pvbs",
+			volumes: []string{
+				"fake-volume-1",
+			},
+			sourcePod: createPodObj(true, true, true, 1),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVObj(1, false),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			retPVBs: []*velerov1api.PodVolumeBackup{
+				failedPVB,
+			},
+			pvbs: []*velerov1api.PodVolumeBackup{
+				failedPVB,
+			},
+			errs: []string{
+				"pod volume backup failed: fake-message",
+			},
+		},
+		{
+			name: "return completed pvbs",
+			volumes: []string{
+				"fake-volume-1",
+			},
+			sourcePod: createPodObj(true, true, true, 1),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVObj(1, false),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			retPVBs: []*velerov1api.PodVolumeBackup{
+				completedPVB,
+			},
+			pvbs: []*velerov1api.PodVolumeBackup{
+				completedPVB,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			if test.ctx != nil {
+				ctx = test.ctx
+			}
+
+			fakeClientBuilder := ctrlfake.NewClientBuilder()
+			if test.runtimeScheme != nil {
+				fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
+			}
+
+			fakeCtlClient := fakeClientBuilder.WithRuntimeObjects(test.ctlClientObj...).Build()
+
+			fakeKubeClient := kubefake.NewSimpleClientset(test.kubeClientObj...)
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			fakeVeleroClient := velerofake.NewSimpleClientset(test.veleroClientObj...)
+			for _, reactor := range test.veleroReactors {
+				fakeVeleroClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+			var veleroClient versioned.Interface = fakeVeleroClient
+
+			ensurer := repository.NewEnsurer(fakeCtlClient, velerotest.NewLogger(), time.Millisecond)
+
+			backupObj := builder.ForBackup(velerov1api.DefaultNamespace, "fake-backup").Result()
+			backupObj.Spec.StorageLocation = test.bsl
+
+			factory := NewBackupperFactory(repository.NewRepoLocker(), ensurer, veleroClient, kubeClient.CoreV1(), kubeClient.CoreV1(), kubeClient.CoreV1(), velerotest.NewLogger())
+			bp, err := factory.NewBackupper(ctx, backupObj, test.uploaderType)
+
+			require.NoError(t, err)
+
+			go func() {
+				if test.ctx != nil {
+					time.Sleep(time.Second)
+					cancel()
+				} else if test.retPVBs != nil {
+					time.Sleep(time.Second)
+					for _, pvb := range test.retPVBs {
+						bp.(*backupper).results[resultsKey(test.sourcePod.Namespace, test.sourcePod.Name)] <- pvb
+					}
+
+				}
+			}()
+
+			pvbs, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
+
+			if errs == nil {
+				assert.Nil(t, test.errs)
+			} else {
+				for i := 0; i < len(errs); i++ {
+					assert.EqualError(t, errs[i], test.errs[i])
+				}
+			}
+
+			assert.Equal(t, test.pvbs, pvbs)
 		})
 	}
 }
