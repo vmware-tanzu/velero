@@ -132,3 +132,47 @@ func TestGetStorageDomainFromCloudName(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRequiredValues(t *testing.T) {
+	testCases := []struct {
+		name string
+		mp   map[string]string
+		keys []string
+		err  string
+	}{
+		{
+			name: "with miss",
+			mp: map[string]string{
+				"key1": "value1",
+			},
+			keys: []string{"key1", "key2", "key3"},
+			err:  "the following keys do not have values: key2, key3",
+		},
+		{
+			name: "without miss",
+			mp: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+				"key3": "value3",
+			},
+			keys: []string{"key1", "key2", "key3"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := getRequiredValues(func(key string) string {
+				if tc.mp == nil {
+					return ""
+				} else {
+					return tc.mp[key]
+				}
+			}, tc.keys...)
+
+			if err == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.err)
+			}
+		})
+	}
+}
