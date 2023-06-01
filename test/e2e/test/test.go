@@ -30,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
@@ -80,24 +81,16 @@ type TestCase struct {
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
 		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
-		veleroCfg := test.GetTestCase().VeleroCfg
 		BeforeEach(func() {
 			flag.Parse()
-			veleroCfg := test.GetTestCase().VeleroCfg
+			// Using the global velero config which covered the installation for most common cases
+			veleroCfg := e2e.VeleroCfg
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
 			if veleroCfg.CloudProvider == "azure" && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
 				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
 			}
 			if veleroCfg.InstallVelero {
-				veleroCfg.UseVolumeSnapshots = test.GetTestCase().UseVolumeSnapshots
-				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
-			}
-		})
-		AfterEach(func() {
-			if !veleroCfg.Debug {
-				if veleroCfg.InstallVelero {
-					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
-				}
+				Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName)).To(Succeed())
 			}
 		})
 		It(test.GetTestMsg().Text, func() {
@@ -108,35 +101,16 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		var countIt int
-		var useVolumeSnapshots bool
-		var veleroCfg VeleroConfig
+		veleroCfg := e2e.VeleroCfg
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
-			veleroCfg = tests[k].GetTestCase().VeleroCfg
-			useVolumeSnapshots = tests[k].GetTestCase().UseVolumeSnapshots
 			defer tests[k].GetTestCase().CtxCancel()
 		}
 
 		BeforeEach(func() {
 			flag.Parse()
 			if veleroCfg.InstallVelero {
-				if countIt == 0 {
-					veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
-					veleroCfg.UseNodeAgent = !useVolumeSnapshots
-					Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
-				}
-				countIt++
-			}
-		})
-
-		AfterEach(func() {
-			if !veleroCfg.Debug {
-				if veleroCfg.InstallVelero {
-					if countIt == len(tests) && !veleroCfg.Debug {
-						Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To((Succeed()))
-					}
-				}
+				Expect(PrepareVelero(context.Background(), tests[0].GetTestCase().CaseBaseName)).To(Succeed())
 			}
 		})
 

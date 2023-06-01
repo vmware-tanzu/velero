@@ -74,6 +74,13 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 		if veleroCfg.VeleroCLI == "" {
 			Skip("VeleroCLI should be provide")
 		}
+		// need to uninstall Velero first in case of the affection of the existing global velero installation
+		if veleroCfg.InstallVelero {
+			By("Uninstall Velero", func() {
+				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace)).To(Succeed())
+			})
+		}
 	})
 	AfterEach(func() {
 		if !veleroCfg.Debug {

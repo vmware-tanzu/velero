@@ -47,7 +47,6 @@ func BackupDeletionWithRestic() {
 func backup_deletion_test(useVolumeSnapshots bool) {
 	var (
 		backupName string
-		err        error
 		veleroCfg  VeleroConfig
 	)
 	veleroCfg = VeleroCfg
@@ -60,11 +59,11 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 		}
 		var err error
 		flag.Parse()
+		if veleroCfg.InstallVelero {
+			Expect(PrepareVelero(context.Background(), "backup deletion")).To(Succeed())
+		}
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
-		if veleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
-		}
 	})
 
 	AfterEach(func() {
@@ -72,10 +71,6 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 			By("Clean backups after test", func() {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
-			if veleroCfg.InstallVelero {
-				err = VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
-				Expect(err).To(Succeed())
-			}
 		}
 	})
 

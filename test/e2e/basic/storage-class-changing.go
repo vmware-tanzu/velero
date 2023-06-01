@@ -48,8 +48,6 @@ func (s *StorageClasssChanging) Init() error {
 		Text: "Change the storage class of persistent volumes and persistent" +
 			" volume claims during restores",
 	}
-	s.BackupName = "backup-sc-" + UUIDgen.String()
-	s.RestoreName = "restore-" + UUIDgen.String()
 	s.srcStorageClass = "default"
 	s.desStorageClass = StorageClassName
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
@@ -58,9 +56,6 @@ func (s *StorageClasssChanging) Init() error {
 	s.configmaptName = "change-storage-class-config"
 	s.volume = "volume-1"
 	s.podName = "pod-1"
-
-	s.BackupName = s.BackupName + "backup-" + UUIDgen.String()
-	s.RestoreName = s.RestoreName + "restore-" + UUIDgen.String()
 	s.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", s.BackupName,
 		"--include-namespaces", s.namespace,

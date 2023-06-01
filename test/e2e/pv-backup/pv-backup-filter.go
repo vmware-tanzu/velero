@@ -66,7 +66,7 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) CreateResources() error {
-	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
 	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return errors.Wrapf(err, "failed to install storage class for pv backup filtering test")

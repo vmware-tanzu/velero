@@ -43,6 +43,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 func init() {
@@ -65,6 +66,8 @@ func init() {
 	flag.StringVar(&VeleroCfg.VSLConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flag.StringVar(&VeleroCfg.VeleroNamespace, "velero-namespace", "velero", "namespace to install Velero into")
 	flag.BoolVar(&VeleroCfg.InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
+	flag.BoolVar(&VeleroCfg.UseNodeAgent, "use-node-agent", true, "whether deploy node agent daemonset velero during the test.  Optional.")
+	flag.BoolVar(&VeleroCfg.UseVolumeSnapshots, "use-volume-snapshots", true, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
 	flag.StringVar(&VeleroCfg.RegistryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
 	flag.StringVar(&VeleroCfg.KibishiiDirectory, "kibishii-directory", "github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/", "The file directory or URL path to install Kibishii. Optional.")
 	//vmware-tanzu-experiments
@@ -189,3 +192,17 @@ func TestE2e(t *testing.T) {
 	junitReporter := reporters.NewJUnitReporter("report.xml")
 	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
 }
+
+var _ = BeforeSuite(func() {
+	if VeleroCfg.InstallVelero {
+		By("Install test resources before testing")
+		Expect(PrepareVelero(context.Background(), "install resource before testing")).To(Succeed())
+	}
+})
+
+var _ = AfterSuite(func() {
+	if VeleroCfg.InstallVelero && !VeleroCfg.Debug {
+		By("release test resources after testing")
+		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+	}
+})

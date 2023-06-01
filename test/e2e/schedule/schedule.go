@@ -32,7 +32,7 @@ func (n *ScheduleBackup) Init() error {
 	n.CaseBaseName = "schedule-backup-" + n.UUIDgen
 	n.NSIncluded = &[]string{n.CaseBaseName}
 	n.ScheduleName = "schedule-" + n.CaseBaseName
-
+	n.RestoreName = "restore-" + n.CaseBaseName
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
@@ -46,6 +46,7 @@ func (n *ScheduleBackup) Init() error {
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
 		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
 	}
+
 	Expect(n.Period < 30).To(Equal(true))
 	return nil
 }
@@ -61,7 +62,7 @@ func (n *ScheduleBackup) CreateResources() error {
 		_, err := CreateConfigMap(n.Client.ClientGo, ns, configmaptName, nil, nil)
 		Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", ns))
 		Expect(WaitForConfigMapComplete(n.Client.ClientGo, ns, configmaptName)).To(Succeed(),
-			fmt.Sprintf("ailed to ensure secret completion in namespace: %q", ns))
+			fmt.Sprintf("failed to ensure secret completion in namespace: %q", ns))
 	}
 	return nil
 }
@@ -139,9 +140,11 @@ func (n *ScheduleBackup) Backup() error {
 
 	n.BackupName = strings.Replace(n.randBackupName, " ", "", -1)
 
-	By("Delete all namespaces", func() {
-		Expect(CleanupNamespacesWithPoll(n.Ctx, n.Client, n.CaseBaseName)).To(Succeed(), "Could cleanup retrieve namespaces")
-	})
+	n.RestoreArgs = []string{
+		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
+		"--from-backup", n.BackupName,
+		"--wait",
+	}
 
 	backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 	Expect(err).To(Succeed(), fmt.Sprintf("Fail to get backups from schedule %s", n.ScheduleName))
@@ -202,10 +205,6 @@ func (n *ScheduleBackup) Verify() error {
 		}
 
 	})
-	return nil
-}
-
-func (n *ScheduleBackup) Destroy() error {
 	return nil
 }
 

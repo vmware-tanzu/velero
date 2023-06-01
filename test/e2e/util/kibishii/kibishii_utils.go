@@ -291,6 +291,18 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
 	kibishiiDirectory string, useVolumeSnapshots bool, kibishiiData *KibishiiData) error {
 	fmt.Printf("installKibishii %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	serviceAccountName := "default"
+
+	// wait until the service account is created before patch the image pull secret
+	if err := WaitUntilServiceAccountCreated(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, 10*time.Minute); err != nil {
+		return errors.Wrapf(err, "failed to wait the service account %q created under the namespace %q", serviceAccountName, kibishiiNamespace)
+	}
+
+	// add the image pull secret to avoid the image pull limit issue of Docker Hub
+	if err := PatchServiceAccountWithImagePullSecret(oneHourTimeout, client, kibishiiNamespace, serviceAccountName, registryCredentialFile); err != nil {
+		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)
+	}
+
 	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, veleroFeatures,
 		kibishiiDirectory, useVolumeSnapshots); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
