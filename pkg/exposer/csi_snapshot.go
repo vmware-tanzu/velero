@@ -44,6 +44,9 @@ import (
 
 // CSISnapshotExposeParam define the input param for Expose of CSI snapshots
 type CSISnapshotExposeParam struct {
+	// SnapshotName is the original volume snapshot name
+	SnapshotName string
+
 	// SourceNamespace is the original namespace of the volume that the snapshot is taken for
 	SourceNamespace string
 
@@ -55,6 +58,9 @@ type CSISnapshotExposeParam struct {
 
 	// HostingPodLabels is the labels that are going to apply to the hosting pod
 	HostingPodLabels map[string]string
+
+	// Timeout specifies the time wait for resources operations in Expose
+	Timeout time.Duration
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -79,7 +85,7 @@ type csiSnapshotExposer struct {
 	log               logrus.FieldLogger
 }
 
-func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, snapshotName string, timeout time.Duration, param interface{}) error {
+func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param interface{}) error {
 	csiExposeParam := param.(*CSISnapshotExposeParam)
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -88,7 +94,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.Info("Exposing CSI snapshot")
 
-	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, snapshotName, csiExposeParam.SourceNamespace, timeout)
+	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, csiExposeParam.SnapshotName, csiExposeParam.SourceNamespace, csiExposeParam.Timeout)
 	if err != nil {
 		return errors.Wrapf(err, "error wait volume snapshot ready")
 	}
@@ -115,14 +121,14 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		}
 	}()
 
-	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, timeout)
+	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.Timeout)
 	if err != nil {
 		return errors.Wrap(err, "error to delete volume snapshot")
 	}
 
 	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
 
-	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, timeout)
+	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.Timeout)
 	if err != nil {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}

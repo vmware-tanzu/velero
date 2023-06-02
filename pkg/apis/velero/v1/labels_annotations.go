@@ -54,6 +54,12 @@ const (
 	// RepositoryTypeLabel is the label key used to identify the type of a repository
 	RepositoryTypeLabel = "velero.io/repository-type"
 
+	// DataUploadLabel is the label key used to identify the dataupload for snapshot backup pod
+	DataUploadLabel = "velero.io/data-upload"
+
+	// DataDownloadLabel is the label key used to identify the datadownload for snapshot restore pod
+	DataDownloadLabel = "velero.io/data-download"
+
 	// SourceClusterK8sVersionAnnotation is the label key used to identify the k8s
 	// git version of the backup , i.e. v1.16.4
 	SourceClusterK8sGitVersionAnnotation = "velero.io/source-cluster-k8s-gitversion"

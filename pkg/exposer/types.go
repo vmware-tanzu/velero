@@ -35,3 +35,11 @@ type ExposeByPod struct {
 	HostingPod *corev1.Pod
 	PVC        string
 }
+
+func GetUploaderType(dataMover string) string {
+	if dataMover == "" || dataMover == "velero" {
+		return "kopia"
+	} else {
+		return dataMover
+	}
+}
