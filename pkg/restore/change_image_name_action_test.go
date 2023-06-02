@@ -39,13 +39,12 @@ import (
 // desired result.
 func TestChangeImageRepositoryActionExecute(t *testing.T) {
 	tests := []struct {
-		name             string
-		podOrObj         interface{}
-		configMap        *corev1.ConfigMap
-		freshedImageName string
-		imageNameSlice   []string
-		want             interface{}
-		wantErr          error
+		name           string
+		podOrObj       interface{}
+		configMap      *corev1.ConfigMap
+		imageNameSlice []string
+		want           interface{}
+		wantErr        error
 	}{
 		{
 			name: "a valid mapping with spaces for a new image repository is applied correctly",
@@ -58,8 +57,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
 				Data("case1", "1.1.1.1:5000  ,  2.2.2.2:3000").
 				Result(),
-			freshedImageName: "2.2.2.2:3000/abc:test",
-			want:             "2.2.2.2:3000/abc:test",
+			want: "2.2.2.2:3000/abc:test",
 		},
 
 		{
@@ -73,8 +71,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
 				Data("specific", "1.1.1.1:5000,2.2.2.2:3000").
 				Result(),
-			freshedImageName: "2.2.2.2:3000/abc:test",
-			want:             "2.2.2.2:3000/abc:test",
+			want: "2.2.2.2:3000/abc:test",
 		},
 
 		{
@@ -88,8 +85,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
 				Data("specific", "abc:test,myproject:latest").
 				Result(),
-			freshedImageName: "1.1.1.1:5000/myproject:latest",
-			want:             "1.1.1.1:5000/myproject:latest",
+			want: "1.1.1.1:5000/myproject:latest",
 		},
 
 		{
@@ -103,8 +99,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
 				Data("specific", "5000,3333").
 				Result(),
-			freshedImageName: "1.1.1.1:5000/abc:test",
-			want:             "1.1.1.1:3333/abc:test",
+			want: "1.1.1.1:3333/abc:test",
 		},
 
 		{
@@ -118,8 +113,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
 				Data("specific", "test,latest").
 				Result(),
-			freshedImageName: "1.1.1.1:5000/abc:test",
-			want:             "1.1.1.1:5000/abc:latest",
+			want: "1.1.1.1:5000/abc:latest",
 		},
 
 		{
@@ -133,8 +127,21 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
 				Data("specific", "dev/,test/").
 				Result(),
-			freshedImageName: "dev/image1:dev",
-			want:             "test/image1:dev",
+			want: "test/image1:dev",
+		},
+		{
+			name: "image name contains more than one part that matching the replacing words and replace them all.",
+			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
+				Containers(&corev1.Container{
+					Name:  "container6",
+					Image: "dev/image1:dev",
+				}).Result(),
+			configMap: builder.ForConfigMap("velero", "change-image-name").
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-image-name", "RestoreItemAction")).
+				Data("specific", "dev/,test/").
+				Data("specific1", ":dev,:latest").
+				Result(),
+			want: "test/image1:latest",
 		},
 	}
 

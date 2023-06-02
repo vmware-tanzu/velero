@@ -184,26 +184,31 @@ func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldIm
 		log.Infoln("Item has no old image name specified")
 		return false, "", nil
 	}
-	log.Debug("oldImageName: ", oldImageName)
 
-	//how to use: "<old_image_name_sub_part><delimiter><new_image_name_sub_part>"
-	//for current implementation the <delimiter> value can only be ","
-	//e.x: in case your old image name is 1.1.1.1:5000/abc:test
-	//"case1":"1.1.1.1:5000,2.2.2.2:3000"
-	//"case2":"5000,3000"
-	//"case3":"abc:test,edf:test"
-	//"case4":"1.1.1.1:5000/abc:test,2.2.2.2:3000/edf:test"
+	newImageName = oldImageName
+	// how to use: "<old_image_name_sub_part><delimiter><new_image_name_sub_part>"
+	// for current implementation the <delimiter> value can only be ","
+	// e.x: in case your old image name is 1.1.1.1:5000/abc:test
+	// "case1":"1.1.1.1:5000,2.2.2.2:3000"
+	// "case2":"5000,3000"
+	// "case3":"abc:test,edf:test"
+	// "case4":"1.1.1.1:5000/abc:test,2.2.2.2:3000/edf:test"
 	for _, row := range cm.Data {
 		if !strings.Contains(row, delimiterValue) {
+			log.Debugf("no delimiter value %s found in %s", delimiterValue, row)
 			continue
 		}
-		if strings.Contains(oldImageName, strings.TrimSpace(row[0:strings.Index(row, delimiterValue)])) && len(row[strings.Index(row, delimiterValue):]) > len(delimiterValue) {
-			log.Infoln("match specific case:", row)
+		if strings.Contains(newImageName, strings.TrimSpace(row[0:strings.Index(row, delimiterValue)])) && len(row[strings.Index(row, delimiterValue):]) > len(delimiterValue) {
+			log.Infof("image %s match specific case: %s", newImageName, row)
 			oldImagePart := strings.TrimSpace(row[0:strings.Index(row, delimiterValue)])
 			newImagePart := strings.TrimSpace(row[strings.Index(row, delimiterValue)+len(delimiterValue):])
-			newImageName = strings.Replace(oldImageName, oldImagePart, newImagePart, -1)
-			return true, newImageName, nil
+			newImageName = strings.Replace(newImageName, oldImagePart, newImagePart, -1)
+		} else {
+			log.Debugf("image %s does not match specific case: %s", newImageName, row)
 		}
 	}
-	return false, "", errors.Errorf("No mapping rule found for image: %s", oldImageName)
+	if newImageName == oldImageName {
+		return false, "", errors.Errorf("No mapping rule found for image: %s", oldImageName)
+	}
+	return true, newImageName, nil
 }
