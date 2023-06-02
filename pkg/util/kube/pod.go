@@ -17,12 +17,14 @@ package kube
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -80,4 +82,31 @@ func DeletePodIfAny(ctx context.Context, podGetter corev1client.CoreV1Interface,
 			log.WithError(err).Errorf("Failed to delete pod %s/%s", podNamespace, podName)
 		}
 	}
+}
+
+// EnsureDeletePod asserts the existence of a pod by name, deletes it and waits for its disappearance and returns errors on any failure
+func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface, pod string, namespace string, timeout time.Duration) error {
+	err := podGetter.Pods(namespace).Delete(ctx, pod, metav1.DeleteOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "error to delete pod %s", pod)
+	}
+
+	err = wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+		_, err := podGetter.Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+
+			return false, errors.Wrapf(err, "error to get pod %s", pod)
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return errors.Wrapf(err, "error to assure pod is deleted, %s", pod)
+	}
+
+	return nil
 }

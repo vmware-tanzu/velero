@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	corev1api "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 
 	clientTesting "k8s.io/client-go/testing"
 )
@@ -126,6 +127,160 @@ func TestWaitPVCBound(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expected, pv)
+		})
+	}
+}
+
+func TestWaitPVCConsumed(t *testing.T) {
+	storageClass := "fake-storage-class"
+	bindModeImmediate := storagev1api.VolumeBindingImmediate
+	bindModeWait := storagev1api.VolumeBindingWaitForFirstConsumer
+
+	pvcObject := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc-1",
+		},
+	}
+
+	pvcObjectWithSC := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc-2",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	scObjWithoutBindMode := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+	}
+
+	scObjWaitBind := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+		VolumeBindingMode: &bindModeWait,
+	}
+
+	scObjWithImmidateBinding := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+		VolumeBindingMode: &bindModeImmediate,
+	}
+
+	pvcObjectWithSCAndAnno := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "fake-namespace",
+			Name:        "fake-pvc-3",
+			Annotations: map[string]string{"volume.kubernetes.io/selected-node": "fake-node-1"},
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		pvcName       string
+		pvcNamespace  string
+		kubeClientObj []runtime.Object
+		kubeReactors  []reactor
+		expectedPVC   *corev1api.PersistentVolumeClaim
+		selectedNode  string
+		err           string
+	}{
+		{
+			name:         "get pvc error",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			err:          "error to wait for PVC: error to get pvc fake-namespace/fake-pvc: persistentvolumeclaims \"fake-pvc\" not found",
+		},
+		{
+			name:         "success when no sc",
+			pvcName:      "fake-pvc-1",
+			pvcNamespace: "fake-namespace",
+			kubeClientObj: []runtime.Object{
+				pvcObject,
+			},
+			expectedPVC: pvcObject,
+		},
+		{
+			name:         "get sc fail",
+			pvcName:      "fake-pvc-2",
+			pvcNamespace: "fake-namespace",
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSC,
+			},
+			err: "error to wait for PVC: error to get storage class fake-storage-class: storageclasses.storage.k8s.io \"fake-storage-class\" not found",
+		},
+		{
+			name:         "success on sc without binding mode",
+			pvcName:      "fake-pvc-2",
+			pvcNamespace: "fake-namespace",
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSC,
+				scObjWithoutBindMode,
+			},
+			expectedPVC: pvcObjectWithSC,
+		},
+		{
+			name:         "success on sc without immediate binding mode",
+			pvcName:      "fake-pvc-2",
+			pvcNamespace: "fake-namespace",
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSC,
+				scObjWithImmidateBinding,
+			},
+			expectedPVC: pvcObjectWithSC,
+		},
+		{
+			name:         "pvc annotation miss",
+			pvcName:      "fake-pvc-2",
+			pvcNamespace: "fake-namespace",
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSC,
+				scObjWaitBind,
+			},
+			err: "error to wait for PVC: timed out waiting for the condition",
+		},
+		{
+			name:         "success on sc without wait binding mode",
+			pvcName:      "fake-pvc-3",
+			pvcNamespace: "fake-namespace",
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSCAndAnno,
+				scObjWaitBind,
+			},
+			expectedPVC:  pvcObjectWithSCAndAnno,
+			selectedNode: "fake-node-1",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			for _, reactor := range test.kubeReactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			selectedNode, pvc, err := WaitPVCConsumed(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, kubeClient.StorageV1(), time.Millisecond)
+
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedPVC, pvc)
+			assert.Equal(t, test.selectedNode, selectedNode)
 		})
 	}
 }
