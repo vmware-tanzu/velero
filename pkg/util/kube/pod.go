@@ -16,8 +16,14 @@ limitations under the License.
 package kube
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // IsPodRunning does a well-rounded check to make sure the specified pod is running stably.
@@ -62,4 +68,16 @@ func isPodScheduledInStatus(pod *corev1api.Pod, statusCheckFunc func(*corev1api.
 	}
 
 	return nil
+}
+
+// DeletePodIfAny deletes a pod by name if it exists, and log an error when the deletion fails
+func DeletePodIfAny(ctx context.Context, podGetter corev1client.CoreV1Interface, podName string, podNamespace string, log logrus.FieldLogger) {
+	err := podGetter.Pods(podNamespace).Delete(ctx, podName, metav1.DeleteOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.WithError(err).Debugf("Abort deleting pod, it doesn't exist %s/%s", podNamespace, podName)
+		} else {
+			log.WithError(err).Errorf("Failed to delete pod %s/%s", podNamespace, podName)
+		}
+	}
 }
