@@ -54,12 +54,6 @@ func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*
 			return
 		}
 
-		// TODO: once the minimum supported Kubernetes version is v1.9.0, remove the following check.
-		// See http://issue.k8s.io/51046 for details.
-		if updated.Name != created.Name {
-			return
-		}
-
 		if updated.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed {
 			created = updated
 			cancel()
