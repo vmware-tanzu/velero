@@ -1360,6 +1360,11 @@ func (in *RestoreSpec) DeepCopyInto(out *RestoreSpec) {
 		**out = **in
 	}
 	in.Hooks.DeepCopyInto(&out.Hooks)
+	if in.ExistingResourcePolicyRecreateResources != nil {
+		in, out := &in.ExistingResourcePolicyRecreateResources, &out.ExistingResourcePolicyRecreateResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.ItemOperationTimeout = in.ItemOperationTimeout
 	if in.ResourceModifier != nil {
 		in, out := &in.ResourceModifier, &out.ResourceModifier

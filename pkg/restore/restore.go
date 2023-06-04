@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1621,20 +1622,49 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					ctx.log.Infof("restore API has resource policy defined %s , executing restore workflow accordingly for changed resource %s %s", resourcePolicy, fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
 
 					// existingResourcePolicy is set as none, add warning
-					if resourcePolicy == velerov1api.PolicyTypeNone {
-						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
-							obj.GetKind(), obj.GetName())
-						warnings.Add(namespace, e)
-						// existingResourcePolicy is set as update, attempt patch on the resource and add warning if it fails
-					} else if resourcePolicy == velerov1api.PolicyTypeUpdate {
+					couldNotRestoreAlreadyExistsError := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
+						obj.GetKind(), obj.GetName())
+					switch resourcePolicy {
+					case velerov1api.PolicyTypeNone:
+						warnings.Add(namespace, couldNotRestoreAlreadyExistsError)
+					case velerov1api.PolicyTypeUpdate, velerov1api.PolicyTypeRecreate:
+						// existingResourcePolicy is set as update or recreate, attempt patch on the resource and add warning if it fails
 						// processing update as existingResourcePolicy
 						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
 						if warningsFromUpdateRP.IsEmpty() && errsFromUpdateRP.IsEmpty() {
 							itemStatus.action = itemRestoreResultUpdated
 							ctx.restoredItems[itemKey] = itemStatus
 						}
-						warnings.Merge(&warningsFromUpdateRP)
-						errs.Merge(&errsFromUpdateRP)
+						if !errsFromUpdateRP.IsEmpty() && resourcePolicy == velerov1api.PolicyTypeRecreate {
+							restoreHasRecreateResourceName := false
+							fromClusterHasOwnerRef := len(fromCluster.GetOwnerReferences()) > 0
+							// Only process objects that has no owner references
+							if !fromClusterHasOwnerRef {
+								for i, recreateResourceName := range ctx.restore.Spec.ExistingResourcePolicyRecreateResources {
+									if recreateResourceName == groupResource.String() {
+										restoreHasRecreateResourceName = true
+										break
+									}
+									if i == len(ctx.restore.Spec.ExistingResourcePolicyRecreateResources)-1 {
+										warnings.Add(namespace, couldNotRestoreAlreadyExistsError)
+									}
+								}
+								if restoreHasRecreateResourceName {
+									// if resourcePolicy is recreate, attempt to recreate if patch had errors
+									ctx.log.Infof("patch attempt had errors, falling back to recreate due to recreate existingResourcePolicy for %s %s", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+									warningsFromRecreateRP, errsFromRecreateRP := ctx.processRecreateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
+									if warningsFromRecreateRP.IsEmpty() && errsFromRecreateRP.IsEmpty() {
+										itemStatus.action = itemRestoreResultUpdated
+										ctx.restoredItems[itemKey] = itemStatus
+									}
+									warnings.Merge(&warningsFromRecreateRP)
+									errs.Merge(&errsFromRecreateRP)
+								}
+							}
+						} else {
+							warnings.Merge(&warningsFromUpdateRP)
+							errs.Merge(&errsFromUpdateRP)
+						}
 					}
 				} else {
 					// Preserved Velero behavior when existingResourcePolicy is not specified by the user
@@ -2513,4 +2543,57 @@ func (ctx *restoreContext) handleSkippedPVHasRetainPolicy(
 	}
 
 	return updatedObj, nil
+}
+
+const RecreateRemoveFinalizerAnnotation = "velero.io/recreate-remove-finalizer"
+
+// function to process existingResourcePolicy as recreate, tries to delete object first before restoring obj
+func (ctx *restoreContext) processRecreateResourcePolicy(fromCluster, fromClusterWithLabels, obj *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) {
+	ctx.log.Infof("restore API has existingResourcePolicy defined as recreate , executing restore workflow accordingly for changed resource %s %s ", obj.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+	ctx.log.Infof("attempting recreate on %s %q", fromCluster.GetKind(), fromCluster.GetName())
+	// TODO: check for fromCluster for finalizers, if present, check for annotation to force deletion.
+	if removeFinalizer, err := strconv.ParseBool(fromCluster.GetAnnotations()[RecreateRemoveFinalizerAnnotation]); err == nil &&
+		removeFinalizer &&
+		len(fromCluster.GetFinalizers()) > 0 {
+		ctx.log.Infof("force deletion of finalizers for %s %q from annotation", fromCluster.GetKind(), fromCluster.GetName())
+		// patch remove finalizers
+		_, err := resourceClient.Patch(fromCluster.GetName(), []byte((`{"metadata": {"finalizers": []}}`)))
+		if err != nil {
+			ctx.log.Warnf("force deletion of finalizers attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+			warnings.Add(namespace, err)
+		} else {
+			ctx.log.Infof("force deletion of finalizers successfully updated for %s %s", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
+		}
+	}
+	// try to delete the object in cluster
+	err := resourceClient.Delete(obj.GetName(), metav1.DeleteOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			ctx.log.Errorf("delete attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+		}
+	}
+	// wait up to 2 minutes until object does not exists in cluster
+	wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+		_, err = resourceClient.Get(obj.GetName(), metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			ctx.log.Infof("waiting until %s %s IsNotFound for recreate existingResourcePolicy. current err from get: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+			return false, nil
+		}
+		return true, nil
+	})
+
+	// Create object from latest backup/restore)
+	obj.SetNamespace(namespace)
+	_, err = resourceClient.Create(obj)
+	if err != nil {
+		ctx.log.Warnf("create attempt failed for %s %s: %v", fromCluster.GroupVersionKind(), kube.NamespaceAndName(fromCluster), err)
+		warnings.Add(namespace, err)
+		// try just patching the labels
+		warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, fromClusterWithLabels, namespace, resourceClient)
+		warnings.Merge(&warningsFromUpdate)
+		errs.Merge(&errsFromUpdate)
+	} else {
+		ctx.log.Infof("%s %s successfully recreated", obj.GroupVersionKind().Kind, kube.NamespaceAndName(obj))
+	}
+	return warnings, errs
 }

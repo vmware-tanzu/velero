@@ -58,7 +58,7 @@ The following is an overview of Velero's restore process that starts after you r
 
 1. The `RestoreController` creates the resource object on the target cluster. If the resource is a PV then the `RestoreController` will restore the PV data from the [durable snapshot](#durable-snapshot-pv-restore), [File System Backup](#file-system-backup-pv-restore), or [CSI snapshot](#csi-pv-restore) depending on how the PV was backed up.
 
-    If the resource already exists in the target cluster, which is determined by the Kubernetes API during resource creation, the `RestoreController` will skip the resource. The only [exception](#restore-existing-resource-policy) are Service Accounts, which Velero will attempt to merge differences between the backed up ServiceAccount into the ServiceAccount on the target cluster. You can [change the default existing resource restore policy](#restore-existing-resource-policy) to update resources instead of skipping them using the `--existing-resource-policy`.
+    If the resource already exists in the target cluster, which is determined by the Kubernetes API during resource creation, the `RestoreController` will skip the resource. The only [exception](#restore-existing-resource-policy) are Service Accounts, which Velero will attempt to merge differences between the backed up ServiceAccount into the ServiceAccount on the target cluster. You can [change the default existing resource restore policy](#restore-existing-resource-policy) to update or recreate resources instead of skipping them using the `--existing-resource-policy`.
 
 1. Once the resource is created on the target cluster, Velero may take some additional steps or wait for additional processes to complete before moving onto the next resource to restore.
 
@@ -260,12 +260,16 @@ By default, Velero is configured to be non-destructive during a restore. This me
 An exception to the default restore policy is ServiceAccounts. When restoring a ServiceAccount that already exists on the target cluster, Velero will attempt to merge the fields of the ServiceAccount from the backup into the existing ServiceAccount. Secrets and ImagePullSecrets are appended from the backed-up ServiceAccount. Velero adds any non-existing labels and annotations from the backed-up ServiceAccount to the existing resource, leaving the existing labels and annotations in place.
 
 You can change this policy for a restore by using the `--existing-resource-policy` restore flag. The available options
-are `none` (default) and `update`. If you choose to update existing resources during a restore
+are `none` (default), `update`, and `recreate`.
+
+If you choose to update existing resources during a restore
 (`--existing-resource-policy=update`), Velero will attempt to update an existing resource to match the resource from the backup: 
 
 * If the existing resource in the target cluster is the same as the resource Velero is attempting to restore, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If patching the labels fails, Velero adds a restore error and continues restoring the next resource.
 
 * If the existing resource in the target cluster is different from the backup, Velero will first try to patch the existing resource to match the backup resource. If the patch is successful, Velero will add a `velero.io/backup-name` label with the backup name and a `velero.io/restore-name` label with the restore name to the existing resource. If the patch fails, Velero adds a restore warning and tries to add the `velero.io/backup-name` and `velero.io/restore-name` labels on the resource. If the labels patch also fails, then Velero logs a restore error and continues restoring the next resource.
+
+If you choose to recreate an existing resource during a restore (`--existing-resource-policy=recreate`) Velero will first try to patch the resource. Upon patch failures, velero will try to delete the existing resource and then create the resource from the backup. If the recreate fails, Velero will log a restore error and continue restoring the next resource.
 
 You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 

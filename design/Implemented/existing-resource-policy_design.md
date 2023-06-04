@@ -20,7 +20,6 @@ Related issue: https://github.com/vmware-tanzu/velero/issues/4066
 
 ## Non Goals
 - Change existing restore workflow for `ServiceAccount` objects
-- Add support for `ExistingResourcePolicy` as `recreate` for Kubernetes resources. (Future scope feature)
 
 ## Unrelated Proposals (Completely different functionalities than the one proposed in the design)
 - Add support for `ExistingResourcePolicy` to restore API for Non-Kubernetes resources.
@@ -55,10 +54,9 @@ skip restoration.
    - Changed resources: Velero will first try to patch the changed resource, Now if the patch:
        - succeeds: Then the in-cluster resource gets updated with the labels as well as the resource diff
        - fails: Velero adds a restore warning and tries to just update the backup/restore labels on the resource, if the labels patch also fails then we add restore error.
-3. `recreate`:  If resource already exists, then Velero will delete it and recreate the resource.
+3. `recreate`:  Similar to `update` but if resource already exists and is immutable (such as Pods), then Velero attempt to recreate the resource by deleting it first. More details below.
 
-*Note:* The `recreate` option is a non-goal for this enhancement proposal, but it is considered as a future scope.
-Another thing to highlight is that Velero will not be deleting any resources in any of the policy options proposed in 
+Velero will not be deleting any resources for `update` and `none` policy proposed in
 this design but Velero will patch the resources in `update` policy option.
 
 Example:
@@ -140,22 +138,38 @@ existingResourcePolicyOverrides:
 The `existingResourcePolicy` spec field will be an `PolicyType` type field. 
 
 Restore API:
-```
+```go
 type RestoreSpec struct {
 .
 .
 .
 // ExistingResourcePolicy specifies the restore behaviour for the Kubernetes resource to be restored
+// +kubebuilder:validation:Enum=none;update;recreate
 // +optional
+// +nullable
 ExistingResourcePolicy PolicyType
 
 }
 ```
 PolicyType:
-```
+```go
 type PolicyType string
 const PolicyTypeNone PolicyType  = "none"
 const PolicyTypePatch PolicyType = "update"
+const PolicyTypePatch PolicyType = "recreate"
+```
+
+existingResourcePolicyRecreateResources will be a new field in the Restore API which will be a slice of resource names where recreate ExistingResourcePolicy will apply. Resoruce names can be in the format of "group/version/resource" or "resource". If empty, a default list of resources (Pod, PV, Secret, ConfigMap) will be used. Recreate will not recreate resources with ownershipReferences or finalizers.
+```go
+// ExistingResourcePolicyRecreateResources is a slice of resource names where recreate ExistingResourcePolicy will apply.
+// Resoruce names can be in the format of "group/version/resource" or "resource"
+// If empty, a default list of resources (Pod, PV, Secret, ConfigMap) will be used.
+// Resources with finalizers without velero.io/recreate-remove-finalizer=true annotation will not be recreated.
+// Recreate will not recreate resources with ownershipReferences.
+// +kubebuilder:example:={"pods", "persistentvolumes", "secrets", "configmaps"}
+// +optional
+// +nullable
+ExistingResourcePolicyRecreateResources []string `json:"existingResourcePolicyRecreateResources,omitempty"`
 ```
 
 ### Approach 2: Add a new spec field `existingResourcePolicyConfig` to the Restore API
@@ -260,3 +274,19 @@ We have decided to go ahead with the implementation of Approach 1 as:
 - It is easier to implement 
 - It is also easier to scale and leaves room for improvement and the door open to expanding to approach 3
 - It also provides an option to preserve the existing velero restore workflow
+
+### Recreate policy details
+Existing resource restore policy *Recreate* purpose is to help users restore existing resources that exists in cluster but differ from backup resouce, are immutable and failed to be updated due to immutability.
+
+The policy will be used to delete the existing resource and recreate it with the backup resource.
+
+The policy will be used for resources that are immutable and cannot first be updated.
+
+#### Restrictions and Limitations
+Resources with OwnerReferences will not be supported by the recreate policy, at least for the initial implementation.
+The policy will only be used on resources specified at Restore.Spec. like Pods, PVCs, PVs, etc.
+
+If an existing resource have finalizers, it would need to have annotations `velero.io/recreate-remove-finalizer=true` to be considered for recreation.
+
+
+*Note:* The `recreate` option is implemented in [#6354](https://github.com/vmware-tanzu/velero/pull/6354) separate from original update policy proposal.

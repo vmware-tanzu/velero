@@ -55,9 +55,30 @@ spec:
                 type: array
               existingResourcePolicy:
                 description: ExistingResourcePolicy specifies the restore behavior
-                  for the Kubernetes resource to be restored
+                  for the kubernetes resource to be restored
+                enum:
+                - none
+                - update
+                - recreate
                 nullable: true
                 type: string
+              existingResourcePolicyRecreateResources:
+                description: ExistingResourcePolicyRecreateResources is a slice of
+                  resource names where recreate ExistingResourcePolicy will apply.
+                  Resoruce names can be in the format of "group/version/resource"
+                  or "resource" If empty, a default list of resources (Pod, PV, Secret,
+                  ConfigMap) will be used. Resources with finalizers without velero.io/recreate-remove-finalizer=true
+                  annotation will not be recreated. Recreate will not recreate resources
+                  with ownershipReferences.
+                example:
+                - pods
+                - persistentvolumes
+                - secrets
+                - configmaps
+                items:
+                  type: string
+                nullable: true
+                type: array
               hooks:
                 description: Hooks represent custom behaviors that should be executed
                   during or post restore.

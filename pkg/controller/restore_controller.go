@@ -90,7 +90,9 @@ var nonRestorableResources = []string{
 	"backuprepositories.velero.io",
 }
 
-var ExternalResourcesFinalizer = "restores.velero.io/external-resources-finalizer"
+const (
+	ExternalResourcesFinalizer = "restores.velero.io/external-resources-finalizer"
+)
 
 type restoreReconciler struct {
 	ctx                         context.Context

@@ -109,10 +109,21 @@ type RestoreSpec struct {
 	// +optional
 	Hooks RestoreHooks `json:"hooks,omitempty"`
 
-	// ExistingResourcePolicy specifies the restore behavior for the Kubernetes resource to be restored
+	// ExistingResourcePolicy specifies the restore behavior for the kubernetes resource to be restored
+	// +kubebuilder:validation:Enum=none;update;recreate
 	// +optional
 	// +nullable
 	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`
+
+	// ExistingResourcePolicyRecreateResources is a slice of resource names where recreate ExistingResourcePolicy will apply.
+	// Resoruce names can be in the format of "group/version/resource" or "resource"
+	// If empty, a default list of resources (Pod, PV, Secret, ConfigMap) will be used.
+	// Resources with finalizers without velero.io/recreate-remove-finalizer=true annotation will not be recreated.
+	// Recreate will not recreate resources with ownershipReferences.
+	// +kubebuilder:example:={"pods", "persistentvolumes", "secrets", "configmaps"}
+	// +optional
+	// +nullable
+	ExistingResourcePolicyRecreateResources []string `json:"existingResourcePolicyRecreateResources,omitempty"`
 
 	// ItemOperationTimeout specifies the time used to wait for RestoreItemAction operations
 	// The default value is 4 hour.
@@ -309,6 +320,9 @@ const (
 	// PolicyTypeUpdate means velero will try to attempt a patch on
 	// the changed resources.
 	PolicyTypeUpdate PolicyType = "update"
+
+	// PolicyTypeRecreate means velero attempt a patch on changed resource and fall back to recreating the resource when patch fails.
+	PolicyTypeRecreate PolicyType = "recreate"
 )
 
 // RestoreStatus captures the current status of a Velero restore
