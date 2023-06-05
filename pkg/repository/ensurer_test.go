@@ -30,7 +30,7 @@ import (
 )
 
 func TestEnsureRepo(t *testing.T) {
-	bkRepoObj := newBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
+	bkRepoObj := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
 		VolumeNamespace: "fake-ns",
 		BackupLocation:  "fake-bsl",
 		RepositoryType:  "fake-repo-type",
@@ -121,7 +121,7 @@ func TestEnsureRepo(t *testing.T) {
 }
 
 func TestCreateBackupRepositoryAndWait(t *testing.T) {
-	bkRepoObj := newBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
+	bkRepoObj := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
 		VolumeNamespace: "fake-ns",
 		BackupLocation:  "fake-bsl",
 		RepositoryType:  "fake-repo-type",

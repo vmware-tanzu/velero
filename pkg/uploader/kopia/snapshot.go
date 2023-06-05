@@ -47,6 +47,9 @@ import (
 var applyRetentionPolicyFunc = policy.ApplyRetentionPolicy
 var saveSnapshotFunc = snapshot.SaveSnapshot
 var loadSnapshotFunc = snapshot.LoadSnapshot
+var listSnapshotsFunc = snapshot.ListSnapshots
+var filesystemEntryFunc = snapshotfs.FilesystemEntryFromIDWithPath
+var restoreEntryFunc = restore.Entry
 
 // SnapshotUploader which mainly used for UT test that could overwrite Upload interface
 type SnapshotUploader interface {
@@ -84,7 +87,7 @@ func setupDefaultPolicy() *policy.Tree {
 }
 
 // Backup backup specific sourcePath and update progress
-func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath string,
+func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string,
 	forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
@@ -238,7 +241,7 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 // findPreviousSnapshotManifest returns the list of previous snapshots for a given source, including
 // last complete snapshot following it.
 func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sourceInfo snapshot.SourceInfo, snapshotTags map[string]string, noLaterThan *fs.UTCTimestamp) ([]*snapshot.Manifest, error) {
-	man, err := snapshot.ListSnapshots(ctx, rep, sourceInfo)
+	man, err := listSnapshotsFunc(ctx, rep, sourceInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +297,7 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 
 	log.Infof("Restore from snapshot %s, description %s, created time %v, tags %v", snapshotID, snapshot.Description, snapshot.EndTime.ToTime(), snapshot.Tags)
 
-	rootEntry, err := snapshotfs.FilesystemEntryFromIDWithPath(kopiaCtx, rep, snapshotID, false)
+	rootEntry, err := filesystemEntryFunc(kopiaCtx, rep, snapshotID, false)
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "Unable to get filesystem entry for snapshot %v", snapshotID)
 	}
@@ -317,7 +320,7 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		return 0, 0, errors.Wrap(err, "error to init output")
 	}
 
-	stat, err := restore.Entry(kopiaCtx, rep, output, rootEntry, restore.Options{
+	stat, err := restoreEntryFunc(kopiaCtx, rep, output, rootEntry, restore.Options{
 		Parallel:               runtime.NumCPU(),
 		RestoreDirEntryAtDepth: math.MaxInt32,
 		Cancel:                 cancleCh,
