@@ -86,7 +86,9 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 			// Using the global velero config which covered the installation for most common cases
 			veleroCfg := e2e.VeleroCfg
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
-			if veleroCfg.CloudProvider == "azure" && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
+			// TODO: Although this issue is closed, but it's not fixed.
+			// TODO: After bump up k8s version in AWS pipeline, this issue also apply for AWS pipeline.
+			if (veleroCfg.CloudProvider == "azure" || veleroCfg.CloudProvider == "aws") && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
 				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
 			}
 			if veleroCfg.InstallVelero {

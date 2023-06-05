@@ -59,14 +59,17 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if veleroCfg.CloudProvider != "kind" {
 		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
-		veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
+		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
+		if veleroCfg.ObjectStoreProvider == "" {
+			veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
+		}
 	} else {
 		if veleroCfg.ObjectStoreProvider == "" {
 			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
 		}
 	}
 
-	providerPluginsTmp, err := getProviderPlugins(ctx, veleroCfg.VeleroCLI, veleroCfg.ObjectStoreProvider, veleroCfg.Plugins, veleroCfg.Features)
+	providerPluginsTmp, err := getProviderPlugins(ctx, veleroCfg.VeleroCLI, veleroCfg.ObjectStoreProvider, veleroCfg.CloudProvider, veleroCfg.Plugins, veleroCfg.Features)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
@@ -80,7 +83,9 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		// We overrider the ObjectStoreProvider here for vSphere because we want to use the aws plugin for the
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
-		veleroCfg.ObjectStoreProvider = "aws"
+		if veleroCfg.ObjectStoreProvider == "" {
+			veleroCfg.ObjectStoreProvider = "aws"
+		}
 		if err := configvSpherePlugin(*veleroCfg.ClientToInstallVelero); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
 		}
