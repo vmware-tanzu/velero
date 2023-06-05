@@ -353,3 +353,6 @@ gen-docs:
 .PHONY: test-e2e
 test-e2e: local
 	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+
+go-generate:
+	go generate ./pkg/...
