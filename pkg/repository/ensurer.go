@@ -108,7 +108,7 @@ func (r *Ensurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
 }
 
 func (r *Ensurer) createBackupRepositoryAndWait(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
-	toCreate := newBackupRepository(namespace, backupRepoKey)
+	toCreate := NewBackupRepository(namespace, backupRepoKey)
 	if err := r.repoClient.Create(ctx, toCreate, &client.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "unable to create backup repository resource")
 	}
