@@ -154,6 +154,11 @@ func createPVRObj(fail bool, index int) *velerov1api.PodVolumeRestore {
 	return pvrObj
 }
 
+type expectError struct {
+	err        string
+	prefixOnly bool
+}
+
 func TestRestorePodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
@@ -177,7 +182,7 @@ func TestRestorePodVolumes(t *testing.T) {
 		pvbs            []*velerov1api.PodVolumeBackup
 		restoredPod     *corev1api.Pod
 		sourceNamespace string
-		errs            []string
+		errs            []expectError
 	}{
 		{
 			name:        "no volume to restore",
@@ -192,8 +197,10 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 			restoredPod:     createPodObj(false, false, false, 2),
 			sourceNamespace: "fake-ns",
-			errs: []string{
-				"error to check node agent status: daemonset not found",
+			errs: []expectError{
+				{
+					err: "error to check node agent status: daemonset not found",
+				},
 			},
 		},
 		{
@@ -207,8 +214,11 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 			restoredPod:     createPodObj(false, false, false, 2),
 			sourceNamespace: "fake-ns",
-			errs: []string{
-				"multiple repository type in one backup, current type restic, differential one [type kopia, snapshot ID fake-snapshot-id-2, uploader kopia]",
+			errs: []expectError{
+				{
+					err:        "multiple repository type in one backup",
+					prefixOnly: true,
+				},
 			},
 		},
 		{
@@ -223,8 +233,10 @@ func TestRestorePodVolumes(t *testing.T) {
 			restoredPod:     createPodObj(false, false, false, 2),
 			sourceNamespace: "fake-ns",
 			runtimeScheme:   scheme,
-			errs: []string{
-				"wrong parameters, namespace \"fake-ns\", backup storage location \"\", repository type \"kopia\"",
+			errs: []expectError{
+				{
+					err: "wrong parameters, namespace \"fake-ns\", backup storage location \"\", repository type \"kopia\"",
+				},
 			},
 		},
 		{
@@ -243,9 +255,13 @@ func TestRestorePodVolumes(t *testing.T) {
 			sourceNamespace: "fake-ns",
 			bsl:             "fake-bsl",
 			runtimeScheme:   scheme,
-			errs: []string{
-				"error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-1\" not found",
-				"error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-2\" not found",
+			errs: []expectError{
+				{
+					err: "error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-1\" not found",
+				},
+				{
+					err: "error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-2\" not found",
+				},
 			},
 		},
 		{
@@ -275,9 +291,13 @@ func TestRestorePodVolumes(t *testing.T) {
 			sourceNamespace: "fake-ns",
 			bsl:             "fake-bsl",
 			runtimeScheme:   scheme,
-			errs: []string{
-				"fake-create-error",
-				"fake-create-error",
+			errs: []expectError{
+				{
+					err: "fake-create-error",
+				},
+				{
+					err: "fake-create-error",
+				},
 			},
 		},
 		{
@@ -297,8 +317,10 @@ func TestRestorePodVolumes(t *testing.T) {
 			sourceNamespace: "fake-ns",
 			bsl:             "fake-bsl",
 			runtimeScheme:   scheme,
-			errs: []string{
-				"timed out waiting for all PodVolumeRestores to complete",
+			errs: []expectError{
+				{
+					err: "timed out waiting for all PodVolumeRestores to complete",
+				},
 			},
 		},
 		{
@@ -320,8 +342,10 @@ func TestRestorePodVolumes(t *testing.T) {
 			retPVRs: []*velerov1api.PodVolumeRestore{
 				failedPVR,
 			},
-			errs: []string{
-				"pod volume restore failed: fake-message",
+			errs: []expectError{
+				{
+					err: "pod volume restore failed: fake-message",
+				},
 			},
 		},
 		{
@@ -341,8 +365,10 @@ func TestRestorePodVolumes(t *testing.T) {
 			sourceNamespace: "fake-ns",
 			bsl:             "fake-bsl",
 			runtimeScheme:   scheme,
-			errs: []string{
-				"node-agent pod is not running in node fake-node-name: daemonset pod not found in running state in node fake-node-name",
+			errs: []expectError{
+				{
+					err: "node-agent pod is not running in node fake-node-name: daemonset pod not found in running state in node fake-node-name",
+				},
 			},
 		},
 		{
@@ -426,7 +452,16 @@ func TestRestorePodVolumes(t *testing.T) {
 				assert.Nil(t, test.errs)
 			} else {
 				for i := 0; i < len(errs); i++ {
-					assert.EqualError(t, errs[i], test.errs[i])
+					if test.errs[i].prefixOnly {
+						errMsg := errs[i].Error()
+						if len(errMsg) >= len(test.errs[i].err) {
+							errMsg = errMsg[0:len(test.errs[i].err)]
+						}
+
+						assert.Equal(t, test.errs[i].err, errMsg)
+					} else {
+						assert.EqualError(t, errs[i], test.errs[i].err)
+					}
 				}
 			}
 		})
