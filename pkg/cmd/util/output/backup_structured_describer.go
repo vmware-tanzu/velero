@@ -437,14 +437,13 @@ func DescribeCSIVolumeSnapshotsInSF(d *StructuredDescriber, details bool, volume
 	// the field of 'CSI Volume Snapshots Details' displays the content of CSI Volume Snapshots
 	if !details {
 		CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsCount"] = len(volumeSnapshotContents)
-		return
+	} else {
+		vscDetails := make(map[string]interface{})
+		for _, vsc := range volumeSnapshotContents {
+			DescribeVSCInSF(details, vsc, vscDetails)
+		}
+		CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsDetails"] = vscDetails
 	}
-
-	vscDetails := make(map[string]interface{})
-	for _, vsc := range volumeSnapshotContents {
-		DescribeVSCInSF(details, vsc, vscDetails)
-	}
-	CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsDetails"] = vscDetails
 	d.Describe("CSIVolumeSnapshots", CSIVolumeSnapshotsInfo)
 }
 
