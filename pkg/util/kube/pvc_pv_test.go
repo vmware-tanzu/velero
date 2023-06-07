@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +31,8 @@ import (
 	corev1api "k8s.io/api/core/v1"
 
 	clientTesting "k8s.io/client-go/testing"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 type reactor struct {
@@ -126,6 +129,71 @@ func TestWaitPVCBound(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expected, pv)
+		})
+	}
+}
+
+func TestDeletePVCIfAny(t *testing.T) {
+	tests := []struct {
+		name          string
+		pvcName       string
+		pvcNamespace  string
+		kubeClientObj []runtime.Object
+		kubeReactors  []reactor
+		logMessage    string
+		logLevel      string
+		logError      string
+	}{
+		{
+			name:         "get fail",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			logMessage:   "Abort deleting PVC, it doesn't exist, fake-namespace/fake-pvc",
+			logLevel:     "level=debug",
+		},
+		{
+			name:         "delete fail",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			kubeReactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-delete-error")
+					},
+				},
+			},
+			logMessage: "Failed to delete pvc fake-namespace/fake-pvc",
+			logLevel:   "level=error",
+			logError:   "error=fake-delete-error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			for _, reactor := range test.kubeReactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			logMessage := ""
+			DeletePVCIfAny(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, velerotest.NewSingleLogger(&logMessage))
+
+			if len(test.logMessage) > 0 {
+				assert.Contains(t, logMessage, test.logMessage)
+			}
+
+			if len(test.logLevel) > 0 {
+				assert.Contains(t, logMessage, test.logLevel)
+			}
+
+			if len(test.logError) > 0 {
+				assert.Contains(t, logMessage, test.logError)
+			}
 		})
 	}
 }
