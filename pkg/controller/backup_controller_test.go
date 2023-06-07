@@ -26,9 +26,6 @@ import (
 	"testing"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotfake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
-	snapshotinformers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -603,6 +600,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -638,6 +636,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "alt-loc",
@@ -676,6 +675,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "read-write",
@@ -711,6 +711,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -748,6 +749,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -785,6 +787,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -822,6 +825,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -859,6 +863,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -896,6 +901,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -934,6 +940,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -972,6 +979,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
 					},
 					Labels: map[string]string{
 						"velero.io/storage-location": "loc-1",
@@ -1370,114 +1378,6 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, getLastSuccessBySchedule(tc.backups))
-		})
-	}
-}
-
-func TestDeleteVolumeSnapshots(t *testing.T) {
-	tests := []struct {
-		name             string
-		vsArray          []snapshotv1api.VolumeSnapshot
-		vscArray         []snapshotv1api.VolumeSnapshotContent
-		expectedVSArray  []snapshotv1api.VolumeSnapshot
-		expectedVSCArray []snapshotv1api.VolumeSnapshotContent
-	}{
-		{
-			name: "VS is ReadyToUse, and VS has corresponding VSC. VS should be deleted.",
-			vsArray: []snapshotv1api.VolumeSnapshot{
-				*builder.ForVolumeSnapshot("velero", "vs1").ObjectMeta(builder.WithLabels("testing-vs", "vs1")).Status().BoundVolumeSnapshotContentName("vsc1").Result(),
-			},
-			vscArray: []snapshotv1api.VolumeSnapshotContent{
-				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
-			},
-			expectedVSArray: []snapshotv1api.VolumeSnapshot{},
-			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{
-				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
-			},
-		},
-		{
-			name: "VS is ReadyToUse, and VS has corresponding VSC. Concurrent test.",
-			vsArray: []snapshotv1api.VolumeSnapshot{
-				*builder.ForVolumeSnapshot("velero", "vs1").ObjectMeta(builder.WithLabels("testing-vs", "vs1")).Status().BoundVolumeSnapshotContentName("vsc1").Result(),
-				*builder.ForVolumeSnapshot("velero", "vs2").ObjectMeta(builder.WithLabels("testing-vs", "vs2")).Status().BoundVolumeSnapshotContentName("vsc2").Result(),
-				*builder.ForVolumeSnapshot("velero", "vs3").ObjectMeta(builder.WithLabels("testing-vs", "vs3")).Status().BoundVolumeSnapshotContentName("vsc3").Result(),
-			},
-			vscArray: []snapshotv1api.VolumeSnapshotContent{
-				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
-				*builder.ForVolumeSnapshotContent("vsc2").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
-				*builder.ForVolumeSnapshotContent("vsc3").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
-			},
-			expectedVSArray: []snapshotv1api.VolumeSnapshot{},
-			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{
-				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
-				*builder.ForVolumeSnapshotContent("vsc2").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
-				*builder.ForVolumeSnapshotContent("vsc3").DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).VolumeSnapshotRef("ns-", "name-").Status().Result(),
-			},
-		},
-		{
-			name: "Corresponding VSC not found for VS. VS is not deleted.",
-			vsArray: []snapshotv1api.VolumeSnapshot{
-				*builder.ForVolumeSnapshot("velero", "vs1").ObjectMeta(builder.WithLabels("testing-vs", "vs1")).Status().BoundVolumeSnapshotContentName("vsc1").Result(),
-			},
-			vscArray: []snapshotv1api.VolumeSnapshotContent{},
-			expectedVSArray: []snapshotv1api.VolumeSnapshot{
-				*builder.ForVolumeSnapshot("velero", "vs1").Status().BoundVolumeSnapshotContentName("vsc1").Result(),
-			},
-			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{},
-		},
-		{
-			name: "VS status is nil. VSC should not be modified.",
-			vsArray: []snapshotv1api.VolumeSnapshot{
-				*builder.ForVolumeSnapshot("velero", "vs1").ObjectMeta(builder.WithLabels("testing-vs", "vs1")).Result(),
-			},
-			vscArray: []snapshotv1api.VolumeSnapshotContent{
-				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
-			},
-			expectedVSArray: []snapshotv1api.VolumeSnapshot{},
-			expectedVSCArray: []snapshotv1api.VolumeSnapshotContent{
-				*builder.ForVolumeSnapshotContent("vsc1").DeletionPolicy(snapshotv1api.VolumeSnapshotContentDelete).Status().Result(),
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var (
-				fakeClient = velerotest.NewFakeControllerRuntimeClientBuilder(t).WithLists(
-					&snapshotv1api.VolumeSnapshotContentList{Items: tc.vscArray},
-				).Build()
-				vsClient        = snapshotfake.NewSimpleClientset()
-				sharedInformers = snapshotinformers.NewSharedInformerFactory(vsClient, 0)
-			)
-			c := &backupReconciler{
-				kbClient:             fakeClient,
-				volumeSnapshotLister: sharedInformers.Snapshot().V1().VolumeSnapshots().Lister(),
-				volumeSnapshotClient: vsClient,
-			}
-
-			for _, vs := range tc.vsArray {
-				_, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots(vs.Namespace).Create(context.Background(), &vs, metav1.CreateOptions{})
-				require.NoError(t, err)
-				require.NoError(t, sharedInformers.Snapshot().V1().VolumeSnapshots().Informer().GetStore().Add(&vs))
-			}
-			logger := logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
-
-			c.deleteVolumeSnapshots(tc.vsArray, tc.vscArray, logger, 30)
-
-			vsList, err := c.volumeSnapshotClient.SnapshotV1().VolumeSnapshots("velero").List(context.TODO(), metav1.ListOptions{})
-			require.NoError(t, err)
-			assert.Equal(t, len(tc.expectedVSArray), len(vsList.Items))
-			for index := range tc.expectedVSArray {
-				assert.Equal(t, tc.expectedVSArray[index].Status, vsList.Items[index].Status)
-				assert.Equal(t, tc.expectedVSArray[index].Spec, vsList.Items[index].Spec)
-			}
-
-			vscList := &snapshotv1api.VolumeSnapshotContentList{}
-			require.NoError(t, c.kbClient.List(context.Background(), vscList))
-			assert.Equal(t, len(tc.expectedVSCArray), len(vscList.Items))
-			for index := range tc.expectedVSCArray {
-				assert.Equal(t, tc.expectedVSCArray[index].Spec, vscList.Items[index].Spec)
-			}
 		})
 	}
 }
