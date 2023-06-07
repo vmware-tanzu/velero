@@ -87,24 +87,27 @@ func TestExpose(t *testing.T) {
 		snapshotClientObj []runtime.Object
 		kubeClientObj     []runtime.Object
 		ownerBackup       *velerov1.Backup
-		snapshotName      string
 		exposeParam       CSISnapshotExposeParam
 		snapReactors      []reactor
 		kubeReactors      []reactor
 		err               string
 	}{
 		{
-			name:         "wait vs ready fail",
-			snapshotName: "fake-vs",
-			ownerBackup:  backup,
-			err:          "error wait volume snapshot ready: error to get volumesnapshot /fake-vs: volumesnapshots.snapshot.storage.k8s.io \"fake-vs\" not found",
+			name:        "wait vs ready fail",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName: "fake-vs",
+				Timeout:      time.Millisecond,
+			},
+			err: "error wait volume snapshot ready: error to get volumesnapshot /fake-vs: volumesnapshots.snapshot.storage.k8s.io \"fake-vs\" not found",
 		},
 		{
-			name:         "get vsc fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "get vsc fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
+				Timeout:         time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -112,11 +115,12 @@ func TestExpose(t *testing.T) {
 			err: "error to get volume snapshot content: error getting volume snapshot content from API: volumesnapshotcontents.snapshot.storage.k8s.io \"fake-vsc\" not found",
 		},
 		{
-			name:         "delete vs fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "delete vs fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
+				Timeout:         time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -134,11 +138,12 @@ func TestExpose(t *testing.T) {
 			err: "error to delete volume snapshot: error to delete volume snapshot: fake-delete-error",
 		},
 		{
-			name:         "delete vsc fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "delete vsc fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
+				Timeout:         time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -156,11 +161,12 @@ func TestExpose(t *testing.T) {
 			err: "error to delete volume snapshot content: error to delete volume snapshot content: fake-delete-error",
 		},
 		{
-			name:         "create backup vs fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "create backup vs fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
+				Timeout:         time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -178,11 +184,12 @@ func TestExpose(t *testing.T) {
 			err: "error to create backup volume snapshot: fake-create-error",
 		},
 		{
-			name:         "create backup vsc fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "create backup vsc fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
+				Timeout:         time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -200,10 +207,10 @@ func TestExpose(t *testing.T) {
 			err: "error to create backup volume snapshot content: fake-create-error",
 		},
 		{
-			name:         "create backup pvc fail, invalid access mode",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "create backup pvc fail, invalid access mode",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
 				AccessMode:      "fake-mode",
 			},
@@ -214,11 +221,12 @@ func TestExpose(t *testing.T) {
 			err: "error to create backup pvc: unsupported access mode fake-mode",
 		},
 		{
-			name:         "create backup pvc fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "create backup pvc fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
+				Timeout:         time.Millisecond,
 				AccessMode:      AccessModeFileSystem,
 			},
 			snapshotClientObj: []runtime.Object{
@@ -237,12 +245,13 @@ func TestExpose(t *testing.T) {
 			err: "error to create backup pvc: error to create pvc: fake-create-error",
 		},
 		{
-			name:         "create backup pod fail",
-			ownerBackup:  backup,
-			snapshotName: "fake-vs",
+			name:        "create backup pod fail",
+			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
 				SourceNamespace: "fake-ns",
 				AccessMode:      AccessModeFileSystem,
+				Timeout:         time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -291,7 +300,7 @@ func TestExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.Expose(context.Background(), ownerObject, test.snapshotName, time.Millisecond, &test.exposeParam)
+			err := exposer.Expose(context.Background(), ownerObject, &test.exposeParam)
 			assert.EqualError(t, err, test.err)
 		})
 	}
