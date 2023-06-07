@@ -648,7 +648,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	var volumeSnapshots []snapshotv1api.VolumeSnapshot
 	var volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent
 	var volumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
+		backupLog.Info("backup SnapshotMoveData is set to true, skip VolumeSnapshot resource persistence.")
+	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
 		vscList := &snapshotv1api.VolumeSnapshotContentList{}
 

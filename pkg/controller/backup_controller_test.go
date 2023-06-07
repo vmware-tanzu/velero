@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotfake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
+	snapshotinformers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -44,6 +47,7 @@ import (
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -581,6 +585,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		expectedResult           *velerov1api.Backup
 		backupExists             bool
 		existenceCheckError      error
+		volumeSnapshot           *snapshotv1api.VolumeSnapshot
 	}{
 		// Finalizing
 		{
@@ -1000,16 +1005,139 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                     "backup with snapshot data movement when CSI feature is enabled",
+			backup:                   defaultBackup().SnapshotMoveData(true).Result(),
+			backupLocation:           defaultBackupLocation,
+			defaultVolumesToFsBackup: false,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:          defaultBackupLocation.Name,
+					DefaultVolumesToFsBackup: boolptr.False(),
+					SnapshotMoveData:         boolptr.True(),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:                       velerov1api.BackupPhaseFinalizing,
+					Version:                     1,
+					FormatVersion:               "1.1.0",
+					StartTimestamp:              &timestamp,
+					Expiration:                  &timestamp,
+					CSIVolumeSnapshotsAttempted: 0,
+					CSIVolumeSnapshotsCompleted: 0,
+				},
+			},
+			volumeSnapshot: builder.ForVolumeSnapshot("velero", "testVS").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+		},
+		{
+			name:   "backup with snapshot data movement set to false when CSI feature is enabled",
+			backup: defaultBackup().SnapshotMoveData(false).Result(),
+			//backup:                   defaultBackup().Result(),
+			backupLocation:           defaultBackupLocation,
+			defaultVolumesToFsBackup: false,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:          defaultBackupLocation.Name,
+					DefaultVolumesToFsBackup: boolptr.False(),
+					SnapshotMoveData:         boolptr.False(),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:                       velerov1api.BackupPhaseFinalizing,
+					Version:                     1,
+					FormatVersion:               "1.1.0",
+					StartTimestamp:              &timestamp,
+					Expiration:                  &timestamp,
+					CSIVolumeSnapshotsAttempted: 1,
+					CSIVolumeSnapshotsCompleted: 0,
+				},
+			},
+			volumeSnapshot: builder.ForVolumeSnapshot("velero", "testVS").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+		},
+		{
+			name:                     "backup with snapshot data movement not set when CSI feature is enabled",
+			backup:                   defaultBackup().Result(),
+			backupLocation:           defaultBackupLocation,
+			defaultVolumesToFsBackup: false,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:          defaultBackupLocation.Name,
+					DefaultVolumesToFsBackup: boolptr.False(),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:                       velerov1api.BackupPhaseFinalizing,
+					Version:                     1,
+					FormatVersion:               "1.1.0",
+					StartTimestamp:              &timestamp,
+					Expiration:                  &timestamp,
+					CSIVolumeSnapshotsAttempted: 1,
+					CSIVolumeSnapshotsCompleted: 0,
+				},
+			},
+			volumeSnapshot: builder.ForVolumeSnapshot("velero", "testVS").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
 			var (
-				logger        = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				pluginManager = new(pluginmocks.Manager)
-				backupStore   = new(persistencemocks.BackupStore)
-				backupper     = new(fakeBackupper)
+				logger         = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				pluginManager  = new(pluginmocks.Manager)
+				backupStore    = new(persistencemocks.BackupStore)
+				backupper      = new(fakeBackupper)
+				snapshotClient = snapshotfake.NewSimpleClientset()
+				sharedInformer = snapshotinformers.NewSharedInformerFactory(snapshotClient, 0)
+				snapshotLister = sharedInformer.Snapshot().V1().VolumeSnapshots().Lister()
 			)
 
 			var fakeClient kbclient.Client
@@ -1018,6 +1146,12 @@ func TestProcessBackupCompletions(t *testing.T) {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation)
 			} else {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
+			}
+
+			if test.volumeSnapshot != nil {
+				snapshotClient.SnapshotV1().VolumeSnapshots(test.volumeSnapshot.Namespace).Create(context.Background(), test.volumeSnapshot, metav1.CreateOptions{})
+				sharedInformer.Snapshot().V1().VolumeSnapshots().Informer().GetStore().Add(test.volumeSnapshot)
+				sharedInformer.WaitForCacheSync(make(chan struct{}))
 			}
 
 			apiServer := velerotest.NewAPIServer(t)
@@ -1050,6 +1184,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupStoreGetter:        NewFakeSingleObjectBackupStoreGetter(backupStore),
 				backupper:                backupper,
 				formatFlag:               formatFlag,
+				volumeSnapshotClient:     snapshotClient,
+				volumeSnapshotLister:     snapshotLister,
 			}
 
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
@@ -1079,9 +1215,19 @@ func TestProcessBackupCompletions(t *testing.T) {
 			// add the default backup storage location to the clientset and the informer/lister store
 			require.NoError(t, fakeClient.Create(context.Background(), defaultBackupLocation))
 
+			// Enable CSI feature flag for SnapshotDataMovement test.
+			if strings.Contains(test.name, "backup with snapshot data movement") {
+				features.Enable(velerov1api.CSIFeatureFlag)
+			}
+
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, actualResult, ctrl.Result{})
 			assert.Nil(t, err)
+
+			// Disable CSI feature to not impact other test cases.
+			if strings.Contains(test.name, "backup with snapshot data movement") {
+				features.Disable(velerov1api.CSIFeatureFlag)
+			}
 
 			res := &velerov1api.Backup{}
 			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
