@@ -49,3 +49,40 @@ func TestBuildUserAgent(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig(t *testing.T) {
+	tests := []struct {
+		name         string
+		kubeconfig   string
+		kubecontext  string
+		QPS          float32
+		burst        int
+		expectedHost string
+	}{
+		{
+			name:         "Test using the right cluster as context indexed",
+			kubeconfig:   "kubeconfig",
+			kubecontext:  "federal-context",
+			QPS:          1.0,
+			burst:        1,
+			expectedHost: "https://horse.org:4443",
+		},
+		{
+			name:         "Test using the right cluster as context indexed",
+			kubeconfig:   "kubeconfig",
+			kubecontext:  "queen-anne-context",
+			QPS:          200.0,
+			burst:        20,
+			expectedHost: "https://pig.org:443",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := Config(test.kubeconfig, test.kubecontext, "velero", test.QPS, test.burst)
+			assert.Equal(t, err, nil)
+			assert.Equal(t, test.expectedHost, client.Host)
+			assert.Equal(t, test.QPS, client.QPS)
+			assert.Equal(t, test.burst, client.Burst)
+		})
+	}
+}
