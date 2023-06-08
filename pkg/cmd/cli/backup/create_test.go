@@ -18,14 +18,20 @@ package backup
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	flag "github.com/spf13/pflag"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 )
 
@@ -125,5 +131,139 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 		"persistentvolumes": "pv1,pv2",
 	}
 	assert.Equal(t, orderedResources, expectedMixedResources)
+
+}
+
+func TestCreateCommand_Run(t *testing.T) {
+	// create a config for factory
+	baseName := "velero-bn"
+	os.Setenv("VELERO_NAMESPACE", testNamespace)
+	config, err := client.LoadConfig()
+	assert.Equal(t, err, nil)
+
+	// create a factory
+	f := client.NewFactory(baseName, config)
+	cliFlags := new(flag.FlagSet)
+	f.BindFlags(cliFlags)
+	host := "https://horse.org:4443"
+	cliFlags.Parse([]string{"--kubeconfig", "kubeconfig", "--kubecontext", "federal-context"})
+
+	// create command
+	cmd := NewCreateCommand(f, "")
+	assert.Equal(t, "Create a backup", cmd.Short)
+	fmt.Println(cmd)
+
+	// create a CreateOptions with full options set and then run this backup command
+	name := "nameToBeCreated"
+	includeNamespaces := "app1,app2"
+	excludeNamespaces := "pod1,pod2,pod3"
+	includeResources := "sc,sts"
+	excludeResources := "job"
+	includeClusterScopedResources := "pv,ComponentStatus"
+	excludeClusterScopedResources := "MutatingWebhookConfiguration,APIService"
+	includeNamespaceScopedResources := "Endpoints,Event,PodTemplate"
+	excludeNamespaceScopedResources := "Secret,MultiClusterIngress"
+	labels := "a=foo,b=woo"
+	storageLocation := "bsl-name-1"
+	snapshotLocations := "region=minio"
+	selector := "a=pod"
+	orderedResources := "bsl-name-1"
+	csiSnapshotTimeout := "8m30s"
+	itemOperationTimeout := "99h1m6s"
+	snapshotVolumes := "false"
+	snapshotMoveData := "true"
+	includeClusterResources := "true"
+	defaultVolumesToFsBackup := "true"
+	resPoliciesConfigmap := "cm-name-2"
+	dataMover := "velero"
+	fromSchedule := "schedule-name-1"
+
+	flags := new(flag.FlagSet)
+	o := NewCreateOptions()
+	o.BindFlags(flags)
+	o.BindWait(flags)
+	o.BindFromSchedule(flags)
+
+	flags.Parse([]string{"--include-namespaces", includeNamespaces})
+	flags.Parse([]string{"--exclude-namespaces", excludeNamespaces})
+	flags.Parse([]string{"--include-resources", includeResources})
+	flags.Parse([]string{"--exclude-resources", excludeResources})
+	flags.Parse([]string{"--include-cluster-scoped-resources", includeClusterScopedResources})
+	flags.Parse([]string{"--exclude-cluster-scoped-resources", excludeClusterScopedResources})
+	flags.Parse([]string{"--include-namespace-scoped-resources", includeNamespaceScopedResources})
+	flags.Parse([]string{"--exclude-namespace-scoped-resources", excludeNamespaceScopedResources})
+	flags.Parse([]string{"--labels", labels})
+	flags.Parse([]string{"--storage-location", storageLocation})
+	flags.Parse([]string{"--volume-snapshot-locations", snapshotLocations})
+	flags.Parse([]string{"--selector", selector})
+	flags.Parse([]string{"--ordered-resources", orderedResources})
+	flags.Parse([]string{"--csi-snapshot-timeout", csiSnapshotTimeout})
+	flags.Parse([]string{"--item-operation-timeout", itemOperationTimeout})
+	flags.Parse([]string{fmt.Sprintf("--snapshot-volumes=%s", snapshotVolumes)})
+	flags.Parse([]string{fmt.Sprintf("--snapshot-move-data=%s", snapshotMoveData)})
+	flags.Parse([]string{"--include-cluster-resources", includeClusterResources})
+	flags.Parse([]string{"--default-volumes-to-fs-backup", defaultVolumesToFsBackup})
+	flags.Parse([]string{"--resource-policies-configmap", resPoliciesConfigmap})
+	flags.Parse([]string{"--data-mover", dataMover})
+	flags.Parse([]string{"--from-schedule", fromSchedule})
+	flags.Parse([]string{"--wait"})
+
+	args := []string{name, "arg2"}
+	o.Complete(args, f)
+	e := o.Validate(cmd, args, f)
+	assert.Contains(t, e.Error(), "/api?timeout=")
+
+	e = o.Run(cmd, f)
+	// as fromSchedule is set, so the error below is expected
+	assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/apis/velero.io/v1/namespaces/%s/schedules/%s", host, testNamespace, fromSchedule))
+
+	// verify all options are set as expected
+	assert.Equal(t, name, o.Name)
+	assert.Equal(t, includeNamespaces, o.IncludeNamespaces.String())
+	assert.Equal(t, excludeNamespaces, o.ExcludeNamespaces.String())
+	assert.Equal(t, includeResources, o.IncludeResources.String())
+	assert.Equal(t, excludeResources, o.ExcludeResources.String())
+	assert.Equal(t, includeClusterScopedResources, o.IncludeClusterScopedResources.String())
+	assert.Equal(t, excludeClusterScopedResources, o.ExcludeClusterScopedResources.String())
+	assert.Equal(t, includeNamespaceScopedResources, o.IncludeNamespaceScopedResources.String())
+	assert.Equal(t, excludeNamespaceScopedResources, o.ExcludeNamespaceScopedResources.String())
+	//assert.Equal(t, labels, o.Labels.String())
+	assert.Equal(t, storageLocation, o.StorageLocation)
+	assert.Equal(t, snapshotLocations, strings.Split(o.SnapshotLocations[0], ",")[0])
+	assert.Equal(t, selector, o.Selector.String())
+	assert.Equal(t, orderedResources, o.OrderedResources)
+	assert.Equal(t, csiSnapshotTimeout, o.CSISnapshotTimeout.String())
+	assert.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
+	assert.Equal(t, snapshotVolumes, o.SnapshotVolumes.String())
+	assert.Equal(t, snapshotMoveData, o.SnapshotMoveData.String())
+	assert.Equal(t, includeClusterResources, o.IncludeClusterResources.String())
+	assert.Equal(t, defaultVolumesToFsBackup, o.DefaultVolumesToFsBackup.String())
+	assert.Equal(t, resPoliciesConfigmap, o.ResPoliciesConfigmap)
+	assert.Equal(t, dataMover, o.DataMover)
+	assert.Equal(t, fromSchedule, o.FromSchedule)
+	assert.Equal(t, true, o.Wait)
+
+	// verify oldAndNewFilterParametersUsedTogether
+	mix := o.oldAndNewFilterParametersUsedTogether()
+	assert.Equal(t, true, mix)
+
+	// create the other create command without fromSchedule option for Run() other branches
+	cmd = NewCreateCommand(f, "")
+	assert.Equal(t, "Create a backup", cmd.Short)
+	fmt.Println(cmd)
+	o = NewCreateOptions()
+	o.Labels.Set("velero.io/test=true")
+	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
+	o.CSISnapshotTimeout = 20 * time.Minute
+	o.ItemOperationTimeout = 20 * time.Minute
+	o.Wait = true
+	f.BindFlags(cliFlags)
+	args = []string{"backup-name-2", "arg2"}
+	o.Complete(args, f)
+	fmt.Println(o.client)
+	e = o.Run(cmd, f)
+
+	// Get failure of backup resource creation
+	assert.Contains(t, e.Error(), fmt.Sprintf("Post \"%s/apis/velero.io/v1/namespaces/%s/backups", host, testNamespace))
 
 }
