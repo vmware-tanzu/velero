@@ -337,10 +337,9 @@ Therefore, for the new path, Velero uses the information in the BackupStorageLoc
 The legacy path will be kept as is. That is, Velero still sets/gets the repoIdentififer in BackupRepository CRs, PodVolume Backup CRs and PodVolume Restore CRs and then passes to Restic CLI.  
 
 ## Installation
- We will add a new flag "--pod-volume-backup-uploader" during installation. The flag has 3 meanings:
- - It indicates PodVolume BR as the default method to protect PV data over other methods, i.e., durable snapshot. Therefore, the existing --use-restic option will be replaced
+ We will add a new flag "--uploader-type" during installation. The flag has 2 meanings:
  - It indicates the file system uploader to be used by PodVolume BR
- - It implies the backup repository type manner, Restic if pod-volume-backup-uploader=restic, Unified Repository in all other cases
+ - It implies the backup repository type manner, Restic if uploader-type=restic, Unified Repository in all other cases
 
  The flag has below two values:  
  **"Restic"**: it means Velero will use Restic to do the pod volume backup. Therefore, the Velero server deployment will be created as below:
@@ -470,7 +469,7 @@ Below sample files demonstrate complete CRs with all the changes mentioned above
 
 ## User Perspective
 This design aims to provide a flexible backup repository layer and a generic file system uploader, which are fundermental for PodVolume and other data movements. Although this will make Velero more capable, at present, we don't pursue to expose differentiated features end to end. Specifically:  
-- By default, Velero still uses Restic for PodVolume BR
+- For a fresh installation, if the "--uploader-type" is not specified, there is a default value for PodVolume BR. We will keep it as "restic" for at least one release, then we switch the value to "kopia"
 - Even when changing to the new path, Velero still allows users to restore from the data backed up by Restic
 - The capability of PodVolume BR under the new path is kept the same as it under Restic path and the same as the existing PodVolume BR
 - The operational experiences are kept the same as much as possible, the known changes are listed below
