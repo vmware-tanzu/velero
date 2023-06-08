@@ -85,6 +85,8 @@ type CreateOptions struct {
 	Name                            string
 	TTL                             time.Duration
 	SnapshotVolumes                 flag.OptionalBool
+	SnapshotMoveData                flag.OptionalBool
+	DataMover                       string
 	DefaultVolumesToFsBackup        flag.OptionalBool
 	IncludeNamespaces               flag.StringArray
 	ExcludeNamespaces               flag.StringArray
@@ -139,6 +141,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	// like a normal bool flag
 	f.NoOptDefVal = "true"
 
+	f = flags.VarPF(&o.SnapshotMoveData, "snapshot-move-data", "", "Specify whether snapshot data should be moved")
+	f.NoOptDefVal = "true"
+
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the backup. Cannot work with include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources.")
 	f.NoOptDefVal = "true"
 
@@ -146,6 +151,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = "true"
 
 	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup using")
+	flags.StringVar(&o.DataMover, "data-mover", "", "Specify the data mover to be used by the backup. If the parameter is not set or set as 'velero', the built-in data mover will be used")
 }
 
 // BindWait binds the wait flag separately so it is not called by other create
@@ -359,7 +365,8 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...).
 			CSISnapshotTimeout(o.CSISnapshotTimeout).
-			ItemOperationTimeout(o.ItemOperationTimeout)
+			ItemOperationTimeout(o.ItemOperationTimeout).
+			DataMover(o.DataMover)
 		if len(o.OrderedResources) > 0 {
 			orders, err := ParseOrderedResources(o.OrderedResources)
 			if err != nil {
@@ -370,6 +377,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 
 		if o.SnapshotVolumes.Value != nil {
 			backupBuilder.SnapshotVolumes(*o.SnapshotVolumes.Value)
+		}
+		if o.SnapshotMoveData.Value != nil {
+			backupBuilder.SnapshotMoveData(*o.SnapshotMoveData.Value)
 		}
 		if o.IncludeClusterResources.Value != nil {
 			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
