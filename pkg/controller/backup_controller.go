@@ -256,8 +256,13 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// store ref to just-updated item for creating patch
 	original = request.Backup.DeepCopy()
 
+	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
+
 	if request.Status.Phase == velerov1api.BackupPhaseFailedValidation {
 		log.Debug("failed to validate backup status")
+		b.metrics.RegisterBackupValidationFailure(backupScheduleName)
+		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
+
 		return ctrl.Result{}, nil
 	}
 
@@ -271,7 +276,6 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	log.Debug("Running backup")
 
-	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
 	b.metrics.RegisterBackupAttempt(backupScheduleName)
 
 	// execution & upload of backup

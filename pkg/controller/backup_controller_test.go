@@ -214,6 +214,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				defaultBackupLocation: defaultBackupLocation.Name,
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
+				metrics:               metrics.NewServerMetrics(),
 			}
 
 			require.NotNil(t, test.backup)
