@@ -125,18 +125,18 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
 	// like a normal bool flag
-	f.NoOptDefVal = "true"
+	f.NoOptDefVal = cmd.TRUE
 
 	f = flags.VarPF(&o.PreserveNodePorts, "preserve-nodeports", "", "Whether to preserve nodeports of Services when restoring.")
 	// this allows the user to just specify "--preserve-nodeports" as shorthand for "--preserve-nodeports=true"
 	// like a normal bool flag
-	f.NoOptDefVal = "true"
+	f.NoOptDefVal = cmd.TRUE
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "Include cluster-scoped resources in the restore.")
-	f.NoOptDefVal = "true"
+	f.NoOptDefVal = cmd.TRUE
 
 	f = flags.VarPF(&o.AllowPartiallyFailed, "allow-partially-failed", "", "If using --from-schedule, whether to consider PartiallyFailed backups when looking for the most recent one. This flag has no effect if not using --from-schedule.")
-	f.NoOptDefVal = "true"
+	f.NoOptDefVal = cmd.TRUE
 
 	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "Wait for the operation to complete.")
 }

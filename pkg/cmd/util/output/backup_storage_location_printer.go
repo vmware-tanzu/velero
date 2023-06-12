@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
 )
 
 var (
@@ -53,7 +54,7 @@ func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []m
 
 	isDefault := ""
 	if location.Spec.Default {
-		isDefault = "true"
+		isDefault = cmd.TRUE
 	}
 
 	bucketAndPrefix := location.Spec.ObjectStorage.Bucket
