@@ -44,6 +44,7 @@ type Provider interface {
 	RunBackup(
 		ctx context.Context,
 		path string,
+		realSource string,
 		tags map[string]string,
 		forceFull bool,
 		parentSnapshot string,
