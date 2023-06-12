@@ -27,7 +27,7 @@ type VolumeSnapshotClassBuilder struct {
 }
 
 // ForVolumeSnapshotClass is the constructor of VolumeSnapshotClassBuilder.
-func (b *VolumeSnapshotClassBuilder) ForVolumeSnapshotClass(name string) *VolumeSnapshotClassBuilder {
+func ForVolumeSnapshotClass(name string) *VolumeSnapshotClassBuilder {
 	return &VolumeSnapshotClassBuilder{
 		object: &snapshotv1api.VolumeSnapshotClass{
 			TypeMeta: metav1.TypeMeta{

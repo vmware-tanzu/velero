@@ -480,6 +480,13 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		return nil
 	}
 
+	// TODO: Snapshot data mover is only supported for CSI plugin scenario by now.
+	// Need to add a mechanism to choose running which plugin for resources.
+	// After that, this warning can be removed.
+	if boolptr.IsSetToTrue(ib.backupRequest.Spec.SnapshotMoveData) {
+		log.Warnf("VolumeSnapshotter plugin doesn't support data movement.")
+	}
+
 	if ib.backupRequest.ResPolicies != nil {
 		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(pv); err != nil {
 			log.WithError(err).Errorf("Error getting matched resource policies for pv %s", pv.Name)
