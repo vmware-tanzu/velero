@@ -36,11 +36,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -112,16 +115,18 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 }
 
 type nodeAgentServer struct {
-	logger         logrus.FieldLogger
-	ctx            context.Context
-	cancelFunc     context.CancelFunc
-	fileSystem     filesystem.Interface
-	mgr            manager.Manager
-	metrics        *metrics.ServerMetrics
-	metricsAddress string
-	namespace      string
-	nodeName       string
-	config         nodeAgentServerConfig
+	logger            logrus.FieldLogger
+	ctx               context.Context
+	cancelFunc        context.CancelFunc
+	fileSystem        filesystem.Interface
+	mgr               manager.Manager
+	metrics           *metrics.ServerMetrics
+	metricsAddress    string
+	namespace         string
+	nodeName          string
+	config            nodeAgentServerConfig
+	kubeClient        kubernetes.Interface
+	csiSnapshotClient *snapshotv1client.Clientset
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -184,14 +189,18 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 
 	// the cache isn't initialized yet when "validatePodVolumesHostPath" is called, the client returned by the manager cannot
 	// be used, so we need the kube client here
-	client, err := factory.KubeClient()
+	s.kubeClient, err = factory.KubeClient()
 	if err != nil {
 		return nil, err
 	}
-	if err := s.validatePodVolumesHostPath(client); err != nil {
+	if err := s.validatePodVolumesHostPath(s.kubeClient); err != nil {
 		return nil, err
 	}
 
+	s.csiSnapshotClient, err = snapshotv1client.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -245,6 +254,10 @@ func (s *nodeAgentServer) run() {
 
 	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
+	}
+
+	if err = controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.logger).SetupWithManager(s.mgr); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
 	s.logger.Info("Controllers starting...")

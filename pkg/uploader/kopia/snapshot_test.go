@@ -536,7 +536,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var repo repo.Repository
 			listSnapshotsFunc = tc.listSnapshotsFunc
-			snapshots, err := findPreviousSnapshotManifest(context.Background(), repo, sourceInfo, snapshotTags, &noLaterThan)
+			snapshots, err := findPreviousSnapshotManifest(context.Background(), repo, sourceInfo, snapshotTags, &noLaterThan, logrus.New())
 
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {
@@ -616,9 +616,9 @@ func TestBackup(t *testing.T) {
 			var snapshotInfo *uploader.SnapshotInfo
 			var err error
 			if tc.isEmptyUploader {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, tc.forceFull, tc.parentSnapshot, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.tags, &logrus.Logger{})
 			} else {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, tc.forceFull, tc.parentSnapshot, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.tags, &logrus.Logger{})
 			}
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {
@@ -674,7 +674,7 @@ func TestRestore(t *testing.T) {
 			expectedError: errors.New("Unable to get filesystem entry"),
 		},
 		{
-			name: "Expect sucessful",
+			name: "Expect successful",
 			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
 				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
 			},

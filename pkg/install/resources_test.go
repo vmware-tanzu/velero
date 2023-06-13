@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestResources(t *testing.T) {
@@ -61,4 +63,50 @@ func TestResources(t *testing.T) {
 	sa := ServiceAccount(DefaultVeleroNamespace, map[string]string{"abcd": "cbd"})
 	assert.Equal(t, "velero", sa.ObjectMeta.Namespace)
 	assert.Equal(t, "cbd", sa.ObjectMeta.Annotations["abcd"])
+}
+
+func TestAllCRDs(t *testing.T) {
+	list := AllCRDs()
+	assert.Len(t, list.Items, 13)
+	assert.Equal(t, Labels(), list.Items[0].GetLabels())
+}
+
+func TestAllResources(t *testing.T) {
+	option := &VeleroOptions{
+		Namespace:          "velero",
+		SecretData:         []byte{'a'},
+		UseVolumeSnapshots: true,
+		UseNodeAgent:       true,
+	}
+	list := AllResources(option)
+
+	objects := map[string]unstructured.Unstructured{}
+	for _, item := range list.Items {
+		objects[item.GetKind()] = item
+	}
+
+	ns, exist := objects["Namespace"]
+	require.True(t, exist)
+	assert.Equal(t, "velero", ns.GetName())
+
+	_, exist = objects["ClusterRoleBinding"]
+	assert.True(t, exist)
+
+	_, exist = objects["ServiceAccount"]
+	assert.True(t, exist)
+
+	_, exist = objects["Secret"]
+	assert.True(t, exist)
+
+	_, exist = objects["BackupStorageLocation"]
+	assert.True(t, exist)
+
+	_, exist = objects["VolumeSnapshotLocation"]
+	assert.True(t, exist)
+
+	_, exist = objects["Deployment"]
+	assert.True(t, exist)
+
+	_, exist = objects["DaemonSet"]
+	assert.True(t, exist)
 }

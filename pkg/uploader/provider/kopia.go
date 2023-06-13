@@ -114,6 +114,7 @@ func (kp *kopiaProvider) Close(ctx context.Context) error {
 func (kp *kopiaProvider) RunBackup(
 	ctx context.Context,
 	path string,
+	realSource string,
 	tags map[string]string,
 	forceFull bool,
 	parentSnapshot string,
@@ -122,8 +123,13 @@ func (kp *kopiaProvider) RunBackup(
 		return "", false, errors.New("Need to initial backup progress updater first")
 	}
 
+	if path == "" {
+		return "", false, errors.New("path is empty")
+	}
+
 	log := kp.log.WithFields(logrus.Fields{
 		"path":           path,
+		"realSource":     realSource,
 		"parentSnapshot": parentSnapshot,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
@@ -147,7 +153,7 @@ func (kp *kopiaProvider) RunBackup(
 	tags[uploader.SnapshotRequestorTag] = kp.requestorType
 	tags[uploader.SnapshotUploaderTag] = uploader.KopiaType
 
-	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, forceFull, parentSnapshot, tags, log)
+	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, tags, log)
 	if err != nil {
 		if kpUploader.IsCanceled() {
 			log.Error("Kopia backup is canceled")

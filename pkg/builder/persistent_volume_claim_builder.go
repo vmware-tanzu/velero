@@ -67,3 +67,9 @@ func (b *PersistentVolumeClaimBuilder) StorageClass(name string) *PersistentVolu
 	b.object.Spec.StorageClassName = &name
 	return b
 }
+
+// Phase sets the PersistentVolumeClaim's status Phase.
+func (b *PersistentVolumeClaimBuilder) Phase(phase corev1api.PersistentVolumeClaimPhase) *PersistentVolumeClaimBuilder {
+	b.object.Status.Phase = phase
+	return b
+}

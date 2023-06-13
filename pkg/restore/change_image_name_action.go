@@ -153,19 +153,19 @@ func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured,
 	needUpdateObj := false
 	containers, _, err := unstructured.NestedSlice(obj.UnstructuredContent(), filed...)
 	if err != nil {
-		a.logger.Infof("UnstructuredConverter meet error: %v", err)
+		log.Infof("UnstructuredConverter meet error: %v", err)
 		return errors.Wrap(err, "error getting item's spec.containers")
 	}
 	if len(containers) == 0 {
 		return nil
 	}
 	for i, container := range containers {
-		a.logger.Infoln("container:", container)
+		log.Infoln("container:", container)
 		if image, ok := container.(map[string]interface{})["image"]; ok {
 			imageName := image.(string)
 			if exists, newImageName, err := a.isImageReplaceRuleExist(log, imageName, config); exists && err == nil {
 				needUpdateObj = true
-				a.logger.Infof("Updating item's image from %s to %s", imageName, newImageName)
+				log.Infof("Updating item's image from %s to %s", imageName, newImageName)
 				container.(map[string]interface{})["image"] = newImageName
 				containers[i] = container
 			}

@@ -34,6 +34,8 @@ import (
 	kcmdutil "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
 )
 
+//go:generate mockery --name Helper
+
 // Helper exposes functions for interacting with the Kubernetes discovery
 // API.
 type Helper interface {

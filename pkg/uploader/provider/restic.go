@@ -117,12 +117,21 @@ func (rp *resticProvider) Close(ctx context.Context) error {
 func (rp *resticProvider) RunBackup(
 	ctx context.Context,
 	path string,
+	realSource string,
 	tags map[string]string,
 	forceFull bool,
 	parentSnapshot string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
+	}
+
+	if path == "" {
+		return "", false, errors.New("path is empty")
+	}
+
+	if realSource != "" {
+		return "", false, errors.New("real source is not empty, this is not supported by restic uploader")
 	}
 
 	log := rp.log.WithFields(logrus.Fields{

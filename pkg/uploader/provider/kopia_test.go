@@ -68,26 +68,26 @@ func TestRunBackup(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		hookBackupFunc func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error)
+		hookBackupFunc func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error)
 		notError       bool
 	}{
 		{
 			name: "success to backup",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return &uploader.SnapshotInfo{}, false, nil
 			},
 			notError: true,
 		},
 		{
 			name: "get error to backup",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return &uploader.SnapshotInfo{}, false, errors.New("failed to backup")
 			},
 			notError: false,
 		},
 		{
 			name: "got empty snapshot",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return nil, true, errors.New("snapshot is empty")
 			},
 			notError: false,
@@ -96,7 +96,7 @@ func TestRunBackup(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			BackupFunc = tc.hookBackupFunc
-			_, _, err := kp.RunBackup(context.Background(), "var", nil, false, "", &updater)
+			_, _, err := kp.RunBackup(context.Background(), "var", "", nil, false, "", &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -304,15 +304,13 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 			name: "Success",
 			mockCredGetter: func() *mocks.SecretStore {
 				mockCredGetter := &mocks.SecretStore{}
-				repoKeySelector := &v1.SecretKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
-				mockCredGetter.On("Get", repoKeySelector).Return("test", nil)
+				mockCredGetter.On("Get", mock.Anything).Return("test", nil)
 				return mockCredGetter
 			}(),
 			mockBackupRepoService: func() udmrepo.BackupRepoService {
 				backupRepoService := &udmrepomocks.BackupRepoService{}
 				var backupRepo udmrepo.BackupRepo
-				repoOpt := udmrepo.RepoOptions{StorageType: "", RepoPassword: "test", ConfigFilePath: "/root/udmrepo/repo-.conf", GeneralOptions: map[string]string{}, StorageOptions: map[string]string{}, Description: "Initial kopia uploader provider"}
-				backupRepoService.On("Open", context.Background(), repoOpt).Return(backupRepo, nil)
+				backupRepoService.On("Open", context.Background(), mock.Anything).Return(backupRepo, nil)
 				return backupRepoService
 			}(),
 			expectedError: "",
@@ -321,15 +319,13 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 			name: "Error to get repo options",
 			mockCredGetter: func() *mocks.SecretStore {
 				mockCredGetter := &mocks.SecretStore{}
-				repoKeySelector := &v1.SecretKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
-				mockCredGetter.On("Get", repoKeySelector).Return("test", errors.New("failed to get password"))
+				mockCredGetter.On("Get", mock.Anything).Return("test", errors.New("failed to get password"))
 				return mockCredGetter
 			}(),
 			mockBackupRepoService: func() udmrepo.BackupRepoService {
 				backupRepoService := &udmrepomocks.BackupRepoService{}
 				var backupRepo udmrepo.BackupRepo
-				repoOpt := udmrepo.RepoOptions{StorageType: "", RepoPassword: "test", ConfigFilePath: "/root/udmrepo/repo-.conf", GeneralOptions: map[string]string{}, StorageOptions: map[string]string{}, Description: "Initial kopia uploader provider"}
-				backupRepoService.On("Open", context.Background(), repoOpt).Return(backupRepo, nil)
+				backupRepoService.On("Open", context.Background(), mock.Anything).Return(backupRepo, nil)
 				return backupRepoService
 			}(),
 			expectedError: "error to get repo options",
@@ -338,15 +334,13 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 			name: "Error open repository service",
 			mockCredGetter: func() *mocks.SecretStore {
 				mockCredGetter := &mocks.SecretStore{}
-				repoKeySelector := &v1.SecretKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
-				mockCredGetter.On("Get", repoKeySelector).Return("test", nil)
+				mockCredGetter.On("Get", mock.Anything).Return("test", nil)
 				return mockCredGetter
 			}(),
 			mockBackupRepoService: func() udmrepo.BackupRepoService {
 				backupRepoService := &udmrepomocks.BackupRepoService{}
 				var backupRepo udmrepo.BackupRepo
-				repoOpt := udmrepo.RepoOptions{StorageType: "", RepoPassword: "test", ConfigFilePath: "/root/udmrepo/repo-.conf", GeneralOptions: map[string]string{}, StorageOptions: map[string]string{}, Description: "Initial kopia uploader provider"}
-				backupRepoService.On("Open", context.Background(), repoOpt).Return(backupRepo, errors.New("failed to init repository"))
+				backupRepoService.On("Open", context.Background(), mock.Anything).Return(backupRepo, errors.New("failed to init repository"))
 				return backupRepoService
 			}(),
 			expectedError: "Failed to find kopia repository",

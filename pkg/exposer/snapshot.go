@@ -26,8 +26,7 @@ import (
 // SnapshotExposer is the interfaces for a snapshot exposer
 type SnapshotExposer interface {
 	// Expose starts the process to expose a snapshot, the expose process may take long time
-	Expose(context.Context, corev1.ObjectReference, string, time.Duration, interface{}) error
-
+	Expose(context.Context, corev1.ObjectReference, interface{}) error
 	// GetExposed polls the status of the expose.
 	// If the expose is accessible by the current caller, it waits the expose ready and returns the expose result.
 	// Otherwise, it returns nil as the expose result without an error.

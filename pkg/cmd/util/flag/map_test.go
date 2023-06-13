@@ -68,8 +68,20 @@ func TestSetOfMap(t *testing.T) {
 				require.NotNil(t, err)
 				return
 			}
-			assert.EqualValues(t, c.expected, m.data)
+			assert.EqualValues(t, c.expected, m.Data())
 		})
 	}
 
+}
+
+func TestStringOfMap(t *testing.T) {
+	m := NewMap()
+	require.Nil(t, m.Set("k1=v1,k2=v2"))
+	str := m.String()
+	assert.True(t, str == "k1=v1,k2=v2" || str == "k2=v2,k1=v1")
+}
+
+func TestTypeOfMap(t *testing.T) {
+	m := NewMap()
+	assert.Equal(t, "mapStringString", m.Type())
 }

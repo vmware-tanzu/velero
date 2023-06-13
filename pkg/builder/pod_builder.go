@@ -76,6 +76,11 @@ func (b *PodBuilder) NodeName(val string) *PodBuilder {
 	return b
 }
 
+func (b *PodBuilder) Labels(labels map[string]string) *PodBuilder {
+	b.object.Labels = labels
+	return b
+}
+
 func (b *PodBuilder) InitContainers(containers ...*corev1api.Container) *PodBuilder {
 	for _, c := range containers {
 		b.object.Spec.InitContainers = append(b.object.Spec.InitContainers, *c)

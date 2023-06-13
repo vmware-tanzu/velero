@@ -287,3 +287,15 @@ func (b *BackupBuilder) ResourcePolicies(name string) *BackupBuilder {
 	b.object.Spec.ResourcePolicy = &v1.TypedLocalObjectReference{Kind: resourcepolicies.ConfigmapRefType, Name: name}
 	return b
 }
+
+// SnapshotMoveData sets the Backup's "snapshot move data" flag.
+func (b *BackupBuilder) SnapshotMoveData(val bool) *BackupBuilder {
+	b.object.Spec.SnapshotMoveData = &val
+	return b
+}
+
+// DataMover sets the Backup's data mover
+func (b *BackupBuilder) DataMover(name string) *BackupBuilder {
+	b.object.Spec.DataMover = name
+	return b
+}

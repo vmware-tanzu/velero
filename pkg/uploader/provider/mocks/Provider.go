@@ -29,30 +29,30 @@ func (_m *Provider) Close(ctx context.Context) error {
 	return r0
 }
 
-// RunBackup provides a mock function with given fields: ctx, path, tags, forceFull, parentSnapshot, updater
-func (_m *Provider) RunBackup(ctx context.Context, path string, tags map[string]string, forceFull bool, parentSnapshot string, updater uploader.ProgressUpdater) (string, bool, error) {
-	ret := _m.Called(ctx, path, tags, forceFull, parentSnapshot, updater)
+// RunBackup provides a mock function with given fields: ctx, path, realSource, tags, forceFull, parentSnapshot, updater
+func (_m *Provider) RunBackup(ctx context.Context, path string, realSource string, tags map[string]string, forceFull bool, parentSnapshot string, updater uploader.ProgressUpdater) (string, bool, error) {
+	ret := _m.Called(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
 
 	var r0 string
 	var r1 bool
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, map[string]string, bool, string, uploader.ProgressUpdater) (string, bool, error)); ok {
-		return rf(ctx, path, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) (string, bool, error)); ok {
+		return rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, map[string]string, bool, string, uploader.ProgressUpdater) string); ok {
-		r0 = rf(ctx, path, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) string); ok {
+		r0 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, map[string]string, bool, string, uploader.ProgressUpdater) bool); ok {
-		r1 = rf(ctx, path, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) bool); ok {
+		r1 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, map[string]string, bool, string, uploader.ProgressUpdater) error); ok {
-		r2 = rf(ctx, path, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) error); ok {
+		r2 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
 	} else {
 		r2 = ret.Error(2)
 	}

@@ -36,6 +36,8 @@ import (
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 )
 
+//go:generate mockery --name Factory
+
 // Factory knows how to create a VeleroClient and Kubernetes client.
 type Factory interface {
 	// BindFlags binds common flags (--kubeconfig, --namespace) to the passed-in FlagSet.

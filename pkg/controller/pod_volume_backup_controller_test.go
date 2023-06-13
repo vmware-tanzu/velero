@@ -103,7 +103,7 @@ func (b *fakeFSBR) Init(ctx context.Context, bslName string, sourceNamespace str
 	return nil
 }
 
-func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, parentSnapshot string, forceFull bool, tags map[string]string) error {
+func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string) error {
 	pvb := b.pvb
 
 	original := b.pvb.DeepCopy()
