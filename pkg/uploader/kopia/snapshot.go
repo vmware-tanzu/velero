@@ -84,7 +84,7 @@ func setupDefaultPolicy() *policy.Tree {
 }
 
 // Backup backup specific sourcePath and update progress
-func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath string,
+func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string,
 	forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
@@ -102,12 +102,18 @@ func Backup(ctx context.Context, fsUploader *snapshotfs.Uploader, repoWriter rep
 		return nil, true, nil
 	}
 
+	dir = filepath.Clean(dir)
+
 	sourceInfo := snapshot.SourceInfo{
 		UserName: udmrepo.GetRepoUser(),
 		Host:     udmrepo.GetRepoDomain(),
-		Path:     filepath.Clean(dir),
+		Path:     filepath.Clean(realSource),
 	}
-	rootDir, err := getLocalFSEntry(sourceInfo.Path)
+	if sourceInfo.Path == "" {
+		sourceInfo.Path = dir
+	}
+
+	rootDir, err := getLocalFSEntry(dir)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "Unable to get local filesystem entry")
 	}
@@ -173,6 +179,8 @@ func SnapshotSource(
 	var previous []*snapshot.Manifest
 	if !forceFull {
 		if parentSnapshot != "" {
+			log.Infof("Using provided parent snapshot %s", parentSnapshot)
+
 			mani, err := loadSnapshotFunc(ctx, rep, manifest.ID(parentSnapshot))
 			if err != nil {
 				return "", 0, errors.Wrapf(err, "Failed to load previous snapshot %v from kopia", parentSnapshot)
@@ -180,13 +188,21 @@ func SnapshotSource(
 
 			previous = append(previous, mani)
 		} else {
-			pre, err := findPreviousSnapshotManifest(ctx, rep, sourceInfo, snapshotTags, nil)
+			log.Infof("Searching for parent snapshot")
+
+			pre, err := findPreviousSnapshotManifest(ctx, rep, sourceInfo, snapshotTags, nil, log)
 			if err != nil {
 				return "", 0, errors.Wrapf(err, "Failed to find previous kopia snapshot manifests for si %v", sourceInfo)
 			}
 
 			previous = pre
 		}
+	} else {
+		log.Info("Forcing full snapshot")
+	}
+
+	for i := range previous {
+		log.Infof("Using parent snapshot %s, start time %v, end time %v, description %s", previous[i].ID, previous[i].StartTime.ToTime(), previous[i].EndTime.ToTime(), previous[i].Description)
 	}
 
 	policyTree := setupDefaultPolicy()
@@ -237,7 +253,7 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 
 // findPreviousSnapshotManifest returns the list of previous snapshots for a given source, including
 // last complete snapshot following it.
-func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sourceInfo snapshot.SourceInfo, snapshotTags map[string]string, noLaterThan *fs.UTCTimestamp) ([]*snapshot.Manifest, error) {
+func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sourceInfo snapshot.SourceInfo, snapshotTags map[string]string, noLaterThan *fs.UTCTimestamp, log logrus.FieldLogger) ([]*snapshot.Manifest, error) {
 	man, err := snapshot.ListSnapshots(ctx, rep, sourceInfo)
 	if err != nil {
 		return nil, err
@@ -247,6 +263,8 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 	var result []*snapshot.Manifest
 
 	for _, p := range man {
+		log.Debugf("Found one snapshot %s, start time %v, incomplete %s, tags %v", p.ID, p.StartTime.ToTime(), p.IncompleteReason, p.Tags)
+
 		requestor, found := p.Tags[uploader.SnapshotRequestorTag]
 		if !found {
 			continue
