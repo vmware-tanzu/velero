@@ -39,6 +39,7 @@ import (
 // BackupFunc mainly used to make testing more convenient
 var BackupFunc = kopia.Backup
 var RestoreFunc = kopia.Restore
+var BackupRepoServiceCreateFunc = service.Create
 
 // kopiaProvider recorded info related with kopiaProvider
 type kopiaProvider struct {
@@ -73,7 +74,7 @@ func NewKopiaUploaderProvider(
 		return nil, errors.Wrapf(err, "error to get repo options")
 	}
 
-	repoSvc := service.Create(log)
+	repoSvc := BackupRepoServiceCreateFunc(log)
 	log.WithField("repoUID", repoUID).Info("Opening backup repo")
 
 	kp.bkRepo, err = repoSvc.Open(ctx, *repoOpt)
