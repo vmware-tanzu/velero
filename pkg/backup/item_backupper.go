@@ -545,7 +545,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	if volumeSnapshotter == nil {
-		log.Info("Persistent volume is not a supported volume type for snapshots, skipping.")
+		// the PV may still has change to be snapshotted by CSI plugin's `PVCBackupItemAction` in PVC backup logic
+		log.Info("Persistent volume is not a supported volume type for Velero-native volumeSnapshotter snapshot, skipping.")
 		return nil
 	}
 
