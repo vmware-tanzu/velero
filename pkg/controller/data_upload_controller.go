@@ -206,7 +206,7 @@ func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, du *
 		OnProgress:  r.OnDataUploadProgress,
 	}
 
-	fsBackup, err := r.dataPathMgr.CreateFileSystemBR(du.Name, dataUploadDownloadRequestor, ctx, r.client, du.Namespace, callbacks, log) // VAE
+	fsBackup, err := r.dataPathMgr.CreateFileSystemBR(du.Name, dataUploadDownloadRequestor, ctx, r.client, du.Namespace, callbacks, log)
 	if err != nil {
 		if err == datapath.ConcurrentLimitExceed {
 			log.Info("runCancelableDataUpload is concurrent limited")
