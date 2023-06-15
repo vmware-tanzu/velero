@@ -130,6 +130,8 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil {
 		log.Warnf("Cannot check progress on Restore operations because backup info is unavailable %s; marking restore PartiallyFailed", err.Error())
 		restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed
+		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+		r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
 		err2 := r.updateRestoreAndOperationsJSON(ctx, original, restore, nil, &itemoperationmap.OperationsForRestore{ErrsSinceUpdate: []string{err.Error()}}, false, false)
 		if err2 != nil {
 			log.WithError(err2).Error("error updating Restore")
@@ -140,7 +142,8 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if info.location.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		log.Infof("Cannot check progress on Restore operations because backup storage location %s is currently in read-only mode; marking restore PartiallyFailed", info.location.Name)
 		restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed
-
+		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+		r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
 		err := r.updateRestoreAndOperationsJSON(ctx, original, restore, nil, &itemoperationmap.OperationsForRestore{ErrsSinceUpdate: []string{"BSL is read-only"}}, false, false)
 		if err != nil {
 			log.WithError(err).Error("error updating Restore")
@@ -188,10 +191,12 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if restore.Status.Phase == velerov1api.RestorePhaseWaitingForPluginOperations {
 			log.Infof("Marking restore %s completed", restore.Name)
 			restore.Status.Phase = velerov1api.RestorePhaseCompleted
+			restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 			r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
 		} else {
 			log.Infof("Marking restore %s FinalizingPartiallyFailed", restore.Name)
 			restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed
+			restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 			r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
 		}
 	}
