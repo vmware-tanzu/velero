@@ -112,15 +112,12 @@ func RetainVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interfa
 
 // DeleteVolumeSnapshotContentIfAny deletes a VSC by name if it exists, and log an error when the deletion fails
 func DeleteVolumeSnapshotContentIfAny(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface, vscName string, log logrus.FieldLogger) {
-	vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
+	err := snapshotClient.VolumeSnapshotContents().Delete(ctx, vscName, metav1.DeleteOptions{})
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			log.WithError(err).Warnf("Abort deleting VSC, it doesn't exist %s", vscName)
-		}
-	} else {
-		err = snapshotClient.VolumeSnapshotContents().Delete(ctx, vsc.Name, metav1.DeleteOptions{})
-		if err != nil {
-			log.WithError(err).Warnf("Failed to delete volume snapshot content %s", vsc.Name)
+		if apierrors.IsNotFound(err) {
+			log.WithError(err).Debugf("Abort deleting VSC, it doesn't exist %s", vscName)
+		} else {
+			log.WithError(err).Errorf("Failed to delete volume snapshot content %s", vscName)
 		}
 	}
 }

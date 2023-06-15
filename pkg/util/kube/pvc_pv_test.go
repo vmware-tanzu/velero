@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,8 @@ import (
 	storagev1api "k8s.io/api/storage/v1"
 
 	clientTesting "k8s.io/client-go/testing"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 type reactor struct {
@@ -281,6 +284,553 @@ func TestWaitPVCConsumed(t *testing.T) {
 
 			assert.Equal(t, test.expectedPVC, pvc)
 			assert.Equal(t, test.selectedNode, selectedNode)
+		})
+	}
+}
+
+func TestDeletePVCIfAny(t *testing.T) {
+	tests := []struct {
+		name          string
+		pvcName       string
+		pvcNamespace  string
+		kubeClientObj []runtime.Object
+		kubeReactors  []reactor
+		logMessage    string
+		logLevel      string
+		logError      string
+	}{
+		{
+			name:         "get fail",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			logMessage:   "Abort deleting PVC, it doesn't exist, fake-namespace/fake-pvc",
+			logLevel:     "level=debug",
+		},
+		{
+			name:         "delete fail",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			kubeReactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-delete-error")
+					},
+				},
+			},
+			logMessage: "Failed to delete pvc fake-namespace/fake-pvc",
+			logLevel:   "level=error",
+			logError:   "error=fake-delete-error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			for _, reactor := range test.kubeReactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			logMessage := ""
+			DeletePVCIfAny(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, velerotest.NewSingleLogger(&logMessage))
+
+			if len(test.logMessage) > 0 {
+				assert.Contains(t, logMessage, test.logMessage)
+			}
+
+			if len(test.logLevel) > 0 {
+				assert.Contains(t, logMessage, test.logLevel)
+			}
+
+			if len(test.logError) > 0 {
+				assert.Contains(t, logMessage, test.logError)
+			}
+		})
+	}
+}
+
+func TestDeletePVIfAny(t *testing.T) {
+	tests := []struct {
+		name          string
+		pvName        string
+		kubeClientObj []runtime.Object
+		kubeReactors  []reactor
+		logMessage    string
+		logLevel      string
+		logError      string
+	}{
+		{
+			name:       "get fail",
+			pvName:     "fake-pv",
+			logMessage: "Abort deleting PV, it doesn't exist, fake-pv",
+			logLevel:   "level=debug",
+		},
+		{
+			name:   "delete fail",
+			pvName: "fake-pv",
+			kubeReactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-delete-error")
+					},
+				},
+			},
+			logMessage: "Failed to delete PV fake-pv",
+			logLevel:   "level=error",
+			logError:   "error=fake-delete-error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			for _, reactor := range test.kubeReactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			logMessage := ""
+			DeletePVIfAny(context.Background(), kubeClient.CoreV1(), test.pvName, velerotest.NewSingleLogger(&logMessage))
+
+			if len(test.logMessage) > 0 {
+				assert.Contains(t, logMessage, test.logMessage)
+			}
+
+			if len(test.logLevel) > 0 {
+				assert.Contains(t, logMessage, test.logLevel)
+			}
+
+			if len(test.logError) > 0 {
+				assert.Contains(t, logMessage, test.logError)
+			}
+		})
+	}
+}
+
+func TestEnsureDeletePVC(t *testing.T) {
+	pvcObject := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "fake-pvc",
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		pvcName   string
+		namespace string
+		reactors  []reactor
+		err       string
+	}{
+		{
+			name:      "delete fail",
+			pvcName:   "fake-pvc",
+			namespace: "fake-ns",
+			err:       "error to delete pvc fake-pvc: persistentvolumeclaims \"fake-pvc\" not found",
+		},
+		{
+			name:      "wait fail",
+			pvcName:   "fake-pvc",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{pvcObject},
+			reactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-get-error")
+					},
+				},
+			},
+			err: "error to retrieve pvc info for fake-pvc: error to get pvc fake-pvc: fake-get-error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			err := EnsureDeletePVC(context.Background(), kubeClient.CoreV1(), test.pvcName, test.namespace, time.Millisecond)
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRebindPVC(t *testing.T) {
+	pvcObject := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "fake-pvc",
+			Annotations: map[string]string{
+				KubeAnnBindCompleted:     "true",
+				KubeAnnBoundByController: "true",
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		pvc       *corev1api.PersistentVolumeClaim
+		pv        string
+		reactors  []reactor
+		result    *corev1api.PersistentVolumeClaim
+		err       string
+	}{
+		{
+			name:      "path fail",
+			pvc:       pvcObject,
+			pv:        "fake-pv",
+			clientObj: []runtime.Object{pvcObject},
+			reactors: []reactor{
+				{
+					verb:     "patch",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-patch-error")
+					},
+				},
+			},
+			err: "error patching PVC: fake-patch-error",
+		},
+		{
+			name:      "succeed",
+			pvc:       pvcObject,
+			pv:        "fake-pv",
+			clientObj: []runtime.Object{pvcObject},
+			result: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "fake-ns",
+					Name:      "fake-pvc",
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					VolumeName: "fake-pv",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			result, err := RebindPVC(context.Background(), kubeClient.CoreV1(), test.pvc, test.pv)
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.result, result)
+		})
+	}
+}
+
+func TestResetPVBinding(t *testing.T) {
+	pvObject := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv",
+			Annotations: map[string]string{
+				KubeAnnBoundByController: "true",
+			},
+		},
+		Spec: corev1api.PersistentVolumeSpec{
+			ClaimRef: &corev1api.ObjectReference{
+				Kind:      "fake-kind",
+				Namespace: "fake-ns",
+				Name:      "fake-pvc",
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		pv        *corev1api.PersistentVolume
+		labels    map[string]string
+		reactors  []reactor
+		result    *corev1api.PersistentVolume
+		err       string
+	}{
+		{
+			name:      "path fail",
+			pv:        pvObject,
+			clientObj: []runtime.Object{pvObject},
+			reactors: []reactor{
+				{
+					verb:     "patch",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-patch-error")
+					},
+				},
+			},
+			err: "error patching PV: fake-patch-error",
+		},
+		{
+			name: "succeed",
+			pv:   pvObject,
+			labels: map[string]string{
+				"fake-label-1": "fake-value-1",
+				"fake-label-2": "fake-value-2",
+			},
+			clientObj: []runtime.Object{pvObject},
+			result: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-pv",
+					Labels: map[string]string{
+						"fake-label-1": "fake-value-1",
+						"fake-label-2": "fake-value-2",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			result, err := ResetPVBinding(context.Background(), kubeClient.CoreV1(), test.pv, test.labels)
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.result, result)
+		})
+	}
+}
+
+func TestSetPVReclaimPolicy(t *testing.T) {
+	pvObject := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv",
+		},
+		Spec: corev1api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: corev1api.PersistentVolumeReclaimRetain,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		pv        *corev1api.PersistentVolume
+		policy    corev1api.PersistentVolumeReclaimPolicy
+		reactors  []reactor
+		result    *corev1api.PersistentVolume
+		err       string
+	}{
+		{
+			name:   "policy not changed",
+			pv:     pvObject,
+			policy: corev1api.PersistentVolumeReclaimRetain,
+		},
+		{
+			name:      "path fail",
+			pv:        pvObject,
+			policy:    corev1api.PersistentVolumeReclaimDelete,
+			clientObj: []runtime.Object{pvObject},
+			reactors: []reactor{
+				{
+					verb:     "patch",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-patch-error")
+					},
+				},
+			},
+			err: "error patching PV: fake-patch-error",
+		},
+		{
+			name:      "succeed",
+			pv:        pvObject,
+			policy:    corev1api.PersistentVolumeReclaimDelete,
+			clientObj: []runtime.Object{pvObject},
+			result: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-pv",
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeReclaimPolicy: corev1api.PersistentVolumeReclaimDelete,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			result, err := SetPVReclaimPolicy(context.Background(), kubeClient.CoreV1(), test.pv, test.policy)
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.result, result)
+		})
+	}
+}
+
+func TestWaitPVBound(t *testing.T) {
+	tests := []struct {
+		name          string
+		pvName        string
+		pvcName       string
+		pvcNamespace  string
+		kubeClientObj []runtime.Object
+		kubeReactors  []reactor
+		expectedPV    *corev1api.PersistentVolume
+		err           string
+	}{
+		{
+			name:   "get pv error",
+			pvName: "fake-pv",
+			err:    "error to wait for bound of PV: failed to get pv fake-pv: persistentvolumes \"fake-pv\" not found",
+		},
+		{
+			name:   "pvc claimRef miss",
+			pvName: "fake-pv",
+			kubeClientObj: []runtime.Object{
+				&corev1api.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fake-pv",
+					},
+				},
+			},
+			err: "error to wait for bound of PV: timed out waiting for the condition",
+		},
+		{
+			name:    "pvc claimRef pvc name mismatch",
+			pvName:  "fake-pv",
+			pvcName: "fake-pvc",
+			kubeClientObj: []runtime.Object{
+				&corev1api.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fake-pv",
+					},
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Kind: "fake-kind",
+						},
+					},
+				},
+			},
+			err: "error to wait for bound of PV: timed out waiting for the condition",
+		},
+		{
+			name:         "pvc claimRef pvc namespace mismatch",
+			pvName:       "fake-pv",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				&corev1api.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fake-pv",
+					},
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Kind: "fake-kind",
+							Name: "fake-pvc",
+						},
+					},
+				},
+			},
+			err: "error to wait for bound of PV: timed out waiting for the condition",
+		},
+		{
+			name:         "success",
+			pvName:       "fake-pv",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				&corev1api.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fake-pv",
+					},
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Kind:      "fake-kind",
+							Name:      "fake-pvc",
+							Namespace: "fake-ns",
+						},
+					},
+				},
+			},
+			expectedPV: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-pv",
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					ClaimRef: &corev1api.ObjectReference{
+						Kind:      "fake-kind",
+						Name:      "fake-pvc",
+						Namespace: "fake-ns",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			for _, reactor := range test.kubeReactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			pv, err := WaitPVBound(context.Background(), kubeClient.CoreV1(), test.pvName, test.pvcName, test.pvcNamespace, time.Millisecond)
+
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedPV, pv)
 		})
 	}
 }

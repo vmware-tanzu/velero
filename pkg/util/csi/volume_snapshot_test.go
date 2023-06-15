@@ -31,6 +31,8 @@ import (
 	clientTesting "k8s.io/client-go/testing"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 type reactor struct {
@@ -282,6 +284,12 @@ func TestEnsureDeleteVS(t *testing.T) {
 			},
 			err: "error to assure VolumeSnapshot is deleted, fake-vs: error to get VolumeSnapshot fake-vs: fake-get-error",
 		},
+		{
+			name:      "success",
+			vsName:    "fake-vs",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{vsObj},
+		},
 	}
 
 	for _, test := range tests {
@@ -336,6 +344,11 @@ func TestEnsureDeleteVSC(t *testing.T) {
 			},
 			err: "error to assure VolumeSnapshotContent is deleted, fake-vsc: error to get VolumeSnapshotContent fake-vsc: fake-get-error",
 		},
+		{
+			name:      "success",
+			vscName:   "fake-vsc",
+			clientObj: []runtime.Object{vscObj},
+		},
 	}
 
 	for _, test := range tests {
@@ -351,6 +364,225 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				assert.EqualError(t, err, test.err)
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestDeleteVolumeSnapshotContentIfAny(t *testing.T) {
+	tests := []struct {
+		name       string
+		clientObj  []runtime.Object
+		reactors   []reactor
+		vscName    string
+		logMessage string
+		logLevel   string
+		logError   string
+	}{
+		{
+			name:       "vsc not exist",
+			vscName:    "fake-vsc",
+			logMessage: "Abort deleting VSC, it doesn't exist fake-vsc",
+			logLevel:   "level=debug",
+		},
+		{
+			name:    "deleete fail",
+			vscName: "fake-vsc",
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "volumesnapshotcontents",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-delete-error")
+					},
+				},
+			},
+			logMessage: "Failed to delete volume snapshot content fake-vsc",
+			logLevel:   "level=error",
+			logError:   "error=fake-delete-error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeSnapshotClient := snapshotFake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			logMessage := ""
+
+			DeleteVolumeSnapshotContentIfAny(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscName, velerotest.NewSingleLogger(&logMessage))
+
+			if len(test.logMessage) > 0 {
+				assert.Contains(t, logMessage, test.logMessage)
+			}
+
+			if len(test.logLevel) > 0 {
+				assert.Contains(t, logMessage, test.logLevel)
+			}
+
+			if len(test.logError) > 0 {
+				assert.Contains(t, logMessage, test.logError)
+			}
+		})
+	}
+}
+
+func TestDeleteVolumeSnapshotIfAny(t *testing.T) {
+	tests := []struct {
+		name        string
+		clientObj   []runtime.Object
+		reactors    []reactor
+		vsName      string
+		vsNamespace string
+		logMessage  string
+		logLevel    string
+		logError    string
+	}{
+		{
+			name:        "vs not exist",
+			vsName:      "fake-vs",
+			vsNamespace: "fake-ns",
+			logMessage:  "Abort deleting volume snapshot, it doesn't exist fake-ns/fake-vs",
+			logLevel:    "level=debug",
+		},
+		{
+			name:        "delete fail",
+			vsName:      "fake-vs",
+			vsNamespace: "fake-ns",
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "volumesnapshots",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-delete-error")
+					},
+				},
+			},
+			logMessage: "Failed to delete volume snapshot fake-ns/fake-vs",
+			logLevel:   "level=error",
+			logError:   "error=fake-delete-error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeSnapshotClient := snapshotFake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			logMessage := ""
+
+			DeleteVolumeSnapshotIfAny(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.vsNamespace, velerotest.NewSingleLogger(&logMessage))
+
+			if len(test.logMessage) > 0 {
+				assert.Contains(t, logMessage, test.logMessage)
+			}
+
+			if len(test.logLevel) > 0 {
+				assert.Contains(t, logMessage, test.logLevel)
+			}
+
+			if len(test.logError) > 0 {
+				assert.Contains(t, logMessage, test.logError)
+			}
+		})
+	}
+}
+
+func TestRetainVSC(t *testing.T) {
+	vscObj := &snapshotv1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-vsc",
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		reactors  []reactor
+		vsc       *snapshotv1api.VolumeSnapshotContent
+		updated   *snapshotv1api.VolumeSnapshotContent
+		err       string
+	}{
+		{
+			name: "already retained",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+				},
+			},
+		},
+		{
+			name: "path vsc fail",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+				},
+			},
+			reactors: []reactor{
+				{
+					verb:     "patch",
+					resource: "volumesnapshotcontents",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-patch-error")
+					},
+				},
+			},
+			err: "error patching VSC: fake-patch-error",
+		},
+		{
+			name: "success",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+				},
+			},
+			clientObj: []runtime.Object{vscObj},
+			updated: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeSnapshotClient := snapshotFake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			returned, err := RetainVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsc)
+
+			if len(test.err) == 0 {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.err)
+			}
+
+			if test.updated != nil {
+				assert.Equal(t, *test.updated, *returned)
+			} else {
+				assert.Nil(t, returned)
 			}
 		})
 	}

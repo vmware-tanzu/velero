@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
@@ -58,6 +59,12 @@ func TestEnabled(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "check warn again warn",
+			level:    logrus.WarnLevel,
+			zapLevel: zapcore.WarnLevel,
+			expected: true,
+		},
+		{
 			name:     "check info again error",
 			level:    logrus.ErrorLevel,
 			zapLevel: zapcore.InfoLevel,
@@ -70,9 +77,21 @@ func TestEnabled(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "check dppanic again panic",
+			level:    logrus.PanicLevel,
+			zapLevel: zapcore.DPanicLevel,
+			expected: true,
+		},
+		{
 			name:     "check panic again error",
 			level:    logrus.ErrorLevel,
 			zapLevel: zapcore.PanicLevel,
+			expected: true,
+		},
+		{
+			name:     "check fatal again fatal",
+			level:    logrus.FatalLevel,
+			zapLevel: zapcore.FatalLevel,
 			expected: true,
 		},
 	}
@@ -89,7 +108,7 @@ func TestEnabled(t *testing.T) {
 	}
 }
 
-func TestWrite(t *testing.T) {
+func TestLogrusFieldsForWrite(t *testing.T) {
 	testCases := []struct {
 		name      string
 		module    string
@@ -151,6 +170,65 @@ func TestWrite(t *testing.T) {
 				"logger name": "logger-name-01",
 			},
 		},
+		{
+			name:   "info with function name",
+			module: "module-05",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.InfoLevel,
+				Caller: zapcore.EntryCaller{
+					Function: "function-name-01",
+				},
+			},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule": "kopia/module-05",
+				"function":  "function-name-01",
+			},
+		},
+		{
+			name:   "info with undefined path",
+			module: "module-06",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.InfoLevel,
+				Caller: zapcore.EntryCaller{
+					Defined: false,
+				},
+			},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule": "kopia/module-06",
+			},
+		},
+		{
+			name:   "info with defined path",
+			module: "module-06",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.InfoLevel,
+				Caller: zapcore.EntryCaller{
+					Defined: true,
+					File:    "file-name-01",
+					Line:    100,
+				},
+			},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule": "kopia/module-06",
+				"path":      "file-name-01:100",
+			},
+		},
+		{
+			name:   "info with stack",
+			module: "module-07",
+			zapEntry: zapcore.Entry{
+				Level: zapcore.InfoLevel,
+				Stack: "fake-stack",
+			},
+			zapFields: nil,
+			expected: logrus.Fields{
+				"logModule": "kopia/module-07",
+				"stack":     "fake-stack",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -162,6 +240,110 @@ func TestWrite(t *testing.T) {
 			m := log.logrusFieldsForWrite(tc.zapEntry, tc.zapFields)
 
 			require.Equal(t, tc.expected, m)
+		})
+	}
+}
+
+func TestWrite(t *testing.T) {
+	testCases := []struct {
+		name        string
+		ent         zapcore.Entry
+		logMessage  string
+		logLevel    string
+		shouldPanic bool
+	}{
+		{
+			name: "write debug",
+			ent: zapcore.Entry{
+				Level:   zapcore.DebugLevel,
+				Message: "fake-message",
+			},
+			logMessage: "fake-message",
+			logLevel:   "level=debug",
+		},
+		{
+			name: "write info",
+			ent: zapcore.Entry{
+				Level:   zapcore.InfoLevel,
+				Message: "fake-message",
+			},
+			logMessage: "fake-message",
+			logLevel:   "level=info",
+		},
+		{
+			name: "write warn",
+			ent: zapcore.Entry{
+				Level:   zapcore.WarnLevel,
+				Message: "fake-message",
+			},
+			logMessage: "fake-message",
+			logLevel:   "level=warn",
+		},
+		{
+			name: "write error",
+			ent: zapcore.Entry{
+				Level:   zapcore.ErrorLevel,
+				Message: "fake-message",
+			},
+			logMessage: "fake-message",
+			logLevel:   "level=warn",
+		},
+		{
+			name: "write DPanic",
+			ent: zapcore.Entry{
+				Level:   zapcore.DPanicLevel,
+				Message: "fake-message",
+			},
+			logMessage:  "fake-message",
+			logLevel:    "level=panic",
+			shouldPanic: true,
+		},
+		{
+			name: "write panic",
+			ent: zapcore.Entry{
+				Level:   zapcore.PanicLevel,
+				Message: "fake-message",
+			},
+			logMessage:  "fake-message",
+			logLevel:    "level=panic",
+			shouldPanic: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logMessage := ""
+
+			log := kopiaLog{
+				logger: test.NewSingleLogger(&logMessage),
+			}
+
+			if tc.shouldPanic {
+				defer func() {
+					r := recover()
+					assert.NotNil(t, r)
+
+					if len(tc.logMessage) > 0 {
+						assert.Contains(t, logMessage, tc.logMessage)
+					}
+
+					if len(tc.logLevel) > 0 {
+						assert.Contains(t, logMessage, tc.logLevel)
+					}
+				}()
+			}
+
+			err := log.Write(tc.ent, nil)
+
+			assert.NoError(t, err)
+
+			if len(tc.logMessage) > 0 {
+				assert.Contains(t, logMessage, tc.logMessage)
+			}
+
+			if len(tc.logLevel) > 0 {
+				assert.Contains(t, logMessage, tc.logLevel)
+			}
 		})
 	}
 }
