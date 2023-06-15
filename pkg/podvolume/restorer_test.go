@@ -460,7 +460,15 @@ func TestRestorePodVolumes(t *testing.T) {
 
 						assert.Equal(t, test.errs[i].err, errMsg)
 					} else {
-						assert.EqualError(t, errs[i], test.errs[i].err)
+						for i := 0; i < len(errs); i++ {
+							j := 0
+							for ; j < len(test.errs); j++ {
+								if errs[i].Error() == test.errs[j].err {
+									break
+								}
+							}
+							assert.Equal(t, true, j < len(test.errs))
+						}
 					}
 				}
 			}

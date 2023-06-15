@@ -137,6 +137,15 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 
 	// describe snapshot volumes
 	backupSpecInfo["veleroNativeSnapshotPVs"] = BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto")
+	// describe snapshot move data
+	backupSpecInfo["veleroSnapshotMoveData"] = BoolPointerString(spec.SnapshotMoveData, "false", "true", "auto")
+	// describe data mover
+	if len(spec.DataMover) == 0 {
+		s = emptyDisplay
+	} else {
+		s = spec.DataMover
+	}
+	backupSpecInfo["dataMover"] = s
 
 	// describe TTL
 	backupSpecInfo["TTL"] = spec.TTL.Duration.String()

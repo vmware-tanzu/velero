@@ -17,6 +17,9 @@ limitations under the License.
 package client
 
 import (
+	"os"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,4 +34,82 @@ func TestVeleroConfig(t *testing.T) {
 	assert.Equal(t, "foo", c.Namespace())
 	assert.Equal(t, []string{"feature1", "feature2"}, c.Features())
 	assert.Equal(t, true, c.Colorized())
+}
+
+func removeConfigfileName() error {
+	// Remove config file if it exist
+	configFile := configFileName()
+	e := os.Remove(configFile)
+	if e != nil {
+		if !os.IsNotExist(e) {
+			return e
+		}
+	}
+	return nil
+}
+func TestConfigOperations(t *testing.T) {
+
+	preHomeEnv := ""
+	prevEnv := os.Environ()
+	for _, entry := range prevEnv {
+		parts := strings.SplitN(entry, "=", 2)
+		if len(parts) == 2 && parts[0] == "HOME" {
+			preHomeEnv = parts[1]
+			break
+		}
+	}
+	os.Unsetenv("HOME")
+	os.Setenv("HOME", ".")
+
+	// Remove config file if it exists
+	err := removeConfigfileName()
+	assert.Equal(t, err, nil)
+
+	// Test LoadConfig: expect an empty velero config
+	expectedConfig := VeleroConfig{}
+	config, err := LoadConfig()
+
+	assert.Equal(t, err, nil)
+	assert.True(t, reflect.DeepEqual(expectedConfig, config))
+
+	// Test savedConfig
+	expectedFeature := "EnableCSI"
+	expectedColorized := true
+	expectedNamespace := "ns-velero"
+	expectedCACert := "ca-cert"
+
+	config[ConfigKeyFeatures] = expectedFeature
+	config[ConfigKeyColorized] = expectedColorized
+	config[ConfigKeyNamespace] = expectedNamespace
+	config[ConfigKeyCACert] = expectedCACert
+
+	err = SaveConfig(config)
+
+	assert.Equal(t, err, nil)
+	savedConfig, err := LoadConfig()
+	assert.Equal(t, err, nil)
+
+	// Test Features
+	feature := savedConfig.Features()
+	assert.Equal(t, 1, len(feature))
+	assert.Equal(t, expectedFeature, feature[0])
+
+	// Test Colorized
+	colorized := savedConfig.Colorized()
+	assert.Equal(t, expectedColorized, colorized)
+
+	// Test Namespace
+	namespace := savedConfig.Namespace()
+	assert.Equal(t, expectedNamespace, namespace)
+
+	// Test Features
+	caCertFile := savedConfig.CACertFile()
+	assert.Equal(t, expectedCACert, caCertFile)
+
+	t.Cleanup(func() {
+		err = removeConfigfileName()
+		assert.Equal(t, err, nil)
+		os.Unsetenv("HOME")
+		os.Setenv("HOME", preHomeEnv)
+	})
 }

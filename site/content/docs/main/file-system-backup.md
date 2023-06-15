@@ -521,7 +521,7 @@ refer to [restic integration](#how-velero-integrates-with-restic) and [kopia int
 Velero's FSB supports two data movement paths, the restic path and the kopia path. Velero allows users to select 
 between the two paths:
 - For backup, the path is specified at the installation time through the `uploader-type` flag, the valid value is 
-either `restic` or `kopia`, or default to `restic` if the value is not specified. The selection is not allowed to be 
+either `restic` or `kopia`, or default to `kopia` if the value is not specified. The selection is not allowed to be 
 changed after the installation.
 - For restore, the path is decided by the path used to back up the data, it is automatically selected. For example, 
 if you've created a backup with restic path, then you reinstall Velero with `uploader-type=kopia`, when you create 

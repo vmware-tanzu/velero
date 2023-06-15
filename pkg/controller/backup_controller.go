@@ -256,8 +256,13 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// store ref to just-updated item for creating patch
 	original = request.Backup.DeepCopy()
 
+	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
+
 	if request.Status.Phase == velerov1api.BackupPhaseFailedValidation {
 		log.Debug("failed to validate backup status")
+		b.metrics.RegisterBackupValidationFailure(backupScheduleName)
+		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
+
 		return ctrl.Result{}, nil
 	}
 
@@ -271,7 +276,6 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	log.Debug("Running backup")
 
-	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
 	b.metrics.RegisterBackupAttempt(backupScheduleName)
 
 	// execution & upload of backup
@@ -648,7 +652,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	var volumeSnapshots []snapshotv1api.VolumeSnapshot
 	var volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent
 	var volumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
+		backupLog.Info("backup SnapshotMoveData is set to true, skip VolumeSnapshot resource persistence.")
+	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
 		vscList := &snapshotv1api.VolumeSnapshotContentList{}
 
