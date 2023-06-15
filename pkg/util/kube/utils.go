@@ -47,6 +47,7 @@ const (
 	KubeAnnBoundByController      = "pv.kubernetes.io/bound-by-controller"
 	KubeAnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 	KubeAnnMigratedTo             = "pv.kubernetes.io/migrated-to"
+	KubeAnnSelectedNode           = "volume.kubernetes.io/selected-node"
 )
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
