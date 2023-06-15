@@ -65,7 +65,7 @@ func NewUploaderProvider(
 	ctx context.Context,
 	client client.Client,
 	uploaderType string,
-	requestorType string,
+	requesterType string,
 	repoIdentifier string,
 	bsl *velerov1api.BackupStorageLocation,
 	backupRepo *velerov1api.BackupRepository,
@@ -73,15 +73,15 @@ func NewUploaderProvider(
 	repoKeySelector *v1.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
-	if requestorType == "" {
-		return nil, errors.New("requestor type is empty")
+	if requesterType == "" {
+		return nil, errors.New("requester type is empty")
 	}
 
 	if credGetter.FromFile == nil {
-		return nil, errors.New("uninitialized FileStore credentail is not supported")
+		return nil, errors.New("uninitialized FileStore credential is not supported")
 	}
 	if uploaderType == uploader.KopiaType {
-		return NewKopiaUploaderProvider(requestorType, ctx, credGetter, backupRepo, log)
+		return NewKopiaUploaderProvider(requesterType, ctx, credGetter, backupRepo, log)
 	} else {
 		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	}

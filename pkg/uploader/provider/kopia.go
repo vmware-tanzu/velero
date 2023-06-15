@@ -150,7 +150,7 @@ func (kp *kopiaProvider) RunBackup(
 	if tags == nil {
 		tags = make(map[string]string)
 	}
-	tags[uploader.SnapshotRequestorTag] = kp.requestorType
+	tags[uploader.SnapshotRequesterTag] = kp.requestorType
 	tags[uploader.SnapshotUploaderTag] = uploader.KopiaType
 
 	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, tags, log)

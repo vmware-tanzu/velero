@@ -268,12 +268,12 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 	for _, p := range man {
 		log.Debugf("Found one snapshot %s, start time %v, incomplete %s, tags %v", p.ID, p.StartTime.ToTime(), p.IncompleteReason, p.Tags)
 
-		requestor, found := p.Tags[uploader.SnapshotRequestorTag]
+		requester, found := p.Tags[uploader.SnapshotRequesterTag]
 		if !found {
 			continue
 		}
 
-		if requestor != snapshotTags[uploader.SnapshotRequestorTag] {
+		if requester != snapshotTags[uploader.SnapshotRequesterTag] {
 			continue
 		}
 

@@ -264,7 +264,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		Path:     "/path/to/dir1",
 	}
 	snapshotTags := map[string]string{
-		uploader.SnapshotRequestorTag: "user1",
+		uploader.SnapshotRequesterTag: "user1",
 		uploader.SnapshotUploaderTag:  "uploader1",
 	}
 	noLaterThan := fs.UTCTimestampFromTime(time.Now())
@@ -299,7 +299,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value",
 							"anotherCustomTag":            "123",
@@ -312,7 +312,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			expectedSnapshots: []*snapshot.Manifest{
 				{
 					Tags: map[string]string{
-						uploader.SnapshotRequestorTag: "user1",
+						uploader.SnapshotRequesterTag: "user1",
 						uploader.SnapshotUploaderTag:  "uploader1",
 						"otherTag":                    "value",
 						"anotherCustomTag":            "123",
@@ -330,7 +330,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value1",
 							"snapshotRequestor":           "user1",
@@ -339,7 +339,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 					},
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value2",
 							"snapshotRequestor":           "user1",
@@ -351,7 +351,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			expectedSnapshots: []*snapshot.Manifest{
 				{
 					Tags: map[string]string{
-						uploader.SnapshotRequestorTag: "user1",
+						uploader.SnapshotRequesterTag: "user1",
 						uploader.SnapshotUploaderTag:  "uploader1",
 						"otherTag":                    "value1",
 						"snapshotRequestor":           "user1",
@@ -361,14 +361,14 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			},
 			expectedError: nil,
 		},
-		// Snapshot with different requestor
+		// Snapshot with different requester
 		{
-			name: "Snapshot with different requestor",
+			name: "Snapshot with different requester",
 			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user2",
+							uploader.SnapshotRequesterTag: "user2",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value",
 							"snapshotRequestor":           "user2",
@@ -387,7 +387,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader2",
 							"otherTag":                    "value",
 							"snapshotRequestor":           "user1",
@@ -406,7 +406,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value",
 							"snapshotRequestor":           "user1",
@@ -426,7 +426,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value",
 							"snapshotRequestor":           "user1",
@@ -446,7 +446,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value1",
 							"snapshotRequestor":           "user1",
@@ -455,7 +455,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 					},
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value2",
 							"snapshotRequestor":           "user1",
@@ -466,7 +466,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 					},
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							uploader.SnapshotUploaderTag:  "uploader1",
 							"otherTag":                    "value3",
 							"snapshotRequestor":           "user1",
@@ -479,7 +479,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			expectedSnapshots: []*snapshot.Manifest{
 				{
 					Tags: map[string]string{
-						uploader.SnapshotRequestorTag: "user1",
+						uploader.SnapshotRequesterTag: "user1",
 						uploader.SnapshotUploaderTag:  "uploader1",
 						"otherTag":                    "value3",
 						"snapshotRequestor":           "user1",
@@ -490,14 +490,14 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			},
 			expectedError: nil,
 		},
-		// Snapshot with manifest SnapshotRequestorTag not found
+		// Snapshot with manifest SnapshotRequesterTag not found
 		{
-			name: "Snapshot with manifest SnapshotRequestorTag not found",
+			name: "Snapshot with manifest SnapshotRequesterTag not found",
 			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							"requestor":                  "user1",
+							"requester":                  "user1",
 							uploader.SnapshotUploaderTag: "uploader1",
 							"otherTag":                   "value",
 							"snapshotRequestor":          "user1",
@@ -510,14 +510,14 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			expectedSnapshots: []*snapshot.Manifest{},
 			expectedError:     nil,
 		},
-		// Snapshot with manifest SnapshotRequestorTag not found
+		// Snapshot with manifest SnapshotRequesterTag not found
 		{
 			name: "Snapshot with manifest SnapshotUploaderTag not found",
 			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
-							uploader.SnapshotRequestorTag: "user1",
+							uploader.SnapshotRequesterTag: "user1",
 							"uploader":                    "uploader1",
 							"otherTag":                    "value",
 							"snapshotRequestor":           "user1",
