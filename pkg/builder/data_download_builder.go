@@ -5,9 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-
 http://www.apache.org/licenses/LICENSE-2.0
-
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +21,6 @@ import (
 
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 )
-
 
 // DataDownloadBuilder builds DataDownload objects.
 type DataDownloadBuilder struct {
@@ -106,10 +103,10 @@ func (d *DataDownloadBuilder) DataMoverConfig(config *map[string]string) *DataDo
 }
 
 // ObjectMeta applies functional options to the DataDownload's ObjectMeta.
-func (b *DataDownloadBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DataDownloadBuilder {
+func (d *DataDownloadBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DataDownloadBuilder {
 	for _, opt := range opts {
-		opt(b.object)
+		opt(d.object)
 	}
 
-	return b
+	return d
 }
