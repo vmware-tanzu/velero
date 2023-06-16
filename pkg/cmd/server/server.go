@@ -521,6 +521,7 @@ High priorities:
   - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
     storage provider
   - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
+  - DataUploads need to restore before PVC for Snapshot DataMover to work, because PVC needs the DataUploadResults to create DataDownloads.
   - PVs go before PVCs because PVCs depend on them.
   - PVCs go before pods or controllers so they can be mounted as volumes.
   - Service accounts go before secrets so service account token secrets can be filled automatically.
@@ -551,6 +552,7 @@ var defaultRestorePriorities = restore.Priorities{
 		"volumesnapshotclass.snapshot.storage.k8s.io",
 		"volumesnapshotcontents.snapshot.storage.k8s.io",
 		"volumesnapshots.snapshot.storage.k8s.io",
+		"datauploads.velero.io",
 		"persistentvolumes",
 		"persistentvolumeclaims",
 		"serviceaccounts",

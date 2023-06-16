@@ -160,3 +160,10 @@ func WithCreationTimestamp(t time.Time) func(obj metav1.Object) {
 		obj.SetCreationTimestamp(metav1.Time{Time: t})
 	}
 }
+
+// WithOwnerReference is a functional option that applies the specified OwnerReference to an object.
+func WithOwnerReference(val []metav1.OwnerReference) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetOwnerReferences(val)
+	}
+}

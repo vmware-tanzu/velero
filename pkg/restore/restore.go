@@ -535,6 +535,21 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	// Close the progress update channel.
 	quit <- struct{}{}
 
+	// Clean the DataUploadResult ConfigMaps
+	defer func() {
+		opts := []crclient.DeleteAllOfOption{
+			crclient.InNamespace(ctx.restore.Namespace),
+			crclient.MatchingLabels{
+				velerov1api.RestoreUIDLabel:    string(ctx.restore.UID),
+				velerov1api.ResourceUsageLabel: string(velerov1api.VeleroResourceUsageDataUploadResult),
+			},
+		}
+		err := ctx.kbClient.DeleteAllOf(go_context.Background(), &v1.ConfigMap{}, opts...)
+		if err != nil {
+			ctx.log.Errorf("Fail to batch delete DataUploadResult ConfigMaps for restore %s: %s", ctx.restore.Name, err.Error())
+		}
+	}()
+
 	// Do a final progress update as stopping the ticker might have left last few
 	// updates from taking place.
 	updated := ctx.restore.DeepCopy()
