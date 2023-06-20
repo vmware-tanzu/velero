@@ -304,8 +304,8 @@ Without these objects, the provider-level snapshots cannot be located in order t
 
 
 [1]: https://kubernetes.io/blog/2018/10/09/introducing-volume-snapshot-alpha-for-kubernetes/
-[2]: https://github.com/kubernetes-csi/external-snapshotter/blob/master/pkg/apis/volumesnapshot/v1alpha1/types.go#L41
-[3]: https://github.com/kubernetes-csi/external-snapshotter/blob/master/pkg/apis/volumesnapshot/v1alpha1/types.go#L161
+[2]: https://github.com/kubernetes-csi/external-snapshotter/blob/master/client/apis/volumesnapshot/v1/types.go#L42
+[3]: https://github.com/kubernetes-csi/external-snapshotter/blob/master/client/apis/volumesnapshot/v1/types.go#L262
 [4]: https://github.com/heptio/velero/blob/main/pkg/volume/snapshot.go#L21
 [5]: https://github.com/heptio/velero/blob/main/pkg/apis/velero/v1/pod_volume_backup.go#L88
 [6]: https://github.com/heptio/velero-csi-plugin/
