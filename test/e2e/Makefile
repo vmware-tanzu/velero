@@ -73,6 +73,7 @@ BSL_PREFIX ?=
 BSL_CONFIG ?=
 VSL_CONFIG ?=
 CLOUD_PROVIDER ?=
+STANDBY_CLUSTER_CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
@@ -98,6 +99,9 @@ DEFAULT_CLUSTER ?=
 STANDBY_CLUSTER ?=
 
 UPLOADER_TYPE ?=
+
+SNAPSHOT_MOVE_DATA ?= false
+DATA_MOVER_PLUGIN ?=
 
 
 .PHONY:ginkgo
@@ -143,7 +147,10 @@ run: ginkgo
 		-velero-server-debug-mode=$(VELERO_SERVER_DEBUG_MODE) \
 		-default-cluster=$(DEFAULT_CLUSTER) \
 		-standby-cluster=$(STANDBY_CLUSTER) \
-		-uploader-type=$(UPLOADER_TYPE)
+		-uploader-type=$(UPLOADER_TYPE) \
+		-snapshot-move-data=$(SNAPSHOT_MOVE_DATA) \
+		-data-mover-plugin=$(DATA_MOVER_plugin) \
+		-standby-cluster-cloud-provider=$(STANDBY_CLUSTER_CLOUD_PROVIDER)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

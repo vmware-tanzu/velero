@@ -84,7 +84,9 @@ func init() {
 	flag.StringVar(&VeleroCfg.StandbyCluster, "standby-cluster", "", "Standby cluster context for migration test.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "", "Identify persistent volume backup uploader.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
-
+	flag.BoolVar(&VeleroCfg.SnapshotMoveData, "snapshot-move-data", false, "Install default plugin for data mover.")
+	flag.StringVar(&VeleroCfg.DataMoverPlugin, "data-mover-plugin", "", "Install customized plugin for data mover.")
+	flag.StringVar(&VeleroCfg.StandbyClusterCloudProvider, "standby-cluster-cloud-provider", "", "Install customized plugin for data mover.")
 }
 
 var _ = Describe("[APIGroup][APIVersion] Velero tests with various CRD API group versions", APIGropuVersionsTest)

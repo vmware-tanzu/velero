@@ -70,7 +70,7 @@ func TTLTest() {
 			// Make sure GCFrequency is shorter than backup TTL
 			veleroCfg.GCFrequency = "4m0s"
 			veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 		}
 	})
 

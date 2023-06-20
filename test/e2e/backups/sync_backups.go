@@ -59,7 +59,7 @@ func BackupsSyncTest() {
 		if VeleroCfg.InstallVelero {
 			veleroCfg := VeleroCfg
 			veleroCfg.UseVolumeSnapshots = false
-			Expect(VeleroInstall(context.Background(), &VeleroCfg)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
 		}
 	})
 
@@ -109,7 +109,7 @@ func BackupsSyncTest() {
 		By("Install velero", func() {
 			veleroCfg := VeleroCfg
 			veleroCfg.UseVolumeSnapshots = false
-			Expect(VeleroInstall(ctx, &VeleroCfg)).To(Succeed())
+			Expect(VeleroInstall(ctx, &VeleroCfg, false)).To(Succeed())
 		})
 
 		By("Check all backups in object storage are synced to Velero", func() {

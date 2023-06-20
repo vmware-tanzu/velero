@@ -48,8 +48,11 @@ type KibishiiData struct {
 	ExpectedNodes int
 }
 
-var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
+var DefaultKibishiiWorkerCounts = 2
+var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, DefaultKibishiiWorkerCounts}
+
 var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
+var KibishiiStorageClassName = "kibishii-storage-class"
 
 // RunKibishiiTests runs kibishii tests on the provider.
 func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
@@ -196,10 +199,14 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 }
 
 func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool) error {
+	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int) error {
 	if strings.EqualFold(cloudPlatform, "azure") &&
 		strings.EqualFold(veleroFeatures, "EnableCSI") {
 		cloudPlatform = "azure-csi"
+	}
+	if strings.EqualFold(cloudPlatform, "aws") &&
+		strings.EqualFold(veleroFeatures, "EnableCSI") {
+		cloudPlatform = "aws-csi"
 	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
@@ -215,6 +222,12 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 	fmt.Printf("Label namespace with PSA policy: %s\n", labelNamespaceCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to label namespace with PSA policy, stderr=%s", stderr)
+	}
+	if workerReplicas != DefaultKibishiiWorkerCounts {
+		err = ScaleStatefulSet(ctx, namespace, "kibishii-deployment", workerReplicas)
+		if err != nil {
+			return errors.Wrapf(err, "failed to scale statefulset, stderr=%s", err.Error())
+		}
 	}
 
 	kibishiiSetWaitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
@@ -311,7 +324,7 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	}
 
 	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, veleroFeatures,
-		kibishiiDirectory, useVolumeSnapshots); err != nil {
+		kibishiiDirectory, useVolumeSnapshots, kibishiiData.ExpectedNodes); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
 	}
 	// wait for kibishii pod startup
