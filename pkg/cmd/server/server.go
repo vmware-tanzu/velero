@@ -508,6 +508,7 @@ func (s *server) veleroResourcesExist() error {
 //   - Replica sets go before deployments/other controllers so they can be explicitly
 //     restored and be adopted by controllers.
 //   - CAPI ClusterClasses go before Clusters.
+//   - Endpoints go before Services so no new Endpoints will be created
 //   - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
 //     for the same clusters
 //
@@ -538,6 +539,7 @@ var defaultRestorePriorities = restore.Priorities{
 		// in the backup.
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
+		"endpoints",
 		"services",
 	},
 	LowPriorities: []string{
