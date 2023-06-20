@@ -532,10 +532,13 @@ High priorities:
   - Replica sets go before deployments/other controllers so they can be explicitly
     restored and be adopted by controllers.
   - CAPI ClusterClasses go before Clusters.
+  - Endpoints go before Services so no new Endpoints will be created
+  - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
+    for the same clusters
 
 Low priorities:
   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
-    ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
+  - ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
   - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
     Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
     See https://github.com/kubernetes-sigs/cluster-api/issues/4105
@@ -561,6 +564,7 @@ var defaultRestorePriorities = restore.Priorities{
 		// in the backup.
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
+		"endpoints",
 		"services",
 	},
 	LowPriorities: []string{
