@@ -102,7 +102,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
-		It("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
+		It("should successfully backup and restore to an additional BackupStorageLocation with unique credentials", func() {
 			if veleroCfg.AdditionalBSLProvider == "" {
 				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
 			}

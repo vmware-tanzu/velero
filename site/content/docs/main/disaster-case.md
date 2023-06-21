@@ -5,7 +5,7 @@ layout: docs
 
 *Using Schedules and Read-Only Backup Storage Locations*
 
-If you periodically back up your cluster's resources, you are able to return to a previous state in case of some unexpected mishap, such as a service outage. Doing so with Velero looks like the following:
+If you periodically backup your cluster's resources, you are able to return to a previous state in case of some unexpected mishap, such as a service outage. Doing so with Velero looks like the following:
 
 1.  After you first run the Velero server on your cluster, set up a daily backup (replacing `<SCHEDULE NAME>` in the command as desired):
 

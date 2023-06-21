@@ -14,7 +14,33 @@ jobs:
       uses: codespell-project/actions-codespell@master
       with:
         # ignore the config/.../crd.go file as it's generated binary data that is edited elswhere.
-        skip: .git,*.png,*.jpg,*.woff,*.ttf,*.gif,*.ico,./config/crd/v1beta1/crds/crds.go,./config/crd/v1/crds/crds.go,,./config/crd/v2alpha1/crds/crds.go,./go.sum,./LICENSE
+        skip: .git,*.png,*.jpg,*.woff,*.ttf,*.gif,*.ico,./config/crd/v1beta1/crds/crds.go,./config/crd/v1/crds/crds.go,./config/crd/v2alpha1/crds/crds.go,./go.sum,./LICENSE
         ignore_words_list: iam,aks,ist,bridget,ue,shouldnot,atleast
         check_filenames: true
         check_hidden: true
+
+    - name: Velero.io word list check
+      run: |
+        FILES_TO_CHECK=$(find . -type f \
+          ! -path "./.git/*" \
+          ! -path "./site/content/docs/*/style-guide.md" \
+          ! -path "./.github/workflows/pr-codespell.yml" \
+          ! -path "./site/static/fonts/Metropolis/Open Font License.md" \
+          ! -regex '.*\.\(png\|jpg\|woff\|ttf\|gif\|ico\|svg\)'
+        )
+        ! xargs grep -Iinr --color 'on-premise ' <<< "$FILES_TO_CHECK"
+        ! xargs grep -Iinr --color 'back up' <<< "$FILES_TO_CHECK" # what about backed up?
+        ! xargs grep -Iinr --color 'back-up' <<< "$FILES_TO_CHECK"
+        ! xargs grep -Iinr --color 'plug-in' <<< "$FILES_TO_CHECK"
+        ! xargs grep -Iinr --color 'whitelist' <<< "$FILES_TO_CHECK"
+        ! xargs grep -Iinr --color 'blacklist' <<< "$FILES_TO_CHECK"
+      # exclude
+      # ./changelogs/CHANGELOG-0.5.md
+      # ./changelogs/CHANGELOG-0.9.md
+      # ./changelogs/CHANGELOG-0.9.md
+      # ./changelogs/CHANGELOG-1.1.md
+      # ./changelogs/CHANGELOG-1.1.md
+      # ./changelogs/CHANGELOG-1.3.md
+      # ./changelogs/CHANGELOG-1.3.md
+      # ./changelogs/CHANGELOG-1.5.md
+      # ./changelogs/CHANGELOG-1.5.md

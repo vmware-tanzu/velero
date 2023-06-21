@@ -1,15 +1,15 @@
 ---
-title: Velero is an Open Source Tool to Back up and Migrate Kubernetes Clusters
-slug: Velero-is-an-Open-Source-Tool-to-Back-up-and-Migrate-Kubernetes-Clusters
+title: Velero is an Open Source Tool to Backup and Migrate Kubernetes Clusters
+slug: Velero-is-an-Open-Source-Tool-to-Backup-and-Migrate-Kubernetes-Clusters
 # image: https://placehold.it/200x200
-excerpt: Velero is an open source tool to safely back up, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud.
+excerpt: Velero is an open source tool to safely backup, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud.
 author_name: Velero Team
 # author_avatar: https://placehold.it/64x64
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero Team']
 ---
-Velero is an open source tool to safely back up, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud. Velero consists of a server process running as a deployment in your Kubernetes cluster and a command-line interface (CLI) with which DevOps teams and platform operators configure scheduled backups, trigger ad-hoc backups, perform restores, and more.
+Velero is an open source tool to safely backup, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud. Velero consists of a server process running as a deployment in your Kubernetes cluster and a command-line interface (CLI) with which DevOps teams and platform operators configure scheduled backups, trigger ad-hoc backups, perform restores, and more.
 
 ## What Makes Velero Stand Out?
 Unlike other tools which directly access the Kubernetes etcd database to perform backups and restores, Velero uses the Kubernetes API to capture the state of cluster resources and to restore them when necessary. This API-driven approach has a number of key benefits:
@@ -31,4 +31,4 @@ Since Velero was initially released in August 2017, we’ve had nearly 70 contri
 
 We are continuing to work towards Velero 1.0 and would love your help working on the items in our roadmap. If you’re interested in contributing, we have a number of GitHub issues labeled as [Good First Issue](https://github.com/vmware-tanzu/velero/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+first+issue%22) and [Help Wanted](https://github.com/vmware-tanzu/velero/issues?q=is%3Aopen+is%3Aissue+label%3A%22Help+wanted%22), including items related to Prometheus metrics, the CLI UX, improved documentation, and more. We are more than happy to work with new and existing contributors alike.
 
-_Previously posted at: <https://blogs.vmware.com/cloudnative/2019/02/28/velero-v0-11-delivers-an-open-source-tool-to-back-up-and-migrate-kubernetes-clusters/>_
+_Previously posted at: <https://blogs.vmware.com/cloudnative/2019/02/28/velero-v0-11-delivers-an-open-source-tool-to-backup-and-migrate-kubernetes-clusters/>_

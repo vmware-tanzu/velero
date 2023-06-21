@@ -15,7 +15,7 @@ This document proposes a solution that allows a user to specify Restore Hooks, m
 
 Velero supports Backup Hooks to execute commands before and/or after a backup.
 This enables a user to, among other things, prepare data to be backed up without having to freeze an in-use volume.
-An example of this would be to attach an empty volume to a Postgres pod, use a backup hook to execute `pg_dump` from the data volume, and back up the volume containing the export.
+An example of this would be to attach an empty volume to a Postgres pod, use a backup hook to execute `pg_dump` from the data volume, and backup the volume containing the export.
 The problem is that there's no easy or automated way to include an automated restore process.
 After a restore with the example configuration above, the postgres pod will be empty, but there will be a need to manually exec in and run `pg_restore`.
 

@@ -1,5 +1,5 @@
 ---
-title: Back up Clusters
+title: Backup Clusters
 icon: case-study-1.svg
 #subtitle: Subheading goes here
 #links:

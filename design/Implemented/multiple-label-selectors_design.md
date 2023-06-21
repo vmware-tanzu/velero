@@ -27,7 +27,7 @@ we would have to create 3 instances of backup for each label rule. This can beco
 
 ## High-Level Design
 ### Addition of `OrLabelSelectors` spec to Velero Backup/Restore API
-For Velero to back up resources if they consist of any one label from a set of labels, we would like to add a new spec
+For Velero to backup resources if they consist of any one label from a set of labels, we would like to add a new spec
 field `OrLabelSelectors` which would enable user to specify them. The Velero backup would somewhat look like:
 
 ```

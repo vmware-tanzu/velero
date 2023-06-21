@@ -101,7 +101,7 @@ These instructions start the Velero server and a Minio instance that is accessib
     kubectl get deployments --namespace=nginx-example
     ```
 
-## Back up
+## Backup
 
 1. Create a backup for any object that matches the `app=nginx` label selector:
 

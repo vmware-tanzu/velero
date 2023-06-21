@@ -440,7 +440,7 @@ type BackupStatus struct {
 type BackupProgress struct {
 	// TotalItems is the total number of items to be backed up. This number may change
 	// throughout the execution of the backup due to plugins that return additional related
-	// items to back up, the velero.io/exclude-from-backup label, and various other
+	// items to backup, the velero.io/exclude-from-backup label, and various other
 	// filters that happen as items are processed.
 	// +optional
 	TotalItems int `json:"totalItems,omitempty"`

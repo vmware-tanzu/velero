@@ -298,7 +298,7 @@ This proposal does not significantly change Velero's security implications withi
 If a deployment is using solely CSI volumes, Velero will no longer need privileges to interact with volumes or snapshots, as these will be handled by the CSI driver.
 This reduces the provider permissions footprint of Velero.
 
-Velero must still be able to access cluster-scoped resources in order to back up `VolumeSnapshotContent` objects.
+Velero must still be able to access cluster-scoped resources in order to backup `VolumeSnapshotContent` objects.
 Without these objects, the provider-level snapshots cannot be located in order to re-associate them with volumes in the event of a restore.
 
 

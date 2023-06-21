@@ -108,7 +108,7 @@ func APIGropuVersionsTest() {
 	})
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
-		It("Should back up API group version and restore by version priority", func() {
+		It("Should backup API group version and restore by version priority", func() {
 			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
 				*veleroCfg.ClientToInstallVelero,

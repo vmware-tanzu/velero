@@ -37,7 +37,7 @@ layout: docs
 $ velero
 Velero is a tool for managing disaster recovery, specifically for Kubernetes
 cluster resources. It provides a simple, configurable, and operationally robust
-way to back up your application state and associated data.
+way to backup your application state and associated data.
 
 If you're familiar with kubectl, Velero supports a similar model, allowing you to
 execute commands such as 'velero get backup' and 'velero create schedule'. The same

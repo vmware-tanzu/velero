@@ -556,7 +556,7 @@ var defaultRestorePriorities = restore.Priorities{
 		"limitranges",
 		"pods",
 		// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
-		// existed in the extensions API group, but we back up replicasets from "apps" so we want
+		// existed in the extensions API group, but we backup replicasets from "apps" so we want
 		// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
 		// in the backup.
 		"replicasets.apps",

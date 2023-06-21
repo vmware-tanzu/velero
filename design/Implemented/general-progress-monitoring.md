@@ -192,7 +192,7 @@ restored from when they are in the Finalizing state.
 
 The "FinalizingPartiallyFailed" phase signifies that, for a backup which had errors during initial
 processing or asynchronous plugin operation, asynchronous backup operations have all completed and
-Velero is currently backing up any resources indicated by asynchronous plugins as items to back up
+Velero is currently backing up any resources indicated by asynchronous plugins as items to backup
 after operations complete. Once this is done, the phase changes to PartiallyFailed.  Backups cannot
 be restored from when they are in the FinalizingPartiallyFailed state.
 

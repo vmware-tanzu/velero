@@ -25,7 +25,7 @@ publicly shared the details of how they use it.
 BitGo uses Velero backup and restore capabilities to seamlessly provision and scale fullnode statefulsets on the fly as well as having it serve an integral piece for our kubernetes disaster-recovery story.
 
 **[Bugsnag][30]**  
-We use Velero for managing backups of an internal instance of our on-premise clustered solution. We also recommend our users of [on-premise Bugsnag installations][31] use Velero for [managing their own backups][32].
+We use Velero for managing backups of an internal instance of our on-premises clustered solution. We also recommend our users of [on-premises Bugsnag installations][31] use Velero for [managing their own backups][32].
 
 **[Banzai Cloud][60]**  
 [Banzai Cloud Pipeline][61] is a Kubernetes-based microservices platform that integrates services needed for Day-1 and Day-2 operations along with first-class support both for on-prem and hybrid multi-cloud deployments. We use Velero to periodically [backup and restore these clusters in case of disasters][62].
@@ -38,7 +38,7 @@ Below is a list of solutions where Velero is being used as a component.
 We have integrated our [solution with Velero][11] to provide our customers with out of box backup/DR.
 
 **[Kyma][40]**  
-Kyma [integrates with Velero][41] to effortlessly back up and restore Kyma clusters with all its resources. Velero capabilities allow Kyma users to define and run manual and scheduled backups in order to successfully handle a disaster-recovery scenario.
+Kyma [integrates with Velero][41] to effortlessly backup and restore Kyma clusters with all its resources. Velero capabilities allow Kyma users to define and run manual and scheduled backups in order to successfully handle a disaster-recovery scenario.
 
 **[Red Hat][50]**  
 Red Hat has developed 2 operators for the OpenShift platform:
@@ -46,7 +46,7 @@ Red Hat has developed 2 operators for the OpenShift platform:
 - [OADP (OpenShift API for Data Protection) Operator][53]: This operator sets up and installs Velero on the OpenShift platform, allowing users to backup and restore applications.
 
 **[Dell EMC][70]**  
-For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Container Storage Interface (CSI) framework to take snapshots to back up the persistent data or the data that the application creates e.g. databases. [Dell EMC leverages Velero][72] to backup the namespace configuration files (also known as Namespace meta data) for enterprise grade data protection.
+For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Container Storage Interface (CSI) framework to take snapshots to backup the persistent data or the data that the application creates e.g. databases. [Dell EMC leverages Velero][72] to backup the namespace configuration files (also known as Namespace meta data) for enterprise grade data protection.
 
 **[SIGHUP][80]**  
 SIGHUP integrates Velero in its [Fury Kubernetes Distribution][81] providing predefined schedules and configurations to ensure an optimized disaster recovery experience.

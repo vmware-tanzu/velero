@@ -196,7 +196,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			BackupCfg.BackupName = backupName_2
 			BackupCfg.BackupLocation = backupLocation_2
 			BackupCfg.Selector = label_2
-			By(fmt.Sprintf("Back up the other one PV of sample workload with label-2 into the additional BSL %s", backupLocation_2), func() {
+			By(fmt.Sprintf("Backup the other one PV of sample workload with label-2 into the additional BSL %s", backupLocation_2), func() {
 				Expect(VeleroBackupNamespace(oneHourTimeout, veleroCfg.VeleroCLI,
 					veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
 					RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupCfg.BackupName, "")

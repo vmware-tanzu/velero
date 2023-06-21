@@ -36,5 +36,5 @@ The above logic will be added to [where BSLs are deleted](https://github.com/vmw
 ## Alternative Considered
 
 I had considered deleting the backup files (the ones in json format and tarballs) in the BSL itself.
-However, a standard use case is to back up a cluster and then restore into a new cluster.
+However, a standard use case is to backup a cluster and then restore into a new cluster.
 Deleting the backup storage location in either location is not expected to remove all of the backups in the backup storage location and should not be done.
