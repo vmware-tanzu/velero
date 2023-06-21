@@ -36,6 +36,7 @@ type PodVolumeBackupsGetter interface {
 	PodVolumeBackups(namespace string) PodVolumeBackupInterface
 }
 
+//go:generate mockery --name PodVolumeBackupInterface
 // PodVolumeBackupInterface has methods to work with PodVolumeBackup resources.
 type PodVolumeBackupInterface interface {
 	Create(ctx context.Context, podVolumeBackup *v1.PodVolumeBackup, opts metav1.CreateOptions) (*v1.PodVolumeBackup, error)
