@@ -88,6 +88,9 @@ When you create a backup, you can specify a TTL (time to live) by adding the fla
 
 The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied.
 
+The effects of expiration are not applied immediately, they are applied when the gc-controller runs its reconciliation loop every hour by default. If needed, you can adjust the frequency of the reconciliation loop using the `--garbage-collection-frequency
+<DURATION>` flag.
+
 If backup fails to delete, a label `velero.io/gc-failure=<Reason>` will be added to the backup custom resource.
 
 You can use this label to filter and select backups that failed to delete.
