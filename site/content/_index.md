@@ -29,7 +29,7 @@ hero:
 secondary_ctas:
   cta1:
     title: Introduction to Velero
-    url: /blog/Velero-is-an-Open-Source-Tool-to-Backup-and-Migrate-Kubernetes-Clusters/
+    url: /blog/Velero-is-an-Open-Source-Tool-to-Back-up-and-Migrate-Kubernetes-Clusters/ # Velero.io word list : ignore
     content: Learn about Velero and how to protect your Kubernetes resources and volumes.
   cta2:
     title: How Do You Use Velero?

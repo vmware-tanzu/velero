@@ -21,26 +21,27 @@ jobs:
 
     - name: Velero.io word list check
       run: |
+        IGNORE_COMMENT="Velero.io word list : ignore"
         FILES_TO_CHECK=$(find . -type f \
           ! -path "./.git/*" \
           ! -path "./site/content/docs/*/style-guide.md" \
+          ! -path "./site/content/docs/v*" \
           ! -path "./.github/workflows/pr-codespell.yml" \
           ! -path "./site/static/fonts/Metropolis/Open Font License.md" \
           ! -regex '.*\.\(png\|jpg\|woff\|ttf\|gif\|ico\|svg\)'
         )
-        ! xargs grep -Iinr --color 'on-premise ' <<< "$FILES_TO_CHECK"
-        ! xargs grep -Iinr --color 'back up' <<< "$FILES_TO_CHECK" # what about backed up?
-        ! xargs grep -Iinr --color 'back-up' <<< "$FILES_TO_CHECK"
-        ! xargs grep -Iinr --color 'plug-in' <<< "$FILES_TO_CHECK"
-        ! xargs grep -Iinr --color 'whitelist' <<< "$FILES_TO_CHECK"
-        ! xargs grep -Iinr --color 'blacklist' <<< "$FILES_TO_CHECK"
-      # exclude
-      # ./changelogs/CHANGELOG-0.5.md
-      # ./changelogs/CHANGELOG-0.9.md
-      # ./changelogs/CHANGELOG-0.9.md
-      # ./changelogs/CHANGELOG-1.1.md
-      # ./changelogs/CHANGELOG-1.1.md
-      # ./changelogs/CHANGELOG-1.3.md
-      # ./changelogs/CHANGELOG-1.3.md
-      # ./changelogs/CHANGELOG-1.5.md
-      # ./changelogs/CHANGELOG-1.5.md
+        function check_word_in_files() {
+            local word=$1
+
+            xargs grep -Iinr "$word" <<< "$FILES_TO_CHECK" | \
+            grep -v "$IGNORE_COMMENT" | \
+            grep -i "$word" && \
+            EXIT_STATUS=1
+        }
+        EXIT_STATUS=0
+        check_word_in_files 'on-premise\b'
+        check_word_in_files 'back-up'
+        check_word_in_files 'plug-in'
+        check_word_in_files 'whitelist'
+        check_word_in_files 'blacklist'
+        exit $EXIT_STATUS

@@ -11,7 +11,7 @@
 
 ## Background
 
-As a Kubernetes BR solution, Velero is pursuing the capability to backup data from the volatile and limited production environment into the durable, heterogeneous and scalable backup storage. This relies on two parts:  
+As a Kubernetes BR solution, Velero is pursuing the capability to back up data from the volatile and limited production environment into the durable, heterogeneous and scalable backup storage. This relies on two parts:  
 
 - Move data from various production workloads. The data mover has this role. Depending on the type of workload, Velero needs different data movers. For example, file system data mover, block data mover, and data movers for specific applications. At present, Velero supports moving file system data from PVs through Restic, which plays the role of the File System Data Mover.  
 - Persist data in backup storage. For a BR solution, this is the responsibility of the backup repository. Specifically, the backup repository is required to:  

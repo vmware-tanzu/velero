@@ -224,7 +224,7 @@ func (ie *ScopeIncludesExcludes) ShouldInclude(typeName string) bool {
 	}
 
 	// when IncludedClusterScopedResources and ExcludedClusterScopedResources are not specified,
-	// only directly backup cluster-scoped resources if we're doing a full-cluster
+	// only directly back up cluster-scoped resources if we're doing a full-cluster
 	// (all namespaces and all namespace-scoped types) backup.
 	if len(ie.clusterScopedResourceFilter.includes.List()) == 0 &&
 		len(ie.clusterScopedResourceFilter.excludes.List()) == 0 &&

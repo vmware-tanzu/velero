@@ -123,7 +123,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 	BackupCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
 	BackupCfg.Selector = ""
 
-	By(fmt.Sprintf("Backup workload with name %s", BackupCfg.BackupName), func() {
+	By(fmt.Sprintf("Back up workload with name %s", BackupCfg.BackupName), func() {
 		Expect(VeleroBackupNamespace(oneHourTimeout, veleroCLI,
 			veleroNamespace, BackupCfg)).To(Succeed(), func() string {
 			RunDebug(context.Background(), veleroCLI, veleroNamespace, BackupCfg.BackupName, "")
@@ -181,7 +181,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 	backupName = "backup-1-" + UUIDgen.String()
 	BackupCfg.BackupName = backupName
 
-	By(fmt.Sprintf("Backup workload with name %s", BackupCfg.BackupName), func() {
+	By(fmt.Sprintf("Back up workload with name %s", BackupCfg.BackupName), func() {
 		Expect(VeleroBackupNamespace(oneHourTimeout, veleroCLI,
 			veleroNamespace, BackupCfg)).To(Succeed(), func() string {
 			RunDebug(context.Background(), veleroCLI, veleroNamespace, BackupCfg.BackupName, "")

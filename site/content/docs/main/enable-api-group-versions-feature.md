@@ -17,7 +17,7 @@ For the most up-to-date information on Kubernetes API version compatibility, you
 
 ## How the Enable API Group Versions Feature Works
 
-When the Enable API Group Versions feature is enabled on the source cluster, Velero will not only backup Kubernetes preferred API group versions, but it will also backup all supported versions on the cluster. As an example, consider the resource `horizontalpodautoscalers` which falls under the `autoscaling` group. Without the feature flag enabled, only the preferred API group version for autoscaling, `v2` will be backed up. With the feature enabled, the remaining supported versions, `v1` will also be backed up. Once the versions are stored in the backup tarball file, they will be available to be restored on the destination cluster.
+When the Enable API Group Versions feature is enabled on the source cluster, Velero will not only back up Kubernetes preferred API group versions, but it will also back up all supported versions on the cluster. As an example, consider the resource `horizontalpodautoscalers` which falls under the `autoscaling` group. Without the feature flag enabled, only the preferred API group version for autoscaling, `v2` will be backed up. With the feature enabled, the remaining supported versions, `v1` will also be backed up. Once the versions are stored in the backup tarball file, they will be available to be restored on the destination cluster.
 
 When the Enable API Group Versions feature is enabled on the destination cluster, Velero restore will choose the version to restore based on an API group version priority order.
 
@@ -59,7 +59,7 @@ To better understand which API group version will be chosen, the following provi
 ## Procedure for Using the Enable API Group Versions Feature
 
 1. [Install Velero](basic-install.md) on source cluster with the [feature flag enabled](customize-installation.md/#enable-server-side-features). The flag is `--features=EnableAPIGroupVersions`. For the enable API group versions feature to work, the feature flag needs to be used for Velero installations on both the source and destination clusters.
-2. Backup and restore following the [migration case instructions](migration-case.md). Note that "Cluster 1" in the instructions refers to the source cluster, and "Cluster 2" refers to the destination cluster.
+2. Back up and restore following the [migration case instructions](migration-case.md). Note that "Cluster 1" in the instructions refers to the source cluster, and "Cluster 2" refers to the destination cluster.
 
 ## Advanced Procedure for Customizing the Version Prioritization
 

@@ -24,7 +24,7 @@ A big focus of our work this cycle was continuing to improve support for restic.
 - Prior to version 1.1, restic backups could be delayed or failed due to long-lived locks on the repository. Now, Velero removes stale locks from restic repositories every 5 minutes, ensuring they do not interrupt normal operations.  
 - Previously, the PodVolumeBackup custom resources that represented a restic backup within a cluster were not synchronized between clusters, making it unclear what restic volumes were available to restore into a new cluster. In version 1.1, these resources are synced into clusters, so they are more visible to you when you are trying to restore volumes.  
 - Originally, Velero would not validate the host path in which volumes were mounted on a given node. If a node did not expose the filesystem correctly, you wouldn’t know about it until a backup failed. Now, Velero’s restic server will validate that the directory structure is correct on startup, providing earlier feedback when it’s not.  
-- Velero’s restic support is intended to work on a broad range of volume types. With the general release of the [Container Storage Interface API](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/), Velero can now use restic to backup CSI volumes.  
+- Velero’s restic support is intended to work on a broad range of volume types. With the general release of the [Container Storage Interface API](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/), Velero can now use restic to back up CSI volumes.  
 
 Along with our bug fixes, we’ve provided an easier way to move restic backups between storage providers. Different providers often have different StorageClasses, requiring user intervention to make restores successfully complete.
 
@@ -44,7 +44,7 @@ In the same vein, we’ve added the ability to put custom tags on cloud-provider
 
 Our final change for increasing visibility into your Velero installation is the `velero plugin get` command. This command will report all the plug-ins within the Velero deployment..
 
-Velero has previously used a restore-only flag on the server to control whether a cluster could write backups to object storage. With Velero 1.1, we’ve now moved the restore-only behavior into read-only BackupStorageLocations. This move means that the Velero server can use a BackupStorageLocation as a source to restore from, but not for backups, while still retaining the ability to backup to other configured locations. In the future, the `--restore-only` flag will be removed in favor of configuring read-only BackupStorageLocations.
+Velero has previously used a restore-only flag on the server to control whether a cluster could write backups to object storage. With Velero 1.1, we’ve now moved the restore-only behavior into read-only BackupStorageLocations. This move means that the Velero server can use a BackupStorageLocation as a source to restore from, but not for backups, while still retaining the ability to back up to other configured locations. In the future, the `--restore-only` flag will be removed in favor of configuring read-only BackupStorageLocations.
 
 ## Community Contributions
 

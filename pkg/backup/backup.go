@@ -175,7 +175,7 @@ type VolumeSnapshotterGetter interface {
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized velerov1api.Backup is written to metadata. Any error that represents
 // a complete backup failure is returned. Errors that constitute partial failures (i.e. failures to
-// backup individual resources that don't prevent the backup from continuing to be processed) are logged
+// back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
 func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
 	actions []biav2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
@@ -277,7 +277,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	}
 
 	items := collector.getAllItems()
-	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to backup, etc.)", len(items))
+	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
 
 	updated := backupRequest.Backup.DeepCopy()
 	if updated.Status.Progress == nil {
@@ -407,7 +407,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	// no more progress updates will be sent on the 'update' channel
 	quit <- struct{}{}
 
-	// backup CRD(this is a CRD definition of the resource, it's a CRD instance) for resource if found.
+	// back up CRD(this is a CRD definition of the resource, it's a CRD instance) for resource if found.
 	// We should only need to do this if we've backed up at least one item for the resource
 	// and the CRD type(this is the CRD type itself) is neither included or excluded.
 	// When it's included, the resource's CRD is already handled. When it's excluded, no need to check.
@@ -500,7 +500,7 @@ func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.Group
 	unstructured, err := crdClient.Get(gr.String(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// not found: this means the GroupResource provided was not a
-		// custom resource, so there's no CRD to backup.
+		// custom resource, so there's no CRD to back up.
 		log.Debugf("No CRD found for GroupResource %s", gr.String())
 		return
 	}

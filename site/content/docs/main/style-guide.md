@@ -268,7 +268,8 @@ A list of Velero-specific terms and words to be used consistently across the sit
 |Velero|Velero should always be capitalized.|
 |VMware|VMware should always be correctly capitalized.|
 |On-premises|On-premises or on-prem rather than on-premise or other variations.|
-|Backup|Backup rather than back up, back-up or other variations.|
+|Backup|Backup for noun or adjective, rather than back-up, back up or other variations.|
+|Back up|Back up for verb, rather than other variations.|
 |Plugin|Plugin rather than plug-in or other variations.|
 |Allowlist|Use allowlist instead of whitelist.|
 |Denylist|Use denylist instead of blacklist.|

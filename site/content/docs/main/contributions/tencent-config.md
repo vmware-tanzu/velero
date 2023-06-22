@@ -62,9 +62,9 @@ Description of the parameters:
 
 - `--use-node-agent`: Enable Velero node-agent daemonset. At present, Velero File System Backup requires this daemonset, so if you are using File System Backup, it needs to be turned on. For the usage and limitation of File System Backup, See [File System Backup](../file-system-backup.md).
 
-- `--default-volumes-to-fs-backup`: Enable the use of File System Backup to backup all Pod volumes, provided that the `--use-node-agent`parameter needs to be turned on.
+- `--default-volumes-to-fs-backup`: Enable the use of File System Backup to back up all Pod volumes, provided that the `--use-node-agent`parameter needs to be turned on.
 
-- `--backup-location-config`: Backup the bucket access-related configuration:
+- `--backup-location-config`: Back up the bucket access-related configuration:
 
   `region`: Tencent cloud COS bucket area, for example, if the created region is Guangzhou, the Region parameter value is "ap-guangzhou".
 
@@ -72,7 +72,7 @@ Description of the parameters:
 
   `s3Url`: Tencent Cloud COS-compatible S3 API access address,Note that instead of creating a COS bucket for public network access domain name, you must use a format of "https://cos.`region`.myqcloud.com" URL, for example, if the region is Guangzhou, the parameter value is "https://cos.ap-guangzhou.myqcloud.com.".
 
-There are other installation parameters that can be viewed using `velero install --help`, such as setting `--use-volume-snapshots-false`  to close the storage volume data snapshot backup if you do not want to backup the storage volume data.
+There are other installation parameters that can be viewed using `velero install --help`, such as setting `--use-volume-snapshots-false`  to close the storage volume data snapshot backup if you do not want to back up the storage volume data.
 
 After executing the installation commands above, the installation process looks like this:
 
@@ -96,7 +96,7 @@ Sign in to the minio web management page and upload some image data for the test
 
 {{< figure src="/docs/main/contributions/img-for-tencent/e932223585c0b19891cc085ad7f438e1.png" width="100%">}}
 
-With Velero Backup, you can backup all objects in the cluster directly, or filter objects by type, namespace, and/or label. This example uses the following command to backup all resources under the 'default' namespace.
+With Velero Backup, you can back up all objects in the cluster directly, or filter objects by type, namespace, and/or label. This example uses the following command to back up all resources under the 'default' namespace.
 
 ```
 velero backup create default-backup --include-namespaces <Namespace>

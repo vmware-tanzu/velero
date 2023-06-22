@@ -9,7 +9,7 @@
 
 ## Background
 
-As a Kubernetes BR solution, Velero is pursuing the capability to backup data from the volatile and limited production environment into the durable, heterogeneous and scalable backup storage. This relies on two parts:  
+As a Kubernetes BR solution, Velero is pursuing the capability to back up data from the volatile and limited production environment into the durable, heterogeneous and scalable backup storage. This relies on two parts:  
 
 - Data Movement: Move data from various production workloads, including the snapshots of the workloads or volumes of the workloads
 - Data Persistency and Management: Persistent the data in backup storage and manage its security, redundancy, accessibility, etc. through backup repository. This has been covered by the [Unified Repository design][1]
