@@ -267,6 +267,8 @@ You can change this policy for a restore by using the `--existing-resource-polic
 
 You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 
+**NOTE:** Update of a resource only applies to the Kubernetes resource data such as its spec. It may not work as expected for certain resource types such as PVCs and Pods. In case of PVCs for example, data in the PV is not restored or overwritten in any way. 
+
 ## Removing a Restore object
 
 There are two ways to delete a Restore object:
