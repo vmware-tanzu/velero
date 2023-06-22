@@ -122,7 +122,7 @@ velero install \
 
 ### Update resource requests and limits after install
 
-After installation you can adjust the resource requests and limits in the Velero Deployment spec or node-agent DaemonSet spec, if you are using the File System Backup.
+After installation you can adjust the resource requests and limits in the Velero Deployment spec or node-agent DeamonSet spec, if you are using the File System Backup.
 
 **Velero pod**
 
@@ -135,7 +135,7 @@ kubectl patch deployment velero -n velero --patch \
 
 **node-agent pod**
 
-Update the `spec.template.spec.containers.resources.limits` and `spec.template.spec.containers.resources.requests` values in the node-agent DaemonSet spec.
+Update the `spec.template.spec.containers.resources.limits` and `spec.template.spec.containers.resources.requests` values in the node-agent DeamonSet spec.
 
 ```bash
 kubectl patch daemonset node-agent -n velero --patch \

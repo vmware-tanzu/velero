@@ -143,7 +143,7 @@ root@csi-nginx:/# cksum /mnt/azuredisk/foobar
 2279846381 1726530 /mnt/azuredisk/foobar 
 ```
 
-## Back up
+## Back Up
 
 Back up the `csi-app` namespace by running the below command
 

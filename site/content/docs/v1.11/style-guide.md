@@ -261,7 +261,7 @@ nginx    1/1       Running   0          13s    10.200.0.4   worker0
 A list of Velero-specific terms and words to be used consistently across the site.
 
 {{< table caption="Velero.io word list" >}}
-|Term|Usage|
+|Trem|Usage|
 |--- |--- |
 |Kubernetes|Kubernetes should always be capitalized.|
 |Docker|Docker should always be capitalized.|

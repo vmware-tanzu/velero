@@ -142,7 +142,7 @@ Compression is either disabled or not unavailable for both uploader.
 | Kopia  | 4c4g     |1m35s | 75%   |248 MB    |10 GB     |
 | Restic | 4c4g     |3m17s | 171%  |126 MB    |10 GB     |
 #### conclusion:
-- This case involves a relatively large backup size, there is no significant time reduction by increasing resources from 1c2g to 4c4g for Kopia uploader, but for Restic uploader when increasing CPU from 1 core to 4, backup time-consuming was shortened by one-third, which means in this scenario should allocate more CPU resources for Restic uploader.
+- This case involves a relatively large backup size, there is no significant time reduction by increasing resources from 1c2g to 4c4g for Kopia uploader, but for Restic upoader when increasing CPU from 1 core to 4, backup time-consuming was shortened by one-third, which means in this scenario should allocate more CPU resources for Restic uploader.
 - For the large backup size case, Restic uploader's repository size comes to normal
 
 ### Case 4: 900 files, 1 directory, 1.000GB per file total 900.000GB content
