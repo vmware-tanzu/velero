@@ -153,3 +153,10 @@ func WithManagedFields(val []metav1.ManagedFieldsEntry) func(obj metav1.Object) 
 		obj.SetManagedFields(val)
 	}
 }
+
+// WithCreationTimestamp is a functional option that applies the specified creationTimestamp
+func WithCreationTimestamp(t time.Time) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetCreationTimestamp(metav1.Time{Time: t})
+	}
+}

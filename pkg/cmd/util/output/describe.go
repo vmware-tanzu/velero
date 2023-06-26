@@ -47,15 +47,6 @@ func Describe(fn func(d *Describer)) string {
 	return d.buf.String()
 }
 
-func NewDescriber(minwidth, tabwidth, padding int, padchar byte, flags uint) *Describer {
-	d := &Describer{
-		out: new(tabwriter.Writer),
-		buf: new(bytes.Buffer),
-	}
-	d.out.Init(d.buf, minwidth, tabwidth, padding, padchar, flags)
-	return d
-}
-
 func (d *Describer) Printf(msg string, args ...interface{}) {
 	fmt.Fprint(d.out, d.Prefix)
 	fmt.Fprintf(d.out, msg, args...)
