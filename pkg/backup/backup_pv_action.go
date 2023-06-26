@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -68,6 +70,15 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	}
 	if pvc.Spec.DataSourceRef != nil {
 		pvc.Spec.DataSourceRef = nil
+	}
+
+	// remove label selectors with "velero.io/" prefixing in the key which is left by Velero restore
+	if pvc.Spec.Selector != nil && pvc.Spec.Selector.MatchLabels != nil {
+		for k := range pvc.Spec.Selector.MatchLabels {
+			if strings.HasPrefix(k, "velero.io/") {
+				delete(pvc.Spec.Selector.MatchLabels, k)
+			}
+		}
 	}
 
 	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)

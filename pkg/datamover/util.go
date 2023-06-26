@@ -14,24 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package exposer
+package datamover
 
-import (
-	corev1 "k8s.io/api/core/v1"
-)
-
-const (
-	AccessModeFileSystem = "by-file-system"
-)
-
-// ExposeResult defines the result of expose.
-// Varying from the type of the expose, the result may be different.
-type ExposeResult struct {
-	ByPod ExposeByPod
-}
-
-// ExposeByPod defines the result for the expose method that a hosting pod is created
-type ExposeByPod struct {
-	HostingPod *corev1.Pod
-	PVC        string
+func GetUploaderType(dataMover string) string {
+	if dataMover == "" || dataMover == "velero" {
+		return "kopia"
+	} else {
+		return dataMover
+	}
 }
