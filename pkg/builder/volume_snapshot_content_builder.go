@@ -48,8 +48,8 @@ func (v *VolumeSnapshotContentBuilder) Result() *snapshotv1api.VolumeSnapshotCon
 }
 
 // Status initiates VolumeSnapshotContent's status.
-func (v *VolumeSnapshotContentBuilder) Status() *VolumeSnapshotContentBuilder {
-	v.object.Status = &snapshotv1api.VolumeSnapshotContentStatus{}
+func (v *VolumeSnapshotContentBuilder) Status(status *snapshotv1api.VolumeSnapshotContentStatus) *VolumeSnapshotContentBuilder {
+	v.object.Status = status
 	return v
 }
 
