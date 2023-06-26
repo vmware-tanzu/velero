@@ -43,6 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/repository"
@@ -222,12 +223,16 @@ func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, du *
 	}
 
 	log.WithField("path", path.ByPath).Debug("Found host path")
-	if err := fsBackup.Init(ctx, du.Spec.BackupStorageLocation, du.Namespace, exposer.GetUploaderType(du.Spec.DataMover),
+	if err := fsBackup.Init(ctx, du.Spec.BackupStorageLocation, du.Spec.SourceNamespace, datamover.GetUploaderType(du.Spec.DataMover),
 		velerov1api.BackupRepositoryTypeKopia, "", r.repoEnsurer, r.credentialGetter); err != nil {
 		return r.errorOut(ctx, du, err, "error to initialize data path", log)
 	}
 	log.WithField("path", path.ByPath).Info("fs init")
-	if err := fsBackup.StartBackup(path, fmt.Sprintf("%s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC), "", false, nil); err != nil {
+
+	tags := map[string]string{
+		velerov1api.AsyncOperationIDLabel: du.Labels[velerov1api.AsyncOperationIDLabel],
+	}
+	if err := fsBackup.StartBackup(path, fmt.Sprintf("%s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC), "", false, tags); err != nil {
 		return r.errorOut(ctx, du, err, "error starting data path backup", log)
 	}
 
@@ -469,7 +474,6 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 
 	r.logger.Infof("Accepting snapshot backup %s", du.Name)
 
-	time.Sleep(2 * time.Second)
 	// For all data upload controller in each node-agent will try to update dataupload CR, and only one controller will success,
 	// and the success one could handle later logic
 	err := r.client.Update(ctx, updated)
