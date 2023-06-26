@@ -260,6 +260,10 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
+	if err = controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, repoEnsurer, credentialGetter, s.nodeName, s.logger).SetupWithManager(s.mgr); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the data download controller")
+	}
+
 	s.logger.Info("Controllers starting...")
 
 	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
