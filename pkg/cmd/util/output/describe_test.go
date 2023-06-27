@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
 	"text/tabwriter"
 
@@ -131,4 +132,37 @@ func TestStructuredDescriber_JSONEncode(t *testing.T) {
 			assert.Equal(tt, tc.expect, got)
 		})
 	}
+}
+
+func TestStructuredDescriber_DescribeMetadata(t *testing.T) {
+	d := NewStructuredDescriber("")
+	input := metav1.ObjectMeta{
+		Name:      "test",
+		Namespace: "test-ns",
+		Labels: map[string]string{
+			"label-1": "v1",
+			"label-2": "v2",
+		},
+		Annotations: map[string]string{
+			"annotation-1": "v1",
+			"annotation-2": "v2",
+		},
+	}
+	expect := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"name":      "test",
+			"namespace": "test-ns",
+			"labels": map[string]string{
+				"label-1": "v1",
+				"label-2": "v2",
+			},
+			"annotations": map[string]string{
+				"annotation-1": "v1",
+				"annotation-2": "v2",
+			},
+		},
+	}
+	d.DescribeMetadata(input)
+
+	assert.True(t, reflect.DeepEqual(expect, d.output))
 }

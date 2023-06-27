@@ -6,6 +6,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+
+	"github.com/stretchr/testify/require"
+
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -46,7 +50,31 @@ func TestDescribeBackupSpec(t *testing.T) {
 		TTL(72 * time.Hour).
 		CSISnapshotTimeout(10 * time.Minute).
 		DataMover("mover").
-		Result().Spec
+		Hooks(velerov1api.BackupHooks{
+			Resources: []velerov1api.BackupResourceHookSpec{
+				{
+					Name: "hook-1",
+					PreHooks: []velerov1api.BackupResourceHook{
+						{
+							Exec: &velerov1api.ExecHook{
+								Container: "hook-container-1",
+								Command:   []string{"pre"},
+								OnError:   velerov1api.HookErrorModeContinue,
+							},
+						},
+					},
+					PostHooks: []velerov1api.BackupResourceHook{
+						{
+							Exec: &velerov1api.ExecHook{
+								Container: "hook-container-1",
+								Command:   []string{"post"},
+								OnError:   velerov1api.HookErrorModeContinue,
+							},
+						},
+					},
+				},
+			},
+		}).Result().Spec
 
 	expect1 := `Namespaces:
   Included:  inc-ns-1, inc-ns-2
@@ -70,7 +98,30 @@ TTL:  72h0m0s
 CSISnapshotTimeout:    10m0s
 ItemOperationTimeout:  0s
 
-Hooks:  <none>
+Hooks:
+  Resources:
+    hook-1:
+      Namespaces:
+        Included:  inc-ns-1, inc-ns-2
+        Excluded:  exc-ns-1, exc-ns-2
+
+      Resources:
+        Included:  inc-res-1, inc-res-2
+        Excluded:  exc-res-1, exc-res-2
+
+      Label selector:  <none>
+
+      Pre Exec Hook:
+        Container:  hook-container-1
+        Command:    pre
+        On Error:   Continue
+        Timeout:    0s
+
+      Post Exec Hook:
+        Container:  hook-container-1
+        Command:    post
+        On Error:   Continue
+        Timeout:    0s
 `
 
 	input2 := builder.ForBackup("test-ns", "test-backup-2").
@@ -112,13 +163,94 @@ ItemOperationTimeout:  0s
 Hooks:  <none>
 `
 
+	input3 := builder.ForBackup("test-ns", "test-backup-3").
+		StorageLocation("backup-location").
+		OrderedResources(map[string]string{
+			"kind1": "rs1-1, rs1-2",
+		}).Hooks(velerov1api.BackupHooks{
+		Resources: []velerov1api.BackupResourceHookSpec{
+			{
+				Name: "hook-1",
+				PreHooks: []velerov1api.BackupResourceHook{
+					{
+						Exec: &velerov1api.ExecHook{
+							Container: "hook-container-1",
+							Command:   []string{"pre"},
+							OnError:   velerov1api.HookErrorModeContinue,
+						},
+					},
+				},
+				PostHooks: []velerov1api.BackupResourceHook{
+					{
+						Exec: &velerov1api.ExecHook{
+							Container: "hook-container-1",
+							Command:   []string{"post"},
+							OnError:   velerov1api.HookErrorModeContinue,
+						},
+					},
+				},
+			},
+		},
+	}).Result().Spec
+
+	expect3 := `Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included:        *
+  Excluded:        <none>
+  Cluster-scoped:  auto
+
+Label selector:  <none>
+
+Storage Location:  backup-location
+
+Velero-Native Snapshot PVs:  auto
+Snapshot Move Data:          auto
+Data Mover:                  <none>
+
+TTL:  0s
+
+CSISnapshotTimeout:    0s
+ItemOperationTimeout:  0s
+
+Hooks:
+  Resources:
+    hook-1:
+      Namespaces:
+        Included:  *
+        Excluded:  <none>
+
+      Resources:
+        Included:  *
+        Excluded:  <none>
+
+      Label selector:  <none>
+
+      Pre Exec Hook:
+        Container:  hook-container-1
+        Command:    pre
+        On Error:   Continue
+        Timeout:    0s
+
+      Post Exec Hook:
+        Container:  hook-container-1
+        Command:    post
+        On Error:   Continue
+        Timeout:    0s
+
+OrderedResources:
+  kind1: rs1-1, rs1-2
+`
+
 	testcases := []struct {
 		name   string
 		input  velerov1api.BackupSpec
 		expect string
 	}{
 		{
-			name:   "old resource filter",
+			name:   "old resource filter with hooks",
 			input:  input1,
 			expect: expect1,
 		},
@@ -126,6 +258,11 @@ Hooks:  <none>
 			name:   "new resource filter",
 			input:  input2,
 			expect: expect2,
+		},
+		{
+			name:   "old resource filter with hooks and ordered resources",
+			input:  input3,
+			expect: expect3,
 		},
 	}
 
@@ -164,7 +301,6 @@ func TestDescribeSnapshot(t *testing.T) {
 
 func TestDescribePodVolumeBackups(t *testing.T) {
 	pvb1 := builder.ForPodVolumeBackup("test-ns", "test-pvb1").
-		BackupStorageLocation("backup-location").
 		UploaderType("kopia").
 		Phase(velerov1api.PodVolumeBackupPhaseCompleted).
 		BackupStorageLocation("bsl-1").
@@ -173,7 +309,6 @@ func TestDescribePodVolumeBackups(t *testing.T) {
 		PodNamespace("pod-ns-1").
 		SnapshotID("snap-1").Result()
 	pvb2 := builder.ForPodVolumeBackup("test-ns1", "test-pvb2").
-		BackupStorageLocation("backup-location").
 		UploaderType("kopia").
 		Phase(velerov1api.PodVolumeBackupPhaseCompleted).
 		BackupStorageLocation("bsl-1").
@@ -288,4 +423,100 @@ Snapshot Content Name: vsc-1
 			assert.Equal(tt, tc.expect, d.buf.String())
 		})
 	}
+}
+
+func TestDescribeDeleteBackupRequests(t *testing.T) {
+	t1, err1 := time.Parse("2006-Jan-02", "2023-Jun-26")
+	require.Nil(t, err1)
+	dbr1 := builder.ForDeleteBackupRequest("velero", "dbr1").
+		ObjectMeta(builder.WithCreationTimestamp(t1)).
+		BackupName("bak-1").
+		Phase(velerov1api.DeleteBackupRequestPhaseProcessed).
+		Errors("some error").Result()
+	t2, err2 := time.Parse("2006-Jan-02", "2023-Jun-25")
+	require.Nil(t, err2)
+	dbr2 := builder.ForDeleteBackupRequest("velero", "dbr2").
+		ObjectMeta(builder.WithCreationTimestamp(t2)).
+		BackupName("bak-2").
+		Phase(velerov1api.DeleteBackupRequestPhaseInProgress).Result()
+
+	testcases := []struct {
+		name   string
+		input  []velerov1api.DeleteBackupRequest
+		expect string
+	}{
+		{
+			name:  "empty list",
+			input: []velerov1api.DeleteBackupRequest{},
+			expect: `Deletion Attempts:
+`,
+		},
+		{
+			name:  "list with one failed and one in-progress request",
+			input: []velerov1api.DeleteBackupRequest{*dbr1, *dbr2},
+			expect: `Deletion Attempts (1 failed):
+  2023-06-26 00:00:00 +0000 UTC: Processed
+  Errors:
+    some error
+
+  2023-06-25 00:00:00 +0000 UTC: InProgress
+`,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(tt *testing.T) {
+			d := &Describer{
+				Prefix: "",
+				out:    &tabwriter.Writer{},
+				buf:    &bytes.Buffer{},
+			}
+			d.out.Init(d.buf, 0, 8, 2, ' ', 0)
+			DescribeDeleteBackupRequests(d, tc.input)
+			d.out.Flush()
+			assert.Equal(tt, tc.expect, d.buf.String())
+		})
+	}
+}
+
+func TestDescribeBackupItemOperation(t *testing.T) {
+	t1, err1 := time.Parse("2006-Jan-02", "2023-Jun-26")
+	require.Nil(t, err1)
+	t2, err2 := time.Parse("2006-Jan-02", "2023-Jun-25")
+	require.Nil(t, err2)
+	t3, err3 := time.Parse("2006-Jan-02", "2023-Jun-24")
+	require.Nil(t, err3)
+	input := builder.ForBackupOperation().
+		BackupName("backup-1").
+		OperationID("op-1").
+		BackupItemAction("action-1").
+		ResourceIdentifier("group", "rs-type", "ns", "rs-name").
+		Status(*builder.ForOperationStatus().
+			Phase(itemoperation.OperationPhaseFailed).
+			Error("operation error").
+			Progress(50, 100, "bytes").
+			Description("operation description").
+			Created(t3).
+			Started(t2).
+			Updated(t1).
+			Result()).Result()
+	expected := `  Operation for rs-type.group ns/rs-name:
+    Backup Item Action Plugin:  action-1
+    Operation ID:               op-1
+    Phase:                      Failed
+    Operation Error:            operation error
+    Progress:                   50 of 100 complete (bytes)
+    Progress description:       operation description
+    Created:                    2023-06-24 00:00:00 +0000 UTC
+    Started:                    2023-06-25 00:00:00 +0000 UTC
+    Updated:                    2023-06-26 00:00:00 +0000 UTC
+`
+	d := &Describer{
+		Prefix: "",
+		out:    &tabwriter.Writer{},
+		buf:    &bytes.Buffer{},
+	}
+	d.out.Init(d.buf, 0, 8, 2, ' ', 0)
+	describeBackupItemOperation(d, input)
+	d.out.Flush()
+	assert.Equal(t, expected, d.buf.String())
 }

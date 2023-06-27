@@ -53,7 +53,6 @@ func (b *PodVolumeBackupBuilder) ObjectMeta(opts ...ObjectMetaOpt) *PodVolumeBac
 	for _, opt := range opts {
 		opt(b.object)
 	}
-
 	return b
 }
 

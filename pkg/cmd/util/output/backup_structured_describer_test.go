@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -31,7 +33,32 @@ func TestDescribeBackupInSF(t *testing.T) {
 		StorageLocation("backup-location").
 		TTL(72 * time.Hour).
 		CSISnapshotTimeout(10 * time.Minute).
-		DataMover("mover")
+		DataMover("mover").
+		Hooks(velerov1api.BackupHooks{
+			Resources: []velerov1api.BackupResourceHookSpec{
+				{
+					Name: "hook-1",
+					PreHooks: []velerov1api.BackupResourceHook{
+						{
+							Exec: &velerov1api.ExecHook{
+								Container: "hook-container-1",
+								Command:   []string{"pre"},
+								OnError:   velerov1api.HookErrorModeContinue,
+							},
+						},
+					},
+					PostHooks: []velerov1api.BackupResourceHook{
+						{
+							Exec: &velerov1api.ExecHook{
+								Container: "hook-container-1",
+								Command:   []string{"post"},
+								OnError:   velerov1api.HookErrorModeContinue,
+							},
+						},
+					},
+				},
+			},
+		})
 
 	expect1 := map[string]interface{}{
 		"spec": map[string]interface{}{
@@ -51,13 +78,73 @@ func TestDescribeBackupInSF(t *testing.T) {
 			"TTL":                     "72h0m0s",
 			"CSISnapshotTimeout":      "10m0s",
 			"veleroSnapshotMoveData":  "auto",
+			"hooks": map[string]interface{}{
+				"resources": map[string]interface{}{
+					"hook-1": map[string]interface{}{
+						"labelSelector": emptyDisplay,
+						"namespaces": map[string]string{
+							"included": "inc-ns-1, inc-ns-2",
+							"excluded": "exc-ns-1, exc-ns-2",
+						},
+						"preExecHook": []map[string]interface{}{
+							{
+								"container": "hook-container-1",
+								"command":   "pre",
+								"onError:":  velerov1api.HookErrorModeContinue,
+								"timeout":   "0s",
+							},
+						},
+						"postExecHook": []map[string]interface{}{
+							{
+								"container": "hook-container-1",
+								"command":   "post",
+								"onError:":  velerov1api.HookErrorModeContinue,
+								"timeout":   "0s",
+							},
+						},
+						"resources": map[string]string{
+							"included": "inc-res-1, inc-res-2",
+							"excluded": "exc-res-1, exc-res-2",
+						},
+					},
+				},
+			},
 		},
 	}
 	DescribeBackupSpecInSF(sd, backupBuilder1.Result().Spec)
 	assert.True(t, reflect.DeepEqual(sd.output, expect1))
 
-	backupBuilder2 := builder.ForBackup("test-ns-2", "test-backup-2")
-	backupBuilder2.StorageLocation("backup-location")
+	backupBuilder2 := builder.ForBackup("test-ns-2", "test-backup-2").
+		StorageLocation("backup-location").
+		OrderedResources(map[string]string{
+			"kind1": "rs1-1, rs1-2",
+			"kind2": "rs2-1, rs2-2",
+		}).Hooks(velerov1api.BackupHooks{
+		Resources: []velerov1api.BackupResourceHookSpec{
+			{
+				Name: "hook-1",
+				PreHooks: []velerov1api.BackupResourceHook{
+					{
+						Exec: &velerov1api.ExecHook{
+							Container: "hook-container-1",
+							Command:   []string{"pre"},
+							OnError:   velerov1api.HookErrorModeContinue,
+						},
+					},
+				},
+				PostHooks: []velerov1api.BackupResourceHook{
+					{
+						Exec: &velerov1api.ExecHook{
+							Container: "hook-container-1",
+							Command:   []string{"post"},
+							OnError:   velerov1api.HookErrorModeContinue,
+						},
+					},
+				},
+			},
+		},
+	})
+
 	expect2 := map[string]interface{}{
 		"spec": map[string]interface{}{
 			"namespaces": map[string]interface{}{
@@ -76,6 +163,41 @@ func TestDescribeBackupInSF(t *testing.T) {
 			"TTL":                     "0s",
 			"CSISnapshotTimeout":      "0s",
 			"veleroSnapshotMoveData":  "auto",
+			"hooks": map[string]interface{}{
+				"resources": map[string]interface{}{
+					"hook-1": map[string]interface{}{
+						"labelSelector": emptyDisplay,
+						"namespaces": map[string]string{
+							"included": "*",
+							"excluded": emptyDisplay,
+						},
+						"preExecHook": []map[string]interface{}{
+							{
+								"container": "hook-container-1",
+								"command":   "pre",
+								"onError:":  velerov1api.HookErrorModeContinue,
+								"timeout":   "0s",
+							},
+						},
+						"postExecHook": []map[string]interface{}{
+							{
+								"container": "hook-container-1",
+								"command":   "post",
+								"onError:":  velerov1api.HookErrorModeContinue,
+								"timeout":   "0s",
+							},
+						},
+						"resources": map[string]string{
+							"included": "*",
+							"excluded": emptyDisplay,
+						},
+					},
+				},
+			},
+			"orderedResources": map[string]string{
+				"kind1": "rs1-1, rs1-2",
+				"kind2": "rs2-1, rs2-2",
+			},
 		},
 	}
 	DescribeBackupSpecInSF(sd, backupBuilder2.Result().Spec)
@@ -249,4 +371,84 @@ func TestDescribeBackupResultInSF(t *testing.T) {
 	}
 	describeResultInSF(got, input)
 	assert.True(t, reflect.DeepEqual(got, expect))
+}
+
+func TestDescribeDeleteBackupRequestsInSF(t *testing.T) {
+	t1, err1 := time.Parse("2006-Jan-02", "2023-Jun-26")
+	require.Nil(t, err1)
+	dbr1 := builder.ForDeleteBackupRequest("velero", "dbr1").
+		ObjectMeta(builder.WithCreationTimestamp(t1)).
+		BackupName("bak-1").
+		Phase(velerov1api.DeleteBackupRequestPhaseProcessed).
+		Errors("some error").Result()
+	t2, err2 := time.Parse("2006-Jan-02", "2023-Jun-25")
+	require.Nil(t, err2)
+	dbr2 := builder.ForDeleteBackupRequest("velero", "dbr2").
+		ObjectMeta(builder.WithCreationTimestamp(t2)).
+		BackupName("bak-2").
+		Phase(velerov1api.DeleteBackupRequestPhaseInProgress).Result()
+
+	testcases := []struct {
+		name   string
+		input  []velerov1api.DeleteBackupRequest
+		expect map[string]interface{}
+	}{
+		{
+			name:  "empty list",
+			input: []velerov1api.DeleteBackupRequest{},
+			expect: map[string]interface{}{
+				"deletionAttempts": map[string]interface{}{
+					"deleteBackupRequests": []map[string]interface{}{},
+				},
+			},
+		},
+		{
+			name:  "list with one failed and one in-progress request",
+			input: []velerov1api.DeleteBackupRequest{*dbr1, *dbr2},
+			expect: map[string]interface{}{
+				"deletionAttempts": map[string]interface{}{
+					"failed": int(1),
+					"deleteBackupRequests": []map[string]interface{}{
+						{
+							"creationTimestamp": t1.String(),
+							"phase":             velerov1api.DeleteBackupRequestPhaseProcessed,
+							"errors": []string{
+								"some error",
+							},
+						},
+						{
+							"creationTimestamp": t2.String(),
+							"phase":             velerov1api.DeleteBackupRequestPhaseInProgress,
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(tt *testing.T) {
+			sd := &StructuredDescriber{
+				output: make(map[string]interface{}),
+				format: "",
+			}
+			DescribeDeleteBackupRequestsInSF(sd, tc.input)
+			assert.True(tt, reflect.DeepEqual(sd.output, tc.expect))
+		})
+	}
+
+}
+
+func TestDescribeSnapshotInSF(t *testing.T) {
+	res := map[string]interface{}{}
+	iops := int64(100)
+	describeSnapshotInSF("pv-1", "snapshot-1", "ebs", "us-east-2", &iops, res)
+	expect := map[string]interface{}{
+		"pv-1": map[string]string{
+			"snapshotID":       "snapshot-1",
+			"type":             "ebs",
+			"availabilityZone": "us-east-2",
+			"IOPS":             "100",
+		},
+	}
+	assert.True(t, reflect.DeepEqual(expect, res))
 }
