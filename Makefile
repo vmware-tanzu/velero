@@ -344,7 +344,7 @@ serve-docs: build-image-hugo
 	-v "$$(pwd)/site:/srv/hugo" \
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
-	hugo server --bind=0.0.0.0 --enableGitInfo=false
+	server --bind=0.0.0.0 --enableGitInfo=false
 # gen-docs generates a new versioned docs directory under site/content/docs.
 # Please read the documentation in the script for instructions on how to use it.
 gen-docs:
