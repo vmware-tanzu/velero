@@ -144,7 +144,7 @@ func (ie *GlobalIncludesExcludes) ShouldInclude(typeName string) bool {
 	}
 
 	// when IncludeClusterResources == nil (auto), only directly
-	// backup cluster-scoped resources if we're doing a full-cluster
+	// back up cluster-scoped resources if we're doing a full-cluster
 	// (all namespaces and all namespace scope types) backup. Note that in the case of a subset of
 	// namespaces being backed up, some related cluster-scoped resources
 	// may still be backed up if triggered by a custom action (e.g. PVC->PV).

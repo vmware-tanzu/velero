@@ -20,6 +20,7 @@ jobs:
         check_hidden: true
 
     - name: Velero.io word list check
+      shell: bash {0}
       run: |
         IGNORE_COMMENT="Velero.io word list : ignore"
         FILES_TO_CHECK=$(find . -type f \
