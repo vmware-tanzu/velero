@@ -25,7 +25,6 @@ jobs:
         IGNORE_COMMENT="Velero.io word list : ignore"
         FILES_TO_CHECK=$(find . -type f \
           ! -path "./.git/*" \
-          ! -path "./site/content/docs/*/style-guide.md" \
           ! -path "./site/content/docs/v*" \
           ! -path "./.github/workflows/pr-codespell.yml" \
           ! -path "./site/static/fonts/Metropolis/Open Font License.md" \
@@ -36,7 +35,7 @@ jobs:
 
             xargs grep -Iinr "$word" <<< "$FILES_TO_CHECK" | \
             grep -v "$IGNORE_COMMENT" | \
-            grep -i "$word" && \
+            grep -i --color=always "$word" && \
             EXIT_STATUS=1
         }
         EXIT_STATUS=0

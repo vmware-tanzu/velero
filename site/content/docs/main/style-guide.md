@@ -267,12 +267,12 @@ A list of Velero-specific terms and words to be used consistently across the sit
 |Docker|Docker should always be capitalized.|
 |Velero|Velero should always be capitalized.|
 |VMware|VMware should always be correctly capitalized.|
-|On-premises|On-premises or on-prem rather than on-premise or other variations.|
-|Backup|Backup for noun or adjective, rather than back-up, back up or other variations.|
+|On-premises|On-premises or on-prem rather than on-premise or other variations.| <!-- Velero.io word list : ignore -->
+|Backup|Backup for noun or adjective, rather than back-up, back up or other variations.| <!-- Velero.io word list : ignore -->
 |Back up|Back up for verb, rather than other variations.|
-|Plugin|Plugin rather than plug-in or other variations.|
-|Allowlist|Use allowlist instead of whitelist.|
-|Denylist|Use denylist instead of blacklist.|
+|Plugin|Plugin rather than plug-in or other variations.| <!-- Velero.io word list : ignore -->
+|Allowlist|Use allowlist instead of whitelist.| <!-- Velero.io word list : ignore -->
+|Denylist|Use denylist instead of blacklist.| <!-- Velero.io word list : ignore -->
 {{< /table >}}
 
 ## Markdown elements
