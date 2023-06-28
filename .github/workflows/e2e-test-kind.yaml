@@ -53,7 +53,7 @@ jobs:
         run: |
           IMAGE=velero VERSION=pr-test make container
           docker save velero:pr-test -o ./velero.tar
-  # Run E2E test against all kubernetes versions on kind
+  # Run E2E test against all Kubernetes versions on kind
   run-e2e-test:
     needs: build
     runs-on: ubuntu-latest

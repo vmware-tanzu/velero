@@ -36,7 +36,7 @@ backup and restore *could* make use of this framework if their actions are refac
 Backup/RestoreItemActions.
 
 - Data Movers
-    - Data movers are asynchronous processes executed inside backup/restore item actions that applies to a specific kubernetes resources. A common use case for data mover is to backup/restore PVCs whose data we want to move to some form of backup storage outside of using velero kopia/restic implementations.
+    - Data movers are asynchronous processes executed inside backup/restore item actions that applies to a specific Kubernetes resources. A common use case for data mover is to backup/restore PVCs whose data we want to move to some form of backup storage outside of using velero kopia/restic implementations.
     - Workflow
         - User takes velero backup of PVC A
         - BIA plugin applies to PVCs with compatible storage driver
@@ -333,7 +333,7 @@ will be modified:
 	// initiate asynchronous actions, and a second slice of ResourceIdentifiers specifying related items
 	// which should be backed up after all asynchronous operations have completed. This last field will be
 	// ignored if operationID is empty, and should not be filled in unless the resource must be updated in the
-	// backup after async operations complete (i.e. some of the item's kubernetes metadata will be updated
+	// backup after async operations complete (i.e. some of the item's Kubernetes metadata will be updated
 	// during the asynch operation which will be required during restore)
 	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error)
     	

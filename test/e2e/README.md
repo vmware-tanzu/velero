@@ -9,7 +9,7 @@ If you previously ran unit tests using the `go test ./...` command or any of its
 ## Prerequisites
 
 Running the E2E tests expects:
-1. A running kubernetes cluster:
+1. A running Kubernetes cluster:
     1. With DNS and CNI installed.
     1. Compatible with Velero- running Kubernetes v1.10 or later.
     1. With necessary storage drivers/provisioners installed.

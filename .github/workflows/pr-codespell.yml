@@ -39,7 +39,16 @@ jobs:
             grep -i --color=always "$word" && \
             EXIT_STATUS=1
         }
+        function check_word_case_sensitive_in_files() {
+            local word=$1
+
+            xargs grep -Inr "$word" <<< "$FILES_TO_CHECK" | \
+            grep -v "$IGNORE_COMMENT" | \
+            grep --color=always "$word" && \
+            EXIT_STATUS=1
+        }
         EXIT_STATUS=0
+        check_word_case_sensitive_in_files ' kubernetes '
         check_word_in_files 'on-premise\b'
         check_word_in_files 'back-up'
         check_word_in_files 'plug-in'

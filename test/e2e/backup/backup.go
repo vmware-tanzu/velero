@@ -91,7 +91,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 			}
 			backupName = "backup-" + UUIDgen.String()
 			restoreName = "restore-" + UUIDgen.String()
-			// Even though we are using Velero's CloudProvider plugin for object storage, the kubernetes cluster is running on
+			// Even though we are using Velero's CloudProvider plugin for object storage, the Kubernetes cluster is running on
 			// KinD. So use the kind installation for Kibishii.
 
 			// if set ProvideSnapshotsVolumeParam to false here, make sure set it true in other tests of this case

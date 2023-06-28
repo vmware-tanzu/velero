@@ -103,7 +103,7 @@ spec:
   # so that the exposed port numbers on the node will remain the same after restore. Optional
   preserveNodePorts: true
   # existingResourcePolicy specifies the restore behaviour
-  # for the kubernetes resource to be restored. Optional
+  # for the Kubernetes resource to be restored. Optional
   existingResourcePolicy: none
   # Actions to perform during or post restore. The only hooks currently supported are
   # adding an init container to a pod before it can be restored and executing a command in a

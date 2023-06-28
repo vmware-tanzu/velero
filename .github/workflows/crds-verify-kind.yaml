@@ -49,7 +49,7 @@ jobs:
         run: |
           make local
 
-  # Check the common CLI against all kubernetes versions
+  # Check the common CLI against all Kubernetes versions
   crd-check:
     needs: build-cli
     runs-on: ubuntu-latest

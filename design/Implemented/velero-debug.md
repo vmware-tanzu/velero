@@ -102,7 +102,7 @@ The code will consolidate the input parameters and execution context of the `vel
 https://github.com/vmware-tanzu/crash-diagnostics/blob/v0.3.4/exec/executor.go#L17
 
 ## Alternatives Considered
-The collection could be done via the kubernetes client-go API, but such integration is not necessarily trivial to implement, therefore, `crashd` is preferred approach
+The collection could be done via the Kubernetes client-go API, but such integration is not necessarily trivial to implement, therefore, `crashd` is preferred approach
 
 ## Security Considerations
 - The starlark script will be embedded into the velero binary, and the byte slice will be passed to the `exec.Execute` func directly, so there’s little risk that the script will be modified before being executed.

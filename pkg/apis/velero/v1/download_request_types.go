@@ -49,7 +49,7 @@ type DownloadTarget struct {
 	// Kind is the type of file to download.
 	Kind DownloadTargetKind `json:"kind"`
 
-	// Name is the name of the kubernetes resource with which the file is associated.
+	// Name is the name of the Kubernetes resource with which the file is associated.
 	Name string `json:"name"`
 }
 

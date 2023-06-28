@@ -47,7 +47,7 @@ type BackupItemAction interface {
 	// initiate (asynchronous) operations, and a second slice of ResourceIdentifiers specifying related items
 	// which should be backed up after all operations have completed. This last field will be
 	// ignored if operationID is empty, and should not be filled in unless the resource must be updated in the
-	// backup after operations complete (i.e. some of the item's kubernetes metadata will be updated
+	// backup after operations complete (i.e. some of the item's Kubernetes metadata will be updated
 	// during the operation which will be required during restore)
 	// Note that (async) operations are not supported for items being backed up during Finalize phases,
 	// so a plugin should not return an OperationID if the backup phase is "Finalizing"
