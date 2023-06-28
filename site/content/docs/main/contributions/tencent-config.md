@@ -52,9 +52,9 @@ region=ap-guangzhou,s3ForcePathStyle="true",s3Url=https://cos.ap-guangzhou.myqcl
 
 Description of the parameters:
 
-- `--provider`: Declares the type of plug-in provided by "aws".
+- `--provider`: Declares the type of plugin provided by "aws".
 
-- `--plugins`: Use the AWS S3 compatible API plug-in "velero-plugin-for-aws".
+- `--plugins`: Use the AWS S3 compatible API plugin "velero-plugin-for-aws".
 
 - `--bucket`: The bucket name created at Tencent Cloud COS.
 

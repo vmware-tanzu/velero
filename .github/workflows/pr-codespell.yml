@@ -26,6 +26,7 @@ jobs:
         FILES_TO_CHECK=$(find . -type f \
           ! -path "./.git/*" \
           ! -path "./site/content/docs/v*" \
+          ! -path "./changelogs/CHANGELOG-*" \
           ! -path "./.github/workflows/pr-codespell.yml" \
           ! -path "./site/static/fonts/Metropolis/Open Font License.md" \
           ! -regex '.*\.\(png\|jpg\|woff\|ttf\|gif\|ico\|svg\)'

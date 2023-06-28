@@ -28,7 +28,7 @@ A big focus of our work this cycle was continuing to improve support for restic.
 
 Along with our bug fixes, we’ve provided an easier way to move restic backups between storage providers. Different providers often have different StorageClasses, requiring user intervention to make restores successfully complete.
 
-To make cross-provider moves simpler, we’ve introduced a StorageClass remapping plug-in. It allows you to automatically translate one StorageClass on PersistentVolumeClaims and PersistentVolumes to another. You can read more about it in our [documentation](https://velero.io/docs/v1.1.0/restore-reference/#changing-pv-pvc-storage-classes).
+To make cross-provider moves simpler, we’ve introduced a StorageClass remapping plugin. It allows you to automatically translate one StorageClass on PersistentVolumeClaims and PersistentVolumes to another. You can read more about it in our [documentation](https://velero.io/docs/v1.1.0/restore-reference/#changing-pv-pvc-storage-classes).
 
 ## Quality-of-Life Improvements
 
@@ -42,7 +42,7 @@ In order to help you better understand what resources have been backed up, we’
 
 In the same vein, we’ve added the ability to put custom tags on cloud-provider snapshots. This approach should provide a better way to keep track of the resources being created in your cloud account. To add a label to a snapshot at backup time, use the `--labels` argument in the `velero backup create` command.
 
-Our final change for increasing visibility into your Velero installation is the `velero plugin get` command. This command will report all the plug-ins within the Velero deployment..
+Our final change for increasing visibility into your Velero installation is the `velero plugin get` command. This command will report all the plugins within the Velero deployment..
 
 Velero has previously used a restore-only flag on the server to control whether a cluster could write backups to object storage. With Velero 1.1, we’ve now moved the restore-only behavior into read-only BackupStorageLocations. This move means that the Velero server can use a BackupStorageLocation as a source to restore from, but not for backups, while still retaining the ability to back up to other configured locations. In the future, the `--restore-only` flag will be removed in favor of configuring read-only BackupStorageLocations.
 

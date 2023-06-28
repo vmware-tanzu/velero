@@ -105,7 +105,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 	fmt.Printf("VeleroBackupNamespace done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if useVolumeSnapshots {
 		if providerName == "vsphere" {
-			// Wait for uploads started by the Velero Plug-in for vSphere to complete
+			// Wait for uploads started by the Velero Plugin for vSphere to complete
 			// TODO - remove after upload progress monitoring is implemented
 			fmt.Println("Waiting for vSphere uploads to complete")
 			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace, 2); err != nil {
@@ -131,7 +131,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", len(pvbs), pvCount, kibishiiNamespace))
 		}
 		if providerName == "vsphere" {
-			// Wait for uploads started by the Velero Plug-in for vSphere to complete
+			// Wait for uploads started by the Velero Plugin for vSphere to complete
 			// TODO - remove after upload progress monitoring is implemented
 
 			// TODO[High] - uncomment code block below when vSphere plugin PR #500 is included in release version.

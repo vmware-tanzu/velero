@@ -160,10 +160,10 @@ while the cloud credential will always be used for the VolumeSnapshotter.
 
 ## Velero Plugin for vSphere compatibility
 
-The vSphere plugin is implemented as a BackupItemAction and shares the credentials of the AWS plug-in for S3 access.
+The vSphere plugin is implemented as a BackupItemAction and shares the credentials of the AWS plugin for S3 access.
 The backup storage location is passed in _Backup.Spec.StorageLocation_.  Currently the plugin retrieves the S3 bucket and
 server from the BSL and creates a BackupRespositoryClaim with that and the credentials retrieved from the cloud credential.
-The plug-in will need to be modified to retrieve the credentials field from the BSL and use that credential in the
+The plugin will need to be modified to retrieve the credentials field from the BSL and use that credential in the
 BackupRepositoryClaim.
 
 ## Backwards compatibility
@@ -185,7 +185,7 @@ In order to support parallelism, Velero will need to be able to use multiple cre
 ObjectStore.  Currently backups are single threaded and a single BSL will be used throughout the entire backup.  The only
 existing points of parallelism are when a user downloads logs for a backup or the BackupStorageLocationReconciler 
 reconciles while a backup or restore is running.  In the current code, `download_request_controller.go` and 
-`backup_storage_location_controller.go` create a new plug-in manager and hence another ObjectStore plugin in 
+`backup_storage_location_controller.go` create a new plugin manager and hence another ObjectStore plugin in 
 parallel with the ObjectStore plugin servicing a backup or restore (if one is running).
 
 ## Alternatives Considered
