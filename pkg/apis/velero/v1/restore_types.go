@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -117,6 +118,10 @@ type RestoreSpec struct {
 	// The default value is 1 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
+
+	// ResourceModifier specifies the reference to JSON resource patches that should be applied to resources before restoration.
+	// +optional
+	ResourceModifier *v1.TypedLocalObjectReference `json:"resourceModifier,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.

@@ -359,6 +359,27 @@ spec:
                   from backup.
                 nullable: true
                 type: boolean
+              resourceModifier:
+                description: ResourceModifier specifies the reference to JSON resource
+                  patches that should be applied to resources before restoration.
+                properties:
+                  apiGroup:
+                    description: APIGroup is the group for the resource being referenced.
+                      If APIGroup is not specified, the specified Kind must be in
+                      the core API group. For any other third-party types, APIGroup
+                      is required.
+                    type: string
+                  kind:
+                    description: Kind is the type of resource being referenced
+                    type: string
+                  name:
+                    description: Name is the name of resource being referenced
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+                x-kubernetes-map-type: atomic
               restorePVs:
                 description: RestorePVs specifies whether to restore all included
                   PVs from snapshot
