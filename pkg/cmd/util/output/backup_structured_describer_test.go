@@ -56,6 +56,10 @@ func TestDescribeBackupInSF(t *testing.T) {
 							},
 						},
 					},
+					IncludedNamespaces: []string{"hook-inc-ns-1", "hook-inc-ns-2"},
+					ExcludedNamespaces: []string{"hook-exc-ns-1", "hook-exc-ns-2"},
+					IncludedResources:  []string{"hook-inc-res-1", "hook-inc-res-2"},
+					ExcludedResources:  []string{"hook-exc-res-1", "hook-exc-res-2"},
 				},
 			},
 		})
@@ -83,8 +87,8 @@ func TestDescribeBackupInSF(t *testing.T) {
 					"hook-1": map[string]interface{}{
 						"labelSelector": emptyDisplay,
 						"namespaces": map[string]string{
-							"included": "inc-ns-1, inc-ns-2",
-							"excluded": "exc-ns-1, exc-ns-2",
+							"included": "hook-inc-ns-1, hook-inc-ns-2",
+							"excluded": "hook-exc-ns-1, hook-exc-ns-2",
 						},
 						"preExecHook": []map[string]interface{}{
 							{
@@ -103,8 +107,8 @@ func TestDescribeBackupInSF(t *testing.T) {
 							},
 						},
 						"resources": map[string]string{
-							"included": "inc-res-1, inc-res-2",
-							"excluded": "exc-res-1, exc-res-2",
+							"included": "hook-inc-res-1, hook-inc-res-2",
+							"excluded": "hook-exc-res-1, hook-exc-res-2",
 						},
 					},
 				},
