@@ -1397,6 +1397,18 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
 			},
 		},
+		{
+			name:    "actions run for datauploads resource",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("datauploads.velero.io", builder.ForDataUpload("velero", "du").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.DataUploads()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("velero").ForResource("datauploads.velero.io"): {"velero/du"},
+			},
+		},
 	}
 
 	for _, tc := range tests {

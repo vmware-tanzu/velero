@@ -183,3 +183,13 @@ func Services(items ...metav1.Object) *APIResource {
 		Items:      items,
 	}
 }
+
+func DataUploads(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "velero.io",
+		Version:    "v2alpha1",
+		Name:       "datauploads",
+		Namespaced: true,
+		Items:      items,
+	}
+}

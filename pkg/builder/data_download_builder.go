@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,22 +22,22 @@ import (
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 )
 
-// DataDownloadBuilder builds DataDownload objects
+// DataDownloadBuilder builds DataDownload objects.
 type DataDownloadBuilder struct {
 	object *velerov2alpha1api.DataDownload
 }
 
-// ForDataDownload is the constructor for a DataDownloadBuilder.
-func ForDataDownload(ns, name string) *DataDownloadBuilder {
+// ForDataDownload is the constructor of DataDownloadBuilder
+func ForDataDownload(namespace, name string) *DataDownloadBuilder {
 	return &DataDownloadBuilder{
 		object: &velerov2alpha1api.DataDownload{
 			TypeMeta: metav1.TypeMeta{
+				Kind:       "DataDownload",
 				APIVersion: velerov2alpha1api.SchemeGroupVersion.String(),
-				Kind:       "DataDownloadload",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
 				Name:      name,
+				Namespace: namespace,
 			},
 		},
 	}
@@ -99,5 +99,14 @@ func (d *DataDownloadBuilder) OperationTimeout(timeout metav1.Duration) *DataDow
 // DataMoverConfig sets the DataDownload's DataMoverConfig.
 func (d *DataDownloadBuilder) DataMoverConfig(config *map[string]string) *DataDownloadBuilder {
 	d.object.Spec.DataMoverConfig = *config
+	return d
+}
+
+// ObjectMeta applies functional options to the DataDownload's ObjectMeta.
+func (d *DataDownloadBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DataDownloadBuilder {
+	for _, opt := range opts {
+		opt(d.object)
+	}
+
 	return d
 }

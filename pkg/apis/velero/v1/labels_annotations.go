@@ -78,4 +78,27 @@ const (
 
 	// AsyncOperationIDLabel is the label key used to identify the async operation ID
 	AsyncOperationIDLabel = "velero.io/async-operation-id"
+
+	// PVCNameLabel is the label key used to identify the the PVC's namespace and name.
+	// The format is <namespace>/<name>.
+	PVCNamespaceNameLabel = "velero.io/pvc-namespace-name"
+
+	// DynamicPVRestoreLabel is the label key for dynamic PV restore
+	DynamicPVRestoreLabel = "velero.io/dynamic-pv-restore"
+
+	// ResourceUsageLabel is the label key to explain the Velero resource usage.
+	ResourceUsageLabel = "velero.io/resource-usage"
+)
+
+type AsyncOperationIDPrefix string
+
+const (
+	AsyncOperationIDPrefixDataDownload AsyncOperationIDPrefix = "dd-"
+	AsyncOperationIDPrefixDataUpload   AsyncOperationIDPrefix = "du-"
+)
+
+type VeleroResourceUsage string
+
+const (
+	VeleroResourceUsageDataUploadResult VeleroResourceUsage = "DataUpload"
 )
