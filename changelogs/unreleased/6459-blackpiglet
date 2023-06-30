@@ -1,0 +1,1 @@
+Add exit code log and possible memory shortage warning log for Restic command failure.
