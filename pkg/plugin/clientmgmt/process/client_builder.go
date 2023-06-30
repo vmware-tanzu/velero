@@ -78,6 +78,10 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(common.PluginKindRestoreItemAction):   framework.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
 			string(common.PluginKindRestoreItemActionV2): riav2.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
 			string(common.PluginKindDeleteItemAction):    framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindPreBackupAction):     framework.NewPreBackupActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindPostBackupAction):    framework.NewPostBackupActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindPreRestoreAction):    framework.NewPreRestoreActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindPostRestoreAction):   framework.NewPostRestoreActionPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint

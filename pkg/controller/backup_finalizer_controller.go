@@ -175,9 +175,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	backupScheduleName := backupRequest.GetLabels()[velerov1api.ScheduleNameLabel]
 	switch backup.Status.Phase {
 	case velerov1api.BackupPhaseFinalizing:
-		backup.Status.Phase = velerov1api.BackupPhaseCompleted
-		r.metrics.RegisterBackupSuccess(backupScheduleName)
-		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusSucc)
+		backup.Status.Phase = velerov1api.BackupPhaseWaitingForPostBackupActions
 	case velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
 		r.metrics.RegisterBackupPartialFailure(backupScheduleName)

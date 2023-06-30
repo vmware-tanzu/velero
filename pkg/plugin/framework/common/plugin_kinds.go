@@ -38,11 +38,23 @@ const (
 	// PluginKindBackupItemActionV2 represents a v2 backup item action plugin.
 	PluginKindBackupItemActionV2 PluginKind = "BackupItemActionV2"
 
+	// PluginKindPreBackupAction represents a pre backup action plugin
+	PluginKindPreBackupAction PluginKind = "PreBackupAction"
+
+	// PluginKindPostBackupAction represents a post backup action plugin
+	PluginKindPostBackupAction PluginKind = "PostBackupAction"
+
 	// PluginKindRestoreItemAction represents a restore item action plugin.
 	PluginKindRestoreItemAction PluginKind = "RestoreItemAction"
 
 	// PluginKindRestoreItemAction represents a v2 restore item action plugin.
 	PluginKindRestoreItemActionV2 PluginKind = "RestoreItemActionV2"
+
+	// PluginKindPreRestoreAction represents a pre restore action plugin
+	PluginKindPreRestoreAction PluginKind = "PreRestoreAction"
+
+	// PluginKindPostRestoreAction represents a post restore action plugin
+	PluginKindPostRestoreAction PluginKind = "PostRestoreAction"
 
 	// PluginKindDeleteItemAction represents a delete item action plugin.
 	PluginKindDeleteItemAction PluginKind = "DeleteItemAction"
@@ -70,5 +82,9 @@ func AllPluginKinds() map[string]PluginKind {
 	allPluginKinds[PluginKindRestoreItemAction.String()] = PluginKindRestoreItemAction
 	allPluginKinds[PluginKindRestoreItemActionV2.String()] = PluginKindRestoreItemActionV2
 	allPluginKinds[PluginKindDeleteItemAction.String()] = PluginKindDeleteItemAction
+	allPluginKinds[PluginKindPreBackupAction.String()] = PluginKindPreBackupAction
+	allPluginKinds[PluginKindPostBackupAction.String()] = PluginKindPostBackupAction
+	allPluginKinds[PluginKindPreRestoreAction.String()] = PluginKindPreRestoreAction
+	allPluginKinds[PluginKindPostRestoreAction.String()] = PluginKindPostRestoreAction
 	return allPluginKinds
 }

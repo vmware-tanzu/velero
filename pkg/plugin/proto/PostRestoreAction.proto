@@ -1,0 +1,14 @@
+syntax = "proto3";
+package generated;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated";
+
+import "Shared.proto";
+
+service PostRestoreAction {
+    rpc Execute(PostRestoreActionExecuteRequest) returns (Empty);
+}
+
+message PostRestoreActionExecuteRequest {
+    string plugin = 1;
+    bytes restore = 2;
+}

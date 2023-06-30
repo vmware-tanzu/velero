@@ -55,6 +55,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -1191,6 +1192,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
+			pluginManager.On("GetPreBackupActions").Return(nil, nil)
+			pluginManager.On("GetPostBackupActions").Return(nil, nil)
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []biav2.BackupItemAction(nil), pluginManager).Return(nil)
 			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, pluginManager).Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
@@ -1527,4 +1530,52 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 			assert.Equal(t, tc.want, getLastSuccessBySchedule(tc.backups))
 		})
 	}
+}
+
+func TestBackupFailedPreBackupActions(t *testing.T) {
+	var (
+		logger                = logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
+		pluginManager         = new(pluginmocks.Manager)
+		backupStore           = new(persistencemocks.BackupStore)
+		backupper             = new(fakeBackupper)
+		defaultBackupLocation = builder.ForBackupStorageLocation("velero", "loc-1").Default(true).Bucket("store-1").Result()
+		fakeClient            = velerotest.NewFakeControllerRuntimeClient(t, defaultBackupLocation)
+	)
+	apiServer := velerotest.NewAPIServer(t)
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+	require.NoError(t, err)
+	c := &backupReconciler{
+		logger:            logger,
+		newPluginManager:  func(fl logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+		backupStoreGetter: NewFakeSingleObjectBackupStoreGetter(backupStore),
+		backupper:         backupper,
+		kbClient:          fakeClient,
+		metrics:           metrics.NewServerMetrics(),
+		clock:             testclocks.NewFakeClock(time.Now()),
+		discoveryHelper:   discoveryHelper,
+		backupTracker:     NewBackupTracker(),
+	}
+
+	backup := defaultBackup().Result()
+
+	pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
+	pluginManager.On("CleanupClients").Return(nil)
+	pluginManager.On("GetPreBackupActions").Return([]velero.PreBackupAction{&failPreBackupAction{}}, nil)
+	backupStore.On("BackupExists", defaultBackupLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name).Return(false, nil)
+	backupStore.On("PutBackupLog", mock.Anything, mock.Anything).Return()
+
+	require.NoError(t, fakeClient.Create(ctx, backup))
+	_, err = c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}})
+	require.Nil(t, err)
+
+	finalBackup := velerov1api.Backup{}
+	fakeClient.Get(ctx, types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}, &finalBackup)
+	require.Equal(t, velerov1api.BackupPhaseFailedPreBackupActions, finalBackup.Status.Phase)
+}
+
+type failPreBackupAction struct {
+}
+
+func (a *failPreBackupAction) Execute(backup *velerov1api.Backup) error {
+	return errors.New("error")
 }

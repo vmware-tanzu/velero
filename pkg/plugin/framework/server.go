@@ -90,6 +90,34 @@ type Server interface {
 	// RegisterDeleteItemActions registers multiple Delete item actions.
 	RegisterDeleteItemActions(map[string]common.HandlerInitializer) Server
 
+	// RegisterPreBackupAction registers a pre backup action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterPreBackupAction(pluginName string, initializer common.HandlerInitializer) Server
+
+	// RegisterPreBackupActions registers multiple pre backup actions.
+	RegisterPreBackupActions(map[string]common.HandlerInitializer) Server
+
+	// RegisterPostBackupAction registers a post backup action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterPostBackupAction(pluginName string, initializer common.HandlerInitializer) Server
+
+	// RegisterPostBackupActions registers multiple post backup actions.
+	RegisterPostBackupActions(map[string]common.HandlerInitializer) Server
+
+	// RegisterPreRestoreAction registers a pre restore action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterPreRestoreAction(pluginName string, initializer common.HandlerInitializer) Server
+
+	// RegisterPreRestoreActions registers multiple pre restore actions.
+	RegisterPreRestoreActions(map[string]common.HandlerInitializer) Server
+
+	// RegisterPostRestoreAction registers a post restore action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterPostRestoreAction(pluginName string, initializer common.HandlerInitializer) Server
+
+	// RegisterPostRestoreActions registers multiple post restore actions.
+	RegisterPostRestoreActions(map[string]common.HandlerInitializer) Server
+
 	// Server runs the plugin server.
 	Serve()
 }
@@ -106,6 +134,10 @@ type server struct {
 	restoreItemAction   *RestoreItemActionPlugin
 	restoreItemActionV2 *riav2.RestoreItemActionPlugin
 	deleteItemAction    *DeleteItemActionPlugin
+	preBackupAction     *PreBackupActionPlugin
+	postBackupAction    *PostBackupActionPlugin
+	preRestoreAction    *PreRestoreActionPlugin
+	postRestoreAction   *PostRestoreActionPlugin
 }
 
 // NewServer returns a new Server
@@ -122,6 +154,10 @@ func NewServer() Server {
 		restoreItemAction:   NewRestoreItemActionPlugin(common.ServerLogger(log)),
 		restoreItemActionV2: riav2.NewRestoreItemActionPlugin(common.ServerLogger(log)),
 		deleteItemAction:    NewDeleteItemActionPlugin(common.ServerLogger(log)),
+		preBackupAction:     NewPreBackupActionPlugin(common.ServerLogger(log)),
+		postBackupAction:    NewPostBackupActionPlugin(common.ServerLogger(log)),
+		preRestoreAction:    NewPreRestoreActionPlugin(common.ServerLogger(log)),
+		postRestoreAction:   NewPostRestoreActionPlugin(common.ServerLogger(log)),
 	}
 }
 
@@ -217,6 +253,54 @@ func (s *server) RegisterDeleteItemActions(m map[string]common.HandlerInitialize
 	return s
 }
 
+func (s *server) RegisterPreBackupAction(name string, initializer common.HandlerInitializer) Server {
+	s.preBackupAction.Register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterPreBackupActions(m map[string]common.HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterPreBackupAction(name, m[name])
+	}
+	return s
+}
+
+func (s *server) RegisterPostBackupAction(name string, initializer common.HandlerInitializer) Server {
+	s.postBackupAction.Register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterPostBackupActions(m map[string]common.HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterPostBackupAction(name, m[name])
+	}
+	return s
+}
+
+func (s *server) RegisterPreRestoreAction(name string, initializer common.HandlerInitializer) Server {
+	s.preRestoreAction.Register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterPreRestoreActions(m map[string]common.HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterPreRestoreAction(name, m[name])
+	}
+	return s
+}
+
+func (s *server) RegisterPostRestoreAction(name string, initializer common.HandlerInitializer) Server {
+	s.postRestoreAction.Register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterPostRestoreActions(m map[string]common.HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterPostRestoreAction(name, m[name])
+	}
+	return s
+}
+
 // getNames returns a list of PluginIdentifiers registered with plugin.
 func getNames(command string, kind common.PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
@@ -251,6 +335,10 @@ func (s *server) Serve() {
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindRestoreItemAction, s.restoreItemAction)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindRestoreItemActionV2, s.restoreItemActionV2)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindDeleteItemAction, s.deleteItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindPreBackupAction, s.preBackupAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindPostBackupAction, s.postBackupAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindPreRestoreAction, s.preRestoreAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindPostRestoreAction, s.postRestoreAction)...)
 
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
@@ -265,6 +353,10 @@ func (s *server) Serve() {
 			string(common.PluginKindRestoreItemAction):   s.restoreItemAction,
 			string(common.PluginKindRestoreItemActionV2): s.restoreItemActionV2,
 			string(common.PluginKindDeleteItemAction):    s.deleteItemAction,
+			string(common.PluginKindPreBackupAction):     s.preBackupAction,
+			string(common.PluginKindPostBackupAction):    s.postBackupAction,
+			string(common.PluginKindPreRestoreAction):    s.preRestoreAction,
+			string(common.PluginKindPostRestoreAction):   s.postRestoreAction,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})

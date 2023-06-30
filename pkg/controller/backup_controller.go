@@ -243,6 +243,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.Debug("Preparing backup request")
 	request := b.prepareBackupRequest(original, log)
 	if len(request.Status.ValidationErrors) > 0 {
+		fmt.Print(request.Status.ValidationErrors)
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
@@ -287,7 +288,9 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// while uploading artifacts to object storage, which would
 		// result in the backup being Failed.
 		log.WithError(err).Error("backup failed")
-		request.Status.Phase = velerov1api.BackupPhaseFailed
+		if request.Status.Phase != velerov1api.BackupPhaseFailedPreBackupActions {
+			request.Status.Phase = velerov1api.BackupPhaseFailed
+		}
 		request.Status.FailureReason = err.Error()
 	}
 
@@ -303,6 +306,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	case velerov1api.BackupPhaseFailedValidation:
 		b.metrics.RegisterBackupValidationFailure(backupScheduleName)
+		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
+	case velerov1api.BackupPhaseFailedPreBackupActions:
 		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
 	log.Info("Updating backup's final status")
@@ -638,6 +643,29 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 			return errors.Wrapf(err, "error checking if backup already exists in object storage")
 		}
 		return errors.Errorf("backup already exists in object storage")
+	}
+
+	backupLog.Info("Getting pre backup actions")
+	preBackupActions, err := pluginManager.GetPreBackupActions()
+	if err != nil {
+		return err
+	}
+	if len(preBackupActions) > 0 {
+		backupLog.Infof("Pre backup actions are present, running them")
+	}
+	for _, preBackupAction := range preBackupActions {
+		err = preBackupAction.Execute(backup.Backup)
+		if err != nil {
+			backupLog.Errorf("Error executing custom action: %s", err)
+			backupLog.DoneForPersist(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
+			logFile, ok := backupLog.GetPersistFile()
+			if ok != nil {
+				return errors.Wrap(err, "error getting log file")
+			}
+			backupStore.PutBackupLog(backup.Name, logFile)
+			backup.Status.Phase = velerov1api.BackupPhaseFailedPreBackupActions
+			return errors.Wrap(err, "error executing custom action")
+		}
 	}
 
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)

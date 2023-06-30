@@ -784,6 +784,442 @@ func TestGetDeleteItemActions(t *testing.T) {
 	}
 }
 
+func TestGetPreBackupAction(t *testing.T) {
+	getPluginTest(t,
+		common.PluginKindPreBackupAction,
+		"velero.io/pre-backup",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetPreBackupAction(name)
+		},
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &restartablePreBackupAction{
+				key:                 process.KindAndName{Kind: common.PluginKindPreBackupAction, Name: name},
+				sharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
+func TestGetPreBackupActions(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+		{
+			name:                       "Error getting restartable process",
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
+		},
+		{
+			name:  "Happy path",
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := common.PluginKindPreBackupAction
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &restartabletest.MockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &restartablePreBackupAction{
+					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					sharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			preBackupActions, err := m.GetPreBackupActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, preBackupActions)
+				assert.EqualError(t, err, "NewRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range preBackupActions {
+					actual = append(actual, preBackupActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
+func TestGetPostBackupAction(t *testing.T) {
+	getPluginTest(t,
+		common.PluginKindPostBackupAction,
+		"velero.io/post-backup",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetPostBackupAction(name)
+		},
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &restartablePostBackupAction{
+				key:                 process.KindAndName{Kind: common.PluginKindPostBackupAction, Name: name},
+				sharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
+func TestGetPostBackupActions(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+		{
+			name:                       "Error getting restartable process",
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
+		},
+		{
+			name:  "Happy path",
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := common.PluginKindPostBackupAction
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &restartabletest.MockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &restartablePostBackupAction{
+					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					sharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			PostBackupActions, err := m.GetPostBackupActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, PostBackupActions)
+				assert.EqualError(t, err, "NewRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range PostBackupActions {
+					actual = append(actual, PostBackupActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
+func TestGetPreRestoreAction(t *testing.T) {
+	getPluginTest(t,
+		common.PluginKindPreRestoreAction,
+		"velero.io/pre-restore",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetPreRestoreAction(name)
+		},
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &restartablePreRestoreAction{
+				key:                 process.KindAndName{Kind: common.PluginKindPreRestoreAction, Name: name},
+				sharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
+func TestGetPreRestoreActions(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+		{
+			name:                       "Error getting restartable process",
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
+		},
+		{
+			name:  "Happy path",
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := common.PluginKindPreRestoreAction
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &restartabletest.MockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &restartablePreRestoreAction{
+					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					sharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			PreRestoreActions, err := m.GetPreRestoreActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, PreRestoreActions)
+				assert.EqualError(t, err, "NewRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range PreRestoreActions {
+					actual = append(actual, PreRestoreActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
+func TestGetPostRestoreAction(t *testing.T) {
+	getPluginTest(t,
+		common.PluginKindPostRestoreAction,
+		"velero.io/post-restore",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetPostRestoreAction(name)
+		},
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &restartablePostRestoreAction{
+				key:                 process.KindAndName{Kind: common.PluginKindPostRestoreAction, Name: name},
+				sharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
+func TestGetPostRestoreActions(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+		{
+			name:                       "Error getting restartable process",
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
+		},
+		{
+			name:  "Happy path",
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := common.PluginKindPostRestoreAction
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &restartabletest.MockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &restartablePostRestoreAction{
+					key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					sharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			PostRestoreActions, err := m.GetPostRestoreActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, PostRestoreActions)
+				assert.EqualError(t, err, "NewRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range PostRestoreActions {
+					actual = append(actual, PostRestoreActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
 func TestSanitizeName(t *testing.T) {
 	tests := []struct {
 		name, pluginName, expectedName string

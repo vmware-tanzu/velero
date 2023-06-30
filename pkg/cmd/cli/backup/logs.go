@@ -63,7 +63,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			}
 
 			switch backup.Status.Phase {
-			case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
+			case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed, velerov1api.BackupPhaseFailedPreBackupActions, velerov1api.BackupPhaseFailedPostBackupActions:
 				// terminal and waiting for plugin operations phases, do nothing.
 			default:
 				cmd.Exit("Logs for backup %q are not available until it's finished processing. Please wait "+

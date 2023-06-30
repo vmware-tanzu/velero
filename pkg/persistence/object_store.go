@@ -20,6 +20,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -63,6 +64,8 @@ type BackupStore interface {
 	PutBackupMetadata(backup string, backupMetadata io.Reader) error
 	PutBackupItemOperations(backup string, backupItemOperations io.Reader) error
 	PutBackupContents(backup string, backupContents io.Reader) error
+	PutBackupLog(backup string, log io.Reader)
+	PutPostBackupLog(backup string, log io.Reader)
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupItemOperations(name string) ([]*itemoperation.BackupOperation, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
@@ -81,6 +84,7 @@ type BackupStore interface {
 	PutRestoreResults(backup, restore string, results io.Reader) error
 	PutRestoredResourceList(restore string, results io.Reader) error
 	PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error
+	PutPostRestoreLog(backup, restore string, log io.Reader)
 	GetRestoreItemOperations(name string) ([]*itemoperation.RestoreOperation, error)
 	DeleteRestore(name string) error
 
@@ -242,11 +246,7 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 }
 
 func (s *objectBackupStore) PutBackup(info BackupInfo) error {
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(info.Name), info.Log); err != nil {
-		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
-		// backup's status.
-		s.logger.WithError(err).WithField("backup", info.Name).Error("Error uploading log file")
-	}
+	s.PutBackupLog(info.Name, info.Log)
 
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(info.Name), info.Metadata); err != nil {
 		// failure to upload metadata file is a hard-stop
@@ -558,6 +558,64 @@ func (s *objectBackupStore) PutBackupContents(backup string, backupContents io.R
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(backup), backupContents)
 }
 
+func (s *objectBackupStore) PutBackupLog(backup string, log io.Reader) {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(backup), log); err != nil {
+		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
+		// backup's status.
+		s.logger.WithError(err).WithField("backup", backup).Error("Error uploading log file")
+	}
+}
+
+func (s *objectBackupStore) PutPostBackupLog(backup string, log io.Reader) {
+	s.logger.Info("Saving post backup log")
+	currentLog, err := s.objectStore.GetObject(s.bucket, s.layout.getBackupLogKey(backup))
+	if err != nil {
+		s.logger.WithError(err).WithField("backup", backup).Error("Error loading backup log file, not loading post backup log")
+		return
+	}
+	currentLogReader, err := seekAndCreateGzipReader(s.logger.WithField("backup", backup), currentLog)
+	if err != nil {
+		return
+	}
+	newLogReader, err := seekAndCreateGzipReader(s.logger.WithField("backup", backup), log)
+	if err != nil {
+		return
+	}
+	commonLogReader, err := combineTwoGzip(s.logger.WithField("backup", backup), currentLogReader, newLogReader)
+	if err != nil {
+		return
+	}
+	err = s.objectStore.PutObject(s.bucket, s.layout.getBackupLogKey(backup), commonLogReader)
+	if err != nil {
+		s.logger.WithError(err).WithField("backup", backup).Error("Error putting post backup log file")
+	}
+}
+
+func (s *objectBackupStore) PutPostRestoreLog(backup, restore string, log io.Reader) {
+	s.logger.Info("Saving post restore log")
+	currentLog, err := s.objectStore.GetObject(s.bucket, s.layout.getRestoreLogKey(restore))
+	if err != nil {
+		s.logger.WithError(err).WithField("restore", restore).Error("Error loading restore log file, not loading post restore log")
+		return
+	}
+	currentLogReader, err := seekAndCreateGzipReader(s.logger.WithField("restore", restore), currentLog)
+	if err != nil {
+		return
+	}
+	newLogReader, err := seekAndCreateGzipReader(s.logger.WithField("restore", restore), log)
+	if err != nil {
+		return
+	}
+	commonLogReader, err := combineTwoGzip(s.logger.WithField("restore", restore), currentLogReader, newLogReader)
+	if err != nil {
+		return
+	}
+	err = s.objectStore.PutObject(s.bucket, s.layout.getRestoreLogKey(restore), commonLogReader)
+	if err != nil {
+		s.logger.WithError(err).WithField("restore", restore).Error("Error putting post restore log file")
+	}
+}
+
 func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (string, error) {
 	switch target.Kind {
 	case velerov1api.DownloadTargetKindBackupContents:
@@ -609,4 +667,42 @@ func seekAndPutObject(objectStore velero.ObjectStore, bucket, key string, file i
 	}
 
 	return objectStore.PutObject(bucket, key, file)
+}
+
+func seekAndCreateGzipReader(log logrus.FieldLogger, reader io.Reader) (io.Reader, error) {
+	err := seekToBeginning(reader)
+	if err != nil {
+		log.WithError(err).Error("Error seeking reader")
+		return nil, err
+	}
+	gzipReader, err := gzip.NewReader(reader)
+	if err != nil {
+		log.WithError(err).Error("Error creating reader")
+		return nil, err
+	}
+	return gzipReader, nil
+}
+
+func combineTwoGzip(log logrus.FieldLogger, gzip1 io.Reader, gzip2 io.Reader) (io.Reader, error) {
+	newGzip, err := os.CreateTemp("", "")
+	if err != nil {
+		log.WithError(err).Error("Error creating temp file")
+	}
+	multiReader := io.MultiReader(gzip1, gzip2)
+	gzipWriter := gzip.NewWriter(newGzip)
+	_, err = io.Copy(gzipWriter, multiReader)
+	if err != nil {
+		log.WithError(err).Error("Error writing gzip file")
+		return nil, err
+	}
+	err = gzipWriter.Close()
+	if err != nil {
+		return nil, err
+	}
+	_, err = newGzip.Seek(0, 0)
+	if err != nil {
+		log.WithError(err).Error("Error seeking file")
+		return nil, err
+	}
+	return newGzip, nil
 }

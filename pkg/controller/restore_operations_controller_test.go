@@ -85,7 +85,7 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 		expectPhase       velerov1api.RestorePhase
 	}{
 		{
-			name: "WaitingForPluginOperations restore with completed operations is Completed",
+			name: "WaitingForPluginOperations restore with completed operations is WaitPostRestoreActions",
 			restore: builder.ForRestore(velerov1api.DefaultNamespace, "restore-11").
 				Backup("backup-1").
 				ItemOperationTimeout(60 * time.Minute).
@@ -94,7 +94,7 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 			backup:            defaultBackup().StorageLocation("default").Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
-			expectPhase:       velerov1api.RestorePhaseCompleted,
+			expectPhase:       velerov1api.RestorePhaseWaitingForPostRestoreActions,
 			restoreOperations: []*itemoperation.RestoreOperation{
 				{
 					Spec: itemoperation.RestoreOperationSpec{

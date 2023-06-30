@@ -423,6 +423,9 @@ spec:
                 - Completed
                 - PartiallyFailed
                 - Failed
+                - FailedPreRestoreActions
+                - FailedPostRestoreActions
+                - WaitingForPostRestoreActions
                 type: string
               progress:
                 description: Progress contains information about the restore's execution

@@ -549,6 +549,9 @@ spec:
                 - PartiallyFailed
                 - Failed
                 - Deleting
+                - FailedPreBackupActions
+                - FailedPostBackupActions
+                - WaitingForPostBackupActions
                 type: string
               progress:
                 description: Progress contains information about the backup's execution
