@@ -123,7 +123,7 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 	}, pod)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			curLog.WithField("backup pod", restorePodName).Error("Backup pod is not running in the current node")
+			curLog.WithField("backup pod", restorePodName).Debug("Backup pod is not running in the current node")
 			return nil, nil
 		} else {
 			return nil, errors.Wrapf(err, "error to get backup pod %s", restorePodName)

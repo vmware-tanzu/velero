@@ -30,13 +30,19 @@ import (
 )
 
 func TestEnsureRepo(t *testing.T) {
-	bkRepoObj := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
+	bkRepoObjReady := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
 		VolumeNamespace: "fake-ns",
 		BackupLocation:  "fake-bsl",
 		RepositoryType:  "fake-repo-type",
 	})
 
-	bkRepoObj.Status.Phase = velerov1.BackupRepositoryPhaseReady
+	bkRepoObjReady.Status.Phase = velerov1.BackupRepositoryPhaseReady
+
+	bkRepoObjNotReady := NewBackupRepository(velerov1.DefaultNamespace, BackupRepositoryKey{
+		VolumeNamespace: "fake-ns",
+		BackupLocation:  "fake-bsl",
+		RepositoryType:  "fake-repo-type",
+	})
 
 	scheme := runtime.NewScheme()
 	velerov1.AddToScheme(scheme)
@@ -82,10 +88,21 @@ func TestEnsureRepo(t *testing.T) {
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
 			kubeClientObj: []runtime.Object{
-				bkRepoObj,
+				bkRepoObjReady,
 			},
 			runtimeScheme: scheme,
-			expectedRepo:  bkRepoObj,
+			expectedRepo:  bkRepoObjReady,
+		},
+		{
+			name:           "wait existing repo fail",
+			namespace:      "fake-ns",
+			bsl:            "fake-bsl",
+			repositoryType: "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				bkRepoObjNotReady,
+			},
+			runtimeScheme: scheme,
+			err:           "failed to wait BackupRepository: timed out waiting for the condition",
 		},
 		{
 			name:           "create fail",
