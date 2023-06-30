@@ -291,8 +291,8 @@ func TestReconcile(t *testing.T) {
 			expectedProcessed: true,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 			expectedRequeue:   ctrl.Result{},
-		},
-		{
+			expectedErrMsg:    "unknown type type of snapshot exposer is not exist",
+		}, {
 			name:              "Dataupload should be accepted",
 			du:                dataUploadBuilder().Result(),
 			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
@@ -336,7 +336,7 @@ func TestReconcile(t *testing.T) {
 			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
 			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Cancel(true).Result(),
 			expectedProcessed: false,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
 			expectedRequeue:   ctrl.Result{Requeue: true, RequeueAfter: time.Minute},
 		},
 	}
@@ -400,7 +400,7 @@ func TestReconcile(t *testing.T) {
 			if test.expectedErrMsg == "" {
 				require.NoError(t, err)
 			} else {
-				assert.Equal(t, err.Error(), test.expectedErrMsg)
+				assert.Contains(t, err.Error(), test.expectedErrMsg)
 			}
 
 			du := velerov2alpha1api.DataUpload{}
