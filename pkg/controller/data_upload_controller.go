@@ -160,7 +160,25 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 
-		log.Info("Exposed snapshot is ready")
+		log.Info("Exposed snapshot is ready and creating data path routine")
+
+		// Need to first create file system BR and get data path instance then update data upload status
+		callbacks := datapath.Callbacks{
+			OnCompleted: r.OnDataUploadCompleted,
+			OnFailed:    r.OnDataUploadFailed,
+			OnCancelled: r.OnDataUploadCancelled,
+			OnProgress:  r.OnDataUploadProgress,
+		}
+
+		fsBackup, err = r.dataPathMgr.CreateFileSystemBR(du.Name, dataUploadDownloadRequestor, ctx, r.client, du.Namespace, callbacks, log)
+		if err != nil {
+			if err == datapath.ConcurrentLimitExceed {
+				log.Info("Data path instance is concurrent limited requeue later")
+				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute}, nil
+			} else {
+				return r.errorOut(ctx, &du, err, "error to create data path", log)
+			}
+		}
 
 		// Update status to InProgress
 		original := du.DeepCopy()
@@ -171,7 +189,12 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		log.Info("Data upload is marked as in progress")
-		return r.runCancelableDataUpload(ctx, &du, res, log)
+		result, err := r.runCancelableDataUpload(ctx, fsBackup, &du, res, log)
+		if err != nil {
+			log.Errorf("Failed to run cancelable data path for %s with err %v", du.Name, err)
+			r.closeDataPath(ctx, du.Name)
+		}
+		return result, err
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
 		log.Info("Data upload is in progress")
 		if du.Spec.Cancel {
@@ -198,25 +221,8 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 }
 
-func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) (reconcile.Result, error) {
-	log.Info("Creating data path routine")
-	callbacks := datapath.Callbacks{
-		OnCompleted: r.OnDataUploadCompleted,
-		OnFailed:    r.OnDataUploadFailed,
-		OnCancelled: r.OnDataUploadCancelled,
-		OnProgress:  r.OnDataUploadProgress,
-	}
-
-	fsBackup, err := r.dataPathMgr.CreateFileSystemBR(du.Name, dataUploadDownloadRequestor, ctx, r.client, du.Namespace, callbacks, log)
-	if err != nil {
-		if err == datapath.ConcurrentLimitExceed {
-			log.Info("runCancelableDataUpload is concurrent limited")
-			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute}, nil
-		} else {
-			return r.errorOut(ctx, du, err, "error to create data path", log)
-		}
-	}
-
+func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, fsBackup datapath.AsyncBR, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) (reconcile.Result, error) {
+	log.Info("Run cancelable dataUpload")
 	path, err := exposer.GetPodVolumeHostPath(ctx, res.ByPod.HostingPod, res.ByPod.PVC, r.client, r.fileSystem, log)
 	if err != nil {
 		return r.errorOut(ctx, du, err, "error exposing host path for pod volume", log)
@@ -460,12 +466,11 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 	}
 
 	du.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-	if err = r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
-		log.WithError(err).Error("error updating DataUpload status")
-		return err
+	if patchErr := r.client.Patch(ctx, du, client.MergeFrom(original)); patchErr != nil {
+		log.WithError(patchErr).Error("error updating DataUpload status")
 	}
 
-	return nil
+	return err
 }
 
 func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload) (bool, error) {

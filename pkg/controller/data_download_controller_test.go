@@ -192,7 +192,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 				},
 			})
 
-			require.Nil(t, err)
+			if test.isGetExposeErr {
+				assert.Contains(t, err.Error(), test.expectedStatusMsg)
+			} else {
+				require.Nil(t, err)
+			}
+
 			require.NotNil(t, actualResult)
 
 			dd := velerov2alpha1api.DataDownload{}
