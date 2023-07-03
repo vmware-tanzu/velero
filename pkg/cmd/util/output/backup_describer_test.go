@@ -72,6 +72,10 @@ func TestDescribeBackupSpec(t *testing.T) {
 							},
 						},
 					},
+					IncludedNamespaces: []string{"hook-inc-ns-1", "hook-inc-ns-2"},
+					ExcludedNamespaces: []string{"hook-exc-ns-1", "hook-exc-ns-2"},
+					IncludedResources:  []string{"hook-inc-res-1", "hook-inc-res-2"},
+					ExcludedResources:  []string{"hook-exc-res-1", "hook-exc-res-2"},
 				},
 			},
 		}).Result().Spec
@@ -102,12 +106,12 @@ Hooks:
   Resources:
     hook-1:
       Namespaces:
-        Included:  inc-ns-1, inc-ns-2
-        Excluded:  exc-ns-1, exc-ns-2
+        Included:  hook-inc-ns-1, hook-inc-ns-2
+        Excluded:  hook-exc-ns-1, hook-exc-ns-2
 
       Resources:
-        Included:  inc-res-1, inc-res-2
-        Excluded:  exc-res-1, exc-res-2
+        Included:  hook-inc-res-1, hook-inc-res-2
+        Excluded:  hook-exc-res-1, hook-exc-res-2
 
       Label selector:  <none>
 

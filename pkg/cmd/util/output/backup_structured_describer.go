@@ -160,31 +160,31 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 		ResourceDetails := make(map[string]interface{})
 		var s string
 		namespaceInfo := make(map[string]string)
-		if len(spec.IncludedNamespaces) == 0 {
+		if len(backupResourceHookSpec.IncludedNamespaces) == 0 {
 			s = "*"
 		} else {
-			s = strings.Join(spec.IncludedNamespaces, ", ")
+			s = strings.Join(backupResourceHookSpec.IncludedNamespaces, ", ")
 		}
 		namespaceInfo["included"] = s
-		if len(spec.ExcludedNamespaces) == 0 {
+		if len(backupResourceHookSpec.ExcludedNamespaces) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.ExcludedNamespaces, ", ")
+			s = strings.Join(backupResourceHookSpec.ExcludedNamespaces, ", ")
 		}
 		namespaceInfo["excluded"] = s
 		ResourceDetails["namespaces"] = namespaceInfo
 
 		resourcesInfo := make(map[string]string)
-		if len(spec.IncludedResources) == 0 {
+		if len(backupResourceHookSpec.IncludedResources) == 0 {
 			s = "*"
 		} else {
-			s = strings.Join(spec.IncludedResources, ", ")
+			s = strings.Join(backupResourceHookSpec.IncludedResources, ", ")
 		}
 		resourcesInfo["included"] = s
-		if len(spec.ExcludedResources) == 0 {
+		if len(backupResourceHookSpec.ExcludedResources) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.ExcludedResources, ", ")
+			s = strings.Join(backupResourceHookSpec.ExcludedResources, ", ")
 		}
 		resourcesInfo["excluded"] = s
 		ResourceDetails["resources"] = resourcesInfo
