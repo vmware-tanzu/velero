@@ -431,7 +431,9 @@ func prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
 }
 
 func (r *DataDownloadReconciler) errorOut(ctx context.Context, dd *velerov2alpha1api.DataDownload, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
-	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
+	if r.restoreExposer != nil {
+		r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
+	}
 	return ctrl.Result{}, r.updateStatusToFailed(ctx, dd, err, msg, log)
 }
 
