@@ -84,8 +84,8 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 			Namespace:    dataUpload.Namespace,
 			Labels: map[string]string{
 				velerov1api.RestoreUIDLabel:       label.GetValidName(string(input.Restore.UID)),
-				velerov1api.PVCNamespaceNameLabel: dataUpload.Spec.SourceNamespace + "." + dataUpload.Spec.SourcePVC,
-				velerov1api.ResourceUsageLabel:    string(velerov1api.VeleroResourceUsageDataUploadResult),
+				velerov1api.PVCNamespaceNameLabel: label.GetValidName(dataUpload.Spec.SourceNamespace + "." + dataUpload.Spec.SourcePVC),
+				velerov1api.ResourceUsageLabel:    label.GetValidName(string(velerov1api.VeleroResourceUsageDataUploadResult)),
 			},
 		},
 		Data: map[string]string{

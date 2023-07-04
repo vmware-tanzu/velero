@@ -83,9 +83,6 @@ const (
 	// The format is <namespace>/<name>.
 	PVCNamespaceNameLabel = "velero.io/pvc-namespace-name"
 
-	// DynamicPVRestoreLabel is the label key for dynamic PV restore
-	DynamicPVRestoreLabel = "velero.io/dynamic-pv-restore"
-
 	// ResourceUsageLabel is the label key to explain the Velero resource usage.
 	ResourceUsageLabel = "velero.io/resource-usage"
 )
