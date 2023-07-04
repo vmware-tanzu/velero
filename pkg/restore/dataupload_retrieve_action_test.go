@@ -31,6 +31,7 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
@@ -48,6 +49,12 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 			dataUpload:               builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").Result(),
 			restore:                  builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Result(),
 			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"","sourceNamespace":"testNamespace"}`).Result(),
+		},
+		{
+			name:                     "Long source namespace and PVC name should also work",
+			dataUpload:               builder.ForDataUpload("velero", "testDU").SourceNamespace("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1").SourcePVC("kibishii-data-kibishii-deployment-0").Result(),
+			restore:                  builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Result(),
+			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "migre209d0da-49c7-45ba-8d5a-3e59fd591ec1.kibishii-data-ki152333", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"","sourceNamespace":"migre209d0da-49c7-45ba-8d5a-3e59fd591ec1"}`).Result(),
 		},
 	}
 
@@ -76,7 +83,7 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 
 			if tc.expectedDataUploadResult != nil {
 				cmList, err := cmClient.CoreV1().ConfigMaps("velero").List(context.Background(), metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", velerov1.RestoreUIDLabel, "testingUID", velerov1.PVCNamespaceNameLabel, tc.dataUpload.Spec.SourceNamespace+"."+tc.dataUpload.Spec.SourcePVC),
+					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", velerov1.RestoreUIDLabel, "testingUID", velerov1.PVCNamespaceNameLabel, label.GetValidName(tc.dataUpload.Spec.SourceNamespace+"."+tc.dataUpload.Spec.SourcePVC)),
 				})
 				require.NoError(t, err)
 				// debug
