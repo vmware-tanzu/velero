@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -84,10 +84,11 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	veleroClient, err := f.Client()
+	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
-	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), o.Name, metav1.GetOptions{}); err != nil {
+	backup := new(velerov1api.Backup)
+	if err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup); err != nil {
 		return err
 	}
 

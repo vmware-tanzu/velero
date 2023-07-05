@@ -33,7 +33,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -47,7 +46,6 @@ func DescribeBackupInSF(
 	podVolumeBackups []velerov1api.PodVolumeBackup,
 	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
-	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
 	outputFormat string,
@@ -70,7 +68,7 @@ func DescribeBackupInSF(
 
 		DescribeBackupSpecInSF(d, backup.Spec)
 
-		DescribeBackupStatusInSF(ctx, kbClient, d, backup, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+		DescribeBackupStatusInSF(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertFile)
 
 		if len(deleteRequests) > 0 {
 			DescribeDeleteBackupRequestsInSF(d, deleteRequests)
@@ -236,7 +234,7 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 }
 
 // DescribeBackupStatusInSF describes a backup status in structured format.
-func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
+func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {
 	status := backup.Status
 	backupStatusInfo := make(map[string]interface{})
 

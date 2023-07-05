@@ -36,7 +36,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
@@ -53,7 +52,6 @@ func DescribeBackup(
 	podVolumeBackups []velerov1api.PodVolumeBackup,
 	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
-	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
 ) string {
@@ -106,7 +104,7 @@ func DescribeBackup(
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(ctx, kbClient, d, backup, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+		DescribeBackupStatus(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertFile)
 
 		if len(deleteRequests) > 0 {
 			d.Println()
@@ -300,7 +298,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
+func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {
 	status := backup.Status
 
 	// Status.Version has been deprecated, use Status.FormatVersion

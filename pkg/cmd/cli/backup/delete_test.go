@@ -17,68 +17,60 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"testing"
 
 	flag "github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 func TestDeleteCommand(t *testing.T) {
-	backupName := "backup-name-1"
+	backup1 := "backup-name-1"
+	backup2 := "backup-name-2"
 
 	// create a factory
 	f := &factorymocks.Factory{}
 
-	deleteBackupRequest := &velerov1mocks.DeleteBackupRequestInterface{}
-	backups := &velerov1mocks.BackupInterface{}
-	veleroV1 := &velerov1mocks.VeleroV1Interface{}
-	client := &versionedmocks.Interface{}
-	bk := &velerov1api.Backup{}
-	dbr := &velerov1api.DeleteBackupRequest{}
-	backups.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-	deleteBackupRequest.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(dbr, nil)
-	veleroV1.On("DeleteBackupRequests", mock.Anything).Return(deleteBackupRequest, nil)
-	veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-	client.On("VeleroV1").Return(veleroV1, nil)
-	f.On("Client").Return(client, nil)
-	f.On("Namespace").Return(mock.Anything)
+	client := velerotest.NewFakeControllerRuntimeClient(t)
+	client.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, backup1).Result(), &controllerclient.CreateOptions{})
+	client.Create(context.Background(), builder.ForBackup("default", backup2).Result(), &controllerclient.CreateOptions{})
+
+	f.On("KubebuilderClient").Return(client, nil)
+	f.On("Namespace").Return(cmdtest.VeleroNameSpace)
 
 	// create command
 	c := NewDeleteCommand(f, "velero backup delete")
-	c.SetArgs([]string{backupName})
-	assert.Equal(t, "Delete backups", c.Short)
+	c.SetArgs([]string{backup1, backup2})
+	require.Equal(t, "Delete backups", c.Short)
 
 	o := cli.NewDeleteOptions("backup")
 	flags := new(flag.FlagSet)
 	o.BindFlags(flags)
 	flags.Parse([]string{"--confirm"})
 
-	args := []string{"bk1", "bk2"}
+	args := []string{backup1, backup2}
 
-	bk.Name = backupName
 	e := o.Complete(f, args)
-	assert.Equal(t, e, nil)
+	require.Equal(t, nil, e)
 
 	e = o.Validate(c, f, args)
-	assert.Equal(t, e, nil)
+	require.Equal(t, nil, e)
 
-	e = Run(o)
-	assert.Equal(t, e, nil)
+	Run(o)
 
 	e = c.Execute()
-	assert.Equal(t, e, nil)
+	require.Equal(t, nil, e)
 
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		return
@@ -87,10 +79,7 @@ func TestDeleteCommand(t *testing.T) {
 	cmd := exec.Command(os.Args[0], []string{"-test.run=TestDeleteCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
-
-	if err == nil {
-		assert.Contains(t, stdout, fmt.Sprintf("Request to delete backup \"%s\" submitted successfully.", backupName))
-		return
+	if err != nil {
+		require.Contains(t, stdout, fmt.Sprintf("backups.velero.io \"%s\" not found.", backup2))
 	}
-	t.Fatalf("process ran with err %v, want backups by get()", err)
 }

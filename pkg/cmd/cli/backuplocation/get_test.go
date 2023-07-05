@@ -24,11 +24,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
@@ -36,7 +35,7 @@ func TestNewGetCommand(t *testing.T) {
 	bkList := []string{"b1", "b2"}
 
 	f := &factorymocks.Factory{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
 	f.On("Namespace").Return(mock.Anything)
 	f.On("KubebuilderClient").Return(kbclient, nil)
 

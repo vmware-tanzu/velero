@@ -23,24 +23,21 @@ import (
 	"testing"
 	"time"
 
+	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	flag "github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/runtime"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-
-	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestCreateOptions_BuildBackup(t *testing.T) {
@@ -77,27 +74,31 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 	o := NewCreateOptions()
 	o.FromSchedule = "test"
-	o.client = fake.NewSimpleClientset()
+
+	scheme := runtime.NewScheme()
+	err := velerov1api.AddToScheme(scheme)
+	require.NoError(t, err)
+	o.client = velerotest.NewFakeControllerRuntimeClient(t).(controllerclient.WithWatch)
 
 	t.Run("inexistent schedule", func(t *testing.T) {
 		_, err := o.BuildBackup(cmdtest.VeleroNameSpace)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	expectedBackupSpec := builder.ForBackup("test", cmdtest.VeleroNameSpace).IncludedNamespaces("test").Result().Spec
 	schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, "test").Template(expectedBackupSpec).ObjectMeta(builder.WithLabels("velero.io/test", "true"), builder.WithAnnotations("velero.io/test", "true")).Result()
-	o.client.VeleroV1().Schedules(cmdtest.VeleroNameSpace).Create(context.TODO(), schedule, metav1.CreateOptions{})
+	o.client.Create(context.TODO(), schedule, &kbclient.CreateOptions{})
 
 	t.Run("existing schedule", func(t *testing.T) {
 		backup, err := o.BuildBackup(cmdtest.VeleroNameSpace)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.Equal(t, expectedBackupSpec, backup.Spec)
-		assert.Equal(t, map[string]string{
+		require.Equal(t, expectedBackupSpec, backup.Spec)
+		require.Equal(t, map[string]string{
 			"velero.io/test":              "true",
 			velerov1api.ScheduleNameLabel: "test",
 		}, backup.GetLabels())
-		assert.Equal(t, map[string]string{
+		require.Equal(t, map[string]string{
 			"velero.io/test": "true",
 		}, backup.GetAnnotations())
 	})
@@ -145,6 +146,7 @@ func TestCreateCommand(t *testing.T) {
 	args := []string{name}
 
 	t.Run("create a backup create command with full options except fromSchedule and wait, then run by create option", func(t *testing.T) {
+
 		// create a factory
 		f := &factorymocks.Factory{}
 
@@ -203,81 +205,68 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--data-mover", dataMover})
 		//flags.Parse([]string{"--wait"})
 
-		backups := &velerov1mocks.BackupInterface{}
-		veleroV1 := &velerov1mocks.VeleroV1Interface{}
-		client := &versionedmocks.Interface{}
-		bk := &velerov1api.Backup{}
-		backups.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-		veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-		client.On("VeleroV1").Return(veleroV1, nil)
-		f.On("Client").Return(client, nil)
+		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
+
 		f.On("Namespace").Return(mock.Anything)
-		f.On("KubebuilderClient").Return(nil, nil)
+		f.On("KubebuilderWatchClient").Return(client, nil)
 
 		//Complete
 		e := o.Complete(args, f)
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		//Validate
 		e = o.Validate(cmd, args, f)
-		assert.Contains(t, e.Error(), "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
-		assert.Contains(t, e.Error(), "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
+		require.Contains(t, e.Error(), "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
+		require.Contains(t, e.Error(), "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
 
 		//cmd
 		e = o.Run(cmd, f)
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		//Execute
 		cmd.SetArgs([]string{"bk-name-exe"})
 		e = cmd.Execute()
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		// verify all options are set as expected
-		assert.Equal(t, name, o.Name)
-		assert.Equal(t, includeNamespaces, o.IncludeNamespaces.String())
-		assert.Equal(t, excludeNamespaces, o.ExcludeNamespaces.String())
-		assert.Equal(t, includeResources, o.IncludeResources.String())
-		assert.Equal(t, excludeResources, o.ExcludeResources.String())
-		assert.Equal(t, includeClusterScopedResources, o.IncludeClusterScopedResources.String())
-		assert.Equal(t, excludeClusterScopedResources, o.ExcludeClusterScopedResources.String())
-		assert.Equal(t, includeNamespaceScopedResources, o.IncludeNamespaceScopedResources.String())
-		assert.Equal(t, excludeNamespaceScopedResources, o.ExcludeNamespaceScopedResources.String())
-		assert.Equal(t, true, test.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
-		assert.Equal(t, storageLocation, o.StorageLocation)
-		assert.Equal(t, snapshotLocations, strings.Split(o.SnapshotLocations[0], ",")[0])
-		assert.Equal(t, selector, o.Selector.String())
-		assert.Equal(t, orderedResources, o.OrderedResources)
-		assert.Equal(t, csiSnapshotTimeout, o.CSISnapshotTimeout.String())
-		assert.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
-		assert.Equal(t, snapshotVolumes, o.SnapshotVolumes.String())
-		assert.Equal(t, snapshotMoveData, o.SnapshotMoveData.String())
-		assert.Equal(t, includeClusterResources, o.IncludeClusterResources.String())
-		assert.Equal(t, defaultVolumesToFsBackup, o.DefaultVolumesToFsBackup.String())
-		assert.Equal(t, resPoliciesConfigmap, o.ResPoliciesConfigmap)
-		assert.Equal(t, dataMover, o.DataMover)
+		require.Equal(t, name, o.Name)
+		require.Equal(t, includeNamespaces, o.IncludeNamespaces.String())
+		require.Equal(t, excludeNamespaces, o.ExcludeNamespaces.String())
+		require.Equal(t, includeResources, o.IncludeResources.String())
+		require.Equal(t, excludeResources, o.ExcludeResources.String())
+		require.Equal(t, includeClusterScopedResources, o.IncludeClusterScopedResources.String())
+		require.Equal(t, excludeClusterScopedResources, o.ExcludeClusterScopedResources.String())
+		require.Equal(t, includeNamespaceScopedResources, o.IncludeNamespaceScopedResources.String())
+		require.Equal(t, excludeNamespaceScopedResources, o.ExcludeNamespaceScopedResources.String())
+		require.Equal(t, true, test.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
+		require.Equal(t, storageLocation, o.StorageLocation)
+		require.Equal(t, snapshotLocations, strings.Split(o.SnapshotLocations[0], ",")[0])
+		require.Equal(t, selector, o.Selector.String())
+		require.Equal(t, orderedResources, o.OrderedResources)
+		require.Equal(t, csiSnapshotTimeout, o.CSISnapshotTimeout.String())
+		require.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
+		require.Equal(t, snapshotVolumes, o.SnapshotVolumes.String())
+		require.Equal(t, snapshotMoveData, o.SnapshotMoveData.String())
+		require.Equal(t, includeClusterResources, o.IncludeClusterResources.String())
+		require.Equal(t, defaultVolumesToFsBackup, o.DefaultVolumesToFsBackup.String())
+		require.Equal(t, resPoliciesConfigmap, o.ResPoliciesConfigmap)
+		require.Equal(t, dataMover, o.DataMover)
 		//assert.Equal(t, true, o.Wait)
 
 		// verify oldAndNewFilterParametersUsedTogether
 		mix := o.oldAndNewFilterParametersUsedTogether()
-		assert.Equal(t, true, mix)
+		require.Equal(t, true, mix)
 	})
+
 	t.Run("create a backup create command with specific storage-location setting", func(t *testing.T) {
 		bsl := "bsl-1"
 		// create a factory
 		f := &factorymocks.Factory{}
 		cmd := NewCreateCommand(f, "")
-		backups := &velerov1mocks.BackupInterface{}
-		veleroV1 := &velerov1mocks.VeleroV1Interface{}
-		client := &versionedmocks.Interface{}
-		kbclient := clientfake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
-		bk := &velerov1api.Backup{}
-		backups.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-		veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-		client.On("VeleroV1").Return(veleroV1, nil)
-		f.On("Client").Return(client, nil)
 		f.On("Namespace").Return(mock.Anything)
-		f.On("KubebuilderClient").Return(kbclient, nil)
+		f.On("KubebuilderWatchClient").Return(kbclient, nil)
 
 		flags := new(flag.FlagSet)
 		o := NewCreateOptions()
@@ -301,18 +290,14 @@ func TestCreateCommand(t *testing.T) {
 		// create a factory
 		f := &factorymocks.Factory{}
 		cmd := NewCreateCommand(f, "")
-		vsls := &velerov1mocks.VolumeSnapshotLocationInterface{}
-		veleroV1 := &velerov1mocks.VeleroV1Interface{}
-		client := &versionedmocks.Interface{}
-		kbclient := clientfake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
-		vsl := &velerov1api.VolumeSnapshotLocation{}
-		vsls.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(vsl, nil)
-		veleroV1.On("VolumeSnapshotLocations", mock.Anything).Return(vsls, nil)
-		client.On("VeleroV1").Return(veleroV1, nil)
-		f.On("Client").Return(client, nil)
-		f.On("Namespace").Return(mock.Anything)
-		f.On("KubebuilderClient").Return(kbclient, nil)
+		vsl := builder.ForVolumeSnapshotLocation(cmdtest.VeleroNameSpace, vslName).Result()
+
+		kbclient.Create(cmd.Context(), vsl, &controllerclient.CreateOptions{})
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+		f.On("KubebuilderWatchClient").Return(kbclient, nil)
 
 		flags := new(flag.FlagSet)
 		o := NewCreateOptions()
@@ -343,22 +328,13 @@ func TestCreateCommand(t *testing.T) {
 		fromSchedule := "schedule-name-1"
 		flags.Parse([]string{"--from-schedule", fromSchedule})
 
-		backups := &velerov1mocks.BackupInterface{}
-		bk := &velerov1api.Backup{}
-		schedules := &velerov1mocks.ScheduleInterface{}
-		veleroV1 := &velerov1mocks.VeleroV1Interface{}
-		client := &versionedmocks.Interface{}
-		kbclient := clientfake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-		sd := &velerov1api.Schedule{}
+		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
-		backups.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-		veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-		schedules.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(sd, nil)
-		veleroV1.On("Schedules", mock.Anything).Return(schedules, nil)
-		client.On("VeleroV1").Return(veleroV1, nil)
-		f.On("Client").Return(client, nil)
-		f.On("Namespace").Return(mock.Anything)
-		f.On("KubebuilderClient").Return(kbclient, nil)
+		schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, fromSchedule).Result()
+		kbclient.Create(context.Background(), schedule, &controllerclient.CreateOptions{})
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+		f.On("KubebuilderWatchClient").Return(kbclient, nil)
 
 		e := o.Complete(args, f)
 		assert.NoError(t, e)
