@@ -156,55 +156,55 @@ var _ = Describe("Download Request Reconciler", func() {
 			}
 		},
 
-		Entry("backup contents request for nonexistent backup returns an error", request{
+		Entry("backup contents request for nonexistent backup returns nil", request{
 			downloadRequest:      builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupContents, "a1-backup").Result(),
 			backup:               builder.ForBackup(velerov1api.DefaultNamespace, "non-matching-backup").StorageLocation("a-location").Result(),
 			backupLocation:       builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
-			expectedReconcileErr: "backups.velero.io \"a1-backup\" not found",
-			expectedRequeue:      ctrl.Result{Requeue: false},
+			expectedReconcileErr: "",
+			expectedRequeue:      ctrl.Result{},
 		}),
-		Entry("restore log request for nonexistent restore returns an error", request{
+		Entry("restore log request for nonexistent restore returns nil", request{
 			downloadRequest:      builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindRestoreLog, "a-backup-20170912150214").Result(),
 			restore:              builder.ForRestore(velerov1api.DefaultNamespace, "non-matching-restore").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:               defaultBackup(),
 			backupLocation:       builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
-			expectedReconcileErr: "restores.velero.io \"a-backup-20170912150214\" not found",
-			expectedRequeue:      ctrl.Result{Requeue: false},
+			expectedReconcileErr: "",
+			expectedRequeue:      ctrl.Result{},
 		}),
-		Entry("backup contents request for backup with nonexistent location returns an error", request{
+		Entry("backup contents request for backup with nonexistent location returns nil", request{
 			downloadRequest:      builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupContents, "a-backup").Result(),
 			backup:               defaultBackup(),
 			backupLocation:       builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "non-matching-location").Provider("a-provider").Bucket("a-bucket").Result(),
-			expectedReconcileErr: "backupstoragelocations.velero.io \"a-location\" not found",
-			expectedRequeue:      ctrl.Result{Requeue: false},
+			expectedReconcileErr: "",
+			expectedRequeue:      ctrl.Result{},
 		}),
 		Entry("backup contents request with phase '' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupContents, "a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("backup contents request with phase 'New' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseNew).Target(velerov1api.DownloadTargetKindBackupContents, "a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("backup log request with phase '' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupLog, "a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("backup log request with phase 'New' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseNew).Target(velerov1api.DownloadTargetKindBackupLog, "a-backup").Result(),
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("restore log request with phase '' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindRestoreLog, "a-backup-20170912150214").Result(),
@@ -212,7 +212,7 @@ var _ = Describe("Download Request Reconciler", func() {
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("restore log request with phase 'New' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseNew).Target(velerov1api.DownloadTargetKindRestoreLog, "a-backup-20170912150214").Result(),
@@ -220,7 +220,7 @@ var _ = Describe("Download Request Reconciler", func() {
 			restore:         builder.ForRestore(velerov1api.DefaultNamespace, "a-backup-20170912150214").Phase(velerov1api.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("restore results request with phase '' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindRestoreResults, "a-backup-20170912150214").Result(),
@@ -228,7 +228,7 @@ var _ = Describe("Download Request Reconciler", func() {
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("restore results request with phase 'New' gets a url", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseNew).Target(velerov1api.DownloadTargetKindRestoreResults, "a-backup-20170912150214").Result(),
@@ -236,30 +236,30 @@ var _ = Describe("Download Request Reconciler", func() {
 			backup:          defaultBackup(),
 			backupLocation:  builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "a-location").Provider("a-provider").Bucket("a-bucket").Result(),
 			expectGetsURL:   true,
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("request with phase 'Processed' and not expired is not deleted", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseProcessed).Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
 			backup:          defaultBackup(),
-			expectedRequeue: ctrl.Result{Requeue: true},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("request with phase 'Processed' and expired is deleted", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseProcessed).Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
 			backup:          defaultBackup(),
 			expired:         true,
-			expectedRequeue: ctrl.Result{Requeue: false},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("request with phase '' and expired is deleted", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase("").Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
 			backup:          defaultBackup(),
 			expired:         true,
-			expectedRequeue: ctrl.Result{Requeue: false},
+			expectedRequeue: ctrl.Result{},
 		}),
 		Entry("request with phase 'New' and expired is deleted", request{
 			downloadRequest: builder.ForDownloadRequest(velerov1api.DefaultNamespace, "a-download-request").Phase(velerov1api.DownloadRequestPhaseNew).Target(velerov1api.DownloadTargetKindBackupLog, "a-backup-20170912150214").Result(),
 			backup:          defaultBackup(),
 			expired:         true,
-			expectedRequeue: ctrl.Result{Requeue: false},
+			expectedRequeue: ctrl.Result{},
 		}),
 	)
 })
