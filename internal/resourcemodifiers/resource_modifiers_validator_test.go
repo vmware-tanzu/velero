@@ -25,7 +25,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
-						Patches: []JsonPatch{
+						Patches: []JSONPatch{
 							{
 								Operation: "replace",
 								Path:      "/spec/storageClassName",
@@ -48,7 +48,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
-						Patches: []JsonPatch{
+						Patches: []JSONPatch{
 							{
 								Operation: "replace",
 								Path:      "/spec/storageClassName",
@@ -124,7 +124,7 @@ func TestJsonPatch_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &JsonPatch{
+			p := &JSONPatch{
 				Operation: tt.fields.Operation,
 				Path:      tt.fields.Path,
 				Value:     tt.fields.Value,

@@ -38,7 +38,6 @@ import (
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
@@ -338,7 +337,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
 	if restore.Spec.ResourceModifier != nil && restore.Spec.ResourceModifier.Kind == resourcemodifiers.ConfigmapRefType {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
-		err := r.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
+		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
 		if err != nil {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("failed to get resource modifiers configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name))
 			return backupInfo{}, nil

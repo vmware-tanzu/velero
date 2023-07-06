@@ -36,7 +36,7 @@ func (p *ResourceModifiers) Validate() error {
 	return nil
 }
 
-func (p *JsonPatch) Validate() error {
+func (p *JSONPatch) Validate() error {
 	// TODO validate allowed operation
 	if p.Operation == "" {
 		return fmt.Errorf("operation cannot be empty")

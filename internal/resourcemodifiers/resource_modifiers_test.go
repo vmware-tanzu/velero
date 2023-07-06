@@ -40,7 +40,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 					ResourceNameRegex: ".*",
 					Namespaces:        []string{"bar", "foo"},
 				},
-				Patches: []JsonPatch{
+				Patches: []JSONPatch{
 					{
 						Operation: "replace",
 						Path:      "/spec/storageClassName",
@@ -114,7 +114,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"foo"},
 						},
-						Patches: []JsonPatch{
+						Patches: []JSONPatch{
 							{
 								Operation: "test",
 								Path:      "/spec/storageClassName",

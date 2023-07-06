@@ -21,7 +21,7 @@ const (
 	ResourceModifierSupportedVersionV1 = "v1"
 )
 
-type JsonPatch struct {
+type JSONPatch struct {
 	Operation string `yaml:"operation"`
 	Path      string `yaml:"path"`
 	Value     string `yaml:"value,omitempty"`
@@ -35,7 +35,7 @@ type Conditions struct {
 
 type ResourceModifierRule struct {
 	Conditions Conditions  `yaml:"conditions"`
-	Patches    []JsonPatch `yaml:"patches"`
+	Patches    []JSONPatch `yaml:"patches"`
 }
 
 type ResourceModifiers struct {
@@ -111,7 +111,7 @@ func (r *ResourceModifierRule) PatchArrayToByteArray() ([]byte, error) {
 	return []byte(fmt.Sprintf(`[%s]`, patchesStr)), nil
 }
 
-func (p *JsonPatch) ToString() string {
+func (p *JSONPatch) ToString() string {
 	return fmt.Sprintf(`{"op": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.Path, p.Value)
 }
 
@@ -122,7 +122,7 @@ func ApplyPatch(patch []byte, obj *unstructured.Unstructured, log logrus.FieldLo
 	}
 	objBytes, err := obj.MarshalJSON()
 	if err != nil {
-		return fmt.Errorf("error in marshalling object %s", err.Error())
+		return fmt.Errorf("error in marshaling object %s", err.Error())
 	}
 	modifiedObjBytes, err := jsonPatch.Apply(objBytes)
 	if err != nil {
