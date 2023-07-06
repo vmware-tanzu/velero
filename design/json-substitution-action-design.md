@@ -130,7 +130,7 @@ resourceModifierRules:
 
 ## Alternatives Considered
 1. JSON Path based addressal of json fields in the resource
-    - This was the intial planned apporach, but there is no open source library which gives satisfactory edit functionality with support for all operators supported by the JsonPath RFC.
+    - This was the initial planned approach, but there is no open source library which gives satisfactory edit functionality with support for all operators supported by the JsonPath RFC.
     - We attempted modifying the  [https://kubernetes.io/docs/reference/kubectl/jsonpath/](https://kubernetes.io/docs/reference/kubectl/jsonpath/) but given the complexity of the code it did not make sense to change it since it would become a long term maintainability problem.
 1. RestoreItemAction for each kind of standard substitution
     - Not an extensible design. If a new kind of substitution is required, a new RestoreItemAction needs to be written.
