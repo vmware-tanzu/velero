@@ -74,7 +74,7 @@ Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
 **RancherOS**
 
 
-Update the host path for volumes in the nonde-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to 
+Update the host path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to 
 `/opt/rke/var/lib/kubelet/pods`.  
 
 ```yaml
