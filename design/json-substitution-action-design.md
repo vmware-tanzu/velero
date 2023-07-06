@@ -47,6 +47,11 @@ Currently velero supports substituting certain values in the K8s resources durin
 - Bob can use this feature to substitute the nodeSelector/ nodeaffinity in the pod spec with the new zone pinning to quickly failover the workload to a different zone's nodes.
 
 ## Detailed Design
+- The design and approach is inspired from [kubectl patch command](https://github.com/kubernetes/kubectl/blob/0a61782351a027411b8b45b1443ec3dceddef421/pkg/cmd/patch/patch.go#L102C2-L104C1)
+```bash
+# Update a container's image using a json patch with positional arrays
+kubectl patch pod valid-pod -type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
+```
 - The user is expected to create a configmap with the desired Resource Modifications. Then the reference of the configmap will be provided in the RestoreSpec.
 - The core restore workflow before creating/updating a particular resource in the cluster will be checked against the filters provided and respective substitutions will be applied on it.
 
