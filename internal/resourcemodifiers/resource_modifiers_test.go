@@ -18,7 +18,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"sub.yml": "# kubectl delete cm jsonsub-configmap -n velero\n# kubectl create cm jsonsub-configmap --from-file /home/anshulahuja/workspace/fork-velero/tilt-resources/examples/sub.yml -nvelero\nversion: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims.storage.k8s.io\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    newValue: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
+			"sub.yml": "# kubectl delete cm jsonsub-configmap -n velero\n# kubectl create cm jsonsub-configmap --from-file /home/anshulahuja/workspace/fork-velero/tilt-resources/examples/sub.yml -nvelero\nversion: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims.storage.k8s.io\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    Value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
 		},
 	}
 
@@ -44,7 +44,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 					{
 						Operation: "replace",
 						Path:      "/spec/storageClassName",
-						NewValue:  "premium",
+						Value:     "premium",
 					},
 					{
 						Operation: "remove",
@@ -116,9 +116,14 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 						},
 						Patches: []JsonPatch{
 							{
+								Operation: "test",
+								Path:      "/spec/storageClassName",
+								Value:     "standard",
+							},
+							{
 								Operation: "replace",
 								Path:      "/spec/storageClassName",
-								NewValue:  "premium",
+								Value:     "premium",
 							},
 						},
 					},

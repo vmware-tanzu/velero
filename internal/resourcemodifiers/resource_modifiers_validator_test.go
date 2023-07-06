@@ -29,7 +29,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 							{
 								Operation: "replace",
 								Path:      "/spec/storageClassName",
-								NewValue:  "premium",
+								Value:     "premium",
 							},
 						},
 					},
@@ -52,7 +52,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 							{
 								Operation: "replace",
 								Path:      "/spec/storageClassName",
-								NewValue:  "premium",
+								Value:     "premium",
 							},
 						},
 					},
@@ -87,7 +87,7 @@ func TestJsonPatch_Validate(t *testing.T) {
 	type fields struct {
 		Operation string
 		Path      string
-		NewValue  string
+		Value     string
 	}
 	tests := []struct {
 		name    string
@@ -99,7 +99,7 @@ func TestJsonPatch_Validate(t *testing.T) {
 			fields: fields{
 				Operation: "replace",
 				Path:      "/spec/storageClassName",
-				NewValue:  "premium",
+				Value:     "premium",
 			},
 			wantErr: false,
 		},
@@ -108,7 +108,7 @@ func TestJsonPatch_Validate(t *testing.T) {
 			fields: fields{
 				Operation: "",
 				Path:      "/spec/storageClassName",
-				NewValue:  "premium",
+				Value:     "premium",
 			},
 			wantErr: true,
 		},
@@ -117,7 +117,7 @@ func TestJsonPatch_Validate(t *testing.T) {
 			fields: fields{
 				Operation: "replace",
 				Path:      "",
-				NewValue:  "premium",
+				Value:     "premium",
 			},
 			wantErr: true,
 		},
@@ -127,7 +127,7 @@ func TestJsonPatch_Validate(t *testing.T) {
 			p := &JsonPatch{
 				Operation: tt.fields.Operation,
 				Path:      tt.fields.Path,
-				NewValue:  tt.fields.NewValue,
+				Value:     tt.fields.Value,
 			}
 			if err := p.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("JsonPatch.Validate() error = %v, wantErr %v", err, tt.wantErr)
