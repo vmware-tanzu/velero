@@ -42,6 +42,10 @@ spec:
       jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - description: Name of the node where the DataUpload is processed
+      jsonPath: .status.node
+      name: Node
+      type: string
     name: v2alpha1
     schema:
       openAPIV3Schema:
@@ -146,6 +150,9 @@ spec:
                 type: object
               message:
                 description: Message is a message about the DataUpload's status.
+                type: string
+              node:
+                description: Node is name of the node where the DataUpload is processed.
                 type: string
               path:
                 description: Path is the full path of the snapshot volume being backed

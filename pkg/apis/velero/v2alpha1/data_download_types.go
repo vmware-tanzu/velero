@@ -111,6 +111,10 @@ type DataDownloadStatus struct {
 	// about the restore operation.
 	// +optional
 	Progress shared.DataMoveOperationProgress `json:"progress,omitempty"`
+
+	// Node is name of the node where the DataDownload is processed.
+	// +optional
+	Node string `json:"node,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runtime-controller client, the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
@@ -125,6 +129,7 @@ type DataDownloadStatus struct {
 // +kubebuilder:printcolumn:name="Total Bytes",type="integer",format="int64",JSONPath=".status.progress.totalBytes",description="Total bytes"
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where the backup data is stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time duration since this DataDownload was created"
+// +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.node",description="Name of the node where the DataDownload is processed"
 
 type DataDownload struct {
 	metav1.TypeMeta `json:",inline"`

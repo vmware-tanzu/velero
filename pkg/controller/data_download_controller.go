@@ -400,7 +400,7 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object)
 	requests := make([]reconcile.Request, 1)
 
 	r.logger.WithField("Restore pod", pod.Name).Infof("Preparing data download %s", dd.Name)
-	err = r.patchDataDownload(context.Background(), dd, prepareDataDownload)
+	err = r.patchDataDownload(context.Background(), dd, r.prepareDataDownload)
 	if err != nil {
 		r.logger.WithField("Restore pod", pod.Name).WithError(err).Error("unable to patch data download")
 		return []reconcile.Request{}
@@ -426,8 +426,9 @@ func (r *DataDownloadReconciler) patchDataDownload(ctx context.Context, req *vel
 	return nil
 }
 
-func prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
+func (r *DataDownloadReconciler) prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
 	ssb.Status.Phase = velerov2alpha1api.DataDownloadPhasePrepared
+	ssb.Status.Node = r.nodeName
 }
 
 func (r *DataDownloadReconciler) errorOut(ctx context.Context, dd *velerov2alpha1api.DataDownload, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {

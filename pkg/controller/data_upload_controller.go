@@ -416,7 +416,7 @@ func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reco
 	}
 
 	r.logger.WithField("Backup pod", pod.Name).Infof("Preparing dataupload %s", du.Name)
-	if err := r.patchDataUpload(context.Background(), du, prepareDataUpload); err != nil {
+	if err := r.patchDataUpload(context.Background(), du, r.prepareDataUpload); err != nil {
 		r.logger.WithField("Backup pod", pod.Name).WithError(err).Error("failed to patch dataupload")
 		return []reconcile.Request{}
 	}
@@ -440,8 +440,9 @@ func (r *DataUploadReconciler) patchDataUpload(ctx context.Context, req *velerov
 	return nil
 }
 
-func prepareDataUpload(du *velerov2alpha1api.DataUpload) {
+func (r *DataUploadReconciler) prepareDataUpload(du *velerov2alpha1api.DataUpload) {
 	du.Status.Phase = velerov2alpha1api.DataUploadPhasePrepared
+	du.Status.Node = r.nodeName
 }
 
 func (r *DataUploadReconciler) errorOut(ctx context.Context, du *velerov2alpha1api.DataUpload, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
