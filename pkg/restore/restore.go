@@ -1344,7 +1344,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
 	if ctx.resourceModifiers != nil {
-		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, ctx.log); errList != nil {
+		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
 			for _, err := range errList {
 				errs.Add(namespace, err)
 			}

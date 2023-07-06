@@ -63,22 +63,25 @@ func GetResourceModifiersFromConfig(cm *v1.ConfigMap) (*ResourceModifiers, error
 	return resModifiers, nil
 }
 
-func (p *ResourceModifiers) ApplyResourceModifierRules(obj *unstructured.Unstructured, log logrus.FieldLogger) []error {
+func (p *ResourceModifiers) ApplyResourceModifierRules(obj *unstructured.Unstructured, groupResource string, log logrus.FieldLogger) []error {
 	var errs []error
 	for _, rule := range p.ResourceModifierRules {
-		errs = append(errs, rule.Apply(obj, log))
+		err := rule.Apply(obj, groupResource, log)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errs
 }
 
-func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, log logrus.FieldLogger) error {
+func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResource string, log logrus.FieldLogger) error {
 	namespaceInclusion := collections.NewIncludesExcludes().Includes(r.Conditions.Namespaces...)
 	if !namespaceInclusion.ShouldInclude(obj.GetNamespace()) {
 		return nil
 	}
-	if !strings.EqualFold(obj.GroupVersionKind().GroupKind().String(), r.Conditions.GroupKind) {
-		return nil	
+	if !strings.EqualFold(groupResource, r.Conditions.GroupKind) {
+		return nil
 	}
 	if r.Conditions.ResourceNameRegex != "" {
 		match, _ := regexp.MatchString(r.Conditions.ResourceNameRegex, obj.GetName())

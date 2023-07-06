@@ -60,24 +60,41 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 	assert.Equal(t, original, expected)
 }
 
-// pvc1 := &unstructured.Unstructured{
-// 	Object: map[string]interface{}{
-// 		"kind": "PersistentVolumeClaim",
-// 		"metadata": map[string]interface{}{
-// 			"name":      "test-pvc",
-// 			"namespace": "foo",
-// 		},
-// 	},
-// }
-
 func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
+
+	pvcStandardSc := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind": "PersistentVolumeClaim",
+			"metadata": map[string]interface{}{
+				"name":      "test-pvc",
+				"namespace": "foo",
+			},
+			"spec": map[string]interface{}{
+				"storageClassName": "standard",
+			},
+		},
+	}
+
+	pvcPremiumSc := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind": "PersistentVolumeClaim",
+			"metadata": map[string]interface{}{
+				"name":      "test-pvc",
+				"namespace": "foo",
+			},
+			"spec": map[string]interface{}{
+				"storageClassName": "premium",
+			},
+		},
+	}
+
 	type fields struct {
 		Version               string
 		ResourceModifierRules []ResourceModifierRule
 	}
 	type args struct {
-		obj *unstructured.Unstructured
-		log logrus.FieldLogger
+		obj           *unstructured.Unstructured
+		groupResource string
 	}
 	tests := []struct {
 		name    string
@@ -86,7 +103,34 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		want    []error
 		wantObj *unstructured.Unstructured
 	}{
-		// TODO: Add test cases.
+		{
+			name: "test1",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "persistentvolumeclaims",
+							ResourceNameRegex: ".*",
+							Namespaces:        []string{"foo"},
+						},
+						Patches: []JsonPatch{
+							{
+								Operation: "replace",
+								Path:      "/spec/storageClassName",
+								NewValue:  "premium",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           pvcStandardSc.DeepCopy(),
+				groupResource: "persistentvolumeclaims",
+			},
+			want:    nil,
+			wantObj: pvcPremiumSc.DeepCopy(),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -94,10 +138,10 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				Version:               tt.fields.Version,
 				ResourceModifierRules: tt.fields.ResourceModifierRules,
 			}
-			// comapre lenght of got and want  {
-			got := p.ApplyResourceModifierRules(tt.args.obj, tt.args.log)
-			assert.Equal(t, len(got), len(tt.want))
-			assert.Equal(t, *tt.args.obj, *tt.wantObj)
+			got := p.ApplyResourceModifierRules(tt.args.obj, tt.args.groupResource, logrus.New())
+
+			assert.Equal(t, len(tt.want), len(got))
+			assert.Equal(t, *tt.wantObj, *tt.args.obj)
 		})
 	}
 }
