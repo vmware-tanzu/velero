@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
@@ -159,6 +160,12 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string) error 
 }
 
 func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	// delete resources with finalizer attached first to ensure finalizer can be handled by corresponding controller and resources can be deleted successfully before controller's pod is deleted.
+	// otherwise the process of deleting namespace will get stuck in deleting those resources forever.
+	if err := deleteResourcesWithFinalizer(ctx, kbClient, namespace); err != nil {
+		return errors.Wrap(err, "Fail to remove finalizer from restores")
+	}
+
 	ns := &corev1.Namespace{}
 	key := kbclient.ObjectKey{Name: namespace}
 	if err := kbClient.Get(ctx, key, ns); err != nil {
@@ -176,7 +183,7 @@ func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace st
 		}
 		return err
 	}
-
+	fmt.Println()
 	fmt.Printf("Waiting for velero namespace %q to be deleted\n", namespace)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -201,5 +208,50 @@ func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace st
 	}
 
 	fmt.Printf("Velero namespace %q deleted\n", namespace)
+	return nil
+}
+
+func deleteResourcesWithFinalizer(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	// delete restores
+	restoreList := &velerov1api.RestoreList{}
+	if err := kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); err != nil {
+		return err
+	}
+
+	for i := range restoreList.Items {
+		if err := kbClient.Delete(ctx, &restoreList.Items[i]); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+	}
+
+	fmt.Println("Waiting for resource with finalizer attached to be deleted")
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var err error
+	checkFunc := func() {
+		restoreList := &velerov1api.RestoreList{}
+		if err = kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); err != nil {
+			cancel()
+			return
+		}
+
+		if len(restoreList.Items) > 0 {
+			fmt.Print(".")
+		} else {
+			cancel()
+			return
+		}
+	}
+
+	// wait until all the restores are deleted
+	wait.Until(checkFunc, 100*time.Millisecond, ctx.Done())
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

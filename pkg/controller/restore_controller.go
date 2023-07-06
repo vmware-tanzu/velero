@@ -30,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
@@ -85,6 +87,8 @@ var nonRestorableResources = []string{
 	// Backup repositories were renamed from Restic repositories
 	"backuprepositories.velero.io",
 }
+
+var ExternalResourcesFinalizer = "restores.velero.io/external-resources-finalizer"
 
 type restoreReconciler struct {
 	ctx                         context.Context
@@ -157,8 +161,56 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	restore := &api.Restore{}
 	err := r.kbClient.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: req.Name}, restore)
 	if err != nil {
-		log.Infof("Fail to get restore %s: %s", req.NamespacedName.String(), err.Error())
+		if apierrors.IsNotFound(err) {
+			log.Debugf("restore[%s] not found", req.Name)
+			return ctrl.Result{}, nil
+		}
+
+		log.Errorf("Fail to get restore %s: %s", req.NamespacedName.String(), err.Error())
 		return ctrl.Result{}, err
+	}
+
+	// deal with finalizer
+	if !restore.DeletionTimestamp.IsZero() {
+		// check the finalizer and run clean-up
+		if controllerutil.ContainsFinalizer(restore, ExternalResourcesFinalizer) {
+			if err := r.deleteExternalResources(restore); err != nil {
+				log.Errorf("fail to delete external resources: %s", err.Error())
+				return ctrl.Result{}, err
+			}
+			// once finish clean-up, remove the finalizer from the restore so that the restore will be unlocked and deleted.
+			original := restore.DeepCopy()
+			controllerutil.RemoveFinalizer(restore, ExternalResourcesFinalizer)
+			if err := kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
+				log.Errorf("fail to remove finalizer: %s", err.Error())
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		} else {
+			log.Error("DeletionTimestamp is marked but can't find the expected finalizer")
+			return ctrl.Result{}, nil
+		}
+	}
+
+	// add finalizer
+	if restore.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(restore, ExternalResourcesFinalizer) {
+		original := restore.DeepCopy()
+		controllerutil.AddFinalizer(restore, ExternalResourcesFinalizer)
+		if err := kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
+			log.Errorf("fail to add finalizer: %s", err.Error())
+			return ctrl.Result{}, err
+		}
+	}
+
+	switch restore.Status.Phase {
+	case "", api.RestorePhaseNew:
+		// only process new restores
+	default:
+		r.logger.WithFields(logrus.Fields{
+			"restore": kubeutil.NamespaceAndName(restore),
+			"phase":   restore.Status.Phase,
+		}).Debug("Restore is not handled")
+		return ctrl.Result{}, nil
 	}
 
 	// store a copy of the original restore for creating patch
@@ -213,6 +265,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	}
 	log.Debug("Updating restore's final status")
+
 	if err = kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
 		log.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
 		// No need to re-enqueue here, because restore's already set to InProgress before.
@@ -224,21 +277,6 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *restoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		WithEventFilter(kubeutil.NewCreateEventPredicate(func(obj client.Object) bool {
-			restore := obj.(*api.Restore)
-
-			switch restore.Status.Phase {
-			case "", api.RestorePhaseNew:
-				// only process new restores
-				return true
-			default:
-				r.logger.WithFields(logrus.Fields{
-					"restore": kubeutil.NamespaceAndName(restore),
-					"phase":   restore.Status.Phase,
-				}).Debug("Restore is not new, skipping")
-				return false
-			}
-		})).
 		For(&api.Restore{}).
 		Complete(r)
 }
@@ -621,6 +659,40 @@ func (r *restoreReconciler) updateTotalRestoreMetric() {
 			r.ctx.Done(),
 		)
 	}()
+}
+
+// deleteExternalResources deletes all the external resources related to the restore
+func (r *restoreReconciler) deleteExternalResources(restore *api.Restore) error {
+	r.logger.Infof("Finalizer is deleting external resources, backup: %s", restore.Spec.BackupName)
+
+	if restore.Spec.BackupName == "" {
+		return nil
+	}
+
+	backupInfo, err := r.fetchBackupInfo(restore.Spec.BackupName)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("can't get backup info, backup: %s", restore.Spec.BackupName))
+	}
+
+	// if storage locations is read-only, skip deletion
+	if backupInfo.location.Spec.AccessMode == api.BackupStorageLocationAccessModeReadOnly {
+		return nil
+	}
+
+	// delete restore files in object storage
+	pluginManager := r.newPluginManager(r.logger)
+	defer pluginManager.CleanupClients()
+
+	backupStore, err := r.backupStoreGetter.Get(backupInfo.location, pluginManager, r.logger)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("can't get backupStore, backup: %s", restore.Spec.BackupName))
+	}
+
+	if err = backupStore.DeleteRestore(restore.Name); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("can't delete restore files in object storage, backup: %s", restore.Spec.BackupName))
+	}
+
+	return nil
 }
 
 func putResults(restore *api.Restore, results map[string]results.Result, backupStore persistence.BackupStore) error {
