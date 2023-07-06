@@ -181,6 +181,7 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 	if restore.Status.Phase != expectedPhase {
 		return errors.Errorf("Unexpected restore phase got %s, expecting %s", restore.Status.Phase, expectedPhase)
 	}
+	fmt.Println(restore.Status.FailureReason)
 	return nil
 }
 
