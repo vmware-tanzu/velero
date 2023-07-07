@@ -112,7 +112,7 @@ func (r *RepositoryService) exec(cmd *restic.Command, bsl *velerov1api.BackupSto
 		cmd.ExtraFlags = append(cmd.ExtraFlags, skipTLSRet)
 	}
 
-	stdout, stderr, err := veleroexec.RunCommand(cmd.Cmd())
+	stdout, stderr, err := veleroexec.RunCommandWithLog(cmd.Cmd(), r.log)
 	r.log.WithFields(logrus.Fields{
 		"repository": cmd.RepoName(),
 		"command":    cmd.String(),
