@@ -147,6 +147,18 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Printf("Label selector:\t%s\n", s)
 
 		d.Println()
+		if len(restore.Spec.OrLabelSelectors) == 0 {
+			s = emptyDisplay
+		} else {
+			orLabelSelectors := []string{}
+			for _, v := range restore.Spec.OrLabelSelectors {
+				orLabelSelectors = append(orLabelSelectors, metav1.FormatLabelSelector(v))
+			}
+			s = strings.Join(orLabelSelectors, " or ")
+		}
+		d.Printf("Or label selector:\t%s\n", s)
+
+		d.Println()
 		d.Printf("Restore PVs:\t%s\n", BoolPointerString(restore.Spec.RestorePVs, "false", "true", "auto"))
 
 		if len(podVolumeRestores) > 0 {

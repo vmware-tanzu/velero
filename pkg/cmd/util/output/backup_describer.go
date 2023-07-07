@@ -200,6 +200,18 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("Label selector:\t%s\n", s)
 
 	d.Println()
+	if len(spec.OrLabelSelectors) == 0 {
+		s = emptyDisplay
+	} else {
+		orLabelSelectors := []string{}
+		for _, v := range spec.OrLabelSelectors {
+			orLabelSelectors = append(orLabelSelectors, metav1.FormatLabelSelector(v))
+		}
+		s = strings.Join(orLabelSelectors, " or ")
+	}
+	d.Printf("Or label selector:\t%s\n", s)
+
+	d.Println()
 	d.Printf("Storage Location:\t%s\n", spec.StorageLocation)
 
 	d.Println()
