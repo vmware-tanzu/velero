@@ -110,3 +110,9 @@ func (d *DataDownloadBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DataDownloadBui
 
 	return d
 }
+
+// StartTimestamp sets the DataDownload's StartTimestamp.
+func (d *DataDownloadBuilder) StartTimestamp(startTime *metav1.Time) *DataDownloadBuilder {
+	d.object.Status.StartTimestamp = startTime
+	return d
+}
