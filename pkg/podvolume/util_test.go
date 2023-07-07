@@ -350,9 +350,12 @@ func TestGetVolumesToBackup(t *testing.T) {
 
 func TestGetVolumesByPod(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		pod                      *corev1api.Pod
-		expected                 []string
+		name     string
+		pod      *corev1api.Pod
+		expected struct {
+			included []string
+			optedOut []string
+		}
 		defaultVolumesToFsBackup bool
 	}{
 		{
@@ -365,7 +368,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{},
+			},
 		},
 		{
 			name:                     "should get all pod volumes when defaultVolumesToFsBackup is true and no PVs are excluded",
@@ -378,7 +387,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{},
+			},
 		},
 		{
 			name:                     "should get all pod volumes except ones excluded when defaultVolumesToFsBackup is true",
@@ -398,7 +413,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{"nonPvbPV1", "nonPvbPV2", "nonPvbPV3"},
+			},
 		},
 		{
 			name:                     "should exclude default service account token from pod volume backup",
@@ -413,7 +434,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{},
+			},
 		},
 		{
 			name:                     "should exclude host path volumes from pod volume backups",
@@ -435,7 +462,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{"nonPvbPV1", "nonPvbPV2", "nonPvbPV3"},
+			},
 		},
 		{
 			name:                     "should exclude volumes mounting secrets",
@@ -457,7 +490,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{"nonPvbPV1", "nonPvbPV2", "nonPvbPV3"},
+			},
 		},
 		{
 			name:                     "should exclude volumes mounting config maps",
@@ -479,7 +518,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{"nonPvbPV1", "nonPvbPV2", "nonPvbPV3"},
+			},
 		},
 		{
 			name:                     "should exclude projected volumes",
@@ -514,7 +559,13 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{},
+			},
 		},
 		{
 			name:                     "should exclude DownwardAPI volumes",
@@ -547,17 +598,27 @@ func TestGetVolumesByPod(t *testing.T) {
 					},
 				},
 			},
-			expected: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup)
+			actualIncluded, actualOptedOut := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup)
 
-			sort.Strings(tc.expected)
-			sort.Strings(actual)
-			assert.Equal(t, tc.expected, actual)
+			sort.Strings(tc.expected.included)
+			sort.Strings(actualIncluded)
+			assert.Equal(t, tc.expected.included, actualIncluded)
+
+			sort.Strings(tc.expected.optedOut)
+			sort.Strings(actualOptedOut)
+			assert.Equal(t, tc.expected.optedOut, actualOptedOut)
 		})
 	}
 }

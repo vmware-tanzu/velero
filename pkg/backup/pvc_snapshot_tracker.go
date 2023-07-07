@@ -22,43 +22,69 @@ import (
 	corev1api "k8s.io/api/core/v1"
 )
 
-// pvcSnapshotTracker keeps track of persistent volume claims that have been snapshotted
-// with pod volume backup.
+// pvcSnapshotTracker keeps track of persistent volume claims that have been handled
+// via pod volume backup.
 type pvcSnapshotTracker struct {
-	pvcs map[string]pvcSnapshotStatus
+	pvcs   map[string]pvcSnapshotStatus
+	pvcPod map[string]string
 }
 
-type pvcSnapshotStatus struct {
-	taken bool
-}
+type pvcSnapshotStatus int
+
+const (
+	pvcSnapshotStatusNotTracked pvcSnapshotStatus = -1
+	pvcSnapshotStatusTracked    pvcSnapshotStatus = iota
+	pvcSnapshotStatusTaken
+	pvcSnapshotStatusOptedout
+)
 
 func newPVCSnapshotTracker() *pvcSnapshotTracker {
 	return &pvcSnapshotTracker{
 		pvcs: make(map[string]pvcSnapshotStatus),
+		// key: pvc ns/name, value: pod name
+		pvcPod: make(map[string]string),
 	}
 }
 
 // Track indicates a volume from a pod should be snapshotted by pod volume backup.
 func (t *pvcSnapshotTracker) Track(pod *corev1api.Pod, volumeName string) {
-	// if the volume is a PVC, track it
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Name == volumeName {
-			if volume.PersistentVolumeClaim != nil {
-				if _, ok := t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)]; !ok {
-					t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = pvcSnapshotStatus{false}
-				}
-			}
-			break
-		}
-	}
+	t.recordStatus(pod, volumeName, pvcSnapshotStatusTracked, pvcSnapshotStatusNotTracked)
 }
 
 // Take indicates a volume from a pod has been taken by pod volume backup.
 func (t *pvcSnapshotTracker) Take(pod *corev1api.Pod, volumeName string) {
+	t.recordStatus(pod, volumeName, pvcSnapshotStatusTaken, pvcSnapshotStatusTracked)
+}
+
+// Optout indicates a volume from a pod has been opted out by pod's annotation
+func (t *pvcSnapshotTracker) Optout(pod *corev1api.Pod, volumeName string) {
+	t.recordStatus(pod, volumeName, pvcSnapshotStatusOptedout, pvcSnapshotStatusNotTracked)
+}
+
+// OptedoutByPod returns true if the PVC with the specified namespace and name has been opted out by the pod.  The
+// second return value is the name of the pod which has the annotation that opted out the volume/pvc
+func (t *pvcSnapshotTracker) OptedoutByPod(namespace, name string) (bool, string) {
+	status, found := t.pvcs[key(namespace, name)]
+
+	if !found || status != pvcSnapshotStatusOptedout {
+		return false, ""
+	}
+	return true, t.pvcPod[key(namespace, name)]
+}
+
+// if the volume is a PVC, record the status and the related pod
+func (t *pvcSnapshotTracker) recordStatus(pod *corev1api.Pod, volumeName string, status pvcSnapshotStatus, preReqStatus pvcSnapshotStatus) {
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == volumeName {
 			if volume.PersistentVolumeClaim != nil {
-				t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = pvcSnapshotStatus{true}
+				t.pvcPod[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = pod.Name
+				currStatus, ok := t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)]
+				if !ok {
+					currStatus = pvcSnapshotStatusNotTracked
+				}
+				if currStatus == preReqStatus {
+					t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = status
+				}
 			}
 			break
 		}
@@ -67,8 +93,8 @@ func (t *pvcSnapshotTracker) Take(pod *corev1api.Pod, volumeName string) {
 
 // Has returns true if the PVC with the specified namespace and name has been tracked.
 func (t *pvcSnapshotTracker) Has(namespace, name string) bool {
-	_, found := t.pvcs[key(namespace, name)]
-	return found
+	status, found := t.pvcs[key(namespace, name)]
+	return found && (status == pvcSnapshotStatusTracked || status == pvcSnapshotStatusTaken)
 }
 
 // TakenForPodVolume returns true and the PVC's name if the pod volume with the specified name uses a
@@ -88,7 +114,7 @@ func (t *pvcSnapshotTracker) TakenForPodVolume(pod *corev1api.Pod, volume string
 			return false, ""
 		}
 
-		if !status.taken {
+		if status != pvcSnapshotStatusTaken {
 			return false, ""
 		}
 

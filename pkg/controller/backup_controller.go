@@ -314,7 +314,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
 	request := &pkgbackup.Request{
-		Backup: backup.DeepCopy(), // don't modify items in the cache
+		Backup:           backup.DeepCopy(), // don't modify items in the cache
+		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 	}
 
 	// set backup major version - deprecated, use Status.FormatVersion
@@ -341,7 +342,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	// calculate expiration
 	request.Status.Expiration = &metav1.Time{Time: b.clock.Now().Add(request.Spec.TTL.Duration)}
 
-	// TODO: post v1.10. Remove this code block after DefaultVolumesToRestic is removed from CRD
+	// TODO: After we drop the support for backup v1 CR.  Remove this code block after DefaultVolumesToRestic is removed from CRD
 	// For now, for CRs created by old versions, we need to respect the DefaultVolumesToRestic value if it is set true
 	if boolptr.IsSetToTrue(request.Spec.DefaultVolumesToRestic) {
 		logger.Warn("DefaultVolumesToRestic field will be deprecated, use DefaultVolumesToFsBackup instead. Automatically remap it to DefaultVolumesToFsBackup")

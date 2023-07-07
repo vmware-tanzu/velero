@@ -253,9 +253,12 @@ func contains(list []string, k string) bool {
 }
 
 // GetVolumesByPod returns a list of volume names to backup for the provided pod.
-func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) []string {
+func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) ([]string, []string) {
+	// tracks the volumes that have been explicitly opted out of backup via the annotation in the pod
+	optedOutVolumes := make([]string, 0)
+
 	if !defaultVolumesToFsBackup {
-		return GetVolumesToBackup(pod)
+		return GetVolumesToBackup(pod), optedOutVolumes
 	}
 
 	volsToExclude := getVolumesToExclude(pod)
@@ -284,6 +287,7 @@ func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) []string
 		}
 		// don't backup volumes that are included in the exclude list.
 		if contains(volsToExclude, pv.Name) {
+			optedOutVolumes = append(optedOutVolumes, pv.Name)
 			continue
 		}
 		// don't include volumes that mount the default service account token.
@@ -292,5 +296,5 @@ func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) []string
 		}
 		podVolumes = append(podVolumes, pv.Name)
 	}
-	return podVolumes
+	return podVolumes, optedOutVolumes
 }
