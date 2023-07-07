@@ -63,6 +63,8 @@ This command will immediately trigger a new backup based on your template for `e
 
 
 ### Limitation
+
+#### Backup's OwnerReference with Schedule
 Backups created from schedule can have owner reference to the schedule. This can be achieved by command:
 
 ```
@@ -74,7 +76,23 @@ Please do notice there is also side effect that may not be expected. Because sch
 
 If there is possibility the schedule will be disable to not create backup anymore, and the created backups are still useful. Please do not enable this option. For detail, please reference to [Backups created by a schedule with useOwnerReferenceInBackup set do not get synced properly](https://github.com/vmware-tanzu/velero/issues/4093).
 
+#### Cannot support backup data immutability
+Starting from 1.11, Velero's backups may not work as expected when the target object storage has some kind of an "immutability" option configured. These options are known by different names (see links below for some examples). The main reason is that Velero first saves the state of a backup as Finalizing and then checks whether there are any async operations in progress. If there are, it needs to wait for all of them to be finished before moving the backup state to Complete. If there are no async operations, the state is moved to Complete right away. In either case, Velero needs to modify the metadata in object storage and that will not be possible if some kind of immutability is configured on the object storage.
 
+Even with versions prior to 1.11, there was no explicit support in Velero to work with object storage that has "immutability" configuration. As a result, you may see some problems even though backups seem to work (e.g. versions objects not being deleted when backup is deleted).
+
+Note that backups may still work in some cases depending on specific providers and configurations.
+
+* For AWS S3 service, backups work because S3's object lock only applies to versioned buckets, and the object data can still be updated as the new version. But when backups are deleted, old versions of the objects will not be deleted.
+* Azure Storage Blob supports both versioned-level immutability and container-level immutability. For the versioned-level scenario, data immutability can still work in Velero, but the container-level cannot.
+* GCP Cloud storage policy only supports bucket-level immutability, so there is no way to make it work in the GCP environment.
+
+The following are the links to cloud providers' documentation in this regard:
+
+* [AWS S3 Using S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html)
+* [Azure Storage Blob Containers - Lock Immutability Policy](https://learn.microsoft.com/en-us/azure/storage/blobs/immutable-policy-configure-version-scope?tabs=azure-portal)
+* [GCP cloud storage Retention policies and retention policy locks](https://cloud.google.com/storage/docs/bucket-lock)
+ 
 ## Kubernetes API Pagination
 
 By default, Velero will paginate the LIST API call for each resource type in the Kubernetes API when collecting items into a backup. The `--client-page-size` flag for the Velero server configures the size of each page.
