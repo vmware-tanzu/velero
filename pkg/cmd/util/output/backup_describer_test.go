@@ -91,6 +91,8 @@ Resources:
 
 Label selector:  <none>
 
+Or label selector:  <none>
+
 Storage Location:  backup-location
 
 Velero-Native Snapshot PVs:  auto
@@ -153,6 +155,8 @@ Resources:
 
 Label selector:  <none>
 
+Or label selector:  <none>
+
 Storage Location:  backup-location
 
 Velero-Native Snapshot PVs:  auto
@@ -207,6 +211,8 @@ Resources:
   Cluster-scoped:  auto
 
 Label selector:  <none>
+
+Or label selector:  <none>
 
 Storage Location:  backup-location
 

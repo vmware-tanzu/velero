@@ -92,6 +92,7 @@ type CreateOptions struct {
 	StatusExcludeResources    flag.StringArray
 	NamespaceMappings         flag.Map
 	Selector                  flag.LabelSelector
+	OrSelector                flag.OrLabelSelector
 	IncludeClusterResources   flag.OptionalBool
 	Wait                      bool
 	AllowPartiallyFailed      flag.OptionalBool
@@ -124,6 +125,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.StatusIncludeResources, "status-include-resources", "Resources to include in the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.Var(&o.StatusExcludeResources, "status-exclude-resources", "Resources to exclude from the restore status, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.VarP(&o.Selector, "selector", "l", "Only restore resources matching this label selector.")
+	flags.Var(&o.OrSelector, "or-selector", "Restore resources matching at least one of the label selector from the list. Label selectors should be separated by ' or '. For example, foo=bar or app=nginx")
 	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "Whether to restore volumes from snapshots.")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
@@ -183,6 +185,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	if o.client == nil {
 		// This should never happen
 		return errors.New("Velero client is not set; unable to proceed")
+	}
+
+	if o.Selector.LabelSelector != nil && o.OrSelector.OrLabelSelectors != nil {
+		return errors.New("either a 'selector' or an 'or-selector' can be specified, but not both")
 	}
 
 	if len(o.ExistingResourcePolicy) > 0 && !isResourcePolicyValid(o.ExistingResourcePolicy) {
@@ -302,6 +308,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			ExistingResourcePolicy:  api.PolicyType(o.ExistingResourcePolicy),
 			NamespaceMapping:        o.NamespaceMappings.Data(),
 			LabelSelector:           o.Selector.LabelSelector,
+			OrLabelSelectors:        o.OrSelector.OrLabelSelectors,
 			RestorePVs:              o.RestoreVolumes.Value,
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,

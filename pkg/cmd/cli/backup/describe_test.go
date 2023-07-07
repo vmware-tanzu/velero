@@ -69,6 +69,7 @@ func TestNewDescribeCommand(t *testing.T) {
 
 	if err == nil {
 		assert.Contains(t, stdout, "Velero-Native Snapshots: <none included>")
+		assert.Contains(t, stdout, "Or label selector:  <none>")
 		assert.Contains(t, stdout, fmt.Sprintf("Name:         %s", backupName))
 		return
 	}
