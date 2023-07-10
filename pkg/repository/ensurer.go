@@ -80,20 +80,18 @@ func (r *Ensurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, ba
 		log.Debug("Released lock")
 	}()
 
-	repo, err := GetBackupRepository(ctx, r.repoClient, namespace, backupRepoKey, true)
+	_, err := GetBackupRepository(ctx, r.repoClient, namespace, backupRepoKey, false)
 	if err == nil {
-		log.Debug("Ready repository found")
-		return repo, nil
-	}
+		log.Info("Founding existing repo")
+		return r.waitBackupRepository(ctx, namespace, backupRepoKey)
+	} else if isBackupRepositoryNotFoundError(err) {
+		log.Info("No repository found, creating one")
 
-	if !isBackupRepositoryNotFoundError(err) {
+		// no repo found: create one and wait for it to be ready
+		return r.createBackupRepositoryAndWait(ctx, namespace, backupRepoKey)
+	} else {
 		return nil, errors.WithStack(err)
 	}
-
-	log.Debug("No repository found, creating one")
-
-	// no repo found: create one and wait for it to be ready
-	return r.createBackupRepositoryAndWait(ctx, namespace, backupRepoKey)
 }
 
 func (r *Ensurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
@@ -113,6 +111,10 @@ func (r *Ensurer) createBackupRepositoryAndWait(ctx context.Context, namespace s
 		return nil, errors.Wrap(err, "unable to create backup repository resource")
 	}
 
+	return r.waitBackupRepository(ctx, namespace, backupRepoKey)
+}
+
+func (r *Ensurer) waitBackupRepository(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
 	var repo *velerov1api.BackupRepository
 	checkFunc := func(ctx context.Context) (bool, error) {
 		found, err := GetBackupRepository(ctx, r.repoClient, namespace, backupRepoKey, true)

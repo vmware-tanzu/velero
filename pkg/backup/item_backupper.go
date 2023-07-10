@@ -445,6 +445,10 @@ const (
 	azureCsiZoneKey  = "topology.disk.csi.azure.com/zone"
 	gkeCsiZoneKey    = "topology.gke.io/zone"
 	gkeZoneSeparator = "__"
+
+	// OpenStack CSI drivers topology keys
+	cinderCsiZoneKey = "topology.manila.csi.openstack.org/zone"
+	manilaCsiZoneKey = "topology.cinder.csi.openstack.org/zone"
 )
 
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
@@ -506,7 +510,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		if !labelFound {
 			var k string
 			log.Infof("label %q is not present on PersistentVolume", zoneLabelDeprecated)
-			k, pvFailureDomainZone = zoneFromPVNodeAffinity(pv, awsEbsCsiZoneKey, azureCsiZoneKey, gkeCsiZoneKey, zoneLabel, zoneLabelDeprecated)
+			k, pvFailureDomainZone = zoneFromPVNodeAffinity(pv, awsEbsCsiZoneKey, azureCsiZoneKey, gkeCsiZoneKey, cinderCsiZoneKey, manilaCsiZoneKey, zoneLabel, zoneLabelDeprecated)
 			if pvFailureDomainZone != "" {
 				log.Infof("zone info from nodeAffinity requirements: %s, key: %s", pvFailureDomainZone, k)
 			} else {
@@ -545,7 +549,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	if volumeSnapshotter == nil {
-		log.Info("Persistent volume is not a supported volume type for snapshots, skipping.")
+		// the PV may still has change to be snapshotted by CSI plugin's `PVCBackupItemAction` in PVC backup logic
+		log.Info("Persistent volume is not a supported volume type for Velero-native volumeSnapshotter snapshot, skipping.")
 		return nil
 	}
 

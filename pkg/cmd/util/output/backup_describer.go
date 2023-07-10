@@ -231,31 +231,31 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			d.Printf("\t\t%s:\n", backupResourceHookSpec.Name)
 			d.Printf("\t\t\tNamespaces:\n")
 			var s string
-			if len(spec.IncludedNamespaces) == 0 {
+			if len(backupResourceHookSpec.IncludedNamespaces) == 0 {
 				s = "*"
 			} else {
-				s = strings.Join(spec.IncludedNamespaces, ", ")
+				s = strings.Join(backupResourceHookSpec.IncludedNamespaces, ", ")
 			}
 			d.Printf("\t\t\t\tIncluded:\t%s\n", s)
-			if len(spec.ExcludedNamespaces) == 0 {
+			if len(backupResourceHookSpec.ExcludedNamespaces) == 0 {
 				s = emptyDisplay
 			} else {
-				s = strings.Join(spec.ExcludedNamespaces, ", ")
+				s = strings.Join(backupResourceHookSpec.ExcludedNamespaces, ", ")
 			}
 			d.Printf("\t\t\t\tExcluded:\t%s\n", s)
 
 			d.Println()
 			d.Printf("\t\t\tResources:\n")
-			if len(spec.IncludedResources) == 0 {
+			if len(backupResourceHookSpec.IncludedResources) == 0 {
 				s = "*"
 			} else {
-				s = strings.Join(spec.IncludedResources, ", ")
+				s = strings.Join(backupResourceHookSpec.IncludedResources, ", ")
 			}
 			d.Printf("\t\t\t\tIncluded:\t%s\n", s)
-			if len(spec.ExcludedResources) == 0 {
+			if len(backupResourceHookSpec.ExcludedResources) == 0 {
 				s = emptyDisplay
 			} else {
-				s = strings.Join(spec.ExcludedResources, ", ")
+				s = strings.Join(backupResourceHookSpec.ExcludedResources, ", ")
 			}
 			d.Printf("\t\t\t\tExcluded:\t%s\n", s)
 

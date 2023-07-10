@@ -18,12 +18,14 @@ package kopialib
 
 import (
 	"context"
+	"math"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/manifest"
+	"github.com/kopia/kopia/repo/object"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -709,6 +711,489 @@ func TestFlush(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestNewObjectWriter(t *testing.T) {
+	rawObjWriter := repomocks.NewWriter(t)
+	testCases := []struct {
+		name         string
+		rawWriter    *repomocks.DirectRepositoryWriter
+		rawWriterRet object.Writer
+		expectedRet  udmrepo.ObjectWriter
+	}{
+		{
+			name: "raw writer is nil",
+		},
+		{
+			name:      "new object writer fail",
+			rawWriter: repomocks.NewDirectRepositoryWriter(t),
+		},
+		{
+			name:         "succeed",
+			rawWriter:    repomocks.NewDirectRepositoryWriter(t),
+			rawWriterRet: rawObjWriter,
+			expectedRet:  &kopiaObjectWriter{rawWriter: rawObjWriter},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaRepository{}
+
+			if tc.rawWriter != nil {
+				tc.rawWriter.On("NewObjectWriter", mock.Anything, mock.Anything).Return(tc.rawWriterRet)
+				kr.rawWriter = tc.rawWriter
+			}
+
+			ret := kr.NewObjectWriter(context.Background(), udmrepo.ObjectWriteOptions{})
+
+			assert.Equal(t, tc.expectedRet, ret)
+		})
+	}
+}
+
+func TestUpdateProgress(t *testing.T) {
+	testCases := []struct {
+		name       string
+		progress   int64
+		uploaded   int64
+		throttle   logThrottle
+		logMessage string
+	}{
+		{
+			name: "should not output",
+			throttle: logThrottle{
+				lastTime: math.MaxInt64,
+			},
+		},
+		{
+			name:       "should output",
+			progress:   100,
+			uploaded:   200,
+			logMessage: "Repo uploaded 300 bytes.",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logMessage := ""
+			kr := &kopiaRepository{
+				logger:   velerotest.NewSingleLogger(&logMessage),
+				throttle: tc.throttle,
+				uploaded: tc.uploaded,
+			}
+
+			kr.updateProgress(tc.progress)
+
+			if len(tc.logMessage) > 0 {
+				assert.Contains(t, logMessage, tc.logMessage)
+			} else {
+				assert.Equal(t, "", logMessage)
+			}
+		})
+	}
+}
+
+func TestReaderRead(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjReader    *repomocks.Reader
+		rawReaderRetErr error
+		expectedErr     string
+	}{
+		{
+			name:        "raw reader is nil",
+			expectedErr: "object reader is closed or not open",
+		},
+		{
+			name:            "raw read fail",
+			rawObjReader:    repomocks.NewReader(t),
+			rawReaderRetErr: errors.New("fake-read-error"),
+			expectedErr:     "fake-read-error",
+		},
+		{
+			name:         "succeed",
+			rawObjReader: repomocks.NewReader(t),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectReader{}
+
+			if tc.rawObjReader != nil {
+				tc.rawObjReader.On("Read", mock.Anything).Return(0, tc.rawReaderRetErr)
+				kr.rawReader = tc.rawObjReader
+			}
+
+			_, err := kr.Read(nil)
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestReaderSeek(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjReader    *repomocks.Reader
+		rawReaderRet    int64
+		rawReaderRetErr error
+		expectedRet     int64
+		expectedErr     string
+	}{
+		{
+			name:        "raw reader is nil",
+			expectedErr: "object reader is closed or not open",
+		},
+		{
+			name:            "raw seek fail",
+			rawObjReader:    repomocks.NewReader(t),
+			rawReaderRetErr: errors.New("fake-seek-error"),
+			expectedErr:     "fake-seek-error",
+		},
+		{
+			name:         "succeed",
+			rawObjReader: repomocks.NewReader(t),
+			rawReaderRet: 100,
+			expectedRet:  100,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectReader{}
+
+			if tc.rawObjReader != nil {
+				tc.rawObjReader.On("Seek", mock.Anything, mock.Anything).Return(tc.rawReaderRet, tc.rawReaderRetErr)
+				kr.rawReader = tc.rawObjReader
+			}
+
+			ret, err := kr.Seek(0, 0)
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedRet, ret)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestReaderClose(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjReader    *repomocks.Reader
+		rawReaderRetErr error
+		expectedErr     string
+	}{
+		{
+			name: "raw reader is nil",
+		},
+		{
+			name:            "raw close fail",
+			rawObjReader:    repomocks.NewReader(t),
+			rawReaderRetErr: errors.New("fake-close-error"),
+			expectedErr:     "fake-close-error",
+		},
+		{
+			name:         "succeed",
+			rawObjReader: repomocks.NewReader(t),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectReader{}
+
+			if tc.rawObjReader != nil {
+				tc.rawObjReader.On("Close").Return(tc.rawReaderRetErr)
+				kr.rawReader = tc.rawObjReader
+			}
+
+			err := kr.Close()
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestReaderLength(t *testing.T) {
+	testCases := []struct {
+		name         string
+		rawObjReader *repomocks.Reader
+		rawReaderRet int64
+		expectedRet  int64
+	}{
+		{
+			name:        "raw reader is nil",
+			expectedRet: -1,
+		},
+		{
+			name:         "raw length fail",
+			rawObjReader: repomocks.NewReader(t),
+			rawReaderRet: 0,
+			expectedRet:  0,
+		},
+		{
+			name:         "succeed",
+			rawObjReader: repomocks.NewReader(t),
+			rawReaderRet: 200,
+			expectedRet:  200,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectReader{}
+
+			if tc.rawObjReader != nil {
+				tc.rawObjReader.On("Length").Return(tc.rawReaderRet)
+				kr.rawReader = tc.rawObjReader
+			}
+
+			ret := kr.Length()
+
+			assert.Equal(t, tc.expectedRet, ret)
+		})
+	}
+}
+
+func TestWriterWrite(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjWriter    *repomocks.Writer
+		rawWrtierRet    int
+		rawWriterRetErr error
+		expectedRet     int
+		expectedErr     string
+	}{
+		{
+			name:        "raw writer is nil",
+			expectedErr: "object writer is closed or not open",
+		},
+		{
+			name:            "raw read fail",
+			rawObjWriter:    repomocks.NewWriter(t),
+			rawWriterRetErr: errors.New("fake-write-error"),
+			expectedErr:     "fake-write-error",
+		},
+		{
+			name:         "succeed",
+			rawObjWriter: repomocks.NewWriter(t),
+			rawWrtierRet: 200,
+			expectedRet:  200,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectWriter{}
+
+			if tc.rawObjWriter != nil {
+				tc.rawObjWriter.On("Write", mock.Anything).Return(tc.rawWrtierRet, tc.rawWriterRetErr)
+				kr.rawWriter = tc.rawObjWriter
+			}
+
+			ret, err := kr.Write(nil)
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedRet, ret)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestWriterCheckpoint(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjWriter    *repomocks.Writer
+		rawWrtierRet    object.ID
+		rawWriterRetErr error
+		expectedRet     udmrepo.ID
+		expectedErr     string
+	}{
+		{
+			name:        "raw writer is nil",
+			expectedErr: "object writer is closed or not open",
+		},
+		{
+			name:            "raw checkpoint fail",
+			rawObjWriter:    repomocks.NewWriter(t),
+			rawWriterRetErr: errors.New("fake-checkpoint-error"),
+			expectedErr:     "error to checkpoint object: fake-checkpoint-error",
+		},
+		{
+			name:         "succeed",
+			rawObjWriter: repomocks.NewWriter(t),
+			rawWrtierRet: object.ID{},
+			expectedRet:  udmrepo.ID(""),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectWriter{}
+
+			if tc.rawObjWriter != nil {
+				tc.rawObjWriter.On("Checkpoint").Return(tc.rawWrtierRet, tc.rawWriterRetErr)
+				kr.rawWriter = tc.rawObjWriter
+			}
+
+			ret, err := kr.Checkpoint()
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedRet, ret)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestWriterResult(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjWriter    *repomocks.Writer
+		rawWrtierRet    object.ID
+		rawWriterRetErr error
+		expectedRet     udmrepo.ID
+		expectedErr     string
+	}{
+		{
+			name:        "raw writer is nil",
+			expectedErr: "object writer is closed or not open",
+		},
+		{
+			name:            "raw result fail",
+			rawObjWriter:    repomocks.NewWriter(t),
+			rawWriterRetErr: errors.New("fake-result-error"),
+			expectedErr:     "error to wait object: fake-result-error",
+		},
+		{
+			name:         "succeed",
+			rawObjWriter: repomocks.NewWriter(t),
+			rawWrtierRet: object.ID{},
+			expectedRet:  udmrepo.ID(""),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectWriter{}
+
+			if tc.rawObjWriter != nil {
+				tc.rawObjWriter.On("Result").Return(tc.rawWrtierRet, tc.rawWriterRetErr)
+				kr.rawWriter = tc.rawObjWriter
+			}
+
+			ret, err := kr.Result()
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedRet, ret)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestWriterClose(t *testing.T) {
+	testCases := []struct {
+		name            string
+		rawObjWriter    *repomocks.Writer
+		rawWriterRetErr error
+		expectedErr     string
+	}{
+		{
+			name: "raw writer is nil",
+		},
+		{
+			name:            "raw close fail",
+			rawObjWriter:    repomocks.NewWriter(t),
+			rawWriterRetErr: errors.New("fake-close-error"),
+			expectedErr:     "fake-close-error",
+		},
+		{
+			name:         "succeed",
+			rawObjWriter: repomocks.NewWriter(t),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaObjectWriter{}
+
+			if tc.rawObjWriter != nil {
+				tc.rawObjWriter.On("Close").Return(tc.rawWriterRetErr)
+				kr.rawWriter = tc.rawObjWriter
+			}
+
+			err := kr.Close()
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestMaintainProgress(t *testing.T) {
+	testCases := []struct {
+		name       string
+		progress   int64
+		uploaded   int64
+		throttle   logThrottle
+		logMessage string
+	}{
+		{
+			name: "should not output",
+			throttle: logThrottle{
+				lastTime: math.MaxInt64,
+			},
+		},
+		{
+			name:       "should output",
+			progress:   100,
+			uploaded:   200,
+			logMessage: "Repo maintenance uploaded 300 bytes.",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logMessage := ""
+			km := &kopiaMaintenance{
+				logger:   velerotest.NewSingleLogger(&logMessage),
+				throttle: tc.throttle,
+				uploaded: tc.uploaded,
+			}
+
+			km.maintainProgress(tc.progress)
+
+			if len(tc.logMessage) > 0 {
+				assert.Contains(t, logMessage, tc.logMessage)
+			} else {
+				assert.Equal(t, "", logMessage)
 			}
 		})
 	}

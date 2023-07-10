@@ -27,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -493,6 +494,55 @@ func TestGetBackupItemOperations(t *testing.T) {
 	assert.EqualValues(t, operations, res)
 }
 
+func TestGetRestoreItemOperations(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// itemoperations file not found should not error
+	res, err := harness.GetRestoreItemOperations("test-restore")
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// itemoperations file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-itemoperations.json.gz", newStringReadSeeker("foo"))
+	_, err = harness.GetRestoreItemOperations("test-restore")
+	assert.NotNil(t, err)
+
+	// itemoperations file containing gzipped json data should return correctly
+	operations := []*itemoperation.RestoreOperation{
+		{
+			Spec: itemoperation.RestoreOperationSpec{
+				RestoreName: "test-restore",
+				ResourceIdentifier: velero.ResourceIdentifier{
+					GroupResource: kuberesource.Pods,
+					Namespace:     "ns",
+					Name:          "item-1",
+				},
+			},
+		},
+		{
+			Spec: itemoperation.RestoreOperationSpec{
+				RestoreName: "test-restore",
+				ResourceIdentifier: velero.ResourceIdentifier{
+					GroupResource: kuberesource.Pods,
+					Namespace:     "ns",
+					Name:          "item-2",
+				},
+			},
+		},
+	}
+
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(operations))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-itemoperations.json.gz", obj))
+
+	res, err = harness.GetRestoreItemOperations("test-restore")
+	assert.NoError(t, err)
+	assert.EqualValues(t, operations, res)
+}
+
 func TestGetBackupContents(t *testing.T) {
 	harness := newObjectBackupStoreTestHarness("test-bucket", "")
 
@@ -553,6 +603,58 @@ func TestDeleteBackup(t *testing.T) {
 			}
 
 			err := backupStore.DeleteBackup("bak")
+
+			velerotest.AssertErrorMatches(t, test.expectedErr, err)
+		})
+	}
+}
+
+func TestDeleteRestore(t *testing.T) {
+	tests := []struct {
+		name             string
+		prefix           string
+		listObjectsError error
+		deleteErrors     []error
+		expectedErr      string
+	}{
+		{
+			name: "normal case",
+		},
+		{
+			name:   "normal case with backup store prefix",
+			prefix: "velero-backups/",
+		},
+		{
+			name:         "some delete errors, do as much as we can",
+			deleteErrors: []error{errors.New("a"), nil, errors.New("c")},
+			expectedErr:  "[a, c]",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			objectStore := new(providermocks.ObjectStore)
+			backupStore := &objectBackupStore{
+				objectStore: objectStore,
+				bucket:      "test-bucket",
+				layout:      NewObjectStoreLayout(test.prefix),
+				logger:      velerotest.NewLogger(),
+			}
+			defer objectStore.AssertExpectations(t)
+
+			objects := []string{test.prefix + "restores/bak/velero-restore.json", test.prefix + "restores/bak/bak.tar.gz", test.prefix + "restores/bak/bak.log.gz"}
+
+			objectStore.On("ListObjects", backupStore.bucket, test.prefix+"restores/bak/").Return(objects, test.listObjectsError)
+			for i, obj := range objects {
+				var err error
+				if i < len(test.deleteErrors) {
+					err = test.deleteErrors[i]
+				}
+
+				objectStore.On("DeleteObject", backupStore.bucket, obj).Return(err)
+			}
+
+			err := backupStore.DeleteRestore("bak")
 
 			velerotest.AssertErrorMatches(t, test.expectedErr, err)
 		})
@@ -671,6 +773,108 @@ func TestGetDownloadURL(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetCSIVolumeSnapshotClasses(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// file not found should not error
+	res, err := harness.GetCSIVolumeSnapshotClasses("test-backup")
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshotclasses.json.gz", newStringReadSeeker("foo"))
+	_, err = harness.GetCSIVolumeSnapshotClasses("test-backup")
+	assert.NotNil(t, err)
+
+	// file containing gzipped json data should return correctly
+	classes := []*snapshotv1api.VolumeSnapshotClass{
+		{
+			Driver: "driver",
+		},
+	}
+
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(classes))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshotclasses.json.gz", obj))
+
+	res, err = harness.GetCSIVolumeSnapshotClasses("test-backup")
+	assert.NoError(t, err)
+	assert.EqualValues(t, classes, res)
+}
+
+func TestGetCSIVolumeSnapshots(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// file not found should not error
+	res, err := harness.GetCSIVolumeSnapshots("test-backup")
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshots.json.gz", newStringReadSeeker("foo"))
+	_, err = harness.GetCSIVolumeSnapshots("test-backup")
+	assert.NotNil(t, err)
+
+	// file containing gzipped json data should return correctly
+	snapshots := []*snapshotv1api.VolumeSnapshot{
+		{
+			Spec: snapshotv1api.VolumeSnapshotSpec{
+				Source: snapshotv1api.VolumeSnapshotSource{
+					VolumeSnapshotContentName: nil,
+				},
+			},
+		},
+	}
+
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(snapshots))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshots.json.gz", obj))
+
+	res, err = harness.GetCSIVolumeSnapshots("test-backup")
+	assert.NoError(t, err)
+	assert.EqualValues(t, snapshots, res)
+}
+
+func TestGetCSIVolumeSnapshotContents(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// file not found should not error
+	res, err := harness.GetCSIVolumeSnapshotContents("test-backup")
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshotcontents.json.gz", newStringReadSeeker("foo"))
+	_, err = harness.GetCSIVolumeSnapshotContents("test-backup")
+	assert.NotNil(t, err)
+
+	// file containing gzipped json data should return correctly
+	contents := []*snapshotv1api.VolumeSnapshotContent{
+		{
+			Spec: snapshotv1api.VolumeSnapshotContentSpec{
+				Driver: "driver",
+			},
+		},
+	}
+
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(contents))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshotcontents.json.gz", obj))
+
+	res, err = harness.GetCSIVolumeSnapshotContents("test-backup")
+	assert.NoError(t, err)
+	assert.EqualValues(t, contents, res)
 }
 
 type objectStoreGetter map[string]velero.ObjectStore

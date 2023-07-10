@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -25,12 +26,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+)
+
+const (
+	defaultDownloadRequestSyncPeriod = time.Minute
 )
 
 // downloadRequestReconciler reconciles a DownloadRequest object
@@ -93,15 +100,6 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	original := downloadRequest.DeepCopy()
-	defer func() {
-		// Always attempt to Patch the downloadRequest object and status after each reconciliation.
-		if err := r.client.Patch(ctx, downloadRequest, kbclient.MergeFrom(original)); err != nil {
-			log.WithError(err).Error("Error updating download request")
-			return
-		}
-	}()
-
 	if downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && downloadRequest.Status.Expiration != nil {
 		if downloadRequest.Status.Expiration.Time.Before(r.clock.Now()) {
 			// Delete any request that is expired, regardless of the phase: it is not
@@ -111,19 +109,25 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				log.WithError(err).Error("Error deleting an expired download request")
 				return ctrl.Result{}, errors.WithStack(err)
 			}
-			return ctrl.Result{Requeue: false}, nil
+			return ctrl.Result{}, nil
 		} else if downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseProcessed {
-			// Requeue the request if is not yet expired and has already been processed before,
-			// since it might still be in use by the logs streaming and shouldn't
-			// be deleted until after its expiration.
-			log.Debug("DownloadRequest has not yet expired - requeueing")
-			return ctrl.Result{Requeue: true}, nil
+			log.Debug("DownloadRequest has not yet expired.")
+			return ctrl.Result{}, nil
 		}
 	}
 
 	// Process a brand new request.
-	backupName := downloadRequest.Spec.Target.Name
 	if downloadRequest.Status.Phase == "" || downloadRequest.Status.Phase == velerov1api.DownloadRequestPhaseNew {
+		backupName := downloadRequest.Spec.Target.Name
+		original := downloadRequest.DeepCopy()
+		defer func() {
+			// Always attempt to Patch the downloadRequest object and status for new DownloadRequest.
+			if err := r.client.Patch(ctx, downloadRequest, kbclient.MergeFrom(original)); err != nil {
+				log.WithError(err).Error("Error updating download request")
+				return
+			}
+		}()
+
 		// Update the expiration.
 		downloadRequest.Status.Expiration = &metav1.Time{Time: r.clock.Now().Add(persistence.DownloadURLTTL)}
 
@@ -136,6 +140,11 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				Namespace: downloadRequest.Namespace,
 				Name:      downloadRequest.Spec.Target.Name,
 			}, restore); err != nil {
+				if apierrors.IsNotFound(err) {
+					log.WithError(err).Error("fail to get restore for DownloadRequest")
+					return ctrl.Result{}, nil
+				}
+				log.Warnf("Fail to get restore for DownloadRequest %s. Retry later.", err.Error())
 				return ctrl.Result{}, errors.WithStack(err)
 			}
 			backupName = restore.Spec.BackupName
@@ -146,6 +155,11 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			Namespace: downloadRequest.Namespace,
 			Name:      backupName,
 		}, backup); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.WithError(err).Error("fail to get backup for DownloadRequest")
+				return ctrl.Result{}, nil
+			}
+			log.Warnf("fail to get backup for DownloadRequest %s. Retry later.", err.Error())
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 
@@ -154,6 +168,11 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			Namespace: backup.Namespace,
 			Name:      backup.Spec.StorageLocation,
 		}, location); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Errorf("BSL for DownloadRequest cannot be found")
+				return ctrl.Result{}, nil
+			}
+			log.Warnf("Fail to get BSL for DownloadRequest: %s", err.Error())
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 
@@ -163,7 +182,9 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		backupStore, err := r.backupStoreGetter.Get(location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting a backup store")
-			return ctrl.Result{}, errors.WithStack(err)
+			// Fail to get backup store is due to BSL setting issue or credential issue.
+			// It cannot be recovered. No need to retry.
+			return ctrl.Result{}, nil
 		}
 
 		// If this is a request for backup item operations, force upload of in-memory operations that
@@ -180,8 +201,10 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// ignore errors here. If we can't upload anything here, process the download as usual
 			_ = r.restoreItemOperationsMap.UpdateForRestore(backupStore, downloadRequest.Spec.Target.Name)
 		}
+
 		if downloadRequest.Status.DownloadURL, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
-			return ctrl.Result{Requeue: true}, errors.WithStack(err)
+			log.Warnf("fail to get Backup metadata file's download URL %s, retry later: %s", downloadRequest.Spec.Target, err)
+			return ctrl.Result{}, errors.WithStack(err)
 		}
 
 		downloadRequest.Status.Phase = velerov1api.DownloadRequestPhaseProcessed
@@ -190,13 +213,22 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		downloadRequest.Status.Expiration = &metav1.Time{Time: r.clock.Now().Add(persistence.DownloadURLTTL)}
 	}
 
-	// Requeue is mostly to handle deleting any expired requests that were not
-	// deleted as part of the normal client flow for whatever reason.
-	return ctrl.Result{Requeue: true}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	downloadRequestSource := kube.NewPeriodicalEnqueueSource(r.log, mgr.GetClient(),
+		&velerov1api.DownloadRequestList{}, defaultDownloadRequestSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	downloadRequestPredicates := kube.NewGenericEventPredicate(func(object kbclient.Object) bool {
+		downloadRequest := object.(*velerov1api.DownloadRequest)
+		if downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && downloadRequest.Status.Expiration != nil {
+			return downloadRequest.Status.Expiration.Time.Before(r.clock.Now())
+		}
+		return true
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.DownloadRequest{}).
+		Watches(downloadRequestSource, nil, builder.WithPredicates(downloadRequestPredicates)).
 		Complete(r)
 }

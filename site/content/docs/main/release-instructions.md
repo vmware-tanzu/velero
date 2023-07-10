@@ -159,7 +159,7 @@ What to include in a release blog:
 
 Release blog post PR:
 * Prepare a PR containing the release blog post. Read the [website guidelines][2] for more information on creating a blog post. It's usually easiest to make a copy of the most recent existing post, then replace the content as appropriate.
-* You also need to update `site/index.html` to have "Latest Release Information" contain a link to the new post.
+* You also need to update `site/content/_index.md` to have "Latest Release Information" contain a link to the new post.
 * Plan to publish the blog post the same day as the release.
 
 ## Announce a release
