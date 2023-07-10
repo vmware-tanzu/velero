@@ -100,7 +100,7 @@ func APIExtensionsVersionsTest() {
 				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
 				veleroCfg.Features = "EnableAPIGroupVersions"
 				veleroCfg.UseVolumeSnapshots = false
-				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Install CRD of apiextenstions v1beta1 in cluster-A (%s)", veleroCfg.DefaultCluster), func() {
@@ -129,7 +129,7 @@ func APIExtensionsVersionsTest() {
 			By(fmt.Sprintf("Install Velero in cluster-B (%s) to restore workload", veleroCfg.StandbyCluster), func() {
 				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
 				veleroCfg.ClientToInstallVelero = veleroCfg.StandbyClient
-				Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", veleroCfg.StandbyCluster), func() {

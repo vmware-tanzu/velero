@@ -75,7 +75,7 @@ func APIGropuVersionsTest() {
 		if veleroCfg.InstallVelero {
 			veleroCfg.Features = "EnableAPIGroupVersions"
 			veleroCfg.UseVolumeSnapshots = false
-			err = VeleroInstall(context.Background(), &veleroCfg)
+			err = VeleroInstall(context.Background(), &veleroCfg, false)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		testCaseNum = 4
