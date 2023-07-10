@@ -18,7 +18,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims.storage.k8s.io\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
 		},
 	}
 
