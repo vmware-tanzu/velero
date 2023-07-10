@@ -36,7 +36,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		ResourceModifierRules: []ResourceModifierRule{
 			{
 				Conditions: Conditions{
-					GroupKind:         "persistentvolumeclaims.storage.k8s.io",
+					GroupKind:         "persistentvolumeclaims",
 					ResourceNameRegex: ".*",
 					Namespaces:        []string{"bar", "foo"},
 				},
@@ -64,7 +64,8 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 
 	pvcStandardSc := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "PersistentVolumeClaim",
+			"apiVersion": "v1",
+			"kind":       "PersistentVolumeClaim",
 			"metadata": map[string]interface{}{
 				"name":      "test-pvc",
 				"namespace": "foo",
@@ -77,13 +78,53 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 
 	pvcPremiumSc := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "PersistentVolumeClaim",
+			"apiVersion": "v1",
+			"kind":       "PersistentVolumeClaim",
 			"metadata": map[string]interface{}{
 				"name":      "test-pvc",
 				"namespace": "foo",
 			},
 			"spec": map[string]interface{}{
 				"storageClassName": "premium",
+			},
+		},
+	}
+
+	deployNginxOneReplica := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "test-deployment",
+				"namespace": "foo",
+			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					},
+				},
+				"replicas": "1",
+			},
+		},
+	}
+	deployNginxTwoReplica := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "test-deployment",
+				"namespace": "foo",
+			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					},
+				},
+				"replicas": "2",
 			},
 		},
 	}
@@ -100,11 +141,11 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []error
+		wantErr bool
 		wantObj *unstructured.Unstructured
 	}{
 		{
-			name: "test1",
+			name: "pvc with standard storage class should be patched to premium",
 			fields: fields{
 				Version: "v1",
 				ResourceModifierRules: []ResourceModifierRule{
@@ -133,10 +174,140 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				obj:           pvcStandardSc.DeepCopy(),
 				groupResource: "persistentvolumeclaims",
 			},
-			want:    nil,
+			wantErr: false,
 			wantObj: pvcPremiumSc.DeepCopy(),
 		},
+		{
+			name: "nginx deployment: 1 -> 2 replicas",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "deployments.apps",
+							ResourceNameRegex: "test-.*",
+							Namespaces:        []string{"foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxTwoReplica.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: Empty Resource Regex",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:  "deployments.apps",
+							Namespaces: []string{"foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxTwoReplica.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: Empty Resource Regex  and namespaces list",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind: "deployments.apps",
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxTwoReplica.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: namespace doesn't match",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "deployments.apps",
+							ResourceNameRegex: ".*",
+							Namespaces:        []string{"bar"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxOneReplica.DeepCopy(),
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &ResourceModifiers{
@@ -145,7 +316,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			}
 			got := p.ApplyResourceModifierRules(tt.args.obj, tt.args.groupResource, logrus.New())
 
-			assert.Equal(t, len(tt.want), len(got))
+			assert.Equal(t, tt.wantErr, len(got) > 0)
 			assert.Equal(t, *tt.wantObj, *tt.args.obj)
 		})
 	}

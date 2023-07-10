@@ -121,6 +121,7 @@ type RestoreSpec struct {
 
 	// ResourceModifier specifies the reference to JSON resource patches that should be applied to resources before restoration.
 	// +optional
+	// +nullable
 	ResourceModifier *v1.TypedLocalObjectReference `json:"resourceModifier,omitempty"`
 }
 

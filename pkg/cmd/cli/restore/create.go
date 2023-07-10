@@ -268,6 +268,15 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		}
 	}
 
+	var resModifiers *corev1.TypedLocalObjectReference = nil
+
+	if o.ResourceModifierConfigMap != "" {
+		resModifiers = &corev1.TypedLocalObjectReference{
+			Kind: resourcemodifiers.ConfigmapRefType,
+			Name: o.ResourceModifierConfigMap,
+		}
+	}
+
 	restore := &api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
@@ -287,10 +296,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			RestorePVs:              o.RestoreVolumes.Value,
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
-			ResourceModifier: &corev1.TypedLocalObjectReference{
-				Kind: resourcemodifiers.ConfigmapRefType,
-				Name: o.ResourceModifierConfigMap,
-			},
+			ResourceModifier:        resModifiers,
 			ItemOperationTimeout: metav1.Duration{
 				Duration: o.ItemOperationTimeout,
 			},
