@@ -586,6 +586,14 @@ func TestFindDataDownloadForPod(t *testing.T) {
 				assert.Equal(t, du.Name, requests[0].Name)
 			},
 		}, {
+			name: "no selected label found for pod",
+			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Result(),
+			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
+				// Assert that the function returns a single request
+				assert.Empty(t, requests)
+			},
+		}, {
 			name: "no matched pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: "non-existing-datadownload"}).Result(),
@@ -594,7 +602,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 			},
 		},
 		{
-			name: "dataDownload not accepte",
+			name: "dataDownload not accept",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {

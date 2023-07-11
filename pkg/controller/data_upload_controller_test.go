@@ -357,7 +357,7 @@ func TestReconcile(t *testing.T) {
 			name:              "runCancelableDataUpload is concurrent limited",
 			dataMgr:           datapath.NewManager(0),
 			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Cancel(true).Result(),
+			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			expectedProcessed: false,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
 			expectedRequeue:   ctrl.Result{Requeue: true, RequeueAfter: time.Minute},
@@ -397,7 +397,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			if test.du.Spec.SnapshotType == fakeSnapshotType {
-				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.clock}}
+				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock}}
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 			}
@@ -406,7 +406,7 @@ func TestReconcile(t *testing.T) {
 				return &fakeDataUploadFSBR{
 					du:         test.du,
 					kubeClient: r.client,
-					clock:      r.clock,
+					clock:      r.Clock,
 				}
 			}
 
@@ -596,6 +596,14 @@ func TestFindDataUploadForPod(t *testing.T) {
 				// Assert that the request contains the correct namespaced name
 				assert.Equal(t, du.Namespace, requests[0].Namespace)
 				assert.Equal(t, du.Name, requests[0].Name)
+			},
+		}, {
+			name: "no selected label found for pod",
+			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Result(),
+			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+				// Assert that the function returns a single request
+				assert.Empty(t, requests)
 			},
 		}, {
 			name: "no matched pod",

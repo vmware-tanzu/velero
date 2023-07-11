@@ -63,7 +63,7 @@ type DataUploadReconciler struct {
 	kubeClient          kubernetes.Interface
 	csiSnapshotClient   snapshotter.SnapshotV1Interface
 	repoEnsurer         *repository.Ensurer
-	clock               clocks.WithTickerAndDelayedExecution
+	Clock               clocks.WithTickerAndDelayedExecution
 	credentialGetter    *credentials.CredentialGetter
 	nodeName            string
 	fileSystem          filesystem.Interface
@@ -80,7 +80,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		client:              client,
 		kubeClient:          kubeClient,
 		csiSnapshotClient:   csiSnapshotClient,
-		clock:               clock,
+		Clock:               clock,
 		credentialGetter:    cred,
 		nodeName:            nodeName,
 		fileSystem:          fs,
@@ -138,18 +138,25 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		log.Info("Data upload is accepted")
 
+		if du.Spec.Cancel {
+			r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+			return ctrl.Result{}, nil
+		}
+
 		exposeParam := r.setupExposeParam(&du)
 
 		if err := ep.Expose(ctx, getOwnerObject(&du), exposeParam); err != nil {
 			return r.errorOut(ctx, &du, err, "error to expose snapshot", log)
 		}
 		log.Info("Snapshot is exposed")
-		// ep.Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
+		// Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
 		// but the pod maybe is not in the same node of the current controller, so we need to return it here.
 		// And then only the controller who is in the same node could do the rest work.
 		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
-		if du.Status.StartTimestamp != nil {
+		if du.Spec.Cancel {
+			r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+		} else if du.Status.StartTimestamp != nil {
 			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, &du)
 			}
@@ -158,6 +165,12 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared {
 		log.Info("Data upload is prepared")
+
+		if du.Spec.Cancel {
+			r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+			return ctrl.Result{}, nil
+		}
+
 		fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
 		if fsBackup != nil {
 			log.Info("Cancellable data path is already started")
@@ -288,7 +301,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 	du.Status.Path = result.Backup.Source.ByPath
 	du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
 	du.Status.SnapshotID = result.Backup.SnapshotID
-	du.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	if result.Backup.EmptySnapshot {
 		du.Status.Message = "volume was empty so no data was upload"
 	}
@@ -342,9 +355,9 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceled
 		if du.Status.StartTimestamp.IsZero() {
-			du.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+			du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
-		du.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("error updating DataUpload status")
 		}
@@ -417,15 +430,12 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1.Pod)
-
-	du := &velerov2alpha1api.DataUpload{}
-	err := r.client.Get(context.Background(), types.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      pod.Labels[velerov1api.DataUploadLabel],
-	}, du)
-
+	du, err := findDataUploadByPod(r.client, *pod)
 	if err != nil {
 		r.logger.WithField("Backup pod", pod.Name).WithError(err).Error("unable to get dataupload")
+		return []reconcile.Request{}
+	} else if du == nil {
+		r.logger.WithField("Backup pod", pod.Name).Error("get empty DataUpload")
 		return []reconcile.Request{}
 	}
 
@@ -455,6 +465,30 @@ func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reco
 	return []reconcile.Request{requests}
 }
 
+func (r *DataUploadReconciler) FindDataUploads(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {
+	pods := &corev1.PodList{}
+	var dataUploads []velerov2alpha1api.DataUpload
+	if err := cli.List(ctx, pods, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list pods on current node")
+		return nil, errors.Wrapf(err, "failed to list pods on current node")
+	}
+
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName != r.nodeName {
+			r.logger.Debugf("Pod %s related data upload will not handled by %s nodes", pod.GetName(), r.nodeName)
+			continue
+		}
+		du, err := findDataUploadByPod(cli, pod)
+		if err != nil {
+			r.logger.WithError(errors.WithStack(err)).Error("failed to get dataUpload by pod")
+			continue
+		} else if du != nil {
+			dataUploads = append(dataUploads, *du)
+		}
+	}
+	return dataUploads, nil
+}
+
 func (r *DataUploadReconciler) prepareDataUpload(du *velerov2alpha1api.DataUpload) {
 	du.Status.Phase = velerov2alpha1api.DataUploadPhasePrepared
 	du.Status.Node = r.nodeName
@@ -478,10 +512,10 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 	du.Status.Phase = velerov2alpha1api.DataUploadPhaseFailed
 	du.Status.Message = errors.WithMessage(err, msg).Error()
 	if du.Status.StartTimestamp.IsZero() {
-		du.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	}
 
-	du.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	if patchErr := r.client.Patch(ctx, du, client.MergeFrom(original)); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataUpload status")
 	}
@@ -496,7 +530,7 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 	// and the success one could handle later logic
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(du *velerov2alpha1api.DataUpload) {
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
-		du.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	})
 
 	if err != nil {
@@ -604,4 +638,20 @@ func getOwnerObject(du *velerov2alpha1api.DataUpload) corev1.ObjectReference {
 		UID:        du.UID,
 		APIVersion: du.APIVersion,
 	}
+}
+
+func findDataUploadByPod(client client.Client, pod corev1.Pod) (*velerov2alpha1api.DataUpload, error) {
+	if label, exist := pod.Labels[velerov1api.DataUploadLabel]; exist {
+		du := &velerov2alpha1api.DataUpload{}
+		err := client.Get(context.Background(), types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      label,
+		}, du)
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "error to find DataUpload by pod %s/%s", pod.Namespace, pod.Name)
+		}
+		return du, nil
+	}
+	return nil, nil
 }

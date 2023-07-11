@@ -57,7 +57,7 @@ type DataDownloadReconciler struct {
 	logger            logrus.FieldLogger
 	credentialGetter  *credentials.CredentialGetter
 	fileSystem        filesystem.Interface
-	clock             clock.WithTickerAndDelayedExecution
+	Clock             clock.WithTickerAndDelayedExecution
 	restoreExposer    exposer.GenericRestoreExposer
 	nodeName          string
 	repositoryEnsurer *repository.Ensurer
@@ -73,7 +73,7 @@ func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Inter
 		logger:            logger.WithField("controller", "DataDownload"),
 		credentialGetter:  credentialGetter,
 		fileSystem:        filesystem.NewFileSystem(),
-		clock:             &clock.RealClock{},
+		Clock:             &clock.RealClock{},
 		nodeName:          nodeName,
 		repositoryEnsurer: repoEnsurer,
 		restoreExposer:    exposer.NewGenericRestoreExposer(kubeClient, logger),
@@ -134,9 +134,15 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		log.Info("Data download is accepted")
 
+		if dd.Spec.Cancel {
+			log.Debugf("Data download is been canceled %s in Phase %s", dd.GetName(), dd.Status.Phase)
+			r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
+			return ctrl.Result{}, nil
+		}
+
 		hostingPodLabels := map[string]string{velerov1api.DataDownloadLabel: dd.Name}
 
-		// ep.Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
+		// Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
 		// but the pod maybe is not in the same node of the current controller, so we need to return it here.
 		// And then only the controller who is in the same node could do the rest work.
 		err = r.restoreExposer.Expose(ctx, getDataDownloadOwnerObject(dd), dd.Spec.TargetVolume.PVC, dd.Spec.TargetVolume.Namespace, hostingPodLabels, dd.Spec.OperationTimeout.Duration)
@@ -147,7 +153,10 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		return ctrl.Result{}, nil
 	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted {
-		if dd.Status.StartTimestamp != nil {
+		if dd.Spec.Cancel {
+			log.Debugf("Data download is been canceled %s in Phase %s", dd.GetName(), dd.Status.Phase)
+			r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
+		} else if dd.Status.StartTimestamp != nil {
 			if time.Since(dd.Status.StartTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, dd)
 			}
@@ -156,6 +165,13 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared {
 		log.Info("Data download is prepared")
+
+		if dd.Spec.Cancel {
+			log.Debugf("Data download is been canceled %s in Phase %s", dd.GetName(), dd.Status.Phase)
+			r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
+			return ctrl.Result{}, nil
+		}
+
 		fsRestore := r.dataPathMgr.GetAsyncBR(dd.Name)
 
 		if fsRestore != nil {
@@ -280,7 +296,7 @@ func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, na
 
 	original := dd.DeepCopy()
 	dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCompleted
-	dd.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	if err := r.client.Patch(ctx, &dd, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("error updating data download status")
 	} else {
@@ -322,9 +338,9 @@ func (r *DataDownloadReconciler) OnDataDownloadCancelled(ctx context.Context, na
 		original := dd.DeepCopy()
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCanceled
 		if dd.Status.StartTimestamp.IsZero() {
-			dd.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+			dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
-		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, &dd, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("error updating data download status")
 		}
@@ -398,14 +414,12 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object) []reconcile.Request {
 	pod := podObj.(*v1.Pod)
 
-	dd := &velerov2alpha1api.DataDownload{}
-	err := r.client.Get(context.Background(), types.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      pod.Labels[velerov1api.DataDownloadLabel],
-	}, dd)
-
+	dd, err := findDataDownloadByPod(r.client, *pod)
 	if err != nil {
 		r.logger.WithField("Restore pod", pod.Name).WithError(err).Error("unable to get DataDownload")
+		return []reconcile.Request{}
+	} else if dd == nil {
+		r.logger.WithField("Restore pod", pod.Name).Error("get empty DataDownload")
 		return []reconcile.Request{}
 	}
 
@@ -438,6 +452,30 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object)
 	return requests
 }
 
+func (r *DataDownloadReconciler) FindDataDownloads(ctx context.Context, cli client.Client, ns string) ([]*velerov2alpha1api.DataDownload, error) {
+	pods := &v1.PodList{}
+	var dataDownloads []*velerov2alpha1api.DataDownload
+	if err := cli.List(ctx, pods, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list pods on current node")
+		return nil, errors.Wrapf(err, "failed to list pods on current node")
+	}
+
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName != r.nodeName {
+			r.logger.Debugf("Pod %s related data download will not handled by %s nodes", pod.GetName(), r.nodeName)
+			continue
+		}
+		dd, err := findDataDownloadByPod(cli, pod)
+		if err != nil {
+			r.logger.WithError(errors.WithStack(err)).Error("failed to get dataDownload by pod")
+			continue
+		} else if dd != nil {
+			dataDownloads = append(dataDownloads, dd)
+		}
+	}
+	return dataDownloads, nil
+}
+
 func (r *DataDownloadReconciler) prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
 	ssb.Status.Phase = velerov2alpha1api.DataDownloadPhasePrepared
 	ssb.Status.Node = r.nodeName
@@ -455,7 +493,7 @@ func (r *DataDownloadReconciler) updateStatusToFailed(ctx context.Context, dd *v
 	original := dd.DeepCopy()
 	dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseFailed
 	dd.Status.Message = errors.WithMessage(err, msg).Error()
-	dd.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
 	if patchErr := r.client.Patch(ctx, dd, client.MergeFrom(original)); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataDownload status")
@@ -471,7 +509,7 @@ func (r *DataDownloadReconciler) acceptDataDownload(ctx context.Context, dd *vel
 	// and the success one could handle later logic
 	succeeded, err := r.exclusiveUpdateDataDownload(ctx, dd, func(dd *velerov2alpha1api.DataDownload) {
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseAccepted
-		dd.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+		dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	})
 
 	if err != nil {
@@ -548,4 +586,21 @@ func getDataDownloadOwnerObject(dd *velerov2alpha1api.DataDownload) v1.ObjectRef
 		UID:        dd.UID,
 		APIVersion: dd.APIVersion,
 	}
+}
+
+func findDataDownloadByPod(client client.Client, pod v1.Pod) (*velerov2alpha1api.DataDownload, error) {
+	if label, exist := pod.Labels[velerov1api.DataDownloadLabel]; exist {
+		dd := &velerov2alpha1api.DataDownload{}
+		err := client.Get(context.Background(), types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      label,
+		}, dd)
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "error to find DataDownload by pod %s/%s", pod.Namespace, pod.Name)
+		}
+		return dd, nil
+	}
+
+	return nil, nil
 }
