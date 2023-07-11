@@ -21,7 +21,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims.storage.k8s.io",
+							GroupKind:         "persistentvolumeclaims",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
@@ -44,7 +44,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims.storage.k8s.io",
+							GroupKind:         "persistentvolumeclaims",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
@@ -121,6 +121,15 @@ func TestJsonPatch_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid operation throws error",
+			fields: fields{
+				Operation: "invalid",
+				Path:      "/spec/storageClassName",
+				Value:     "premium",
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -151,7 +160,7 @@ func TestConditions_Validate(t *testing.T) {
 			name: "non 0 length namespaces, non empty group kind, non empty resource name regex",
 			fields: fields{
 				Namespaces:        []string{"bar", "foo"},
-				GroupKind:         "persistentvolumeclaims.storage.k8s.io",
+				GroupKind:         "persistentvolumeclaims",
 				ResourceNameRegex: ".*",
 			},
 			wantErr: false,

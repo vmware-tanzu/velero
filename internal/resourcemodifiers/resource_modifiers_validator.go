@@ -37,9 +37,11 @@ func (p *ResourceModifiers) Validate() error {
 }
 
 func (p *JSONPatch) Validate() error {
-	// TODO validate allowed operation
 	if p.Operation == "" {
 		return fmt.Errorf("operation cannot be empty")
+	}
+	if operation := strings.ToLower(p.Operation); operation != "add" && operation != "remove" && operation != "replace" && operation != "test" && operation != "move" && operation != "copy" {
+		return fmt.Errorf("unsupported operation %s", p.Operation)
 	}
 	if p.Path == "" {
 		return fmt.Errorf("path cannot be empty")

@@ -362,6 +362,7 @@ spec:
               resourceModifier:
                 description: ResourceModifier specifies the reference to JSON resource
                   patches that should be applied to resources before restoration.
+                nullable: true
                 properties:
                   apiGroup:
                     description: APIGroup is the group for the resource being referenced.
