@@ -350,6 +350,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("Validation error in resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)).Error())
 			return backupInfo{}, nil
 		}
+		r.logger.Infof("Retrieved Resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)
 	}
 
 	return info, resourceModifiers

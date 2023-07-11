@@ -94,6 +94,7 @@ func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResour
 	if err != nil {
 		return err
 	}
+	log.Infof("Applying resource modifier patch on %s/%s", obj.GetNamespace(), obj.GetName())
 	err = ApplyPatch(patches, obj, log)
 	if err != nil {
 		return err
