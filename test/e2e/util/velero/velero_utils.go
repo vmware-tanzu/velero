@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,15 +71,16 @@ var pluginsMatrix = map[string]map[string][]string{
 		"csi":     {"velero/velero-plugin-for-csi:v0.5.0"},
 	},
 	"main": {
-		"aws":     {"velero/velero-plugin-for-aws:main"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:main"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:main"},
-		"csi":     {"velero/velero-plugin-for-csi:main"},
+		"aws":       {"velero/velero-plugin-for-aws:main"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
+		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":       {"velero/velero-plugin-for-gcp:main"},
+		"csi":       {"velero/velero-plugin-for-csi:main"},
+		"datamover": {"velero/velero-plugin-for-aws:main"},
 	},
 }
 
-func GetProviderPluginsByVersion(version, providerName, feature string) ([]string, error) {
+func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature string, needDataMoverPlugin bool) ([]string, error) {
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
@@ -92,17 +94,47 @@ func GetProviderPluginsByVersion(version, providerName, feature string) ([]strin
 	}
 	var pluginsForFeature []string
 
-	plugins, ok := cloudMap[providerName]
-	if !ok {
-		return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, providerName)
+	if cloudProvider == "kind" {
+		plugins, ok := cloudMap["aws"]
+		if !ok {
+			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
+		}
+		return plugins, nil
 	}
+
+	plugins, ok := cloudMap[cloudProvider]
+	if !ok {
+		return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
+	}
+
+	if objectStoreProvider != cloudProvider {
+		pluginsForObjectStoreProvider, ok := cloudMap[objectStoreProvider]
+		if !ok {
+			return nil, errors.Errorf("fail to get plugins by version: %s and object store provider %s", version, objectStoreProvider)
+		}
+		plugins = append(plugins, pluginsForObjectStoreProvider...)
+	}
+
 	if strings.EqualFold(feature, "EnableCSI") {
 		pluginsForFeature, ok = cloudMap["csi"]
 		if !ok {
-			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, providerName)
+			return nil, errors.Errorf("fail to get CSI plugins by version: %s ", version)
 		}
+		plugins = append(plugins, pluginsForFeature...)
 	}
-	return append(plugins, pluginsForFeature...), nil
+	if needDataMoverPlugin {
+		pluginsForDatamover, ok := cloudMap["datamover"]
+		if !ok {
+			return nil, errors.Errorf("fail to get plugins by for datamover")
+		}
+		for _, p := range pluginsForDatamover {
+			if !slices.Contains(plugins, p) {
+				plugins = append(plugins, pluginsForDatamover...)
+			}
+		}
+
+	}
+	return plugins, nil
 }
 
 // getProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
@@ -278,6 +310,10 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 	}
 	if backupCfg.Selector != "" {
 		args = append(args, "--selector", backupCfg.Selector)
+	}
+
+	if backupCfg.SnapshotMoveData {
+		args = append(args, "--snapshot-move-data")
 	}
 
 	if backupCfg.UseVolumeSnapshots {
@@ -516,26 +552,58 @@ func VeleroVersion(ctx context.Context, veleroCLI, veleroNamespace string) error
 	return nil
 }
 
-func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, cloudProvider, providerPlugins, feature string) ([]string, error) {
+// getProviderPlugins only provide plugin for specific cloud provider
+func getProviderPlugins(ctx context.Context, veleroCLI string, cloudProvider string) ([]string, error) {
+	if cloudProvider == "" {
+		return []string{}, errors.New("CloudProvider should be provided")
+	}
+
+	version, err := getVeleroVersion(ctx, veleroCLI, true)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to get velero version")
+	}
+
+	plugins, err := getPluginsByVersion(version, cloudProvider, cloudProvider, "", false)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", cloudProvider, version)
+	}
+
+	return plugins, nil
+}
+
+// getPlugins will collect all kinds plugins for VeleroInstall, such as provider
+// plugins(cloud provider/object store provider, if object store provider is not
+// provided, it should be set to value as cloud provider's), feature plugins (CSI/Datamover)
+func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
+	veleroCLI := veleroCfg.VeleroCLI
+	cloudProvider := veleroCfg.CloudProvider
+	objectStoreProvider := veleroCfg.ObjectStoreProvider
+	providerPlugins := veleroCfg.Plugins
+	feature := veleroCfg.Features
+	needDataMoverPlugin := false
+
 	// Fetch the plugins for the provider before checking for the object store provider below.
 	var plugins []string
 	if len(providerPlugins) > 0 {
 		plugins = strings.Split(providerPlugins, ",")
 	} else {
+		if cloudProvider == "" {
+			return []string{}, errors.New("CloudProvider should be provided")
+		}
+		if objectStoreProvider == "" {
+			objectStoreProvider = cloudProvider
+		}
 		version, err := getVeleroVersion(ctx, veleroCLI, true)
 		if err != nil {
 			return nil, errors.WithMessage(err, "failed to get velero version")
 		}
-		plugins, err = GetProviderPluginsByVersion(version, objectStoreProvider, feature)
+
+		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" {
+			needDataMoverPlugin = true
+		}
+		plugins, err = getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature, needDataMoverPlugin)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
-		}
-		if objectStoreProvider != "" && cloudProvider != "kind" && objectStoreProvider != cloudProvider {
-			pluginsTmp, err := GetProviderPluginsByVersion(version, cloudProvider, feature)
-			if err != nil {
-				return nil, errors.WithMessage(err, "failed to get velero version")
-			}
-			plugins = append(plugins, pluginsTmp...)
 		}
 	}
 	return plugins, nil
@@ -543,9 +611,8 @@ func getProviderPlugins(ctx context.Context, veleroCLI, objectStoreProvider, clo
 
 // VeleroAddPluginsForProvider determines which plugins need to be installed for a provider and
 // installs them in the current Velero installation, skipping over those that are already installed.
-func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, addPlugins, feature string) error {
-	plugins, err := getProviderPlugins(ctx, veleroCLI, provider, provider, addPlugins, feature)
-	fmt.Printf("addPlugins cmd =%v\n", addPlugins)
+func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string) error {
+	plugins, err := getProviderPlugins(ctx, veleroCLI, provider)
 	fmt.Printf("provider cmd = %v\n", provider)
 	fmt.Printf("plugins cmd = %v\n", plugins)
 	if err != nil {

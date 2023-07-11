@@ -55,6 +55,8 @@ import (
 const dataMoverType string = "velero"
 const dataUploadDownloadRequestor string = "snapshot-data-upload-download"
 
+const preparingMonitorFrequency time.Duration = time.Minute
+
 // DataUploadReconciler reconciles a DataUpload object
 type DataUploadReconciler struct {
 	client              client.Client
@@ -68,11 +70,12 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
+	preparingTimeout    time.Duration
 }
 
 func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface,
 	csiSnapshotClient snapshotter.SnapshotV1Interface, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
-	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, log logrus.FieldLogger) *DataUploadReconciler {
+	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
 		kubeClient:          kubeClient,
@@ -85,6 +88,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		repoEnsurer:         repoEnsurer,
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
 		dataPathMgr:         datapath.NewManager(1),
+		preparingTimeout:    preparingTimeout,
 	}
 }
 
@@ -152,7 +156,12 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
 		if du.Spec.Cancel {
 			r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+		} else if du.Status.StartTimestamp != nil {
+			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
+				r.onPrepareTimeout(ctx, &du)
+			}
 		}
+
 		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared {
 		log.Info("Data upload is prepared")
@@ -199,7 +208,6 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// Update status to InProgress
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
-		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
 			return r.errorOut(ctx, &du, err, "error updating dataupload status", log)
 		}
@@ -379,8 +387,15 @@ func (r *DataUploadReconciler) OnDataUploadProgress(ctx context.Context, namespa
 // re-enqueue the previous related request once the related pod is in running status to keep going on the rest logic. and below logic will avoid handling the unwanted
 // pod status and also avoid block others CR handling
 func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	s := kube.NewPeriodicalEnqueueSource(r.logger, r.client, &velerov2alpha1api.DataUploadList{}, preparingMonitorFrequency, kube.PeriodicalEnqueueSourceOption{})
+	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
+		du := object.(*velerov2alpha1api.DataUpload)
+		return (du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted)
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov2alpha1api.DataUpload{}).
+		Watches(s, nil, builder.WithPredicates(gp)).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.findDataUploadForPod),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(ue event.UpdateEvent) bool {
@@ -429,8 +444,15 @@ func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reco
 	}
 
 	r.logger.WithField("Backup pod", pod.Name).Infof("Preparing dataupload %s", du.Name)
-	if err := r.patchDataUpload(context.Background(), du, prepareDataUpload); err != nil {
-		r.logger.WithField("Backup pod", pod.Name).WithError(err).Error("failed to patch dataupload")
+
+	// we don't expect anyone else update the CR during the Prepare process
+	updated, err := r.exclusiveUpdateDataUpload(context.Background(), du, r.prepareDataUpload)
+	if err != nil || !updated {
+		r.logger.WithFields(logrus.Fields{
+			"Dataupload": du.Name,
+			"Backup pod": pod.Name,
+			"updated":    updated,
+		}).WithError(err).Warn("failed to patch dataupload, prepare will halt for this dataupload")
 		return []reconcile.Request{}
 	}
 
@@ -467,18 +489,9 @@ func (r *DataUploadReconciler) FindDataUploads(ctx context.Context, cli client.C
 	return dataUploads, nil
 }
 
-func (r *DataUploadReconciler) patchDataUpload(ctx context.Context, req *velerov2alpha1api.DataUpload, mutate func(*velerov2alpha1api.DataUpload)) error {
-	original := req.DeepCopy()
-	mutate(req)
-	if err := r.client.Patch(ctx, req, client.MergeFrom(original)); err != nil {
-		return errors.Wrap(err, "error patching DataUpload")
-	}
-
-	return nil
-}
-
-func prepareDataUpload(du *velerov2alpha1api.DataUpload) {
+func (r *DataUploadReconciler) prepareDataUpload(du *velerov2alpha1api.DataUpload) {
 	du.Status.Phase = velerov2alpha1api.DataUploadPhasePrepared
+	du.Status.Node = r.nodeName
 }
 
 func (r *DataUploadReconciler) errorOut(ctx context.Context, du *velerov2alpha1api.DataUpload, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
@@ -511,19 +524,73 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 }
 
 func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload) (bool, error) {
-	updated := du.DeepCopy()
-	updated.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
-
-	r.logger.Infof("Accepting snapshot backup %s", du.Name)
+	r.logger.Infof("Accepting data upload %s", du.Name)
 
 	// For all data upload controller in each node-agent will try to update dataupload CR, and only one controller will success,
 	// and the success one could handle later logic
+	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(du *velerov2alpha1api.DataUpload) {
+		du.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
+		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	if succeeded {
+		r.logger.WithField("Dataupload", du.Name).Infof("This datauplod has been accepted by %s", r.nodeName)
+		return true, nil
+	}
+
+	r.logger.WithField("Dataupload", du.Name).Info("This datauplod has been accepted by others")
+	return false, nil
+}
+
+func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov2alpha1api.DataUpload) {
+	log := r.logger.WithField("Dataupload", du.Name)
+
+	log.Info("Timeout happened for preparing dataupload")
+
+	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(du *velerov2alpha1api.DataUpload) {
+		du.Status.Phase = velerov2alpha1api.DataUploadPhaseFailed
+		du.Status.Message = "timeout on preparing data upload"
+	})
+
+	if err != nil {
+		log.WithError(err).Warn("Failed to update dataupload")
+		return
+	}
+
+	if !succeeded {
+		log.Warn("Dataupload has been updated by others")
+		return
+	}
+
+	ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
+	if !ok {
+		log.WithError(fmt.Errorf("%v type of snapshot exposer is not exist", du.Spec.SnapshotType)).
+			Warn("Failed to clean up resources on canceled")
+	} else {
+		var volumeSnapshotName string
+		if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI { // Other exposer should have another condition
+			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
+		}
+
+		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
+
+		log.Info("Dataupload has been cleaned up")
+	}
+}
+
+func (r *DataUploadReconciler) exclusiveUpdateDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload,
+	updateFunc func(*velerov2alpha1api.DataUpload)) (bool, error) {
+	updated := du.DeepCopy()
+	updateFunc(updated)
+
 	err := r.client.Update(ctx, updated)
 	if err == nil {
-		r.logger.WithField("Dataupload", du.Name).Infof("This datauplod backup has been accepted by %s", r.nodeName)
 		return true, nil
 	} else if apierrors.IsConflict(err) {
-		r.logger.WithField("Dataupload", du.Name).Info("This datauplod backup has been accepted by others")
 		return false, nil
 	} else {
 		return false, err

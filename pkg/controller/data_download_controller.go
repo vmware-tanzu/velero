@@ -62,10 +62,11 @@ type DataDownloadReconciler struct {
 	nodeName          string
 	repositoryEnsurer *repository.Ensurer
 	dataPathMgr       *datapath.Manager
+	preparingTimeout  time.Duration
 }
 
 func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface,
-	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, logger logrus.FieldLogger) *DataDownloadReconciler {
+	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:            client,
 		kubeClient:        kubeClient,
@@ -77,6 +78,7 @@ func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Inter
 		repositoryEnsurer: repoEnsurer,
 		restoreExposer:    exposer.NewGenericRestoreExposer(kubeClient, logger),
 		dataPathMgr:       datapath.NewManager(1),
+		preparingTimeout:  preparingTimeout,
 	}
 }
 
@@ -154,7 +156,12 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if dd.Spec.Cancel {
 			log.Debugf("Data download is been canceled %s in Phase %s", dd.GetName(), dd.Status.Phase)
 			r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
+		} else if dd.Status.StartTimestamp != nil {
+			if time.Since(dd.Status.StartTimestamp.Time) >= r.preparingTimeout {
+				r.onPrepareTimeout(ctx, dd)
+			}
 		}
+
 		return ctrl.Result{}, nil
 	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared {
 		log.Info("Data download is prepared")
@@ -203,7 +210,6 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Update status to InProgress
 		original := dd.DeepCopy()
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseInProgress
-		dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, dd, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Unable to update status to in progress")
 			return ctrl.Result{}, err
@@ -364,8 +370,15 @@ func (r *DataDownloadReconciler) OnDataDownloadProgress(ctx context.Context, nam
 // re-enqueue the previous related request once the related pod is in running status to keep going on the rest logic. and below logic will avoid handling the unwanted
 // pod status and also avoid block others CR handling
 func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	s := kube.NewPeriodicalEnqueueSource(r.logger, r.client, &velerov2alpha1api.DataDownloadList{}, preparingMonitorFrequency, kube.PeriodicalEnqueueSourceOption{})
+	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
+		dd := object.(*velerov2alpha1api.DataDownload)
+		return (dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted)
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov2alpha1api.DataDownload{}).
+		Watches(s, nil, builder.WithPredicates(gp)).
 		Watches(&source.Kind{Type: &v1.Pod{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.findSnapshotRestoreForPod),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(ue event.UpdateEvent) bool {
@@ -417,9 +430,15 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object)
 	requests := make([]reconcile.Request, 1)
 
 	r.logger.WithField("Restore pod", pod.Name).Infof("Preparing data download %s", dd.Name)
-	err = r.patchDataDownload(context.Background(), dd, prepareDataDownload)
-	if err != nil {
-		r.logger.WithField("Restore pod", pod.Name).WithError(err).Error("unable to patch data download")
+
+	// we don't expect anyone else update the CR during the Prepare process
+	updated, err := r.exclusiveUpdateDataDownload(context.Background(), dd, r.prepareDataDownload)
+	if err != nil || !updated {
+		r.logger.WithFields(logrus.Fields{
+			"Datadownload": dd.Name,
+			"Restore pod":  pod.Name,
+			"updated":      updated,
+		}).WithError(err).Warn("failed to patch datadownload, prepare will halt for this datadownload")
 		return []reconcile.Request{}
 	}
 
@@ -457,18 +476,9 @@ func (r *DataDownloadReconciler) FindDataDownloads(ctx context.Context, cli clie
 	return dataDownloads, nil
 }
 
-func (r *DataDownloadReconciler) patchDataDownload(ctx context.Context, req *velerov2alpha1api.DataDownload, mutate func(*velerov2alpha1api.DataDownload)) error {
-	original := req.DeepCopy()
-	mutate(req)
-	if err := r.client.Patch(ctx, req, client.MergeFrom(original)); err != nil {
-		return errors.Wrap(err, "error patching data download")
-	}
-
-	return nil
-}
-
-func prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
+func (r *DataDownloadReconciler) prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
 	ssb.Status.Phase = velerov2alpha1api.DataDownloadPhasePrepared
+	ssb.Status.Node = r.nodeName
 }
 
 func (r *DataDownloadReconciler) errorOut(ctx context.Context, dd *velerov2alpha1api.DataDownload, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
@@ -493,17 +503,62 @@ func (r *DataDownloadReconciler) updateStatusToFailed(ctx context.Context, dd *v
 }
 
 func (r *DataDownloadReconciler) acceptDataDownload(ctx context.Context, dd *velerov2alpha1api.DataDownload) (bool, error) {
-	updated := dd.DeepCopy()
-	updated.Status.Phase = velerov2alpha1api.DataDownloadPhaseAccepted
+	r.logger.Infof("Accepting data download %s", dd.Name)
 
-	r.logger.Infof("Accepting snapshot restore %s", dd.Name)
 	// For all data download controller in each node-agent will try to update download CR, and only one controller will success,
 	// and the success one could handle later logic
+	succeeded, err := r.exclusiveUpdateDataDownload(ctx, dd, func(dd *velerov2alpha1api.DataDownload) {
+		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseAccepted
+		dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	if succeeded {
+		r.logger.WithField("DataDownload", dd.Name).Infof("This datadownload has been accepted by %s", r.nodeName)
+		return true, nil
+	}
+
+	r.logger.WithField("DataDownload", dd.Name).Info("This datadownload has been accepted by others")
+	return false, nil
+}
+
+func (r *DataDownloadReconciler) onPrepareTimeout(ctx context.Context, dd *velerov2alpha1api.DataDownload) {
+	log := r.logger.WithField("DataDownload", dd.Name)
+
+	log.Info("Timeout happened for preparing datadownload")
+
+	succeeded, err := r.exclusiveUpdateDataDownload(ctx, dd, func(dd *velerov2alpha1api.DataDownload) {
+		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseFailed
+		dd.Status.Message = "timeout on preparing data download"
+	})
+
+	if err != nil {
+		log.WithError(err).Warn("Failed to update datadownload")
+		return
+	}
+
+	if !succeeded {
+		log.Warn("Dataupload has been updated by others")
+		return
+	}
+
+	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
+
+	log.Info("Dataupload has been cleaned up")
+}
+
+func (r *DataDownloadReconciler) exclusiveUpdateDataDownload(ctx context.Context, dd *velerov2alpha1api.DataDownload,
+	updateFunc func(*velerov2alpha1api.DataDownload)) (bool, error) {
+	updated := dd.DeepCopy()
+	updateFunc(updated)
+
 	err := r.client.Update(ctx, updated)
 	if err == nil {
 		return true, nil
 	} else if apierrors.IsConflict(err) {
-		r.logger.WithField("DataDownload", dd.Name).Error("This data download restore has been accepted by others")
 		return false, nil
 	} else {
 		return false, err

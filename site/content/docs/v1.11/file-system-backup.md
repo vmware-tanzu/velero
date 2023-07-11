@@ -74,7 +74,7 @@ Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.
 **RancherOS**
 
 
-Update the host path for volumes in the nonde-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to 
+Update the host path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to 
 `/opt/rke/var/lib/kubelet/pods`.  
 
 ```yaml
@@ -539,7 +539,7 @@ that it's backing up for the volumes to be backed up using FSB.
 5. Meanwhile, each `PodVolumeBackup` is handled by the controller on the appropriate node, which:
     - has a hostPath volume mount of `/var/lib/kubelet/pods` to access the pod volume data
     - finds the pod volume's subdirectory within the above volume
-    - based on the path selection, Velero inokes restic or kopia for backup
+    - based on the path selection, Velero invokes restic or kopia for backup
     - updates the status of the custom resource to `Completed` or `Failed`
 6. As each `PodVolumeBackup` finishes, the main Velero process adds it to the Velero backup in a file named 
 `<backup-name>-podvolumebackups.json.gz`. This file gets uploaded to object storage alongside the backup tarball. 
@@ -556,7 +556,7 @@ It will be used for restores, as seen in the next section.
 3. Velero adds an init container to the pod, whose job is to wait for all FSB restores for the pod to complete (more
 on this shortly)
 4. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API. Then, the Kubernetes 
-scheduler schedules this pod to a worker node, and the pod must be in a running state. If the pod fails to start for 
+scheduler schedules this pod to a worker node. If the pod fails to be scheduled for 
 some reason (i.e. lack of cluster resources), the FSB restore will not be done.
 5. Velero creates a `PodVolumeRestore` custom resource for each volume to be restored in the pod
 6. The main Velero process now waits for each `PodVolumeRestore` resource to complete or fail
@@ -564,7 +564,7 @@ some reason (i.e. lack of cluster resources), the FSB restore will not be done.
     - has a hostPath volume mount of `/var/lib/kubelet/pods` to access the pod volume data
     - waits for the pod to be running the init container
     - finds the pod volume's subdirectory within the above volume
-    - based on the path selection, Velero inokes restic or kopia for restore
+    - based on the path selection, Velero invokes restic or kopia for restore
     - on success, writes a file into the pod volume, in a `.velero` subdirectory, whose name is the UID of the Velero 
     restore that this pod volume restore is for
     - updates the status of the custom resource to `Completed` or `Failed`

@@ -113,3 +113,9 @@ func (d *DataUploadBuilder) CSISnapshot(cSISnapshot *velerov2alpha1api.CSISnapsh
 	d.object.Spec.CSISnapshot = cSISnapshot
 	return d
 }
+
+// StartTimestamp sets the DataUpload's StartTimestamp.
+func (d *DataUploadBuilder) StartTimestamp(startTime *metav1.Time) *DataUploadBuilder {
+	d.object.Status.StartTimestamp = startTime
+	return d
+}

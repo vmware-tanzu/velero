@@ -200,6 +200,7 @@ func AddLabelToCRD(ctx context.Context, crd, label string) error {
 
 func KubectlApplyByFile(ctx context.Context, file string) error {
 	args := []string{"apply", "-f", file, "--force=true"}
+	fmt.Println(args)
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }
 
