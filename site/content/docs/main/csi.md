@@ -56,7 +56,9 @@ From there, the CSI external-snapshotter controller will see the VolumeSnapshot 
 The external-snapshotter plugin will call the CSI driver's snapshot method, and the driver will call the storage system's APIs to generate the snapshot.
 Once an ID is generated and the storage system marks the snapshot as usable for restore, the VolumeSnapshotContent object will be updated with a `status.snapshotHandle` and the `status.readyToUse` field will be set.
 
-Velero will include the generated VolumeSnapshot and VolumeSnapshotContent objects in the backup tarball, as well as upload all VolumeSnapshots and VolumeSnapshotContents objects in a JSON file to the object storage system.
+Velero will include the generated VolumeSnapshot and VolumeSnapshotContent objects in the backup tarball, as well as
+upload all VolumeSnapshots and VolumeSnapshotContents objects in a JSON file to the object storage system. **Note that
+only Kubernetes objects are uploaded to the object storage, not the data in snapshots.**
 
 When Velero synchronizes backups into a new cluster, VolumeSnapshotContent objects and the VolumeSnapshotClass that is chosen to take
 snapshot will be synced into the cluster as well, so that Velero can manage backup expiration appropriately.
