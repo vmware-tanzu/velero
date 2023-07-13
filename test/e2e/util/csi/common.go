@@ -91,6 +91,43 @@ func GetCsiSnapshotHandle(client TestClient, backupName string) ([]string, error
 	}
 	return snapshotHandleList, nil
 }
+func GetCsiSnapshotHandleV1(client TestClient, backupName string) ([]string, error) {
+	_, snapshotClient, err := GetClients()
+	if err != nil {
+		return nil, err
+	}
+	vscList, err1 := snapshotClient.SnapshotV1().VolumeSnapshotContents().List(context.TODO(), metav1.ListOptions{})
+	if err1 != nil {
+		return nil, err
+	}
+
+	var snapshotHandleList []string
+	for _, i := range vscList.Items {
+		if i.Status == nil {
+			fmt.Println("SnapshotHandle Status s nil")
+			continue
+		}
+		if i.Status.SnapshotHandle == nil {
+			fmt.Println("SnapshotHandle is nil")
+			continue
+		}
+
+		if i.Labels == nil {
+			fmt.Println("VolumeSnapshotContents label is nil")
+			continue
+		}
+
+		if i.Labels["velero.io/backup-name"] == backupName {
+			tmp := strings.Split(*i.Status.SnapshotHandle, "/")
+			snapshotHandleList = append(snapshotHandleList, tmp[len(tmp)-1])
+		}
+	}
+
+	if len(snapshotHandleList) == 0 {
+		fmt.Printf("No VolumeSnapshotContent from backup %s", backupName)
+	}
+	return snapshotHandleList, nil
+}
 func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, backupName string) (string, error) {
 	pvcList, err := GetPvcByPodName(context.Background(), namespace, podName)
 	if err != nil {
@@ -128,11 +165,19 @@ func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, ba
 	return "", errors.New(fmt.Sprintf("Fail to get VolumeSnapshotContentName for pod %s under namespace %s", podName, namespace))
 }
 
-func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount int) ([]string, error) {
+func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount int, apiVersion string) ([]string, error) {
 	var err error
 	var snapshotContentNameList []string
-	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil {
-		return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+	if apiVersion == "v1beta1" {
+		if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil {
+			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+		}
+	} else if apiVersion == "v1" {
+		if snapshotContentNameList, err = GetCsiSnapshotHandleV1(client, backupName); err != nil {
+			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+		}
+	} else {
+		return nil, errors.New("API version is invalid")
 	}
 	if len(snapshotContentNameList) != expectedCount {
 		return nil, errors.New(fmt.Sprintf("Snapshot count %d is not as expect %d", len(snapshotContentNameList), expectedCount))

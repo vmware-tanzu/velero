@@ -47,7 +47,7 @@ func (d *DeploymentBuilder) Result() *apps.Deployment {
 }
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container) *DeploymentBuilder {
+func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container, volumes []v1.Volume) *DeploymentBuilder {
 	if containers == nil {
 		containers = []v1.Container{
 			{
@@ -70,6 +70,17 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 			},
 		}
 	}
+	if volumes == nil {
+
+		volumes = []v1.Volume{
+			{
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+	}
+
 	return &DeploymentBuilder{
 		&apps.Deployment{
 			TypeMeta: metav1.TypeMeta{
@@ -98,6 +109,7 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 							FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
 						},
 						Containers: containers,
+						Volumes:    volumes,
 					},
 				},
 			},

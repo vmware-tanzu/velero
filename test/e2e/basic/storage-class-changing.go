@@ -27,6 +27,7 @@ type StorageClasssChanging struct {
 	volume          string
 	podName         string
 	mappedNS        string
+	replica         int32
 }
 
 const SCCBaseName string = "scc-"
@@ -78,10 +79,27 @@ func (s *StorageClasssChanging) CreateResources() error {
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
 	})
 
-	By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
-		_, err := CreatePod(s.Client, s.namespace, s.podName, s.srcStorageClass, "", []string{s.volume}, nil, nil)
-		Expect(err).To(Succeed())
-	})
+	// By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
+	// 	_, err := CreatePod(s.Client, s.namespace, s.podName, s.srcStorageClass, "", []string{s.volume}, nil, nil)
+	// 	Expect(err).To(Succeed())
+	// })
+
+	//Create deployment
+	fmt.Printf("Creating deployment in namespaces ...%s\n", s.namespace)
+
+	// VolumeSource: v1.VolumeSource{
+	// 	PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+	// 		ClaimName: "aaa",
+	// 	},
+	// },
+
+	deployment := NewDeployment(s.CaseBaseName, s.namespace, s.replica, s.labels, nil).Result()
+	deployment, err := CreateDeployment(s.Client.ClientGo, s.namespace, deployment)
+	Expect(err).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q", s.namespace))
+
+	err = WaitForReadyDeployment(s.Client.ClientGo, s.namespace, deployment.Name)
+	Expect(err).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q", s.namespace))
+
 	By(fmt.Sprintf("Create ConfigMap %s in namespace %s", s.configmaptName, s.VeleroCfg.VeleroNamespace), func() {
 		_, err := CreateConfigMap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.configmaptName, s.labels, s.data)
 		Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", s.VeleroCfg.VeleroNamespace))
