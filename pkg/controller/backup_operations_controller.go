@@ -185,14 +185,15 @@ func (c *backupOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		operations.ChangesSinceUpdate = true
 	}
 
+	if len(operations.ErrsSinceUpdate) > 0 {
+		backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed
+	}
+
 	// if stillInProgress is false, backup moves to finalize phase and needs update
 	// if operations.ErrsSinceUpdate is not empty, then backup phase needs to change to
 	// BackupPhaseWaitingForPluginOperationsPartiallyFailed and needs update
 	// If the only changes are incremental progress, then no write is necessary, progress can remain in memory
 	if !stillInProgress {
-		if len(operations.ErrsSinceUpdate) > 0 {
-			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed
-		}
 		if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations {
 			log.Infof("Marking backup %s Finalizing", backup.Name)
 			backup.Status.Phase = velerov1api.BackupPhaseFinalizing
