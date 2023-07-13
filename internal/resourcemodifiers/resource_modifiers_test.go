@@ -145,6 +145,39 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		wantObj *unstructured.Unstructured
 	}{
 		{
+			name: "Invalid Regex throws error",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "persistentvolumeclaims",
+							ResourceNameRegex: "[a-z",
+							Namespaces:        []string{"foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/storageClassName",
+								Value:     "standard",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/storageClassName",
+								Value:     "premium",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           pvcStandardSc.DeepCopy(),
+				groupResource: "persistentvolumeclaims",
+			},
+			wantErr: true,
+			wantObj: pvcStandardSc.DeepCopy(),
+		},
+		{
 			name: "pvc with standard storage class should be patched to premium",
 			fields: fields{
 				Version: "v1",

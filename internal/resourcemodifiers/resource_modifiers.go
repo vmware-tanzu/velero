@@ -85,7 +85,10 @@ func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResour
 		return nil
 	}
 	if r.Conditions.ResourceNameRegex != "" {
-		match, _ := regexp.MatchString(r.Conditions.ResourceNameRegex, obj.GetName())
+		match, err := regexp.MatchString(r.Conditions.ResourceNameRegex, obj.GetName())
+		if err != nil {
+			return errors.Errorf("error in matching regex %s", err.Error())
+		}
 		if !match {
 			return nil
 		}
