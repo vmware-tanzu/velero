@@ -4,17 +4,15 @@ import (
 	"strings"
 
 	"fmt"
-
-	"github.com/pkg/errors"
 )
 
 func (r *ResourceModifierRule) Validate() error {
 	if err := r.Conditions.Validate(); err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 	for _, patch := range r.Patches {
 		if err := patch.Validate(); err != nil {
-			return errors.WithStack(err)
+			return err
 		}
 	}
 	return nil
@@ -29,7 +27,7 @@ func (p *ResourceModifiers) Validate() error {
 	}
 	for _, rule := range p.ResourceModifierRules {
 		if err := rule.Validate(); err != nil {
-			return errors.WithStack(err)
+			return err
 		}
 	}
 

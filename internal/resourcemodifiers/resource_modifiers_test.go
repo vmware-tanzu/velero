@@ -116,9 +116,17 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid payload",
+			name: "invalid payload version1",
 			args: args{
 				cm: cm3,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "nil configmap",
+			args: args{
+				cm: nil,
 			},
 			want:    nil,
 			wantErr: true,

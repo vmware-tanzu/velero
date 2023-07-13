@@ -68,6 +68,52 @@ func TestResourceModifiers_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "patch has invalid operation",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "persistentvolumeclaims",
+							ResourceNameRegex: ".*",
+							Namespaces:        []string{"bar", "foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "invalid",
+								Path:      "/spec/storageClassName",
+								Value:     "premium",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Condition has empty GroupKind",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "",
+							ResourceNameRegex: ".*",
+							Namespaces:        []string{"bar", "foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "invalid",
+								Path:      "/spec/storageClassName",
+								Value:     "premium",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -140,50 +186,6 @@ func TestJsonPatch_Validate(t *testing.T) {
 			}
 			if err := p.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("JsonPatch.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestConditions_Validate(t *testing.T) {
-	type fields struct {
-		Namespaces        []string
-		GroupKind         string
-		ResourceNameRegex string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		{
-			name: "non 0 length namespaces, non empty group kind, non empty resource name regex",
-			fields: fields{
-				Namespaces:        []string{"bar", "foo"},
-				GroupKind:         "persistentvolumeclaims",
-				ResourceNameRegex: ".*",
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty group kind throws error",
-			fields: fields{
-				Namespaces:        []string{"bar", "foo"},
-				GroupKind:         "",
-				ResourceNameRegex: ".*",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := &Conditions{
-				Namespaces:        tt.fields.Namespaces,
-				GroupKind:         tt.fields.GroupKind,
-				ResourceNameRegex: tt.fields.ResourceNameRegex,
-			}
-			if err := c.Validate(); (err != nil) != tt.wantErr {
-				t.Errorf("Conditions.Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
