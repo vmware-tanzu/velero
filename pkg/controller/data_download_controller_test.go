@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 
@@ -136,7 +137,7 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 	if err != nil {
 		return nil, err
 	}
-	return NewDataDownloadReconciler(fakeClient, fakeKubeClient, nil, &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", time.Minute*5, velerotest.NewLogger()), nil
+	return NewDataDownloadReconciler(fakeClient, fakeKubeClient, nil, &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {

@@ -44,6 +44,7 @@ import (
 	datamover "github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	repository "github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -63,10 +64,11 @@ type DataDownloadReconciler struct {
 	repositoryEnsurer *repository.Ensurer
 	dataPathMgr       *datapath.Manager
 	preparingTimeout  time.Duration
+	metrics           *metrics.ServerMetrics
 }
 
 func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface,
-	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger) *DataDownloadReconciler {
+	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:            client,
 		kubeClient:        kubeClient,
@@ -79,6 +81,7 @@ func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Inter
 		restoreExposer:    exposer.NewGenericRestoreExposer(kubeClient, logger),
 		dataPathMgr:       datapath.NewManager(1),
 		preparingTimeout:  preparingTimeout,
+		metrics:           metrics,
 	}
 }
 
@@ -301,6 +304,7 @@ func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, na
 		log.WithError(err).Error("error updating data download status")
 	} else {
 		log.Infof("Data download is marked as %s", dd.Status.Phase)
+		r.metrics.RegisterDataDownloadSuccess(r.nodeName)
 	}
 }
 
@@ -343,6 +347,8 @@ func (r *DataDownloadReconciler) OnDataDownloadCancelled(ctx context.Context, na
 		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, &dd, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("error updating data download status")
+		} else {
+			r.metrics.RegisterDataDownloadCancel(r.nodeName)
 		}
 	}
 }
@@ -497,6 +503,8 @@ func (r *DataDownloadReconciler) updateStatusToFailed(ctx context.Context, dd *v
 
 	if patchErr := r.client.Patch(ctx, dd, client.MergeFrom(original)); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataDownload status")
+	} else {
+		r.metrics.RegisterDataDownloadFailure(r.nodeName)
 	}
 
 	return err
@@ -548,6 +556,8 @@ func (r *DataDownloadReconciler) onPrepareTimeout(ctx context.Context, dd *veler
 	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
 
 	log.Info("Dataupload has been cleaned up")
+
+	r.metrics.RegisterDataDownloadFailure(r.nodeName)
 }
 
 func (r *DataDownloadReconciler) exclusiveUpdateDataDownload(ctx context.Context, dd *velerov2alpha1api.DataDownload,

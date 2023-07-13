@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -71,11 +72,12 @@ type DataUploadReconciler struct {
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
 	preparingTimeout    time.Duration
+	metrics             *metrics.ServerMetrics
 }
 
 func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface,
 	csiSnapshotClient snapshotter.SnapshotV1Interface, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
-	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger) *DataUploadReconciler {
+	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
 		kubeClient:          kubeClient,
@@ -89,6 +91,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
 		dataPathMgr:         datapath.NewManager(1),
 		preparingTimeout:    preparingTimeout,
+		metrics:             metrics,
 	}
 }
 
@@ -308,8 +311,10 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 
 	if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("error updating DataUpload status")
+	} else {
+		log.Info("Data upload completed")
+		r.metrics.RegisterDataUploadSuccess(r.nodeName)
 	}
-	log.Info("Data upload completed")
 }
 
 func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace string, duName string, err error) {
@@ -360,6 +365,8 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("error updating DataUpload status")
+		} else {
+			r.metrics.RegisterDataUploadCancel(r.nodeName)
 		}
 	}
 }
@@ -518,6 +525,8 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 	du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	if patchErr := r.client.Patch(ctx, du, client.MergeFrom(original)); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataUpload status")
+	} else {
+		r.metrics.RegisterDataUploadFailure(r.nodeName)
 	}
 
 	return err
@@ -580,6 +589,8 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 
 		log.Info("Dataupload has been cleaned up")
 	}
+
+	r.metrics.RegisterDataUploadFailure(r.nodeName)
 }
 
 func (r *DataUploadReconciler) exclusiveUpdateDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload,
