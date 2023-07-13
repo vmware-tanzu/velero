@@ -26,11 +26,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/kibishii"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/providers"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/kibishii"
+	. "github.com/vmware-tanzu/velero/test/util/providers"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 var migrationNamespace string
@@ -291,7 +291,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			By(fmt.Sprintf("Restore %s", migrationNamespace), func() {
 				if OriginVeleroCfg.SnapshotMoveData {
 					By(fmt.Sprintf("Create a storage class %s for restore PV provisioned by storage class %s on different cloud provider", StorageClassName, KibishiiStorageClassName), func() {
-						Expect(InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml", veleroCfg.StandbyClusterCloudProvider))).To(Succeed())
+						Expect(InstallStorageClass(context.Background(), fmt.Sprintf("../testdata/storage-class/%s.yaml", veleroCfg.StandbyClusterCloudProvider))).To(Succeed())
 					})
 					configmaptName := "datamover-storage-class-config"
 					labels := map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
