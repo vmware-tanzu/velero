@@ -244,6 +244,39 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			wantObj: deployNginxTwoReplica.DeepCopy(),
 		},
 		{
+			name: "nginx deployment: test operator fails, skips substitution, no error",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupKind:         "deployments.apps",
+							ResourceNameRegex: "^test-.*$",
+							Namespaces:        []string{"foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "5",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxOneReplica.DeepCopy(),
+		},
+		{
 			name: "nginx deployment: Empty Resource Regex",
 			fields: fields{
 				Version: "v1",

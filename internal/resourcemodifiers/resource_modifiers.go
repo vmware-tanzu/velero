@@ -130,7 +130,11 @@ func ApplyPatch(patch []byte, obj *unstructured.Unstructured, log logrus.FieldLo
 	}
 	modifiedObjBytes, err := jsonPatch.Apply(objBytes)
 	if err != nil {
-		return fmt.Errorf("error in applying JSON Patch, could be due to test operator failing %s", err.Error())
+		if errors.Is(err, jsonpatch.ErrTestFailed) {
+			log.Infof("Test operation failed for JSON Patch %s", err.Error())
+			return nil
+		}
+		return fmt.Errorf("error in applying JSON Patch %s", err.Error())
 	}
 	err = obj.UnmarshalJSON(modifiedObjBytes)
 	if err != nil {
