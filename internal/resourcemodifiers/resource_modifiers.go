@@ -23,6 +23,7 @@ const (
 
 type JSONPatch struct {
 	Operation string `yaml:"operation"`
+	From      string `yaml:"from,omitempty"`
 	Path      string `yaml:"path"`
 	Value     string `yaml:"value,omitempty"`
 }
@@ -116,7 +117,10 @@ func (r *ResourceModifierRule) PatchArrayToByteArray() ([]byte, error) {
 }
 
 func (p *JSONPatch) ToString() string {
-	return fmt.Sprintf(`{"op": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.Path, p.Value)
+	if strings.Contains(p.Value, "\"") {
+		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
+	}
+	return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.From, p.Path, p.Value)
 }
 
 func ApplyPatch(patch []byte, obj *unstructured.Unstructured, log logrus.FieldLogger) error {
