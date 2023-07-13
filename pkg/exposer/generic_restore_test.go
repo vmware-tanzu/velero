@@ -54,6 +54,16 @@ func TestRestoreExpose(t *testing.T) {
 		},
 	}
 
+	targetPVCObjBound := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "fake-target-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "fake-pv",
+		},
+	}
+
 	tests := []struct {
 		name            string
 		kubeClientObj   []runtime.Object
@@ -69,6 +79,16 @@ func TestRestoreExpose(t *testing.T) {
 			sourceNamespace: "fake-ns",
 			ownerRestore:    restore,
 			err:             "error to wait target PVC consumed, fake-ns/fake-target-pvc: error to wait for PVC: error to get pvc fake-ns/fake-target-pvc: persistentvolumeclaims \"fake-target-pvc\" not found",
+		},
+		{
+			name:            "target pvc is already bound",
+			targetPVCName:   "fake-target-pvc",
+			sourceNamespace: "fake-ns",
+			ownerRestore:    restore,
+			kubeClientObj: []runtime.Object{
+				targetPVCObjBound,
+			},
+			err: "Target PVC fake-ns/fake-target-pvc has already been bound, abort",
 		},
 		{
 			name:            "create restore pod fail",

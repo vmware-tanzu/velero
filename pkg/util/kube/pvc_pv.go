@@ -284,11 +284,11 @@ func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvN
 		}
 
 		if tmpPV.Spec.ClaimRef.Name != pvcName {
-			return false, nil
+			return false, errors.Errorf("pv has been bound by unexpected pvc %s/%s", tmpPV.Spec.ClaimRef.Namespace, tmpPV.Spec.ClaimRef.Name)
 		}
 
 		if tmpPV.Spec.ClaimRef.Namespace != pvcNamespace {
-			return false, nil
+			return false, errors.Errorf("pv has been bound by unexpected pvc %s/%s", tmpPV.Spec.ClaimRef.Namespace, tmpPV.Spec.ClaimRef.Name)
 		}
 
 		updated = tmpPV
@@ -301,4 +301,9 @@ func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvN
 	} else {
 		return updated, nil
 	}
+}
+
+// IsPVCBound returns true if the specified PVC has been bound
+func IsPVCBound(pvc *corev1api.PersistentVolumeClaim) bool {
+	return pvc.Spec.VolumeName != ""
 }

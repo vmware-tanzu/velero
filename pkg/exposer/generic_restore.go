@@ -78,6 +78,10 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.O
 
 	curLog.WithField("target PVC", targetPVCName).WithField("selected node", selectedNode).Info("Target PVC is consumed")
 
+	if kube.IsPVCBound(targetPVC) {
+		return errors.Errorf("Target PVC %s/%s has already been bound, abort", sourceNamespace, targetPVCName)
+	}
+
 	restorePod, err := e.createRestorePod(ctx, ownerObject, hostingPodLabels, selectedNode)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
