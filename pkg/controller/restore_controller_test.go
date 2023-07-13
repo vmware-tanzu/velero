@@ -34,6 +34,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -48,7 +50,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func TestFetchBackupInfo(t *testing.T) {
