@@ -185,7 +185,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 					{
 						Conditions: Conditions{
 							GroupKind:         "deployments.apps",
-							ResourceNameRegex: "test-.*",
+							ResourceNameRegex: "^test-.*$",
 							Namespaces:        []string{"foo"},
 						},
 						Patches: []JSONPatch{
