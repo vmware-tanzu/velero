@@ -192,7 +192,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			r := PodVolumeBackupReconciler{
 				Client:           fakeClient,
 				clock:            testclocks.NewFakeClock(now),
-				metrics:          metrics.NewPodVolumeMetrics(),
+				metrics:          metrics.NewNodeMetrics(),
 				credentialGetter: &credentials.CredentialGetter{FromFile: credentialFileStore},
 				nodeName:         "test_node",
 				fileSystem:       fakeFS,
