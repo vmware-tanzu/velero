@@ -26,16 +26,17 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -93,8 +94,7 @@ type CreateOptions struct {
 	Wait                    bool
 	AllowPartiallyFailed    flag.OptionalBool
 	ItemOperationTimeout    time.Duration
-
-	client veleroclient.Interface
+	client                  kbclient.WithWatch
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -153,7 +153,7 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 		o.RestoreName = fmt.Sprintf("%s-%s", sourceName, time.Now().Format("20060102150405"))
 	}
 
-	client, err := f.Client()
+	client, err := f.KubebuilderWatchClient()
 	if err != nil {
 		return err
 	}
@@ -186,15 +186,20 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	switch {
 	case o.BackupName != "":
-		if _, err := o.client.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), o.BackupName, metav1.GetOptions{}); err != nil {
+		backup := new(api.Backup)
+		if err := o.client.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: o.BackupName}, backup); err != nil {
 			return err
 		}
 	case o.ScheduleName != "":
-		backupItems, err := o.client.VeleroV1().Backups(f.Namespace()).List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
+		backupList := new(api.BackupList)
+		err := o.client.List(context.TODO(), backupList, &kbclient.ListOptions{
+			LabelSelector: labels.SelectorFromSet(map[string]string{api.ScheduleNameLabel: o.ScheduleName}),
+			Namespace:     f.Namespace(),
+		})
 		if err != nil {
 			return err
 		}
-		if len(backupItems.Items) == 0 {
+		if len(backupList.Items) == 0 {
 			return errors.Errorf("No backups found for the schedule %s", o.ScheduleName)
 		}
 	}
@@ -248,14 +253,18 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	// PartiallyFailed backup for the provided schedule, and use that specific backup
 	// to restore from.
 	if o.ScheduleName != "" && boolptr.IsSetToTrue(o.AllowPartiallyFailed.Value) {
-		backups, err := o.client.VeleroV1().Backups(f.Namespace()).List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
+		backupList := new(api.BackupList)
+		err := o.client.List(context.TODO(), backupList, &kbclient.ListOptions{
+			LabelSelector: labels.SelectorFromSet(map[string]string{api.ScheduleNameLabel: o.ScheduleName}),
+			Namespace:     f.Namespace(),
+		})
 		if err != nil {
 			return err
 		}
 
 		// if we find a Completed or PartiallyFailed backup for the schedule, restore specifically from that backup. If we don't
 		// find one, proceed as-is -- the Velero server will handle validation.
-		if backup := mostRecentBackup(backups.Items, api.BackupPhaseCompleted, api.BackupPhasePartiallyFailed); backup != nil {
+		if backup := mostRecentBackup(backupList.Items, api.BackupPhaseCompleted, api.BackupPhasePartiallyFailed); backup != nil {
 			// TODO(sk): this is kind of a hack -- we should revisit this and probably
 			// move this logic to the server side or otherwise solve this problem.
 			o.BackupName = backup.Name
@@ -299,7 +308,6 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	var restoreInformer cache.SharedIndexInformer
 	var updates chan *api.Restore
 	if o.Wait {
 		stop := make(chan struct{})
@@ -307,7 +315,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 		updates = make(chan *api.Restore)
 
-		restoreInformer = v1.NewRestoreInformer(o.client, f.Namespace(), 0, nil)
+		lw := kube.InternalLW{
+			Client:     o.client,
+			Namespace:  f.Namespace(),
+			ObjectList: new(api.RestoreList),
+		}
+		restoreInformer := cache.NewSharedInformer(&lw, &api.Restore{}, time.Second)
 
 		restoreInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
@@ -339,7 +352,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go restoreInformer.Run(stop)
 	}
 
-	restore, err := o.client.VeleroV1().Restores(restore.Namespace).Create(context.TODO(), restore, metav1.CreateOptions{})
+	err := o.client.Create(context.TODO(), restore, &kbclient.CreateOptions{})
 	if err != nil {
 		return err
 	}

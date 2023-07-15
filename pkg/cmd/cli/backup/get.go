@@ -21,6 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -38,19 +40,24 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			veleroClient, err := f.Client()
+			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var backups *api.BackupList
+			backups := new(api.BackupList)
 			if len(args) > 0 {
-				backups = new(api.BackupList)
 				for _, name := range args {
-					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
+					backup := new(api.Backup)
+					err := kbClient.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: name}, backup)
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(context.TODO(), listOptions)
+				parsedSelector, err := labels.Parse(listOptions.LabelSelector)
+				cmd.CheckError(err)
+				err = kbClient.List(context.TODO(), backups, &kbclient.ListOptions{
+					LabelSelector: parsedSelector,
+					Namespace:     f.Namespace(),
+				})
 				cmd.CheckError(err)
 			}
 

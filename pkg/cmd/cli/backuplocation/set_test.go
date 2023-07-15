@@ -27,16 +27,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
@@ -44,16 +38,9 @@ func TestNewSetCommand(t *testing.T) {
 	backupName := "arg2"
 	// create a config for factory
 	f := &factorymocks.Factory{}
-	backups := &velerov1mocks.BackupInterface{}
-	veleroV1 := &velerov1mocks.VeleroV1Interface{}
-	client := &versionedmocks.Interface{}
-	bk := &velerov1api.Backup{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 
-	backups.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-	veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-	client.On("VeleroV1").Return(veleroV1, nil)
-	f.On("Client").Return(client, nil)
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
+
 	f.On("Namespace").Return(mock.Anything)
 	f.On("KubebuilderClient").Return(kbclient, nil)
 
@@ -97,16 +84,9 @@ func TestSetCommand_Execute(t *testing.T) {
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		// create a config for factory
 		f := &factorymocks.Factory{}
-		backups := &velerov1mocks.BackupInterface{}
-		veleroV1 := &velerov1mocks.VeleroV1Interface{}
-		client := &versionedmocks.Interface{}
-		bk := &velerov1api.Backup{}
-		kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 
-		backups.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-		veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-		client.On("VeleroV1").Return(veleroV1, nil)
-		f.On("Client").Return(client, nil)
+		kbclient := velerotest.NewFakeControllerRuntimeClient(t)
+
 		f.On("Namespace").Return(mock.Anything)
 		f.On("KubebuilderClient").Return(kbclient, nil)
 

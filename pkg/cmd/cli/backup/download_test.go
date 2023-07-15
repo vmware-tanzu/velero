@@ -27,14 +27,12 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
+	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 func TestNewDownloadCommand(t *testing.T) {
@@ -42,7 +40,7 @@ func TestNewDownloadCommand(t *testing.T) {
 	f := &factorymocks.Factory{}
 
 	backupName := "backup-1"
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
 	err := kbclient.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result())
 	require.NoError(t, err)
 	err = kbclient.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, "bk-to-be-download").Result())

@@ -141,6 +141,10 @@ func TestFactory(t *testing.T) {
 			kubebuilderClient, e := f.KubebuilderClient()
 			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
 			assert.Nil(t, kubebuilderClient)
+
+			kbClientWithWatch, e := f.KubebuilderWatchClient()
+			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
+			assert.Nil(t, kbClientWithWatch)
 		})
 	}
 }
