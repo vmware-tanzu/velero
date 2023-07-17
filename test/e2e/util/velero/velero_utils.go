@@ -56,6 +56,27 @@ const RestoreObjectsPrefix = "restores"
 const PluginsObjectsPrefix = "plugins"
 
 var pluginsMatrix = map[string]map[string][]string{
+	"v1.7": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.3.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.3.0"},
+		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.0"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.3.0"},
+		"csi":     {"velero/velero-plugin-for-csi:v0.2.0"},
+	},
+	"v1.8": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.4.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.4.0"},
+		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.1"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.4.0"},
+		"csi":     {"velero/velero-plugin-for-csi:v0.2.0"},
+	},
+	"v1.9": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.5.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.5.0"},
+		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.4.0"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.5.0"},
+		"csi":     {"velero/velero-plugin-for-csi:v0.3.0"},
+	},
 	"v1.10": {
 		"aws":     {"velero/velero-plugin-for-aws:v1.6.0"},
 		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.6.0"},
@@ -558,7 +579,7 @@ func getProviderPlugins(ctx context.Context, veleroCLI string, cloudProvider str
 		return []string{}, errors.New("CloudProvider should be provided")
 	}
 
-	version, err := getVeleroVersion(ctx, veleroCLI, true)
+	version, err := GetVeleroVersion(ctx, veleroCLI, true)
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed to get velero version")
 	}
@@ -593,11 +614,17 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 		if objectStoreProvider == "" {
 			objectStoreProvider = cloudProvider
 		}
-		version, err := getVeleroVersion(ctx, veleroCLI, true)
-		if err != nil {
-			return nil, errors.WithMessage(err, "failed to get velero version")
-		}
 
+		var version string
+		var err error
+		if veleroCfg.VeleroVersion != "" {
+			version = veleroCfg.VeleroVersion
+		} else {
+			version, err = GetVeleroVersion(ctx, veleroCLI, true)
+			if err != nil {
+				return nil, errors.WithMessage(err, "failed to get velero version")
+			}
+		}
 		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" {
 			needDataMoverPlugin = true
 		}
@@ -611,8 +638,14 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 
 // VeleroAddPluginsForProvider determines which plugins need to be installed for a provider and
 // installs them in the current Velero installation, skipping over those that are already installed.
-func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string) error {
-	plugins, err := getProviderPlugins(ctx, veleroCLI, provider)
+func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNamespace string, provider string, plugin string) error {
+	var err error
+	var plugins []string
+	if plugin == "" {
+		plugins, err = getProviderPlugins(ctx, veleroCLI, provider)
+	} else {
+		plugins = append(plugins, plugin)
+	}
 	fmt.Printf("provider cmd = %v\n", provider)
 	fmt.Printf("plugins cmd = %v\n", plugins)
 	if err != nil {
@@ -743,7 +776,7 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 	return result, nil
 }
 
-func getVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (string, error) {
+func GetVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (string, error) {
 	args := []string{"version", "--timeout", "60s"}
 	if clientOnly {
 		args = append(args, "--client-only")
@@ -778,7 +811,7 @@ func getVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (s
 
 func CheckVeleroVersion(ctx context.Context, veleroCLI string, expectedVer string) error {
 	tag := expectedVer
-	tagInstalled, err := getVeleroVersion(ctx, veleroCLI, false)
+	tagInstalled, err := GetVeleroVersion(ctx, veleroCLI, false)
 	if err != nil {
 		return errors.WithMessagef(err, "failed to get Velero version")
 	}
@@ -1107,13 +1140,23 @@ func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace
 
 func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
-	var err error
+
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
 	if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
 		snapshotCheckPoint.EnableCSI = true
-		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, backupName, expectCount); err != nil {
+		resourceName := "snapshot.storage.k8s.io"
+
+		srcVersions, err := GetAPIVersions(VeleroCfg.DefaultClient, resourceName)
+
+		if err != nil {
+			return snapshotCheckPoint, err
+		}
+		if len(srcVersions) == 0 {
+			return snapshotCheckPoint, errors.New("Fail to get APIVersion")
+		}
+		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, backupName, expectCount, srcVersions[0]); err != nil {
 			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
 		}
 	}

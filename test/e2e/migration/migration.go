@@ -145,6 +145,10 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				OriginVeleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 				OriginVeleroCfg.UseNodeAgent = !useVolumeSnapshots
 
+				version, err := GetVeleroVersion(oneHourTimeout, OriginVeleroCfg.VeleroCLI, true)
+				Expect(err).To(Succeed(), "Fail to get Velero version")
+				OriginVeleroCfg.VeleroVersion = version
+
 				// self represents v1.12
 				if veleroCLI2Version.VeleroVersion == "self" {
 					if OriginVeleroCfg.SnapshotMoveData {
