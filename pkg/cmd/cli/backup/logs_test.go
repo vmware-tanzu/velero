@@ -105,6 +105,8 @@ func TestNewLogsCommand(t *testing.T) {
 		require.Error(t, err)
 
 		require.Equal(t, fmt.Sprintf("backup \"%s\" does not exist", backupName), err.Error())
+
+		c.Execute()
 	})
 
 	t.Run("Normal backup log test", func(t *testing.T) {
@@ -142,5 +144,25 @@ func TestNewLogsCommand(t *testing.T) {
 			t.Skip("Test didn't finish in time, because BSL is not in Available state.")
 		case <-done:
 		}
+	})
+
+	t.Run("Invalid client test", func(t *testing.T) {
+		// create a factory
+		f := &factorymocks.Factory{}
+
+		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+
+		c := NewLogsCommand(f)
+		assert.Equal(t, "Get backup logs", c.Short)
+
+		l := NewLogsOptions()
+		flags := new(flag.FlagSet)
+		l.BindFlags(flags)
+
+		f.On("KubebuilderClient").Return(kbClient, fmt.Errorf("test error"))
+		err := l.Complete([]string{""}, f)
+		require.Equal(t, "test error", err.Error())
 	})
 }

@@ -162,7 +162,7 @@ func TestCreateCommand(t *testing.T) {
 		excludeClusterScopedResources := "MutatingWebhookConfiguration,APIService"
 		includeNamespaceScopedResources := "Endpoints,Event,PodTemplate"
 		excludeNamespaceScopedResources := "Secret,MultiClusterIngress"
-		labels := "c=foo,b=woo"
+		labels := "c=foo"
 		storageLocation := "bsl-name-1"
 		snapshotLocations := "region=minio"
 		selector := "a=pod"
