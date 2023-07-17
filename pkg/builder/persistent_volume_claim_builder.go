@@ -18,6 +18,7 @@ package builder
 
 import (
 	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -65,5 +66,47 @@ func (b *PersistentVolumeClaimBuilder) VolumeName(name string) *PersistentVolume
 // StorageClass sets the PersistentVolumeClaim's storage class name.
 func (b *PersistentVolumeClaimBuilder) StorageClass(name string) *PersistentVolumeClaimBuilder {
 	b.object.Spec.StorageClassName = &name
+	return b
+}
+
+// Phase sets the PersistentVolumeClaim's status Phase.
+func (b *PersistentVolumeClaimBuilder) Phase(phase corev1api.PersistentVolumeClaimPhase) *PersistentVolumeClaimBuilder {
+	b.object.Status.Phase = phase
+	return b
+}
+
+// RequestResource sets the PersistentVolumeClaim's spec.Resources.Requests.
+func (b *PersistentVolumeClaimBuilder) RequestResource(requests corev1api.ResourceList) *PersistentVolumeClaimBuilder {
+	if b.object.Spec.Resources.Requests == nil {
+		b.object.Spec.Resources.Requests = make(map[corev1api.ResourceName]resource.Quantity)
+	}
+	b.object.Spec.Resources.Requests = requests
+	return b
+}
+
+// LimitResource sets the PersistentVolumeClaim's spec.Resources.Limits.
+func (b *PersistentVolumeClaimBuilder) LimitResource(limits corev1api.ResourceList) *PersistentVolumeClaimBuilder {
+	if b.object.Spec.Resources.Limits == nil {
+		b.object.Spec.Resources.Limits = make(map[corev1api.ResourceName]resource.Quantity)
+	}
+	b.object.Spec.Resources.Limits = limits
+	return b
+}
+
+// DataSource sets the PersistentVolumeClaim's spec.DataSource.
+func (b *PersistentVolumeClaimBuilder) DataSource(dataSource *corev1api.TypedLocalObjectReference) *PersistentVolumeClaimBuilder {
+	b.object.Spec.DataSource = dataSource
+	return b
+}
+
+// DataSourceRef sets the PersistentVolumeClaim's spec.DataSourceRef.
+func (b *PersistentVolumeClaimBuilder) DataSourceRef(dataSourceRef *corev1api.TypedLocalObjectReference) *PersistentVolumeClaimBuilder {
+	b.object.Spec.DataSourceRef = dataSourceRef
+	return b
+}
+
+// Selector sets the PersistentVolumeClaim's spec.Selector.
+func (b *PersistentVolumeClaimBuilder) Selector(labelSelector *metav1.LabelSelector) *PersistentVolumeClaimBuilder {
+	b.object.Spec.Selector = labelSelector
 	return b
 }

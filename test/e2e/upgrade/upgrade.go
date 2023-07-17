@@ -74,6 +74,13 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 		if veleroCfg.VeleroCLI == "" {
 			Skip("VeleroCLI should be provide")
 		}
+		// need to uninstall Velero first in case of the affection of the existing global velero installation
+		if veleroCfg.InstallVelero {
+			By("Uninstall Velero", func() {
+				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace)).To(Succeed())
+			})
+		}
 	})
 	AfterEach(func() {
 		if !veleroCfg.Debug {
@@ -129,7 +136,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					tmpCfgForOldVeleroInstall.UseNodeAgent = false
 				}
 
-				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall)).To(Succeed())
+				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall, false)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,
 					tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion)).To(Succeed())
 			})
@@ -181,7 +188,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				snapshotCheckPoint.NamespaceBackedUp = upgradeNamespace
 				By("Snapshot should be created in cloud object store", func() {
 					snapshotCheckPoint, err := GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 2,
-						upgradeNamespace, backupName, KibishiiPodNameList)
+						upgradeNamespace, backupName, KibishiiPVCNameList)
 					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
 					Expect(SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
 						veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
@@ -216,7 +223,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfg.UseNodeAgent = !useVolumeSnapshots
 				Expect(err).To(Succeed())
 				if supportUploaderType {
-					Expect(VeleroInstall(context.Background(), &tmpCfg)).To(Succeed())
+					Expect(VeleroInstall(context.Background(), &tmpCfg, false)).To(Succeed())
 					Expect(CheckVeleroVersion(context.Background(), tmpCfg.VeleroCLI,
 						tmpCfg.VeleroVersion)).To(Succeed())
 				} else {

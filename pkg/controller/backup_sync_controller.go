@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
@@ -397,7 +398,10 @@ func backupSyncSourceOrderFunc(objList client.ObjectList) client.ObjectList {
 				cpBsl := bsl
 				bslArray = append(bslArray, &cpBsl)
 			}
-			meta.SetList(resultBSLList, bslArray)
+			if err := meta.SetList(resultBSLList, bslArray); err != nil {
+				fmt.Printf("fail to sort BSL list: %s", err.Error())
+				return &velerov1api.BackupStorageLocationList{}
+			}
 
 			return resultBSLList
 		}

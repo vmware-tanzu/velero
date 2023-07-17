@@ -75,7 +75,7 @@ func APIGropuVersionsTest() {
 		if veleroCfg.InstallVelero {
 			veleroCfg.Features = "EnableAPIGroupVersions"
 			veleroCfg.UseVolumeSnapshots = false
-			err = VeleroInstall(context.Background(), &veleroCfg)
+			err = VeleroInstall(context.Background(), &veleroCfg, false)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		testCaseNum = 4
@@ -100,7 +100,7 @@ func APIGropuVersionsTest() {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 			if veleroCfg.InstallVelero {
-				By("Uninstall Velero", func() {
+				By("Uninstall Velero in api group version case", func() {
 					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
 				})
 			}

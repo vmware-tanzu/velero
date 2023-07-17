@@ -1,9 +1,7 @@
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: velero-perms
 rules:
 - apiGroups:
@@ -80,6 +78,46 @@ rules:
   - velero.io
   resources:
   - backupstoragelocations/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - datadownloads
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - datadownloads/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - velero.io
+  resources:
+  - datauploads
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - datauploads/status
   verbs:
   - get
   - patch
@@ -184,12 +222,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - velero.io
-  resources:
-  - restorestoragelocations
-  verbs:
-  - get
 - apiGroups:
   - velero.io
   resources:

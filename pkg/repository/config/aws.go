@@ -21,6 +21,8 @@ import (
 	"context"
 	"os"
 
+	goerr "errors"
+
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -54,38 +56,46 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 
 // GetS3Credentials gets the S3 credential values according to the information
 // of the provided config or the system's environment variables
-func GetS3Credentials(config map[string]string) (credentials.Value, error) {
+func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
+	if len(os.Getenv("AWS_ROLE_ARN")) > 0 {
+		return nil, nil
+	}
+
 	credentialsFile := config[CredentialsFileKey]
 	if credentialsFile == "" {
 		credentialsFile = os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
 	}
 
 	if credentialsFile == "" {
-		return credentials.Value{}, errors.New("missing credential file")
+		return nil, errors.New("missing credential file")
 	}
 
 	creds := credentials.NewSharedCredentials(credentialsFile, "")
 	credValue, err := creds.Get()
 	if err != nil {
-		return credValue, err
+		return nil, err
 	}
 
-	return credValue, nil
+	return &credValue, nil
 }
 
 // GetAWSBucketRegion returns the AWS region that a bucket is in, or an error
 // if the region cannot be determined.
 func GetAWSBucketRegion(bucket string) (string, error) {
-	var region string
-
 	sess, err := session.NewSession()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
+	var region string
+	var requestErrs []error
+
 	for _, partition := range endpoints.DefaultPartitions() {
 		for regionHint := range partition.Regions() {
-			region, _ = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
+			region, err = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
+			if err != nil {
+				requestErrs = append(requestErrs, errors.Wrapf(err, "error to get region with hint %s", regionHint))
+			}
 
 			// we only need to try a single region hint per partition, so break after the first
 			break
@@ -96,5 +106,9 @@ func GetAWSBucketRegion(bucket string) (string, error) {
 		}
 	}
 
-	return "", errors.New("unable to determine bucket's region")
+	if requestErrs == nil {
+		return "", errors.Errorf("unable to determine region by bucket %s", bucket)
+	} else {
+		return "", errors.Wrapf(goerr.Join(requestErrs...), "error to get region by bucket %s", bucket)
+	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestGetItemFilePath(t *testing.T) {
@@ -46,4 +50,38 @@ func TestGetItemFilePath(t *testing.T) {
 
 	res = GetVersionedItemFilePath("", "resource", "", "item", "")
 	assert.Equal(t, "resources/resource/cluster/item.json", res)
+}
+
+func TestGetScopeDir(t *testing.T) {
+	res := GetScopeDir("")
+	assert.Equal(t, velerov1api.ClusterScopedDir, res)
+
+	res = GetScopeDir("test-namespace")
+	assert.Equal(t, velerov1api.NamespaceScopedDir, res)
+}
+
+func TestUnmarshal(t *testing.T) {
+	fs := test.NewFakeFileSystem()
+	filePath := "pod.json"
+	fileContent := `{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "example-pod"
+		},
+		"spec": {
+			"containers": [{
+				"name": "example-container",
+				"image": "example-image"
+			}]
+		}
+	}`
+	out, err := fs.Create(filePath)
+	require.NoError(t, err)
+
+	_, err = out.Write([]byte(fileContent))
+	require.NoError(t, err)
+
+	_, err = Unmarshal(fs, filePath)
+	require.NoError(t, err)
 }

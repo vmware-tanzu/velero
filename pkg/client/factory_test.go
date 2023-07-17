@@ -16,11 +16,16 @@ limitations under the License.
 package client
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 
-	"github.com/spf13/pflag"
+	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // TestFactory tests the client.Factory interface.
@@ -40,7 +45,7 @@ func TestFactory(t *testing.T) {
 	// Argument should change the namespace
 	f = NewFactory("velero", make(map[string]interface{}))
 	s := "flag-velero"
-	flags := new(pflag.FlagSet)
+	flags := new(flag.FlagSet)
 
 	f.BindFlags(flags)
 
@@ -51,11 +56,91 @@ func TestFactory(t *testing.T) {
 	// An argument overrides the env variable if both are set.
 	os.Setenv("VELERO_NAMESPACE", "env-velero")
 	f = NewFactory("velero", make(map[string]interface{}))
-	flags = new(pflag.FlagSet)
+	flags = new(flag.FlagSet)
 
 	f.BindFlags(flags)
 	flags.Parse([]string{"--namespace", s})
 	assert.Equal(t, s, f.Namespace())
 
 	os.Unsetenv("VELERO_NAMESPACE")
+
+	tests := []struct {
+		name         string
+		kubeconfig   string
+		kubecontext  string
+		QPS          float32
+		burst        int
+		baseName     string
+		expectedHost string
+	}{
+		{
+			name:         "Test flag setting in factory ClientConfig (test data #1)",
+			kubeconfig:   "kubeconfig",
+			kubecontext:  "federal-context",
+			QPS:          1.0,
+			burst:        1,
+			baseName:     "bn-velero-1",
+			expectedHost: "https://horse.org:4443",
+		},
+		{
+			name:         "Test flag setting in factory ClientConfig (test data #2)",
+			kubeconfig:   "kubeconfig",
+			kubecontext:  "queen-anne-context",
+			QPS:          200.0,
+			burst:        20,
+			baseName:     "bn-velero-2",
+			expectedHost: "https://pig.org:443",
+		},
+	}
+
+	baseName := "velero-bn"
+	config, err := LoadConfig()
+	assert.Equal(t, err, nil)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			f = NewFactory(baseName, config)
+			f.SetClientBurst(test.burst)
+			f.SetClientQPS(test.QPS)
+			f.SetBasename(test.baseName)
+
+			flags = new(flag.FlagSet)
+			f.BindFlags(flags)
+			flags.Parse([]string{"--kubeconfig", test.kubeconfig, "--kubecontext", test.kubecontext})
+			clientConfig, _ := f.ClientConfig()
+			assert.Equal(t, test.expectedHost, clientConfig.Host)
+			assert.Equal(t, test.QPS, clientConfig.QPS)
+			assert.Equal(t, test.burst, clientConfig.Burst)
+			strings.Contains(clientConfig.UserAgent, test.baseName)
+
+			client, _ := f.Client()
+			_, e := client.Discovery().ServerGroups()
+			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
+			assert.NotNil(t, client)
+
+			kubeClient, _ := f.KubeClient()
+			group := kubeClient.NodeV1().RESTClient().APIVersion().Group
+			assert.NotNil(t, kubeClient)
+			assert.Equal(t, "node.k8s.io", group)
+
+			namespace := "ns1"
+			dynamicClient, _ := f.DynamicClient()
+			resource := &schema.GroupVersionResource{
+				Group:   "group_test",
+				Version: "verion_test",
+			}
+			list, e := dynamicClient.Resource(*resource).Namespace(namespace).List(
+				context.Background(),
+				metav1.ListOptions{
+					LabelSelector: "none",
+				},
+			)
+			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/apis/%s/%s/namespaces/%s", test.expectedHost, resource.Group, resource.Version, namespace))
+			assert.Nil(t, list)
+			assert.NotNil(t, dynamicClient)
+
+			kubebuilderClient, e := f.KubebuilderClient()
+			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
+			assert.Nil(t, kubebuilderClient)
+		})
+	}
 }

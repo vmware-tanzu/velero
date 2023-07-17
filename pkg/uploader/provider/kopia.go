@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
@@ -38,24 +39,29 @@ import (
 // BackupFunc mainly used to make testing more convenient
 var BackupFunc = kopia.Backup
 var RestoreFunc = kopia.Restore
+var BackupRepoServiceCreateFunc = service.Create
 
 // kopiaProvider recorded info related with kopiaProvider
 type kopiaProvider struct {
-	bkRepo     udmrepo.BackupRepo
-	credGetter *credentials.CredentialGetter
-	log        logrus.FieldLogger
+	requestorType string
+	bkRepo        udmrepo.BackupRepo
+	credGetter    *credentials.CredentialGetter
+	log           logrus.FieldLogger
+	canceling     int32
 }
 
 // NewKopiaUploaderProvider initialized with open or create a repository
 func NewKopiaUploaderProvider(
+	requestorType string,
 	ctx context.Context,
 	credGetter *credentials.CredentialGetter,
 	backupRepo *velerov1api.BackupRepository,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	kp := &kopiaProvider{
-		log:        log,
-		credGetter: credGetter,
+		requestorType: requestorType,
+		log:           log,
+		credGetter:    credGetter,
 	}
 	//repoUID which is used to generate kopia repository config with unique directory path
 	repoUID := string(backupRepo.GetUID())
@@ -68,7 +74,7 @@ func NewKopiaUploaderProvider(
 		return nil, errors.Wrapf(err, "error to get repo options")
 	}
 
-	repoSvc := service.Create(log)
+	repoSvc := BackupRepoServiceCreateFunc(log)
 	log.WithField("repoUID", repoUID).Info("Opening backup repo")
 
 	kp.bkRepo, err = repoSvc.Open(ctx, *repoOpt)
@@ -85,6 +91,8 @@ func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struc
 		kp.log.Infof("Action finished")
 		return
 	case <-ctx.Done():
+		atomic.StoreInt32(&kp.canceling, 1)
+
 		if uploader != nil {
 			uploader.Cancel()
 			kp.log.Infof("Backup is been canceled")
@@ -106,15 +114,22 @@ func (kp *kopiaProvider) Close(ctx context.Context) error {
 func (kp *kopiaProvider) RunBackup(
 	ctx context.Context,
 	path string,
+	realSource string,
 	tags map[string]string,
+	forceFull bool,
 	parentSnapshot string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
 	}
 
+	if path == "" {
+		return "", false, errors.New("path is empty")
+	}
+
 	log := kp.log.WithFields(logrus.Fields{
 		"path":           path,
+		"realSource":     realSource,
 		"parentSnapshot": parentSnapshot,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
@@ -132,9 +147,20 @@ func (kp *kopiaProvider) RunBackup(
 		close(quit)
 	}()
 
-	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, parentSnapshot, log)
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	tags[uploader.SnapshotRequesterTag] = kp.requestorType
+	tags[uploader.SnapshotUploaderTag] = uploader.KopiaType
+
+	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, tags, log)
 	if err != nil {
-		return "", false, errors.Wrapf(err, "Failed to run kopia backup")
+		if kpUploader.IsCanceled() {
+			log.Error("Kopia backup is canceled")
+			return "", false, ErrorCanceled
+		} else {
+			return "", false, errors.Wrapf(err, "Failed to run kopia backup")
+		}
 	} else if isSnapshotEmpty {
 		log.Debugf("Kopia backup got empty dir with path %s", path)
 		return "", true, nil
@@ -177,26 +203,31 @@ func (kp *kopiaProvider) RunRestore(
 		"volumePath": volumePath,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
-	prorgess := new(kopia.Progress)
-	prorgess.InitThrottle(restoreProgressCheckInterval)
-	prorgess.Updater = updater
+	progress := new(kopia.Progress)
+	progress.InitThrottle(restoreProgressCheckInterval)
+	progress.Updater = updater
 	restoreCancel := make(chan struct{})
 	quit := make(chan struct{})
 
 	log.Info("Starting restore")
-	go kp.CheckContext(ctx, quit, restoreCancel, nil)
-
 	defer func() {
-		if restoreCancel != nil {
-			close(restoreCancel)
-		}
 		close(quit)
 	}()
 
-	size, fileCount, err := RestoreFunc(ctx, repoWriter, prorgess, snapshotID, volumePath, log, restoreCancel)
+	go kp.CheckContext(ctx, quit, restoreCancel, nil)
+
+	// We use the cancel channel to control the restore cancel, so don't pass a context with cancel to Kopia restore.
+	// Otherwise, Kopia restore will not response to the cancel control but return an arbitrary error.
+	// Kopia restore cancel is not designed as well as Kopia backup which uses the context to control backup cancel all the way.
+	size, fileCount, err := RestoreFunc(context.Background(), repoWriter, progress, snapshotID, volumePath, log, restoreCancel)
 
 	if err != nil {
 		return errors.Wrapf(err, "Failed to run kopia restore")
+	}
+
+	if atomic.LoadInt32(&kp.canceling) == 1 {
+		log.Error("Kopia restore is canceled")
+		return ErrorCanceled
 	}
 
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished

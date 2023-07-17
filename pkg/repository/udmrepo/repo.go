@@ -68,6 +68,7 @@ type ObjectWriteOptions struct {
 	Prefix      ID     // A prefix of the name used to save the object
 	AccessMode  int    // OBJECT_DATA_ACCESS_*
 	BackupMode  int    // OBJECT_DATA_BACKUP_*
+	AsyncWrites int    // Num of async writes for the object, 0 means no async write
 }
 
 // BackupRepoService is used to initialize, open or maintain a backup repository

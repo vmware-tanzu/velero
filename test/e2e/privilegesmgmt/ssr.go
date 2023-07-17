@@ -44,15 +44,7 @@ func SSRTest() {
 		flag.Parse()
 		veleroCfg.UseVolumeSnapshots = false
 		if veleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
-		}
-	})
-
-	AfterEach(func() {
-		if veleroCfg.InstallVelero {
-			if !veleroCfg.Debug {
-				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
-			}
+			Expect(PrepareVelero(context.Background(), "SSR test")).To(Succeed())
 		}
 	})
 
@@ -102,7 +94,7 @@ func SSRTest() {
 		Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.List(ctx, ssrListResp, &kbclient.ListOptions{Namespace: testNS})).To(Succeed(),
 			fmt.Sprintf("Failed to list ssr object in %s namespace", testNS))
 		Expect(len(ssrListResp.Items)).To(BeNumerically("==", 1),
-			fmt.Sprintf("Count of ssr object in %s namespace is not 1", testNS))
+			fmt.Sprintf("Count of ssr object in %s namespace is not 1 but %d", testNS, len(ssrListResp.Items)))
 		Expect(ssrListResp.Items[0].Status.Phase).To(BeEmpty(),
 			fmt.Sprintf("Status of ssr object in %s namespace should be empty", testNS))
 		Expect(ssrListResp.Items[0].Status.ServerVersion).To(BeEmpty(),

@@ -96,7 +96,6 @@ func (r *restoreOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:rbac:groups=velero.io,resources=restores,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=velero.io,resources=restores/status,verbs=get
-// +kubebuilder:rbac:groups=velero.io,resources=restorestoragelocations,verbs=get
 
 func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.logger.WithField("restore operations for restore", req.String())
@@ -178,14 +177,15 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		operations.ChangesSinceUpdate = true
 	}
 
+	if len(operations.ErrsSinceUpdate) > 0 {
+		restore.Status.Phase = velerov1api.RestorePhaseWaitingForPluginOperationsPartiallyFailed
+	}
+
 	// if stillInProgress is false, restore moves to terminal phase and needs update
 	// if operations.ErrsSinceUpdate is not empty, then restore phase needs to change to
 	// RestorePhaseWaitingForPluginOperationsPartiallyFailed and needs update
 	// If the only changes are incremental progress, then no write is necessary, progress can remain in memory
 	if !stillInProgress {
-		if len(operations.ErrsSinceUpdate) > 0 {
-			restore.Status.Phase = velerov1api.RestorePhaseWaitingForPluginOperationsPartiallyFailed
-		}
 		if restore.Status.Phase == velerov1api.RestorePhaseWaitingForPluginOperations {
 			log.Infof("Marking restore %s completed", restore.Name)
 			restore.Status.Phase = velerov1api.RestorePhaseCompleted

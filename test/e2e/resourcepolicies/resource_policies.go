@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -28,7 +27,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -61,25 +59,31 @@ type ResourcePoliciesCase struct {
 var ResourcePoliciesTest func() = TestFunc(&ResourcePoliciesCase{})
 
 func (r *ResourcePoliciesCase) Init() error {
-	rand.Seed(time.Now().UnixNano())
-	UUIDgen, _ = uuid.NewRandom()
+	// generate random number as UUIDgen and set one default timeout duration
+	r.TestCase.Init()
+
+	// generate variable names based on CaseBaseName + UUIDgen
+	r.CaseBaseName = "resource-policies-" + r.UUIDgen
+	r.BackupName = "backup-" + r.CaseBaseName
+	r.RestoreName = "restore-" + r.CaseBaseName
+	r.cmName = "cm-" + r.CaseBaseName
+
+	// generate namespaces by NamespacesTotal
+	r.NamespacesTotal = 3
+	r.NSIncluded = &[]string{}
+	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
+		*r.NSIncluded = append(*r.NSIncluded, createNSName)
+	}
+
+	// assign values to the inner variable for specific case
 	r.yamlConfig = yamlData
 	r.VeleroCfg = VeleroCfg
 	r.Client = *r.VeleroCfg.ClientToInstallVelero
 	r.VeleroCfg.UseVolumeSnapshots = false
 	r.VeleroCfg.UseNodeAgent = true
-	r.NamespacesTotal = 3
-	r.NSBaseName = "resource-policies-" + UUIDgen.String()
-	r.cmName = "cm-resource-policies-sc"
-	r.NSIncluded = &[]string{}
-	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		createNSName := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
-		*r.NSIncluded = append(*r.NSIncluded, createNSName)
-	}
 
-	r.BackupName = "backup-resource-policies-" + UUIDgen.String()
-	r.RestoreName = "restore-resource-policies-" + UUIDgen.String()
-
+	// NEED explicitly specify the value of the variables for snapshot-volumes or default-volumes-to-fs-backup
 	r.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--resource-policies-configmap", r.cmName,
@@ -93,6 +97,7 @@ func (r *ResourcePoliciesCase) Init() error {
 		"--from-backup", r.BackupName, "--wait",
 	}
 
+	// Message output by ginkgo
 	r.TestMsg = &TestMSG{
 		Desc:      "Skip backup of volume by resource policies",
 		FailedMSG: "Failed to skip backup of volume by resource policies",
@@ -102,8 +107,9 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
+	// It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
+	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+
 	By(("Installing storage class..."), func() {
 		Expect(r.installTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
@@ -117,12 +123,12 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	})
 
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
-		namespace := fmt.Sprintf("%s-%00000d", r.NSBaseName, nsNum)
+		namespace := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
-			Expect(CreateNamespace(ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
+			Expect(CreateNamespace(r.Ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
-		volName := fmt.Sprintf("vol-%s-%00000d", r.NSBaseName, nsNum)
+		volName := fmt.Sprintf("vol-%s-%00000d", r.CaseBaseName, nsNum)
 		volList := PrepareVolumeList([]string{volName})
 
 		// Create PVC
@@ -145,23 +151,21 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 }
 
 func (r *ResourcePoliciesCase) Verify() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	for i, ns := range *r.NSIncluded {
 		By(fmt.Sprintf("Verify pod data in namespace %s", ns), func() {
-			By(fmt.Sprintf("Waiting for deployment %s in namespace %s ready", r.NSBaseName, ns), func() {
-				Expect(WaitForReadyDeployment(r.Client.ClientGo, ns, r.NSBaseName)).To(Succeed(), fmt.Sprintf("Failed to waiting for deployment %s in namespace %s ready", r.NSBaseName, ns))
+			By(fmt.Sprintf("Waiting for deployment %s in namespace %s ready", r.CaseBaseName, ns), func() {
+				Expect(WaitForReadyDeployment(r.Client.ClientGo, ns, r.CaseBaseName)).To(Succeed(), fmt.Sprintf("Failed to waiting for deployment %s in namespace %s ready", r.CaseBaseName, ns))
 			})
-			podList, err := ListPods(ctx, r.Client, ns)
+			podList, err := ListPods(r.Ctx, r.Client, ns)
 			Expect(err).To(Succeed(), fmt.Sprintf("failed to list pods in namespace: %q with error %v", ns, err))
 
-			volName := fmt.Sprintf("vol-%s-%00000d", r.NSBaseName, i)
+			volName := fmt.Sprintf("vol-%s-%00000d", r.CaseBaseName, i)
 			for _, pod := range podList.Items {
 				for _, vol := range pod.Spec.Volumes {
 					if vol.Name != volName {
 						continue
 					}
-					content, err := ReadFileFromPodVolume(ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
+					content, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
 					if i%2 == 0 {
 						Expect(err).To(HaveOccurred(), "Expected file not found") // File should not exist
 					} else {
@@ -183,15 +187,19 @@ func (r *ResourcePoliciesCase) Verify() error {
 }
 
 func (r *ResourcePoliciesCase) Clean() error {
-	if err := r.deleteTestStorageClassList([]string{"e2e-storage-class", "e2e-storage-class-2"}); err != nil {
-		return err
-	}
+	// If created some resources which is not in current test namespace, we NEED to override the base Clean function
+	if !r.VeleroCfg.Debug {
+		if err := r.deleteTestStorageClassList([]string{"e2e-storage-class", "e2e-storage-class-2"}); err != nil {
+			return err
+		}
 
-	if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
-		return err
-	}
+		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
+			return err
+		}
 
-	return r.GetTestCase().Clean()
+		return r.GetTestCase().Clean() // only clean up resources in test namespace
+	}
+	return nil
 }
 
 func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
@@ -217,7 +225,7 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 }
 
 func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
-	deployment := NewDeployment(r.NSBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
+	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))
@@ -230,9 +238,7 @@ func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volL
 }
 
 func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
-	podList, err := ListPods(ctx, r.Client, namespace)
+	podList, err := ListPods(r.Ctx, r.Client, namespace)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to list pods in namespace: %q with error %v", namespace, err))
 	}
@@ -241,7 +247,7 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if vol.Name != volName {
 				continue
 			}
-			err := CreateFileToPod(ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
+			err := CreateFileToPod(r.Ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}
@@ -251,10 +257,8 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 }
 
 func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
 	for _, v := range scList {
-		if err := DeleteStorageClass(ctx, r.Client, v); err != nil {
+		if err := DeleteStorageClass(r.Ctx, r.Client, v); err != nil {
 			return err
 		}
 	}
@@ -262,9 +266,7 @@ func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error
 }
 
 func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer ctxCancel()
-	err := InstallStorageClass(ctx, path)
+	err := InstallStorageClass(r.Ctx, path)
 	if err != nil {
 		return err
 	}
@@ -285,5 +287,5 @@ func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
 	if _, err := tmpFile.WriteString(newContent); err != nil {
 		return errors.Wrapf(err, "failed to write content into temp file %s when install storage class", tmpFile.Name())
 	}
-	return InstallStorageClass(ctx, tmpFile.Name())
+	return InstallStorageClass(r.Ctx, tmpFile.Name())
 }

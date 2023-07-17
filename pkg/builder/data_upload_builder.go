@@ -1,0 +1,121 @@
+/*
+Copyright The Velero Contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package builder
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+)
+
+// DataUploadBuilder builds DataUpload objects
+type DataUploadBuilder struct {
+	object *velerov2alpha1api.DataUpload
+}
+
+// ForDataUpload is the constructor for a DataUploadBuilder.
+func ForDataUpload(ns, name string) *DataUploadBuilder {
+	return &DataUploadBuilder{
+		object: &velerov2alpha1api.DataUpload{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: velerov2alpha1api.SchemeGroupVersion.String(),
+				Kind:       "DataUpload",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+		},
+	}
+}
+
+// Result returns the built DataUpload.
+func (d *DataUploadBuilder) Result() *velerov2alpha1api.DataUpload {
+	return d.object
+}
+
+// BackupStorageLocation sets the DataUpload's backup storage location.
+func (d *DataUploadBuilder) BackupStorageLocation(name string) *DataUploadBuilder {
+	d.object.Spec.BackupStorageLocation = name
+	return d
+}
+
+// Phase sets the DataUpload's phase.
+func (d *DataUploadBuilder) Phase(phase velerov2alpha1api.DataUploadPhase) *DataUploadBuilder {
+	d.object.Status.Phase = phase
+	return d
+}
+
+// SnapshotID sets the DataUpload's SnapshotID.
+func (d *DataUploadBuilder) SnapshotID(id string) *DataUploadBuilder {
+	d.object.Status.SnapshotID = id
+	return d
+}
+
+// DataMover sets the DataUpload's DataMover.
+func (d *DataUploadBuilder) DataMover(dataMover string) *DataUploadBuilder {
+	d.object.Spec.DataMover = dataMover
+	return d
+}
+
+// SourceNamespace sets the DataUpload's SourceNamespace.
+func (d *DataUploadBuilder) SourceNamespace(sourceNamespace string) *DataUploadBuilder {
+	d.object.Spec.SourceNamespace = sourceNamespace
+	return d
+}
+
+// SourcePVC sets the DataUpload's SourcePVC.
+func (d *DataUploadBuilder) SourcePVC(sourcePVC string) *DataUploadBuilder {
+	d.object.Spec.SourcePVC = sourcePVC
+	return d
+}
+
+// SnapshotType sets the DataUpload's SnapshotType.
+func (d *DataUploadBuilder) SnapshotType(SnapshotType velerov2alpha1api.SnapshotType) *DataUploadBuilder {
+	d.object.Spec.SnapshotType = SnapshotType
+	return d
+}
+
+// Cancel sets the DataUpload's Cancel.
+func (d *DataUploadBuilder) Cancel(cancel bool) *DataUploadBuilder {
+	d.object.Spec.Cancel = cancel
+	return d
+}
+
+// OperationTimeout sets the DataUpload's OperationTimeout.
+func (d *DataUploadBuilder) OperationTimeout(timeout metav1.Duration) *DataUploadBuilder {
+	d.object.Spec.OperationTimeout = timeout
+	return d
+}
+
+// DataMoverConfig sets the DataUpload's DataMoverConfig.
+func (d *DataUploadBuilder) DataMoverConfig(config *map[string]string) *DataUploadBuilder {
+	d.object.Spec.DataMoverConfig = config
+	return d
+}
+
+// CSISnapshot sets the DataUpload's CSISnapshot.
+func (d *DataUploadBuilder) CSISnapshot(cSISnapshot *velerov2alpha1api.CSISnapshotSpec) *DataUploadBuilder {
+	d.object.Spec.CSISnapshot = cSISnapshot
+	return d
+}
+
+// StartTimestamp sets the DataUpload's StartTimestamp.
+func (d *DataUploadBuilder) StartTimestamp(startTime *metav1.Time) *DataUploadBuilder {
+	d.object.Status.StartTimestamp = startTime
+	return d
+}

@@ -70,7 +70,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
 		if veleroCfg.InstallVelero {
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+			Expect(PrepareVelero(context.Background(), "BSL Deletion")).To(Succeed())
 		}
 	})
 
@@ -84,14 +84,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					true)).To(Succeed(), fmt.Sprintf("failed to delete the namespace %q",
 					bslDeletionTestNs))
 			})
-			if veleroCfg.InstallVelero {
-				By("Uninstall Velero", func() {
-					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
-				})
-			}
 		}
-
 	})
 
 	When("kibishii is the sample workload", func() {
@@ -111,9 +104,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			}
 
 			By(fmt.Sprintf("Add an additional plugin for provider %s", veleroCfg.AdditionalBSLProvider), func() {
-				Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI,
-					veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider,
-					veleroCfg.AddBSLPlugins, veleroCfg.Features)).To(Succeed())
+				Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider)).To(Succeed())
 			})
 
 			additionalBsl := fmt.Sprintf("bsl-%s", UUIDgen)

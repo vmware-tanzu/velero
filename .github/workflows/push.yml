@@ -71,7 +71,11 @@ jobs:
     - name: Publish container image
       if: github.repository == 'vmware-tanzu/velero'
       run: |
-        # Build and push Velero image to docker registry and gcr.io.
+        sudo swapoff -a
+        sudo rm -f /mnt/swapfile
+        docker image prune -a --force
+              
+        # Build and push Velero image to docker registry
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         VERSION=$(./hack/docker-push.sh | grep 'VERSION:' | awk -F: '{print $2}' | xargs)
 

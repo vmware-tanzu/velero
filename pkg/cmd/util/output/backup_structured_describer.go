@@ -33,7 +33,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -47,7 +46,6 @@ func DescribeBackupInSF(
 	podVolumeBackups []velerov1api.PodVolumeBackup,
 	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
-	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
 	outputFormat string,
@@ -70,7 +68,7 @@ func DescribeBackupInSF(
 
 		DescribeBackupSpecInSF(d, backup.Spec)
 
-		DescribeBackupStatusInSF(ctx, kbClient, d, backup, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+		DescribeBackupStatusInSF(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertFile)
 
 		if len(deleteRequests) > 0 {
 			DescribeDeleteBackupRequestsInSF(d, deleteRequests)
@@ -137,6 +135,15 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 
 	// describe snapshot volumes
 	backupSpecInfo["veleroNativeSnapshotPVs"] = BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto")
+	// describe snapshot move data
+	backupSpecInfo["veleroSnapshotMoveData"] = BoolPointerString(spec.SnapshotMoveData, "false", "true", "auto")
+	// describe data mover
+	if len(spec.DataMover) == 0 {
+		s = emptyDisplay
+	} else {
+		s = spec.DataMover
+	}
+	backupSpecInfo["dataMover"] = s
 
 	// describe TTL
 	backupSpecInfo["TTL"] = spec.TTL.Duration.String()
@@ -151,31 +158,31 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 		ResourceDetails := make(map[string]interface{})
 		var s string
 		namespaceInfo := make(map[string]string)
-		if len(spec.IncludedNamespaces) == 0 {
+		if len(backupResourceHookSpec.IncludedNamespaces) == 0 {
 			s = "*"
 		} else {
-			s = strings.Join(spec.IncludedNamespaces, ", ")
+			s = strings.Join(backupResourceHookSpec.IncludedNamespaces, ", ")
 		}
 		namespaceInfo["included"] = s
-		if len(spec.ExcludedNamespaces) == 0 {
+		if len(backupResourceHookSpec.ExcludedNamespaces) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.ExcludedNamespaces, ", ")
+			s = strings.Join(backupResourceHookSpec.ExcludedNamespaces, ", ")
 		}
 		namespaceInfo["excluded"] = s
 		ResourceDetails["namespaces"] = namespaceInfo
 
 		resourcesInfo := make(map[string]string)
-		if len(spec.IncludedResources) == 0 {
+		if len(backupResourceHookSpec.IncludedResources) == 0 {
 			s = "*"
 		} else {
-			s = strings.Join(spec.IncludedResources, ", ")
+			s = strings.Join(backupResourceHookSpec.IncludedResources, ", ")
 		}
 		resourcesInfo["included"] = s
-		if len(spec.ExcludedResources) == 0 {
+		if len(backupResourceHookSpec.ExcludedResources) == 0 {
 			s = emptyDisplay
 		} else {
-			s = strings.Join(spec.ExcludedResources, ", ")
+			s = strings.Join(backupResourceHookSpec.ExcludedResources, ", ")
 		}
 		resourcesInfo["excluded"] = s
 		ResourceDetails["resources"] = resourcesInfo
@@ -227,7 +234,7 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 }
 
 // DescribeBackupStatusInSF describes a backup status in structured format.
-func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
+func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {
 	status := backup.Status
 	backupStatusInfo := make(map[string]interface{})
 
@@ -428,14 +435,13 @@ func DescribeCSIVolumeSnapshotsInSF(d *StructuredDescriber, details bool, volume
 	// the field of 'CSI Volume Snapshots Details' displays the content of CSI Volume Snapshots
 	if !details {
 		CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsCount"] = len(volumeSnapshotContents)
-		return
+	} else {
+		vscDetails := make(map[string]interface{})
+		for _, vsc := range volumeSnapshotContents {
+			DescribeVSCInSF(details, vsc, vscDetails)
+		}
+		CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsDetails"] = vscDetails
 	}
-
-	vscDetails := make(map[string]interface{})
-	for _, vsc := range volumeSnapshotContents {
-		DescribeVSCInSF(details, vsc, vscDetails)
-	}
-	CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsDetails"] = vscDetails
 	d.Describe("CSIVolumeSnapshots", CSIVolumeSnapshotsInfo)
 }
 

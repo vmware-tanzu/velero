@@ -17,9 +17,12 @@ limitations under the License.
 package backup
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -61,5 +64,27 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		GroupResource: kuberesource.PersistentVolumes,
 		Name:          pvc.Spec.VolumeName,
 	}
-	return item, []velero.ResourceIdentifier{pv}, nil
+	// remove dataSource if exists from prior restored CSI volumes
+	if pvc.Spec.DataSource != nil {
+		pvc.Spec.DataSource = nil
+	}
+	if pvc.Spec.DataSourceRef != nil {
+		pvc.Spec.DataSourceRef = nil
+	}
+
+	// remove label selectors with "velero.io/" prefixing in the key which is left by Velero restore
+	if pvc.Spec.Selector != nil && pvc.Spec.Selector.MatchLabels != nil {
+		for k := range pvc.Spec.Selector.MatchLabels {
+			if strings.HasPrefix(k, "velero.io/") {
+				delete(pvc.Spec.Selector.MatchLabels, k)
+			}
+		}
+	}
+
+	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to convert pvc to unstructured item")
+	}
+
+	return &unstructured.Unstructured{Object: pvcMap}, []velero.ResourceIdentifier{pv}, nil
 }

@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"path"
@@ -422,11 +423,13 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 		if err != nil {
 			return map[string]string{}, errors.Wrap(err, "error get s3 credentials")
 		}
-		result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
-		result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
-		result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
-		result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
 
+		if credValue != nil {
+			result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
+			result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
+			result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
+			result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
+		}
 	case repoconfig.AzureBackend:
 		storageAccount, accountKey, err := getAzureCredentials(config)
 		if err != nil {
@@ -496,6 +499,10 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3URL, "/")
 		result[udmrepo.StoreOptionS3DisableTLSVerify] = config["insecureSkipTLSVerify"]
 		result[udmrepo.StoreOptionS3DisableTLS] = strconv.FormatBool(disableTLS)
+
+		if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
+			result[udmrepo.StoreOptionS3CustomCA] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
+		}
 	} else if backendType == repoconfig.AzureBackend {
 		domain, err := getAzureStorageDomain(config)
 		if err != nil {

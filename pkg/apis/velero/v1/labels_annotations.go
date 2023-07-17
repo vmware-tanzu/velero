@@ -54,6 +54,12 @@ const (
 	// RepositoryTypeLabel is the label key used to identify the type of a repository
 	RepositoryTypeLabel = "velero.io/repository-type"
 
+	// DataUploadLabel is the label key used to identify the dataupload for snapshot backup pod
+	DataUploadLabel = "velero.io/data-upload"
+
+	// DataDownloadLabel is the label key used to identify the datadownload for snapshot restore pod
+	DataDownloadLabel = "velero.io/data-download"
+
 	// SourceClusterK8sVersionAnnotation is the label key used to identify the k8s
 	// git version of the backup , i.e. v1.16.4
 	SourceClusterK8sGitVersionAnnotation = "velero.io/source-cluster-k8s-gitversion"
@@ -65,4 +71,31 @@ const (
 	// SourceClusterK8sMajorVersionAnnotation is the label key used to identify the k8s
 	// minor version of the backup , i.e. 16
 	SourceClusterK8sMinorVersionAnnotation = "velero.io/source-cluster-k8s-minor-version"
+
+	// ResourceTimeoutAnnotation is the annotation key used to carry the global resource
+	// timeout value for backup to plugins.
+	ResourceTimeoutAnnotation = "velero.io/resource-timeout"
+
+	// AsyncOperationIDLabel is the label key used to identify the async operation ID
+	AsyncOperationIDLabel = "velero.io/async-operation-id"
+
+	// PVCNameLabel is the label key used to identify the the PVC's namespace and name.
+	// The format is <namespace>/<name>.
+	PVCNamespaceNameLabel = "velero.io/pvc-namespace-name"
+
+	// ResourceUsageLabel is the label key to explain the Velero resource usage.
+	ResourceUsageLabel = "velero.io/resource-usage"
+)
+
+type AsyncOperationIDPrefix string
+
+const (
+	AsyncOperationIDPrefixDataDownload AsyncOperationIDPrefix = "dd-"
+	AsyncOperationIDPrefixDataUpload   AsyncOperationIDPrefix = "du-"
+)
+
+type VeleroResourceUsage string
+
+const (
+	VeleroResourceUsageDataUploadResult VeleroResourceUsage = "DataUpload"
 )

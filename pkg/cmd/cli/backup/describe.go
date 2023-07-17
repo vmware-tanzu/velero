@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
@@ -54,9 +54,6 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
 		Short: "Describe backups",
 		Run: func(c *cobra.Command, args []string) {
-			veleroClient, err := f.Client()
-			cmd.CheckError(err)
-
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
@@ -64,29 +61,37 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 				cmd.CheckError(fmt.Errorf("invalid output format '%s'. valid value are 'plaintext, json'", outputFormat))
 			}
 
-			var backups *velerov1api.BackupList
+			backups := new(velerov1api.BackupList)
 			if len(args) > 0 {
-				backups = new(velerov1api.BackupList)
 				for _, name := range args {
-					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
+					backup := new(velerov1api.Backup)
+					err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: name}, backup)
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(context.TODO(), listOptions)
+				parsedSelector, err := labels.Parse(listOptions.LabelSelector)
+				cmd.CheckError(err)
+				err = kbClient.List(context.TODO(), backups, &controllerclient.ListOptions{LabelSelector: parsedSelector, Namespace: f.Namespace()})
 				cmd.CheckError(err)
 			}
 
 			first := true
 			for i, backup := range backups.Items {
-				deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
-				deleteRequestList, err := veleroClient.VeleroV1().DeleteBackupRequests(f.Namespace()).List(context.TODO(), deleteRequestListOptions)
+				deleteRequestList := new(velerov1api.DeleteBackupRequestList)
+				err := kbClient.List(context.TODO(), deleteRequestList, &controllerclient.ListOptions{
+					Namespace:     f.Namespace(),
+					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: label.GetValidName(backup.Name), velerov1api.BackupUIDLabel: string(backup.UID)}),
+				})
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
 				}
 
-				opts := label.NewListOptionsForBackup(backup.Name)
-				podVolumeBackupList, err := veleroClient.VeleroV1().PodVolumeBackups(f.Namespace()).List(context.TODO(), opts)
+				podVolumeBackupList := new(velerov1api.PodVolumeBackupList)
+				err = kbClient.List(context.TODO(), podVolumeBackupList, &controllerclient.ListOptions{
+					Namespace:     f.Namespace(),
+					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: label.GetValidName(backup.Name)}),
+				})
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
@@ -101,6 +106,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					csiClient, err = snapshotv1client.NewForConfig(clientConfig)
 					cmd.CheckError(err)
 
+					opts := label.NewListOptionsForBackup(backup.Name)
 					vscList, err = csiClient.SnapshotV1().VolumeSnapshotContents().List(context.TODO(), opts)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "error getting VolumeSnapshotContent objects for backup %s: %v\n", backup.Name, err)
@@ -110,10 +116,10 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 				// structured output only applies to a single backup in case of OOM
 				// To describe the list of backups in structured format, users could iterate over the list and describe backup one after another.
 				if len(backups.Items) == 1 && outputFormat != "plaintext" {
-					s := output.DescribeBackupInSF(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile, outputFormat)
+					s := output.DescribeBackupInSF(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, insecureSkipTLSVerify, caCertFile, outputFormat)
 					fmt.Print(s)
 				} else {
-					s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
+					s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, insecureSkipTLSVerify, caCertFile)
 					if first {
 						first = false
 						fmt.Print(s)

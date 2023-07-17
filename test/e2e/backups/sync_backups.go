@@ -50,8 +50,6 @@ func (b *SyncBackups) Init() {
 
 func BackupsSyncTest() {
 	test := new(SyncBackups)
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	defer ctxCancel()
 	var (
 		err error
 	)
@@ -61,7 +59,7 @@ func BackupsSyncTest() {
 		if VeleroCfg.InstallVelero {
 			veleroCfg := VeleroCfg
 			veleroCfg.UseVolumeSnapshots = false
-			Expect(VeleroInstall(context.Background(), &VeleroCfg)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
 		}
 	})
 
@@ -79,7 +77,8 @@ func BackupsSyncTest() {
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
-
+		ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS))
 		Expect(CreateNamespace(ctx, *VeleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", test.testNS))
@@ -110,16 +109,17 @@ func BackupsSyncTest() {
 		By("Install velero", func() {
 			veleroCfg := VeleroCfg
 			veleroCfg.UseVolumeSnapshots = false
-			Expect(VeleroInstall(ctx, &VeleroCfg)).To(Succeed())
+			Expect(VeleroInstall(ctx, &VeleroCfg, false)).To(Succeed())
 		})
 
 		By("Check all backups in object storage are synced to Velero", func() {
-			Expect(test.IsBackupsSynced()).To(Succeed(), fmt.Sprintf("Failed to sync backup %s from object storage", test.backupName))
+			Expect(test.IsBackupsSynced(ctx, ctxCancel)).To(Succeed(), fmt.Sprintf("Failed to sync backup %s from object storage", test.backupName))
 		})
 	})
 
 	It("Deleted backups in object storage are synced to be deleted in Velero", func() {
 		test.Init()
+		ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace in %s namespace", test.testNS), func() {
 			Expect(CreateNamespace(ctx, *VeleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
@@ -163,8 +163,7 @@ func BackupsSyncTest() {
 	})
 }
 
-func (b *SyncBackups) IsBackupsSynced() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+func (b *SyncBackups) IsBackupsSynced(ctx context.Context, ctxCancel context.CancelFunc) error {
 	defer ctxCancel()
 	return WaitForBackupToBeCreated(ctx, VeleroCfg.VeleroCLI, b.backupName, 10*time.Minute)
 }

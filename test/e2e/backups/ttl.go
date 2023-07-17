@@ -51,21 +51,17 @@ func (b *TTL) Init() {
 	b.testNS = "backup-ttl-test-" + UUIDgen.String()
 	b.backupName = "backup-ttl-test-" + UUIDgen.String()
 	b.restoreName = "restore-ttl-test-" + UUIDgen.String()
-	b.ttl = 20 * time.Minute
+	b.ttl = 10 * time.Minute
 
 }
 
 func TTLTest() {
-	ctx, contextCancel := context.WithCancel(context.Background())
-	defer contextCancel()
 	var err error
 	var veleroCfg VeleroConfig
 	useVolumeSnapshots := true
 	test := new(TTL)
 	veleroCfg = VeleroCfg
 	client := *veleroCfg.ClientToInstallVelero
-
-	//Expect(err).To(Succeed(), "Failed to instantiate cluster client for backup tests")
 
 	BeforeEach(func() {
 		flag.Parse()
@@ -74,7 +70,7 @@ func TTLTest() {
 			// Make sure GCFrequency is shorter than backup TTL
 			veleroCfg.GCFrequency = "4m0s"
 			veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
-			Expect(VeleroInstall(context.Background(), &veleroCfg)).To(Succeed())
+			Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 		}
 	})
 
@@ -87,12 +83,16 @@ func TTLTest() {
 			if veleroCfg.InstallVelero {
 				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
 			}
+			ctx, ctxCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer ctxCancel()
 			Expect(DeleteNamespace(ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 		}
 	})
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
 		test.Init()
+		ctx, ctxCancel := context.WithTimeout(context.Background(), 1*time.Hour)
+		defer ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS), func() {
 			Expect(CreateNamespace(ctx, client, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
@@ -128,7 +128,7 @@ func TTLTest() {
 						test.testNS, 2)).To(Succeed())
 				})
 			}
-			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, test.testNS, test.backupName, KibishiiPodNameList)
+			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, test.testNS, test.backupName, KibishiiPVCNameList)
 			Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 
 			Expect(SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,

@@ -57,7 +57,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
 				).Result(),
 			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
 				Data("source-node", "dest-node").
 				Result(),
 			newNode: builder.ForNode("dest-node").Result(),
@@ -73,7 +73,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
 				).Result(),
 			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/some-other-plugin", "RestoreItemAction")).
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/some-other-plugin", "RestoreItemAction")).
 				Data("source-noed", "dest-node").
 				Result(),
 			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
@@ -85,7 +85,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
 				).Result(),
 			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
 				Result(),
 			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
 		},
@@ -96,7 +96,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
 				).Result(),
 			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
 				Result(),
 			// MAYANK TODO
 			node: builder.ForNode("source-node").Result(),
@@ -109,7 +109,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 			name: "when persistent volume claim has no node selector, the item is returned as-is",
 			pvc:  builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
 			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
 				Data("source-node", "dest-node").
 				Result(),
 			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
@@ -121,7 +121,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
 				).Result(),
 			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
+				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
 				Data("source-node-1", "dest-node").
 				Result(),
 			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),

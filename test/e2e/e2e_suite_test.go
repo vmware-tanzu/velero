@@ -43,6 +43,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
 func init() {
@@ -65,6 +66,8 @@ func init() {
 	flag.StringVar(&VeleroCfg.VSLConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flag.StringVar(&VeleroCfg.VeleroNamespace, "velero-namespace", "velero", "namespace to install Velero into")
 	flag.BoolVar(&VeleroCfg.InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
+	flag.BoolVar(&VeleroCfg.UseNodeAgent, "use-node-agent", true, "whether deploy node agent daemonset velero during the test.  Optional.")
+	flag.BoolVar(&VeleroCfg.UseVolumeSnapshots, "use-volume-snapshots", true, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
 	flag.StringVar(&VeleroCfg.RegistryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
 	flag.StringVar(&VeleroCfg.KibishiiDirectory, "kibishii-directory", "github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/", "The file directory or URL path to install Kibishii. Optional.")
 	//vmware-tanzu-experiments
@@ -81,10 +84,12 @@ func init() {
 	flag.StringVar(&VeleroCfg.StandbyCluster, "standby-cluster", "", "Standby cluster context for migration test.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "", "Identify persistent volume backup uploader.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
-
+	flag.BoolVar(&VeleroCfg.SnapshotMoveData, "snapshot-move-data", false, "Install default plugin for data mover.")
+	flag.StringVar(&VeleroCfg.DataMoverPlugin, "data-mover-plugin", "", "Install customized plugin for data mover.")
+	flag.StringVar(&VeleroCfg.StandbyClusterCloudProvider, "standby-cluster-cloud-provider", "", "Install customized plugin for data mover.")
 }
 
-var _ = Describe("[APIGroup][Common] Velero tests with various CRD API group versions", APIGropuVersionsTest)
+var _ = Describe("[APIGroup][APIVersion] Velero tests with various CRD API group versions", APIGropuVersionsTest)
 var _ = Describe("[APIGroup][APIExtensions] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
 
 // Test backup and restore of Kibishi using restic
@@ -189,3 +194,17 @@ func TestE2e(t *testing.T) {
 	junitReporter := reporters.NewJUnitReporter("report.xml")
 	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
 }
+
+var _ = BeforeSuite(func() {
+	if VeleroCfg.InstallVelero {
+		By("Install test resources before testing")
+		Expect(PrepareVelero(context.Background(), "install resource before testing")).To(Succeed())
+	}
+})
+
+var _ = AfterSuite(func() {
+	if VeleroCfg.InstallVelero && !VeleroCfg.Debug {
+		By("release test resources after testing")
+		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+	}
+})

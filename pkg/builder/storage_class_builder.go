@@ -81,3 +81,9 @@ func ForStorageClassSlice(names ...string) *StorageClassBuilder {
 func (b *StorageClassBuilder) SliceResult() []*storagev1api.StorageClass {
 	return b.objectSlice
 }
+
+// Provisioner sets StorageClass's provisioner.
+func (b *StorageClassBuilder) Provisioner(provisioner string) *StorageClassBuilder {
+	b.object.Provisioner = provisioner
+	return b
+}

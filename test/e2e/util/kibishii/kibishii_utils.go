@@ -48,12 +48,16 @@ type KibishiiData struct {
 	ExpectedNodes int
 }
 
-var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, 2}
-var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
+var DefaultKibishiiWorkerCounts = 2
+var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, DefaultKibishiiWorkerCounts}
+
+var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
+var KibishiiStorageClassName = "kibishii-storage-class"
 
 // RunKibishiiTests runs kibishii tests on the provider.
 func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
+	pvCount := len(KibishiiPVCNameList)
 	client := *veleroCfg.ClientToInstallVelero
 	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
 	defer ctxCancel()
@@ -79,12 +83,13 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			}
 		}
 	}()
-
+	fmt.Printf("KibishiiPrepareBeforeBackup %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName,
 		kibishiiNamespace, registryCredentialFile, veleroFeatures,
 		kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
+	fmt.Printf("KibishiiPrepareBeforeBackup done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
 	var BackupCfg BackupConfig
 	BackupCfg.BackupName = backupName
@@ -94,17 +99,14 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 	BackupCfg.DefaultVolumesToFsBackup = defaultVolumesToFsBackup
 	BackupCfg.Selector = ""
 	BackupCfg.ProvideSnapshotsVolumeParam = veleroCfg.ProvideSnapshotsVolumeParam
+
+	fmt.Printf("VeleroBackupNamespace %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
-	var snapshotCheckPoint SnapshotCheckPoint
-	var err error
-	pvbs, err := GetPVB(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
+	fmt.Printf("VeleroBackupNamespace done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if useVolumeSnapshots {
-		if err != nil || len(pvbs) != 0 {
-			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
-		}
 		if providerName == "vsphere" {
 			// Wait for uploads started by the Velero Plug-in for vSphere to complete
 			// TODO - remove after upload progress monitoring is implemented
@@ -113,7 +115,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 				return errors.Wrapf(err, "Error waiting for uploads to complete")
 			}
 		}
-		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, kibishiiNamespace, backupName, KibishiiPodNameList)
+		snapshotCheckPoint, err := GetSnapshotCheckPoint(client, veleroCfg, 2, kibishiiNamespace, backupName, KibishiiPVCNameList)
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}
@@ -124,8 +126,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	} else {
-		if err != nil || len(pvbs) != 2 {
+		pvbs, err := GetPVB(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
+		if err != nil {
 			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		}
+		if len(pvbs) != pvCount {
+			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", len(pvbs), pvCount, kibishiiNamespace))
 		}
 		if providerName == "vsphere" {
 			// Wait for uploads started by the Velero Plug-in for vSphere to complete
@@ -143,11 +149,14 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			time.Sleep(5 * time.Minute)
 			if strings.EqualFold(veleroFeatures, "EnableCSI") {
 				_, err = GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 0,
-					kibishiiNamespace, backupName, KibishiiPodNameList)
+					kibishiiNamespace, backupName, KibishiiPVCNameList)
+				if err != nil {
+					return errors.Wrap(err, "failed to get snapshot checkPoint")
+				}
 			} else {
 				err = SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
 					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-					backupName, snapshotCheckPoint)
+					backupName, SnapshotCheckPoint{})
 				if err != nil {
 					return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 				}
@@ -155,7 +164,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		}
 	}
 
-	fmt.Printf("Simulating a disaster by removing namespace %s\n", kibishiiNamespace)
+	fmt.Printf("Simulating a disaster by removing namespace %s %s\n", kibishiiNamespace, time.Now().Format("2006-01-02 15:04:05"))
 	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
@@ -168,29 +177,36 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		time.Sleep(5 * time.Minute)
 	}
 
+	fmt.Printf("VeleroRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := VeleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName, ""); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
-	if !useVolumeSnapshots {
+	if !useVolumeSnapshots && providerName != "vsphere" {
 		pvrs, err := GetPVR(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
-		if err != nil || len(pvrs) != 2 {
-			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get PVR for namespace %s", kibishiiNamespace)
+		} else if len(pvrs) != pvCount {
+			return errors.New(fmt.Sprintf("PVR count %d is not as expected %d", len(pvrs), pvCount))
 		}
 	}
-
+	fmt.Printf("KibishiiVerifyAfterRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
-	fmt.Printf("kibishii test completed successfully\n")
+	fmt.Printf("kibishii test completed successfully %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
 
 func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool) error {
+	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int) error {
 	if strings.EqualFold(cloudPlatform, "azure") &&
 		strings.EqualFold(veleroFeatures, "EnableCSI") {
 		cloudPlatform = "azure-csi"
+	}
+	if strings.EqualFold(cloudPlatform, "aws") &&
+		strings.EqualFold(veleroFeatures, "EnableCSI") {
+		cloudPlatform = "aws-csi"
 	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
@@ -199,6 +215,19 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 	fmt.Printf("Install Kibishii cmd: %s\n", kibishiiInstallCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
+	}
+
+	labelNamespaceCmd := exec.CommandContext(ctx, "kubectl", "label", "namespace", namespace, "pod-security.kubernetes.io/enforce=baseline", "pod-security.kubernetes.io/enforce-version=latest", "--overwrite=true")
+	_, stderr, err = veleroexec.RunCommand(labelNamespaceCmd)
+	fmt.Printf("Label namespace with PSA policy: %s\n", labelNamespaceCmd)
+	if err != nil {
+		return errors.Wrapf(err, "failed to label namespace with PSA policy, stderr=%s", stderr)
+	}
+	if workerReplicas != DefaultKibishiiWorkerCounts {
+		err = ScaleStatefulSet(ctx, namespace, "kibishii-deployment", workerReplicas)
+		if err != nil {
+			return errors.Wrapf(err, "failed to scale statefulset, stderr=%s", err.Error())
+		}
 	}
 
 	kibishiiSetWaitCmd := exec.CommandContext(ctx, "kubectl", "rollout", "status", "statefulset.apps/kibishii-deployment",
@@ -281,6 +310,7 @@ func waitForKibishiiPods(ctx context.Context, client TestClient, kibishiiNamespa
 func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient,
 	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
 	kibishiiDirectory string, useVolumeSnapshots bool, kibishiiData *KibishiiData) error {
+	fmt.Printf("installKibishii %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	serviceAccountName := "default"
 
 	// wait until the service account is created before patch the image pull secret
@@ -294,22 +324,23 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	}
 
 	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, veleroFeatures,
-		kibishiiDirectory, useVolumeSnapshots); err != nil {
+		kibishiiDirectory, useVolumeSnapshots, kibishiiData.ExpectedNodes); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
 	}
-
 	// wait for kibishii pod startup
 	// TODO - Fix kibishii so we can check that it is ready to go
-	fmt.Printf("Waiting for kibishii pods to be ready\n")
+	fmt.Printf("Waiting for kibishii pods to be ready %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := waitForKibishiiPods(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
+	fmt.Printf("generateData %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := generateData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {
 		return errors.Wrap(err, "Failed to generate data")
 	}
+	fmt.Printf("generateData done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
 
@@ -324,7 +355,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 	if err := waitForKibishiiPods(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
-	time.Sleep(60 * time.Second)
+
 	// TODO - check that namespace exists
 	fmt.Printf("running kibishii verify\n")
 	if err := verifyData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {

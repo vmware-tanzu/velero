@@ -63,7 +63,12 @@ func InvokeDeleteActions(ctx *Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "error extracting backup")
 	}
-	defer ctx.Filesystem.RemoveAll(dir)
+	defer func() {
+		if err := ctx.Filesystem.RemoveAll(dir); err != nil {
+			ctx.Log.Errorf("error removing temporary directory %s: %s", dir, err.Error())
+		}
+	}()
+
 	ctx.Log.Debugf("Downloaded and extracted the backup file to: %s", dir)
 
 	backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir)

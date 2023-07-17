@@ -3,6 +3,7 @@ package basic
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -20,40 +21,42 @@ import (
 
 type NodePort struct {
 	TestCase
-	replica              int32
 	labels               map[string]string
-	containers           *[]v1.Container
 	serviceName          string
-	serviceSpec          *v1.ServiceSpec
+	namespaceToCollision []string
 	nodePort             int32
-	namespaceToCollision string
-	namespace            string
 }
 
 const NodeportBaseName string = "nodeport-"
 
-var NodePortTest func() = TestFunc(&NodePort{namespace: NodeportBaseName + "1", TestCase: TestCase{NSBaseName: NodeportBaseName}})
+var NodePortTest func() = TestFunc(&NodePort{})
 
 func (n *NodePort) Init() error {
+	n.TestCase.Init()
+	n.CaseBaseName = NodeportBaseName + n.UUIDgen
+	n.BackupName = "backup-" + n.CaseBaseName
+	n.RestoreName = "restore-" + n.CaseBaseName
+	n.serviceName = "nginx-service-" + n.CaseBaseName
 	n.VeleroCfg = VeleroCfg
 	n.Client = *n.VeleroCfg.ClientToInstallVelero
-	n.NSBaseName = NodeportBaseName
+	n.NamespacesTotal = 1
 	n.TestMsg = &TestMSG{
-		Desc:      fmt.Sprintf("Nodeport preservation"),
+		Desc:      "Nodeport preservation",
 		FailedMSG: "Failed to restore with nodeport preservation",
-		Text:      fmt.Sprintf("Nodeport can be preserved or omit during restore"),
+		Text:      "Nodeport can be preserved or omit during restore",
 	}
-	n.BackupName = "backup-nodeport-" + UUIDgen.String()
-	n.RestoreName = "restore-" + UUIDgen.String()
-	n.serviceName = "nginx-service-" + UUIDgen.String()
-	n.labels = map[string]string{"app": "nginx"}
-	return nil
-}
 
-func (n *NodePort) StartRun() error {
+	n.labels = map[string]string{"app": "nginx"}
+	n.NSIncluded = &[]string{}
+	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
+		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
+		n.namespaceToCollision = append(n.namespaceToCollision, createNSName+"tmp")
+		*n.NSIncluded = append(*n.NSIncluded, createNSName)
+	}
+
 	n.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
-		"--include-namespaces", n.namespace, "--wait",
+		"--include-namespaces", strings.Join(*n.NSIncluded, ","), "--wait",
 	}
 	n.RestoreArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore",
@@ -63,47 +66,45 @@ func (n *NodePort) StartRun() error {
 	return nil
 }
 func (n *NodePort) CreateResources() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
+	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 
-	By(fmt.Sprintf("Creating service %s in namespaces %s ......\n", n.serviceName, n.namespace), func() {
-		Expect(CreateNamespace(ctx, n.Client, n.namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", n.namespace))
-		Expect(createServiceWithNodeport(ctx, n.Client, n.namespace, n.serviceName, n.labels, 0)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
-		service, err := GetService(ctx, n.Client, n.namespace, n.serviceName)
-		Expect(err).To(Succeed())
-		Expect(len(service.Spec.Ports)).To(Equal(1))
-		n.nodePort = service.Spec.Ports[0].NodePort
-		_, err = GetAllService(ctx)
-		Expect(err).To(Succeed(), "fail to get service")
-	})
+	for _, ns := range *n.NSIncluded {
+		By(fmt.Sprintf("Creating service %s in namespaces %s ......\n", n.serviceName, ns), func() {
+			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(createServiceWithNodeport(n.Ctx, n.Client, ns, n.serviceName, n.labels, 0)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
+			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
+			Expect(err).To(Succeed())
+			Expect(len(service.Spec.Ports)).To(Equal(1))
+			n.nodePort = service.Spec.Ports[0].NodePort
+			_, err = GetAllService(n.Ctx)
+			Expect(err).To(Succeed(), "fail to get service")
+		})
+	}
 	return nil
 }
 
 func (n *NodePort) Destroy() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
-	By(fmt.Sprintf("Start to destroy namespace %s......", n.NSBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(ctx, n.Client, NodeportBaseName)).To(Succeed(),
-			fmt.Sprintf("Failed to delete namespace %s", n.NSBaseName))
-		Expect(WaitForServiceDelete(n.Client, n.namespace, n.serviceName, false)).To(Succeed(), "fail to delete service")
-		_, err := GetAllService(ctx)
-		Expect(err).To(Succeed(), "fail to get service")
-	})
+	for i, ns := range *n.NSIncluded {
+		By(fmt.Sprintf("Start to destroy namespace %s......", n.CaseBaseName), func() {
+			Expect(CleanupNamespacesWithPoll(n.Ctx, n.Client, NodeportBaseName)).To(Succeed(),
+				fmt.Sprintf("Failed to delete namespace %s", n.CaseBaseName))
+			Expect(WaitForServiceDelete(n.Client, ns, n.serviceName, false)).To(Succeed(), "fail to delete service")
+			_, err := GetAllService(n.Ctx)
+			Expect(err).To(Succeed(), "fail to get service")
+		})
 
-	n.namespaceToCollision = NodeportBaseName + "tmp"
-	By(fmt.Sprintf("Creating a new service which has the same nodeport as backed up service has in a new namespaces for nodeport collision ...%s\n", n.namespaceToCollision), func() {
-		Expect(CreateNamespace(ctx, n.Client, n.namespaceToCollision)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", n.namespaceToCollision))
-		Expect(createServiceWithNodeport(ctx, n.Client, n.namespaceToCollision, n.serviceName, n.labels, n.nodePort)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
-		_, err := GetAllService(ctx)
-		Expect(err).To(Succeed(), "fail to get service")
-	})
+		By(fmt.Sprintf("Creating a new service which has the same nodeport as backed up service has in a new namespaces for nodeport collision ...%s\n", n.namespaceToCollision[i]), func() {
+			Expect(CreateNamespace(n.Ctx, n.Client, n.namespaceToCollision[i])).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", n.namespaceToCollision[i]))
+			Expect(createServiceWithNodeport(n.Ctx, n.Client, n.namespaceToCollision[i], n.serviceName, n.labels, n.nodePort)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
+			_, err := GetAllService(n.Ctx)
+			Expect(err).To(Succeed(), "fail to get service")
+		})
+	}
 
 	return nil
 }
 
 func (n *NodePort) Restore() error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 60*time.Minute)
-	defer ctxCancel()
 	index := 4
 	restoreName1 := n.RestoreName + "-1"
 	restoreName2 := restoreName1 + "-1"
@@ -112,7 +113,7 @@ func (n *NodePort) Restore() error {
 	args = append(args[:index], append([]string{n.RestoreName}, args[index:]...)...)
 	args = append(args, "--preserve-nodeports=true")
 	By(fmt.Sprintf("Start to restore %s with nodeports preservation when port %d is already occupied by other service", n.RestoreName, n.nodePort), func() {
-		Expect(VeleroRestoreExec(ctx, n.VeleroCfg.VeleroCLI,
+		Expect(VeleroRestoreExec(n.Ctx, n.VeleroCfg.VeleroCLI,
 			n.VeleroCfg.VeleroNamespace, n.RestoreName,
 			args, velerov1api.RestorePhasePartiallyFailed)).To(
 			Succeed(),
@@ -127,44 +128,45 @@ func (n *NodePort) Restore() error {
 	args = append(args[:index], append([]string{restoreName1}, args[index:]...)...)
 	args = append(args, "--preserve-nodeports=false")
 	By(fmt.Sprintf("Start to restore %s without nodeports preservation ......", restoreName1), func() {
-		Expect(VeleroRestoreExec(ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace,
+		Expect(VeleroRestoreExec(n.Ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace,
 			restoreName1, args, velerov1api.RestorePhaseCompleted)).To(Succeed(), func() string {
 			RunDebug(context.Background(), n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, "", restoreName1)
 			return "Fail to restore workload"
 		})
 	})
 
-	By(fmt.Sprintf("Delete service %s by deleting namespace %s", n.serviceName, n.namespace), func() {
-		service, err := GetService(ctx, n.Client, n.namespace, n.serviceName)
-		Expect(err).To(Succeed())
-		Expect(len(service.Spec.Ports)).To(Equal(1))
-		fmt.Println(service.Spec.Ports)
-		Expect(DeleteNamespace(ctx, n.Client, n.namespace, true)).To(Succeed())
-	})
-
-	By(fmt.Sprintf("Start to delete service %s in namespace %s ......", n.serviceName, n.namespaceToCollision), func() {
-		Expect(WaitForServiceDelete(n.Client, n.namespaceToCollision, n.serviceName, true)).To(Succeed(), "fail to delete service")
-		_, err := GetAllService(ctx)
-		Expect(err).To(Succeed(), "fail to get service")
-	})
-
-	args = n.RestoreArgs
-	args = append(args[:index], append([]string{restoreName2}, args[index:]...)...)
-	args = append(args, "--preserve-nodeports=true")
-	By(fmt.Sprintf("Start to restore %s with nodeports preservation ......", restoreName2), func() {
-		Expect(VeleroRestoreExec(ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace,
-			restoreName2, args, velerov1api.RestorePhaseCompleted)).To(Succeed(), func() string {
-			RunDebug(context.Background(), n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, "", restoreName2)
-			return "Fail to restore workload"
+	for i, ns := range *n.NSIncluded {
+		By(fmt.Sprintf("Delete service %s by deleting namespace %s", n.serviceName, ns), func() {
+			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
+			Expect(err).To(Succeed())
+			Expect(len(service.Spec.Ports)).To(Equal(1))
+			fmt.Println(service.Spec.Ports)
+			Expect(DeleteNamespace(n.Ctx, n.Client, ns, true)).To(Succeed())
 		})
-	})
 
-	By(fmt.Sprintf("Verify service %s was restore successfully with the origin nodeport.", n.namespace), func() {
-		service, err := GetService(ctx, n.Client, n.namespace, n.serviceName)
-		Expect(err).To(Succeed())
-		Expect(len(service.Spec.Ports)).To(Equal(1))
-		Expect(service.Spec.Ports[0].NodePort).To(Equal(n.nodePort))
-	})
+		By(fmt.Sprintf("Start to delete service %s in namespace %s ......", n.serviceName, n.namespaceToCollision[i]), func() {
+			Expect(WaitForServiceDelete(n.Client, n.namespaceToCollision[i], n.serviceName, true)).To(Succeed(), "fail to delete service")
+			_, err := GetAllService(n.Ctx)
+			Expect(err).To(Succeed(), "fail to get service")
+		})
+		args = n.RestoreArgs
+		args = append(args[:index], append([]string{restoreName2}, args[index:]...)...)
+		args = append(args, "--preserve-nodeports=true")
+		By(fmt.Sprintf("Start to restore %s with nodeports preservation ......", restoreName2), func() {
+			Expect(VeleroRestoreExec(n.Ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace,
+				restoreName2, args, velerov1api.RestorePhaseCompleted)).To(Succeed(), func() string {
+				RunDebug(context.Background(), n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, "", restoreName2)
+				return "Fail to restore workload"
+			})
+		})
+
+		By(fmt.Sprintf("Verify service %s was restore successfully with the origin nodeport.", ns), func() {
+			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
+			Expect(err).To(Succeed())
+			Expect(len(service.Spec.Ports)).To(Equal(1))
+			Expect(service.Spec.Ports[0].NodePort).To(Equal(n.nodePort))
+		})
+	}
 
 	return nil
 }

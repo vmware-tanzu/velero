@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kopia/kopia/repo/blob/s3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -27,9 +28,10 @@ import (
 
 func TestS3Setup(t *testing.T) {
 	testCases := []struct {
-		name        string
-		flags       map[string]string
-		expectedErr string
+		name            string
+		flags           map[string]string
+		expectedOptions s3.Options
+		expectedErr     string
 	}{
 		{
 			name:        "must have bucket name",
@@ -37,19 +39,79 @@ func TestS3Setup(t *testing.T) {
 			expectedErr: "key " + udmrepo.StoreOptionOssBucket + " not found",
 		},
 		{
-			name: "must have access key Id",
+			name: "with bucket only",
 			flags: map[string]string{
 				udmrepo.StoreOptionOssBucket: "fake-bucket",
 			},
-			expectedErr: "key " + udmrepo.StoreOptionS3KeyID + " not found",
+			expectedOptions: s3.Options{
+				BucketName: "fake-bucket",
+			},
 		},
 		{
-			name: "must have access key",
+			name: "with others",
 			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket: "fake-bucket",
-				udmrepo.StoreOptionS3KeyID:   "fake-key-id",
+				udmrepo.StoreOptionOssBucket:   "fake-bucket",
+				udmrepo.StoreOptionS3KeyID:     "fake-ak",
+				udmrepo.StoreOptionS3SecretKey: "fake-sk",
+				udmrepo.StoreOptionS3Endpoint:  "fake-endpoint",
+				udmrepo.StoreOptionOssRegion:   "fake-region",
+				udmrepo.StoreOptionPrefix:      "fake-prefix",
+				udmrepo.StoreOptionS3Token:     "fake-token",
 			},
-			expectedErr: "key " + udmrepo.StoreOptionS3SecretKey + " not found",
+			expectedOptions: s3.Options{
+				BucketName:      "fake-bucket",
+				AccessKeyID:     "fake-ak",
+				SecretAccessKey: "fake-sk",
+				Endpoint:        "fake-endpoint",
+				Region:          "fake-region",
+				Prefix:          "fake-prefix",
+				SessionToken:    "fake-token",
+			},
+		},
+		{
+			name: "with wrong tls",
+			flags: map[string]string{
+				udmrepo.StoreOptionOssBucket:          "fake-bucket",
+				udmrepo.StoreOptionS3DisableTLS:       "fake-bool",
+				udmrepo.StoreOptionS3DisableTLSVerify: "fake-bool",
+			},
+			expectedOptions: s3.Options{
+				BucketName: "fake-bucket",
+			},
+		},
+		{
+			name: "with correct tls",
+			flags: map[string]string{
+				udmrepo.StoreOptionOssBucket:          "fake-bucket",
+				udmrepo.StoreOptionS3DisableTLS:       "true",
+				udmrepo.StoreOptionS3DisableTLSVerify: "false",
+			},
+			expectedOptions: s3.Options{
+				BucketName:     "fake-bucket",
+				DoNotUseTLS:    true,
+				DoNotVerifyTLS: false,
+			},
+		},
+		{
+			name: "with wrong ca",
+			flags: map[string]string{
+				udmrepo.StoreOptionOssBucket:  "fake-bucket",
+				udmrepo.StoreOptionS3CustomCA: "fake-base-64",
+			},
+			expectedOptions: s3.Options{
+				BucketName: "fake-bucket",
+			},
+		},
+		{
+			name: "with correct ca",
+			flags: map[string]string{
+				udmrepo.StoreOptionOssBucket:  "fake-bucket",
+				udmrepo.StoreOptionS3CustomCA: "ZmFrZS1jYQ==",
+			},
+			expectedOptions: s3.Options{
+				BucketName: "fake-bucket",
+				RootCA:     []byte{'f', 'a', 'k', 'e', '-', 'c', 'a'},
+			},
 		},
 	}
 

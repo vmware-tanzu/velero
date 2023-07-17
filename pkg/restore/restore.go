@@ -401,7 +401,11 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		errs.AddVeleroError(err)
 		return warnings, errs
 	}
-	defer ctx.fileSystem.RemoveAll(dir)
+	defer func() {
+		if err := ctx.fileSystem.RemoveAll(dir); err != nil {
+			ctx.log.Errorf("error removing temporary directory %s: %s", dir, err.Error())
+		}
+	}()
 
 	// Need to set this for additionalItems to be restored.
 	ctx.restoreDir = dir
@@ -483,13 +487,14 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	for _, selectedResource := range crdResourceCollection {
 		var w, e results.Result
-		// Restore this resource
+		// Restore this resource, the update channel is set to nil, to avoid misleading value of "totalItems"
+		// more details see #5990
 		processedItems, w, e = ctx.processSelectedResource(
 			selectedResource,
 			totalItems,
 			processedItems,
 			existingNamespaces,
-			update,
+			nil,
 		)
 		warnings.Merge(&w)
 		errs.Merge(&e)
@@ -529,6 +534,21 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	// Close the progress update channel.
 	quit <- struct{}{}
+
+	// Clean the DataUploadResult ConfigMaps
+	defer func() {
+		opts := []crclient.DeleteAllOfOption{
+			crclient.InNamespace(ctx.restore.Namespace),
+			crclient.MatchingLabels{
+				velerov1api.RestoreUIDLabel:    string(ctx.restore.UID),
+				velerov1api.ResourceUsageLabel: string(velerov1api.VeleroResourceUsageDataUploadResult),
+			},
+		}
+		err := ctx.kbClient.DeleteAllOf(go_context.Background(), &v1.ConfigMap{}, opts...)
+		if err != nil {
+			ctx.log.Errorf("Fail to batch delete DataUploadResult ConfigMaps for restore %s: %s", ctx.restore.Name, err.Error())
+		}
+	}()
 
 	// Do a final progress update as stopping the ticker might have left last few
 	// updates from taking place.
@@ -657,9 +677,11 @@ func (ctx *restoreContext) processSelectedResource(
 			// time, we don't want previously known items counted twice as
 			// they are present in both restoredItems and totalItems.
 			actualTotalItems := len(ctx.restoredItems) + (totalItems - processedItems)
-			update <- progressUpdate{
-				totalItems:    actualTotalItems,
-				itemsRestored: len(ctx.restoredItems),
+			if update != nil {
+				update <- progressUpdate{
+					totalItems:    actualTotalItems,
+					itemsRestored: len(ctx.restoredItems),
+				}
 			}
 			ctx.log.WithFields(map[string]interface{}{
 				"progress":  "",

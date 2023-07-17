@@ -24,6 +24,8 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
 )
 
+const StorageClassName = "e2e-storage-class"
+
 var UUIDgen uuid.UUID
 
 var VeleroCfg VeleroConfig
@@ -70,6 +72,9 @@ type VeleroConfig struct {
 	DefaultVolumesToFsBackup    bool
 	UseVolumeSnapshots          bool
 	VeleroServerDebugMode       bool
+	SnapshotMoveData            bool
+	DataMoverPlugin             string
+	StandbyClusterCloudProvider string
 }
 
 type SnapshotCheckPoint struct {
@@ -96,6 +101,7 @@ type BackupConfig struct {
 	OrderedResources            string
 	UseResticIfFSBackup         bool
 	DefaultVolumesToFsBackup    bool
+	SnapshotMoveData            bool
 }
 
 type VeleroCLI2Version struct {

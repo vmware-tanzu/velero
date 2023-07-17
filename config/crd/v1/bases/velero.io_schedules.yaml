@@ -1,11 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.0
   name: schedules.velero.io
 spec:
   group: velero.io
@@ -71,6 +69,11 @@ spec:
                     description: CSISnapshotTimeout specifies the time used to wait
                       for CSI VolumeSnapshot status turns to ReadyToUse during creation,
                       before returning error as timeout. The default value is 10 minute.
+                    type: string
+                  datamover:
+                    description: DataMover specifies the data mover to be used by
+                      the backup. If DataMover is "" or "velero", the built-in data
+                      mover will be used.
                     type: string
                   defaultVolumesToFsBackup:
                     description: DefaultVolumesToFsBackup specifies whether pod volume
@@ -206,6 +209,7 @@ spec:
                                     requirements are ANDed.
                                   type: object
                               type: object
+                              x-kubernetes-map-type: atomic
                             name:
                               description: Name is the name of this hook.
                               type: string
@@ -396,6 +400,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-map-type: atomic
                   metadata:
                     properties:
                       labels:
@@ -456,6 +461,7 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
+                      x-kubernetes-map-type: atomic
                     nullable: true
                     type: array
                   orderedResources:
@@ -488,6 +494,12 @@ spec:
                     - kind
                     - name
                     type: object
+                    x-kubernetes-map-type: atomic
+                  snapshotMoveData:
+                    description: SnapshotMoveData specifies whether snapshot data
+                      should be moved
+                    nullable: true
+                    type: boolean
                   snapshotVolumes:
                     description: SnapshotVolumes specifies whether to take snapshots
                       of any PV's referenced in the set of objects included in the
@@ -545,9 +557,3 @@ spec:
     served: true
     storage: true
     subresources: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

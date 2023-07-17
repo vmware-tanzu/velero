@@ -55,6 +55,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -101,7 +102,7 @@ const (
 	defaultBackupTTL = 30 * 24 * time.Hour
 
 	defaultCSISnapshotTimeout   = 10 * time.Minute
-	defaultItemOperationTimeout = 60 * time.Minute
+	defaultItemOperationTimeout = 4 * time.Hour
 
 	resourceTimeout = 10 * time.Minute
 
@@ -225,10 +226,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "How long to wait by default before backups can be garbage collected.")
 	command.Flags().DurationVar(&config.repoMaintenanceFrequency, "default-repo-maintain-frequency", config.repoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default.")
 	command.Flags().DurationVar(&config.garbageCollectionFrequency, "garbage-collection-frequency", config.garbageCollectionFrequency, "How often garbage collection is run for expired backups.")
-	command.Flags().DurationVar(&config.itemOperationSyncFrequency, "item-operation-sync-frequency", config.itemOperationSyncFrequency, "How often to check status on backup/restore operations after backup/restore processing.")
+	command.Flags().DurationVar(&config.itemOperationSyncFrequency, "item-operation-sync-frequency", config.itemOperationSyncFrequency, "How often to check status on backup/restore operations after backup/restore processing. Default is 10 seconds")
 	command.Flags().BoolVar(&config.defaultVolumesToFsBackup, "default-volumes-to-fs-backup", config.defaultVolumesToFsBackup, "Backup all volumes with pod volume file system backup by default.")
 	command.Flags().StringVar(&config.uploaderType, "uploader-type", config.uploaderType, "Type of uploader to handle the transfer of data of pod volumes")
-	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out.")
+	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out. Default is 4 hours")
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().IntVar(&config.maxConcurrentK8SConnections, "max-concurrent-k8s-connections", config.maxConcurrentK8SConnections, "Max concurrent connections number that Velero can create with kube-apiserver. Default is 30.")
 
@@ -313,9 +314,22 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	scheme := runtime.NewScheme()
-	velerov1api.AddToScheme(scheme)
-	corev1api.AddToScheme(scheme)
-	snapshotv1api.AddToScheme(scheme)
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := velerov2alpha1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := corev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
 
 	ctrl.SetLogger(logrusr.New(logger))
 
@@ -507,6 +521,7 @@ High priorities:
   - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
     storage provider
   - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
+  - DataUploads need to restore before PVC for Snapshot DataMover to work, because PVC needs the DataUploadResults to create DataDownloads.
   - PVs go before PVCs because PVCs depend on them.
   - PVCs go before pods or controllers so they can be mounted as volumes.
   - Service accounts go before secrets so service account token secrets can be filled automatically.
@@ -518,10 +533,13 @@ High priorities:
   - Replica sets go before deployments/other controllers so they can be explicitly
     restored and be adopted by controllers.
   - CAPI ClusterClasses go before Clusters.
+  - Endpoints go before Services so no new Endpoints will be created
+  - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
+    for the same clusters
 
 Low priorities:
   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
-    ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
+  - ClusterBootstraps go before CAPI Clusters otherwise a new default ClusterBootstrap object is created for the cluster
   - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
     Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
     See https://github.com/kubernetes-sigs/cluster-api/issues/4105
@@ -534,6 +552,7 @@ var defaultRestorePriorities = restore.Priorities{
 		"volumesnapshotclass.snapshot.storage.k8s.io",
 		"volumesnapshotcontents.snapshot.storage.k8s.io",
 		"volumesnapshots.snapshot.storage.k8s.io",
+		"datauploads.velero.io",
 		"persistentvolumes",
 		"persistentvolumeclaims",
 		"serviceaccounts",
@@ -547,6 +566,7 @@ var defaultRestorePriorities = restore.Priorities{
 		// in the backup.
 		"replicasets.apps",
 		"clusterclasses.cluster.x-k8s.io",
+		"endpoints",
 		"services",
 	},
 	LowPriorities: []string{
@@ -1045,7 +1065,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 	}
 
 	for i, backup := range backups.Items {
-		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+		if backup.Status.Phase != velerov1api.BackupPhaseInProgress && backup.Status.Phase != velerov1api.BackupPhaseWaitingForPluginOperations {
 			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
 		}
@@ -1058,6 +1078,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 			continue
 		}
 		log.WithField("backup", backup.GetName()).Warn(updated.Status.FailureReason)
+		markDataUploadsCancel(ctx, client, backup, log)
 	}
 }
 
@@ -1068,7 +1089,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		return
 	}
 	for i, restore := range restores.Items {
-		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
+		if restore.Status.Phase != velerov1api.RestorePhaseInProgress && restore.Status.Phase != velerov1api.RestorePhaseWaitingForPluginOperations {
 			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
 			continue
 		}
@@ -1081,5 +1102,56 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 			continue
 		}
 		log.WithField("restore", restore.GetName()).Warn(updated.Status.FailureReason)
+		markDataDownloadsCancel(ctx, client, restore, log)
+	}
+}
+
+func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup velerov1api.Backup, log logrus.FieldLogger) {
+	dataUploads := &velerov2alpha1api.DataUploadList{}
+
+	if err := client.List(ctx, dataUploads, &ctrlclient.MatchingFields{"metadata.namespace": backup.GetNamespace()}, &ctrlclient.MatchingLabels{velerov1api.BackupUIDLabel: string(backup.GetUID())}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list dataUploads")
+		return
+	}
+
+	for i := range dataUploads.Items {
+		du := dataUploads.Items[i]
+		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+			updated := du.DeepCopy()
+			updated.Spec.Cancel = true
+			updated.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&du)); err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
+				continue
+			}
+			log.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
+		}
+	}
+}
+
+func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, restore velerov1api.Restore, log logrus.FieldLogger) {
+	dataDownloads := &velerov2alpha1api.DataDownloadList{}
+
+	if err := client.List(ctx, dataDownloads, &ctrlclient.MatchingFields{"metadata.namespace": restore.GetNamespace()}, &ctrlclient.MatchingLabels{velerov1api.RestoreUIDLabel: string(restore.GetUID())}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list dataDownloads")
+		return
+	}
+
+	for i := range dataDownloads.Items {
+		dd := dataDownloads.Items[i]
+		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+			updated := dd.DeepCopy()
+			updated.Spec.Cancel = true
+			updated.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&dd)); err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", dd.GetName())
+				continue
+			}
+			log.WithField("datadownload", dd.GetName()).Warn(dd.Status.Message)
+		}
 	}
 }

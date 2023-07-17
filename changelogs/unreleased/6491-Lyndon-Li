@@ -1,0 +1,1 @@
+Fix issue 6490, If a backup/restore has multiple async operations and one operation fails while others are still in-progress, when all the operations finish, the backup/restore will be set as Completed falsely

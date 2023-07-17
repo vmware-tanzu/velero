@@ -1,0 +1,1 @@
+Fix issue #5123, Kopia repository supports self-cert CA for S3 compatible storage.

@@ -27,3 +27,26 @@ func NewLogger() logrus.FieldLogger {
 	logger.Out = io.Discard
 	return logrus.NewEntry(logger)
 }
+
+func NewLoggerWithLevel(level logrus.Level) logrus.FieldLogger {
+	logger := logrus.New()
+	logger.Out = io.Discard
+	logger.Level = level
+	return logrus.NewEntry(logger)
+}
+
+type singleLogRecorder struct {
+	buffer *string
+}
+
+func (s *singleLogRecorder) Write(p []byte) (n int, err error) {
+	*s.buffer = string(p[:])
+	return len(p), nil
+}
+
+func NewSingleLogger(buffer *string) logrus.FieldLogger {
+	logger := logrus.New()
+	logger.Out = &singleLogRecorder{buffer: buffer}
+	logger.Level = logrus.TraceLevel
+	return logrus.NewEntry(logger)
+}

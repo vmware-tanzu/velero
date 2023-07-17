@@ -143,7 +143,7 @@ func NewInstallOptions() *Options {
 		NoDefaultBackupLocation:  false,
 		CRDsOnly:                 false,
 		DefaultVolumesToFsBackup: false,
-		UploaderType:             uploader.ResticType,
+		UploaderType:             uploader.KopiaType,
 	}
 }
 

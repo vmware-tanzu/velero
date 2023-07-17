@@ -26,6 +26,8 @@ kind: Deployment
 metadata:
   name: nginx-deployment
   namespace: nginx-example
+  labels:
+    app: nginx
 spec:
   replicas: 2
   selector:

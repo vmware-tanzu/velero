@@ -55,7 +55,7 @@ VELERO_VERSION ?= $(VERSION)
 PLUGINS ?=
 RESTORE_HELPER_IMAGE ?=
 #Released version only
-UPGRADE_FROM_VELERO_VERSION ?= v1.9.6,v1.10.2
+UPGRADE_FROM_VELERO_VERSION ?= v1.10.2,v1.11.0
 # UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
 # Upgrade tests will be executed sequently according to the list by UPGRADE_FROM_VELERO_VERSION
 # So although length of UPGRADE_FROM_VELERO_CLI list is not equal with UPGRADE_FROM_VELERO_VERSION
@@ -63,7 +63,7 @@ UPGRADE_FROM_VELERO_VERSION ?= v1.9.6,v1.10.2
 # to the end, nil string will be set if UPGRADE_FROM_VELERO_CLI is shorter than UPGRADE_FROM_VELERO_VERSION
 UPGRADE_FROM_VELERO_CLI ?=
 
-MIGRATE_FROM_VELERO_VERSION ?= v1.10.2,self
+MIGRATE_FROM_VELERO_VERSION ?= v1.11.0,self
 MIGRATE_FROM_VELERO_CLI ?=
 
 VELERO_NAMESPACE ?= velero
@@ -73,6 +73,7 @@ BSL_PREFIX ?=
 BSL_CONFIG ?=
 VSL_CONFIG ?=
 CLOUD_PROVIDER ?=
+STANDBY_CLUSTER_CLOUD_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
@@ -98,6 +99,9 @@ DEFAULT_CLUSTER ?=
 STANDBY_CLUSTER ?=
 
 UPLOADER_TYPE ?=
+
+SNAPSHOT_MOVE_DATA ?= false
+DATA_MOVER_PLUGIN ?=
 
 
 .PHONY:ginkgo
@@ -143,7 +147,10 @@ run: ginkgo
 		-velero-server-debug-mode=$(VELERO_SERVER_DEBUG_MODE) \
 		-default-cluster=$(DEFAULT_CLUSTER) \
 		-standby-cluster=$(STANDBY_CLUSTER) \
-		-uploader-type=$(UPLOADER_TYPE)
+		-uploader-type=$(UPLOADER_TYPE) \
+		-snapshot-move-data=$(SNAPSHOT_MOVE_DATA) \
+		-data-mover-plugin=$(DATA_MOVER_plugin) \
+		-standby-cluster-cloud-provider=$(STANDBY_CLUSTER_CLOUD_PROVIDER)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

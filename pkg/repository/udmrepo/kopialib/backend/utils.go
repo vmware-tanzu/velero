@@ -18,6 +18,7 @@ package backend
 
 import (
 	"context"
+	"encoding/base64"
 	"strconv"
 	"time"
 
@@ -82,6 +83,19 @@ func optionalHaveDuration(ctx context.Context, key string, flags map[string]stri
 	}
 
 	return 0
+}
+
+func optionalHaveBase64(ctx context.Context, key string, flags map[string]string) []byte {
+	if value, exist := flags[key]; exist {
+		ret, err := base64.StdEncoding.DecodeString(value)
+		if err == nil {
+			return ret
+		}
+
+		backendLog()(ctx).Errorf("Ignore %s, value [%s] is invalid, err %v", key, value, err)
+	}
+
+	return nil
 }
 
 func backendLog() func(ctx context.Context) logging.Logger {

@@ -29,13 +29,13 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 const restoreProgressCheckInterval = 10 * time.Second
 const backupProgressCheckInterval = 10 * time.Second
+
+var ErrorCanceled error = errors.New("uploader is canceled")
 
 // Provider which is designed for one pod volume to do the backup or restore
 type Provider interface {
@@ -44,7 +44,9 @@ type Provider interface {
 	RunBackup(
 		ctx context.Context,
 		path string,
+		realSource string,
 		tags map[string]string,
+		forceFull bool,
 		parentSnapshot string,
 		updater uploader.ProgressUpdater) (string, bool, error)
 	// RunRestore which will do restore for one specific volume with given snapshot id and return error
@@ -63,6 +65,7 @@ func NewUploaderProvider(
 	ctx context.Context,
 	client client.Client,
 	uploaderType string,
+	requesterType string,
 	repoIdentifier string,
 	bsl *velerov1api.BackupStorageLocation,
 	backupRepo *velerov1api.BackupRepository,
@@ -70,20 +73,16 @@ func NewUploaderProvider(
 	repoKeySelector *v1.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
+	if requesterType == "" {
+		return nil, errors.New("requester type is empty")
+	}
+
 	if credGetter.FromFile == nil {
-		return nil, errors.New("uninitialized FileStore credentail is not supported")
+		return nil, errors.New("uninitialized FileStore credential is not supported")
 	}
 	if uploaderType == uploader.KopiaType {
-		// We use the hardcode repositoryType velerov1api.BackupRepositoryTypeKopia for now, because we have only one implementation of unified repo.
-		// TODO: post v1.10, replace the hardcode. In future, when we have multiple implementations of Unified Repo (besides Kopia), we will add the
-		// repositoryType to BSL, because by then, we are not able to hardcode the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
-		if err := provider.NewUnifiedRepoProvider(*credGetter, velerov1api.BackupRepositoryTypeKopia, log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
-			return nil, errors.Wrap(err, "failed to connect repository")
-		}
-		return NewKopiaUploaderProvider(ctx, credGetter, backupRepo, log)
+		return NewKopiaUploaderProvider(requesterType, ctx, credGetter, backupRepo, log)
+	} else {
+		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	}
-	if err := provider.NewResticRepositoryProvider(credGetter.FromFile, filesystem.NewFileSystem(), log).ConnectToRepo(ctx, provider.RepoParam{BackupLocation: bsl, BackupRepo: backupRepo}); err != nil {
-		return nil, errors.Wrap(err, "failed to connect repository")
-	}
-	return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 }

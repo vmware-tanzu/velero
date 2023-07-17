@@ -234,6 +234,10 @@ endif
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
+# update-crd is for development purpose only, it is faster than update, so is a shortcut when you want to generate CRD changes only
+update-crd:
+	@$(MAKE) shell CMD="-c 'hack/update-3generated-crd-code.sh'"	
+
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
@@ -345,7 +349,7 @@ serve-docs: build-image-hugo
 	-v "$$(pwd)/site:/srv/hugo" \
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
-	hugo server --bind=0.0.0.0 --enableGitInfo=false
+	server --bind=0.0.0.0 --enableGitInfo=false
 # gen-docs generates a new versioned docs directory under site/content/docs.
 # Please read the documentation in the script for instructions on how to use it.
 gen-docs:
@@ -354,3 +358,6 @@ gen-docs:
 .PHONY: test-e2e
 test-e2e: local
 	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+
+go-generate:
+	go generate ./pkg/...

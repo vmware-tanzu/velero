@@ -5,7 +5,9 @@
 
 ## Overview
 
-Velero (formerly Heptio Ark) gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. You can run Velero with a public cloud platform or on-premises. Velero lets you:
+Velero (formerly Heptio Ark) gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. You can run Velero with a public cloud platform or on-premises. 
+
+Velero lets you:
 
 * Take backups of your cluster and restore in case of loss.
 * Migrate cluster resources to other clusters.
@@ -18,7 +20,7 @@ Velero consists of:
 
 ## Documentation
 
-[The documentation][29] provides a getting started guide and information about building from source, architecture, extending Velero, and more.
+[The documentation][29] provides a getting started guide and information about building from source, architecture, extending Velero and more.
 
 Please use the version selector at the top of the site to ensure you are using the appropriate documentation for your version of Velero.
 

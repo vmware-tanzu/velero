@@ -14,14 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package backup
 
-// PodVolumeOperationProgress represents the progress of a
-// PodVolumeBackup/Restore operation
-type PodVolumeOperationProgress struct {
-	// +optional
-	TotalBytes int64 `json:"totalBytes,omitempty"`
+import (
+	"testing"
 
-	// +optional
-	BytesDone int64 `json:"bytesDone,omitempty"`
+	"github.com/stretchr/testify/assert"
+
+	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
+)
+
+func TestNewBackupCommand(t *testing.T) {
+	// create a factory
+	f := &factorymocks.Factory{}
+
+	// create command
+	cmd := NewCommand(f)
+	assert.Equal(t, "Work with backups", cmd.Short)
 }
