@@ -23,8 +23,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -32,51 +33,84 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 )
 
-func NewLogsCommand(f client.Factory) *cobra.Command {
+type LogsOptions struct {
+	Timeout               time.Duration
+	InsecureSkipTLSVerify bool
+	CaCertFile            string
+	Client                kbclient.Client
+	BackupName            string
+}
+
+func NewLogsOptions() LogsOptions {
 	config, err := client.LoadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "WARNING: Error reading config file: %v\n", err)
 	}
 
-	timeout := time.Minute
-	insecureSkipTLSVerify := false
-	caCertFile := config.CACertFile()
+	return LogsOptions{
+		Timeout:               time.Minute,
+		InsecureSkipTLSVerify: false,
+		CaCertFile:            config.CACertFile(),
+	}
+}
+
+func (l *LogsOptions) BindFlags(flags *pflag.FlagSet) {
+	flags.DurationVar(&l.Timeout, "timeout", l.Timeout, "How long to wait to receive logs.")
+	flags.BoolVar(&l.InsecureSkipTLSVerify, "insecure-skip-tls-verify", l.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
+	flags.StringVar(&l.CaCertFile, "cacert", l.CaCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
+}
+
+func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
+	backup := new(velerov1api.Backup)
+	err := l.Client.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: l.BackupName}, backup)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("backup %q does not exist", l.BackupName)
+	} else if err != nil {
+		return fmt.Errorf("error checking for backup %q: %v", l.BackupName, err)
+	}
+
+	switch backup.Status.Phase {
+	case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
+		// terminal and waiting for plugin operations phases, do nothing.
+	default:
+		return fmt.Errorf("logs for backup %q are not available until it's finished processing, please wait "+
+			"until the backup has a phase of Completed or Failed and try again", l.BackupName)
+	}
+
+	err = downloadrequest.Stream(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, os.Stdout, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile)
+	return err
+}
+
+func (l *LogsOptions) Complete(args []string, f client.Factory) error {
+	if len(args) > 0 {
+		l.BackupName = args[0]
+	}
+
+	kbClient, err := f.KubebuilderClient()
+	if err != nil {
+		return err
+	}
+	l.Client = kbClient
+	return nil
+}
+
+func NewLogsCommand(f client.Factory) *cobra.Command {
+	l := NewLogsOptions()
 
 	c := &cobra.Command{
 		Use:   "logs BACKUP",
 		Short: "Get backup logs",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			backupName := args[0]
-
-			veleroClient, err := f.Client()
+			err := l.Complete(args, f)
 			cmd.CheckError(err)
 
-			kbClient, err := f.KubebuilderClient()
-			cmd.CheckError(err)
-
-			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), backupName, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				cmd.Exit("Backup %q does not exist.", backupName)
-			} else if err != nil {
-				cmd.Exit("Error checking for backup %q: %v", backupName, err)
-			}
-
-			switch backup.Status.Phase {
-			case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseWaitingForPluginOperations, velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed:
-				// terminal and waiting for plugin operations phases, do nothing.
-			default:
-				cmd.Exit("Logs for backup %q are not available until it's finished processing. Please wait "+
-					"until the backup has a phase of Completed or Failed and try again.", backupName)
-			}
-
-			err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), backupName, velerov1api.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
+			err = l.Run(c, f)
 			cmd.CheckError(err)
 		},
 	}
 
-	c.Flags().DurationVar(&timeout, "timeout", timeout, "How long to wait to receive logs.")
-	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
+	l.BindFlags(c.Flags())
+
 	return c
 }

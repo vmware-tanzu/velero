@@ -29,16 +29,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
-	"github.com/vmware-tanzu/velero/pkg/test"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
+	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestBuildBackupStorageLocationSetsNamespace(t *testing.T) {
@@ -149,16 +142,7 @@ func TestCreateCommand_Run(t *testing.T) {
 
 	args := []string{name, "arg2"}
 
-	backups := &velerov1mocks.BackupInterface{}
-	veleroV1 := &velerov1mocks.VeleroV1Interface{}
-	client := &versionedmocks.Interface{}
-	bk := &velerov1api.Backup{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-
-	backups.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-	veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-	client.On("VeleroV1").Return(veleroV1, nil)
-	f.On("Client").Return(client, nil)
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
 	f.On("Namespace").Return(mock.Anything)
 	f.On("KubebuilderClient").Return(kbclient, nil)
 
@@ -179,7 +163,7 @@ func TestCreateCommand_Run(t *testing.T) {
 	assert.Equal(t, backupSyncPeriod, o.BackupSyncPeriod.String())
 	assert.Equal(t, validationFrequency, o.ValidationFrequency.String())
 	assert.Equal(t, true, reflect.DeepEqual(bslConfig, o.Config))
-	assert.Equal(t, true, test.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
+	assert.Equal(t, true, velerotest.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
 	assert.Equal(t, caCertFile, o.CACertFile)
 	assert.Equal(t, accessMode, o.AccessMode.String())
 
