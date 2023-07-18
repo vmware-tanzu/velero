@@ -60,6 +60,13 @@ jobs:
         files: coverage.out
         verbose: true
 
+    # Use the JSON key in secret to login gcr.io
+    - uses: 'docker/login-action@v2'
+      with:
+        registry: 'gcr.io' # or REGION.docker.pkg.dev
+        username: '_json_key'
+        password: '${{ secrets.GCR_SA_KEY }}'
+
     # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
     - name: Publish container image
       if: github.repository == 'vmware-tanzu/velero'
@@ -91,19 +98,3 @@ jobs:
         uploader ${VELERO_RESTORE_HELPER_IMAGE_FILE} ${GCS_BUCKET}
         uploader ${VELERO_IMAGE_BACKUP_FILE} ${GCS_BUCKET}
         uploader ${VELERO_RESTORE_HELPER_IMAGE_BACKUP_FILE} ${GCS_BUCKET}
-
-    # Use the JSON key in secret to login gcr.io
-    - uses: 'docker/login-action@v1'
-      with:
-        registry: 'gcr.io' # or REGION.docker.pkg.dev
-        username: '_json_key'
-        password: '${{ secrets.GCR_SA_KEY }}'
-
-    # Push image to GCR to facilitate some environments that have rate limitation to docker hub, e.g. vSphere.
-    - name: Publish container image to GCR
-      if: github.repository == 'vmware-tanzu/velero'
-      run: |
-        sudo swapoff -a
-        sudo rm -f /mnt/swapfile
-        docker image prune -a --force
-        REGISTRY=gcr.io/velero-gcp ./hack/docker-push.sh
