@@ -23,6 +23,8 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -48,34 +50,37 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
 		Short: "Describe restores",
 		Run: func(c *cobra.Command, args []string) {
-			veleroClient, err := f.Client()
-			cmd.CheckError(err)
-
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var restores *velerov1api.RestoreList
+			restoreList := new(velerov1api.RestoreList)
 			if len(args) > 0 {
-				restores = new(velerov1api.RestoreList)
 				for _, name := range args {
-					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
+					restore := new(velerov1api.Restore)
+					err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: name}, restore)
 					cmd.CheckError(err)
-					restores.Items = append(restores.Items, *restore)
+					restoreList.Items = append(restoreList.Items, *restore)
 				}
 			} else {
-				restores, err = veleroClient.VeleroV1().Restores(f.Namespace()).List(context.TODO(), listOptions)
+				parsedSelector, err := labels.Parse(listOptions.LabelSelector)
+				cmd.CheckError(err)
+
+				err = kbClient.List(context.TODO(), restoreList, &controllerclient.ListOptions{LabelSelector: parsedSelector, Namespace: f.Namespace()})
 				cmd.CheckError(err)
 			}
 
 			first := true
-			for i, restore := range restores.Items {
-				opts := newPodVolumeRestoreListOptions(restore.Name)
-				podvolumeRestoreList, err := veleroClient.VeleroV1().PodVolumeRestores(f.Namespace()).List(context.TODO(), opts)
+			for i, restore := range restoreList.Items {
+				podVolumeRestoreList := new(velerov1api.PodVolumeRestoreList)
+				err = kbClient.List(context.TODO(), podVolumeRestoreList, &controllerclient.ListOptions{
+					Namespace:     f.Namespace(),
+					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: label.GetValidName(restore.Name)}),
+				})
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}
 
-				s := output.DescribeRestore(context.Background(), kbClient, &restores.Items[i], podvolumeRestoreList.Items, details, insecureSkipTLSVerify, caCertFile)
+				s := output.DescribeRestore(context.Background(), kbClient, &restoreList.Items[i], podVolumeRestoreList.Items, details, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -93,12 +98,4 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 
 	return c
-}
-
-// newPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
-// find PodVolumeRestores for the restore identified by name.
-func newPodVolumeRestoreListOptions(name string) metav1.ListOptions {
-	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, label.GetValidName(name)),
-	}
 }

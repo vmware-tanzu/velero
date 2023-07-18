@@ -18,7 +18,6 @@ package restore
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -72,7 +71,7 @@ func TestCreateCommand(t *testing.T) {
 		scheduleName := "schedule1"
 		restoreVolumes := "true"
 		preserveNodePorts := "true"
-		labels := "c=foo,b=woo"
+		labels := "c=foo"
 		includeNamespaces := "app1,app2"
 		excludeNamespaces := "pod1,pod2,pod3"
 		existingResourcePolicy := "none"
@@ -146,7 +145,7 @@ func TestCreateCommand(t *testing.T) {
 
 	})
 
-	t.Run("create a restore create from schedule", func(t *testing.T) {
+	t.Run("create a restore from schedule", func(t *testing.T) {
 		f := &factorymocks.Factory{}
 		c := NewCreateCommand(f, "")
 		require.Equal(t, "Create a restore", c.Short)
@@ -157,18 +156,39 @@ func TestCreateCommand(t *testing.T) {
 		fromSchedule := "schedule-name-1"
 		flags.Parse([]string{"--from-schedule", fromSchedule})
 
-		fmt.Printf("debug, restore options: %+v\n", o)
-
 		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
-
 		schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, fromSchedule).Result()
-		kbclient.Create(context.Background(), schedule, &controllerclient.CreateOptions{})
+		require.NoError(t, kbclient.Create(context.Background(), schedule, &controllerclient.CreateOptions{}))
+		backup := builder.ForBackup(cmdtest.VeleroNameSpace, "test-backup").FromSchedule(schedule).Phase(velerov1api.BackupPhaseCompleted).Result()
+		require.NoError(t, kbclient.Create(context.Background(), backup, &controllerclient.CreateOptions{}))
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
 		f.On("KubebuilderWatchClient").Return(kbclient, nil)
 
 		require.NoError(t, o.Complete(args, f))
-
+		require.NoError(t, o.Validate(c, []string{}, f))
 		require.NoError(t, o.Run(c, f))
+	})
+
+	t.Run("create a restore from not-existed backup", func(t *testing.T) {
+		f := &factorymocks.Factory{}
+		c := NewCreateCommand(f, "")
+		require.Equal(t, "Create a restore", c.Short)
+		flags := new(pflag.FlagSet)
+		o := NewCreateOptions()
+		o.BindFlags(flags)
+		nonExistedBackupName := "not-exist"
+
+		flags.Parse([]string{"--wait", "true"})
+		flags.Parse([]string{"--from-backup", nonExistedBackupName})
+
+		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+		f.On("KubebuilderWatchClient").Return(kbclient, nil)
+
+		require.NoError(t, o.Complete(nil, f))
+		err := o.Validate(c, []string{}, f)
+		require.Equal(t, "backups.velero.io \"not-exist\" not found", err.Error())
 	})
 }
