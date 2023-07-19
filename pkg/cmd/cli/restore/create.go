@@ -25,11 +25,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -75,26 +77,27 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	BackupName              string
-	ScheduleName            string
-	RestoreName             string
-	RestoreVolumes          flag.OptionalBool
-	PreserveNodePorts       flag.OptionalBool
-	Labels                  flag.Map
-	IncludeNamespaces       flag.StringArray
-	ExcludeNamespaces       flag.StringArray
-	ExistingResourcePolicy  string
-	IncludeResources        flag.StringArray
-	ExcludeResources        flag.StringArray
-	StatusIncludeResources  flag.StringArray
-	StatusExcludeResources  flag.StringArray
-	NamespaceMappings       flag.Map
-	Selector                flag.LabelSelector
-	IncludeClusterResources flag.OptionalBool
-	Wait                    bool
-	AllowPartiallyFailed    flag.OptionalBool
-	ItemOperationTimeout    time.Duration
-	client                  kbclient.WithWatch
+	BackupName                string
+	ScheduleName              string
+	RestoreName               string
+	RestoreVolumes            flag.OptionalBool
+	PreserveNodePorts         flag.OptionalBool
+	Labels                    flag.Map
+	IncludeNamespaces         flag.StringArray
+	ExcludeNamespaces         flag.StringArray
+	ExistingResourcePolicy    string
+	IncludeResources          flag.StringArray
+	ExcludeResources          flag.StringArray
+	StatusIncludeResources    flag.StringArray
+	StatusExcludeResources    flag.StringArray
+	NamespaceMappings         flag.Map
+	Selector                  flag.LabelSelector
+	IncludeClusterResources   flag.OptionalBool
+	Wait                      bool
+	AllowPartiallyFailed      flag.OptionalBool
+	ItemOperationTimeout      time.Duration
+	ResourceModifierConfigMap string
+	client                    kbclient.WithWatch
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -139,6 +142,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = cmd.TRUE
 
 	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "Wait for the operation to complete.")
+
+	flags.StringVar(&o.ResourceModifierConfigMap, "resource-modifier-configmap", "", "Reference to the resource modifier configmap that restore will use")
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
@@ -272,6 +277,15 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		}
 	}
 
+	var resModifiers *corev1.TypedLocalObjectReference = nil
+
+	if o.ResourceModifierConfigMap != "" {
+		resModifiers = &corev1.TypedLocalObjectReference{
+			Kind: resourcemodifiers.ConfigmapRefType,
+			Name: o.ResourceModifierConfigMap,
+		}
+	}
+
 	restore := &api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
@@ -291,6 +305,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			RestorePVs:              o.RestoreVolumes.Value,
 			PreserveNodePorts:       o.PreserveNodePorts.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
+			ResourceModifier:        resModifiers,
 			ItemOperationTimeout: metav1.Duration{
 				Duration: o.ItemOperationTimeout,
 			},

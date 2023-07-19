@@ -48,6 +48,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -305,6 +306,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		hooksCancelFunc:                hooksCancelFunc,
 		kbClient:                       kr.kbClient,
 		itemOperationsList:             req.GetItemOperationsList(),
+		resourceModifiers:              req.ResourceModifiers,
 	}
 
 	return restoreCtx.execute()
@@ -350,6 +352,7 @@ type restoreContext struct {
 	hooksCancelFunc                go_context.CancelFunc
 	kbClient                       crclient.Client
 	itemOperationsList             *[]*itemoperation.RestoreOperation
+	resourceModifiers              *resourcemodifiers.ResourceModifiers
 }
 
 type resourceClientKey struct {
@@ -1354,6 +1357,14 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// for easy identification of all cluster resources created by this restore
 	// and which backup they came from.
 	addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
+
+	if ctx.resourceModifiers != nil {
+		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
+			for _, err := range errList {
+				errs.Add(namespace, err)
+			}
+		}
+	}
 
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)

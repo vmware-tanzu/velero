@@ -53,3 +53,4 @@ tilt-resources/cloud
 # test generated files
 test/e2e/report.xml
 coverage.out
+__debug_bin*

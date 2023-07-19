@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -57,6 +58,7 @@ type Request struct {
 	BackupReader       io.Reader
 	RestoredItems      map[itemKey]restoredItemStatus
 	itemOperationsList *[]*itemoperation.RestoreOperation
+	ResourceModifiers  *resourcemodifiers.ResourceModifiers
 }
 
 type restoredItemStatus struct {
