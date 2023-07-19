@@ -132,6 +132,12 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, metri
 			&v1.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
+			&velerov1api.PodVolumeBackup{}: {
+				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
+			},
+			&velerov1api.PodVolumeRestore{}: {
+				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
+			},
 		},
 	}
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
