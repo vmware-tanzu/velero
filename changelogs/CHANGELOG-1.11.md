@@ -1,3 +1,26 @@
+## v1.11.1
+### 2023-07-19
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.11.1
+
+### Container Image
+`velero/velero:v1.11.1`
+
+### Documentation
+https://velero.io/docs/v1.11/
+
+### Upgrading
+https://velero.io/docs/v1.11/upgrade-to-1.11/
+
+### All changes
+  * Add support for OpenStack CSI drivers topology keys (#6488, @kayrus)
+  * Enhance the code because of #6297, the return value of GetBucketRegion is not recorded, as a result, when it fails, we have no way to get the cause (#6477, @Lyndon-Li)
+  * Fixed a bug where status.progress is not getting updated for backups. (#6324, @blackpiglet)
+  * Restore Endpoints before Services (#6316, @ywk253100)
+  * Fix issue #6182. If pod is not running, don't treat it as an error, let it go and leave a warning. (#6189, @Lyndon-Li)
+
+
 ## v1.11
 ### 2023-04-07
 
