@@ -1065,7 +1065,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 	}
 
 	for i, backup := range backups.Items {
-		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+		if backup.Status.Phase != velerov1api.BackupPhaseInProgress && backup.Status.Phase != velerov1api.BackupPhaseWaitingForPluginOperations {
 			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
 		}
@@ -1078,6 +1078,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 			continue
 		}
 		log.WithField("backup", backup.GetName()).Warn(updated.Status.FailureReason)
+		markDataUploadsCancel(ctx, client, backup, log)
 	}
 }
 
@@ -1088,7 +1089,7 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		return
 	}
 	for i, restore := range restores.Items {
-		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
+		if restore.Status.Phase != velerov1api.RestorePhaseInProgress && restore.Status.Phase != velerov1api.RestorePhaseWaitingForPluginOperations {
 			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
 			continue
 		}
@@ -1101,5 +1102,56 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 			continue
 		}
 		log.WithField("restore", restore.GetName()).Warn(updated.Status.FailureReason)
+		markDataDownloadsCancel(ctx, client, restore, log)
+	}
+}
+
+func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup velerov1api.Backup, log logrus.FieldLogger) {
+	dataUploads := &velerov2alpha1api.DataUploadList{}
+
+	if err := client.List(ctx, dataUploads, &ctrlclient.MatchingFields{"metadata.namespace": backup.GetNamespace()}, &ctrlclient.MatchingLabels{velerov1api.BackupUIDLabel: string(backup.GetUID())}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list dataUploads")
+		return
+	}
+
+	for i := range dataUploads.Items {
+		du := dataUploads.Items[i]
+		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+			updated := du.DeepCopy()
+			updated.Spec.Cancel = true
+			updated.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&du)); err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
+				continue
+			}
+			log.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
+		}
+	}
+}
+
+func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, restore velerov1api.Restore, log logrus.FieldLogger) {
+	dataDownloads := &velerov2alpha1api.DataDownloadList{}
+
+	if err := client.List(ctx, dataDownloads, &ctrlclient.MatchingFields{"metadata.namespace": restore.GetNamespace()}, &ctrlclient.MatchingLabels{velerov1api.RestoreUIDLabel: string(restore.GetUID())}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list dataDownloads")
+		return
+	}
+
+	for i := range dataDownloads.Items {
+		dd := dataDownloads.Items[i]
+		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+			updated := dd.DeepCopy()
+			updated.Spec.Cancel = true
+			updated.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&dd)); err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", dd.GetName())
+				continue
+			}
+			log.WithField("datadownload", dd.GetName()).Warn(dd.Status.Message)
+		}
 	}
 }

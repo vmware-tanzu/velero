@@ -157,6 +157,32 @@ func (_m *Factory) KubebuilderClient() (pkgclient.Client, error) {
 	return r0, r1
 }
 
+// KubebuilderWatchClient provides a mock function with given fields:
+func (_m *Factory) KubebuilderWatchClient() (pkgclient.WithWatch, error) {
+	ret := _m.Called()
+
+	var r0 pkgclient.WithWatch
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (pkgclient.WithWatch, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() pkgclient.WithWatch); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(pkgclient.WithWatch)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Namespace provides a mock function with given fields:
 func (_m *Factory) Namespace() string {
 	ret := _m.Called()

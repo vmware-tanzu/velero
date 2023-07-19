@@ -55,8 +55,23 @@ type installOptions struct {
 	VeleroServerDebugMode  bool
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
+func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluster bool) error {
 	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	// veleroCfg struct including a set of BSL params and a set of additional BSL params,
+	// additional BSL set is for additional BSL test only, so only default BSL set is effective
+	// for VeleroInstall().
+	//
+	// veleroCfg struct including 2 sets of cluster setting, but VeleroInstall() only read
+	// default cluster settings, so if E2E test needs install on the standby cluster, default cluster
+	// setting should be reset to the value of standby cluster's.
+	//
+	// Some other setting might not needed by standby cluster installation like "snapshotMoveData", because in
+	// standby cluster only restore if performed, so CSI plugin is not needed, but it is installed due to
+	// the only one veleroCfg setting is provided as current design, since it will not introduce any issues as
+	// we can predict, so keep it intact for now.
+	if isStandbyCluster {
+		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
+	}
 	if veleroCfg.CloudProvider != "kind" {
 		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
@@ -69,7 +84,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		}
 	}
 
-	providerPluginsTmp, err := getProviderPlugins(ctx, veleroCfg.VeleroCLI, veleroCfg.ObjectStoreProvider, veleroCfg.CloudProvider, veleroCfg.Plugins, veleroCfg.Features)
+	pluginsTmp, err := getPlugins(ctx, *veleroCfg)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
@@ -91,22 +106,19 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig) error {
 		}
 	}
 
-	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg, providerPluginsTmp)
+	veleroInstallOptions, err := getProviderVeleroInstallOptions(veleroCfg, pluginsTmp)
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 	veleroInstallOptions.UseVolumeSnapshots = veleroCfg.UseVolumeSnapshots
-	if !veleroCfg.UseRestic {
-		veleroInstallOptions.UseNodeAgent = veleroCfg.UseNodeAgent
-	}
-	veleroInstallOptions.UseRestic = veleroCfg.UseRestic
+	veleroInstallOptions.UseNodeAgent = veleroCfg.UseNodeAgent
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
 	veleroInstallOptions.UploaderType = veleroCfg.UploaderType
 	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
 	veleroInstallOptions.GarbageCollectionFrequency = GCFrequency
 
-	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, &installOptions{
+	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
 		Options:                veleroInstallOptions,
 		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
 		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
@@ -176,7 +188,7 @@ func clearupvSpherePluginConfig(c clientset.Interface, ns, secretName, configMap
 	return nil
 }
 
-func installVeleroServer(ctx context.Context, cli string, options *installOptions) error {
+func installVeleroServer(ctx context.Context, cli, cloudProvider string, options *installOptions) error {
 	args := []string{"install"}
 	namespace := "velero"
 	if len(options.Namespace) > 0 {
@@ -191,9 +203,6 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	}
 	if options.DefaultVolumesToFsBackup {
 		args = append(args, "--default-volumes-to-fs-backup")
-	}
-	if options.UseRestic {
-		args = append(args, "--use-restic")
 	}
 	if options.UseVolumeSnapshots {
 		args = append(args, "--use-volume-snapshots")
@@ -219,10 +228,11 @@ func installVeleroServer(ctx context.Context, cli string, options *installOption
 	if len(options.Plugins) > 0 {
 		args = append(args, "--plugins", options.Plugins.String())
 	}
+	fmt.Println("Start to install Azure VolumeSnapshotClass ...")
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
 		if strings.EqualFold(options.Features, "EnableCSI") && options.UseVolumeSnapshots {
-			if strings.EqualFold(options.ProviderName, "Azure") {
+			if strings.EqualFold(cloudProvider, "azure") {
 				if err := KubectlApplyByFile(ctx, "util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
 					return err
 				}
@@ -528,7 +538,7 @@ func PrepareVelero(ctx context.Context, caseName string) error {
 		return nil
 	}
 	fmt.Printf("need to install velero for case %s \n", caseName)
-	return VeleroInstall(context.Background(), &VeleroCfg)
+	return VeleroInstall(context.Background(), &VeleroCfg, false)
 }
 
 func VeleroUninstall(ctx context.Context, cli, namespace string) error {

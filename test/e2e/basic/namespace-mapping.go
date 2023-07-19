@@ -115,7 +115,7 @@ func (n *NamespaceMapping) Verify() error {
 
 func (n *NamespaceMapping) Clean() error {
 	if !n.VeleroCfg.Debug {
-		if err := DeleteStorageClass(context.Background(), n.Client, "kibishii-storage-class"); err != nil {
+		if err := DeleteStorageClass(context.Background(), n.Client, KibishiiStorageClassName); err != nil {
 			return err
 		}
 		for _, ns := range n.MappedNamespaceList {

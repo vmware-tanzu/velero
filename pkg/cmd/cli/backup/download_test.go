@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,35 +26,27 @@ import (
 
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"github.com/stretchr/testify/require"
 
-	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
+	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 func TestNewDownloadCommand(t *testing.T) {
-
 	// create a factory
 	f := &factorymocks.Factory{}
 
-	backups := &velerov1mocks.BackupInterface{}
-	veleroV1 := &velerov1mocks.VeleroV1Interface{}
-	client := &versionedmocks.Interface{}
-	bk := &velerov1api.Backup{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	backupName := "backup-1"
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
+	err := kbclient.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result())
+	require.NoError(t, err)
+	err = kbclient.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, "bk-to-be-download").Result())
+	require.NoError(t, err)
 
-	backups.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-	veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-	client.On("VeleroV1").Return(veleroV1, nil)
-	f.On("Client").Return(client, nil)
-	f.On("Namespace").Return(mock.Anything)
+	f.On("Namespace").Return(cmdtest.VeleroNameSpace)
 	f.On("KubebuilderClient").Return(kbclient, nil)
 
 	// create command
@@ -78,7 +71,6 @@ func TestNewDownloadCommand(t *testing.T) {
 	flags.Parse([]string{fmt.Sprintf("--insecure-skip-tls-verify=%s", strconv.FormatBool(insecureSkipTlsVerify))})
 	flags.Parse([]string{"--cacert", cacert})
 
-	backupName := "backup-1"
 	args := []string{backupName, "arg2"}
 
 	e := o.Complete(args)
@@ -105,7 +97,7 @@ func TestNewDownloadCommand(t *testing.T) {
 	_, stderr, err := veleroexec.RunCommand(cmd)
 
 	if err != nil {
-		assert.Contains(t, stderr, "download request download url timeout")
+		require.Contains(t, stderr, "download request download url timeout")
 		return
 	}
 	t.Fatalf("process ran with err %v, want backup delete successfully", err)

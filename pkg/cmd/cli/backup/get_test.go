@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,15 +25,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
+	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
 func TestNewGetCommand(t *testing.T) {
@@ -41,18 +41,16 @@ func TestNewGetCommand(t *testing.T) {
 	// create a factory
 	f := &factorymocks.Factory{}
 
-	backups := &velerov1mocks.BackupInterface{}
-	veleroV1 := &velerov1mocks.VeleroV1Interface{}
-	client := &versionedmocks.Interface{}
-	bk := &velerov1api.Backup{}
-	bkList := &velerov1api.BackupList{}
+	client := velerotest.NewFakeControllerRuntimeClient(t)
 
-	backups.On("List", mock.Anything, mock.Anything).Return(bkList, nil)
-	backups.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-	veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-	client.On("VeleroV1").Return(veleroV1, nil)
-	f.On("Client").Return(client, nil)
-	f.On("Namespace").Return(mock.Anything)
+	for _, backupName := range args {
+		backup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).ObjectMeta(builder.WithLabels("abc", "abc")).Result()
+		err := client.Create(context.Background(), backup, &kbclient.CreateOptions{})
+		require.NoError(t, err)
+	}
+
+	f.On("KubebuilderClient").Return(client, nil)
+	f.On("Namespace").Return(cmdtest.VeleroNameSpace)
 
 	// create command
 	c := NewGetCommand(f, "velero backup get")
@@ -69,6 +67,7 @@ func TestNewGetCommand(t *testing.T) {
 	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewGetCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	stdout, _, err := veleroexec.RunCommand(cmd)
+	require.NoError(t, err)
 
 	if err == nil {
 		output := strings.Split(stdout, "\n")
@@ -79,7 +78,26 @@ func TestNewGetCommand(t *testing.T) {
 			}
 		}
 		assert.Equal(t, len(args), i)
-		return
 	}
-	t.Fatalf("process ran with err %v, want backups by get()", err)
+
+	d := NewGetCommand(f, "velero backup get")
+	c.SetArgs([]string{"-l", "abc=abc"})
+	e = d.Execute()
+	assert.NoError(t, e)
+
+	cmd = exec.Command(os.Args[0], []string{"-test.run=TestNewGetCommand"}...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
+	stdout, _, err = veleroexec.RunCommand(cmd)
+	require.NoError(t, err)
+
+	if err == nil {
+		output := strings.Split(stdout, "\n")
+		i := 0
+		for _, line := range output {
+			if strings.Contains(line, "New") {
+				i++
+			}
+		}
+		assert.Equal(t, len(args), i)
+	}
 }

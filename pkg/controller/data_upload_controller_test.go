@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -58,45 +59,68 @@ const fakeSnapshotType velerov2alpha1api.SnapshotType = "fake-snapshot"
 
 type FakeClient struct {
 	kbclient.Client
-	getError    bool
-	createError bool
-	updateError bool
-	patchError  bool
+	getError    error
+	createError error
+	updateError error
+	patchError  error
 }
 
 func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object) error {
-	if c.getError {
-		return fmt.Errorf("Create error")
+	if c.getError != nil {
+		return c.getError
 	}
 
 	return c.Client.Get(ctx, key, obj)
 }
 
 func (c *FakeClient) Create(ctx context.Context, obj kbclient.Object, opts ...kbclient.CreateOption) error {
-	if c.createError {
-		return fmt.Errorf("Create error")
+	if c.createError != nil {
+		return c.createError
 	}
 
 	return c.Client.Create(ctx, obj, opts...)
 }
 
 func (c *FakeClient) Update(ctx context.Context, obj kbclient.Object, opts ...kbclient.UpdateOption) error {
-	if c.updateError {
-		return fmt.Errorf("Update error")
+	if c.updateError != nil {
+		return c.updateError
 	}
 
 	return c.Client.Update(ctx, obj, opts...)
 }
 
 func (c *FakeClient) Patch(ctx context.Context, obj kbclient.Object, patch kbclient.Patch, opts ...kbclient.PatchOption) error {
-	if c.patchError {
-		return fmt.Errorf("Patch error")
+	if c.patchError != nil {
+		return c.patchError
 	}
 
 	return c.Client.Patch(ctx, obj, patch, opts...)
 }
 
 func initDataUploaderReconciler(needError ...bool) (*DataUploadReconciler, error) {
+	var errs []error = make([]error, 4)
+	if len(needError) == 4 {
+		if needError[0] {
+			errs[0] = fmt.Errorf("Get error")
+		}
+
+		if needError[1] {
+			errs[1] = fmt.Errorf("Create error")
+		}
+
+		if needError[2] {
+			errs[2] = fmt.Errorf("Update error")
+		}
+
+		if needError[3] {
+			errs[3] = fmt.Errorf("Patch error")
+		}
+	}
+
+	return initDataUploaderReconcilerWithError(errs...)
+}
+
+func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconciler, error) {
 	vscName := "fake-vsc"
 	vsObject := &snapshotv1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -170,7 +194,7 @@ func initDataUploaderReconciler(needError ...bool) (*DataUploadReconciler, error
 		return nil, err
 	}
 	return NewDataUploadReconciler(fakeClient, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), nil,
-		testclocks.NewFakeClock(now), &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", fakeFS, velerotest.NewLogger()), nil
+		testclocks.NewFakeClock(now), &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", fakeFS, time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func dataUploadBuilder() *builder.DataUploadBuilder {
@@ -277,7 +301,7 @@ func TestReconcile(t *testing.T) {
 			expectedProcessed: false,
 			expected:          nil,
 			expectedRequeue:   ctrl.Result{},
-			expectedErrMsg:    "getting DataUpload: Create error",
+			expectedErrMsg:    "getting DataUpload: Get error",
 			needErrs:          []bool{true, false, false, false},
 		}, {
 			name:              "Unsupported data mover type",
@@ -334,10 +358,15 @@ func TestReconcile(t *testing.T) {
 			name:              "runCancelableDataUpload is concurrent limited",
 			dataMgr:           datapath.NewManager(0),
 			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
-			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Cancel(true).Result(),
+			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			expectedProcessed: false,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
 			expectedRequeue:   ctrl.Result{Requeue: true, RequeueAfter: time.Minute},
+		},
+		{
+			name:     "prepare timeout",
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 		},
 	}
 
@@ -369,7 +398,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			if test.du.Spec.SnapshotType == fakeSnapshotType {
-				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.clock}}
+				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock}}
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 			}
@@ -378,7 +407,7 @@ func TestReconcile(t *testing.T) {
 				return &fakeDataUploadFSBR{
 					du:         test.du,
 					kubeClient: r.client,
-					clock:      r.clock,
+					clock:      r.Clock,
 				}
 			}
 
@@ -570,6 +599,14 @@ func TestFindDataUploadForPod(t *testing.T) {
 				assert.Equal(t, du.Name, requests[0].Name)
 			},
 		}, {
+			name: "no selected label found for pod",
+			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Result(),
+			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+				// Assert that the function returns a single request
+				assert.Empty(t, requests)
+			},
+		}, {
 			name: "no matched pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: "non-existing-dataupload"}).Result(),
@@ -597,5 +634,109 @@ func TestFindDataUploadForPod(t *testing.T) {
 		if test.pod != nil {
 			r.client.Delete(ctx, test.pod, &kbclient.DeleteOptions{})
 		}
+	}
+}
+
+type fakeAPIStatus struct {
+	reason metav1.StatusReason
+}
+
+func (f *fakeAPIStatus) Status() metav1.Status {
+	return metav1.Status{
+		Reason: f.reason,
+	}
+}
+
+func (f *fakeAPIStatus) Error() string {
+	return string(f.reason)
+}
+
+func TestAcceptDataUpload(t *testing.T) {
+	tests := []struct {
+		name        string
+		du          *velerov2alpha1api.DataUpload
+		needErrs    []error
+		succeeded   bool
+		expectedErr string
+	}{
+		{
+			name:        "update fail",
+			du:          dataUploadBuilder().Result(),
+			needErrs:    []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
+			expectedErr: "fake-update-error",
+		},
+		{
+			name:     "accepted by others",
+			du:       dataUploadBuilder().Result(),
+			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+		},
+		{
+			name:      "succeed",
+			du:        dataUploadBuilder().Result(),
+			needErrs:  []error{nil, nil, nil, nil},
+			succeeded: true,
+		},
+	}
+	for _, test := range tests {
+		ctx := context.Background()
+		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
+		require.NoError(t, err)
+
+		err = r.client.Create(ctx, test.du)
+		require.NoError(t, err)
+
+		succeeded, err := r.acceptDataUpload(ctx, test.du)
+		assert.Equal(t, test.succeeded, succeeded)
+		if test.expectedErr == "" {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, test.expectedErr)
+		}
+	}
+}
+
+func TestOnDuPrepareTimeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		du       *velerov2alpha1api.DataUpload
+		needErrs []error
+		expected *velerov2alpha1api.DataUpload
+	}{
+		{
+			name:     "update fail",
+			du:       dataUploadBuilder().Result(),
+			needErrs: []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
+			expected: dataUploadBuilder().Result(),
+		},
+		{
+			name:     "update interrupted",
+			du:       dataUploadBuilder().Result(),
+			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+			expected: dataUploadBuilder().Result(),
+		},
+		{
+			name:     "succeed",
+			du:       dataUploadBuilder().Result(),
+			needErrs: []error{nil, nil, nil, nil},
+			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+		},
+	}
+	for _, test := range tests {
+		ctx := context.Background()
+		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
+		require.NoError(t, err)
+
+		err = r.client.Create(ctx, test.du)
+		require.NoError(t, err)
+
+		r.onPrepareTimeout(ctx, test.du)
+
+		du := velerov2alpha1api.DataUpload{}
+		_ = r.client.Get(ctx, kbclient.ObjectKey{
+			Name:      test.du.Name,
+			Namespace: test.du.Namespace,
+		}, &du)
+
+		assert.Equal(t, test.expected.Status.Phase, du.Status.Phase)
 	}
 }

@@ -71,20 +71,23 @@ const (
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
 
-	defaultResourceTimeout = 10 * time.Minute
+	defaultResourceTimeout         = 10 * time.Minute
+	defaultDataMoverPrepareTimeout = 30 * time.Minute
 )
 
 type nodeAgentServerConfig struct {
-	metricsAddress  string
-	resourceTimeout time.Duration
+	metricsAddress          string
+	resourceTimeout         time.Duration
+	dataMoverPrepareTimeout time.Duration
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
 	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
 	formatFlag := logging.NewFormatFlag()
 	config := nodeAgentServerConfig{
-		metricsAddress:  defaultMetricsAddress,
-		resourceTimeout: defaultResourceTimeout,
+		metricsAddress:          defaultMetricsAddress,
+		resourceTimeout:         defaultResourceTimeout,
+		dataMoverPrepareTimeout: defaultDataMoverPrepareTimeout,
 	}
 
 	command := &cobra.Command{
@@ -110,6 +113,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("The level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
 	command.Flags().Var(formatFlag, "log-format", fmt.Sprintf("The format for log output. Valid values are %s.", strings.Join(formatFlag.AllowedValues(), ", ")))
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
+	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 
 	return command
 }
@@ -220,9 +224,9 @@ func (s *nodeAgentServer) run() {
 			s.logger.Fatalf("Failed to start metric server for node agent at [%s]: %v", s.metricsAddress, err)
 		}
 	}()
-	s.metrics = metrics.NewPodVolumeMetrics()
+	s.metrics = metrics.NewNodeMetrics()
 	s.metrics.RegisterAllMetrics()
-	s.metrics.InitPodVolumeMetricsForNode(s.nodeName)
+	s.metrics.InitMetricsForNode(s.nodeName)
 
 	s.markInProgressCRsFailed()
 
@@ -256,11 +260,15 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
-	if err = controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.logger).SetupWithManager(s.mgr); err != nil {
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	s.markDataUploadsCancel(dataUploadReconciler)
+	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	if err = controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, repoEnsurer, credentialGetter, s.nodeName, s.logger).SetupWithManager(s.mgr); err != nil {
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	s.markDataDownloadsCancel(dataDownloadReconciler)
+	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
 
@@ -331,6 +339,62 @@ func (s *nodeAgentServer) markInProgressCRsFailed() {
 	s.markInProgressPVBsFailed(client)
 
 	s.markInProgressPVRsFailed(client)
+}
+
+func (s *nodeAgentServer) markDataUploadsCancel(r *controller.DataUploadReconciler) {
+	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
+	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
+	if err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
+		return
+	}
+	if dataUploads, err := r.FindDataUploads(s.ctx, client, s.namespace); err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("failed to find data downloads")
+	} else {
+		for i := range dataUploads {
+			du := dataUploads[i]
+			if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
+				du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
+				du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+				updated := du.DeepCopy()
+				updated.Spec.Cancel = true
+				updated.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
+				if err := client.Patch(s.ctx, updated, ctrlclient.MergeFrom(&du)); err != nil {
+					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", du.GetName())
+					continue
+				}
+				s.logger.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
+			}
+		}
+	}
+}
+
+func (s *nodeAgentServer) markDataDownloadsCancel(r *controller.DataDownloadReconciler) {
+	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
+	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
+	if err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
+		return
+	}
+	if dataDownloads, err := r.FindDataDownloads(s.ctx, client, s.namespace); err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("failed to find data downloads")
+	} else {
+		for i := range dataDownloads {
+			dd := dataDownloads[i]
+			if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
+				dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
+				dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+				updated := dd.DeepCopy()
+				updated.Spec.Cancel = true
+				updated.Status.Message = fmt.Sprintf("found a datadownload with status %q during the node-agent starting, mark it as cancel", dd.Status.Phase)
+				if err := client.Patch(s.ctx, updated, ctrlclient.MergeFrom(dd)); err != nil {
+					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", dd.GetName())
+					continue
+				}
+				s.logger.WithField("datadownload", dd.GetName()).Warn(dd.Status.Message)
+			}
+		}
+	}
 }
 
 func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {

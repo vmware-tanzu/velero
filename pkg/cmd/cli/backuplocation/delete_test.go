@@ -26,14 +26,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
@@ -41,9 +38,7 @@ func TestNewDeleteCommand(t *testing.T) {
 
 	// create a factory
 	f := &factorymocks.Factory{}
-	client := &versionedmocks.Interface{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-	f.On("Client").Return(client, nil)
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
 	f.On("Namespace").Return(mock.Anything)
 	f.On("KubebuilderClient").Return(kbclient, nil)
 
@@ -86,9 +81,7 @@ func TestDeleteFunctions(t *testing.T) {
 	//t.Run("create the other create command with fromSchedule option for Run() other branches", func(t *testing.T) {
 	// create a factory
 	f := &factorymocks.Factory{}
-	client := &versionedmocks.Interface{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-	f.On("Client").Return(client, nil)
+	kbclient := velerotest.NewFakeControllerRuntimeClient(t)
 	f.On("Namespace").Return(mock.Anything)
 	f.On("KubebuilderClient").Return(kbclient, nil)
 

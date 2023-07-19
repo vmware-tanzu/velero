@@ -741,9 +741,10 @@ func TestWaitPVBound(t *testing.T) {
 			err: "error to wait for bound of PV: timed out waiting for the condition",
 		},
 		{
-			name:    "pvc claimRef pvc name mismatch",
-			pvName:  "fake-pv",
-			pvcName: "fake-pvc",
+			name:         "pvc claimRef pvc name mismatch",
+			pvName:       "fake-pv",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
 				&corev1api.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
@@ -751,12 +752,14 @@ func TestWaitPVBound(t *testing.T) {
 					},
 					Spec: corev1api.PersistentVolumeSpec{
 						ClaimRef: &corev1api.ObjectReference{
-							Kind: "fake-kind",
+							Kind:      "fake-kind",
+							Namespace: "fake-ns",
+							Name:      "fake-pvc-1",
 						},
 					},
 				},
 			},
-			err: "error to wait for bound of PV: timed out waiting for the condition",
+			err: "error to wait for bound of PV: pv has been bound by unexpected pvc fake-ns/fake-pvc-1",
 		},
 		{
 			name:         "pvc claimRef pvc namespace mismatch",
@@ -770,13 +773,14 @@ func TestWaitPVBound(t *testing.T) {
 					},
 					Spec: corev1api.PersistentVolumeSpec{
 						ClaimRef: &corev1api.ObjectReference{
-							Kind: "fake-kind",
-							Name: "fake-pvc",
+							Kind:      "fake-kind",
+							Namespace: "fake-ns-1",
+							Name:      "fake-pvc",
 						},
 					},
 				},
 			},
-			err: "error to wait for bound of PV: timed out waiting for the condition",
+			err: "error to wait for bound of PV: pv has been bound by unexpected pvc fake-ns-1/fake-pvc",
 		},
 		{
 			name:         "success",
@@ -831,6 +835,46 @@ func TestWaitPVBound(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectedPV, pv)
+		})
+	}
+}
+
+func TestIsPVCBound(t *testing.T) {
+	tests := []struct {
+		name   string
+		pvc    *corev1api.PersistentVolumeClaim
+		expect bool
+	}{
+		{
+			name: "expect bound",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "fake-ns",
+					Name:      "fake-pvc",
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					VolumeName: "fake-volume",
+				},
+			},
+			expect: true,
+		},
+		{
+			name: "expect not bound",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "fake-ns",
+					Name:      "fake-pvc",
+				},
+			},
+			expect: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := IsPVCBound(test.pvc)
+
+			assert.Equal(t, test.expect, result)
 		})
 	}
 }

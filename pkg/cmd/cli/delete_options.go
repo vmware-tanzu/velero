@@ -25,16 +25,16 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 )
 
 // DeleteOptions contains parameters used for deleting a restore.
 type DeleteOptions struct {
 	*SelectOptions
 	Confirm   bool
-	Client    clientset.Interface
+	Client    controllerclient.Client
 	Namespace string
 }
 
@@ -47,7 +47,7 @@ func NewDeleteOptions(singularTypeName string) *DeleteOptions {
 // Complete fills in the correct values for all the options.
 func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 	o.Namespace = f.Namespace()
-	client, err := f.Client()
+	client, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}

@@ -25,12 +25,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestPrintVersion(t *testing.T) {
@@ -83,7 +82,7 @@ func TestPrintVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				kbClient           = fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+				kbClient           = velerotest.NewFakeControllerRuntimeClient(t)
 				serverStatusGetter = new(mockServerStatusGetter)
 				buf                = new(bytes.Buffer)
 			)

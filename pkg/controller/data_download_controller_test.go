@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgofake "k8s.io/client-go/kubernetes/fake"
@@ -45,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 
@@ -65,6 +67,29 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
+	var errs []error = make([]error, 4)
+	if len(needError) == 4 {
+		if needError[0] {
+			errs[0] = fmt.Errorf("Get error")
+		}
+
+		if needError[1] {
+			errs[1] = fmt.Errorf("Create error")
+		}
+
+		if needError[2] {
+			errs[2] = fmt.Errorf("Update error")
+		}
+
+		if needError[3] {
+			errs[3] = fmt.Errorf("Patch error")
+		}
+	}
+
+	return initDataDownloadReconcilerWithError(objects, errs...)
+}
+
+func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...error) (*DataDownloadReconciler, error) {
 	scheme := runtime.NewScheme()
 	err := velerov1api.AddToScheme(scheme)
 	if err != nil {
@@ -112,7 +137,7 @@ func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*D
 	if err != nil {
 		return nil, err
 	}
-	return NewDataDownloadReconciler(fakeClient, fakeKubeClient, nil, &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", velerotest.NewLogger()), nil
+	return NewDataDownloadReconciler(fakeClient, fakeKubeClient, nil, &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
@@ -132,6 +157,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		notMockCleanUp    bool
 		mockCancel        bool
 		mockClose         bool
+		expected          *velerov2alpha1api.DataDownload
 		expectedStatusMsg string
 		expectedResult    *ctrl.Result
 	}{
@@ -215,7 +241,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 			dd:                builder.ForDataDownload("test-ns", dataDownloadName).Result(),
 			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
 			needErrs:          []bool{true, false, false, false},
-			expectedStatusMsg: "Create error",
+			expectedStatusMsg: "Get error",
 		},
 		{
 			name:      "Unsupported dataDownload type",
@@ -245,6 +271,11 @@ func TestDataDownloadReconcile(t *testing.T) {
 			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
 			expectedStatusMsg: "Error to expose restore exposer",
 			isExposeErr:       true,
+		},
+		{
+			name:     "prepare timeout",
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
 		},
 	}
 
@@ -344,6 +375,11 @@ func TestDataDownloadReconcile(t *testing.T) {
 				Name:      test.dd.Name,
 				Namespace: test.dd.Namespace,
 			}, &dd)
+
+			if test.expected != nil {
+				require.NoError(t, err)
+				assert.Equal(t, dd.Status.Phase, test.expected.Status.Phase)
+			}
 
 			if test.isGetExposeErr {
 				assert.Contains(t, dd.Status.Message, test.expectedStatusMsg)
@@ -551,6 +587,14 @@ func TestFindDataDownloadForPod(t *testing.T) {
 				assert.Equal(t, du.Name, requests[0].Name)
 			},
 		}, {
+			name: "no selected label found for pod",
+			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Result(),
+			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
+				// Assert that the function returns a single request
+				assert.Empty(t, requests)
+			},
+		}, {
 			name: "no matched pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: "non-existing-datadownload"}).Result(),
@@ -559,7 +603,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 			},
 		},
 		{
-			name: "dataDownload not accepte",
+			name: "dataDownload not accept",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
@@ -578,5 +622,95 @@ func TestFindDataDownloadForPod(t *testing.T) {
 		if test.pod != nil {
 			r.client.Delete(ctx, test.pod, &kbclient.DeleteOptions{})
 		}
+	}
+}
+
+func TestAcceptDataDownload(t *testing.T) {
+	tests := []struct {
+		name        string
+		dd          *velerov2alpha1api.DataDownload
+		needErrs    []error
+		succeeded   bool
+		expectedErr string
+	}{
+		{
+			name:        "update fail",
+			dd:          dataDownloadBuilder().Result(),
+			needErrs:    []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
+			expectedErr: "fake-update-error",
+		},
+		{
+			name:     "accepted by others",
+			dd:       dataDownloadBuilder().Result(),
+			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+		},
+		{
+			name:      "succeed",
+			dd:        dataDownloadBuilder().Result(),
+			needErrs:  []error{nil, nil, nil, nil},
+			succeeded: true,
+		},
+	}
+	for _, test := range tests {
+		ctx := context.Background()
+		r, err := initDataDownloadReconcilerWithError(nil, test.needErrs...)
+		require.NoError(t, err)
+
+		err = r.client.Create(ctx, test.dd)
+		require.NoError(t, err)
+
+		succeeded, err := r.acceptDataDownload(ctx, test.dd)
+		assert.Equal(t, test.succeeded, succeeded)
+		if test.expectedErr == "" {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, test.expectedErr)
+		}
+	}
+}
+
+func TestOnDdPrepareTimeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		dd       *velerov2alpha1api.DataDownload
+		needErrs []error
+		expected *velerov2alpha1api.DataDownload
+	}{
+		{
+			name:     "update fail",
+			dd:       dataDownloadBuilder().Result(),
+			needErrs: []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
+			expected: dataDownloadBuilder().Result(),
+		},
+		{
+			name:     "update interrupted",
+			dd:       dataDownloadBuilder().Result(),
+			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+			expected: dataDownloadBuilder().Result(),
+		},
+		{
+			name:     "succeed",
+			dd:       dataDownloadBuilder().Result(),
+			needErrs: []error{nil, nil, nil, nil},
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
+		},
+	}
+	for _, test := range tests {
+		ctx := context.Background()
+		r, err := initDataDownloadReconcilerWithError(nil, test.needErrs...)
+		require.NoError(t, err)
+
+		err = r.client.Create(ctx, test.dd)
+		require.NoError(t, err)
+
+		r.onPrepareTimeout(ctx, test.dd)
+
+		dd := velerov2alpha1api.DataDownload{}
+		_ = r.client.Get(ctx, kbclient.ObjectKey{
+			Name:      test.dd.Name,
+			Namespace: test.dd.Namespace,
+		}, &dd)
+
+		assert.Equal(t, test.expected.Status.Phase, dd.Status.Phase)
 	}
 }

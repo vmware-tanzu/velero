@@ -556,7 +556,7 @@ It will be used for restores, as seen in the next section.
 3. Velero adds an init container to the pod, whose job is to wait for all FSB restores for the pod to complete (more
 on this shortly)
 4. Velero creates the pod, with the added init container, by submitting it to the Kubernetes API. Then, the Kubernetes 
-scheduler schedules this pod to a worker node, and the pod must be in a running state. If the pod fails to start for 
+scheduler schedules this pod to a worker node. If the pod fails to be scheduled for 
 some reason (i.e. lack of cluster resources), the FSB restore will not be done.
 5. Velero creates a `PodVolumeRestore` custom resource for each volume to be restored in the pod
 6. The main Velero process now waits for each `PodVolumeRestore` resource to complete or fail

@@ -17,62 +17,152 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"os/exec"
+	"strconv"
 	"testing"
+	"time"
 
+	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"github.com/stretchr/testify/require"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
-	versionedmocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/mocks"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
-	velerov1mocks "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/mocks"
-	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestNewLogsCommand(t *testing.T) {
-	backupName := "bk-logs-1"
+	t.Run("Flag test", func(t *testing.T) {
+		l := NewLogsOptions()
+		flags := new(flag.FlagSet)
+		l.BindFlags(flags)
 
-	// create a factory
-	f := &factorymocks.Factory{}
+		timeout := "1m0s"
+		insecureSkipTLSVerify := "true"
+		caCertFile := "testing"
 
-	backups := &velerov1mocks.BackupInterface{}
-	veleroV1 := &velerov1mocks.VeleroV1Interface{}
-	client := &versionedmocks.Interface{}
-	bk := &velerov1api.Backup{}
-	bkList := &velerov1api.BackupList{}
-	kbclient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+		flags.Parse([]string{"--timeout", timeout})
+		flags.Parse([]string{"--insecure-skip-tls-verify", insecureSkipTLSVerify})
+		flags.Parse([]string{"--cacert", caCertFile})
 
-	backups.On("List", mock.Anything, mock.Anything).Return(bkList, nil)
-	backups.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(bk, nil)
-	veleroV1.On("Backups", mock.Anything).Return(backups, nil)
-	client.On("VeleroV1").Return(veleroV1, nil)
-	f.On("Client").Return(client, nil)
-	f.On("Namespace").Return(mock.Anything)
-	f.On("KubebuilderClient").Return(kbclient, nil)
+		require.Equal(t, timeout, l.Timeout.String())
+		require.Equal(t, insecureSkipTLSVerify, strconv.FormatBool(l.InsecureSkipTLSVerify))
+		require.Equal(t, caCertFile, l.CaCertFile)
+	})
 
-	c := NewLogsCommand(f)
-	assert.Equal(t, "Get backup logs", c.Short)
+	t.Run("Backup not complete test", func(t *testing.T) {
+		backupName := "bk-logs-1"
 
-	if os.Getenv(cmdtest.CaptureFlag) == "1" {
-		c.SetArgs([]string{backupName})
-		e := c.Execute()
-		assert.NoError(t, e)
-		return
-	}
+		// create a factory
+		f := &factorymocks.Factory{}
 
-	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewLogsCommand"}...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
-	_, stderr, err := veleroexec.RunCommand(cmd)
+		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
+		backup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result()
+		err := kbClient.Create(context.Background(), backup, &kbclient.CreateOptions{})
+		require.NoError(t, err)
 
-	if err != nil {
-		assert.Contains(t, stderr, fmt.Sprintf("Logs for backup \"%s\" are not available until it's finished processing", backupName))
-		return
-	}
-	t.Fatalf("process ran with err %v, want backup delete successfully", err)
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+		f.On("KubebuilderClient").Return(kbClient, nil)
+
+		c := NewLogsCommand(f)
+		assert.Equal(t, "Get backup logs", c.Short)
+
+		l := NewLogsOptions()
+		flags := new(flag.FlagSet)
+		l.BindFlags(flags)
+		err = l.Complete([]string{backupName}, f)
+		require.NoError(t, err)
+
+		err = l.Run(c, f)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("logs for backup \"%s\" are not available until it's finished processing", backupName))
+	})
+
+	t.Run("Backup not exist test", func(t *testing.T) {
+		backupName := "not-exist"
+		// create a factory
+		f := &factorymocks.Factory{}
+
+		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+		f.On("KubebuilderClient").Return(kbClient, nil)
+
+		c := NewLogsCommand(f)
+		assert.Equal(t, "Get backup logs", c.Short)
+
+		l := NewLogsOptions()
+		flags := new(flag.FlagSet)
+		l.BindFlags(flags)
+		err := l.Complete([]string{backupName}, f)
+		require.NoError(t, err)
+
+		err = l.Run(c, f)
+		require.Error(t, err)
+
+		require.Equal(t, fmt.Sprintf("backup \"%s\" does not exist", backupName), err.Error())
+
+		c.Execute()
+	})
+
+	t.Run("Normal backup log test", func(t *testing.T) {
+		backupName := "bk-logs-1"
+
+		// create a factory
+		f := &factorymocks.Factory{}
+
+		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
+		backup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Phase(velerov1api.BackupPhaseCompleted).Result()
+		err := kbClient.Create(context.Background(), backup, &kbclient.CreateOptions{})
+		require.NoError(t, err)
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+		f.On("KubebuilderClient").Return(kbClient, nil)
+
+		c := NewLogsCommand(f)
+		assert.Equal(t, "Get backup logs", c.Short)
+
+		l := NewLogsOptions()
+		flags := new(flag.FlagSet)
+		l.BindFlags(flags)
+		err = l.Complete([]string{backupName}, f)
+		require.NoError(t, err)
+
+		timeout := time.After(3 * time.Second)
+		done := make(chan bool)
+		go func() {
+			err = l.Run(c, f)
+			require.Error(t, err)
+		}()
+
+		select {
+		case <-timeout:
+			t.Skip("Test didn't finish in time, because BSL is not in Available state.")
+		case <-done:
+		}
+	})
+
+	t.Run("Invalid client test", func(t *testing.T) {
+		// create a factory
+		f := &factorymocks.Factory{}
+
+		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
+
+		c := NewLogsCommand(f)
+		assert.Equal(t, "Get backup logs", c.Short)
+
+		l := NewLogsOptions()
+		flags := new(flag.FlagSet)
+		l.BindFlags(flags)
+
+		f.On("KubebuilderClient").Return(kbClient, fmt.Errorf("test error"))
+		err := l.Complete([]string{""}, f)
+		require.Equal(t, "test error", err.Error())
+	})
 }

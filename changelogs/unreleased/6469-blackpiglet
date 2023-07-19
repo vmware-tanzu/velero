@@ -1,0 +1,1 @@
+Remove dependency of the legacy client code from pkg/cmd directory
