@@ -158,16 +158,10 @@ func TestProcessQueueItemSkips(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "invalid key returns error",
-			namespace:   "invalid",
-			restoreName: "key/value",
-			expectError: true,
-		},
-		{
-			name:        "missing restore returns error",
+			name:        "missing restore returns nil",
 			namespace:   "foo",
 			restoreName: "bar",
-			expectError: true,
+			expectError: false,
 		},
 	}
 
@@ -237,6 +231,7 @@ func TestRestoreReconcile(t *testing.T) {
 		backupStoreGetBackupContentsErr error
 		putRestoreLogErr                error
 		expectedFinalPhase              string
+		addValidFinalizer               bool
 	}{
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
@@ -394,6 +389,29 @@ func TestRestoreReconcile(t *testing.T) {
 			backupStoreGetBackupContentsErr: errors.New("Couldn't download backup"),
 			backup:                          defaultBackup().StorageLocation("default").Result(),
 		},
+		{
+			name:              "restore attached with an expected finalizer gets cleaned up successfully",
+			location:          defaultStorageLocation,
+			restore:           NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseCompleted).ObjectMeta(builder.WithFinalizers(ExternalResourcesFinalizer), builder.WithDeletionTimestamp(timestamp.Time)).Result(),
+			backup:            defaultBackup().StorageLocation("default").Result(),
+			expectedErr:       false,
+			addValidFinalizer: true,
+		},
+		{
+			name:              "restore attached with an unknown finalizer will be skipped",
+			location:          defaultStorageLocation,
+			restore:           NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseCompleted).ObjectMeta(builder.WithFinalizers("restores.velero.io/unknown-finalizer"), builder.WithDeletionTimestamp(timestamp.Time)).Result(),
+			backup:            defaultBackup().StorageLocation("default").Result(),
+			expectedErr:       false,
+			addValidFinalizer: false,
+		},
+		{
+			name:        "completed restore will be skipped",
+			location:    defaultStorageLocation,
+			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseCompleted).Result(),
+			backup:      defaultBackup().StorageLocation("default").Result(),
+			expectedErr: false,
+		},
 	}
 
 	formatFlag := logging.FormatText
@@ -486,6 +504,10 @@ func TestRestoreReconcile(t *testing.T) {
 				pluginManager.On("CleanupClients")
 			}
 
+			if test.addValidFinalizer {
+				backupStore.On("DeleteRestore", test.restore.Name).Return(nil)
+			}
+
 			//err = r.processQueueItem(key)
 			_, err = r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
 				Namespace: test.restore.Namespace,
@@ -539,7 +561,9 @@ func TestRestoreReconcile(t *testing.T) {
 				assert.Zero(t, restorer.calledWithArg)
 				return
 			}
-			assert.Equal(t, 1, len(restorer.Calls))
+			if !test.addValidFinalizer {
+				assert.Equal(t, 1, len(restorer.Calls))
+			}
 
 			// validate Patch call 2 (setting phase)
 
