@@ -127,7 +127,7 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 
 				Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 			}
-			Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider)).To(Succeed())
+			Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider, veleroCfg.AddBSLPlugins)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", UUIDgen)

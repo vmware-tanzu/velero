@@ -111,7 +111,10 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 	veleroInstallOptions.UseVolumeSnapshots = veleroCfg.UseVolumeSnapshots
-	veleroInstallOptions.UseNodeAgent = veleroCfg.UseNodeAgent
+	if !veleroCfg.UseRestic {
+		veleroInstallOptions.UseNodeAgent = veleroCfg.UseNodeAgent
+	}
+	veleroInstallOptions.UseRestic = veleroCfg.UseRestic
 	veleroInstallOptions.Image = veleroCfg.VeleroImage
 	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
 	veleroInstallOptions.UploaderType = veleroCfg.UploaderType
@@ -197,6 +200,9 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	}
 	if len(options.Image) > 0 {
 		args = append(args, "--image", options.Image)
+	}
+	if options.UseRestic {
+		args = append(args, "--use-restic")
 	}
 	if options.UseNodeAgent {
 		args = append(args, "--use-node-agent")
