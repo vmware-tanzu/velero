@@ -54,6 +54,7 @@ type Request struct {
 	CSISnapshots              []snapshotv1api.VolumeSnapshot
 	itemOperationsList        *[]*itemoperation.BackupOperation
 	ResPolicies               *resourcepolicies.Policies
+	SkippedPVTracker          *skipPVTracker
 }
 
 // GetItemOperationsList returns ItemOperationsList, initializing it if necessary

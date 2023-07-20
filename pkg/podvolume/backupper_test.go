@@ -238,9 +238,9 @@ func createBackupRepoObj() *velerov1api.BackupRepository {
 
 func createPodObj(running bool, withVolume bool, withVolumeMounted bool, volumeNum int) *corev1api.Pod {
 	podObj := builder.ForPod("fake-ns", "fake-pod").Result()
+	podObj.Spec.NodeName = "fake-node-name"
 	if running {
 		podObj.Status.Phase = corev1api.PodRunning
-		podObj.Spec.NodeName = "fake-node-name"
 	}
 
 	if withVolume {
@@ -354,7 +354,16 @@ func TestBackupPodVolumes(t *testing.T) {
 				"fake-volume-1",
 				"fake-volume-2",
 			},
-			sourcePod: createPodObj(false, false, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			sourcePod:     createPodObj(false, false, false, 2),
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
 		},
 		{
 			name: "node-agent pod is not running in node",
@@ -608,7 +617,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			},
 		},
 	}
-
+	// TODO add more verification around PVCBackupSummary returned by "BackupPodVolumes"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -655,7 +664,7 @@ func TestBackupPodVolumes(t *testing.T) {
 				}
 			}()
 
-			pvbs, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
+			pvbs, _, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
 
 			if errs == nil {
 				assert.Nil(t, test.errs)
@@ -668,4 +677,31 @@ func TestBackupPodVolumes(t *testing.T) {
 			assert.Equal(t, test.pvbs, pvbs)
 		})
 	}
+}
+
+func TestPVCBackupSummary(t *testing.T) {
+	pbs := NewPVCBackupSummary()
+	pbs.pvcMap["vol-1"] = builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Result()
+	pbs.pvcMap["vol-2"] = builder.ForPersistentVolumeClaim("ns-2", "pvc-2").VolumeName("pv-2").Result()
+
+	// it won't be added if the volme is not in the pvc map.
+	pbs.addSkipped("vol-3", "whatever reason")
+	assert.Equal(t, 0, len(pbs.Skipped))
+	pbs.addBackedup("vol-3")
+	assert.Equal(t, 0, len(pbs.Backedup))
+
+	// only can be added as skipped when it's not in backedup set
+	pbs.addBackedup("vol-1")
+	assert.Equal(t, 1, len(pbs.Backedup))
+	assert.Equal(t, "pvc-1", pbs.Backedup["vol-1"].Name)
+	pbs.addSkipped("vol-1", "whatever reason")
+	assert.Equal(t, 0, len(pbs.Skipped))
+	pbs.addSkipped("vol-2", "vol-2 has to be skipped")
+	assert.Equal(t, 1, len(pbs.Skipped))
+	assert.Equal(t, "pvc-2", pbs.Skipped["vol-2"].PVC.Name)
+
+	// adding a vol as backedup removes it from skipped set
+	pbs.addBackedup("vol-2")
+	assert.Equal(t, 0, len(pbs.Skipped))
+	assert.Equal(t, 2, len(pbs.Backedup))
 }
