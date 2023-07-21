@@ -19,7 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -163,7 +163,7 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 			reconciler, backupper := mockBackupFinalizerReconciler(fakeClient, fakeClock)
 			pluginManager.On("CleanupClients").Return(nil)
 			backupStore.On("GetBackupItemOperations", test.backup.Name).Return(test.backupOperations, nil)
-			backupStore.On("GetBackupContents", mock.Anything).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
+			backupStore.On("GetBackupContents", mock.Anything).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 			backupStore.On("PutBackupContents", mock.Anything, mock.Anything).Return(nil)
 			backupStore.On("PutBackupMetadata", mock.Anything, mock.Anything).Return(nil)
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
