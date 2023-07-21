@@ -109,7 +109,7 @@ type RestoreSpec struct {
 	// +optional
 	Hooks RestoreHooks `json:"hooks,omitempty"`
 
-	// ExistingResourcePolicy specifies the restore behavior for the kubernetes resource to be restored
+	// ExistingResourcePolicy specifies the restore behavior for the Kubernetes resource to be restored
 	// +optional
 	// +nullable
 	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`

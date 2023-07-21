@@ -125,7 +125,7 @@ To mount the correct hostpath to pods volumes, run the node-agent pod in `privil
 If node-agent is not running in a privileged mode, it will not be able to access pods volumes within the mounted 
 hostpath directory because of the default enforced SELinux mode configured in the host system level. You can 
 [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) to relax the 
-security in your cluster so that node-agent pods are allowed to use the hostPath volume plug-in without granting 
+security in your cluster so that node-agent pods are allowed to use the hostPath volume plugin without granting 
 them access to the `privileged` SCC.  
 
 By default a userland openshift namespace will not schedule pods on all nodes in the cluster.  

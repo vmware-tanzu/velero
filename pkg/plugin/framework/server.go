@@ -128,7 +128,7 @@ func NewServer() Server {
 func (s *server) BindFlags(flags *pflag.FlagSet) Server {
 	flags.Var(s.logLevelFlag, "log-level", fmt.Sprintf("The level at which to log. Valid values are %s.", strings.Join(s.logLevelFlag.AllowedValues(), ", ")))
 	s.flagSet = flags
-	s.flagSet.ParseErrorsWhitelist.UnknownFlags = true
+	s.flagSet.ParseErrorsWhitelist.UnknownFlags = true // Velero.io word list : ignore
 
 	return s
 }

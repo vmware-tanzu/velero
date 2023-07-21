@@ -132,7 +132,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 	})
 
 	if providerName == "vsphere" && useVolumeSnapshots {
-		// Wait for uploads started by the Velero Plug-in for vSphere to complete
+		// Wait for uploads started by the Velero Plugin for vSphere to complete
 		// TODO - remove after upload progress monitoring is implemented
 		fmt.Println("Waiting for vSphere uploads to complete")
 		if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, deletionTest, 2); err != nil {

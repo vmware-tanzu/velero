@@ -179,7 +179,7 @@ func GetKubeconfigContext() error {
 func TestE2e(t *testing.T) {
 	// Skip running E2E tests when running only "short" tests because:
 	// 1. E2E tests are long running tests involving installation of Velero and performing backup and restore operations.
-	// 2. E2E tests require a kubernetes cluster to install and run velero which further requires more configuration. See above referenced command line flags.
+	// 2. E2E tests require a Kubernetes cluster to install and run velero which further requires more configuration. See above referenced command line flags.
 	if testing.Short() {
 		t.Skip("Skipping E2E tests")
 	}

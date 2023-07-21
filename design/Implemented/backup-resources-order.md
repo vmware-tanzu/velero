@@ -6,7 +6,7 @@ During backup process, user may need to back up resources of specific type in so
 (Ex: primary-secondary database pods in a cluster).
 
 ## Goals
-- Enable user to specify an order of back up resources belong to specific resource type
+- Enable user to specify an order of backup resources belong to specific resource type
 
 ## Alternatives Considered
 - Use a plugin to backup an resources and all the sub resources.  For example use a plugin for StatefulSet and backup pods belong to the StatefulSet in specific order.  This plugin solution is not generic and requires plugin for each resource type.

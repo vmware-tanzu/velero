@@ -1,6 +1,6 @@
 # Velero Assets
 
-This folder contains logo images for Velero in gray (for light backgrounds) and white (for dark backgrounds like black tshirts or dark mode!) – horizontal and stacked… in .eps and .svg.
+This folder contains logo images for Velero in gray (for light backgrounds) and white (for dark backgrounds like black t-shirts or dark mode!) – horizontal and stacked… in .eps and .svg.
 
 ## Some general guidelines for usage
 

@@ -509,7 +509,7 @@ spec:
                       - CSIBackupVolumeSnapshotContents
                   type: string
                 name:
-                  description: Name is the name of the kubernetes resource with
+                  description: Name is the name of the Kubernetes resource with
                     which the file is associated.
                   type: string
               required:

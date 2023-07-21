@@ -3,7 +3,7 @@
 As of today Velero supports filtering of resources based on single label selector per backup. It is desired that Velero
 support backing up of resources based on multiple labels (OR logic).
 
-**Note:** This solution is required because kubernetes label selectors only allow AND logic of labels.
+**Note:** This solution is required because Kubernetes label selectors only allow AND logic of labels.
 
 ## Background
 Currently, Velero's Backup/Restore API has a spec field `LabelSelector` which helps in filtering of resources based on

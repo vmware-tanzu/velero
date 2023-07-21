@@ -80,7 +80,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		}
 	} else {
 		if veleroCfg.ObjectStoreProvider == "" {
-			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Gotta have an object store provider
+			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Must have an object store provider
 		}
 	}
 

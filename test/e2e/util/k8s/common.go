@@ -33,7 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
 
-// ensureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
+// ensureClusterExists returns whether or not a Kubernetes cluster exists for tests to be run on.
 func EnsureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
 }

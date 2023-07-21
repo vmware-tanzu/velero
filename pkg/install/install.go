@@ -55,7 +55,7 @@ var kindToResource = map[string]string{
 	"VolumeSnapshotLocation":   "volumesnapshotlocations",
 }
 
-// ResourceGroup represents a collection of kubernetes objects with a common ready condition
+// ResourceGroup represents a collection of Kubernetes objects with a common ready condition
 type ResourceGroup struct {
 	CRDResources   []*unstructured.Unstructured
 	OtherResources []*unstructured.Unstructured
@@ -164,7 +164,7 @@ func isAvailable(c appsv1.DeploymentCondition) bool {
 	return false
 }
 
-// DeploymentIsReady will poll the kubernetes API server to see if the velero deployment is ready to service user requests.
+// DeploymentIsReady will poll the Kubernetes API server to see if the velero deployment is ready to service user requests.
 func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "Deployment")
 	apiResource := metav1.APIResource{
@@ -206,7 +206,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	return isReady, err
 }
 
-// DaemonSetIsReady will poll the kubernetes API server to ensure the node-agent daemonset is ready, i.e. that
+// DaemonSetIsReady will poll the Kubernetes API server to ensure the node-agent daemonset is ready, i.e. that
 // pods are scheduled and available on all of the desired nodes.
 func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "DaemonSet")
@@ -252,7 +252,7 @@ func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, er
 	return isReady, err
 }
 
-// GroupResources groups resources based on whether the resources are CustomResourceDefinitions or other types of kubernetes objects
+// GroupResources groups resources based on whether the resources are CustomResourceDefinitions or other types of Kubernetes objects
 // This is useful to wait for readiness before creating CRD objects
 func GroupResources(resources *unstructured.UnstructuredList) *ResourceGroup {
 	rg := new(ResourceGroup)

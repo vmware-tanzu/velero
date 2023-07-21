@@ -3,7 +3,7 @@ title: "Velero Install CLI"
 layout: docs
 ---
 
-This document serves as a guide to using the `velero install` CLI command to install `velero` server components into your kubernetes cluster.
+This document serves as a guide to using the `velero install` CLI command to install `velero` server components into your Kubernetes cluster.
 
 _NOTE_: `velero install` will, by default, use the CLI's version information to determine the version of the server components to deploy. This behavior may be overridden by using the `--image` flag. Refer to [Building Server Component Container Images][1].
 
