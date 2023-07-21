@@ -248,10 +248,11 @@ func newSecretRestoreItemAction(f client.Factory) plugincommon.HandlerInitialize
 
 func newDataUploadRetrieveAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
-		client, err := f.KubeClient()
+		client, err := f.KubebuilderClient()
 		if err != nil {
 			return nil, err
 		}
-		return restore.NewDataUploadRetrieveAction(logger, client.CoreV1().ConfigMaps(f.Namespace())), nil
+
+		return restore.NewDataUploadRetrieveAction(logger, client), nil
 	}
 }

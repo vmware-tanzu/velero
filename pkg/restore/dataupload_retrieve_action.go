@@ -25,7 +25,8 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -34,14 +35,14 @@ import (
 )
 
 type DataUploadRetrieveAction struct {
-	logger          logrus.FieldLogger
-	configMapClient corev1client.ConfigMapInterface
+	logger logrus.FieldLogger
+	client client.Client
 }
 
-func NewDataUploadRetrieveAction(logger logrus.FieldLogger, configMapClient corev1client.ConfigMapInterface) *DataUploadRetrieveAction {
+func NewDataUploadRetrieveAction(logger logrus.FieldLogger, client client.Client) *DataUploadRetrieveAction {
 	return &DataUploadRetrieveAction{
-		logger:          logger,
-		configMapClient: configMapClient,
+		logger: logger,
+		client: client,
 	}
 }
 
@@ -60,8 +61,18 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		return nil, errors.Wrap(err, "unable to convert unstructured item to DataUpload.")
 	}
 
+	backup := &velerov1api.Backup{}
+	err := d.client.Get(context.Background(), types.NamespacedName{
+		Namespace: input.Restore.Namespace,
+		Name:      input.Restore.Spec.BackupName,
+	}, backup)
+	if err != nil {
+		d.logger.WithError(err).Errorf("Fail to get backup for restore %s.", input.Restore.Name)
+		return nil, errors.Wrapf(err, "error to get backup for restore %s", input.Restore.Name)
+	}
+
 	dataUploadResult := velerov2alpha1.DataUploadResult{
-		BackupStorageLocation: dataUpload.Spec.BackupStorageLocation,
+		BackupStorageLocation: backup.Spec.StorageLocation,
 		DataMover:             dataUpload.Spec.DataMover,
 		SnapshotID:            dataUpload.Status.SnapshotID,
 		SourceNamespace:       dataUpload.Spec.SourceNamespace,
@@ -93,7 +104,7 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		},
 	}
 
-	_, err = d.configMapClient.Create(context.Background(), &cm, metav1.CreateOptions{})
+	err = d.client.Create(context.Background(), &cm, &client.CreateOptions{})
 	if err != nil {
 		d.logger.Errorf("fail to create DataUploadResult ConfigMap %s/%s: %s", cm.Namespace, cm.Name, err.Error())
 		return nil, errors.Wrap(err, "fail to create DataUploadResult ConfigMap")

@@ -23,10 +23,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -37,31 +38,58 @@ import (
 )
 
 func TestDataUploadRetrieveActionExectue(t *testing.T) {
+	scheme := runtime.NewScheme()
+	velerov1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+
 	tests := []struct {
 		name                     string
 		dataUpload               *velerov2alpha1.DataUpload
 		restore                  *velerov1.Restore
 		expectedDataUploadResult *corev1.ConfigMap
 		expectedErr              string
+		runtimeScheme            *runtime.Scheme
+		veleroObjs               []runtime.Object
 	}{
 		{
-			name:                     "DataUploadRetrieve Action test",
-			dataUpload:               builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").Result(),
-			restore:                  builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Result(),
-			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"","sourceNamespace":"testNamespace"}`).Result(),
+			name:          "error to find backup",
+			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").Result(),
+			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
+			runtimeScheme: scheme,
+			expectedErr:   "error to get backup for restore testRestore: backups.velero.io \"testBackup\" not found",
 		},
 		{
-			name:                     "Long source namespace and PVC name should also work",
-			dataUpload:               builder.ForDataUpload("velero", "testDU").SourceNamespace("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1").SourcePVC("kibishii-data-kibishii-deployment-0").Result(),
-			restore:                  builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Result(),
-			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "migre209d0da-49c7-45ba-8d5a-3e59fd591ec1.kibishii-data-ki152333", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"","sourceNamespace":"migre209d0da-49c7-45ba-8d5a-3e59fd591ec1"}`).Result(),
+			name:          "DataUploadRetrieve Action test",
+			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").Result(),
+			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
+			runtimeScheme: scheme,
+			veleroObjs: []runtime.Object{
+				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
+			},
+			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","sourceNamespace":"testNamespace"}`).Result(),
+		},
+		{
+			name:          "Long source namespace and PVC name should also work",
+			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1").SourcePVC("kibishii-data-kibishii-deployment-0").Result(),
+			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
+			runtimeScheme: scheme,
+			veleroObjs: []runtime.Object{
+				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
+			},
+			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "migre209d0da-49c7-45ba-8d5a-3e59fd591ec1.kibishii-data-ki152333", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","sourceNamespace":"migre209d0da-49c7-45ba-8d5a-3e59fd591ec1"}`).Result(),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := velerotest.NewLogger()
-			cmClient := fake.NewSimpleClientset()
+
+			fakeClientBuilder := fake.NewClientBuilder()
+			if tc.runtimeScheme != nil {
+				fakeClientBuilder = fakeClientBuilder.WithScheme(tc.runtimeScheme)
+			}
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(tc.veleroObjs...).Build()
 
 			var unstructuredDataUpload map[string]interface{}
 			if tc.dataUpload != nil {
@@ -74,21 +102,28 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredDataUpload},
 			}
 
-			action := NewDataUploadRetrieveAction(logger, cmClient.CoreV1().ConfigMaps("velero"))
+			action := NewDataUploadRetrieveAction(logger, fakeClient)
 			_, err := action.Execute(&input)
 			if tc.expectedErr != "" {
 				require.Equal(t, tc.expectedErr, err.Error())
+			} else {
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
 
 			if tc.expectedDataUploadResult != nil {
-				cmList, err := cmClient.CoreV1().ConfigMaps("velero").List(context.Background(), metav1.ListOptions{
-					LabelSelector: fmt.Sprintf("%s=%s,%s=%s", velerov1.RestoreUIDLabel, "testingUID", velerov1.PVCNamespaceNameLabel, label.GetValidName(tc.dataUpload.Spec.SourceNamespace+"."+tc.dataUpload.Spec.SourcePVC)),
+				var cmList corev1.ConfigMapList
+				err := fakeClient.List(context.Background(), &cmList, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						velerov1.RestoreUIDLabel:       "testingUID",
+						velerov1.PVCNamespaceNameLabel: label.GetValidName(tc.dataUpload.Spec.SourceNamespace + "." + tc.dataUpload.Spec.SourcePVC),
+					}),
 				})
+
 				require.NoError(t, err)
 				// debug
 				fmt.Printf("CM: %s\n", &cmList.Items[0])
-				require.Equal(t, *tc.expectedDataUploadResult, cmList.Items[0])
+				require.Equal(t, tc.expectedDataUploadResult.Labels, cmList.Items[0].Labels)
+				require.Equal(t, tc.expectedDataUploadResult.Data, cmList.Items[0].Data)
 			}
 		})
 	}
