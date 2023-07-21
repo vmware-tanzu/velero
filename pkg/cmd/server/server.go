@@ -879,7 +879,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			restoreOpsMap,
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupOperations)
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.RestoreOperations)
 		}
 	}
 
