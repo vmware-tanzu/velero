@@ -1,0 +1,1 @@
+Fix issue #6519. Restrict the client manager of node-agent server to include only Velero resources from the server's namespace, otherwise, the controllers will try to reconcile CRs from all the installed Velero namespaces.
