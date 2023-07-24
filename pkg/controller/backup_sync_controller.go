@@ -197,6 +197,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 			podVolumeBackup.Namespace = backup.Namespace
 			podVolumeBackup.ResourceVersion = ""
+			podVolumeBackup.Spec.BackupStorageLocation = location.Name
 
 			err = b.client.Create(ctx, podVolumeBackup, &client.CreateOptions{})
 			switch {
