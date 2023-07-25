@@ -76,7 +76,7 @@ type CSISnapshotSpec struct {
 	// StorageClass is the name of the storage class of the PVC that the volume snapshot is created from
 	StorageClass string `json:"storageClass"`
 
-	// StorageClass is the name of the snapshot class that the volume snapshot is created with
+	// SnapshotClass is the name of the snapshot class that the volume snapshot is created with
 	// +optional
 	SnapshotClass string `json:"snapshotClass"`
 }
