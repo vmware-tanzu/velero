@@ -212,7 +212,18 @@ func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace st
 }
 
 func deleteResourcesWithFinalizer(ctx context.Context, kbClient kbclient.Client, namespace string) error {
-	// delete restores
+	//check if restore crd exists
+	v1crd := &apiextv1.CustomResourceDefinition{}
+	key := kbclient.ObjectKey{Name: "restores.velero.io"}
+	if err := kbClient.Get(ctx, key, v1crd); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	// delete all the restores
 	restoreList := &velerov1api.RestoreList{}
 	if err := kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); err != nil {
 		return err
