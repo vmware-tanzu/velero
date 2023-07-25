@@ -43,6 +43,8 @@ toc:
         url: /restore-reference
       - page: Restore hooks
         url: /restore-hooks
+      - page: Restore Resource Modifiers
+        url: /restore-resource-modifiers
       - page: Run in any namespace
         url: /namespace
       - page: CSI Support
