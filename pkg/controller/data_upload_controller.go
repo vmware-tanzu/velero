@@ -53,10 +53,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-const dataMoverType string = "velero"
-const dataUploadDownloadRequestor string = "snapshot-data-upload-download"
-
-const preparingMonitorFrequency time.Duration = time.Minute
+const (
+	dataUploadDownloadRequestor string        = "snapshot-data-upload-download"
+	preparingMonitorFrequency   time.Duration = time.Minute
+)
 
 // DataUploadReconciler reconciles a DataUpload object
 type DataUploadReconciler struct {
@@ -116,7 +116,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, errors.Wrap(err, "getting DataUpload")
 	}
 
-	if du.Spec.DataMover != "" && du.Spec.DataMover != dataMoverType {
+	if !datamover.IsBuiltInUploader(du.Spec.DataMover) {
 		log.WithField("Data mover", du.Spec.DataMover).Debug("it is not one built-in data mover which is not supported by Velero")
 		return ctrl.Result{}, nil
 	}

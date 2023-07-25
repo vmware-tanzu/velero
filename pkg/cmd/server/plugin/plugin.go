@@ -21,6 +21,8 @@ import (
 	"github.com/spf13/cobra"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
+	"github.com/vmware-tanzu/velero/pkg/datamover"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -59,7 +61,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/apiservice", newAPIServiceRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/admission-webhook-configuration", newAdmissionWebhookConfigurationAction).
 				RegisterRestoreItemAction("velero.io/secret", newSecretRestoreItemAction(f)).
-				RegisterRestoreItemAction("velero.io/dataupload", newDataUploadRetrieveAction(f))
+				RegisterRestoreItemAction("velero.io/dataupload", newDataUploadRetrieveAction(f)).
+				RegisterDeleteItemAction("velero.io/dataupload-delete", newDateUploadDeleteItemAction(f))
+
 			if !features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
 				// Do not register crd-remap-version BIA if the API Group feature flag is enabled, so that the v1 CRD can be backed up
 				pluginServer = pluginServer.RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction(f))
@@ -254,5 +258,15 @@ func newDataUploadRetrieveAction(f client.Factory) plugincommon.HandlerInitializ
 		}
 
 		return restore.NewDataUploadRetrieveAction(logger, client), nil
+	}
+}
+
+func newDateUploadDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubebuilderClient()
+		if err != nil {
+			return nil, err
+		}
+		return datamover.NewDataUploadDeleteAction(logger, client), nil
 	}
 }
