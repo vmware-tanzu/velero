@@ -18,6 +18,10 @@ RUN microdnf -y update && microdnf -y install nmap-ncat && microdnf clean all
 COPY --from=builder /go/src/velero velero
 COPY --from=restic-builder /opt/app-root/src/restic /usr/bin/restic
 
+RUN mkdir -p /home/velero
+RUN chmod -R 777 /home/velero
+
 USER 65534:65534
+ENV HOME=/home/velero
 
 ENTRYPOINT ["/velero"]
