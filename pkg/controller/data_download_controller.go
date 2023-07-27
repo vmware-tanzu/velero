@@ -109,7 +109,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if dd.Spec.DataMover != "" && dd.Spec.DataMover != dataMoverType {
+	if !datamover.IsBuiltInUploader(dd.Spec.DataMover) {
 		log.WithField("data mover", dd.Spec.DataMover).Info("it is not one built-in data mover which is not supported by Velero")
 		return ctrl.Result{}, nil
 	}
