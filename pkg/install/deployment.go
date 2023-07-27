@@ -47,6 +47,7 @@ type podTemplateConfig struct {
 	serviceAccountName              string
 	uploaderType                    string
 	defaultSnapshotMoveData         bool
+	privilegedNodeAgent             bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -146,6 +147,12 @@ func WithDefaultSnapshotMoveData() podTemplateOption {
 func WithServiceAccountName(sa string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.serviceAccountName = sa
+	}
+}
+
+func WithPrivilegedNodeAgent() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.privilegedNodeAgent = true
 	}
 }
 

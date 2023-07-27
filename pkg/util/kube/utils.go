@@ -35,6 +35,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
@@ -49,6 +50,8 @@ const (
 	KubeAnnMigratedTo             = "pv.kubernetes.io/migrated-to"
 	KubeAnnSelectedNode           = "volume.kubernetes.io/selected-node"
 )
+
+var ErrorPodVolumeIsNotPVC = errors.New("pod volume is not a PVC")
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
 func NamespaceAndName(objMeta metav1.Object) string {
@@ -122,6 +125,57 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 // where the specified volume lives.
 // For volumes with a CSIVolumeSource, append "/mount" to the directory name.
 func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (string, error) {
+	pvc, pv, volume, err := GetPodPVCVolume(ctx, log, pod, volumeName, cli)
+	if err != nil {
+		// This case implies the administrator created the PV and attached it directly, without PVC.
+		// Note that only one VolumeSource can be populated per Volume on a pod
+		if err == ErrorPodVolumeIsNotPVC {
+			if volume.VolumeSource.CSI != nil {
+				return volume.Name + "/mount", nil
+			}
+			return volume.Name, nil
+		}
+		return "", errors.WithStack(err)
+	}
+
+	// Most common case is that we have a PVC VolumeSource, and we need to check the PV it points to for a CSI source.
+	// PV's been created with a CSI source.
+	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, cli)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	if isProvisionedByCSI {
+		if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
+			return pvc.Spec.VolumeName, nil
+		}
+		return pvc.Spec.VolumeName + "/mount", nil
+	}
+
+	return pvc.Spec.VolumeName, nil
+}
+
+// GetVolumeMode gets the uploader.PersistentVolumeMode of the volume.
+func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (
+	uploader.PersistentVolumeMode, error) {
+	_, pv, _, err := GetPodPVCVolume(ctx, log, pod, volumeName, cli)
+
+	if err != nil {
+		if err == ErrorPodVolumeIsNotPVC {
+			return uploader.PersistentVolumeFilesystem, nil
+		}
+		return "", errors.WithStack(err)
+	}
+
+	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
+		return uploader.PersistentVolumeBlock, nil
+	}
+	return uploader.PersistentVolumeFilesystem, nil
+}
+
+// GetPodPVCVolume gets the PVC, PV and volume for a pod volume name.
+// Returns pod volume in case of ErrorPodVolumeIsNotPVC error
+func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (
+	*corev1api.PersistentVolumeClaim, *corev1api.PersistentVolume, *corev1api.Volume, error) {
 	var volume *corev1api.Volume
 
 	for i := range pod.Spec.Volumes {
@@ -132,41 +186,26 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 	}
 
 	if volume == nil {
-		return "", errors.New("volume not found in pod")
+		return nil, nil, nil, errors.New("volume not found in pod")
 	}
 
-	// This case implies the administrator created the PV and attached it directly, without PVC.
-	// Note that only one VolumeSource can be populated per Volume on a pod
 	if volume.VolumeSource.PersistentVolumeClaim == nil {
-		if volume.VolumeSource.CSI != nil {
-			return volume.Name + "/mount", nil
-		}
-		return volume.Name, nil
+		return nil, nil, volume, ErrorPodVolumeIsNotPVC // There is a pod volume but it is not a PVC
 	}
 
-	// Most common case is that we have a PVC VolumeSource, and we need to check the PV it points to for a CSI source.
 	pvc := &corev1api.PersistentVolumeClaim{}
 	err := cli.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: volume.VolumeSource.PersistentVolumeClaim.ClaimName}, pvc)
 	if err != nil {
-		return "", errors.WithStack(err)
+		return nil, nil, nil, errors.WithStack(err)
 	}
 
 	pv := &corev1api.PersistentVolume{}
 	err = cli.Get(ctx, client.ObjectKey{Name: pvc.Spec.VolumeName}, pv)
 	if err != nil {
-		return "", errors.WithStack(err)
+		return nil, nil, nil, errors.WithStack(err)
 	}
 
-	// PV's been created with a CSI source.
-	isProvisionedByCSI, err := isProvisionedByCSI(log, pv, cli)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-	if isProvisionedByCSI {
-		return pvc.Spec.VolumeName + "/mount", nil
-	}
-
-	return pvc.Spec.VolumeName, nil
+	return pvc, pv, volume, nil
 }
 
 // isProvisionedByCSI function checks whether this is a CSI PV by annotation.
