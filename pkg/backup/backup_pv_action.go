@@ -72,6 +72,14 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		pvc.Spec.DataSourceRef = nil
 	}
 
+	// When StorageClassName is set to "", it means no StorageClass is specified,
+	// even the default StorageClass is not used. Only keep the Selector for this case.
+	// https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume
+	if pvc.Spec.StorageClassName == nil || *pvc.Spec.StorageClassName != "" {
+		// Clean the selector to make the PVC to dynamically allocate PV.
+		pvc.Spec.Selector = nil
+	}
+
 	// remove label selectors with "velero.io/" prefixing in the key which is left by Velero restore
 	if pvc.Spec.Selector != nil && pvc.Spec.Selector.MatchLabels != nil {
 		for k := range pvc.Spec.Selector.MatchLabels {
