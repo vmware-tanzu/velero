@@ -127,6 +127,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
 		VeleroServerDebugMode:  veleroCfg.VeleroServerDebugMode,
 	})
+
 	if err != nil {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
@@ -536,7 +537,9 @@ func PrepareVelero(ctx context.Context, caseName string) error {
 	ready, err := IsVeleroReady(context.Background(), VeleroCfg.VeleroNamespace, VeleroCfg.UseNodeAgent)
 	if err != nil {
 		fmt.Printf("error in checking velero status with %v", err)
-		VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
+		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+		defer ctxCancel()
+		VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)
 		ready = false
 	}
 	if ready {

@@ -73,13 +73,15 @@ func APIExtensionsVersionsTest() {
 			})
 			if veleroCfg.InstallVelero {
 				By("Uninstall Velero and delete CRD ", func() {
+					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+					defer ctxCancel()
 					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
-					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
+					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
 						veleroCfg.VeleroNamespace)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 
 					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
-					Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI,
+					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
 						veleroCfg.VeleroNamespace)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 				})
