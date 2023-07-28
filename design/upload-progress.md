@@ -89,7 +89,7 @@ will be deleted and at that point any uploads still in progress should be aborte
 
 ### Uploading (new)
 The "Uploading" phase signifies that the main part of the backup, including snapshotting has completed successfully
-and and uploading is continuing.  In the event of an error during uploading, the phase will change to 
+and uploading is continuing.  In the event of an error during uploading, the phase will change to 
 UploadingPartialFailure.  On success, the phase changes to Completed.  The backup cannot be
 restored from when it is in the Uploading state.
 

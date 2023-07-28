@@ -503,7 +503,7 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	if len(errs) > 0 {
-		errs = append(errs, errors.New("Velero custom resources not found - apply examples/common/00-prereqs.yaml to update the custom resource definitions"))
+		errs = append(errs, errors.New("Velero custom resources not found - apply config/crd/v1/bases/*.yaml,config/crd/v2alpha1/bases*.yaml, to update the custom resource definitions"))
 		return kubeerrs.NewAggregate(errs)
 	}
 
