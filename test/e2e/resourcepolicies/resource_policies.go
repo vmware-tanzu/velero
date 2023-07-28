@@ -19,7 +19,6 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -270,7 +269,7 @@ func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
 	if err != nil {
 		return err
 	}
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get %s when install storage class", path)
 	}
@@ -278,7 +277,7 @@ func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
 	// replace sc to new value
 	newContent := strings.ReplaceAll(string(content), "name: e2e-storage-class", "name: e2e-storage-class-2")
 
-	tmpFile, err := ioutil.TempFile("", "sc-file")
+	tmpFile, err := os.CreateTemp("", "sc-file")
 	if err != nil {
 		return errors.Wrapf(err, "failed to create temp file  when install storage class")
 	}

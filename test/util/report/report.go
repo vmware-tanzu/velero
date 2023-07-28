@@ -20,8 +20,9 @@ import (
 	"io/ioutil"
 
 	"github.com/pkg/errors"
-	"github.com/vmware-tanzu/velero/test"
 	"gopkg.in/yaml.v3"
+
+	"github.com/vmware-tanzu/velero/test"
 )
 
 func GenerateYamlReport() error {

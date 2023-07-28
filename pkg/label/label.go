@@ -27,7 +27,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-// GetValidName converts an input string to valid kubernetes label string in accordance to rfc1035 DNS Label spec
+// GetValidName converts an input string to valid Kubernetes label string in accordance to rfc1035 DNS Label spec
 // (https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/identifiers.md)
 // Length of the label is adjusted basis the DNS1035LabelMaxLength (defined at k8s.io/apimachinery/pkg/util/validation)
 // If length exceeds, we trim the label name to contain only max allowed characters

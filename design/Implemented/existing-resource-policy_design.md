@@ -1,6 +1,6 @@
 # Add support for `ExistingResourcePolicy` to restore API
 ## Abstract
-Velero currently does not support any restore policy on kubernetes resources that are already present in-cluster. Velero skips over the restore of the resource if it already exists in the namespace/cluster irrespective of whether the resource present in the restore is the same or different from the one present on the cluster. It is desired that Velero gives the option to the user to decide whether or not the resource in backup should overwrite the one present in the cluster.
+Velero currently does not support any restore policy on Kubernetes resources that are already present in-cluster. Velero skips over the restore of the resource if it already exists in the namespace/cluster irrespective of whether the resource present in the restore is the same or different from the one present on the cluster. It is desired that Velero gives the option to the user to decide whether or not the resource in backup should overwrite the one present in the cluster.
 
 ## Background
 As of Today, Velero will skip over the restoration of resources that already exist in the cluster. The current workflow followed by Velero is (Using a `service` that is backed up for example):
@@ -145,7 +145,7 @@ type RestoreSpec struct {
 .
 .
 .
-// ExistingResourcePolicy specifies the restore behaviour for the kubernetes resource to be restored
+// ExistingResourcePolicy specifies the restore behaviour for the Kubernetes resource to be restored
 // +optional
 ExistingResourcePolicy PolicyType
 
@@ -167,7 +167,7 @@ type RestoreSpec struct {
 .
 .
 .
-// ExistingResourcePolicyConfig specifies the restore behaviour for a particular/list of kubernetes resource(s) to be restored
+// ExistingResourcePolicyConfig specifies the restore behaviour for a particular/list of Kubernetes resource(s) to be restored
 // +optional
 ExistingResourcePolicyConfig []PolicyConfiguration
 
@@ -205,11 +205,11 @@ type RestoreSpec struct {
 .
 .
 .
-// ExistingResourceDefaultPolicy specifies the default restore behaviour for the kubernetes resource to be restored
+// ExistingResourceDefaultPolicy specifies the default restore behaviour for the Kubernetes resource to be restored
 // +optional
 existingResourceDefaultPolicy PolicyType
 
-// ExistingResourcePolicyOverrides specifies the restore behaviour for a particular/list of kubernetes resource(s) to be restored
+// ExistingResourcePolicyOverrides specifies the restore behaviour for a particular/list of Kubernetes resource(s) to be restored
 // +optional
 existingResourcePolicyOverrides []PolicyConfiguration
 

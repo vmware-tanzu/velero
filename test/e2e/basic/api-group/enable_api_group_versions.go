@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -376,7 +375,7 @@ func installTestCRD(ctx context.Context, index int, group, path string) error {
 }
 
 func rerenderTestYaml(index int, group, path string) (string, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get %s when install test yaml", path)
 	}
@@ -399,7 +398,7 @@ func rerenderTestYaml(index int, group, path string) (string, error) {
 	newContent = strings.ReplaceAll(newContent, group, fmt.Sprintf("%s.%d", group, index))
 
 	By(fmt.Sprintf("\n%s\n", newContent))
-	tmpFile, err := ioutil.TempFile("", "test-yaml")
+	tmpFile, err := os.CreateTemp("", "test-yaml")
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create temp file  when install storage class")
 	}

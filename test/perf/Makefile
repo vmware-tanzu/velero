@@ -86,7 +86,7 @@ run: ginkgo
 		@[ "${BSL_BUCKET}" ] && echo "Using bucket ${BSL_BUCKET} to store backups from E2E tests" || \
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
 		@[ "${CLOUD_PROVIDER}" ] && echo "Using cloud provider ${CLOUD_PROVIDER}" || \
-			(echo "Cloud provider for target cloud/plug-in provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
+			(echo "Cloud provider for target cloud/plugin provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
 	@$(GINKGO) -v $(FOCUS_STR) $(SKIP_STR) . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-plugins=$(PLUGINS) \

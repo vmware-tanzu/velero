@@ -99,7 +99,7 @@ The following use cases must be included as part of the Velero restore hooks MVP
     **Title: **Allow restore hook to run on non-kubernetes databases
 
 
-    **Description: **As a user, I would like to run restore hook operations even on databases that are external to kubernetes (such as postgres, elastic, etc…).
+    **Description: **As a user, I would like to run restore hook operations even on databases that are external to Kubernetes (such as postgres, elastic, etc…).
 
 **<span style="text-decoration:underline;">______________________________________________________________</span>**
 
@@ -291,7 +291,7 @@ The following requirements are out of scope for the Velero Restore Hooks MVP:
 
 
 1. Verifying the integrity of a backup, resource, or other artifact will not be included in the scope of this effort. 
-2. Verifying the integrity of a snapshot using kubernetes hash checks.
+2. Verifying the integrity of a snapshot using Kubernetes hash checks.
 3. Running concurrent restore operations (for the MVP) a secondary epic will be opened to align better with the concurrent workload operations currently set on the Velero roadmap for Q4 timeframe. 
 
 **Questions** 

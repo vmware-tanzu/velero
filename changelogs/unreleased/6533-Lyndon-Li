@@ -1,0 +1,1 @@
+Fix issue #6534, reset PVB CR's StorageLocation to the latest one during backup sync as same as the backup CR. Also fix similar problem with DataUploadResult for data mover restore.

@@ -1,0 +1,1 @@
+Add missing CompletionTimestamp and metrics when restore moved into terminal phase in restoreOperationsReconciler

@@ -5,9 +5,9 @@ This is intended as a replacement for the previously-approved Upload Progress Mo
 snapshot uploads to include what was previously called Async Backup/Restore Item Actions. This
 updated design should handle the combined set of use cases for those previously separate designs.
 
-Volume snapshotter plug-in are used by Velero to take snapshots of persistent volume contents. 
+Volume snapshotter plugin are used by Velero to take snapshots of persistent volume contents. 
 Depending on the underlying storage system, those snapshots may be available to use immediately, 
-they may be uploaded to stable storage internally by the plug-in or they may need to be uploaded after
+they may be uploaded to stable storage internally by the plugin or they may need to be uploaded after
 the snapshot has been taken. We would like for Velero to continue on to the next part of the backup as quickly
 as possible but we would also like the backup to not be marked as complete until it is a usable backup.  We'd also
 eventually like to bring the control of upload under the control of Velero and allow the user to make decisions
@@ -36,7 +36,7 @@ backup and restore *could* make use of this framework if their actions are refac
 Backup/RestoreItemActions.
 
 - Data Movers
-    - Data movers are asynchronous processes executed inside backup/restore item actions that applies to a specific kubernetes resources. A common use case for data mover is to backup/restore PVCs whose data we want to move to some form of backup storage outside of using velero kopia/restic implementations.
+    - Data movers are asynchronous processes executed inside backup/restore item actions that applies to a specific Kubernetes resources. A common use case for data mover is to backup/restore PVCs whose data we want to move to some form of backup storage outside of using velero kopia/restic implementations.
     - Workflow
         - User takes velero backup of PVC A
         - BIA plugin applies to PVCs with compatible storage driver
@@ -91,7 +91,7 @@ ID).
 
 ### Internal configuration and management
 In this model, movement of the snapshot to stable storage is under the control of the snapshot
-plug-in.  Decisions about where and when the snapshot gets moved to stable storage are not
+plugin.  Decisions about where and when the snapshot gets moved to stable storage are not
 directly controlled by Velero.  This is the model for the current VolumeSnapshot plugins.
 
 ### Velero controlled management
@@ -120,7 +120,7 @@ will remain in the "WaitingForPluginOperations" phase until all BIA/RIA operatio
 (for example, for a volume snapshotter, until all data has been successfully moved to persistent
 storage).  The backup/restore will not fail once it reaches this phase, although an error return
 from a plugin could cause a backup or restore to move to "PartiallyFailed".  If the backup is
-deleted (cancelled), the plug-ins will attempt to delete the snapshots and stop the data movement -
+deleted (cancelled), the plugins will attempt to delete the snapshots and stop the data movement -
 this may not be possible with all storage systems.
 
 In addition, for backups (but not restores), there will also be two additional phases, "Finalizing"
@@ -145,7 +145,7 @@ terminates
 When work on the backup/restore begins, it moves to the "InProgress" phase.  It remains in the
 "InProgress" phase until all pre/post execution hooks have been executed, all snapshots have been
 taken and the Kubernetes metadata and backup/restore info is safely written to the object store
-plug-in.
+plugin.
 
 In the current implementation, Restic backups will move data during the "InProgress" phase.  In the
 future, it may be possible to combine a snapshot with a Restic (or equivalent) backup which would
@@ -263,7 +263,7 @@ InProgress backups will not have a `velero-backup.json` present in the object st
 reconciliation, backups which do not have a `velero-backup.json` object in the object store will be
 ignored.
 
-## Plug-in API changes
+## Plugin API changes
 
 ### OperationProgress struct
 
@@ -289,15 +289,15 @@ Two new methods will be added to the VolumeSnapshotter interface:
     Cancel(snapshotID string) (error)
 
 Progress will report the current status of a snapshot upload.  This should be callable at
-any time after the snapshot has been taken.  In the event a plug-in is restarted, if the operationID
+any time after the snapshot has been taken.  In the event a plugin is restarted, if the operationID
 (snapshot ID) continues to be valid it should be possible to retrieve the progress.
 
 `error` is set if there is an issue retrieving progress.  If the snapshot is has encountered an
 error during the upload, the error should be returned in OperationProgress and error should be nil.
 
-### BackupItemAction and RestoreItemAction plug-in changes
+### BackupItemAction and RestoreItemAction plugin changes
 
-Currently CSI snapshots and the Velero Plug-in for vSphere are implemented as BackupItemAction
+Currently CSI snapshots and the Velero Plugin for vSphere are implemented as BackupItemAction
 plugins.  While the majority of BackupItemAction plugins do not take snapshots or upload data, this
 functionality is useful for any longstanding plugin operation managed by an external
 process/controller so we will modify BackupItemAction and RestoreItemAction to optionally return an
@@ -333,7 +333,7 @@ will be modified:
 	// initiate asynchronous actions, and a second slice of ResourceIdentifiers specifying related items
 	// which should be backed up after all asynchronous operations have completed. This last field will be
 	// ignored if operationID is empty, and should not be filled in unless the resource must be updated in the
-	// backup after async operations complete (i.e. some of the item's kubernetes metadata will be updated
+	// backup after async operations complete (i.e. some of the item's Kubernetes metadata will be updated
 	// during the asynch operation which will be required during restore)
 	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error)
     	
@@ -464,10 +464,10 @@ snapshot to stable storage.  CSI snapshots expose the _readyToUse_ state that, i
 indicates that the snapshot has been transferred to durable storage and is ready to be used.  The
 CSI BackupItemAction.Progress method will poll that field and when completed, return completion.
 
-## vSphere plug-in
+## vSphere plugin
 
-The vSphere Plug-in for Velero uploads snapshots to S3 in the background.  This is also a
-BackupItemAction plug-in, it will check the status of the Upload records for the snapshot and return
+The vSphere Plugin for Velero uploads snapshots to S3 in the background.  This is also a
+BackupItemAction plugin, it will check the status of the Upload records for the snapshot and return
 progress.
 
 ## Backup workflow changes
@@ -553,14 +553,14 @@ RestoreItemAction new plugin APIs
 New backup phases  
 New restore phases  
 Defer uploading `velero-backup.json`  
-AWS EBS plug-in Progress implementation  
+AWS EBS plugin Progress implementation  
 Operation monitoring  
 Implementation of `<backup-name>-itemoperations.json.gz` file  
 Implementation of `<restore-name>-itemoperations.json.gz` file
 Restart logic  
 Change in reconciliation logic to ignore backups/restores that have not completed  
-CSI plug-in BackupItemAction Progress implementation  
-vSphere plug-in BackupItemAction Progress implementation (vSphere plug-in team)  
+CSI plugin BackupItemAction Progress implementation  
+vSphere plugin BackupItemAction Progress implementation (vSphere plugin team)  
 
 
 # Open Questions

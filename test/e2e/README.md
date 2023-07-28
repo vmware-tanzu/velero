@@ -9,7 +9,7 @@ If you previously ran unit tests using the `go test ./...` command or any of its
 ## Prerequisites
 
 Running the E2E tests expects:
-1. A running kubernetes cluster:
+1. A running Kubernetes cluster:
     1. With DNS and CNI installed.
     1. Compatible with Velero- running Kubernetes v1.10 or later.
     1. With necessary storage drivers/provisioners installed.
@@ -31,7 +31,7 @@ These configuration parameters are expected as values to the following command l
 
 1. `-credentials-file`: File containing credentials for backup and volume provider. Required.
 1. `-bucket`: Name of the object storage bucket where backups from e2e tests should be stored. Required.
-1. `-cloud-provider`: The cloud the tests will be run in.  Appropriate plug-ins will be installed except for kind which requires
+1. `-cloud-provider`: The cloud the tests will be run in.  Appropriate plugins will be installed except for kind which requires
 the object-store-provider to be specified.
 1. `-object-store-provider`: Object store provider to use. Required when kind is the cloud provider.
 1. `-velerocli`: Path to the velero application to use. Optional, by default uses `velero` in the `$PATH`

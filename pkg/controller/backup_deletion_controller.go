@@ -22,6 +22,11 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
+	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -126,15 +131,16 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Since we use the reconciler along with the PeriodicalEnqueueSource, there may be reconciliation triggered by
 	// stale requests.
-	if dbr.Status.Phase == velerov1api.DeleteBackupRequestPhaseProcessed {
+	if dbr.Status.Phase == velerov1api.DeleteBackupRequestPhaseProcessed ||
+		dbr.Status.Phase == velerov1api.DeleteBackupRequestPhaseInProgress {
 		age := r.clock.Now().Sub(dbr.CreationTimestamp.Time)
 		if age >= deleteBackupRequestMaxAge { // delete the expired request
-			log.Debug("The request is expired, deleting it.")
+			log.Debugf("The request is expired, status: %s, deleting it.", dbr.Status.Phase)
 			if err := r.Delete(ctx, dbr); err != nil {
 				log.WithError(err).Error("Error deleting DeleteBackupRequest")
 			}
 		} else {
-			log.Info("The request has been processed, skip.")
+			log.Infof("The request has status '%s', skip.", dbr.Status.Phase)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -314,6 +320,33 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
+	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
+		log.Info("Removing snapshot data by data mover")
+		if deleteErrs := r.deleteMovedSnapshots(ctx, backup); len(deleteErrs) > 0 {
+			for _, err := range deleteErrs {
+				errs = append(errs, err.Error())
+			}
+		}
+		duList := &velerov2alpha1.DataUploadList{}
+		log.Info("Removing local datauploads")
+		if err := r.Client.List(ctx, duList, &client.ListOptions{
+			Namespace: backup.Namespace,
+			LabelSelector: labels.SelectorFromSet(map[string]string{
+				velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
+			}),
+		}); err != nil {
+			log.WithError(err).Error("Error listing datauploads")
+			errs = append(errs, err.Error())
+		} else {
+			for i := range duList.Items {
+				du := duList.Items[i]
+				if err := r.Delete(ctx, &du); err != nil {
+					errs = append(errs, err.Error())
+				}
+			}
+		}
+	}
+
 	if backupStore != nil {
 		log.Info("Removing backup from backup storage")
 		if err := backupStore.DeleteBackup(backup.Name); err != nil {
@@ -464,6 +497,41 @@ func (r *backupDeletionReconciler) deletePodVolumeSnapshots(ctx context.Context,
 	for _, snapshot := range snapshots {
 		if err := r.repoMgr.Forget(ctx2, snapshot); err != nil {
 			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, backup *velerov1api.Backup) []error {
+	if r.repoMgr == nil {
+		return nil
+	}
+	list := &corev1.ConfigMapList{}
+	if err := r.Client.List(ctx, list, &client.ListOptions{
+		Namespace: backup.Namespace,
+		LabelSelector: labels.SelectorFromSet(
+			map[string]string{
+				velerov1api.BackupNameLabel:             label.GetValidName(backup.Name),
+				velerov1api.DataUploadSnapshotInfoLabel: "true",
+			}),
+	}); err != nil {
+		return []error{errors.Wrapf(err, "failed to retrieve config for snapshot info")}
+	}
+	var errs []error
+	for i := range list.Items {
+		cm := list.Items[i]
+		snapshot := repository.SnapshotIdentifier{}
+		b, _ := json.Marshal(cm.Data)
+		if err := json.Unmarshal(b, &snapshot); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to unmarshal snapshot info"))
+			continue
+		}
+		if err := r.repoMgr.Forget(ctx, snapshot); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to delete snapshot %s, namespace: %s", snapshot.SnapshotID, snapshot.VolumeNamespace))
+		}
+		r.logger.Infof("Deleted snapshot %s, namespace: %s, repo type: %s", snapshot.SnapshotID, snapshot.VolumeNamespace, snapshot.RepositoryType)
+		if err := r.Client.Delete(ctx, &cm); err != nil {
+			r.logger.Warnf("Failed to delete snapshot info configmap %s/%s: %v", cm.Namespace, cm.Name, err)
 		}
 	}
 	return errs

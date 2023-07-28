@@ -436,7 +436,7 @@ func (s *server) run() error {
 }
 
 // namespaceExists returns nil if namespace can be successfully
-// gotten from the kubernetes API, or an error otherwise.
+// gotten from the Kubernetes API, or an error otherwise.
 func (s *server) namespaceExists(namespace string) error {
 	s.logger.WithField("namespace", namespace).Info("Checking existence of namespace.")
 
@@ -879,7 +879,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			restoreOpsMap,
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
-			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupOperations)
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.RestoreOperations)
 		}
 	}
 

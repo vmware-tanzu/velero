@@ -44,7 +44,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     velero install --crds-only --dry-run -o yaml | kubectl apply -f -
     ```
 
-    **NOTE:** Since velero v1.10.0 only v1 CRD will be supported during installation, therefore, the v1.10.0 will only work on kubernetes version >= v1.16
+    **NOTE:** Since velero v1.10.0 only v1 CRD will be supported during installation, therefore, the v1.10.0 will only work on Kubernetes version >= v1.16
 
 3. Update the container image and objects fields used by the Velero deployment and, optionally, the restic daemon set:
 

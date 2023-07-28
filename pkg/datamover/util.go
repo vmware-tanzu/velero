@@ -23,3 +23,7 @@ func GetUploaderType(dataMover string) string {
 		return dataMover
 	}
 }
+
+func IsBuiltInUploader(dataMover string) bool {
+	return dataMover == "" || dataMover == "velero"
+}

@@ -36,18 +36,18 @@ import (
 type SnapshotIdentifier struct {
 	// VolumeNamespace is the namespace of the pod/volume that
 	// the snapshot is for.
-	VolumeNamespace string
+	VolumeNamespace string `json:"volumeNamespace"`
 
 	// BackupStorageLocation is the backup's storage location
 	// name.
-	BackupStorageLocation string
+	BackupStorageLocation string `json:"backupStorageLocation"`
 
 	// SnapshotID is the short ID of the snapshot.
-	SnapshotID string
+	SnapshotID string `json:"snapshotID"`
 
 	// RepositoryType is the type of the repository where the
 	// snapshot is stored
-	RepositoryType string
+	RepositoryType string `json:"repositoryType"`
 }
 
 // Manager manages backup repositories.

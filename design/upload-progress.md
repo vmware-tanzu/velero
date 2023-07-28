@@ -1,8 +1,8 @@
 # Upload Progress Monitoring
 
-Volume snapshotter plug-in are used by Velero to take snapshots of persistent volume contents. 
+Volume snapshotter plugin are used by Velero to take snapshots of persistent volume contents. 
 Depending on the underlying storage system, those snapshots may be available to use immediately, 
-they may be uploaded to stable storage internally by the plug-in or they may need to be uploaded after
+they may be uploaded to stable storage internally by the plugin or they may need to be uploaded after
 the snapshot has been taken. We would like for Velero to continue on to the next part of the backup as quickly
 as possible but we would also like the backup to not be marked as complete until it is a usable backup.  We'd also
 eventually like to bring the control of upload under the control of Velero and allow the user to make decisions
@@ -23,7 +23,7 @@ Restic - Does not go through the volume snapshot path.  Restic backups will bloc
 
 - Enable monitoring of operations that continue after snapshotting operations have completed
 - Keep non-usable backups (upload/persistence has not finished) from appearing as completed
-- Minimize change to volume snapshot and BackupItemAction plug-ins
+- Minimize change to volume snapshot and BackupItemAction plugins
 
 ## Non-goals
 - Unification of BackupItemActions and VolumeSnapshotters
@@ -32,7 +32,7 @@ Restic - Does not go through the volume snapshot path.  Restic backups will bloc
 
 ### Internal configuration and management
 In this model, movement of the snapshot to stable storage is under the control of the snapshot
-plug-in.  Decisions about where and when the snapshot gets moved to stable storage are not
+plugin.  Decisions about where and when the snapshot gets moved to stable storage are not
 directly controlled by Velero.  This is the model for the current VolumeSnapshot plugins.
 
 ### Velero controlled management
@@ -56,7 +56,7 @@ slow the progress of the system without adding any actual benefit to the user.
 A new backup phase, "Uploading" will be introduced.  When a backup has entered this phase, Velero
 is free to start another backup.  The backup will remain in the "Uploading" phase until all data
 has been successfully moved to persistent storage.  The backup will not fail once it reaches
-this phase, it will continuously retry moving the data.  If the backup is deleted (cancelled), the plug-ins will
+this phase, it will continuously retry moving the data.  If the backup is deleted (cancelled), the plugins will
 attempt to delete the snapshots and stop the data movement - this may not be possible with all
 storage systems.
 
@@ -74,7 +74,7 @@ If the backup request is incorrectly formed, it goes to the "FailedValidation" p
 ### InProgress
 When work on the backup begins, it moves to the "InProgress" phase.  It remains in the "InProgress"
 phase until all pre/post execution hooks have been executed, all snapshots have been taken and the
-Kubernetes metadata and backup info is safely written to the object store plug-in.
+Kubernetes metadata and backup info is safely written to the object store plugin.
 
 In the current implementation, Restic backups will move data during the "InProgress" phase.
 In the future, it may be possible to combine a snapshot with a Restic (or equivalent) backup which
@@ -146,7 +146,7 @@ Completed, Failed or PartialFailure
 InProgress backups will not have a `velero-backup.json` present in the object store.  During reconciliation, backups which
 do not have a `velero-backup.json` object in the object store will be ignored.
 
-## Plug-in API changes
+## Plugin API changes
 
 ### UploadProgress struct
 
@@ -166,23 +166,23 @@ do not have a `velero-backup.json` object in the object store will be ignored.
 
 ### VolumeSnapshotter changes
 
-A new method will be added to the VolumeSnapshotter interface (details depending on plug-in versioning spec)
+A new method will be added to the VolumeSnapshotter interface (details depending on plugin versioning spec)
 
     UploadProgress(snapshotID string) (UploadProgress, error)
 
 UploadProgress will report the current status of a snapshot upload.  This should be callable at any time after the snapshot
-has been taken.  In the event a plug-in is restarted, if the snapshotID continues to be valid it should be possible to
+has been taken.  In the event a plugin is restarted, if the snapshotID continues to be valid it should be possible to
 retrieve the progress.
 
 `error` is set if there is an issue retrieving progress.  If the snapshot is has encountered an error during the upload,
 the error should be return in UploadProgress and error should be nil.
 
-### SnapshotItemAction plug-in
+### SnapshotItemAction plugin
 
-Currently CSI snapshots and the Velero Plug-in for vSphere are implemented as BackupItemAction plugins.  The majority of
+Currently CSI snapshots and the Velero Plugin for vSphere are implemented as BackupItemAction plugins.  The majority of
 BackupItemAction plugins do not take snapshots or upload data so rather than modify BackupItemAction we introduce a new
-plug-ins, SnapshotItemAction.  SnapshotItemAction will be used in place of BackupItemAction for
-the CSI snapshots and the Velero Plug-in for vSphere and will return a snapshot ID in addition to the item itself.
+plugins, SnapshotItemAction.  SnapshotItemAction will be used in place of BackupItemAction for
+the CSI snapshots and the Velero Plugin for vSphere and will return a snapshot ID in addition to the item itself.
 
 The SnapshotItemAction plugin identifier as well as the Item and Snapshot ID will be stored in the 
 `<backup-name>-itemsnapshots.json.gz`.  When checking for progress, this info will be used to select the appropriate
@@ -248,9 +248,9 @@ stable storage.  CSI snapshots expose the _readyToUse_ state that, in the case o
 has been transferred to durable storage and is ready to be used.  The CSI BackupItemProgress.Progress method will
 poll that field and when completed, return completion.
 
-## vSphere plug-in
+## vSphere plugin
 
-The vSphere Plug-in for Velero uploads snapshots to S3 in the background.  This is also a BackupItemAction plug-in,
+The vSphere Plugin for Velero uploads snapshots to S3 in the background.  This is also a BackupItemAction plugin,
 it will check the status of the Upload records for the snapshot and return progress.
 
 ## Backup workflow changes
@@ -281,13 +281,13 @@ VolumeSnapshotter new plugin APIs
 BackupItemProgress new plugin interface  
 New backup phases  
 Defer uploading `velero-backup.json`  
-AWS EBS plug-in UploadProgress implementation  
+AWS EBS plugin UploadProgress implementation  
 Upload monitoring  
 Implementation of `<backup-name>-itemsnapshots.json.gz` file  
 Restart logic  
 Change in reconciliation logic to ignore backups that have not completed  
-CSI plug-in BackupItemProgress implementation  
-vSphere plug-in BackupItemProgress implementation (vSphere plug-in team)  
+CSI plugin BackupItemProgress implementation  
+vSphere plugin BackupItemProgress implementation (vSphere plugin team)  
 
 # Future Fragile/Durable snapshot tracking
 Futures are here for reference, they may change radically when actually implemented.
@@ -296,11 +296,11 @@ Some storage systems have the ability to provide different levels of protection 
 and "Durable".  Currently, Velero expects snapshots to be Durable (they should be able to survive the destruction of the
 cluster and the storage it is using).  In the future we would like the ability to take advantage of snapshots that are
 Fragile.  For example, vSphere snapshots are Fragile (they reside in the same datastore as the virtual disk).  The Velero
-Plug-in for vSphere uses a vSphere local/fragile snapshot to get a consistent snapshot, then uploads the data to S3 to
+Plugin for vSphere uses a vSphere local/fragile snapshot to get a consistent snapshot, then uploads the data to S3 to
 make it Durable.  In the current design, upload progress will not be complete until the snapshot is ready to use and
 Durable.  It is possible, however, to restore data from a vSphere snapshot before it has been made Durable, and this is a
 capability we'd like to expose in the future.  Other storage systems implement this functionality as well.  We will be moving
-the control of the data movement from the vSphere plug-in into Velero.
+the control of the data movement from the vSphere plugin into Velero.
 
 Some storage system, such as EBS, are only capable of creating Durable snapshots.  There is no usable intermediate Fragile stage.
 

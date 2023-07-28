@@ -677,7 +677,7 @@ func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 	return nil
 }
 
-// WaitForVSphereUploadCompletion waits for uploads started by the Velero Plug-in for vSphere to complete
+// WaitForVSphereUploadCompletion waits for uploads started by the Velero Plugin for vSphere to complete
 // TODO - remove after upload progress monitoring is implemented
 func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, namespace string, expectCount int) error {
 	err := wait.PollImmediate(time.Second*5, timeout, func() (bool, error) {
