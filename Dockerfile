@@ -38,8 +38,13 @@ WORKDIR /go/src/github.com/vmware-tanzu/velero
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
-RUN mkdir -p /output/usr/bin && \
-    export GOARM=$( echo "${GOARM}" | cut -c2-) && \
+# if TARGETVARIANT is v8, set GOARM to empty string
+RUN if [ "${TARGETVARIANT}" = "v8" ]; then \
+        export GOARM=""; \
+else \
+    export GOARM=$( echo "${GOARM}" | cut -c2-); \
+fi && \
+    mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
 
@@ -52,7 +57,7 @@ ARG TARGETARCH
 ARG TARGETVARIANT
 ARG RESTIC_VERSION
 
-env CGO_ENABLED=0 \
+ENV CGO_ENABLED=0 \
     GO111MODULE=on \
     GOPROXY=${GOPROXY} \
     GOOS=${TARGETOS} \
@@ -61,8 +66,13 @@ env CGO_ENABLED=0 \
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
-RUN mkdir -p /output/usr/bin && \
-    export GOARM=$(echo "${GOARM}" | cut -c2-) && \
+# if TARGETVARIANT is v8, set GOARM to empty string
+RUN if [ "${TARGETVARIANT}" = "v8" ]; then \
+    export GOARM=""; \
+else \
+    export GOARM=$( echo "${GOARM}" | cut -c2-); \
+fi && \
+    mkdir -p /output/usr/bin && \
     /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
 
 # Velero image packing section
