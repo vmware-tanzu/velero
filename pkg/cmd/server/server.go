@@ -586,13 +586,6 @@ func (s *server) checkNodeAgent() {
 }
 
 func (s *server) initRepoManager() error {
-	// warn if node agent does not exist
-	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
-		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
-	} else if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
-	}
-
 	// ensure the repo key secret is set up
 	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
 		return err
