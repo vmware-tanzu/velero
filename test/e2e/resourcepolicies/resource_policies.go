@@ -30,9 +30,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	. "github.com/vmware-tanzu/velero/test/e2e"
+	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 const FileName = "test-data.txt"
@@ -110,7 +110,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 
 	By(("Installing storage class..."), func() {
-		Expect(r.installTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
+		Expect(r.installTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
 
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {

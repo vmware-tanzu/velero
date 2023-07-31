@@ -10,10 +10,10 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
-	. "github.com/vmware-tanzu/velero/test/e2e"
+	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type StorageClasssChanging struct {
@@ -70,7 +70,7 @@ func (s *StorageClasssChanging) Init() error {
 func (s *StorageClasssChanging) CreateResources() error {
 	s.Ctx, s.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	By(fmt.Sprintf("Create a storage class %s", s.desStorageClass), func() {
-		Expect(InstallStorageClass(s.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml",
+		Expect(InstallStorageClass(s.Ctx, fmt.Sprintf("../testdata/storage-class/%s.yaml",
 			s.VeleroCfg.CloudProvider))).To(Succeed())
 	})
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {

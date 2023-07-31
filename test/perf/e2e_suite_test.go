@@ -1,0 +1,121 @@
+/*
+Copyright the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package perf_test
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
+
+	. "github.com/vmware-tanzu/velero/test"
+
+	"github.com/vmware-tanzu/velero/test/perf/backup"
+	"github.com/vmware-tanzu/velero/test/perf/basic"
+	"github.com/vmware-tanzu/velero/test/perf/restore"
+	"github.com/vmware-tanzu/velero/test/perf/test"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/vmware-tanzu/velero/test/util/report"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
+)
+
+func init() {
+	flag.StringVar(&VeleroCfg.CloudProvider, "cloud-provider", "", "cloud that Velero will be installed into.  Required.")
+	flag.StringVar(&VeleroCfg.ObjectStoreProvider, "object-store-provider", "", "provider of object store plugin. Required if cloud-provider is kind, otherwise ignored.")
+	flag.StringVar(&VeleroCfg.BSLBucket, "bucket", "", "name of the object storage bucket where backups from e2e tests should be stored. Required.")
+	flag.StringVar(&VeleroCfg.CloudCredentialsFile, "credentials-file", "", "file containing credentials for backup and volume provider. Required.")
+	flag.StringVar(&VeleroCfg.VeleroCLI, "velerocli", "velero", "path to the velero application to use.")
+	flag.StringVar(&VeleroCfg.VeleroImage, "velero-image", "velero/velero:main", "image for the velero server to be tested.")
+	flag.StringVar(&VeleroCfg.Plugins, "plugins", "", "provider plugins to be tested.")
+	flag.StringVar(&VeleroCfg.AddBSLPlugins, "additional-bsl-plugins", "", "additional plugins to be tested.")
+	flag.StringVar(&VeleroCfg.VeleroVersion, "velero-version", "main", "image version for the velero server to be tested with.")
+	flag.StringVar(&VeleroCfg.RestoreHelperImage, "restore-helper-image", "", "image for the velero restore helper to be tested.")
+	flag.StringVar(&VeleroCfg.BSLConfig, "bsl-config", "", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
+	flag.StringVar(&VeleroCfg.BSLPrefix, "prefix", "", "prefix under which all Velero data should be stored within the bucket. Optional.")
+	flag.StringVar(&VeleroCfg.VSLConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
+	flag.StringVar(&VeleroCfg.VeleroNamespace, "velero-namespace", "velero", "namespace to install Velero into")
+	flag.BoolVar(&VeleroCfg.InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
+	flag.BoolVar(&VeleroCfg.UseNodeAgent, "use-node-agent", true, "whether deploy node agent daemonset velero during the test.  Optional.")
+	flag.StringVar(&VeleroCfg.RegistryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
+	//vmware-tanzu-experiments
+	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
+	flag.StringVar(&VeleroCfg.DefaultCluster, "default-cluster-context", "", "Default cluster context for migration test.")
+	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", true, "Switch to control namespace cleaning.")
+	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "kopia", "Identify persistent volume backup uploader.")
+	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
+	flag.StringVar(&VeleroCfg.NFSServerPath, "nfs-server-path", "", "the path of nfs server")
+	flag.StringVar(&VeleroCfg.TestCaseDescribe, "test-case-describe", "velero performance test", "the description for the current test")
+	flag.StringVar(&VeleroCfg.BackupForRestore, "backup-for-restore", "", "the name of backup for restore")
+}
+
+func initConfig() error {
+	cli, err := NewTestClient("")
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	VeleroCfg.DefaultClient = &cli
+
+	ReportData = &Report{
+		TestDescription: VeleroCfg.TestCaseDescribe,
+		OtherFields:     make(map[string]interface{}),
+	}
+
+	return nil
+}
+
+var _ = Describe("[PerformanceTest][BackupAndRestore] Velero test on both backup and restore resources", test.TestFunc(&basic.BasicTest{}))
+
+var _ = Describe("[PerformanceTest][Backup] Velero test on only backup resources", test.TestFunc(&backup.BackupTest{}))
+
+var _ = Describe("[PerformanceTest][Restore] Velero test on only restore resources", test.TestFunc(&restore.RestoreTest{}))
+
+func TestE2e(t *testing.T) {
+	flag.Parse()
+	By("Install test resources before testing TestE2e")
+	// Skip running E2E tests when running only "short" tests because:
+	// 1. E2E tests are long running tests involving installation of Velero and performing backup and restore operations.
+	// 2. E2E tests require a Kubernetes cluster to install and run velero which further requires more configuration. See above referenced command line flags.
+
+	if err := initConfig(); err != nil {
+		fmt.Println(err)
+		t.FailNow()
+	}
+
+	RegisterFailHandler(Fail)
+	junitReporter := reporters.NewJUnitReporter("report.xml")
+	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
+}
+
+var _ = BeforeSuite(func() {
+	if VeleroCfg.InstallVelero {
+		By("Install test resources before testing BeforeSuite")
+		Expect(PrepareVelero(context.Background(), "install resource before testing")).To(Succeed())
+	}
+})
+
+var _ = AfterSuite(func() {
+	Expect(report.GenerateYamlReport()).To(Succeed())
+	if VeleroCfg.InstallVelero && !VeleroCfg.Debug {
+		By("release test resources after testing")
+		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+	}
+})

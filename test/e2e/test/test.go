@@ -30,10 +30,9 @@ import (
 	"github.com/pkg/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 /*
@@ -84,7 +83,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 		BeforeEach(func() {
 			flag.Parse()
 			// Using the global velero config which covered the installation for most common cases
-			veleroCfg := e2e.VeleroCfg
+			veleroCfg := VeleroCfg
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
 			// TODO: Although this issue is closed, but it's not fixed.
 			// TODO: After bump up k8s version in AWS pipeline, this issue also apply for AWS pipeline.
@@ -103,7 +102,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		veleroCfg := e2e.VeleroCfg
+		veleroCfg := VeleroCfg
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
 			defer tests[k].GetTestCase().CtxCancel()
@@ -212,7 +211,9 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 	if test == nil {
 		return errors.New("No case should be tested")
 	}
+
 	defer test.Clean()
+
 	fmt.Printf("CreateResources %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	err := test.CreateResources()
 	if err != nil {
