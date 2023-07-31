@@ -245,7 +245,7 @@ spec:
                   of the CSI snapshot.
                 properties:
                   snapshotClass:
-                    description: StorageClass is the name of the snapshot class that
+                    description: SnapshotClass is the name of the snapshot class that
                       the volume snapshot is created with
                     type: string                
                   storageClass:
