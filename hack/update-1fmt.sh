@@ -35,7 +35,7 @@ fi
 
 files="$(find . -type f -name '*.go' -not -path './.go/*' -not -path './vendor/*' -not -path './site/*' -not -path '*/generated/*' -not -name 'zz_generated*' -not -path '*/mocks/*')"
 echo "${ACTION} gofmt"
-output=$(printf '%s\n' "${files}" | xargs gofmt "${MODE}" -s)
+output=$(gofmt "${MODE}" -s ${files})
 if [[ -n "${output}" ]]; then
   VERIFY_FMT_FAILED=1
   echo "${output}"
@@ -47,7 +47,7 @@ else
 fi
 
 echo "${ACTION} goimports"
-output=$(printf '%s\n' "${files}" | xargs goimports "${MODE}" -local github.com/vmware-tanzu/velero)
+output=$(goimports "${MODE}" -local github.com/vmware-tanzu/velero ${files})
 if [[ -n "${output}" ]]; then
   VERIFY_IMPORTS_FAILED=1
   echo "${output}"
