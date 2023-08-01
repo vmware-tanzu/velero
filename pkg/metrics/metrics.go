@@ -505,6 +505,79 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	}
 }
 
+// ResetSchedule Resets counter metrics of a schedule.
+func (m *ServerMetrics) ResetSchedule(scheduleName string) {
+	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupValidationFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupWarningTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restorePartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[volumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[volumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName, "")
+	}
+	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName, "")
+	}
+	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName, "")
+	}
+}
+
 // InitSchedule initializes counter metrics for a node.
 func (m *ServerMetrics) InitMetricsForNode(node string) {
 	if c, ok := m.metrics[podVolumeBackupEnqueueTotal].(*prometheus.CounterVec); ok {
