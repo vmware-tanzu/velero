@@ -31,7 +31,7 @@ Moreover, we would like to create a general workflow to variations during the da
 
 ## Non-Goals
 
-- The implementation details of block level access will be included in a future design
+- The current support for block level access is through file system uploader, so it is not aimed to deliver features of an ultimate block level backup. Block level backup will be included in a future design
 - Most of the components are generic, but the Exposer is snapshot type specific or snapshot access specific. The current design covers the implementation details for exposing CSI snapshot to host path access only, for other types or accesses, we may need a separate design
 - The current workflow focuses on snapshot-based data movements. For some application/SaaS level data sources, snapshots may not be taken explicitly. We don’t take them into consideration, though we believe that some workflows or components may still be reusable.
 
@@ -67,7 +67,7 @@ DMs take the responsibility to handle DUCR/DDCRs, Velero provides a built-in DM 
 **Node-Agent**: Node-Agent is an existing Velero module that will be used to host VBDM.  
 **Exposer**: Exposer is to expose the snapshot/target volume as a path/device name/endpoint that are recognizable by Velero generic data path. For different snapshot types/snapshot accesses, the Exposer may be different. This isolation guarantees that when we want to support other snapshot types/snapshot accesses, we only need to replace with a new Exposer and keep other components as is.  
 **Velero Generic Data Path (VGDP)**: VGDP is the collective of modules that is introduced in [Unified Repository design][1]. Velero uses these modules to finish data transmission for various purposes. In includes uploaders and the backup repository.  
-**Uploader**: Uploader is the module in VGDP that reads data from the source and writes to backup repository for backup; while read data from backup repository and write to the restore target for restore. At present, only file system uploader is supported. In future, the block level uploader will be added. For file system uploader, only Kopia uploader will be used, Restic will not be integrated with VBDM.   
+**Uploader**: Uploader is the module in VGDP that reads data from the source and writes to backup repository for backup; while read data from backup repository and write to the restore target for restore. At present, only file system uploader is supported. In future, the block level uploader will be added. For file system and basic block uploader, only Kopia uploader will be used, Restic will not be integrated with VBDM.   
 
 ## Replacement
 3rd parties could integrate their own data movement into Velero by replacing VBDM with their own DMs. The DMs should process DUCR/DDCRs appropriately and finally put them into one of the terminal states as shown in the DataUpload CRD and DataDownload CRD sections.  
@@ -82,8 +82,8 @@ Below are the data movement actions and sequences during backup:
 Below are actions from Velero and DMP:
 
 **BIA Execute**  
-This the existing logic in Velero. For a source PVC/PV, Velero delivers it to the corresponding BackupItemAction plugin, the plugin then takes the related actions to back it up.  
-For example, the existing CSI plugin takes a CSI snapshot to the volume represented by the PVC and then returns additional items (i.e., VolumeSnapshot, VolumeSnapshotContent and VolumeSnapshotClass) for Velero to further backup.  
+This is the existing logic in Velero. For a source PVC/PV, Velero delivers it to the corresponding BackupItemAction plugin, the plugin then takes the related actions to back it up.
+For example, the existing CSI plugin takes a CSI snapshot to the volume represented by the PVC and then returns additional items (i.e., VolumeSnapshot, VolumeSnapshotContent and VolumeSnapshotClass) for Velero to further backup.
 To support data movement, we will use BIA V2 which supports asynchronized operation management. Here is the Execute method from BIA V2:  
 ```
 Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error)
@@ -115,7 +115,7 @@ Progress(operationID string, backup *api.Backup) (velero.OperationProgress, erro
 On the call of this method, DMP will query the DUCR’s status. Some critical progress data is transferred from DUCR to the ```OperationProgress``` which is the return value of BIA V2’s Progress method. For example, NCompleted indicates the size/number of data that have been completed and NTotal indicates the total size/number of data.  
 When the async operation completes, the Progress method returns an OperationProgress with ```Completed``` set as true. Then Velero will persist DUCR as well as any other items returned by DUP as ```itemToUpdate```.  
 Finally, then backup is as ```Completed```.  
-To help BIA Progress find the corresponding DUCR, the ```operationID``` is saved along with the DUCR as a label ```velero.io/async-operation-id```.  
+To help BIA Progress find the corresponding DUCR, the ```operationID``` is saved along with the DUCR as a label ```velero.io/async-operation-id```.
 
 DUCRs are handled by the data movers, so how to handle them are totally decided by the data movers. Below covers the details of VBDM, plugging data movers should have their own actions and workflows.  
 
@@ -663,6 +663,209 @@ If DM restarts, Velero has no way to detect this, DM is expected to:
 
 At present, VBDM doesn't support recovery, so it will follow the second rule.  
 
+## Kopia For Block Device
+To work with block devices, VGDP will be updated. Today, when Kopia attempts to create a snapshot of the block device, it will error because kopia does not support this file type. Kopia does have a nice set of interfaces that are able to be extended though.
+
+To achieve the necessary information to determine the type of volume that is being used, we will need to pass in the volume mode in provider interface.
+
+```go
+type PersistentVolumeMode string 
+
+const (
+	// PersistentVolumeBlock means the volume will not be formatted with a filesystem and will remain a raw block device.
+	PersistentVolumeBlock PersistentVolumeMode = "Block"
+	// PersistentVolumeFilesystem means the volume will be or is formatted with a filesystem.
+	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
+)
+
+// Provider which is designed for one pod volume to do the backup or restore
+type Provider interface {
+	// RunBackup which will do backup for one specific volume and return snapshotID, isSnapshotEmpty, error
+	// updater is used for updating backup progress which implement by third-party
+	RunBackup(
+		ctx context.Context,
+		path string,
+		realSource string,
+		tags map[string]string,
+		forceFull bool,
+		parentSnapshot string,
+		volMode uploader.PersistentVolumeMode,
+		updater uploader.ProgressUpdater) (string, bool, error)
+
+  RunRestore(
+		ctx context.Context,
+		snapshotID string,
+		volumePath string,
+		volMode uploader.PersistentVolumeMode,
+		updater uploader.ProgressUpdater) error
+```
+
+In this case, we will extend the default kopia uploader to add the ability, when a given volume is for a block mode and is mapped as a device, we will use the [StreamingFile](https://pkg.go.dev/github.com/kopia/kopia@v0.13.0/fs#StreamingFile) to stream the device and backup to the kopia repository. 
+
+```go
+func getLocalBlockEntry(kopiaEntry fs.Entry, log logrus.FieldLogger) (fs.Entry, error) {
+	path := kopiaEntry.LocalFilesystemPath()
+
+	fileInfo, err := os.Lstat(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Unable to get the source device information %s", path)
+	}
+
+	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
+		return nil, errors.Errorf("Source path %s is not a block device", path)
+	}
+  	device, err := os.Open(path)
+	if err != nil {
+		if os.IsPermission(err) || err.Error() == ErrNotPermitted {
+			return nil, errors.Wrapf(err, "No permission to open the source device %s, make sure that node agent is running in privileged mode", path)
+		}
+		return nil, errors.Wrapf(err, "Unable to open the source device %s", path)
+	}
+	return virtualfs.StreamingFileFromReader(kopiaEntry.Name(), device), nil
+
+}
+```
+
+In the `pkg/uploader/kopia/snapshot.go` this is used in the Backup call like
+
+```go
+	if volMode == PersistentVolumeFilesystem {
+		// to be consistent with restic when backup empty dir returns one error for upper logic handle
+		dirs, err := os.ReadDir(source)
+		if err != nil {
+			return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", source)
+		} else if len(dirs) == 0 {
+			return nil, true, nil
+		}
+	}
+
+  source = filepath.Clean(source)
+  ...
+
+  sourceEntry, err := getLocalFSEntry(source)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "Unable to get local filesystem entry")
+	}
+
+  if volMode == PersistentVolumeBlock {
+		sourceEntry, err = getLocalBlockEntry(sourceEntry, log)
+		if err != nil {
+			return nil, false, errors.Wrap(err, "Unable to get local block device entry")
+		}
+	}
+
+  ...
+  	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, log, "Kopia Uploader")
+
+```
+
+To handle restore, we need to extend the [Output](https://pkg.go.dev/github.com/kopia/kopia@v0.13.0/snapshot/restore#Output) interface and specifically the [FilesystemOutput](https://pkg.go.dev/github.com/kopia/kopia@v0.13.0/snapshot/restore#FilesystemOutput).
+
+We only need to extend two functions the rest will be passed through.
+
+```go
+type BlockOutput struct {
+	*restore.FilesystemOutput
+}
+
+var _ restore.Output = &BlockOutput{}
+
+const bufferSize = 128 * 1024
+
+func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remoteFile fs.File) error {
+
+	targetFileName, err := filepath.EvalSymlinks(o.TargetPath)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to evaluate symlinks for %s", targetFileName)
+	}
+
+	fileInfo, err := os.Lstat(targetFileName)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to get the target device information for %s", targetFileName)
+	}
+
+	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
+		return errors.Errorf("Target file %s is not a block device", targetFileName)
+	}
+
+	remoteReader, err := remoteFile.Open(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to open remote file %s", remoteFile.Name())
+	}
+	defer remoteReader.Close()
+
+	targetFile, err := os.Create(targetFileName)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to open file %s", targetFileName)
+	}
+	defer targetFile.Close()
+
+	buffer := make([]byte, bufferSize)
+
+	readData := true
+	for readData {
+		bytesToWrite, err := remoteReader.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				return errors.Wrapf(err, "Failed to read data from remote file %s", targetFileName)
+			}
+			readData = false
+		}
+
+		if bytesToWrite > 0 {
+			offset := 0
+			for bytesToWrite > 0 {
+				if bytesWritten, err := targetFile.Write(buffer[offset:bytesToWrite]); err == nil {
+					bytesToWrite -= bytesWritten
+					offset += bytesWritten
+				} else {
+					return errors.Wrapf(err, "Failed to write data to file %s", targetFileName)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e fs.Directory) error {
+	targetFileName, err := filepath.EvalSymlinks(o.TargetPath)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to evaluate symlinks for %s", targetFileName)
+	}
+
+	fileInfo, err := os.Lstat(targetFileName)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to get the target device information for %s", o.TargetPath)
+	}
+
+	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
+		return errors.Errorf("Target file %s is not a block device", o.TargetPath)
+	}
+
+	return nil
+}
+```
+
+Of note, we do need to add root access to the daemon set node agent to access the new mount. 
+
+```yaml
+...
+            - mountPath: /var/lib/kubelet/plugins
+              mountPropagation: HostToContainer
+              name: host-plugins
+
+....
+        - hostPath:
+            path: /var/lib/kubelet/plugins
+          name: host-plugins
+
+...
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: &c.privilegedAgent,
+							},
+
+```
 
 ## Plugin Data Movers
 There should be only one DM to handle a specific DUCR/DDCR in all cases. If more than one DMs process a DUCR/DDCR at the same time, there will be a disaster.  
