@@ -564,6 +564,7 @@ func TestBackup(t *testing.T) {
 		isSnapshotSourceError bool
 		expectedError         error
 		expectedEmpty         bool
+		volMode               uploader.PersistentVolumeMode
 	}
 	manifest := &snapshot.Manifest{
 		ID:        "test",
@@ -590,10 +591,20 @@ func TestBackup(t *testing.T) {
 			tags:          nil,
 			expectedError: errors.New("Unable to read dir"),
 		},
+		{
+			name:          "Unable to handle block mode",
+			sourcePath:    "/",
+			tags:          nil,
+			volMode:       uploader.PersistentVolumeBlock,
+			expectedError: errors.New("unable to handle block storage"),
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.volMode == "" {
+				tc.volMode = uploader.PersistentVolumeFilesystem
+			}
 			s := injectSnapshotFuncs()
 			args := []mockArgs{
 				{methodName: "LoadSnapshot", returns: []interface{}{manifest, nil}},
@@ -616,9 +627,9 @@ func TestBackup(t *testing.T) {
 			var snapshotInfo *uploader.SnapshotInfo
 			var err error
 			if tc.isEmptyUploader {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, tc.tags, &logrus.Logger{})
 			} else {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, tc.tags, &logrus.Logger{})
 			}
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {

@@ -28,6 +28,15 @@ const (
 	SnapshotUploaderTag  = "snapshot-uploader"
 )
 
+type PersistentVolumeMode string
+
+const (
+	// PersistentVolumeBlock means the volume will not be formatted with a filesystem and will remain a raw block device.
+	PersistentVolumeBlock PersistentVolumeMode = "Block"
+	// PersistentVolumeFilesystem means the volume will be or is formatted with a filesystem.
+	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
+)
+
 // ValidateUploaderType validates if the input param is a valid uploader type.
 // It will return an error if it's invalid.
 func ValidateUploaderType(t string) error {

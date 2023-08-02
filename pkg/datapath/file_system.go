@@ -133,9 +133,10 @@ func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, paren
 	if !fs.initialized {
 		return errors.New("file system data path is not initialized")
 	}
+	volMode := getPersistentVolumeMode(source)
 
 	go func() {
-		snapshotID, emptySnapshot, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, realSource, tags, forceFull, parentSnapshot, fs)
+		snapshotID, emptySnapshot, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, realSource, tags, forceFull, parentSnapshot, volMode, fs)
 
 		if err == provider.ErrorCanceled {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
@@ -154,8 +155,10 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint) erro
 		return errors.New("file system data path is not initialized")
 	}
 
+	volMode := getPersistentVolumeMode(target)
+
 	go func() {
-		err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, fs)
+		err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, volMode, fs)
 
 		if err == provider.ErrorCanceled {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
@@ -167,6 +170,13 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint) erro
 	}()
 
 	return nil
+}
+
+func getPersistentVolumeMode(source AccessPoint) uploader.PersistentVolumeMode {
+	if source.ByBlock != "" {
+		return uploader.PersistentVolumeBlock
+	}
+	return uploader.PersistentVolumeFilesystem
 }
 
 // UpdateProgress which implement ProgressUpdater interface to update progress status

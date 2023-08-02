@@ -121,6 +121,7 @@ func (rp *resticProvider) RunBackup(
 	tags map[string]string,
 	forceFull bool,
 	parentSnapshot string,
+	volMode uploader.PersistentVolumeMode,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -132,6 +133,10 @@ func (rp *resticProvider) RunBackup(
 
 	if realSource != "" {
 		return "", false, errors.New("real source is not empty, this is not supported by restic uploader")
+	}
+
+	if volMode == uploader.PersistentVolumeBlock {
+		return "", false, errors.New("unable to support block mode")
 	}
 
 	log := rp.log.WithFields(logrus.Fields{
@@ -179,6 +184,7 @@ func (rp *resticProvider) RunRestore(
 	ctx context.Context,
 	snapshotID string,
 	volumePath string,
+	volMode uploader.PersistentVolumeMode,
 	updater uploader.ProgressUpdater) error {
 	if updater == nil {
 		return errors.New("Need to initial backup progress updater first")
@@ -187,6 +193,10 @@ func (rp *resticProvider) RunRestore(
 		"snapshotID": snapshotID,
 		"volumePath": volumePath,
 	})
+
+	if volMode == uploader.PersistentVolumeBlock {
+		return errors.New("unable to support block mode")
+	}
 
 	restoreCmd := resticRestoreCMDFunc(rp.repoIdentifier, rp.credentialsFile, snapshotID, volumePath)
 	restoreCmd.Env = rp.cmdEnv

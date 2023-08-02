@@ -45,6 +45,7 @@ func TestResticRunBackup(t *testing.T) {
 		nilUpdater                  bool
 		parentSnapshot              string
 		rp                          *resticProvider
+		volMode                     uploader.PersistentVolumeMode
 		hookBackupFunc              func(string, string, string, map[string]string) *restic.Command
 		hookResticBackupFunc        func(*restic.Command, logrus.FieldLogger, uploader.ProgressUpdater) (string, string, error)
 		hookResticGetSnapshotFunc   func(string, string, map[string]string) *restic.Command
@@ -117,6 +118,14 @@ func TestResticRunBackup(t *testing.T) {
 				return strings.Contains(err.Error(), "failed to get snapshot id")
 			},
 		},
+		{
+			name:    "failed to use block mode",
+			rp:      &resticProvider{log: logrus.New(), extraFlags: []string{"testFlags"}},
+			volMode: uploader.PersistentVolumeBlock,
+			errorHandleFunc: func(err error) bool {
+				return strings.Contains(err.Error(), "unable to support block mode")
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -135,11 +144,14 @@ func TestResticRunBackup(t *testing.T) {
 			if tc.hookResticGetSnapshotIDFunc != nil {
 				resticGetSnapshotIDFunc = tc.hookResticGetSnapshotIDFunc
 			}
+			if tc.volMode == "" {
+				tc.volMode = uploader.PersistentVolumeFilesystem
+			}
 			if !tc.nilUpdater {
 				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()}
-				_, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, &updater)
+				_, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, &updater)
 			} else {
-				_, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, nil)
+				_, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
@@ -158,6 +170,7 @@ func TestResticRunRestore(t *testing.T) {
 		nilUpdater            bool
 		hookResticRestoreFunc func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command
 		errorHandleFunc       func(err error) bool
+		volMode               uploader.PersistentVolumeMode
 	}{
 		{
 			name:       "wrong restic execute command",
@@ -187,17 +200,28 @@ func TestResticRunRestore(t *testing.T) {
 				return strings.Contains(err.Error(), "error running command")
 			},
 		},
+		{
+			name: "error block volume mode",
+			rp:   &resticProvider{log: logrus.New()},
+			errorHandleFunc: func(err error) bool {
+				return strings.Contains(err.Error(), "unable to support block mode")
+			},
+			volMode: uploader.PersistentVolumeBlock,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			resticRestoreCMDFunc = tc.hookResticRestoreFunc
+			if tc.volMode == "" {
+				tc.volMode = uploader.PersistentVolumeFilesystem
+			}
 			var err error
 			if !tc.nilUpdater {
 				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()}
-				err = tc.rp.RunRestore(context.Background(), "", "var", &updater)
+				err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, &updater)
 			} else {
-				err = tc.rp.RunRestore(context.Background(), "", "var", nil)
+				err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)

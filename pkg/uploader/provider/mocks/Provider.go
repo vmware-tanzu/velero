@@ -30,8 +30,8 @@ func (_m *Provider) Close(ctx context.Context) error {
 }
 
 // RunBackup provides a mock function with given fields: ctx, path, realSource, tags, forceFull, parentSnapshot, updater
-func (_m *Provider) RunBackup(ctx context.Context, path string, realSource string, tags map[string]string, forceFull bool, parentSnapshot string, updater uploader.ProgressUpdater) (string, bool, error) {
-	ret := _m.Called(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
+func (_m *Provider) RunBackup(ctx context.Context, path string, realSource string, tags map[string]string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, updater uploader.ProgressUpdater) (string, bool, error) {
+	ret := _m.Called(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, updater)
 
 	var r0 string
 	var r1 bool
@@ -61,8 +61,8 @@ func (_m *Provider) RunBackup(ctx context.Context, path string, realSource strin
 }
 
 // RunRestore provides a mock function with given fields: ctx, snapshotID, volumePath, updater
-func (_m *Provider) RunRestore(ctx context.Context, snapshotID string, volumePath string, updater uploader.ProgressUpdater) error {
-	ret := _m.Called(ctx, snapshotID, volumePath, updater)
+func (_m *Provider) RunRestore(ctx context.Context, snapshotID string, volumePath string, volMode uploader.PersistentVolumeMode, updater uploader.ProgressUpdater) error {
+	ret := _m.Called(ctx, snapshotID, volumePath, volMode, updater)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, uploader.ProgressUpdater) error); ok {
