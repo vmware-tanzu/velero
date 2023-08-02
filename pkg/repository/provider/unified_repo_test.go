@@ -783,6 +783,7 @@ func TestForget(t *testing.T) {
 		backupRepo      *reposervicenmocks.BackupRepo
 		retFuncOpen     []interface{}
 		retFuncDelete   interface{}
+		retFuncFlush    interface{}
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -843,6 +844,37 @@ func TestForget(t *testing.T) {
 			},
 			expectedErr: "error to delete manifest: fake-error-3",
 		},
+		{
+			name:            "flush fail",
+			getter:          new(credmock.SecretStore),
+			credStoreReturn: "fake-password",
+			funcTable: localFuncTable{
+				getStorageVariables: func(*velerov1api.BackupStorageLocation, string, string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				getStorageCredentials: func(*velerov1api.BackupStorageLocation, velerocredentials.FileStore) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+			},
+			repoService: new(reposervicenmocks.BackupRepoService),
+			backupRepo:  new(reposervicenmocks.BackupRepo),
+			retFuncOpen: []interface{}{
+				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
+					return backupRepo
+				},
+
+				func(context.Context, udmrepo.RepoOptions) error {
+					return nil
+				},
+			},
+			retFuncDelete: func(context.Context, udmrepo.ID) error {
+				return nil
+			},
+			retFuncFlush: func(context.Context) error {
+				return errors.New("fake-error-4")
+			},
+			expectedErr: "error to flush repo: fake-error-4",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -871,6 +903,7 @@ func TestForget(t *testing.T) {
 
 			if tc.backupRepo != nil {
 				backupRepo.On("DeleteManifest", mock.Anything, mock.Anything).Return(tc.retFuncDelete)
+				backupRepo.On("Flush", mock.Anything).Return(tc.retFuncFlush)
 				backupRepo.On("Close", mock.Anything).Return(nil)
 			}
 
