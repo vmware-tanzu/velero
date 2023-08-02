@@ -34,7 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/clock"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -363,23 +365,44 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error listing restore API objects")
 	} else {
+		// Restore files in object storage will be handled by restore finalizer, so we simply need to initiate a delete request on restores here.
 		for i, restore := range restoreList.Items {
 			if restore.Spec.BackupName != backup.Name {
 				continue
 			}
 			restoreLog := log.WithField("restore", kube.NamespaceAndName(&restoreList.Items[i]))
 
-			restoreLog.Info("Deleting restore log/results from backup storage")
-			if err := backupStore.DeleteRestore(restore.Name); err != nil {
-				errs = append(errs, err.Error())
-				// if we couldn't delete the restore files, don't delete the API object
-				continue
-			}
-
 			restoreLog.Info("Deleting restore referencing backup")
 			if err := r.Delete(ctx, &restoreList.Items[i]); err != nil {
 				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(&restoreList.Items[i])).Error())
 			}
+		}
+
+		// Wait for the deletion of restores within certain amount of time.
+		// Notice that there could be potential errors during the finalization process, which may result in the failure to delete the restore.
+		// Therefore, it is advisable to set a timeout period for waiting.
+		err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			restoreList := &velerov1api.RestoreList{}
+			if err := r.List(ctx, restoreList, &client.ListOptions{Namespace: backup.Namespace, LabelSelector: selector}); err != nil {
+				return false, err
+			}
+			cnt := 0
+			for _, restore := range restoreList.Items {
+				if restore.Spec.BackupName != backup.Name {
+					continue
+				}
+				cnt++
+			}
+
+			if cnt > 0 {
+				return false, nil
+			} else {
+				return true, nil
+			}
+		})
+		if err != nil {
+			log.WithError(err).Error("Error polling for deletion of restores")
+			errs = append(errs, errors.Wrapf(err, "error deleting restore %s", err).Error())
 		}
 	}
 
