@@ -41,7 +41,9 @@ COPY . /go/src/github.com/vmware-tanzu/velero
 RUN mkdir -p /output/usr/bin && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
-    -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN} && \
+    go build -o /output/velero-helper \
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper
 
 # Restic binary build section
 FROM --platform=$BUILDPLATFORM golang:1.20-bullseye as restic-builder

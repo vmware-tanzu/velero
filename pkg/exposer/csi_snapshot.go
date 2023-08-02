@@ -345,6 +345,11 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim, label map[string]string) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
 	var gracePeriod int64 = 0
 
 	pod := &corev1.Pod{
@@ -366,15 +371,16 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 			Containers: []corev1.Container{
 				{
 					Name:            podName,
-					Image:           "alpine:latest",
-					ImagePullPolicy: corev1.PullIfNotPresent,
-					Command:         []string{"sleep", "infinity"},
+					Image:           podInfo.image,
+					ImagePullPolicy: corev1.PullNever,
+					Command:         []string{"/velero-helper", "pause"},
 					VolumeMounts: []corev1.VolumeMount{{
 						Name:      backupPVC.Name,
 						MountPath: "/" + backupPVC.Name,
 					}},
 				},
 			},
+			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes: []corev1.Volume{{
 				Name: backupPVC.Name,

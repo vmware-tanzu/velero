@@ -30,6 +30,7 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	clientTesting "k8s.io/client-go/testing"
 )
@@ -62,6 +63,18 @@ func TestRestoreExpose(t *testing.T) {
 		Spec: corev1api.PersistentVolumeClaimSpec{
 			VolumeName: "fake-pv",
 		},
+	}
+
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+		Spec: appsv1.DaemonSetSpec{},
 	}
 
 	tests := []struct {
@@ -97,6 +110,7 @@ func TestRestoreExpose(t *testing.T) {
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
+				daemonSet,
 			},
 			kubeReactors: []reactor{
 				{
@@ -116,6 +130,7 @@ func TestRestoreExpose(t *testing.T) {
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
+				daemonSet,
 			},
 			kubeReactors: []reactor{
 				{

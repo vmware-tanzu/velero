@@ -251,6 +251,11 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
 	var gracePeriod int64 = 0
 
 	pod := &corev1.Pod{
@@ -272,15 +277,16 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			Containers: []corev1.Container{
 				{
 					Name:            restorePodName,
-					Image:           "alpine:latest",
-					ImagePullPolicy: corev1.PullIfNotPresent,
-					Command:         []string{"sleep", "infinity"},
+					Image:           podInfo.image,
+					ImagePullPolicy: corev1.PullNever,
+					Command:         []string{"/velero-helper", "pause"},
 					VolumeMounts: []corev1.VolumeMount{{
 						Name:      restorePVCName,
 						MountPath: "/" + restorePVCName,
 					}},
 				},
 			},
+			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes: []corev1.Volume{{
 				Name: restorePVCName,
