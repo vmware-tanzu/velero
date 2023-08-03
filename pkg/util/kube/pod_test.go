@@ -343,3 +343,96 @@ func TestDeletePodIfAny(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPodInAbnormalState(t *testing.T) {
+	testCases := []struct {
+		description string
+		pod         *corev1api.Pod
+		expected    bool
+	}{
+		{
+			description: "All containers ready",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Ready: true},
+						{Ready: true},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			description: "Some containers not ready",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Ready: true},
+						{Ready: false},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "Container waiting",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Ready: true},
+						{
+							Ready: false,
+							State: corev1api.ContainerState{
+								Waiting: &corev1api.ContainerStateWaiting{},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "All containers ready but waiting",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Ready: true},
+						{
+							Ready: true,
+							State: corev1api.ContainerState{
+								Waiting: &corev1api.ContainerStateWaiting{},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "All containers ready and running",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Ready: true},
+						{
+							Ready: true,
+							State: corev1api.ContainerState{
+								Running: &corev1api.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			actual := IsPodInAbnormalState(tc.pod)
+			if actual != tc.expected {
+				t.Errorf("Expected pod to be in abnormal state: %v, but got: %v", tc.expected, actual)
+			}
+		})
+	}
+}

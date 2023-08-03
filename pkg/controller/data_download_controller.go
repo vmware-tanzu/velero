@@ -394,7 +394,7 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return false
 					}
 
-					if newObj.Status.Phase != v1.PodRunning {
+					if newObj.Status.Phase == "" {
 						return false
 					}
 
@@ -433,10 +433,18 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object)
 		return []reconcile.Request{}
 	}
 
-	requests := make([]reconcile.Request, 1)
+	if kube.IsPodInAbnormalState(pod) { // let the abnormal restore pod failed early
+		msg := fmt.Sprintf("restore mark as cancel to failed early for restore pod %s/%s is not in running status", pod.Namespace, pod.Name)
+		if err := MarkDataDownloadCancel(context.Background(), r.client, dd, msg); err != nil {
+			r.logger.WithFields(logrus.Fields{
+				"Datadownload": dd.Name,
+				"Restore pod":  pod.Name,
+			}).WithError(err).Warn("failed to cancel datadownload, and it will wait for prepare timeout")
+			return []reconcile.Request{}
+		}
+	}
 
 	r.logger.WithField("Restore pod", pod.Name).Infof("Preparing data download %s", dd.Name)
-
 	// we don't expect anyone else update the CR during the Prepare process
 	updated, err := r.exclusiveUpdateDataDownload(context.Background(), dd, r.prepareDataDownload)
 	if err != nil || !updated {
@@ -448,6 +456,7 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object)
 		return []reconcile.Request{}
 	}
 
+	requests := make([]reconcile.Request, 1)
 	requests[0] = reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: dd.Namespace,
@@ -524,13 +533,34 @@ func (r *DataDownloadReconciler) acceptDataDownload(ctx context.Context, dd *vel
 		return false, err
 	}
 
-	if succeeded {
-		r.logger.WithField("DataDownload", dd.Name).Infof("This datadownload has been accepted by %s", r.nodeName)
-		return true, nil
+	if !succeeded {
+		r.logger.WithField("DataDownload", dd.Name).Info("This datadownload has been accepted by others")
+		return false, nil
 	}
 
-	r.logger.WithField("DataDownload", dd.Name).Info("This datadownload has been accepted by others")
-	return false, nil
+	if err = r.AddAcceptedLabel(ctx, dd); err != nil {
+		return false, err
+	}
+
+	r.logger.WithField("DataDownload", dd.Name).Infof("This datadownload has been accepted by %s", r.nodeName)
+	return true, nil
+
+}
+
+func (r *DataDownloadReconciler) AddAcceptedLabel(ctx context.Context, dd *velerov2alpha1api.DataDownload) error {
+	updated := dd.DeepCopy()
+	labels := updated.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels[acceptNodeLabelKey] = r.nodeName
+	updated.SetLabels(labels)
+	if err := r.client.Patch(ctx, updated, client.MergeFrom(dd)); err != nil {
+		return errors.Wrapf(err, "failed to add accepted label for datadownload %s", dd.Name)
+	}
+
+	return nil
 }
 
 func (r *DataDownloadReconciler) onPrepareTimeout(ctx context.Context, dd *velerov2alpha1api.DataDownload) {
@@ -613,4 +643,14 @@ func findDataDownloadByPod(client client.Client, pod v1.Pod) (*velerov2alpha1api
 	}
 
 	return nil, nil
+}
+
+func MarkDataDownloadCancel(ctx context.Context, cli client.Client, dd *velerov2alpha1api.DataDownload, msg string) error {
+	updated := dd.DeepCopy()
+	updated.Spec.Cancel = true
+	updated.Status.Message = msg
+	if err := cli.Patch(ctx, updated, client.MergeFrom(dd)); err != nil {
+		return errors.Wrapf(err, "failed to mark datadownload as canceled %s", dd.Name)
+	}
+	return nil
 }

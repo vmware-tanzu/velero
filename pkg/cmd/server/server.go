@@ -1107,10 +1107,8 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
 			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
 			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
-			updated := du.DeepCopy()
-			updated.Spec.Cancel = true
-			updated.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
-			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&du)); err != nil {
+			msg := fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+			if err := controller.MarkDataUploadCancel(ctx, client, &du, msg); err != nil {
 				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
 				continue
 			}
@@ -1132,10 +1130,8 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
-			updated := dd.DeepCopy()
-			updated.Spec.Cancel = true
-			updated.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
-			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&dd)); err != nil {
+			msg := fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+			if err := controller.MarkDataDownloadCancel(ctx, client, &dd, msg); err != nil {
 				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", dd.GetName())
 				continue
 			}

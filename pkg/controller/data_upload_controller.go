@@ -55,6 +55,7 @@ import (
 
 const (
 	dataUploadDownloadRequestor string        = "snapshot-data-upload-download"
+	acceptNodeLabelKey          string        = "velero.io/accepted-by"
 	preparingMonitorFrequency   time.Duration = time.Minute
 )
 
@@ -412,7 +413,7 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return false
 					}
 
-					if newObj.Status.Phase != corev1.PodRunning {
+					if newObj.Status.Phase == "" {
 						return false
 					}
 
@@ -448,6 +449,17 @@ func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reco
 
 	if du.Status.Phase != velerov2alpha1api.DataUploadPhaseAccepted {
 		return []reconcile.Request{}
+	}
+
+	if kube.IsPodInAbnormalState(pod) { // let the abnormal backup pod failed early
+		msg := fmt.Sprintf("backup mark as cancel to failed early for restore pod %s/%s is not in running status", pod.Namespace, pod.Name)
+		if err := MarkDataUploadCancel(context.Background(), r.client, du, msg); err != nil {
+			r.logger.WithFields(logrus.Fields{
+				"Datadupload": du.Name,
+				"Backup pod":  pod.Name,
+			}).WithError(err).Warn("failed to cancel dataupload, and it will wait for prepare timeout")
+			return []reconcile.Request{}
+		}
 	}
 
 	r.logger.WithField("Backup pod", pod.Name).Infof("Preparing dataupload %s", du.Name)
@@ -546,13 +558,33 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 		return false, err
 	}
 
-	if succeeded {
-		r.logger.WithField("Dataupload", du.Name).Infof("This datauplod has been accepted by %s", r.nodeName)
-		return true, nil
+	if !succeeded {
+		r.logger.WithField("Dataupload", du.Name).Info("This datauplod has been accepted by others")
+		return false, nil
 	}
 
-	r.logger.WithField("Dataupload", du.Name).Info("This datauplod has been accepted by others")
-	return false, nil
+	if err = r.AddAcceptedLabel(ctx, du); err != nil {
+		return false, err
+	}
+
+	r.logger.WithField("Dataupload", du.Name).Infof("This datauplod has been accepted by %s", r.nodeName)
+	return true, nil
+}
+
+func (r *DataUploadReconciler) AddAcceptedLabel(ctx context.Context, du *velerov2alpha1api.DataUpload) error {
+	updated := du.DeepCopy()
+	labels := updated.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels[acceptNodeLabelKey] = r.nodeName
+	updated.SetLabels(labels)
+	if err := r.client.Patch(ctx, updated, client.MergeFrom(du)); err != nil {
+		return errors.Wrapf(err, "failed to add accepted label for dataupload %s", du.Name)
+	}
+
+	return nil
 }
 
 func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov2alpha1api.DataUpload) {
@@ -665,4 +697,14 @@ func findDataUploadByPod(client client.Client, pod corev1.Pod) (*velerov2alpha1a
 		return du, nil
 	}
 	return nil, nil
+}
+
+func MarkDataUploadCancel(ctx context.Context, cli client.Client, du *velerov2alpha1api.DataUpload, msg string) error {
+	updated := du.DeepCopy()
+	updated.Spec.Cancel = true
+	updated.Status.Message = msg
+	if err := cli.Patch(ctx, updated, client.MergeFrom(du)); err != nil {
+		return errors.Wrapf(err, "failed to mark dataupload as canceled %s", du.Name)
+	}
+	return nil
 }

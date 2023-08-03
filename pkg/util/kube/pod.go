@@ -110,3 +110,15 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 
 	return nil
 }
+
+func IsPodInAbnormalState(pod *corev1api.Pod) bool {
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if !containerStatus.Ready {
+			return true
+		}
+		if containerStatus.State.Waiting != nil {
+			return true
+		}
+	}
+	return false
+}
