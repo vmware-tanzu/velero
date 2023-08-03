@@ -1,0 +1,1 @@
+Fix issue #6571, fix the problem for restore item operation to set the errors correctly so that they can be recorded by Velero restore and then reflect the correct status for Velero restore.
