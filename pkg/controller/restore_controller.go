@@ -172,6 +172,14 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// deal with finalizer
 	if !restore.DeletionTimestamp.IsZero() {
+		// update the phase to Deleting
+		original := restore.DeepCopy()
+		restore.Status.Phase = api.RestorePhaseDeleting
+		if err := kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
+			log.Errorf("fail to update phase to Deleting: %s", err.Error())
+			return ctrl.Result{}, err
+		}
+
 		// check the finalizer and run clean-up
 		if controllerutil.ContainsFinalizer(restore, ExternalResourcesFinalizer) {
 			if err := r.deleteExternalResources(restore); err != nil {

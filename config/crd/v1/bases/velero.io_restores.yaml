@@ -445,6 +445,7 @@ spec:
                 - Completed
                 - PartiallyFailed
                 - Failed
+                - Deleting
                 type: string
               progress:
                 description: Progress contains information about the restore's execution
