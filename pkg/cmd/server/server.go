@@ -475,31 +475,26 @@ func (s *server) initDiscoveryHelper() error {
 func (s *server) veleroResourcesExist() error {
 	s.logger.Info("Checking existence of Velero custom resource definitions")
 
-	var veleroGroupVersion *metav1.APIResourceList
-	for _, gv := range s.discoveryHelper.Resources() {
-		if gv.GroupVersion == velerov1api.SchemeGroupVersion.String() {
-			veleroGroupVersion = gv
-			break
+	// add more group versions whenever available
+	gvResources := map[string]sets.String{
+		velerov1api.SchemeGroupVersion.String():       velerov1api.CustomResourceKinds(),
+		velerov2alpha1api.SchemeGroupVersion.String(): velerov2alpha1api.CustomResourceKinds(),
+	}
+
+	for _, lst := range s.discoveryHelper.Resources() {
+		if resources, found := gvResources[lst.GroupVersion]; found {
+			for _, resource := range lst.APIResources {
+				s.logger.WithField("kind", resource.Kind).Info("Found custom resource")
+				resources.Delete(resource.Kind)
+			}
 		}
-	}
-
-	if veleroGroupVersion == nil {
-		return fmt.Errorf("velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it", velerov1api.SchemeGroupVersion)
-	}
-
-	foundResources := sets.NewString()
-	for _, resource := range veleroGroupVersion.APIResources {
-		foundResources.Insert(resource.Kind)
 	}
 
 	var errs []error
-	for kind := range velerov1api.CustomResources() {
-		if foundResources.Has(kind) {
-			s.logger.WithField("kind", kind).Debug("Found custom resource")
-			continue
+	for gv, resources := range gvResources {
+		for kind := range resources {
+			errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, gv))
 		}
-
-		errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, velerov1api.SchemeGroupVersion))
 	}
 
 	if len(errs) > 0 {

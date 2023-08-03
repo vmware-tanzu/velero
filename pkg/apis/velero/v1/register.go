@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Resource gets a Velero GroupResource for a specified resource
@@ -57,6 +58,18 @@ func CustomResources() map[string]typeInfo {
 		"VolumeSnapshotLocation": newTypeInfo("volumesnapshotlocations", &VolumeSnapshotLocation{}, &VolumeSnapshotLocationList{}),
 		"ServerStatusRequest":    newTypeInfo("serverstatusrequests", &ServerStatusRequest{}, &ServerStatusRequestList{}),
 	}
+}
+
+// CustomResourceKinds returns a list of all custom resources kinds within the Velero
+func CustomResourceKinds() sets.String {
+	kinds := sets.NewString()
+
+	resources := CustomResources()
+	for kind := range resources {
+		kinds.Insert(kind)
+	}
+
+	return kinds
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
