@@ -1,0 +1,1 @@
+Fix issue 6575, flush the repo after delete the snapshot, otherwise, the changes(deleting repo snapshot) cannot be committed to the repo.
