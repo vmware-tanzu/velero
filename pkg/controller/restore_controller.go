@@ -535,8 +535,8 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	// Completed yet.
 	inProgressOperations, _, opsCompleted, opsFailed, errs := getRestoreItemOperationProgress(restoreReq.Restore, pluginManager, *restoreReq.GetItemOperationsList())
 	if len(errs) > 0 {
-		for err := range errs {
-			restoreLog.Error(err)
+		for _, err := range errs {
+			restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error from restore item operation: %v", err))
 		}
 	}
 
