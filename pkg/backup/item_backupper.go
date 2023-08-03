@@ -525,6 +525,11 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	// After that, this warning can be removed.
 	if boolptr.IsSetToTrue(ib.backupRequest.Spec.SnapshotMoveData) {
 		log.Warnf("VolumeSnapshotter plugin doesn't support data movement.")
+
+		if features.IsEnabled(velerov1api.CSIFeatureFlag) && pv.Spec.CSI == nil {
+			log.Warn("Cannot use CSI data mover to handle PV, because PV doesn't contain CSI in spec.",
+				" Fall back to Velero native snapshot.")
+		}
 	}
 
 	if ib.backupRequest.ResPolicies != nil {
