@@ -37,7 +37,7 @@ func TestThrottle_ShouldOutput(t *testing.T) {
 		expectedOutput bool
 	}{
 		{interval: time.Second, expectedOutput: true},
-		{interval: time.Second, throttle: time.Now().UnixNano() + int64(time.Nanosecond*10000), expectedOutput: false},
+		{interval: time.Second, throttle: time.Now().UnixNano() + int64(time.Nanosecond*100000000), expectedOutput: false},
 	}
 	p := new(Progress)
 	for _, tc := range testCases {
